@@ -1,0 +1,50 @@
+[
+    {
+        "fonte": "FINEP",
+        "titulo": "PROINFRA 2025 EXPANSÃO",
+        "link": "http://www.finep.gov.br/chamadas-publicas/chamadapublica/770",
+        "status": "ABERTA",
+        "data_publicacao": "23/12/2025",
+        "prazo_envio": "27/03/2026",
+        "fonte_recurso": "FINEP; FNDCT",
+        "publico_alvo": "Instituições de pesquisa",
+        "tema": "Outros",
+        "data_extracao": "2026-02-03 16:09:09"
+    },
+    {
+        "fonte": "FINEP",
+        "titulo": "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT - Subvenção Econômica à Inovação - DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "link": "http://www.finep.gov.br/chamadas-publicas/chamadapublica/769",
+        "status": "ABERTA",
+        "data_publicacao": "23/12/2025",
+        "prazo_envio": "03/03/2026",
+        "fonte_recurso": "FINEP; FNDCT",
+        "publico_alvo": "Empresas e Cooperativas",
+        "tema": "Agricultura, agronegócio e saúde animal; Agritech; Sustentabilidade",
+        "data_extracao": "2026-02-03 16:09:09"
+    },
+    {
+        "fonte": "FINEP",
+        "titulo": "Cadeias Socioprodutivas da Agricultura Familiar e Sistemas Agroalimentares - Empresas",
+        "link": "http://www.finep.gov.br/chamadas-publicas/chamadapublica/740",
+        "status": "ENCERRADA",
+        "data_publicacao": "09/07/2024",
+        "prazo_envio": "03/09/2024",
+        "fonte_recurso": "Finep; FNDCT",
+        "publico_alvo": "Empresas",
+        "tema": null,
+        "data_extracao": "2026-02-03 16:09:09"
+    },
+    {
+        "fonte": "FINEP",
+        "titulo": "PRÓ-INFRA CENTROS TEMÁTICOS - Implantação e melhoria da infraestrutura de pesquisa para solucionar desafios em áreas temáticas críticas",
+        "link": "http://www.finep.gov.br/chamadas-publicas/chamadapublica/719",
+        "status": "ENCERRADA",
+        "data_publicacao": "14/12/2023",
+        "prazo_envio": "03/05/2024",
+        "fonte_recurso": "FNDCT",
+        "publico_alvo": "ICTs | Empresas",
+        "tema": "Saúde e Fármacos",
+        "data_extracao": "2026-02-03 16:09:09"
+    }
+]

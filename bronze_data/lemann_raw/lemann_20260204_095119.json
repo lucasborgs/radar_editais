@@ -1,0 +1,38 @@
+[
+    {
+        "fonte": "LEMANN",
+        "tipo": "BOLSA",
+        "titulo": "Bolsa Complementar Alcance",
+        "descricao": "Bolsa para estudantes negros e indígenas em programas de mestrado/doutorado no exterior. Valor: USD 7.000/ano.",
+        "url": "https://fundacaolemann.org.br/liderancas/bolsas-e-oportunidades/",
+        "status": "VERIFICAR_SITE",
+        "data_extracao": "2026-02-04"
+    },
+    {
+        "fonte": "LEMANN",
+        "tipo": "PROGRAMA",
+        "titulo": "Programa Alcance Prep",
+        "descricao": "Apoio para preparação de candidaturas a programas de mestrado em universidades de excelência (Harvard, Stanford, MIT, Oxford, etc.). 100% gratuito.",
+        "url": "https://fundacaolemann.org.br/liderancas/bolsas-e-oportunidades/",
+        "status": "VERIFICAR_SITE",
+        "data_extracao": "2026-02-04"
+    },
+    {
+        "fonte": "LEMANN",
+        "tipo": "PROGRAMA",
+        "titulo": "Lemann Fellowship",
+        "descricao": "Programa de bolsas para estudantes brasileiros em universidades parceiras (Harvard, Stanford, Columbia, Oxford, Illinois).",
+        "url": "https://fundacaolemann.org.br/liderancas/bolsas-e-oportunidades/",
+        "status": "VERIFICAR_SITE",
+        "data_extracao": "2026-02-04"
+    },
+    {
+        "fonte": "LEMANN",
+        "tipo": "BOLSA",
+        "titulo": "Bolsas de Graduação em Direito",
+        "descricao": "Bolsas para estudantes negros de baixa renda em Direito na USP e FGV.",
+        "url": "https://fundacaolemann.org.br/liderancas/bolsas-e-oportunidades/",
+        "status": "VERIFICAR_SITE",
+        "data_extracao": "2026-02-04"
+    }
+]

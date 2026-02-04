@@ -1,0 +1,26 @@
+[
+    {
+        "fonte": "ITAU_SOCIAL",
+        "titulo": "Janela Avaliação 3ª edição – Municípios",
+        "url": "https://www.itausocial.org.br/editais/janela-avaliacao-3a-edicao-municipios/",
+        "descricao": "Chamada pública para órgãos e entidades municipais que poderão ter uma política, programa ou projeto avaliado, de forma gratuita, por meio do método colaborativo e formativo da Assessoria para Avaliação da Enap, em parceria com a Fundação Itaú.",
+        "status": "DISPONÍVEL",
+        "data_extracao": "2026-02-04"
+    },
+    {
+        "fonte": "ITAU_SOCIAL",
+        "titulo": "Edital Educação e Trabalho",
+        "url": "https://www.itausocial.org.br/editais/edital-educacao-e-trabalho/",
+        "descricao": "O Edital Educação e Trabalho tem como objetivo identificar, reconhecer, apoiar e difundir boas práticas no âmbito da Educação Profissional e Tecnológica (EPT)",
+        "status": "DISPONÍVEL",
+        "data_extracao": "2026-02-04"
+    },
+    {
+        "fonte": "ITAU_SOCIAL",
+        "titulo": "Edital Itaú Esporte 2025",
+        "url": "https://www.itausocial.org.br/editais/edital-itau-esporte-2025/",
+        "descricao": "Seleção de projetos aprovados na Lei Federal de Incentivo ao Esporte, que vão além do ensino da modalidade e que olham para as pessoas de forma integral, contribuindo para o seu desenvolvimento e impactando sua comunidade.",
+        "status": "DISPONÍVEL",
+        "data_extracao": "2026-02-04"
+    }
+]
