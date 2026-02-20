@@ -1,10 +1,8 @@
 """
 Motor de Busca Híbrido (Radar de Editais)
 
-Implementa busca híbrida (semântica + lexical) sobre os dados
-vetorizados do Radar de Editais.
-
-Autor: Pipeline Radar Editais
+Implementa busca híbrida (semântica via ChromaDB + lexical via BM25)
+sobre os dados vetorizados do Radar de Editais.
 """
 
 import logging
@@ -12,12 +10,12 @@ import re
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
-from functools import lru_cache
 
 import numpy as np
 import pandas as pd
-import requests
+import chromadb
 from rank_bm25 import BM25Okapi
+from sentence_transformers import SentenceTransformer
 
 # NLTK para stemming português
 try:
@@ -28,7 +26,7 @@ except ImportError:
     STEMMER = None
     HAS_STEMMER = False
 
-# Stopwords português (palavras muito comuns que não agregam valor semântico)
+# Stopwords português
 PORTUGUESE_STOPWORDS = {
     "a", "ao", "aos", "as", "à", "às", "com", "como", "da", "das", "de", "do",
     "dos", "e", "em", "é", "foi", "foram", "há", "isso", "isto", "já", "na",
@@ -48,33 +46,26 @@ PORTUGUESE_STOPWORDS = {
 # =============================================================================
 
 SILVER_PATH = Path("silver_data")
-GOLD_PATH = Path("gold_vectors")
+CHROMA_PATH = Path("chroma_db")
 
-# Ollama Configuration
-OLLAMA_URL = "http://localhost:11434/api/embeddings"
-EMBEDDING_MODEL = "nomic-embed-text"
-EMBEDDING_DIM = 768
+# Modelo de Embedding (mesmo usado no ETL)
+EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+EMBEDDING_DIM = 384
 
 # Search Configuration
 DEFAULT_TOP_K = 10
 DEFAULT_SEMANTIC_WEIGHT = 0.7
 DEFAULT_LEXICAL_WEIGHT = 0.3
-RRF_K = 60  # Parâmetro para Reciprocal Rank Fusion
+RRF_K = 60
 
-# Source Boosting - Prioriza fontes curadas sobre volume (PNCP)
-# Valores > 1.0 aumentam relevância, < 1.0 diminuem
+# Source Boosting
 SOURCE_BOOST = {
-    "FAPESP": 1.5,       # Alta qualidade, editais de fomento
-    "CNPQ": 1.5,         # Alta qualidade, editais de pesquisa
-    "FINEP": 1.4,        # Alta qualidade, inovação
-    "BNDES": 1.3,        # Financiamento desenvolvimento
-    "LEMANN": 1.3,       # Fundação educação
-    "SERRAPILHEIRA": 1.3, # Ciência
-    "ARAPYAU": 1.2,      # Programas sociais
-    "ITAU_SOCIAL": 1.2,  # Programas sociais
-    "PNCP": 0.7,         # Volume alto, licitações genéricas - penalizado
+    "FAPESP": 1.3,
+    "CNPQ": 1.3,
+    "FINEP": 1.2,
+    "BNDES": 1.1,
 }
-DEFAULT_SOURCE_BOOST = 1.0  # Para fontes não listadas
+DEFAULT_SOURCE_BOOST = 1.0
 
 # Logging
 logging.basicConfig(
@@ -90,42 +81,15 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 def tokenize(text: str, use_stemming: bool = True) -> list[str]:
-    """
-    Tokeniza texto para BM25 com stemming português e remoção de stopwords.
-
-    Args:
-        text: Texto para tokenizar
-        use_stemming: Se True, aplica stemming português (RSLP)
-
-    Returns:
-        Lista de tokens processados
-    """
     if not text:
         return []
-
-    # Lowercase e remove pontuação
     text = text.lower()
     text = re.sub(r'[^\w\s]', ' ', text)
-
-    # Split e remove vazios e tokens muito curtos
     tokens = [t for t in text.split() if len(t) > 1]
-
-    # Remove stopwords
     tokens = [t for t in tokens if t not in PORTUGUESE_STOPWORDS]
-
-    # Aplica stemming português se disponível
     if use_stemming and HAS_STEMMER and STEMMER:
         tokens = [STEMMER.stem(t) for t in tokens]
-
     return tokens
-
-
-def normalize_vector(v: np.ndarray) -> np.ndarray:
-    """Normaliza vetor para norma unitária."""
-    norm = np.linalg.norm(v)
-    if norm > 0:
-        return v / norm
-    return v
 
 
 # =============================================================================
@@ -135,7 +99,7 @@ def normalize_vector(v: np.ndarray) -> np.ndarray:
 class HybridSearchEngine:
     """
     Motor de busca híbrido que combina:
-    - Busca semântica (embeddings + cosine similarity)
+    - Busca semântica (ChromaDB com cosine similarity)
     - Busca lexical (BM25)
     - Fusão via Reciprocal Rank Fusion (RRF)
     """
@@ -143,19 +107,10 @@ class HybridSearchEngine:
     def __init__(
         self,
         silver_path: str = "silver_data",
-        gold_path: str = "gold_vectors",
-        load_gold: bool = True
+        chroma_path: str = "chroma_db",
     ):
-        """
-        Inicializa o motor carregando os índices.
-
-        Args:
-            silver_path: Caminho para dados Silver
-            gold_path: Caminho para dados Gold (vetores)
-            load_gold: Se True, carrega embeddings na inicialização
-        """
         self.silver_path = Path(silver_path)
-        self.gold_path = Path(gold_path)
+        self.chroma_path = Path(chroma_path)
 
         logger.info("Inicializando HybridSearchEngine...")
 
@@ -170,130 +125,65 @@ class HybridSearchEngine:
         self._build_bm25_index()
         logger.info(f"  → Índice BM25 pronto")
 
-        # Carrega Gold (embeddings)
-        self.df_gold = None
-        self.embeddings = None
-        self.embedding_ids = None
+        # Carrega ChromaDB
+        logger.info("Conectando ao ChromaDB...")
+        self._load_chroma()
 
-        if load_gold:
-            self._load_gold_vectors()
-
-        # Cache de embeddings de queries
+        # Cache de queries e fontes
         self._query_cache = {}
-
-        # Cache de fonte por documento (para source boosting)
         self._source_cache = {}
+        self._embedding_model = None
 
         logger.info("Motor de busca inicializado!")
 
     def _build_bm25_index(self):
         """Constrói índice BM25 sobre title + description."""
-        # Combina title e description para cada documento
         corpus = []
         for _, row in self.df_silver.iterrows():
             text = f"{row.get('title', '')} {row.get('description', '')}"
             tokens = tokenize(text)
             corpus.append(tokens)
-
         self.bm25 = BM25Okapi(corpus)
         self.bm25_doc_ids = self.df_silver["id"].tolist()
 
-    def _load_gold_vectors(self):
-        """Carrega embeddings do Gold."""
-        logger.info("Carregando vetores Gold...")
+    def _load_chroma(self):
+        """Conecta ao ChromaDB e carrega a collection."""
+        self.collection = None
+        try:
+            client = chromadb.PersistentClient(path=str(self.chroma_path))
+            self.collection = client.get_collection("editais")
+            logger.info(f"  → ChromaDB: {self.collection.count()} chunks indexados")
+        except Exception as e:
+            logger.warning(f"ChromaDB não disponível: {e}")
+            logger.warning("Busca semântica ficará desabilitada.")
 
-        # Verifica quais fontes estão disponíveis
-        available_sources = [
-            d.name for d in self.gold_path.iterdir()
-            if d.is_dir() and d.name.startswith("source=")
-        ]
+    def _get_embedding_model(self) -> SentenceTransformer:
+        if self._embedding_model is None:
+            logger.info(f"Carregando modelo {EMBEDDING_MODEL}...")
+            self._embedding_model = SentenceTransformer(EMBEDDING_MODEL)
+        return self._embedding_model
 
-        if not available_sources:
-            logger.warning("Nenhum dado Gold encontrado!")
-            return
-
-        logger.info(f"  → Fontes disponíveis: {len(available_sources)}")
-
-        # Carrega todos os parquets
-        dfs = []
-        for source_dir in available_sources:
-            source_path = self.gold_path / source_dir
-            try:
-                df = pd.read_parquet(source_path)
-                dfs.append(df)
-            except Exception as e:
-                logger.warning(f"Erro ao carregar {source_dir}: {e}")
-
-        if not dfs:
-            logger.warning("Nenhum dado Gold carregado!")
-            return
-
-        self.df_gold = pd.concat(dfs, ignore_index=True)
-        logger.info(f"  → {len(self.df_gold)} chunks carregados")
-
-        # Extrai embeddings como numpy array
-        logger.info("  → Convertendo embeddings para numpy...")
-        self.embeddings = np.array(self.df_gold["embedding"].tolist())
-
-        # Normaliza para usar dot product como cosine similarity
-        logger.info("  → Normalizando vetores...")
-        norms = np.linalg.norm(self.embeddings, axis=1, keepdims=True)
-        norms[norms == 0] = 1  # Evita divisão por zero
-        self.embeddings = self.embeddings / norms
-
-        # Mapeia índices para IDs
-        self.embedding_parent_ids = self.df_gold["parent_id"].tolist()
-        self.embedding_chunk_texts = self.df_gold["chunk_text"].tolist()
-
-        logger.info(f"  → Embeddings prontos: {self.embeddings.shape}")
-
-    def _embed_query(self, query: str) -> np.ndarray:
-        """
-        Gera embedding para a query via Ollama.
-
-        Args:
-            query: Texto da query
-
-        Returns:
-            Vetor numpy normalizado
-        """
-        # Verifica cache
+    def _embed_query(self, query: str) -> list[float]:
+        """Gera embedding para a query."""
         if query in self._query_cache:
             return self._query_cache[query]
-
         try:
-            response = requests.post(
-                OLLAMA_URL,
-                json={"model": EMBEDDING_MODEL, "prompt": query},
-                timeout=30
-            )
-            if response.status_code == 200:
-                embedding = np.array(response.json().get("embedding", []))
-                # Normaliza
-                embedding = normalize_vector(embedding)
-                # Cache
-                self._query_cache[query] = embedding
-                return embedding
-            else:
-                logger.warning(f"Erro Ollama: {response.status_code}")
-                return np.zeros(EMBEDDING_DIM)
+            model = self._get_embedding_model()
+            embedding = model.encode(
+                [query],
+                show_progress_bar=False,
+                normalize_embeddings=True
+            )[0]
+            result = embedding.tolist()
+            self._query_cache[query] = result
+            return result
         except Exception as e:
             logger.warning(f"Erro ao gerar embedding: {e}")
-            return np.zeros(EMBEDDING_DIM)
+            return [0.0] * EMBEDDING_DIM
 
     def _get_doc_source(self, doc_id: str) -> str:
-        """
-        Retorna a fonte de um documento pelo ID.
-
-        Args:
-            doc_id: ID do documento
-
-        Returns:
-            Nome da fonte ou string vazia se não encontrado
-        """
         if doc_id in self._source_cache:
             return self._source_cache[doc_id]
-
         row = self.df_silver[self.df_silver["id"] == doc_id]
         if not row.empty:
             source = row.iloc[0].get("source", "")
@@ -301,99 +191,126 @@ class HybridSearchEngine:
             return source
         return ""
 
+    def _build_chroma_where(self, filters: dict) -> Optional[dict]:
+        """Converte filtros do usuário para ChromaDB where clause."""
+        if not filters:
+            return None
+
+        conditions = []
+
+        if "source" in filters and filters["source"]:
+            sources = filters["source"]
+            if isinstance(sources, str):
+                sources = [sources]
+            if len(sources) == 1:
+                conditions.append({"source": {"$eq": sources[0]}})
+            else:
+                conditions.append({"source": {"$in": sources}})
+
+        if "status" in filters and filters["status"]:
+            statuses = filters["status"]
+            if isinstance(statuses, str):
+                statuses = [statuses]
+            if len(statuses) == 1:
+                conditions.append({"status": {"$eq": statuses[0]}})
+            else:
+                conditions.append({"status": {"$in": statuses}})
+
+        if not conditions:
+            return None
+        if len(conditions) == 1:
+            return conditions[0]
+        return {"$and": conditions}
+
     def _apply_filters(self, filters: dict) -> set[str]:
-        """
-        Aplica filtros nos metadados Silver.
-
-        Args:
-            filters: Dicionário de filtros
-
-        Returns:
-            Set de IDs que passam nos filtros
-        """
+        """Aplica filtros nos metadados Silver (para BM25 e enriquecimento)."""
         if not filters:
             return self.silver_ids.copy()
 
         mask = pd.Series([True] * len(self.df_silver))
 
-        # Filtro por fonte
         if "source" in filters and filters["source"]:
             sources = filters["source"]
             if isinstance(sources, str):
                 sources = [sources]
             mask &= self.df_silver["source"].isin(sources)
 
-        # Filtro por status
         if "status" in filters and filters["status"]:
             statuses = filters["status"]
             if isinstance(statuses, str):
                 statuses = [statuses]
             mask &= self.df_silver["status"].isin(statuses)
 
-        # Filtro por deadline (após)
         if "deadline_after" in filters and filters["deadline_after"]:
             deadline = pd.to_datetime(filters["deadline_after"])
             mask &= (self.df_silver["deadline_date"] >= deadline) | self.df_silver["deadline_date"].isna()
 
-        # Filtro por deadline (antes)
         if "deadline_before" in filters and filters["deadline_before"]:
             deadline = pd.to_datetime(filters["deadline_before"])
             mask &= (self.df_silver["deadline_date"] <= deadline) | self.df_silver["deadline_date"].isna()
 
-        # Filtro por localização
         if "location" in filters and filters["location"]:
             location = filters["location"].upper()
             mask &= self.df_silver["location"].str.contains(location, na=False, case=False)
 
-        # Filtro por valor mínimo
         if "min_value" in filters and filters["min_value"]:
             mask &= (self.df_silver["value_brl"] >= filters["min_value"]) | self.df_silver["value_brl"].isna()
 
-        # Filtro por valor máximo
         if "max_value" in filters and filters["max_value"]:
             mask &= (self.df_silver["value_brl"] <= filters["max_value"]) | self.df_silver["value_brl"].isna()
 
         filtered_ids = set(self.df_silver.loc[mask, "id"].values)
-        logger.debug(f"Filtros aplicados: {len(filtered_ids)}/{len(self.silver_ids)} IDs")
-
         return filtered_ids
 
     def _semantic_search(
         self,
-        query_embedding: np.ndarray,
+        query_embedding: list[float],
         candidate_ids: set,
-        top_k: int
+        top_k: int,
+        filters: dict = None,
     ) -> list[tuple]:
-        """
-        Busca semântica via cosine similarity.
-
-        Args:
-            query_embedding: Vetor da query (normalizado)
-            candidate_ids: IDs válidos (após filtros)
-            top_k: Número de resultados
-
-        Returns:
-            Lista de (parent_id, score, chunk_text)
-        """
-        if self.embeddings is None:
-            logger.warning("Embeddings não carregados!")
+        """Busca semântica via ChromaDB."""
+        if self.collection is None:
+            logger.warning("ChromaDB não disponível!")
             return []
 
-        # Calcula similaridade (dot product = cosine para vetores normalizados)
-        scores = self.embeddings @ query_embedding
+        # Constrói where clause para ChromaDB (source/status filtering)
+        where = self._build_chroma_where(filters)
 
-        # Filtra por candidate_ids e agrupa por parent_id
+        # Query ChromaDB
+        try:
+            result = self.collection.query(
+                query_embeddings=[query_embedding],
+                n_results=min(top_k * 4, self.collection.count()),
+                where=where,
+                include=["documents", "metadatas", "distances"],
+            )
+        except Exception as e:
+            logger.warning(f"Erro na busca ChromaDB: {e}")
+            return []
+
+        if not result["ids"] or not result["ids"][0]:
+            return []
+
+        # Processa resultados: agrupa por parent_id, mantém melhor score
         results = {}
-        for idx, score in enumerate(scores):
-            parent_id = self.embedding_parent_ids[idx]
+        ids = result["ids"][0]
+        distances = result["distances"][0]
+        documents = result["documents"][0]
+        metadatas = result["metadatas"][0]
+
+        for i, chunk_id in enumerate(ids):
+            parent_id = metadatas[i]["parent_id"]
+
+            # ChromaDB com cosine retorna distância (0=idêntico, 2=oposto)
+            # Converte para similaridade: sim = 1 - dist/2
+            score = 1.0 - distances[i] / 2.0
+
             if parent_id in candidate_ids:
-                # Mantém o melhor score por documento
                 if parent_id not in results or score > results[parent_id][0]:
-                    results[parent_id] = (score, self.embedding_chunk_texts[idx])
+                    results[parent_id] = (score, documents[i])
 
-        # Ordena e retorna top-k
         sorted_results = sorted(results.items(), key=lambda x: x[1][0], reverse=True)[:top_k * 2]
-
         return [(pid, score, text) for pid, (score, text) in sorted_results]
 
     def _lexical_search(
@@ -402,32 +319,16 @@ class HybridSearchEngine:
         candidate_ids: set,
         top_k: int
     ) -> list[tuple]:
-        """
-        Busca lexical via BM25.
-
-        Args:
-            query: Texto da query
-            candidate_ids: IDs válidos (após filtros)
-            top_k: Número de resultados
-
-        Returns:
-            Lista de (id, score)
-        """
+        """Busca lexical via BM25."""
         query_tokens = tokenize(query)
         if not query_tokens:
             return []
-
-        # Calcula scores BM25
         scores = self.bm25.get_scores(query_tokens)
-
-        # Filtra por candidate_ids
         results = []
         for idx, score in enumerate(scores):
             doc_id = self.bm25_doc_ids[idx]
             if doc_id in candidate_ids and score > 0:
                 results.append((doc_id, score))
-
-        # Ordena e retorna top-k
         results.sort(key=lambda x: x[1], reverse=True)
         return results[:top_k * 2]
 
@@ -439,41 +340,23 @@ class HybridSearchEngine:
         lexical_weight: float,
         k: int = RRF_K
     ) -> list[tuple]:
-        """
-        Combina rankings via Reciprocal Rank Fusion.
-
-        RRF Score = Σ weight_i / (k + rank_i)
-
-        Args:
-            semantic_results: Resultados da busca semântica
-            lexical_results: Resultados da busca lexical
-            semantic_weight: Peso da busca semântica
-            lexical_weight: Peso da busca lexical
-            k: Parâmetro RRF (default 60)
-
-        Returns:
-            Lista de (id, combined_score, semantic_score, lexical_score, chunk_text)
-        """
+        """Combina rankings via Reciprocal Rank Fusion."""
         rrf_scores = {}
         semantic_scores = {}
         lexical_scores = {}
         chunk_texts = {}
 
-        # Processa resultados semânticos
         for rank, (doc_id, score, chunk_text) in enumerate(semantic_results):
             rrf_scores[doc_id] = rrf_scores.get(doc_id, 0) + semantic_weight / (k + rank + 1)
             semantic_scores[doc_id] = score
             chunk_texts[doc_id] = chunk_text
 
-        # Processa resultados lexicais
         for rank, (doc_id, score) in enumerate(lexical_results):
             rrf_scores[doc_id] = rrf_scores.get(doc_id, 0) + lexical_weight / (k + rank + 1)
             lexical_scores[doc_id] = score
 
-        # Combina e aplica source boosting
         combined = []
         for doc_id, rrf_score in rrf_scores.items():
-            # Busca a fonte do documento para aplicar boost
             source = self._get_doc_source(doc_id)
             boost = SOURCE_BOOST.get(source, DEFAULT_SOURCE_BOOST)
             boosted_score = rrf_score * boost
@@ -496,30 +379,15 @@ class HybridSearchEngine:
         semantic_weight: float = DEFAULT_SEMANTIC_WEIGHT,
         lexical_weight: float = DEFAULT_LEXICAL_WEIGHT
     ) -> list[dict]:
-        """
-        Enriquece resultados com metadados do Silver.
-
-        Args:
-            ranked_results: Lista de (id, score, sem_score, lex_score, chunk_text)
-            top_k: Número máximo de resultados
-            semantic_weight: Peso semântico usado na busca
-            lexical_weight: Peso lexical usado na busca
-
-        Returns:
-            Lista de dicionários com resultados completos
-        """
+        """Enriquece resultados com metadados do Silver."""
         results = []
 
         for doc_id, score, sem_score, lex_score, chunk_text in ranked_results[:top_k]:
-            # Busca metadados no Silver
             row = self.df_silver[self.df_silver["id"] == doc_id]
-
             if row.empty:
                 continue
-
             row = row.iloc[0]
 
-            # Normaliza score para 0-1 usando os pesos reais
             max_possible = semantic_weight / RRF_K + lexical_weight / RRF_K
             normalized_score = min(score / max_possible, 1.0) if max_possible > 0 else 0.0
 
@@ -540,7 +408,6 @@ class HybridSearchEngine:
                 "lexical_score": round(float(lex_score), 4),
                 "matching_chunk": chunk_text[:500] if chunk_text else "",
             }
-
             results.append(result)
 
         return results
@@ -559,14 +426,7 @@ class HybridSearchEngine:
         Args:
             query: Texto de busca em linguagem natural
             top_k: Número de resultados (default 10)
-            filters: Filtros opcionais:
-                - source: list[str] - Ex: ["FAPESP", "CNPQ"]
-                - status: str - "ABERTA" | "ENCERRADA"
-                - deadline_after: str - "YYYY-MM-DD"
-                - deadline_before: str - "YYYY-MM-DD"
-                - location: str - UF (ex: "SP")
-                - min_value: float - Valor mínimo em R$
-                - max_value: float - Valor máximo em R$
+            filters: Filtros opcionais (source, status, deadline_after/before, location, min/max_value)
             semantic_weight: Peso da busca semântica (0-1)
             lexical_weight: Peso da busca lexical (0-1)
 
@@ -575,26 +435,24 @@ class HybridSearchEngine:
         """
         logger.info(f"Buscando: '{query}' (top_k={top_k})")
 
-        # 1. Aplica filtros
+        # 1. Aplica filtros (Silver para BM25, ChromaDB para semântico)
         candidate_ids = self._apply_filters(filters)
         if not candidate_ids:
             logger.info("Nenhum documento passou nos filtros")
             return []
 
-        logger.debug(f"Candidatos após filtros: {len(candidate_ids)}")
-
-        # 2. Busca semântica
+        # 2. Busca semântica via ChromaDB
         semantic_results = []
-        if self.embeddings is not None and semantic_weight > 0:
+        if self.collection is not None and semantic_weight > 0:
             query_embedding = self._embed_query(query)
-            semantic_results = self._semantic_search(query_embedding, candidate_ids, top_k)
-            logger.debug(f"Resultados semânticos: {len(semantic_results)}")
+            semantic_results = self._semantic_search(
+                query_embedding, candidate_ids, top_k, filters
+            )
 
         # 3. Busca lexical
         lexical_results = []
         if lexical_weight > 0:
             lexical_results = self._lexical_search(query, candidate_ids, top_k)
-            logger.debug(f"Resultados lexicais: {len(lexical_results)}")
 
         # 4. Fusão RRF
         if not semantic_results and not lexical_results:
@@ -650,7 +508,6 @@ def main():
     print("MOTOR DE BUSCA HÍBRIDO - Radar de Editais")
     print("=" * 60)
 
-    # Inicializa engine
     engine = HybridSearchEngine()
 
     print("\nComandos:")
@@ -673,7 +530,6 @@ def main():
         if not query:
             continue
 
-        # Comandos especiais
         if query.lower() in ["/sair", "/exit", "/quit", "q"]:
             print("Saindo...")
             break
@@ -681,7 +537,7 @@ def main():
         if query.lower() == "/filtros":
             print("\nFiltros ativos:", current_filters if current_filters else "Nenhum")
             print("\nFiltros disponíveis:")
-            print("  source: PNCP, FAPESP, CNPQ, FINEP, BNDES, LEMANN, SERRAPILHEIRA, ITAU_SOCIAL, ARAPYAU")
+            print("  source: FAPESP, CNPQ, FINEP, BNDES")
             print("  status: ABERTA, ENCERRADA, FLUXO_CONTINUO, VERIFICAR")
             continue
 
@@ -702,7 +558,6 @@ def main():
             print("Filtros limpos")
             continue
 
-        # Executa busca
         results = engine.search(
             query,
             top_k=5,
