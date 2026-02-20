@@ -1,0 +1,4946 @@
+<?xml version='1.0' encoding='utf-8'?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="d10" for="edge" attr.name="weight" attr.type="double"/>
+<key id="d9" for="edge" attr.name="edge_type" attr.type="string"/>
+<key id="d8" for="node" attr.name="req_type" attr.type="string"/>
+<key id="d7" for="node" attr.name="deadline_date" attr.type="string"/>
+<key id="d6" for="node" attr.name="category" attr.type="string"/>
+<key id="d5" for="node" attr.name="url" attr.type="string"/>
+<key id="d4" for="node" attr.name="status" attr.type="string"/>
+<key id="d3" for="node" attr.name="source" attr.type="string"/>
+<key id="d2" for="node" attr.name="title" attr.type="string"/>
+<key id="d1" for="node" attr.name="label" attr.type="string"/>
+<key id="d0" for="node" attr.name="node_type" attr.type="string"/>
+<graph edgedefault="undirected"><node id="SRC:ARAPYAU">
+  <data key="d0">SOURCE</data>
+  <data key="d1">ARAPYAU</data>
+</node>
+<node id="SRC:BNDES">
+  <data key="d0">SOURCE</data>
+  <data key="d1">BNDES</data>
+</node>
+<node id="SRC:CNPQ">
+  <data key="d0">SOURCE</data>
+  <data key="d1">CNPQ</data>
+</node>
+<node id="SRC:FAPESP">
+  <data key="d0">SOURCE</data>
+  <data key="d1">FAPESP</data>
+</node>
+<node id="SRC:FINEP">
+  <data key="d0">SOURCE</data>
+  <data key="d1">FINEP</data>
+</node>
+<node id="SRC:ITAU_SOCIAL">
+  <data key="d0">SOURCE</data>
+  <data key="d1">ITAU_SOCIAL</data>
+</node>
+<node id="SRC:LEMANN">
+  <data key="d0">SOURCE</data>
+  <data key="d1">LEMANN</data>
+</node>
+<node id="SRC:SERRAPILHEIRA">
+  <data key="d0">SOURCE</data>
+  <data key="d1">SERRAPILHEIRA</data>
+</node>
+<node id="fda383fdf30e0fce">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Programa de Fellows Arapyaú</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://arapyau.org.br/programa-fellows/</data>
+  <data key="d6">PROGRAMA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:desenvolvimento sustentável">
+  <data key="d0">THEME</data>
+  <data key="d1">Desenvolvimento Sustentável</data>
+</node>
+<node id="THEME:políticas públicas">
+  <data key="d0">THEME</data>
+  <data key="d1">Políticas Públicas</data>
+</node>
+<node id="THEME:gestão ambiental">
+  <data key="d0">THEME</data>
+  <data key="d1">Gestão Ambiental</data>
+</node>
+<node id="THEME:inovação">
+  <data key="d0">THEME</data>
+  <data key="d1">Inovação</data>
+</node>
+<node id="THEME:sustentabilidade">
+  <data key="d0">THEME</data>
+  <data key="d1">Sustentabilidade</data>
+</node>
+<node id="THEME:justiça climática">
+  <data key="d0">THEME</data>
+  <data key="d1">Justiça Climática</data>
+</node>
+<node id="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">porte</data>
+  <data key="d1">MEI|ME|EPP|MEDIO|GRANDE</data>
+</node>
+<node id="REQ:entity:empresa">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">Empresa</data>
+</node>
+<node id="REQ:entity:ong">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">ONG</data>
+</node>
+<node id="REQ:entity:unidade de ensino">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">Unidade de Ensino</data>
+</node>
+<node id="REQ:entity:pessoa física">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">Pessoa Física</data>
+</node>
+<node id="6154f9b53723e2d9">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Viabilidade econômica de sistemas agroflorestais com cacau</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/viabilidade-economica-de-sistemas-agroflorestais-com-cacau/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:viabilidade econômica">
+  <data key="d0">THEME</data>
+  <data key="d1">Viabilidade econômica</data>
+</node>
+<node id="THEME:sistemas agroflorestais">
+  <data key="d0">THEME</data>
+  <data key="d1">sistemas agroflorestais</data>
+</node>
+<node id="THEME:cacau">
+  <data key="d0">THEME</data>
+  <data key="d1">cacau</data>
+</node>
+<node id="f30670cfb0ba8201">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Cas&amp;#8217;amazonia na COP30</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/casamazonia-na-cop30/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:cop30">
+  <data key="d0">THEME</data>
+  <data key="d1">COP30</data>
+</node>
+<node id="THEME:amazonia">
+  <data key="d0">THEME</data>
+  <data key="d1">Amazonia</data>
+</node>
+<node id="a414af1fc054877d">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Trajetória do desenvolvimento territorial no sul da Bahia e Implicações para uma agenda de sustentab</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/desenvolvimento-territorial-sul-bahia-costa-do-cacau/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:desenvolvimento territorial">
+  <data key="d0">THEME</data>
+  <data key="d1">desenvolvimento territorial</data>
+</node>
+<node id="THEME:inclusão">
+  <data key="d0">THEME</data>
+  <data key="d1">inclusão</data>
+</node>
+<node id="REQ:entity:universidade">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">universidade</data>
+</node>
+<node id="fd186f558987c496">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Atuação em redes para transformações sistêmicas</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/atuacao-em-redes-para-transformacoes-sistemicas/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:transformações sistêmicas">
+  <data key="d0">THEME</data>
+  <data key="d1">transformações sistêmicas</data>
+</node>
+<node id="THEME:atuação em redes">
+  <data key="d0">THEME</data>
+  <data key="d1">atuação em redes</data>
+</node>
+<node id="ac6d583f8b0fe153">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Instituto Arapyaú’s Renata Piazzon speaks on COP30 and the future of philanthropy in the Global Sout</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/instituto-arapyaus-renata-piazzon-speaks-on-cop30-and-the-future-of-philanthropy-in-the-global-south/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:filantropia">
+  <data key="d0">THEME</data>
+  <data key="d1">filantropia</data>
+</node>
+<node id="THEME:global south">
+  <data key="d0">THEME</data>
+  <data key="d1">Global South</data>
+</node>
+<node id="75a6d9bac9ef944f">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Instituto Arapyaú promove ciência e soluções brasileiras na COP30</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/instituto-arapyau-promove-ciencia-e-solucoes-brasileiras-na-cop30/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:ciência">
+  <data key="d0">THEME</data>
+  <data key="d1">ciência</data>
+</node>
+<node id="THEME:soluções brasileiras">
+  <data key="d0">THEME</data>
+  <data key="d1">soluções brasileiras</data>
+</node>
+<node id="b7b69e514b410d34">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Livros e estudos projetam o papel do Brasil na transição climática global</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/livros-e-estudos-projetam-o-papel-do-brasil-na-transicao-climatica-global/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:transição climática">
+  <data key="d0">THEME</data>
+  <data key="d1">transição climática</data>
+</node>
+<node id="THEME:brasil">
+  <data key="d0">THEME</data>
+  <data key="d1">brasil</data>
+</node>
+<node id="f208059e3bb58aff">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Avanços em adaptação e transição justa estão no saldo da COP30</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/avancos-em-adaptacao-e-transicao-justa-estao-no-saldo-da-cop30/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:avanços">
+  <data key="d0">THEME</data>
+  <data key="d1">avanços</data>
+</node>
+<node id="THEME:adaptação">
+  <data key="d0">THEME</data>
+  <data key="d1">adaptação</data>
+</node>
+<node id="THEME:transição justa">
+  <data key="d0">THEME</data>
+  <data key="d1">transição justa</data>
+</node>
+<node id="40dc53e1b77b3698">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Colaboração impulsiona ação climática em Belém</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/colaboracao-impulsiona-acao-climatica-em-belem/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:clima">
+  <data key="d0">THEME</data>
+  <data key="d1">clima</data>
+</node>
+<node id="THEME:ambiente">
+  <data key="d0">THEME</data>
+  <data key="d1">ambiente</data>
+</node>
+<node id="5a865e3f935496d5">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Scientists statement on state of COP30 Negotiations, November 19, 2025</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/scientists_statement_on_state_of_cop30/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:negociações do acordo de paris">
+  <data key="d0">THEME</data>
+  <data key="d1">Negociações do Acordo de Paris</data>
+</node>
+<node id="056dcf2a58271952">
+  <data key="d0">EDITAL</data>
+  <data key="d2">A COP30 deve proteger a estabilidade dos dois biomas mais ricos da Terra — a floresta amazônica e os</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/carta-ciencias-planetarias/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:estabilidade">
+  <data key="d0">THEME</data>
+  <data key="d1">estabilidade</data>
+</node>
+<node id="THEME:biomas">
+  <data key="d0">THEME</data>
+  <data key="d1">biomas</data>
+</node>
+<node id="THEME:floresta amazônica">
+  <data key="d0">THEME</data>
+  <data key="d1">floresta amazônica</data>
+</node>
+<node id="THEME:recifes de corais tropicais">
+  <data key="d0">THEME</data>
+  <data key="d1">recifes de corais tropicais</data>
+</node>
+<node id="d814b7a5f0123afa">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Fundação Rockefeller aposta no Brasil para mostrar que alimentação escolar pode regenerar o planeta</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/fundacao-rockefeller-aposta-no-brasil-para-mostrar-que-alimentacao-escolar-pode-regenerar-o-planeta/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:alimentação escolar">
+  <data key="d0">THEME</data>
+  <data key="d1">alimentação escolar</data>
+</node>
+<node id="THEME:regenerar o planeta">
+  <data key="d0">THEME</data>
+  <data key="d1">regenerar o planeta</data>
+</node>
+<node id="8be51dbd22303827">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Espaço de Ciência Planetária tenta aproximar evidência científica de negociadores na COP30</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/espaco-de-ciencia-planetaria-tenta-aproximar-evidencia-cientifica-de-negociadores-na-cop30/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:negociadores">
+  <data key="d0">THEME</data>
+  <data key="d1">negociadores</data>
+</node>
+<node id="ce248ab36759367d">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chef Bel Coelho lança livro e documentário em Belém durante a COP30</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/chef-bel-coelho-lanca-livro-e-documentario-em-belem-durante-a-cop30/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:livro">
+  <data key="d0">THEME</data>
+  <data key="d1">livro</data>
+</node>
+<node id="THEME:documentário">
+  <data key="d0">THEME</data>
+  <data key="d1">documentário</data>
+</node>
+<node id="fd28f6fbd4f7fee8">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Setor privado deve protagonizar agenda florestal, defende Roberto Waack</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/setor-privado-deve-protagonizar-agenda-florestal-defende-roberto-waack/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:florestal">
+  <data key="d0">THEME</data>
+  <data key="d1">florestal</data>
+</node>
+<node id="THEME:setor privado">
+  <data key="d0">THEME</data>
+  <data key="d1">setor privado</data>
+</node>
+<node id="8e50468da59e0dbf">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Contínuo florestal: protagonismo brasileiro na agenda do clima</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/continuo-florestal-protagonismo-brasileiro-na-agenda-do-clima/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:protagonismo brasileiro">
+  <data key="d0">THEME</data>
+  <data key="d1">protagonismo brasileiro</data>
+</node>
+<node id="59e0792b778f788f">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Instituto Arapyaú quer promover soluções climáticas na COP30</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/instituto-arapyau-quer-promover-solucoes-climaticas-na-cop30/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="9959f61ad741bdf8">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Natureza positiva em perspectiva: um olhar brasileiro</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/natureza-positiva-em-perspectiva-um-olhar-brasileiro/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:natureza">
+  <data key="d0">THEME</data>
+  <data key="d1">Natureza</data>
+</node>
+<node id="THEME:perspectiva">
+  <data key="d0">THEME</data>
+  <data key="d1">Perspectiva</data>
+</node>
+<node id="THEME:olhar brasileiro">
+  <data key="d0">THEME</data>
+  <data key="d1">Olhar brasileiro</data>
+</node>
+<node id="585ff9d4bf882078">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Soluções brasileiras para desafios globais</data>
+  <data key="d3">ARAPYAU</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://arapyau.org.br/solucoes-brasileiras-para-desafios-globais-2/</data>
+  <data key="d6">NOTICIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:desafios globais">
+  <data key="d0">THEME</data>
+  <data key="d1">desafios globais</data>
+</node>
+<node id="1912033b4701440c">
+  <data key="d0">EDITAL</data>
+  <data key="d2">BNDES Garagem</data>
+  <data key="d3">BNDES</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://www.bndes.gov.br/wps/portal/site/home/onde-atuamos/inovacao?1dmy&amp;urile=wcm%3apath%3a%2Fbndes_institucional%2Fhome%2Fonde-atuamos%2Finovacao%2Fgaragem%2Fbndes-garagem</data>
+  <data key="d6">inovacao</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="REQ:entity:startup">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">startup</data>
+</node>
+<node id="b715a26845228c17">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Funtec</data>
+  <data key="d3">BNDES</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://www.bndes.gov.br/wps/portal/site/home/onde-atuamos/inovacao?1dmy&amp;urile=wcm%3apath%3a%2Fbndes_institucional%2Fhome%2Ffinanciamentos%2Flinhas-programas-fundos%2Fbndes-funtec</data>
+  <data key="d6">inovacao</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="1f9148aca9697212">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Credenciamento de Equipamentos</data>
+  <data key="d3">BNDES</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://www.bndes.gov.br/wps/portal/site/home/financiamento/servicos-online/credenciamento-de-equipamentos/</data>
+  <data key="d6">inovacao</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="REQ:entity:ict">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">ICT</data>
+</node>
+<node id="f4d493548863fd5e">
+  <data key="d0">EDITAL</data>
+  <data key="d2">BNDES Garagem</data>
+  <data key="d3">BNDES</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://www.bndes.gov.br/wps/portal/site/home/onde-atuamos/inovacao/bndes%20garagem%20-%20apoio%20ao%20desenvolvimento%20de%20startups/bndes-garagem/!ut/p/z0/fY09D4IwFEV_i0NH0qpIZ2SAKCQSF3wLeWAtVWn5qKj_XiTE0fHmnnsuBZpR0DgoiVYZjfcxn8DLeRoGke8u43B_4CzdRFvO4zU7uh7dUfgPjAZ1bVvwKZRGW_GyNCv0WfS50r1V9lFOT4RVphaEmbFy0D6wNj1hSpsBSzSESexQipqwaevM8WtfdUmQSAoN2spR-mJm_49pblC8n_7iA4BOfl4!/</data>
+  <data key="d6">inovacao</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="4354334260d7e839">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Funtec</data>
+  <data key="d3">BNDES</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://www.bndes.gov.br/wps/portal/site/home/financiamento/produto/bndes-funtec/!ut/p/z0/fY3LDoIwFES_xQVLUkCibAkLiIEoMSbYDSmlwFW4BVp8_L1AdOtuJnMyh1CSEYrsATXTIJG1c7_SXb5PwyDyXTsOY9ux0ot3Ss9etD0GLjkQ-h-YH-A2DNQnlEvU4qVJVmApVA6oNOiJrybDamQnDKsCZMiBdQK1VIbVAjZMmf0o65F1c6omLJdh_ViaFnyROGMSJDWhPdONCVjJr-aH9HdavJ_-5gP_b-S9/</data>
+  <data key="d6">inovacao</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="694dfaab83340267">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada Pública MCTI/CNPq Nº 02/2026 Programa de Cooperação Latino-Americana e Caribenha em Ciência,</data>
+  <data key="d3">CNPQ</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://memoria2.cnpq.br/web/guest/chamadas-publicas?p_p_id=resultadosportlet_WAR_resultadoscnpqportlet_INSTANCE_0ZaM&amp;filtro=abertas&amp;detalha=chamadaDivulgada&amp;idDivulgacao=13365</data>
+  <data key="d6">None</data>
+  <data key="d7">2026-04-30</data>
+</node>
+<node id="THEME:ambiente e sustentabilidade">
+  <data key="d0">THEME</data>
+  <data key="d1">Ambiente e sustentabilidade</data>
+</node>
+<node id="THEME:alimentação e agricultura">
+  <data key="d0">THEME</data>
+  <data key="d1">Alimentação e agricultura</data>
+</node>
+<node id="THEME:energia e mineração">
+  <data key="d0">THEME</data>
+  <data key="d1">Energia e mineração</data>
+</node>
+<node id="THEME:saúde">
+  <data key="d0">THEME</data>
+  <data key="d1">Saúde</data>
+</node>
+<node id="THEME:tecnologia da informação">
+  <data key="d0">THEME</data>
+  <data key="d1">Tecnologia da informação</data>
+</node>
+<node id="THEME:ciências humanas e sociais">
+  <data key="d0">THEME</data>
+  <data key="d1">Ciências humanas e sociais</data>
+</node>
+<node id="4a0a7921f9815281">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada CNPq/Decit/SCTIE/MS - Nº 32/2025 - Pesquisas Inovadoras para a Saúde das Mulheres</data>
+  <data key="d3">CNPQ</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://memoria2.cnpq.br/web/guest/chamadas-publicas?p_p_id=resultadosportlet_WAR_resultadoscnpqportlet_INSTANCE_0ZaM&amp;filtro=abertas&amp;detalha=chamadaDivulgada&amp;idDivulgacao=13325</data>
+  <data key="d6">None</data>
+  <data key="d7">2026-02-25</data>
+</node>
+<node id="THEME:saúde das mulheres">
+  <data key="d0">THEME</data>
+  <data key="d1">Saúde das Mulheres</data>
+</node>
+<node id="THEME:pesquisa inovadora">
+  <data key="d0">THEME</data>
+  <data key="d1">Pesquisa Inovadora</data>
+</node>
+<node id="REQ:entity:unidade de saúde pública">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">Unidade de Saúde Pública</data>
+</node>
+<node id="a5cc55f3960e1c29">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada CNPq/MS-SCTIE-Decit Nº 30/2025 - Pesquisas Estratégicas em Terapias Avançadas e Terapias Bas</data>
+  <data key="d3">CNPQ</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://memoria2.cnpq.br/web/guest/chamadas-publicas?p_p_id=resultadosportlet_WAR_resultadoscnpqportlet_INSTANCE_0ZaM&amp;filtro=abertas&amp;detalha=chamadaDivulgada&amp;idDivulgacao=13288</data>
+  <data key="d6">None</data>
+  <data key="d7">2026-02-23</data>
+</node>
+<node id="THEME:pesquisas estratégicas">
+  <data key="d0">THEME</data>
+  <data key="d1">pesquisas estratégicas</data>
+</node>
+<node id="THEME:terapias avançadas">
+  <data key="d0">THEME</data>
+  <data key="d1">terapias avançadas</data>
+</node>
+<node id="THEME:terapias baseadas em ácidos nucleicos">
+  <data key="d0">THEME</data>
+  <data key="d1">terapias baseadas em ácidos nucleicos</data>
+</node>
+<node id="05ac6b74e4637ad8">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada para Pesquisas Inovadoras em Vacinas CNPq/Decit/SCTIE/MS Nº 31/2025</data>
+  <data key="d3">CNPQ</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://memoria2.cnpq.br/web/guest/chamadas-publicas?p_p_id=resultadosportlet_WAR_resultadoscnpqportlet_INSTANCE_0ZaM&amp;filtro=abertas&amp;detalha=chamadaDivulgada&amp;idDivulgacao=13305</data>
+  <data key="d6">None</data>
+  <data key="d7">2026-02-23</data>
+</node>
+<node id="THEME:vacinologia">
+  <data key="d0">THEME</data>
+  <data key="d1">Vacinologia</data>
+</node>
+<node id="REQ:entity:unidade de pesquisa">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">Unidade de Pesquisa</data>
+</node>
+<node id="6e340b55056e1e9e">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada Nº 28/2025 - Apoio a Projetos de Cooperação CNPq-TUBITAK</data>
+  <data key="d3">CNPQ</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://memoria2.cnpq.br/web/guest/chamadas-publicas?p_p_id=resultadosportlet_WAR_resultadoscnpqportlet_INSTANCE_0ZaM&amp;filtro=abertas&amp;detalha=chamadaDivulgada&amp;idDivulgacao=13287</data>
+  <data key="d6">None</data>
+  <data key="d7">2026-05-04</data>
+</node>
+<node id="THEME:meio ambiente">
+  <data key="d0">THEME</data>
+  <data key="d1">Meio Ambiente</data>
+</node>
+<node id="THEME:alimentos e agricultura">
+  <data key="d0">THEME</data>
+  <data key="d1">Alimentos e Agricultura</data>
+</node>
+<node id="THEME:ict's">
+  <data key="d0">THEME</data>
+  <data key="d1">ICT'S</data>
+</node>
+<node id="THEME:física">
+  <data key="d0">THEME</data>
+  <data key="d1">Física</data>
+</node>
+<node id="640853ee4bbdbed9">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada CNPq/Daevs/SVSA/MS Nº 33/2025 - Pesquisa, Extensão e Formação em Epidemiologia e Vigilância </data>
+  <data key="d3">CNPQ</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://memoria2.cnpq.br/web/guest/chamadas-publicas?p_p_id=resultadosportlet_WAR_resultadoscnpqportlet_INSTANCE_0ZaM&amp;filtro=abertas&amp;detalha=chamadaDivulgada&amp;idDivulgacao=13285</data>
+  <data key="d6">None</data>
+  <data key="d7">2026-03-31</data>
+</node>
+<node id="THEME:pesquisa">
+  <data key="d0">THEME</data>
+  <data key="d1">pesquisa</data>
+</node>
+<node id="THEME:extensão">
+  <data key="d0">THEME</data>
+  <data key="d1">extensão</data>
+</node>
+<node id="THEME:formação">
+  <data key="d0">THEME</data>
+  <data key="d1">formação</data>
+</node>
+<node id="THEME:epidemiologia">
+  <data key="d0">THEME</data>
+  <data key="d1">epidemiologia</data>
+</node>
+<node id="THEME:vigilância em saúde">
+  <data key="d0">THEME</data>
+  <data key="d1">vigilância em saúde</data>
+</node>
+<node id="7568c1499a85347c">
+  <data key="d0">EDITAL</data>
+  <data key="d2">CNPq/CAPES/IRD Nº 27/2025 Programa de apoio ao Centro Franco-Brasileiro de Biodiversidade Amazônica</data>
+  <data key="d3">CNPQ</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://memoria2.cnpq.br/web/guest/chamadas-publicas?p_p_id=resultadosportlet_WAR_resultadoscnpqportlet_INSTANCE_0ZaM&amp;filtro=abertas&amp;detalha=chamadaDivulgada&amp;idDivulgacao=13225</data>
+  <data key="d6">None</data>
+  <data key="d7">2026-02-20</data>
+</node>
+<node id="THEME:compreensão, monitoramento, conservação e documentação da biodiversidade amazônica">
+  <data key="d0">THEME</data>
+  <data key="d1">Compreensão, Monitoramento, Conservação e Documentação da Biodiversidade Amazônica</data>
+</node>
+<node id="THEME:contribuições presentes e passadas dos povos indígenas e comunidades locais para a biodiversidade">
+  <data key="d0">THEME</data>
+  <data key="d1">Contribuições Presentes e Passadas dos Povos Indígenas e Comunidades Locais para a Biodiversidade</data>
+</node>
+<node id="THEME:cobertura florestal, observação da terra, mudanças ambientais regionais e sustentabilidade">
+  <data key="d0">THEME</data>
+  <data key="d1">Cobertura Florestal, Observação da Terra, Mudanças Ambientais Regionais e Sustentabilidade</data>
+</node>
+<node id="THEME:biodiversidade, saúde humana e alimentação (abordagem one health)">
+  <data key="d0">THEME</data>
+  <data key="d1">Biodiversidade, Saúde Humana e Alimentação (Abordagem One Health)</data>
+</node>
+<node id="THEME:bioeconomia para meios de subsistência inclusivos e economias plurais, bem viver e sistemas alimentares saudáveis">
+  <data key="d0">THEME</data>
+  <data key="d1">Bioeconomia para Meios de Subsistência Inclusivos e Economias Plurais, Bem Viver e Sistemas Alimentares Saudáveis</data>
+</node>
+<node id="5fc2be1044952999">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada de Propostas – Centros Urbanos 2025</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17809</data>
+  <data key="d6">Mudanças Climáticas, Cidades Sustentáveis</data>
+  <data key="d7">2026-02-23</data>
+</node>
+<node id="THEME:mudanças climáticas">
+  <data key="d0">THEME</data>
+  <data key="d1">Mudanças Climáticas</data>
+</node>
+<node id="THEME:cidades sustentáveis">
+  <data key="d0">THEME</data>
+  <data key="d1">Cidades Sustentáveis</data>
+</node>
+<node id="8a05b5d110384d92">
+  <data key="d0">EDITAL</data>
+  <data key="d2">SPRINT 2025</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17550</data>
+  <data key="d6">todas</data>
+  <data key="d7">2026-02-23</data>
+</node>
+<node id="THEME:all">
+  <data key="d0">THEME</data>
+  <data key="d1">all</data>
+</node>
+<node id="6a8b14853e9edef3">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada FAPESP no âmbito do Consórcio Genomas de São Paulo</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17930</data>
+  <data key="d6">genômica</data>
+  <data key="d7">2026-02-27</data>
+</node>
+<node id="THEME:genômica">
+  <data key="d0">THEME</data>
+  <data key="d1">genômica</data>
+</node>
+<node id="THEME:inovação na administração e serviços públicos">
+  <data key="d0">THEME</data>
+  <data key="d1">inovação na administração e serviços públicos</data>
+</node>
+<node id="THEME:transição energética">
+  <data key="d0">THEME</data>
+  <data key="d1">transição energética</data>
+</node>
+<node id="THEME:bioeconomia e desenvolvimento sustentável">
+  <data key="d0">THEME</data>
+  <data key="d1">bioeconomia e desenvolvimento sustentável</data>
+</node>
+<node id="THEME:ciência da computação com inteligência artificial">
+  <data key="d0">THEME</data>
+  <data key="d1">ciência da computação com inteligência artificial</data>
+</node>
+<node id="THEME:geociências">
+  <data key="d0">THEME</data>
+  <data key="d1">geociências</data>
+</node>
+<node id="d507ab39215e262d">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada de Propostas para o Programa PIPE FAPESP em parceria com a PRODESP - 2025</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17902</data>
+  <data key="d6">inovação na administração e serviços públicos</data>
+  <data key="d7">2026-03-02</data>
+</node>
+<node id="31706f79815280bf">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Programa Centros de Ciência para o Desenvolvimento (CCD)</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17876</data>
+  <data key="d6">consultar chamada</data>
+  <data key="d7">2026-03-03</data>
+</node>
+<node id="c4e0514bccb30cc3">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada de Propostas - Iniciativa Internacional de Pesquisa sobre o Uso de Tecnologias Disruptivas p</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17952</data>
+  <data key="d6">interdisciplinar</data>
+  <data key="d7">2026-03-03</data>
+</node>
+<node id="THEME:interdisciplinar">
+  <data key="d0">THEME</data>
+  <data key="d1">interdisciplinar</data>
+</node>
+<node id="a6fe9c8332927bfb">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada de Propostas FAPESP e Berlin University Alliance (BUA) - 2026</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://fapesp.br/17975</data>
+  <data key="d6">todas</data>
+  <data key="d7">2026-03-15</data>
+</node>
+<node id="425ad3f85d784838">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada de Propostas de Redes FAPESP de Colaboração em Pesquisa em Transição Energética</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://www.fapesp.br/17933</data>
+  <data key="d6">Transição Energética</data>
+  <data key="d7">2026-03-16</data>
+</node>
+<node id="892be58ee82b2cb3">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada FAPESP/FAPEAM 2026</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://www.fapesp.br/17974</data>
+  <data key="d6">Bioeconomia e Desenvolvimento Sustentável</data>
+  <data key="d7">2026-03-23</data>
+</node>
+<node id="THEME:bioeconomia">
+  <data key="d0">THEME</data>
+  <data key="d1">Bioeconomia</data>
+</node>
+<node id="REQ:entity:unidade de i&amp;d">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">Unidade de I&amp;D</data>
+</node>
+<node id="e16eab0002059090">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Cooperação São Paulo-Espanha para Projetos de Pesquisa e Inovação: Segunda Chamada de Propostas 2025</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17365</data>
+  <data key="d6">todas</data>
+  <data key="d7">2026-03-31</data>
+</node>
+<node id="THEME:engenharia">
+  <data key="d0">THEME</data>
+  <data key="d1">Engenharia</data>
+</node>
+<node id="THEME:química e física">
+  <data key="d0">THEME</data>
+  <data key="d1">Química e Física</data>
+</node>
+<node id="THEME:ciências digitais e matemática">
+  <data key="d0">THEME</data>
+  <data key="d1">Ciências Digitais e Matemática</data>
+</node>
+<node id="THEME:ciência dos materiais">
+  <data key="d0">THEME</data>
+  <data key="d1">Ciência dos Materiais</data>
+</node>
+<node id="THEME:ciências sociais e humanidades">
+  <data key="d0">THEME</data>
+  <data key="d1">Ciências Sociais e Humanidades</data>
+</node>
+<node id="THEME:meio ambiente, ecossistemas e recursos biológicos">
+  <data key="d0">THEME</data>
+  <data key="d1">Meio Ambiente, Ecossistemas e Recursos Biológicos</data>
+</node>
+<node id="THEME:biologia e saúde">
+  <data key="d0">THEME</data>
+  <data key="d1">Biologia e Saúde</data>
+</node>
+<node id="THEME:turismo inteligente">
+  <data key="d0">THEME</data>
+  <data key="d1">Turismo Inteligente</data>
+</node>
+<node id="THEME:turismo sustentável">
+  <data key="d0">THEME</data>
+  <data key="d1">Turismo Sustentável</data>
+</node>
+<node id="THEME:gestão e desenvolvimento turístico">
+  <data key="d0">THEME</data>
+  <data key="d1">Gestão e Desenvolvimento Turístico</data>
+</node>
+<node id="THEME:urbanismo e turismo">
+  <data key="d0">THEME</data>
+  <data key="d1">Urbanismo e Turismo</data>
+</node>
+<node id="THEME:economia do visitante">
+  <data key="d0">THEME</data>
+  <data key="d1">Economia do Visitante</data>
+</node>
+<node id="THEME:empregabilidade">
+  <data key="d0">THEME</data>
+  <data key="d1">Empregabilidade</data>
+</node>
+<node id="THEME:gestão da oferta">
+  <data key="d0">THEME</data>
+  <data key="d1">Gestão da Oferta</data>
+</node>
+<node id="REQ:porte:&lt;MEI|ME|EPP|MEDIO|GRANDE&gt;">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">porte</data>
+  <data key="d1">&lt;MEI|ME|EPP|MEDIO|GRANDE&gt;</data>
+</node>
+<node id="REQ:cnae:&lt;CNAE 1&gt;">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">cnae</data>
+  <data key="d1">&lt;CNAE 1&gt;</data>
+</node>
+<node id="REQ:cnae:&lt;CNAE 2&gt;">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">cnae</data>
+  <data key="d1">&lt;CNAE 2&gt;</data>
+</node>
+<node id="850de2779272de02">
+  <data key="d0">EDITAL</data>
+  <data key="d2">FAPESP – Agence Nationale de la Recherche Chamada de Propostas para o Programa "Generic Call for Pro</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17789</data>
+  <data key="d6">Engenharia, Química e Física; Ciências Digitais e Matemática; Ciência dos Materiais; Ciências Sociais e Humanidades; Meio Ambiente, Ecossistemas e Recursos Biológicos; e Biologia e Saúde</data>
+  <data key="d7">2026-04-01</data>
+</node>
+<node id="4bf7d9371ea63d75">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada FAPESP – Secretaria de Turismo (SETUR-SP)</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17899</data>
+  <data key="d6">Turismo Inteligente; Turismo Sustentável; Gestão e Desenvolvimento Turístico; Urbanismo e Turismo; Economia do Visitante; Empregabilidade; e Gestão da Oferta</data>
+  <data key="d7">2026-04-01</data>
+</node>
+<node id="5a0ceb6f77a1ae81">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Etapa de seleção ao Prêmio CONFAP de Ciência, Tecnologia e Inovação Professora Niède Guidon (5ª Ediç</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17961</data>
+  <data key="d6">Comunicação</data>
+  <data key="d7">2026-04-06</data>
+</node>
+<node id="THEME:comunicação">
+  <data key="d0">THEME</data>
+  <data key="d1">Comunicação</data>
+</node>
+<node id="THEME:inteligência artificial">
+  <data key="d0">THEME</data>
+  <data key="d1">Inteligência Artificial</data>
+</node>
+<node id="THEME:ciências exatas e da terra">
+  <data key="d0">THEME</data>
+  <data key="d1">Ciências Exatas e da Terra</data>
+</node>
+<node id="THEME:engenharias">
+  <data key="d0">THEME</data>
+  <data key="d1">Engenharias</data>
+</node>
+<node id="THEME:biorrefinarias">
+  <data key="d0">THEME</data>
+  <data key="d1">Biorrefinarias</data>
+</node>
+<node id="54306ce9aa281838">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada de Propostas de Redes FAPESP de Colaboração em Ciência da Computação com Inteligência Artifi</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://www.fapesp.br/17936</data>
+  <data key="d6">Inteligência Artificial e Computação de Alto Desempenho</data>
+  <data key="d7">2026-04-08</data>
+</node>
+<node id="THEME:computação de alto desempenho">
+  <data key="d0">THEME</data>
+  <data key="d1">Computação de Alto Desempenho</data>
+</node>
+<node id="b20a061875365a55">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada de Propostas – Programa de Pesquisa em Políticas Públicas (PPPP) 2025/2026</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17812</data>
+  <data key="d6">Políticas Públicas</data>
+  <data key="d7">2026-04-27</data>
+</node>
+<node id="9dfdc651023d6143">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada Centros de Pesquisa, Inovação e Difusão (CEPID) – 2025</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17875</data>
+  <data key="d6">Ciências Exatas e da Terra e Engenharias</data>
+  <data key="d7">2026-04-27</data>
+</node>
+<node id="THEME:ciências exatas e da terra e engenharias">
+  <data key="d0">THEME</data>
+  <data key="d1">Ciências Exatas e da Terra e Engenharias</data>
+</node>
+<node id="THEME:temas científicos das ciências biológicas e biotecnologia">
+  <data key="d0">THEME</data>
+  <data key="d1">Temas científicos das ciências biológicas e biotecnologia</data>
+</node>
+<node id="b64db6375a2c9b90">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada conjunta FAPESP-NWO 2026: Biorrefinarias Integradas para um Futuro Circular</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17977</data>
+  <data key="d6">Biorrefinarias</data>
+  <data key="d7">2026-06-23</data>
+</node>
+<node id="THEME:segurança alimentar">
+  <data key="d0">THEME</data>
+  <data key="d1">Segurança alimentar</data>
+</node>
+<node id="THEME:bioenergia">
+  <data key="d0">THEME</data>
+  <data key="d1">Bioenergia</data>
+</node>
+<node id="THEME:biotecnologia industrial">
+  <data key="d0">THEME</data>
+  <data key="d1">Biotecnologia industrial</data>
+</node>
+<node id="fbcf90fafadb412f">
+  <data key="d0">EDITAL</data>
+  <data key="d2">FAPESP-BBSRC Pump-Priming Award (FAPPA)</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">http://www.fapesp.br/11999</data>
+  <data key="d6">Temas científicos das ciências biológicas e biotecnologia, mas propostas nos temas segurança alimentar, bioenergia ou biotecnologia industrial terão prioridade.</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:ciências biológicas e biotecnologia">
+  <data key="d0">THEME</data>
+  <data key="d1">ciências biológicas e biotecnologia</data>
+</node>
+<node id="36e103dfeba9dd56">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada FAPESP - National Science Foundation, Diretoria de Geociências</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/17293</data>
+  <data key="d6">Geociências</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="2c2356cb1df1eb8a">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada FAPESP/Confap/Horizon Europe</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">FLUXO_CONTINUO</data>
+  <data key="d5">https://fapesp.br/16466</data>
+  <data key="d6">todas</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="233e8a8a44f29e7d">
+  <data key="d0">EDITAL</data>
+  <data key="d2">DFG</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://fapesp.br/acordos-dfg</data>
+  <data key="d6">Todas as áreas do conhecimento</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:todas as áreas do conhecimento">
+  <data key="d0">THEME</data>
+  <data key="d1">Todas as áreas do conhecimento</data>
+</node>
+<node id="63228450615f733c">
+  <data key="d0">EDITAL</data>
+  <data key="d2">UK Research and Innovation (UKRI)</data>
+  <data key="d3">FAPESP</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://www.fapesp.br/10273</data>
+  <data key="d6">conforme Conselhos de Pesquisa do Reino Unido</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:&lt;conforme conselhos de pesquisa do reino unido&gt;">
+  <data key="d0">THEME</data>
+  <data key="d1">&lt;conforme Conselhos de Pesquisa do Reino Unido&gt;</data>
+</node>
+<node id="REQ:entity:&lt;conforme conselhos de pesquisa do reino unido&gt;">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">&lt;conforme Conselhos de Pesquisa do Reino Unido&gt;</data>
+</node>
+<node id="d438ead13dcd53c5">
+  <data key="d0">EDITAL</data>
+  <data key="d2">PROINFRA 2025 EXPANSÃO</data>
+  <data key="d3">FINEP</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://www.finep.gov.br/chamadas-publicas/chamadapublica/770</data>
+  <data key="d6">Outros</data>
+  <data key="d7">2026-03-27</data>
+</node>
+<node id="THEME:outros">
+  <data key="d0">THEME</data>
+  <data key="d1">outros</data>
+</node>
+<node id="d0a476108afb43b1">
+  <data key="d0">EDITAL</data>
+  <data key="d2">SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT - Subvenção Econômica à Inovação - DESAFIOS TECNOLÓGICOS PARA AGRIC</data>
+  <data key="d3">FINEP</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://www.finep.gov.br/chamadas-publicas/chamadapublica/769</data>
+  <data key="d6">Agricultura, agronegócio e saúde animal; Agritech; Sustentabilidade</data>
+  <data key="d7">2026-03-03</data>
+</node>
+<node id="THEME:agricultura">
+  <data key="d0">THEME</data>
+  <data key="d1">Agricultura</data>
+</node>
+<node id="THEME:agronegócio e saúde animal">
+  <data key="d0">THEME</data>
+  <data key="d1">Agronegócio e saúde animal</data>
+</node>
+<node id="THEME:agritech">
+  <data key="d0">THEME</data>
+  <data key="d1">Agritech</data>
+</node>
+<node id="8e7096bb84acf886">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Cadeias Socioprodutivas da Agricultura Familiar e Sistemas Agroalimentares - Empresas</data>
+  <data key="d3">FINEP</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">http://www.finep.gov.br/chamadas-publicas/chamadapublica/740</data>
+  <data key="d6">None</data>
+  <data key="d7">2024-09-03</data>
+</node>
+<node id="THEME:cadeias socioprodutivas da agricultura familiar e sistemas agroalimentares - empresas">
+  <data key="d0">THEME</data>
+  <data key="d1">Cadeias Socioprodutivas da Agricultura Familiar e Sistemas Agroalimentares - Empresas</data>
+</node>
+<node id="9effb2084ae5e693">
+  <data key="d0">EDITAL</data>
+  <data key="d2">PRÓ-INFRA CENTROS TEMÁTICOS - Implantação e melhoria da infraestrutura de pesquisa para solucionar d</data>
+  <data key="d3">FINEP</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">http://www.finep.gov.br/chamadas-publicas/chamadapublica/719</data>
+  <data key="d6">Saúde e Fármacos</data>
+  <data key="d7">2024-05-03</data>
+</node>
+<node id="THEME:saúde e fármacos">
+  <data key="d0">THEME</data>
+  <data key="d1">Saúde e Fármacos</data>
+</node>
+<node id="1fb364320aca7842">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Finep Mais Inovação Brasil – Rodada 2 – Cadeias Agroindustriais Sustentáveis</data>
+  <data key="d3">FINEP</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://www.finep.gov.br/chamadas-publicas/chamadapublica/774</data>
+  <data key="d6">Agricultura, agronegócio e saúde animal; Foodtech; Outros</data>
+  <data key="d7">2026-09-30</data>
+</node>
+<node id="THEME:foodtech">
+  <data key="d0">THEME</data>
+  <data key="d1">Foodtech</data>
+</node>
+<node id="9817a4d14ee46f1a">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Finep Mais Inovação Brasil – Rodada 2 - Base Industrial de Defesa</data>
+  <data key="d3">FINEP</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">http://www.finep.gov.br/chamadas-publicas/chamadapublica/775</data>
+  <data key="d6">Defesa e segurança nacional; Sustentabilidade</data>
+  <data key="d7">2026-09-30</data>
+</node>
+<node id="THEME:defesa e segurança nacional">
+  <data key="d0">THEME</data>
+  <data key="d1">defesa e segurança nacional</data>
+</node>
+<node id="517530ac90557a6e">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Janela Avaliação 3ª edição – Municípios</data>
+  <data key="d3">ITAU_SOCIAL</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://www.itausocial.org.br/editais/janela-avaliacao-3a-edicao-municipios/</data>
+  <data key="d6">None</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:municípios">
+  <data key="d0">THEME</data>
+  <data key="d1">Municípios</data>
+</node>
+<node id="THEME:políticas">
+  <data key="d0">THEME</data>
+  <data key="d1">Políticas</data>
+</node>
+<node id="THEME:programas">
+  <data key="d0">THEME</data>
+  <data key="d1">Programas</data>
+</node>
+<node id="THEME:projetos">
+  <data key="d0">THEME</data>
+  <data key="d1">Projetos</data>
+</node>
+<node id="REQ:entity:municípios">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">Municípios</data>
+</node>
+<node id="REQ:entity:órgãos">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">Órgãos</data>
+</node>
+<node id="REQ:entity:entidades">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">entity_type</data>
+  <data key="d1">Entidades</data>
+</node>
+<node id="6c496cd45c5bb552">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Edital Educação e Trabalho</data>
+  <data key="d3">ITAU_SOCIAL</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://www.itausocial.org.br/editais/edital-educacao-e-trabalho/</data>
+  <data key="d6">None</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:educação profissional e tecnológica">
+  <data key="d0">THEME</data>
+  <data key="d1">Educação Profissional e Tecnológica</data>
+</node>
+<node id="a32b62331c5e3d1f">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Edital Itaú Esporte 2025</data>
+  <data key="d3">ITAU_SOCIAL</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://www.itausocial.org.br/editais/edital-itau-esporte-2025/</data>
+  <data key="d6">None</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:desenvolvimento">
+  <data key="d0">THEME</data>
+  <data key="d1">desenvolvimento</data>
+</node>
+<node id="THEME:integral">
+  <data key="d0">THEME</data>
+  <data key="d1">integral</data>
+</node>
+<node id="THEME:comunidade">
+  <data key="d0">THEME</data>
+  <data key="d1">comunidade</data>
+</node>
+<node id="1a5d7ac97c33072d">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Bolsa Complementar Alcance</data>
+  <data key="d3">LEMANN</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://fundacaolemann.org.br/liderancas/bolsas-e-oportunidades/</data>
+  <data key="d6">BOLSA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:estudantes negros">
+  <data key="d0">THEME</data>
+  <data key="d1">estudantes negros</data>
+</node>
+<node id="THEME:estudantes indígenas">
+  <data key="d0">THEME</data>
+  <data key="d1">estudantes indígenas</data>
+</node>
+<node id="THEME:programas de mestrado">
+  <data key="d0">THEME</data>
+  <data key="d1">programas de mestrado</data>
+</node>
+<node id="THEME:programas de doutorado">
+  <data key="d0">THEME</data>
+  <data key="d1">programas de doutorado</data>
+</node>
+<node id="THEME:exteriores">
+  <data key="d0">THEME</data>
+  <data key="d1">exteriores</data>
+</node>
+<node id="d4463db1e6b9f9f5">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Programa Alcance Prep</data>
+  <data key="d3">LEMANN</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://fundacaolemann.org.br/liderancas/bolsas-e-oportunidades/</data>
+  <data key="d6">PROGRAMA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:preparação de candidaturas">
+  <data key="d0">THEME</data>
+  <data key="d1">preparação de candidaturas</data>
+</node>
+<node id="5e18d7c5e4e36edf">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Lemann Fellowship</data>
+  <data key="d3">LEMANN</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://fundacaolemann.org.br/liderancas/bolsas-e-oportunidades/</data>
+  <data key="d6">PROGRAMA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:bolsas">
+  <data key="d0">THEME</data>
+  <data key="d1">bolsas</data>
+</node>
+<node id="THEME:estudantes">
+  <data key="d0">THEME</data>
+  <data key="d1">estudantes</data>
+</node>
+<node id="THEME:universidades">
+  <data key="d0">THEME</data>
+  <data key="d1">universidades</data>
+</node>
+<node id="THEME:parcerias">
+  <data key="d0">THEME</data>
+  <data key="d1">parcerias</data>
+</node>
+<node id="855769e067cae622">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Bolsas de Graduação em Direito</data>
+  <data key="d3">LEMANN</data>
+  <data key="d4">VERIFICAR</data>
+  <data key="d5">https://fundacaolemann.org.br/liderancas/bolsas-e-oportunidades/</data>
+  <data key="d6">BOLSA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:direito">
+  <data key="d0">THEME</data>
+  <data key="d1">Direito</data>
+</node>
+<node id="THEME:educação">
+  <data key="d0">THEME</data>
+  <data key="d1">Educação</data>
+</node>
+<node id="REQ:porte:MEI|ME|EPP|MEDIO">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">porte</data>
+  <data key="d1">MEI|ME|EPP|MEDIO</data>
+</node>
+<node id="7015f8cba414ae74">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada Pública nº 9 – 2025 | Ciência</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-publica-de-apoio-a-jovens-cientistas-no-9-2025/</data>
+  <data key="d6">OUTROS</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="90eae823603802fb">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada pública conjunta de apoio a pós-docs negros e indígenas em ecologia nº 4/2025</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-publica-conjunta-de-apoio-a-pos-docs-negros-e-indigenas-em-ecologia-no-4-2025/</data>
+  <data key="d6">ECOLOGIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:ecologia">
+  <data key="d0">THEME</data>
+  <data key="d1">ECOLOGIA</data>
+</node>
+<node id="837d304119e187b6">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada pública para laboratório colaborativo de comunicação e ciência</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-publica-para-laboratorio-colaborativo-de-comunicacao-e-ciencia/</data>
+  <data key="d6">CIÊNCIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="3fec707c4a59cf52">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Formação em Ecologia Quantitativa – 2026</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://serrapilheira.org/ano/formacao-em-ecologia-quantitativa-2026/</data>
+  <data key="d6">ECOLOGIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:quantidade">
+  <data key="d0">THEME</data>
+  <data key="d1">quantidade</data>
+</node>
+<node id="0723a9d41100920f">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Camp Serrapilheira 2025: Podcasts</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://serrapilheira.org/ano/camp-serrapilheira-2025-podcasts/</data>
+  <data key="d6">DIVULGAÇÃO</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:divulgação">
+  <data key="d0">THEME</data>
+  <data key="d1">divulgação</data>
+</node>
+<node id="a28c8a5f0e796027">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada pública conjunta de apoio a pós-docs negros e indígenas em ecologia nº 3 – 2024</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-conjunta-de-apoio-a-pos-docs-negros-e-indigenas-em-ecologia-no-3-2024/</data>
+  <data key="d6">ECOLOGIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="ed7d682d67da1515">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada Pública nº 8 – 2024 | Ciência</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-publica-no-8-2024-ciencia/</data>
+  <data key="d6">CIÊNCIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="a70c3ecf566f6164">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada pública para reportagens jornalísticas baseadas em dados de biodiversidade</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-reportagens-jornalisticas-dados-de-biodiversidade/</data>
+  <data key="d6">JORNALISMO</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:jornalismo">
+  <data key="d0">THEME</data>
+  <data key="d1">JORNALISMO</data>
+</node>
+<node id="2dc68e65b30c527e">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Formação em Ecologia Quantitativa – 2025</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ABERTA</data>
+  <data key="d5">https://serrapilheira.org/ano/formacao-em-ecologia-quantitativa-2025/</data>
+  <data key="d6">ECOLOGIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="c39f2d9d9e8e9d82">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Camp Serrapilheira 2024: Podcasts</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/camp-serrapilheira-2024-podcasts/</data>
+  <data key="d6">DIVULGAÇÃO</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="13eca16fab83ff45">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada pública conjunta de apoio a pós-docs negros e indígenas em ecologia nº 2 – 2023</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-conjunta-de-apoio-a-pos-docs-negros-e-indigenas-em-ecologia-no-2-2023/</data>
+  <data key="d6">ECOLOGIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="3cdc341d52ad0e1d">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada Pública nº 7 – 2023 | Ciência</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-publica-no-7-2023-ciencia/</data>
+  <data key="d6">CIÊNCIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="87ff41ae482f1e54">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Formação em Ecologia Quantitativa – 2024</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/formacao-em-ecologia-quantitativa-2024/</data>
+  <data key="d6">ECOLOGIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="568e87851dbd5a12">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Camp Serrapilheira 2023: Podcasts</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/camp-serrapilheira-2023-podcasts/</data>
+  <data key="d6">DIVULGAÇÃO</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="92bf45c491dc9163">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada pública conjunta de apoio a pós-docs negros e indígenas em ecologia nº 1 – 2023</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-faperj-2022/</data>
+  <data key="d6">ECOLOGIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="bd524b1ca851e475">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Disarming Disinformation – 2022</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/disarming-disinformation/</data>
+  <data key="d6">OUTROS</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="d373919a45f993a8">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada para pesquisa em doenças raras – 2022</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-doencas-raras/</data>
+  <data key="d6">OUTROS</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:doenças raras">
+  <data key="d0">THEME</data>
+  <data key="d1">doenças raras</data>
+</node>
+<node id="6e8f3a569bbcd0ad">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Formação em Ecologia Quantitativa – 2023</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/formacao-em-ecologia-quantitativa-2023/</data>
+  <data key="d6">ECOLOGIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="46d9e6d6d6205603">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada Pública nº 6 – 2022 | Ciência</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-publica-no-6-2022-ciencia/</data>
+  <data key="d6">CIÊNCIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="b5d056b2e7f3a760">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada pública: O papel da ciência no Brasil de amanhã</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-publica-para-projetos-jornalisticos-o-papel-da-ciencia-no-brasil-de-amanha/</data>
+  <data key="d6">CIÊNCIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="9d979e4ff4a5a9ea">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Formação em Biologia e Ecologia Quantitativas 2022</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/formacao-em-biologia-e-ecologia-quantitativas-2022/</data>
+  <data key="d6">ECOLOGIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="15b3b9b7f25246da">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada Pública nº 5 – 2021 | Ciência</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-publica-no-5-2021-ciencia/</data>
+  <data key="d6">CIÊNCIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="ea56fa83597d7b15">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Formação em Biologia e Ecologia Quantitativas – 2021</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/formacao-em-biologia-e-ecologia-quantitativas-no-1-formacao/</data>
+  <data key="d6">ECOLOGIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="b0b3238c3ff6eeb9">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada Pública n° 4 – 2020 | Ciência</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-publica-n-4-2020-ciencia/</data>
+  <data key="d6">CIÊNCIA</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="0932de8e7cb881da">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Camp Serrapilheira 2020: Podcasts | Divulgação Científica</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/camp-serrapilheira-2020-divulgacao-cientifica/</data>
+  <data key="d6">DIVULGAÇÃO</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:científica">
+  <data key="d0">THEME</data>
+  <data key="d1">Científica</data>
+</node>
+<node id="9ff34ef28c8310e5">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada pública nº 3 – 2019 | Ciência</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-publica-no-3-2019-pesquisa-cientifica/</data>
+  <data key="d6">OUTROS</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="74105a7ea0bf37f2">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Camp Serrapilheira 2019 | Divulgação Científica</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/camp-serrapilheira-2019-divulgacao-cientifica/</data>
+  <data key="d6">DIVULGAÇÃO</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="THEME:divulgação científica">
+  <data key="d0">THEME</data>
+  <data key="d1">Divulgação Científica</data>
+</node>
+<node id="b5b07487761bc3ae">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada Pública nº 2 – 2018 | Ciência</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-publica-no-2-2018-pesquisa-cientifica/</data>
+  <data key="d6">OUTROS</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="REQ:porte:OUTROS">
+  <data key="d0">REQUIREMENT</data>
+  <data key="d8">porte</data>
+  <data key="d1">OUTROS</data>
+</node>
+<node id="09ff6b0c1a5a085f">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Camp Serrapilheira 2018 | Divulgação Científica</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/camp-serrapilheira-2018-divulgacao-cientifica/</data>
+  <data key="d6">DIVULGAÇÃO</data>
+  <data key="d7">NaT</data>
+</node>
+<node id="751ac91766cf29a4">
+  <data key="d0">EDITAL</data>
+  <data key="d2">Chamada Pública nº 1 – 2017 | Ciência</data>
+  <data key="d3">SERRAPILHEIRA</data>
+  <data key="d4">ENCERRADA</data>
+  <data key="d5">https://serrapilheira.org/ano/chamada-publica-no-1-2017-pesquisa-cientifica/</data>
+  <data key="d6">OUTROS</data>
+  <data key="d7">NaT</data>
+</node>
+<edge source="SRC:ARAPYAU" target="fda383fdf30e0fce">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="6154f9b53723e2d9">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="f30670cfb0ba8201">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="a414af1fc054877d">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="fd186f558987c496">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="ac6d583f8b0fe153">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="75a6d9bac9ef944f">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="b7b69e514b410d34">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="f208059e3bb58aff">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="40dc53e1b77b3698">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="5a865e3f935496d5">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="056dcf2a58271952">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="d814b7a5f0123afa">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="8be51dbd22303827">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="ce248ab36759367d">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="fd28f6fbd4f7fee8">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="8e50468da59e0dbf">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="59e0792b778f788f">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="9959f61ad741bdf8">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ARAPYAU" target="585ff9d4bf882078">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:BNDES" target="1912033b4701440c">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:BNDES" target="b715a26845228c17">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:BNDES" target="1f9148aca9697212">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:BNDES" target="f4d493548863fd5e">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:BNDES" target="4354334260d7e839">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:CNPQ" target="694dfaab83340267">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:CNPQ" target="4a0a7921f9815281">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:CNPQ" target="a5cc55f3960e1c29">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:CNPQ" target="05ac6b74e4637ad8">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:CNPQ" target="6e340b55056e1e9e">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:CNPQ" target="640853ee4bbdbed9">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:CNPQ" target="7568c1499a85347c">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="5fc2be1044952999">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="8a05b5d110384d92">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="6a8b14853e9edef3">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="d507ab39215e262d">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="31706f79815280bf">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="c4e0514bccb30cc3">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="a6fe9c8332927bfb">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="425ad3f85d784838">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="892be58ee82b2cb3">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="e16eab0002059090">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="850de2779272de02">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="4bf7d9371ea63d75">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="5a0ceb6f77a1ae81">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="54306ce9aa281838">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="b20a061875365a55">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="9dfdc651023d6143">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="b64db6375a2c9b90">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="fbcf90fafadb412f">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="36e103dfeba9dd56">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="2c2356cb1df1eb8a">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="233e8a8a44f29e7d">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FAPESP" target="63228450615f733c">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FINEP" target="d438ead13dcd53c5">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FINEP" target="d0a476108afb43b1">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FINEP" target="8e7096bb84acf886">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FINEP" target="9effb2084ae5e693">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FINEP" target="1fb364320aca7842">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:FINEP" target="9817a4d14ee46f1a">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ITAU_SOCIAL" target="517530ac90557a6e">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ITAU_SOCIAL" target="6c496cd45c5bb552">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:ITAU_SOCIAL" target="a32b62331c5e3d1f">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:LEMANN" target="1a5d7ac97c33072d">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:LEMANN" target="d4463db1e6b9f9f5">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:LEMANN" target="5e18d7c5e4e36edf">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:LEMANN" target="855769e067cae622">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="7015f8cba414ae74">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="90eae823603802fb">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="837d304119e187b6">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="3fec707c4a59cf52">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="0723a9d41100920f">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="a28c8a5f0e796027">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="ed7d682d67da1515">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="a70c3ecf566f6164">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="2dc68e65b30c527e">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="c39f2d9d9e8e9d82">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="13eca16fab83ff45">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="3cdc341d52ad0e1d">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="87ff41ae482f1e54">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="568e87851dbd5a12">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="92bf45c491dc9163">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="bd524b1ca851e475">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="d373919a45f993a8">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="6e8f3a569bbcd0ad">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="46d9e6d6d6205603">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="b5d056b2e7f3a760">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="9d979e4ff4a5a9ea">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="15b3b9b7f25246da">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="ea56fa83597d7b15">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="b0b3238c3ff6eeb9">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="0932de8e7cb881da">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="9ff34ef28c8310e5">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="74105a7ea0bf37f2">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="b5b07487761bc3ae">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="09ff6b0c1a5a085f">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="SRC:SERRAPILHEIRA" target="751ac91766cf29a4">
+  <data key="d9">FROM_SOURCE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fda383fdf30e0fce" target="THEME:desenvolvimento sustentável">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fda383fdf30e0fce" target="THEME:políticas públicas">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fda383fdf30e0fce" target="THEME:gestão ambiental">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fda383fdf30e0fce" target="THEME:inovação">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fda383fdf30e0fce" target="THEME:sustentabilidade">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fda383fdf30e0fce" target="THEME:justiça climática">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fda383fdf30e0fce" target="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fda383fdf30e0fce" target="REQ:entity:empresa">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fda383fdf30e0fce" target="REQ:entity:ong">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fda383fdf30e0fce" target="REQ:entity:unidade de ensino">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fda383fdf30e0fce" target="REQ:entity:pessoa física">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:desenvolvimento sustentável" target="892be58ee82b2cb3">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:políticas públicas" target="6a8b14853e9edef3">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:políticas públicas" target="d507ab39215e262d">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:políticas públicas" target="31706f79815280bf">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:políticas públicas" target="c4e0514bccb30cc3">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:políticas públicas" target="b20a061875365a55">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:políticas públicas" target="THEME:bioeconomia e desenvolvimento sustentável">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.4</data>
+</edge>
+<edge source="THEME:políticas públicas" target="THEME:ciência da computação com inteligência artificial">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.4</data>
+</edge>
+<edge source="THEME:políticas públicas" target="THEME:geociências">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="THEME:políticas públicas" target="THEME:inovação na administração e serviços públicos">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:políticas públicas" target="THEME:transição energética">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.4</data>
+</edge>
+<edge source="THEME:inovação" target="1912033b4701440c">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:inovação" target="b715a26845228c17">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:inovação" target="1f9148aca9697212">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:inovação" target="f4d493548863fd5e">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:inovação" target="4354334260d7e839">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:inovação" target="05ac6b74e4637ad8">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:sustentabilidade" target="a414af1fc054877d">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:sustentabilidade" target="59e0792b778f788f">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:sustentabilidade" target="d0a476108afb43b1">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:sustentabilidade" target="9817a4d14ee46f1a">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="fd28f6fbd4f7fee8">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="9959f61ad741bdf8">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="1912033b4701440c">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="b715a26845228c17">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="1f9148aca9697212">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="f4d493548863fd5e">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="4354334260d7e839">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="7568c1499a85347c">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="5fc2be1044952999">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="8a05b5d110384d92">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="6a8b14853e9edef3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="d507ab39215e262d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="31706f79815280bf">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="c4e0514bccb30cc3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="4bf7d9371ea63d75">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="b20a061875365a55">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="9dfdc651023d6143">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="517530ac90557a6e">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="6c496cd45c5bb552">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="a32b62331c5e3d1f">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="7015f8cba414ae74">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="90eae823603802fb">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="837d304119e187b6">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="a28c8a5f0e796027">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="13eca16fab83ff45">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="87ff41ae482f1e54">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="92bf45c491dc9163">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="d373919a45f993a8">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="6e8f3a569bbcd0ad">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="9ff34ef28c8310e5">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="74105a7ea0bf37f2">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:MEI|ME|EPP|MEDIO|GRANDE" target="09ff6b0c1a5a085f">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="a414af1fc054877d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="8be51dbd22303827">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="ce248ab36759367d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="fd28f6fbd4f7fee8">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="1912033b4701440c">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="b715a26845228c17">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="1f9148aca9697212">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="f4d493548863fd5e">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="4354334260d7e839">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="694dfaab83340267">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="4a0a7921f9815281">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="a5cc55f3960e1c29">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="05ac6b74e4637ad8">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="6e340b55056e1e9e">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="640853ee4bbdbed9">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="7568c1499a85347c">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="5fc2be1044952999">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="8a05b5d110384d92">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="6a8b14853e9edef3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="d507ab39215e262d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="31706f79815280bf">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="c4e0514bccb30cc3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="a6fe9c8332927bfb">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="892be58ee82b2cb3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="e16eab0002059090">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="850de2779272de02">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="4bf7d9371ea63d75">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="5a0ceb6f77a1ae81">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="54306ce9aa281838">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="b20a061875365a55">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="9dfdc651023d6143">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="b64db6375a2c9b90">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="fbcf90fafadb412f">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="36e103dfeba9dd56">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="2c2356cb1df1eb8a">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="233e8a8a44f29e7d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="d0a476108afb43b1">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="8e7096bb84acf886">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="6c496cd45c5bb552">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="a32b62331c5e3d1f">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="d4463db1e6b9f9f5">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="855769e067cae622">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="837d304119e187b6">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="a70c3ecf566f6164">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="87ff41ae482f1e54">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="6e8f3a569bbcd0ad">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="74105a7ea0bf37f2">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:empresa" target="09ff6b0c1a5a085f">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="a414af1fc054877d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="8be51dbd22303827">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="1f9148aca9697212">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="694dfaab83340267">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="4a0a7921f9815281">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="a5cc55f3960e1c29">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="05ac6b74e4637ad8">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="6e340b55056e1e9e">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="640853ee4bbdbed9">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="5fc2be1044952999">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="8a05b5d110384d92">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="6a8b14853e9edef3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="d507ab39215e262d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="31706f79815280bf">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="c4e0514bccb30cc3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="a6fe9c8332927bfb">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="892be58ee82b2cb3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="e16eab0002059090">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="850de2779272de02">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="4bf7d9371ea63d75">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="5a0ceb6f77a1ae81">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="54306ce9aa281838">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="b20a061875365a55">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="9dfdc651023d6143">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="b64db6375a2c9b90">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="fbcf90fafadb412f">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="36e103dfeba9dd56">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="2c2356cb1df1eb8a">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="233e8a8a44f29e7d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="6c496cd45c5bb552">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="a32b62331c5e3d1f">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="837d304119e187b6">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="a28c8a5f0e796027">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="13eca16fab83ff45">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="87ff41ae482f1e54">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="92bf45c491dc9163">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="d373919a45f993a8">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="6e8f3a569bbcd0ad">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="74105a7ea0bf37f2">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:ong" target="09ff6b0c1a5a085f">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="a414af1fc054877d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="8be51dbd22303827">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="ce248ab36759367d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="fd28f6fbd4f7fee8">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="1912033b4701440c">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="b715a26845228c17">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="1f9148aca9697212">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="4354334260d7e839">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="694dfaab83340267">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="a5cc55f3960e1c29">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="6e340b55056e1e9e">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="640853ee4bbdbed9">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="7568c1499a85347c">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="5fc2be1044952999">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="8a05b5d110384d92">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="6a8b14853e9edef3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="d507ab39215e262d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="31706f79815280bf">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="c4e0514bccb30cc3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="a6fe9c8332927bfb">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="892be58ee82b2cb3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="e16eab0002059090">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="850de2779272de02">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="4bf7d9371ea63d75">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="5a0ceb6f77a1ae81">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="54306ce9aa281838">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="b20a061875365a55">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="9dfdc651023d6143">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="b64db6375a2c9b90">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="fbcf90fafadb412f">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="36e103dfeba9dd56">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="2c2356cb1df1eb8a">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="233e8a8a44f29e7d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="d0a476108afb43b1">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="6c496cd45c5bb552">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="a32b62331c5e3d1f">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="1a5d7ac97c33072d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="d4463db1e6b9f9f5">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="5e18d7c5e4e36edf">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="855769e067cae622">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="837d304119e187b6">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="a28c8a5f0e796027">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="a70c3ecf566f6164">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="13eca16fab83ff45">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="87ff41ae482f1e54">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="92bf45c491dc9163">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="d373919a45f993a8">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="6e8f3a569bbcd0ad">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="74105a7ea0bf37f2">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:pessoa física" target="09ff6b0c1a5a085f">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6154f9b53723e2d9" target="THEME:viabilidade econômica">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6154f9b53723e2d9" target="THEME:sistemas agroflorestais">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6154f9b53723e2d9" target="THEME:cacau">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="f30670cfb0ba8201" target="THEME:cop30">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="f30670cfb0ba8201" target="THEME:amazonia">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="f30670cfb0ba8201" target="5a865e3f935496d5">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="f30670cfb0ba8201" target="8be51dbd22303827">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="f30670cfb0ba8201" target="ce248ab36759367d">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="f30670cfb0ba8201" target="ac6d583f8b0fe153">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="THEME:cop30" target="ac6d583f8b0fe153">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:cop30" target="5a865e3f935496d5">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:cop30" target="056dcf2a58271952">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:cop30" target="8be51dbd22303827">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:cop30" target="ce248ab36759367d">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a414af1fc054877d" target="THEME:desenvolvimento territorial">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a414af1fc054877d" target="THEME:inclusão">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a414af1fc054877d" target="REQ:entity:universidade">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a414af1fc054877d" target="59e0792b778f788f">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="a414af1fc054877d" target="9817a4d14ee46f1a">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="REQ:entity:universidade" target="1f9148aca9697212">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="694dfaab83340267">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="4a0a7921f9815281">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="a5cc55f3960e1c29">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="05ac6b74e4637ad8">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="6e340b55056e1e9e">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="640853ee4bbdbed9">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="5fc2be1044952999">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="8a05b5d110384d92">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="6a8b14853e9edef3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="d507ab39215e262d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="31706f79815280bf">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="c4e0514bccb30cc3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="a6fe9c8332927bfb">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="e16eab0002059090">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="850de2779272de02">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="4bf7d9371ea63d75">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="5a0ceb6f77a1ae81">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="54306ce9aa281838">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="b20a061875365a55">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="9dfdc651023d6143">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="b64db6375a2c9b90">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="fbcf90fafadb412f">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="36e103dfeba9dd56">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="2c2356cb1df1eb8a">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="233e8a8a44f29e7d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="6c496cd45c5bb552">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="837d304119e187b6">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="87ff41ae482f1e54">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:universidade" target="6e8f3a569bbcd0ad">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fd186f558987c496" target="THEME:transformações sistêmicas">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fd186f558987c496" target="THEME:atuação em redes">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="ac6d583f8b0fe153" target="THEME:filantropia">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="ac6d583f8b0fe153" target="THEME:global south">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="ac6d583f8b0fe153" target="5a865e3f935496d5">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="THEME:ciência">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="THEME:soluções brasileiras">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="7015f8cba414ae74">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="585ff9d4bf882078">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="b0b3238c3ff6eeb9">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="46d9e6d6d6205603">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="b5b07487761bc3ae">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="15b3b9b7f25246da">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="ed7d682d67da1515">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="751ac91766cf29a4">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="837d304119e187b6">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="3cdc341d52ad0e1d">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="b5d056b2e7f3a760">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="9ff34ef28c8310e5">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="75a6d9bac9ef944f" target="8be51dbd22303827">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="THEME:ciência" target="8be51dbd22303827">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência" target="7015f8cba414ae74">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência" target="837d304119e187b6">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência" target="ed7d682d67da1515">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência" target="3cdc341d52ad0e1d">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência" target="46d9e6d6d6205603">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência" target="b5d056b2e7f3a760">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência" target="15b3b9b7f25246da">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência" target="b0b3238c3ff6eeb9">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência" target="9ff34ef28c8310e5">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência" target="b5b07487761bc3ae">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência" target="751ac91766cf29a4">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:soluções brasileiras" target="585ff9d4bf882078">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b7b69e514b410d34" target="THEME:transição climática">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b7b69e514b410d34" target="THEME:brasil">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="f208059e3bb58aff" target="THEME:avanços">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="f208059e3bb58aff" target="THEME:adaptação">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="f208059e3bb58aff" target="THEME:transição justa">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="40dc53e1b77b3698" target="THEME:clima">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="40dc53e1b77b3698" target="THEME:ambiente">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="40dc53e1b77b3698" target="8e50468da59e0dbf">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="40dc53e1b77b3698" target="59e0792b778f788f">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="THEME:clima" target="8e50468da59e0dbf">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:clima" target="59e0792b778f788f">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5a865e3f935496d5" target="THEME:negociações do acordo de paris">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5a865e3f935496d5" target="ce248ab36759367d">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="5a865e3f935496d5" target="8be51dbd22303827">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="056dcf2a58271952" target="THEME:estabilidade">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="056dcf2a58271952" target="THEME:biomas">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="056dcf2a58271952" target="THEME:floresta amazônica">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="056dcf2a58271952" target="THEME:recifes de corais tropicais">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="d814b7a5f0123afa" target="THEME:alimentação escolar">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="d814b7a5f0123afa" target="THEME:regenerar o planeta">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="8be51dbd22303827" target="THEME:negociadores">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="8be51dbd22303827" target="837d304119e187b6">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="8be51dbd22303827" target="3cdc341d52ad0e1d">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="8be51dbd22303827" target="b5d056b2e7f3a760">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="8be51dbd22303827" target="9ff34ef28c8310e5">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="8be51dbd22303827" target="b0b3238c3ff6eeb9">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="8be51dbd22303827" target="46d9e6d6d6205603">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="8be51dbd22303827" target="b5b07487761bc3ae">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="8be51dbd22303827" target="ed7d682d67da1515">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="8be51dbd22303827" target="15b3b9b7f25246da">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="8be51dbd22303827" target="751ac91766cf29a4">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="8be51dbd22303827" target="7015f8cba414ae74">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="ce248ab36759367d" target="THEME:livro">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="ce248ab36759367d" target="THEME:documentário">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fd28f6fbd4f7fee8" target="THEME:florestal">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fd28f6fbd4f7fee8" target="THEME:setor privado">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fd28f6fbd4f7fee8" target="8e50468da59e0dbf">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="THEME:florestal" target="8e50468da59e0dbf">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="8e50468da59e0dbf" target="THEME:protagonismo brasileiro">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="8e50468da59e0dbf" target="59e0792b778f788f">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="59e0792b778f788f" target="9817a4d14ee46f1a">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="9959f61ad741bdf8" target="THEME:natureza">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="9959f61ad741bdf8" target="THEME:perspectiva">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="9959f61ad741bdf8" target="THEME:olhar brasileiro">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="585ff9d4bf882078" target="THEME:desafios globais">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1912033b4701440c" target="REQ:entity:startup">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1912033b4701440c" target="05ac6b74e4637ad8">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="1912033b4701440c" target="f4d493548863fd5e">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1912033b4701440c" target="4354334260d7e839">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1912033b4701440c" target="1f9148aca9697212">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1912033b4701440c" target="b715a26845228c17">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="b715a26845228c17">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="1f9148aca9697212">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="f4d493548863fd5e">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="4354334260d7e839">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="5fc2be1044952999">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="8a05b5d110384d92">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="6a8b14853e9edef3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="d507ab39215e262d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="31706f79815280bf">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="c4e0514bccb30cc3">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="e16eab0002059090">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="850de2779272de02">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="4bf7d9371ea63d75">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="b20a061875365a55">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="9dfdc651023d6143">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="233e8a8a44f29e7d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="d0a476108afb43b1">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="6c496cd45c5bb552">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="837d304119e187b6">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="87ff41ae482f1e54">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:entity:startup" target="6e8f3a569bbcd0ad">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b715a26845228c17" target="f4d493548863fd5e">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b715a26845228c17" target="05ac6b74e4637ad8">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="b715a26845228c17" target="1f9148aca9697212">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b715a26845228c17" target="4354334260d7e839">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1f9148aca9697212" target="REQ:entity:ict">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1f9148aca9697212" target="05ac6b74e4637ad8">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="1f9148aca9697212" target="f4d493548863fd5e">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1f9148aca9697212" target="4354334260d7e839">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="f4d493548863fd5e" target="05ac6b74e4637ad8">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="f4d493548863fd5e" target="4354334260d7e839">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="4354334260d7e839" target="05ac6b74e4637ad8">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="694dfaab83340267" target="THEME:ambiente e sustentabilidade">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="694dfaab83340267" target="THEME:alimentação e agricultura">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="694dfaab83340267" target="THEME:energia e mineração">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="694dfaab83340267" target="THEME:saúde">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="694dfaab83340267" target="THEME:tecnologia da informação">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="694dfaab83340267" target="THEME:ciências humanas e sociais">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:saúde" target="05ac6b74e4637ad8">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:saúde" target="6e340b55056e1e9e">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="4a0a7921f9815281" target="THEME:saúde das mulheres">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="4a0a7921f9815281" target="THEME:pesquisa inovadora">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="4a0a7921f9815281" target="REQ:entity:unidade de saúde pública">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a5cc55f3960e1c29" target="THEME:pesquisas estratégicas">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a5cc55f3960e1c29" target="THEME:terapias avançadas">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a5cc55f3960e1c29" target="THEME:terapias baseadas em ácidos nucleicos">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="05ac6b74e4637ad8" target="THEME:vacinologia">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="05ac6b74e4637ad8" target="REQ:entity:unidade de pesquisa">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6e340b55056e1e9e" target="THEME:meio ambiente">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6e340b55056e1e9e" target="THEME:alimentos e agricultura">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6e340b55056e1e9e" target="THEME:ict's">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6e340b55056e1e9e" target="THEME:física">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="640853ee4bbdbed9" target="THEME:pesquisa">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="640853ee4bbdbed9" target="THEME:extensão">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="640853ee4bbdbed9" target="THEME:formação">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="640853ee4bbdbed9" target="THEME:epidemiologia">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="640853ee4bbdbed9" target="THEME:vigilância em saúde">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7568c1499a85347c" target="THEME:compreensão, monitoramento, conservação e documentação da biodiversidade amazônica">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7568c1499a85347c" target="THEME:contribuições presentes e passadas dos povos indígenas e comunidades locais para a biodiversidade">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7568c1499a85347c" target="THEME:cobertura florestal, observação da terra, mudanças ambientais regionais e sustentabilidade">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7568c1499a85347c" target="THEME:biodiversidade, saúde humana e alimentação (abordagem one health)">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7568c1499a85347c" target="THEME:bioeconomia para meios de subsistência inclusivos e economias plurais, bem viver e sistemas alimentares saudáveis">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5fc2be1044952999" target="THEME:mudanças climáticas">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5fc2be1044952999" target="THEME:cidades sustentáveis">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="8a05b5d110384d92" target="THEME:all">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="8a05b5d110384d92" target="2c2356cb1df1eb8a">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:all" target="2c2356cb1df1eb8a">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6a8b14853e9edef3" target="THEME:genômica">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6a8b14853e9edef3" target="THEME:inovação na administração e serviços públicos">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6a8b14853e9edef3" target="THEME:transição energética">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6a8b14853e9edef3" target="THEME:bioeconomia e desenvolvimento sustentável">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6a8b14853e9edef3" target="THEME:ciência da computação com inteligência artificial">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6a8b14853e9edef3" target="THEME:geociências">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6a8b14853e9edef3" target="c4e0514bccb30cc3">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.625</data>
+</edge>
+<edge source="6a8b14853e9edef3" target="d507ab39215e262d">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.8571428571428571</data>
+</edge>
+<edge source="6a8b14853e9edef3" target="31706f79815280bf">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.7142857142857143</data>
+</edge>
+<edge source="6a8b14853e9edef3" target="a6fe9c8332927bfb">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.2857142857142857</data>
+</edge>
+<edge source="THEME:inovação na administração e serviços públicos" target="d507ab39215e262d">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:inovação na administração e serviços públicos" target="THEME:bioeconomia e desenvolvimento sustentável">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:inovação na administração e serviços públicos" target="THEME:ciência da computação com inteligência artificial">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:inovação na administração e serviços públicos" target="THEME:geociências">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:inovação na administração e serviços públicos" target="THEME:transição energética">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:transição energética" target="d507ab39215e262d">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:transição energética" target="31706f79815280bf">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:transição energética" target="c4e0514bccb30cc3">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:transição energética" target="a6fe9c8332927bfb">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:transição energética" target="425ad3f85d784838">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:transição energética" target="THEME:bioeconomia e desenvolvimento sustentável">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="THEME:transição energética" target="THEME:ciência da computação com inteligência artificial">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.4</data>
+</edge>
+<edge source="THEME:transição energética" target="THEME:geociências">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.4</data>
+</edge>
+<edge source="THEME:bioeconomia e desenvolvimento sustentável" target="d507ab39215e262d">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:bioeconomia e desenvolvimento sustentável" target="31706f79815280bf">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:bioeconomia e desenvolvimento sustentável" target="c4e0514bccb30cc3">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:bioeconomia e desenvolvimento sustentável" target="a6fe9c8332927bfb">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:bioeconomia e desenvolvimento sustentável" target="THEME:ciência da computação com inteligência artificial">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.4</data>
+</edge>
+<edge source="THEME:bioeconomia e desenvolvimento sustentável" target="THEME:geociências">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.4</data>
+</edge>
+<edge source="THEME:ciência da computação com inteligência artificial" target="d507ab39215e262d">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência da computação com inteligência artificial" target="31706f79815280bf">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência da computação com inteligência artificial" target="c4e0514bccb30cc3">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência da computação com inteligência artificial" target="THEME:geociências">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.4</data>
+</edge>
+<edge source="THEME:geociências" target="d507ab39215e262d">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:geociências" target="31706f79815280bf">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:geociências" target="c4e0514bccb30cc3">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:geociências" target="5a0ceb6f77a1ae81">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:geociências" target="b20a061875365a55">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:geociências" target="9dfdc651023d6143">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:geociências" target="36e103dfeba9dd56">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:geociências" target="THEME:biorrefinarias">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.3</data>
+</edge>
+<edge source="THEME:geociências" target="THEME:ciências exatas e da terra">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:geociências" target="THEME:engenharias">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="d507ab39215e262d" target="a6fe9c8332927bfb">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="d507ab39215e262d" target="c4e0514bccb30cc3">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.7142857142857143</data>
+</edge>
+<edge source="d507ab39215e262d" target="31706f79815280bf">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.8333333333333334</data>
+</edge>
+<edge source="31706f79815280bf" target="b20a061875365a55">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="31706f79815280bf" target="a6fe9c8332927bfb">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.4</data>
+</edge>
+<edge source="31706f79815280bf" target="c4e0514bccb30cc3">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.8333333333333334</data>
+</edge>
+<edge source="c4e0514bccb30cc3" target="THEME:interdisciplinar">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="c4e0514bccb30cc3" target="a6fe9c8332927bfb">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="a6fe9c8332927bfb" target="425ad3f85d784838">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="892be58ee82b2cb3" target="THEME:bioeconomia">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="892be58ee82b2cb3" target="REQ:entity:unidade de i&amp;d">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:engenharia">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:química e física">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:ciências digitais e matemática">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:ciência dos materiais">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:ciências sociais e humanidades">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:meio ambiente, ecossistemas e recursos biológicos">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:biologia e saúde">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:turismo inteligente">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:turismo sustentável">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:gestão e desenvolvimento turístico">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:urbanismo e turismo">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:economia do visitante">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:empregabilidade">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="THEME:gestão da oferta">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="REQ:porte:&lt;MEI|ME|EPP|MEDIO|GRANDE&gt;">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="REQ:cnae:&lt;CNAE 1&gt;">
+  <data key="d9">ACCEPTS_CNAE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="REQ:cnae:&lt;CNAE 2&gt;">
+  <data key="d9">ACCEPTS_CNAE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="e16eab0002059090" target="850de2779272de02">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="e16eab0002059090" target="4bf7d9371ea63d75">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="THEME:engenharia" target="850de2779272de02">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:engenharia" target="THEME:biologia e saúde">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:engenharia" target="THEME:ciência dos materiais">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:engenharia" target="THEME:ciências digitais e matemática">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:engenharia" target="THEME:ciências sociais e humanidades">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:engenharia" target="THEME:meio ambiente, ecossistemas e recursos biológicos">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:engenharia" target="THEME:química e física">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:química e física" target="850de2779272de02">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:química e física" target="THEME:biologia e saúde">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:química e física" target="THEME:ciência dos materiais">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:química e física" target="THEME:ciências digitais e matemática">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:química e física" target="THEME:ciências sociais e humanidades">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:química e física" target="THEME:meio ambiente, ecossistemas e recursos biológicos">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:ciências digitais e matemática" target="850de2779272de02">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciências digitais e matemática" target="THEME:biologia e saúde">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:ciências digitais e matemática" target="THEME:ciência dos materiais">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:ciências digitais e matemática" target="THEME:ciências sociais e humanidades">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:ciências digitais e matemática" target="THEME:meio ambiente, ecossistemas e recursos biológicos">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:ciência dos materiais" target="850de2779272de02">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciência dos materiais" target="THEME:biologia e saúde">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:ciência dos materiais" target="THEME:ciências sociais e humanidades">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:ciência dos materiais" target="THEME:meio ambiente, ecossistemas e recursos biológicos">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:ciências sociais e humanidades" target="850de2779272de02">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciências sociais e humanidades" target="THEME:biologia e saúde">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:ciências sociais e humanidades" target="THEME:meio ambiente, ecossistemas e recursos biológicos">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:meio ambiente, ecossistemas e recursos biológicos" target="850de2779272de02">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:meio ambiente, ecossistemas e recursos biológicos" target="THEME:biologia e saúde">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:biologia e saúde" target="850de2779272de02">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:turismo inteligente" target="4bf7d9371ea63d75">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:turismo inteligente" target="THEME:economia do visitante">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:turismo inteligente" target="THEME:empregabilidade">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:turismo inteligente" target="THEME:gestão da oferta">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:turismo inteligente" target="THEME:gestão e desenvolvimento turístico">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:turismo inteligente" target="THEME:turismo sustentável">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:turismo inteligente" target="THEME:urbanismo e turismo">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:turismo sustentável" target="4bf7d9371ea63d75">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:turismo sustentável" target="THEME:economia do visitante">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:turismo sustentável" target="THEME:empregabilidade">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:turismo sustentável" target="THEME:gestão da oferta">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:turismo sustentável" target="THEME:gestão e desenvolvimento turístico">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:turismo sustentável" target="THEME:urbanismo e turismo">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:gestão e desenvolvimento turístico" target="4bf7d9371ea63d75">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:gestão e desenvolvimento turístico" target="THEME:economia do visitante">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:gestão e desenvolvimento turístico" target="THEME:empregabilidade">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:gestão e desenvolvimento turístico" target="THEME:gestão da oferta">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:gestão e desenvolvimento turístico" target="THEME:urbanismo e turismo">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:urbanismo e turismo" target="4bf7d9371ea63d75">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:urbanismo e turismo" target="THEME:economia do visitante">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:urbanismo e turismo" target="THEME:empregabilidade">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:urbanismo e turismo" target="THEME:gestão da oferta">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:economia do visitante" target="4bf7d9371ea63d75">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:economia do visitante" target="THEME:empregabilidade">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:economia do visitante" target="THEME:gestão da oferta">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:empregabilidade" target="4bf7d9371ea63d75">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:empregabilidade" target="THEME:gestão da oferta">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:gestão da oferta" target="4bf7d9371ea63d75">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:&lt;MEI|ME|EPP|MEDIO|GRANDE&gt;" target="850de2779272de02">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:cnae:&lt;CNAE 1&gt;" target="850de2779272de02">
+  <data key="d9">ACCEPTS_CNAE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:cnae:&lt;CNAE 2&gt;" target="850de2779272de02">
+  <data key="d9">ACCEPTS_CNAE</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5a0ceb6f77a1ae81" target="THEME:comunicação">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5a0ceb6f77a1ae81" target="THEME:inteligência artificial">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5a0ceb6f77a1ae81" target="THEME:ciências exatas e da terra">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5a0ceb6f77a1ae81" target="THEME:engenharias">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5a0ceb6f77a1ae81" target="THEME:biorrefinarias">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5a0ceb6f77a1ae81" target="9dfdc651023d6143">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="5a0ceb6f77a1ae81" target="b20a061875365a55">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5714285714285714</data>
+</edge>
+<edge source="THEME:comunicação" target="837d304119e187b6">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:inteligência artificial" target="54306ce9aa281838">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciências exatas e da terra" target="b20a061875365a55">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ciências exatas e da terra" target="THEME:biorrefinarias">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:ciências exatas e da terra" target="THEME:engenharias">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:engenharias" target="b20a061875365a55">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:engenharias" target="THEME:biorrefinarias">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:biorrefinarias" target="b20a061875365a55">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:biorrefinarias" target="9dfdc651023d6143">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:biorrefinarias" target="b64db6375a2c9b90">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="54306ce9aa281838" target="THEME:computação de alto desempenho">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b20a061875365a55" target="9dfdc651023d6143">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.2857142857142857</data>
+</edge>
+<edge source="9dfdc651023d6143" target="THEME:ciências exatas e da terra e engenharias">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="9dfdc651023d6143" target="THEME:temas científicos das ciências biológicas e biotecnologia">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="9dfdc651023d6143" target="36e103dfeba9dd56">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="b64db6375a2c9b90" target="THEME:segurança alimentar">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b64db6375a2c9b90" target="THEME:bioenergia">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b64db6375a2c9b90" target="THEME:biotecnologia industrial">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b64db6375a2c9b90" target="fbcf90fafadb412f">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.6</data>
+</edge>
+<edge source="THEME:segurança alimentar" target="fbcf90fafadb412f">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:segurança alimentar" target="THEME:bioenergia">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:segurança alimentar" target="THEME:biotecnologia industrial">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:bioenergia" target="fbcf90fafadb412f">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:bioenergia" target="THEME:biotecnologia industrial">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:biotecnologia industrial" target="fbcf90fafadb412f">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="fbcf90fafadb412f" target="THEME:ciências biológicas e biotecnologia">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="233e8a8a44f29e7d" target="THEME:todas as áreas do conhecimento">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="63228450615f733c" target="THEME:&lt;conforme conselhos de pesquisa do reino unido&gt;">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="63228450615f733c" target="REQ:entity:&lt;conforme conselhos de pesquisa do reino unido&gt;">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="d438ead13dcd53c5" target="THEME:outros">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="d438ead13dcd53c5" target="1fb364320aca7842">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.25</data>
+</edge>
+<edge source="THEME:outros" target="1fb364320aca7842">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="d0a476108afb43b1" target="THEME:agricultura">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="d0a476108afb43b1" target="THEME:agronegócio e saúde animal">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="d0a476108afb43b1" target="THEME:agritech">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="d0a476108afb43b1" target="1fb364320aca7842">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.3333333333333333</data>
+</edge>
+<edge source="THEME:agricultura" target="1fb364320aca7842">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:agricultura" target="THEME:agronegócio e saúde animal">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.2</data>
+</edge>
+<edge source="THEME:agronegócio e saúde animal" target="1fb364320aca7842">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="8e7096bb84acf886" target="THEME:cadeias socioprodutivas da agricultura familiar e sistemas agroalimentares - empresas">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="9effb2084ae5e693" target="THEME:saúde e fármacos">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1fb364320aca7842" target="THEME:foodtech">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="9817a4d14ee46f1a" target="THEME:defesa e segurança nacional">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="517530ac90557a6e" target="THEME:municípios">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="517530ac90557a6e" target="THEME:políticas">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="517530ac90557a6e" target="THEME:programas">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="517530ac90557a6e" target="THEME:projetos">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="517530ac90557a6e" target="REQ:entity:municípios">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="517530ac90557a6e" target="REQ:entity:órgãos">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="517530ac90557a6e" target="REQ:entity:entidades">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6c496cd45c5bb552" target="THEME:educação profissional e tecnológica">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a32b62331c5e3d1f" target="THEME:desenvolvimento">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a32b62331c5e3d1f" target="THEME:integral">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a32b62331c5e3d1f" target="THEME:comunidade">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1a5d7ac97c33072d" target="THEME:estudantes negros">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1a5d7ac97c33072d" target="THEME:estudantes indígenas">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1a5d7ac97c33072d" target="THEME:programas de mestrado">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1a5d7ac97c33072d" target="THEME:programas de doutorado">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="1a5d7ac97c33072d" target="THEME:exteriores">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:programas de mestrado" target="d4463db1e6b9f9f5">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="d4463db1e6b9f9f5" target="THEME:preparação de candidaturas">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5e18d7c5e4e36edf" target="THEME:bolsas">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5e18d7c5e4e36edf" target="THEME:estudantes">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5e18d7c5e4e36edf" target="THEME:universidades">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="5e18d7c5e4e36edf" target="THEME:parcerias">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="855769e067cae622" target="THEME:direito">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="855769e067cae622" target="THEME:educação">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="855769e067cae622" target="REQ:porte:MEI|ME|EPP|MEDIO">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7015f8cba414ae74" target="837d304119e187b6">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="7015f8cba414ae74" target="46d9e6d6d6205603">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7015f8cba414ae74" target="15b3b9b7f25246da">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7015f8cba414ae74" target="751ac91766cf29a4">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7015f8cba414ae74" target="b5d056b2e7f3a760">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7015f8cba414ae74" target="9ff34ef28c8310e5">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7015f8cba414ae74" target="b0b3238c3ff6eeb9">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7015f8cba414ae74" target="b5b07487761bc3ae">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7015f8cba414ae74" target="ed7d682d67da1515">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="7015f8cba414ae74" target="3cdc341d52ad0e1d">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="90eae823603802fb" target="THEME:ecologia">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="90eae823603802fb" target="ea56fa83597d7b15">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="90eae823603802fb" target="9d979e4ff4a5a9ea">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="90eae823603802fb" target="87ff41ae482f1e54">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="90eae823603802fb" target="3fec707c4a59cf52">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="90eae823603802fb" target="a28c8a5f0e796027">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="90eae823603802fb" target="13eca16fab83ff45">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="90eae823603802fb" target="92bf45c491dc9163">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="90eae823603802fb" target="2dc68e65b30c527e">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="90eae823603802fb" target="6e8f3a569bbcd0ad">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="THEME:ecologia" target="3fec707c4a59cf52">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ecologia" target="a28c8a5f0e796027">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ecologia" target="2dc68e65b30c527e">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ecologia" target="13eca16fab83ff45">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ecologia" target="87ff41ae482f1e54">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ecologia" target="92bf45c491dc9163">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ecologia" target="6e8f3a569bbcd0ad">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ecologia" target="9d979e4ff4a5a9ea">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ecologia" target="ea56fa83597d7b15">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:ecologia" target="THEME:quantidade">
+  <data key="d9">CO_OCCURS</data>
+  <data key="d10">0.4</data>
+</edge>
+<edge source="837d304119e187b6" target="b5d056b2e7f3a760">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="837d304119e187b6" target="9ff34ef28c8310e5">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="837d304119e187b6" target="46d9e6d6d6205603">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="837d304119e187b6" target="15b3b9b7f25246da">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="837d304119e187b6" target="b0b3238c3ff6eeb9">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="837d304119e187b6" target="751ac91766cf29a4">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="837d304119e187b6" target="b5b07487761bc3ae">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="837d304119e187b6" target="ed7d682d67da1515">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="837d304119e187b6" target="3cdc341d52ad0e1d">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="3fec707c4a59cf52" target="THEME:quantidade">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="3fec707c4a59cf52" target="2dc68e65b30c527e">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="3fec707c4a59cf52" target="6e8f3a569bbcd0ad">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="3fec707c4a59cf52" target="87ff41ae482f1e54">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="3fec707c4a59cf52" target="92bf45c491dc9163">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="3fec707c4a59cf52" target="a28c8a5f0e796027">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="3fec707c4a59cf52" target="9d979e4ff4a5a9ea">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="3fec707c4a59cf52" target="13eca16fab83ff45">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="3fec707c4a59cf52" target="ea56fa83597d7b15">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="THEME:quantidade" target="2dc68e65b30c527e">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:quantidade" target="87ff41ae482f1e54">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:quantidade" target="6e8f3a569bbcd0ad">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="0723a9d41100920f" target="THEME:divulgação">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="0723a9d41100920f" target="568e87851dbd5a12">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="0723a9d41100920f" target="c39f2d9d9e8e9d82">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="0723a9d41100920f" target="0932de8e7cb881da">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="THEME:divulgação" target="c39f2d9d9e8e9d82">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:divulgação" target="568e87851dbd5a12">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:divulgação" target="0932de8e7cb881da">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a28c8a5f0e796027" target="87ff41ae482f1e54">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="a28c8a5f0e796027" target="13eca16fab83ff45">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a28c8a5f0e796027" target="92bf45c491dc9163">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a28c8a5f0e796027" target="ea56fa83597d7b15">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a28c8a5f0e796027" target="6e8f3a569bbcd0ad">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="a28c8a5f0e796027" target="9d979e4ff4a5a9ea">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a28c8a5f0e796027" target="2dc68e65b30c527e">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="ed7d682d67da1515" target="46d9e6d6d6205603">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="ed7d682d67da1515" target="b5b07487761bc3ae">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="ed7d682d67da1515" target="9ff34ef28c8310e5">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="ed7d682d67da1515" target="15b3b9b7f25246da">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="ed7d682d67da1515" target="751ac91766cf29a4">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="ed7d682d67da1515" target="b5d056b2e7f3a760">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="ed7d682d67da1515" target="3cdc341d52ad0e1d">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="ed7d682d67da1515" target="b0b3238c3ff6eeb9">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="a70c3ecf566f6164" target="THEME:jornalismo">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="2dc68e65b30c527e" target="9d979e4ff4a5a9ea">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="2dc68e65b30c527e" target="ea56fa83597d7b15">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="2dc68e65b30c527e" target="87ff41ae482f1e54">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="2dc68e65b30c527e" target="6e8f3a569bbcd0ad">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="2dc68e65b30c527e" target="13eca16fab83ff45">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="2dc68e65b30c527e" target="92bf45c491dc9163">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="c39f2d9d9e8e9d82" target="568e87851dbd5a12">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="c39f2d9d9e8e9d82" target="0932de8e7cb881da">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="13eca16fab83ff45" target="9d979e4ff4a5a9ea">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="13eca16fab83ff45" target="87ff41ae482f1e54">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="13eca16fab83ff45" target="6e8f3a569bbcd0ad">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="13eca16fab83ff45" target="92bf45c491dc9163">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="13eca16fab83ff45" target="ea56fa83597d7b15">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="3cdc341d52ad0e1d" target="15b3b9b7f25246da">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="3cdc341d52ad0e1d" target="b5d056b2e7f3a760">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="3cdc341d52ad0e1d" target="9ff34ef28c8310e5">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="3cdc341d52ad0e1d" target="b0b3238c3ff6eeb9">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="3cdc341d52ad0e1d" target="b5b07487761bc3ae">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="3cdc341d52ad0e1d" target="46d9e6d6d6205603">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="3cdc341d52ad0e1d" target="751ac91766cf29a4">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="87ff41ae482f1e54" target="92bf45c491dc9163">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="87ff41ae482f1e54" target="6e8f3a569bbcd0ad">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="87ff41ae482f1e54" target="9d979e4ff4a5a9ea">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="87ff41ae482f1e54" target="ea56fa83597d7b15">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="568e87851dbd5a12" target="0932de8e7cb881da">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="92bf45c491dc9163" target="ea56fa83597d7b15">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="92bf45c491dc9163" target="9d979e4ff4a5a9ea">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="92bf45c491dc9163" target="6e8f3a569bbcd0ad">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="d373919a45f993a8" target="THEME:doenças raras">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="6e8f3a569bbcd0ad" target="ea56fa83597d7b15">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="6e8f3a569bbcd0ad" target="9d979e4ff4a5a9ea">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">0.5</data>
+</edge>
+<edge source="46d9e6d6d6205603" target="751ac91766cf29a4">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="46d9e6d6d6205603" target="15b3b9b7f25246da">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="46d9e6d6d6205603" target="b5d056b2e7f3a760">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="46d9e6d6d6205603" target="9ff34ef28c8310e5">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="46d9e6d6d6205603" target="b0b3238c3ff6eeb9">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="46d9e6d6d6205603" target="b5b07487761bc3ae">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b5d056b2e7f3a760" target="b0b3238c3ff6eeb9">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b5d056b2e7f3a760" target="b5b07487761bc3ae">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b5d056b2e7f3a760" target="9ff34ef28c8310e5">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b5d056b2e7f3a760" target="15b3b9b7f25246da">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b5d056b2e7f3a760" target="751ac91766cf29a4">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="9d979e4ff4a5a9ea" target="ea56fa83597d7b15">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="15b3b9b7f25246da" target="b5b07487761bc3ae">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="15b3b9b7f25246da" target="751ac91766cf29a4">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="15b3b9b7f25246da" target="9ff34ef28c8310e5">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="15b3b9b7f25246da" target="b0b3238c3ff6eeb9">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b0b3238c3ff6eeb9" target="751ac91766cf29a4">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b0b3238c3ff6eeb9" target="b5b07487761bc3ae">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b0b3238c3ff6eeb9" target="9ff34ef28c8310e5">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="0932de8e7cb881da" target="THEME:científica">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="9ff34ef28c8310e5" target="b5b07487761bc3ae">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="9ff34ef28c8310e5" target="751ac91766cf29a4">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="74105a7ea0bf37f2" target="THEME:divulgação científica">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="74105a7ea0bf37f2" target="09ff6b0c1a5a085f">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="THEME:divulgação científica" target="09ff6b0c1a5a085f">
+  <data key="d9">HAS_THEME</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b5b07487761bc3ae" target="REQ:porte:OUTROS">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="b5b07487761bc3ae" target="751ac91766cf29a4">
+  <data key="d9">SIMILAR_TO</data>
+  <data key="d10">1.0</data>
+</edge>
+<edge source="REQ:porte:OUTROS" target="751ac91766cf29a4">
+  <data key="d9">REQUIRES</data>
+  <data key="d10">1.0</data>
+</edge>
+</graph></graphml>
