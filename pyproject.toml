@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "radar-editais"
+version = "0.1.0"
+description = "Plataforma de matching empresa-edital com pipeline ETL e agentes LLM"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["backend*", "pipeline*", "core*", "agents*", "domain*", "scripts*"]
+
+[tool.setuptools]
+py-modules = ["config"]
