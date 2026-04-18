@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -13,6 +13,8 @@ import {
   type UsoFinanciamento,
 } from "@/types/profile";
 import { PORTE_LABELS } from "@/lib/constants";
+import { extractProfileFromUrl } from "@/lib/api";
+import type { FieldConfidence } from "@/types/api";
 
 // ── Shared UI primitives ─────────────────────────────────────────────────────
 
@@ -27,11 +29,13 @@ function Field({
   label,
   hint,
   required,
+  confidence,
   children,
 }: {
   label: string;
   hint?: string;
   required?: boolean;
+  confidence?: FieldConfidence;
   children: React.ReactNode;
 }) {
   return (
@@ -39,6 +43,12 @@ function Field({
       <label className="block text-sm font-medium text-content-primary font-sans">
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
+        {confidence === "high" && (
+          <span className="ml-1.5 text-[10px] font-sans text-green-600 font-normal">✓ extraído</span>
+        )}
+        {confidence === "missing" && required && (
+          <span className="ml-1.5 text-[10px] font-sans text-amber-600 font-normal">⚠ preencha</span>
+        )}
       </label>
       {hint && <p className="text-xs text-content-secondary font-sans">{hint}</p>}
       {children}
@@ -217,13 +227,15 @@ const TRL_LABELS: Record<number, string> = {
 function Step1({
   profile,
   set,
+  confidence,
 }: {
   profile: CompanyProfile;
   set: <K extends keyof CompanyProfile>(k: K, v: CompanyProfile[K]) => void;
+  confidence: Record<string, FieldConfidence>;
 }) {
   return (
     <div className="space-y-5">
-      <Field label="Nome da empresa" required>
+      <Field label="Nome da empresa" required confidence={confidence.nome}>
         <input
           className={INPUT_CLS}
           value={profile.nome}
@@ -240,7 +252,7 @@ function Step1({
           placeholder="00.000.000/0001-00"
         />
       </Field>
-      <Field label="Tipo de entidade" required>
+      <Field label="Tipo de entidade" required confidence={confidence.tipo_entidade}>
         <div className="flex flex-wrap gap-2 mt-1">
           {TIPO_ENTIDADE_OPTIONS.map((opt) => (
             <button
@@ -317,9 +329,11 @@ function Step1({
 function Step2({
   profile,
   set,
+  confidence,
 }: {
   profile: CompanyProfile;
   set: <K extends keyof CompanyProfile>(k: K, v: CompanyProfile[K]) => void;
+  confidence: Record<string, FieldConfidence>;
 }) {
   return (
     <div className="space-y-5">
@@ -327,6 +341,7 @@ function Step2({
         label="Proposta de valor"
         hint="Uma frase que resume o que vocês fazem e para quem."
         required
+        confidence={confidence.one_liner}
       >
         <input
           className={INPUT_CLS}
@@ -364,6 +379,7 @@ function Step2({
         label="Descrição completa das atividades"
         hint="Conte mais sobre o negócio, mercado de atuação e diferenciais."
         required
+        confidence={confidence.descricao_atividades}
       >
         <textarea
           rows={3}
@@ -468,13 +484,23 @@ function canAdvance(profile: CompanyProfile, step: number): boolean {
   return false;
 }
 
+type OnboardingMode = "url-input" | "wizard";
+
 function OnboardingInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/matching";
 
+  const [mode, setMode] = useState<OnboardingMode>("url-input");
   const [step, setStep] = useState(0);
   const [profile, setProfile] = useState<CompanyProfile>(EMPTY_PROFILE);
+  const [confidence, setConfidence] = useState<Record<string, FieldConfidence>>({});
+
+  // URL extraction state
+  const [urlInput, setUrlInput] = useState("");
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const urlRef = useRef<HTMLInputElement>(null);
 
   function set<K extends keyof CompanyProfile>(key: K, value: CompanyProfile[K]) {
     setProfile((prev) => ({ ...prev, [key]: value }));
@@ -485,9 +511,122 @@ function OnboardingInner() {
     router.push(next);
   }
 
+  async function handleExtract() {
+    const url = urlInput.trim();
+    if (!url) return;
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      setExtractError("Digite uma URL completa começando com https://");
+      return;
+    }
+    setExtracting(true);
+    setExtractError(null);
+    try {
+      const res = await extractProfileFromUrl(url);
+      if (res.error && res.low_confidence) {
+        setExtractError(res.error === "llm_unavailable"
+          ? "Serviço de IA indisponível. Preencha manualmente."
+          : `Não conseguimos ler o site: ${res.error}`
+        );
+        return;
+      }
+      setProfile({ ...EMPTY_PROFILE, ...res.profile });
+      setConfidence(res.confidence);
+      setMode("wizard");
+      setStep(0);
+    } catch {
+      setExtractError("Não foi possível conectar ao servidor.");
+    } finally {
+      setExtracting(false);
+    }
+  }
+
   const isLast = step === STEPS.length - 1;
   const canNext = canAdvance(profile, step);
 
+  // ── URL-input screen ──────────────────────────────────────────────────────
+  if (mode === "url-input") {
+    return (
+      <div className="min-h-screen bg-app-bg flex items-center justify-center p-4">
+        <div className="w-full max-w-lg">
+          <div className="text-center mb-8">
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary font-sans mb-2">
+              Radar de Editais
+            </p>
+            <h1 className="font-heading text-2xl font-bold text-content-primary">
+              Conta-nos sobre sua empresa
+            </h1>
+            <p className="text-sm text-content-secondary font-sans mt-1">
+              Cole o site da empresa e extraímos o perfil automaticamente.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-border p-6 shadow-card space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-content-primary font-sans mb-1.5">
+                URL do site da empresa
+              </label>
+              <div className="flex gap-2">
+                <input
+                  ref={urlRef}
+                  type="url"
+                  className={cn(INPUT_CLS, "flex-1")}
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleExtract()}
+                  placeholder="https://suaempresa.com.br"
+                  autoFocus
+                  disabled={extracting}
+                />
+                <button
+                  type="button"
+                  onClick={handleExtract}
+                  disabled={extracting || !urlInput.trim()}
+                  className={cn(
+                    "shrink-0 px-4 py-2 rounded-xl text-sm font-semibold font-sans text-white",
+                    "bg-primary hover:bg-primary-hover transition-colors",
+                    "disabled:opacity-40 disabled:cursor-not-allowed"
+                  )}
+                >
+                  {extracting ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Lendo...
+                    </span>
+                  ) : "Extrair"}
+                </button>
+              </div>
+            </div>
+
+            {extractError && (
+              <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-sans">
+                {extractError}
+              </div>
+            )}
+
+            {extracting && (
+              <div className="space-y-2">
+                {[80, 60, 72].map((w, i) => (
+                  <div key={i} className={`h-3 bg-gray-100 rounded animate-pulse`} style={{ width: `${w}%` }} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <p className="text-center mt-4">
+            <button
+              type="button"
+              onClick={() => setMode("wizard")}
+              className="text-xs text-content-secondary hover:text-content-primary font-sans transition-colors"
+            >
+              Prefiro preencher manualmente →
+            </button>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Wizard screen ─────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-app-bg flex items-center justify-center p-4">
       <div className="w-full max-w-xl">
@@ -542,8 +681,8 @@ function OnboardingInner() {
 
         {/* Card */}
         <div className="bg-white rounded-2xl border border-border p-6 shadow-card">
-          {step === 0 && <Step1 profile={profile} set={set} />}
-          {step === 1 && <Step2 profile={profile} set={set} />}
+          {step === 0 && <Step1 profile={profile} set={set} confidence={confidence} />}
+          {step === 1 && <Step2 profile={profile} set={set} confidence={confidence} />}
           {step === 2 && <Step3 profile={profile} set={set} />}
 
           {/* Navigation */}

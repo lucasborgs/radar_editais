@@ -7,6 +7,9 @@ Executar da raiz do projeto:
 Docs automáticos: http://localhost:8000/docs
 """
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -14,6 +17,7 @@ from typing import Optional
 
 from core.hybrid_match_service import HybridMatchService
 from core.writing_session import WritingSession
+from core.profile_extractor import ProfileExtractor
 from domain.user_profile import CompanyProfile as PyCompanyProfile
 
 # =============================================================================
@@ -85,6 +89,16 @@ class WritingStartRequest(BaseModel):
 class WritingTurnRequest(BaseModel):
     session_id: str
     user_message: str
+    section_hint: Optional[str] = None
+
+
+class WritingSectionStartRequest(BaseModel):
+    session_id: str
+    section_title: str
+
+
+class ProfileExtractRequest(BaseModel):
+    url: str
 
 
 # =============================================================================
@@ -202,4 +216,65 @@ def writing_turn(req: WritingTurnRequest):
             status_code=404,
             detail=f"Sessão '{req.session_id}' não encontrada ou expirada",
         )
-    return session.turn(req.user_message)
+    return session.turn(req.user_message, section_hint=req.section_hint)
+
+
+@app.post("/writing/section-start", summary="Mensagem inicial para uma seção da proposta")
+def writing_section_start(req: WritingSectionStartRequest):
+    """
+    Gera a mensagem de boas-vindas contextualizada para a seção selecionada.
+    Chamado pelo frontend ao clicar em uma seção do checklist.
+    """
+    session = _writing_sessions.get(req.session_id)
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Sessão '{req.session_id}' não encontrada ou expirada",
+        )
+    starter = session.get_section_starter(req.section_title)
+    return {"starter_message": starter, "section_title": req.section_title}
+
+
+# =============================================================================
+# ENDPOINTS — PROFILE EXTRACTION
+# =============================================================================
+
+
+@app.post("/profile/extract", summary="Extrai perfil da empresa a partir de URL")
+def extract_profile(req: ProfileExtractRequest):
+    """
+    Recebe a URL do site da empresa, faz scraping e usa LLM para inferir
+    os campos do CompanyProfile. Retorna perfil parcial + mapa de confiança.
+    """
+    url = req.url.strip()
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=422, detail="URL deve começar com http:// ou https://")
+
+    result = ProfileExtractor().extract(url)
+
+    return {
+        "profile": {
+            "nome": result.profile.nome,
+            "cnpj": result.profile.cnpj,
+            "tipo_entidade": result.profile.tipo_entidade,
+            "one_liner": result.profile.one_liner,
+            "problem_statement": result.profile.problem_statement,
+            "solution_summary": result.profile.solution_summary,
+            "descricao_atividades": result.profile.descricao_atividades,
+            "portfolio_projetos": result.profile.portfolio_projetos,
+            "tamanho_empresa": result.profile.tamanho_empresa,
+            "faturamento_anual_faixa": result.profile.faturamento_anual_faixa,
+            "localizacao": result.profile.localizacao,
+            "capital_social": result.profile.capital_social,
+            "certificacoes": result.profile.certificacoes,
+            "trl": result.profile.trl,
+            "equipe_resumo": result.profile.equipe_resumo,
+            "tipos_financiamento_interesse": result.profile.tipos_financiamento_interesse,
+            "uso_financiamento": result.profile.uso_financiamento,
+            "valor_buscado": result.profile.valor_buscado,
+        },
+        "confidence": result.confidence,
+        "source_title": result.source_title,
+        "low_confidence": result.low_confidence,
+        "error": result.error,
+    }

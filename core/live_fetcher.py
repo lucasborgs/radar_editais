@@ -78,6 +78,33 @@ class LiveFetcher:
     # API pública
     # ------------------------------------------------------------------
 
+    def fetch_text(self, url: str, max_chars: int = 6000) -> tuple[str, str]:
+        """
+        Faz scraping da URL e retorna texto limpo + título da página.
+        Usado pelo ProfileExtractor (não estrutura em seções).
+
+        Returns:
+            (text, page_title) — text truncado em max_chars, page_title pode ser ""
+        """
+        sections, soup = self._fetch_html_sections(url)
+        page_title = ""
+        if soup:
+            title_el = soup.find("title")
+            if title_el:
+                page_title = title_el.get_text(strip=True)
+
+        if sections:
+            text = "\n\n".join(
+                f"{s['title']}\n{s['content']}" for s in sections if s.get("content")
+            )
+        elif soup:
+            body = soup.find("body")
+            text = body.get_text(" ", strip=True) if body else ""
+        else:
+            text = ""
+
+        return text[:max_chars], page_title
+
     def fetch_and_save(self, edital_id: str, url: str) -> list[dict]:
         """
         Busca conteúdo ao vivo, estrutura em seções e persiste no section_index.

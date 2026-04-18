@@ -63,7 +63,13 @@ Diretrizes:
 - Quando produzir um trecho, seja propositivo: não diga "poderíamos fazer", diga "faremos".
 - Nunca invente dados numéricos que não estejam no perfil ou no edital.
 - Use [COMPLETAR: descrição] para lacunas que dependem de informação do usuário.
-- Para perguntas conceituais ou de esclarecimento, responda de forma direta sem redigir trecho."""
+- Para perguntas conceituais ou de esclarecimento, responda de forma direta sem redigir trecho.
+- Quando uma seção ativa for indicada, concentre a resposta nessa seção específica."""
+
+SECTION_STARTER_SYSTEM = """Você é um especialista em redação de propostas para editais de fomento no Brasil.
+Gere uma mensagem de boas-vindas curta (máx. 3 frases) para introduzir o usuário à seção indicada.
+Mencione o que essa seção deve conter e como o perfil da empresa se conecta ao edital.
+Termine com uma pergunta ou sugestão de por onde começar. Seja direto e propositivo."""
 
 COMPRESS_SYSTEM_PROMPT = """Você é um assistente que resume conversas.
 Resuma os turnos abaixo em um parágrafo conciso (máx. 200 palavras),
@@ -130,9 +136,13 @@ class WritingSession:
     # API pública
     # ------------------------------------------------------------------
 
-    def turn(self, user_message: str) -> dict:
+    def turn(self, user_message: str, section_hint: Optional[str] = None) -> dict:
         """
         Processa um turno da conversa.
+
+        Args:
+            user_message: Mensagem do usuário.
+            section_hint: Título da seção ativa no frontend (opcional).
 
         Returns:
             {session_id, assistant_message, sections_used, turn_number, success, error}
@@ -142,7 +152,7 @@ class WritingSession:
 
         try:
             # 1. Router: decide quais seções buscar
-            sections_to_fetch = self._route_sections(user_message)
+            sections_to_fetch = self._route_sections(user_message, section_hint)
 
             # 2. Retriever: carrega conteúdo das seções selecionadas
             sections_text = self._retriever.get_sections(self.edital_id, sections_to_fetch)
@@ -152,7 +162,7 @@ class WritingSession:
                 self._compress_history()
 
             # 4. Writer: gera resposta
-            messages = self._build_writer_messages(user_message, sections_text)
+            messages = self._build_writer_messages(user_message, sections_text, section_hint)
             success, response_text, error_type = self._call_llm(messages)
 
             if not success:
@@ -175,6 +185,32 @@ class WritingSession:
             logger.error(f"[{self.session_id}] Erro no turno {self._turn_count}: {e}")
             return self._error_result(str(e), "INTERNAL_ERROR")
 
+    def get_section_starter(self, section_title: str) -> str:
+        """
+        Gera mensagem inicial para uma seção específica da proposta.
+        Busca fatos relevantes do edital para contextualizar.
+        """
+        section_text = self._retriever.get_sections(self.edital_id, [section_title])
+
+        user_content = (
+            f"Seção da proposta: {section_title}\n\n"
+            f"Perfil da empresa:\n{self._profile_context[:800]}\n\n"
+        )
+        if section_text:
+            user_content += f"Conteúdo do edital para esta seção:\n{section_text[:1200]}"
+
+        messages = [
+            {"role": "system", "content": SECTION_STARTER_SYSTEM},
+            {"role": "user", "content": user_content},
+        ]
+        success, text, _ = self._call_llm(messages, temperature=0.4, max_tokens=300)
+        if success:
+            return text
+        return (
+            f"Vamos trabalhar na seção **{section_title}**. "
+            "Como posso ajudar você a começar?"
+        )
+
     def get_info(self) -> dict:
         """Retorna metadados da sessão (para o endpoint /writing/start)."""
         return {
@@ -190,17 +226,20 @@ class WritingSession:
     # Router LLM
     # ------------------------------------------------------------------
 
-    def _route_sections(self, user_message: str) -> list[str]:
+    def _route_sections(self, user_message: str, section_hint: Optional[str] = None) -> list[str]:
         """
         Chama o Router LLM para decidir quais seções são relevantes ao turno.
+        Se section_hint fornecido, prioriza essa seção.
         Retorna lista de títulos. Fallback: retorna todas as seções disponíveis.
         """
         if not self._section_titles:
             return []
 
         sections_list = "\n".join(f"- {t}" for t in self._section_titles)
+        hint_line = f"Seção ativa na interface: {section_hint}\n" if section_hint else ""
         user_content = (
             f"Seções disponíveis no edital:\n{sections_list}\n\n"
+            f"{hint_line}"
             f"Pedido do usuário: {user_message}"
         )
 
@@ -274,7 +313,7 @@ class WritingSession:
     # Montagem do prompt do Writer LLM
     # ------------------------------------------------------------------
 
-    def _build_writer_messages(self, user_message: str, sections_text: str) -> list[dict]:
+    def _build_writer_messages(self, user_message: str, sections_text: str, section_hint: Optional[str] = None) -> list[dict]:
         """
         Monta a lista de mensagens para o Writer LLM.
 
@@ -300,6 +339,12 @@ class WritingSession:
             messages.append({
                 "role":    "user",
                 "content": self._history_summary,
+            })
+
+        if section_hint:
+            messages.append({
+                "role": "user",
+                "content": f"[Seção ativa: {section_hint}]",
             })
 
         messages.extend(self._history)
