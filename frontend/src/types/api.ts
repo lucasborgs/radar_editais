@@ -22,3 +22,20 @@ export interface WritingTurnResponse {
   success: boolean;
   error?: string;
 }
+
+export interface SectionStartResponse {
+  starter_message: string;
+  section_title: string;
+}
+
+// Profile extraction (onboarding por URL)
+
+export type FieldConfidence = "high" | "missing";
+
+export interface ExtractProfileResponse {
+  profile: import("./profile").CompanyProfile;
+  confidence: Record<string, FieldConfidence>;
+  source_title: string;
+  low_confidence: boolean;
+  error: string | null;
+}

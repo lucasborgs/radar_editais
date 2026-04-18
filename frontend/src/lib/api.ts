@@ -1,7 +1,12 @@
 import { API_BASE_URL } from "./constants";
 import type { EditalEntry, EditalCard, KGMatchResult, DashboardStats } from "@/types/edital";
 import type { CompanyProfile } from "@/types/profile";
-import type { WritingStartResponse, WritingTurnResponse } from "@/types/api";
+import type {
+  WritingStartResponse,
+  WritingTurnResponse,
+  SectionStartResponse,
+  ExtractProfileResponse,
+} from "@/types/api";
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -54,8 +59,28 @@ export const startWritingSession = (
     body: JSON.stringify({ edital_id: editalId, profile }),
   });
 
-export const sendWritingTurn = (sessionId: string, userMessage: string) =>
+export const sendWritingTurn = (
+  sessionId: string,
+  userMessage: string,
+  sectionHint?: string
+) =>
   apiFetch<WritingTurnResponse>("/writing/turn", {
     method: "POST",
-    body: JSON.stringify({ session_id: sessionId, user_message: userMessage }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      user_message: userMessage,
+      section_hint: sectionHint,
+    }),
+  });
+
+export const startSectionChat = (sessionId: string, sectionTitle: string) =>
+  apiFetch<SectionStartResponse>("/writing/section-start", {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId, section_title: sectionTitle }),
+  });
+
+export const extractProfileFromUrl = (url: string) =>
+  apiFetch<ExtractProfileResponse>("/profile/extract", {
+    method: "POST",
+    body: JSON.stringify({ url }),
   });
