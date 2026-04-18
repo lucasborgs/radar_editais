@@ -1,0 +1,59 @@
+/* ── Cabinet Grotesk from Fontshare CDN ───────────────────── */
+@font-face {
+  font-family: "Cabinet Grotesk";
+  src: url("https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@700&display=swap")
+    format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Tailwind layers ─────────────────────────────────────── */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── CSS Design Tokens ───────────────────────────────────── */
+@layer base {
+  :root {
+    --color-primary: #1db954;
+    --color-primary-hover: #1ed760;
+    --color-app-bg: #f9fafb;
+    --color-surface: #ffffff;
+    --color-text-primary: #111827;
+    --color-text-secondary: #6b7280;
+    --color-border: #e5e7eb;
+  }
+
+  html {
+    background-color: #f9fafb;
+    color: #111827;
+  }
+
+  /* Headings use Cabinet Grotesk */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-cabinet, "Cabinet Grotesk"), sans-serif;
+    font-weight: 700;
+  }
+
+  /* Remove default focus ring and replace with green accent */
+  *:focus-visible {
+    outline: 2px solid #1db954;
+    outline-offset: 2px;
+  }
+}
+
+/* ── Custom utilities ────────────────────────────────────── */
+@layer utilities {
+  /* Data/numbers/IDs — Fragment Mono with tabular-nums */
+  .font-data {
+    font-family: var(--font-fragment-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}

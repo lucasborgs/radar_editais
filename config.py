@@ -10,21 +10,21 @@ BRONZE_DIR = ROOT / "bronze_data"
 
 # Dados Silver (normalizados)
 SILVER_DIR = ROOT / "silver_data"
-SILVER_ENRICHED_DIR = ROOT / "silver_data_enriched"
-
-# Dados Gold (vetores / ChromaDB)
-GOLD_VECTORS_DIR = ROOT / "gold_vectors"
-CHROMA_DB_DIR = ROOT / "chroma_db"
 
 # Perfis de empresa
 PROFILES_DIR = ROOT / "profiles"
 
-# Section index para feature Writing
+# Section index para WritingSession
 SECTION_INDEX_DIR = ROOT / "silver_data" / "section_index"
 
-# Fine-tuning
-FINETUNE_DATA_DIR = ROOT / "finetune_data"
-MODELS_DIR = ROOT / "models"
+# FINEP PDFs organizados por chamada_id
+FINEP_PDFS_DIR = BRONZE_DIR / "finep_pdfs"
 
-# Cache de enriquecimento LLM
-ENRICHMENT_CACHE = ROOT / ".enrichment_cache.json"
+# FINEP fatos atômicos extraídos por LLM
+FINEP_FACTS_DIR = SILVER_DIR / "finep" / "facts"
+
+# Knowledge Graph
+KNOWLEDGE_GRAPH_DIR = ROOT / "knowledge_graph"
+
+# Cards ricos por edital (Karpathy-style)
+KG_CARDS_DIR = KNOWLEDGE_GRAPH_DIR / "cards"
