@@ -4,17 +4,22 @@ Scraper para chamadas públicas da FINEP.
 Modo produção (padrão):
   Acessa http://www.finep.gov.br/chamadas-publicas/chamadas-publicas
   → captura editais abertos + encerrados recentes listados na página principal.
+  → para cada chamada, busca página de detalhe (descrição, PDFs).
+  → baixa todos os PDFs para bronze_data/finep_pdfs/{chamada_id}/.
 
 Modo histórico (include_historical=True):
   Acessa chamadaspublicas?situacao=encerrada com paginação (&start=N, 10/pág).
   Existem ~34 páginas de encerradas (desde 2001).
   Por padrão, faz max_pages=20 páginas (≈200 chamadas encerradas).
-  Para cada chamada, busca a página de detalhe para capturar a descrição completa.
 """
+import io
 import re
-from datetime import datetime
+import time
+from pathlib import Path
 
 from .base import BaseScraper
+
+from config import FINEP_PDFS_DIR
 
 
 class FINEPScraper(BaseScraper):
@@ -30,6 +35,7 @@ class FINEPScraper(BaseScraper):
     ENCERRADAS_PARAMS = "?situacao=encerrada&filter_order=ordering&filter_order_Dir=asc"
 
     ITEMS_PER_PAGE = 10
+    THROTTLE_SECONDS = 2
 
     def __init__(self):
         super().__init__(source_name="FINEP", output_subdir="finep_raw")
@@ -62,8 +68,15 @@ class FINEPScraper(BaseScraper):
                 seen_links.add(link)
                 all_results.append(item)
 
+        # Enriquece cada chamada com detalhe + PDFs
+        print(f"\nEnriquecendo {len(all_results)} chamadas (detalhe + PDFs)...")
+        for i, chamada in enumerate(all_results, 1):
+            print(f"  [{i}/{len(all_results)}] {chamada['titulo'][:60]}...")
+            self._enrich_chamada(chamada)
+            time.sleep(self.THROTTLE_SECONDS)
+
         if include_historical:
-            print(f"Modo histórico FINEP: buscando encerradas ({max_pages} páginas × {self.ITEMS_PER_PAGE}/pág)...")
+            print(f"\nModo histórico FINEP: buscando encerradas ({max_pages} páginas × {self.ITEMS_PER_PAGE}/pág)...")
             for item in self._scrape_encerradas(max_pages=max_pages):
                 link = item.get("link", "")
                 if link not in seen_links:
@@ -75,6 +88,178 @@ class FINEPScraper(BaseScraper):
             self._save(all_results, prefix=prefix)
 
         return all_results
+
+    # =========================================================================
+    # Enriquecimento: detalhe + PDFs
+    # =========================================================================
+
+    def _enrich_chamada(self, chamada: dict) -> None:
+        """Busca página de detalhe, extrai descrição, PDFs e baixa para disco."""
+        url = chamada.get("link", "")
+        if not url:
+            return
+
+        soup = self._fetch_detail_soup(url)
+        if not soup:
+            return
+
+        # Descrição e HTML bruto
+        chamada["descricao"] = self._get_html_description(soup)
+        chamada["raw_html"] = self._get_raw_html_content(soup)
+
+        # Todas as URLs de PDFs da tabela de documentos
+        pdf_urls = self._find_all_pdf_urls(soup)
+        chamada["pdf_urls"] = pdf_urls
+
+        # Download de PDFs para disco
+        chamada_id = self._extract_chamada_id(url)
+        chamada["chamada_id"] = chamada_id
+
+        if pdf_urls and chamada_id:
+            pdf_texts = self._download_all_pdfs(chamada_id, pdf_urls)
+            chamada["pdf_texts"] = pdf_texts
+        else:
+            chamada["pdf_texts"] = {}
+
+    def _extract_chamada_id(self, url: str) -> str:
+        """Extrai ID numérico da URL da chamada.
+
+        Ex: http://www.finep.gov.br/chamadas-publicas/chamadapublica/782 → '782'
+        """
+        m = re.search(r"/chamadapublica/(\d+)", url)
+        return m.group(1) if m else ""
+
+    def _find_all_pdf_urls(self, soup) -> list[dict]:
+        """Encontra TODOS os PDFs na tabela de documentos da página de detalhe.
+
+        Returns:
+            Lista de dicts: [{"nome": "Edital", "url": "http://..."}, ...]
+        """
+        table = soup.find("table", class_="document")
+        if not table:
+            return []
+
+        tbody = table.find("tbody") or table
+        rows = tbody.find_all("tr")
+        pdfs = []
+
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) < 3:
+                continue
+
+            doc_name = cells[1].get_text(strip=True)
+
+            # Tenta na coluna de formatos (índice 2), depois na coluna 0
+            pdf_link = cells[2].find("a", href=lambda h: h and h.lower().endswith(".pdf"))
+            if not pdf_link:
+                pdf_link = cells[0].find("a", href=lambda h: h and h.lower().endswith(".pdf"))
+            if not pdf_link:
+                continue
+
+            href = pdf_link.get("href", "")
+            url = f"http://www.finep.gov.br{href}" if href.startswith("/") else href
+
+            pdfs.append({"nome": doc_name, "url": url})
+
+        return pdfs
+
+    def _download_all_pdfs(self, chamada_id: str, pdf_urls: list[dict]) -> dict[str, str]:
+        """Baixa todos os PDFs de uma chamada para disco e extrai texto.
+
+        Args:
+            chamada_id: ID numérico da chamada (ex: "782")
+            pdf_urls: Lista de {"nome": ..., "url": ...}
+
+        Returns:
+            Dict nome_slug → texto extraído do PDF.
+        """
+        dest_dir = FINEP_PDFS_DIR / chamada_id
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        pdf_texts = {}
+
+        for pdf_info in pdf_urls:
+            nome = pdf_info["nome"]
+            url = pdf_info["url"]
+
+            # Slug para nome de arquivo
+            slug = self._slugify(nome)
+            dest_path = dest_dir / f"{slug}.pdf"
+
+            # Skip se já existe (cache em disco)
+            if dest_path.exists() and dest_path.stat().st_size > 0:
+                print(f"    PDF já existe: {dest_path.name}")
+                text = self._extract_pdf_from_file(dest_path)
+            else:
+                print(f"    Baixando: {nome} → {dest_path.name}")
+                ok = self._download_pdf(url, dest_path)
+                if ok:
+                    text = self._extract_pdf_from_file(dest_path)
+                else:
+                    text = ""
+
+            if text:
+                pdf_texts[slug] = text
+
+        return pdf_texts
+
+    def _download_pdf(self, url: str, dest: Path, max_mb: int = 15) -> bool:
+        """Baixa um PDF para o path indicado."""
+        import requests
+
+        try:
+            resp = requests.get(url, headers=self.headers, timeout=30, stream=True)
+            if resp.status_code != 200:
+                print(f"    Aviso: HTTP {resp.status_code} para {url}")
+                return False
+
+            chunks = []
+            total = 0
+            max_bytes = max_mb * 1024 * 1024
+            for chunk in resp.iter_content(chunk_size=8192):
+                chunks.append(chunk)
+                total += len(chunk)
+                if total > max_bytes:
+                    print(f"    Aviso: PDF excede {max_mb}MB — truncando")
+                    break
+
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(b"".join(chunks))
+            return True
+
+        except Exception as e:
+            print(f"    Erro ao baixar {url}: {e}")
+            return False
+
+    def _extract_pdf_from_file(self, pdf_path: Path) -> str:
+        """Extrai texto de um PDF local com pdfplumber."""
+        try:
+            import pdfplumber
+        except ImportError:
+            print("    Aviso: pdfplumber não instalado — instale com 'pip install pdfplumber'")
+            return ""
+
+        try:
+            text_parts = []
+            with pdfplumber.open(pdf_path) as pdf:
+                for page in pdf.pages:
+                    text_parts.append(page.extract_text() or "")
+            return "\n".join(text_parts)
+        except Exception as e:
+            print(f"    Aviso: falha ao parsear {pdf_path.name}: {e}")
+            return ""
+
+    def _slugify(self, name: str) -> str:
+        """Converte nome de documento em slug seguro para filename."""
+        import unicodedata
+        # NFD decompose + strip combining marks
+        s = unicodedata.normalize("NFD", name)
+        s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+        s = s.lower().strip()
+        s = re.sub(r"[^\w\s-]", "", s)
+        s = re.sub(r"[\s_-]+", "_", s)
+        return s[:80] or "documento"
 
     # =========================================================================
     # Scraping da página principal
@@ -160,13 +345,10 @@ class FINEPScraper(BaseScraper):
                 except Exception as e:
                     print(f"  Erro ao parsear item: {e}")
 
-            # Busca descrição e HTML nas páginas de detalhe
+            # Enriquece cada chamada com detalhe + PDFs
             for chamada in page_items:
-                desc, raw_html = self._fetch_detail_description(chamada["link"])
-                if desc:
-                    chamada["descricao"] = desc
-                if raw_html:
-                    chamada["raw_html"] = raw_html
+                self._enrich_chamada(chamada)
+                time.sleep(self.THROTTLE_SECONDS)
 
             all_items.extend(page_items)
             print(f"  → {len(page_items)} itens | total acumulado: {len(all_items)}")
@@ -221,59 +403,8 @@ class FINEPScraper(BaseScraper):
             return el.decode_contents()
         return ""
 
-    def _find_regulamento_pdf_url(self, soup) -> str | None:
-        """Localiza a URL do PDF do Regulamento na tabela de documentos.
-
-        Prioridade pelo nome do documento (case-insensitive):
-          1. "regulamento"
-          2. "edital"
-          3. "chamada" (alguns editais usam esse nome)
-          4. Primeiro PDF da tabela (fallback)
-        """
-        PRIORITY = ["regulamento", "edital", "chamada"]
-
-        table = soup.find("table", class_="document")
-        if not table:
-            return None
-
-        tbody = table.find("tbody") or table
-        rows = tbody.find_all("tr")
-
-        best_url = None
-        best_rank = len(PRIORITY)  # menor = melhor
-
-        for row in rows:
-            cells = row.find_all("td")
-            if len(cells) < 3:
-                continue
-
-            doc_name = cells[1].get_text(strip=True).lower()
-
-            # Ranking do documento
-            rank = len(PRIORITY)
-            for i, kw in enumerate(PRIORITY):
-                if kw in doc_name:
-                    rank = i
-                    break
-
-            # Pega link PDF na coluna de "Formatos proprietários" (índice 2)
-            pdf_link = cells[2].find("a", href=lambda h: h and h.lower().endswith(".pdf"))
-            if not pdf_link:
-                continue
-            href = pdf_link.get("href", "")
-            url = f"http://www.finep.gov.br{href}" if href.startswith("/") else href
-
-            if rank < best_rank:
-                best_rank = rank
-                best_url = url
-                if rank == 0:  # "regulamento" — para de procurar
-                    break
-
-        return best_url
-
     def _extract_pdf_text(self, pdf_url: str) -> str:
         """Baixa um PDF e extrai texto via pdfplumber. Retorna '' em caso de falha."""
-        import io
         try:
             import pdfplumber
         except ImportError:
@@ -306,17 +437,6 @@ class FINEPScraper(BaseScraper):
             print(f"    Aviso: falha ao extrair PDF {pdf_url}: {e}")
             return ""
 
-    def _fetch_detail_description(self, url: str) -> tuple[str, str]:
-        """Busca descrição HTML e HTML bruto da página de detalhe.
-
-        Returns:
-            (text, raw_html) — texto limpo e HTML bruto do elemento de conteúdo.
-        """
-        soup = self._fetch_detail_soup(url)
-        if not soup:
-            return "", ""
-        return self._get_html_description(soup), self._get_raw_html_content(soup)
-
     # =========================================================================
     # Parse de item individual
     # =========================================================================
@@ -341,9 +461,11 @@ class FINEPScraper(BaseScraper):
         tema = self._extract_span_text(item, "tema")
 
         status = default_status or self._get_status(item)
+        chamada_id = self._extract_chamada_id(link)
 
         return {
             "fonte": self.source_name,
+            "chamada_id": chamada_id,
             "titulo": titulo,
             "link": link,
             "status": status,
@@ -352,7 +474,10 @@ class FINEPScraper(BaseScraper):
             "fonte_recurso": fonte_recurso,
             "publico_alvo": publico_alvo,
             "tema": tema,
-            "descricao": "",  # preenchido por _fetch_detail_description em modo histórico
+            "descricao": "",       # preenchido por _enrich_chamada
+            "raw_html": "",        # preenchido por _enrich_chamada
+            "pdf_urls": [],        # preenchido por _enrich_chamada
+            "pdf_texts": {},       # preenchido por _enrich_chamada
             "data_extracao": self._get_timestamp(),
         }
 

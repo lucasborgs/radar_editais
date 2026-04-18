@@ -7,6 +7,7 @@ com editais (Contexto A vs Contexto B).
 
 import json
 import logging
+from pathlib import Path
 from dataclasses import dataclass, field, asdict, fields as dataclass_fields
 from typing import Optional
 
