@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-Pipeline completo FINEP — Knowledge Graph + Fatos Atômicos + Cards.
+Pipeline completo FINEP.
 
 Etapas:
   1. Scraper FINEP (web + PDFs)
-  2. Knowledge Graph (metadata → graph.json + index.json)
-  3. Fatos atômicos (PDFs → facts/{id}.json via LLM)
-  4. Cards ricos (facts + metadata → cards/{id}.json via LLM)
-  5. Health check
+  2. Knowledge Graph (metadata → index.json)
+  3. ETL Process (PDFs + metadata → card + section index, uma chamada LLM por edital)
+  4. Health check
 
 Uso:
-    python scripts/run_finep_pipeline.py                    # pipeline completo
-    python scripts/run_finep_pipeline.py --skip-scraper     # pula scraping
-    python scripts/run_finep_pipeline.py --skip-facts       # pula extração LLM de fatos
-    python scripts/run_finep_pipeline.py --skip-cards       # pula geração de cards
-    python scripts/run_finep_pipeline.py --edital 782 790   # editais específicos
+    python scripts/run_finep_pipeline.py
+    python scripts/run_finep_pipeline.py --skip-scraper
+    python scripts/run_finep_pipeline.py --skip-process
+    python scripts/run_finep_pipeline.py --edital 782 790
+    python scripts/run_finep_pipeline.py --backend openai
+    python scripts/run_finep_pipeline.py --skip-cache
 """
 import argparse
 import sys
@@ -23,12 +23,12 @@ from datetime import datetime
 
 def main():
     parser = argparse.ArgumentParser(description="Pipeline FINEP completo")
-    parser.add_argument("--skip-scraper", action="store_true", help="Pula etapa de scraping")
-    parser.add_argument("--skip-facts", action="store_true", help="Pula extração de fatos (LLM)")
-    parser.add_argument("--skip-cards", action="store_true", help="Pula geração de cards (LLM)")
+    parser.add_argument("--skip-scraper",  action="store_true", help="Pula scraping")
+    parser.add_argument("--skip-process",  action="store_true", help="Pula etapa LLM (cards + sections)")
     parser.add_argument("--edital", nargs="+", help="IDs de editais específicos")
     parser.add_argument("--backend", default="gemini", choices=["gemini", "openai"])
-    parser.add_argument("--dry-run", action="store_true", help="Dry-run nos fatos e health check")
+    parser.add_argument("--skip-cache", action="store_true", help="Reprocessa mesmo com cache válido")
+    parser.add_argument("--delay", type=float, default=1.5, help="Delay entre chamadas LLM (s)")
     args = parser.parse_args()
 
     start = datetime.now()
@@ -42,8 +42,7 @@ def main():
         print("-" * 40)
         try:
             from pipeline.extractors.finep import FINEPScraper
-            scraper = FINEPScraper()
-            results = scraper.run()
+            results = FINEPScraper().run()
             print(f"  → {len(results)} chamadas extraídas")
         except Exception as e:
             print(f"  ERRO no scraper: {e}")
@@ -55,47 +54,33 @@ def main():
     print("-" * 40)
     try:
         from pipeline.build_knowledge_graph import main as build_graph
-        build_graph()  # gera index.json (vigentes) + index_historico.json
+        build_graph()
     except Exception as e:
         print(f"  ERRO no grafo: {e}")
 
-    # Etapa 3: Fatos atômicos
-    if not args.skip_facts:
-        print("\n>>> ETAPA 3: Extração de Fatos Atômicos")
+    # Etapa 3: ETL Process (card + section index)
+    if not args.skip_process:
+        print("\n>>> ETAPA 3: ETL Process (cards + sections)")
         print("-" * 40)
         try:
-            from pipeline.etl_finep_facts import main as extract_facts
-            extract_facts(
+            from pipeline.etl_process import main as etl_process
+            etl_process(
                 backend=args.backend,
                 edital_ids=args.edital,
-                dry_run=args.dry_run,
+                skip_cache=args.skip_cache,
+                delay=args.delay,
             )
         except Exception as e:
-            print(f"  ERRO na extração de fatos: {e}")
+            print(f"  ERRO no ETL Process: {e}")
     else:
-        print("\n>>> ETAPA 3: Fatos atômicos — PULADO")
+        print("\n>>> ETAPA 3: ETL Process — PULADO")
 
-    # Etapa 4: Cards ricos
-    if not args.skip_cards:
-        print("\n>>> ETAPA 4: Geração de Cards")
-        print("-" * 40)
-        try:
-            from pipeline.etl_finep_cards import main as generate_cards
-            generate_cards(
-                backend=args.backend,
-                edital_ids=args.edital,
-            )
-        except Exception as e:
-            print(f"  ERRO na geração de cards: {e}")
-    else:
-        print("\n>>> ETAPA 4: Cards — PULADO")
-
-    # Etapa 5: Health check
-    print("\n>>> ETAPA 5: Health Check")
+    # Etapa 4: Health check
+    print("\n>>> ETAPA 4: Health Check")
     print("-" * 40)
     try:
         from pipeline.health_check import run_health_check
-        run_health_check(edital_ids=args.edital, dry_run=args.dry_run)
+        run_health_check(edital_ids=args.edital)
     except Exception as e:
         print(f"  ERRO no health check: {e}")
 
