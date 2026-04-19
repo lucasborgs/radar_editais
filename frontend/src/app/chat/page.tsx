@@ -3,7 +3,23 @@
 import { Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { startWritingSession, sendWritingTurn, startSectionChat } from "@/lib/api";
+import {
+  startWritingSession,
+  sendWritingTurn,
+  startSectionChat,
+  saveDocumentSection,
+  exportDocument,
+  type DocumentSection,
+} from "@/lib/api";
+
+interface ChecklistItem {
+  id: string;
+  requirement: string;
+  section: string;
+  status: "pending" | "addressed" | "not_applicable";
+  source: string;
+  reason?: string;
+}
 import { cn } from "@/lib/utils";
 import {
   getProposalSections,
@@ -33,10 +49,16 @@ function TypingDots() {
 
 // ── Message bubble ────────────────────────────────────────────────────────────
 
-function MessageBubble({ msg }: { msg: WritingMessage }) {
+function MessageBubble({
+  msg,
+  onInsert,
+}: {
+  msg: WritingMessage;
+  onInsert?: (text: string) => void;
+}) {
   const isUser = msg.role === "user";
   return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+    <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       <div
         className={cn(
           "max-w-[82%] rounded-2xl px-4 py-3 text-sm font-sans leading-relaxed",
@@ -49,6 +71,71 @@ function MessageBubble({ msg }: { msg: WritingMessage }) {
         <p className={cn("text-[10px] mt-1.5", isUser ? "text-white/60" : "text-content-secondary")}>
           {msg.timestamp}
         </p>
+      </div>
+      {!isUser && onInsert && (
+        <button
+          onClick={() => onInsert(msg.content)}
+          className="mt-1 text-[10px] font-sans text-primary hover:underline px-1"
+        >
+          ↑ Inserir na seção
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Document editor ───────────────────────────────────────────────────────────
+
+function DocumentEditor({
+  sectionTitle,
+  content,
+  onChange,
+  onSave,
+  saving,
+}: {
+  sectionTitle: string | null;
+  content: string;
+  onChange: (v: string) => void;
+  onSave: () => void;
+  saving: boolean;
+}) {
+  if (!sectionTitle) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6 text-center">
+        <p className="text-sm text-content-secondary font-sans">
+          Selecione uma seção para editar o documento
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
+        <p className="text-xs font-semibold text-content-secondary font-sans uppercase tracking-wide">
+          Documento
+        </p>
+        <button
+          onClick={onSave}
+          disabled={saving}
+          className="text-xs font-sans text-primary hover:underline disabled:opacity-50"
+        >
+          {saving ? "Salvando..." : "Salvar"}
+        </button>
+      </div>
+      <div className="p-4 flex-1 flex flex-col">
+        <p className="text-xs font-semibold text-content-primary font-sans mb-2">{sectionTitle}</p>
+        <textarea
+          className={cn(
+            "flex-1 w-full rounded-lg border border-border px-3 py-2.5 text-sm font-sans",
+            "text-content-primary placeholder:text-content-secondary resize-none",
+            "focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary",
+            "leading-relaxed"
+          )}
+          value={content}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="O conteúdo desta seção aparecerá aqui. Use o chat para gerar rascunhos e clique em 'Inserir na seção'."
+        />
       </div>
     </div>
   );
@@ -172,6 +259,73 @@ function ProposalModal({
   );
 }
 
+// ── Checklist panel ───────────────────────────────────────────────────────────
+
+const CHECKLIST_STATUS_ICON: Record<string, string> = {
+  pending:         "⬜",
+  addressed:       "✅",
+  not_applicable:  "–",
+};
+
+function ChecklistPanel({
+  items,
+  onToggle,
+  onAutoReview,
+  reviewing,
+}: {
+  items: ChecklistItem[];
+  onToggle: (id: string, status: ChecklistItem["status"]) => void;
+  onAutoReview: () => void;
+  reviewing: boolean;
+}) {
+  const done = items.filter(i => i.status === "addressed").length;
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
+        <div>
+          <p className="text-xs font-semibold text-content-secondary font-sans uppercase tracking-wide">Requisitos</p>
+          <p className="text-[10px] text-content-secondary font-sans">{done}/{items.length} cobertos</p>
+        </div>
+        <button
+          onClick={onAutoReview}
+          disabled={reviewing}
+          className="text-[10px] font-sans text-primary hover:underline disabled:opacity-50"
+        >
+          {reviewing ? "Revisando..." : "Auto-revisar"}
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto py-2 space-y-1">
+        {items.map(item => (
+          <button
+            key={item.id}
+            onClick={() => onToggle(item.id, item.status === "addressed" ? "pending" : "addressed")}
+            className="w-full text-left px-4 py-2 flex items-start gap-2 hover:bg-gray-50 transition-colors group"
+          >
+            <span className="text-xs shrink-0 mt-0.5">{CHECKLIST_STATUS_ICON[item.status]}</span>
+            <div className="min-w-0">
+              <p className={cn(
+                "text-xs font-sans leading-snug",
+                item.status === "addressed" ? "text-content-secondary line-through" : "text-content-primary"
+              )}>
+                {item.requirement}
+              </p>
+              {item.reason && (
+                <p className="text-[10px] text-content-secondary font-sans mt-0.5">{item.reason}</p>
+              )}
+              <p className="text-[10px] text-content-secondary/60 font-sans">{item.section}</p>
+            </div>
+          </button>
+        ))}
+        {items.length === 0 && (
+          <p className="text-xs text-content-secondary font-sans text-center py-4 px-4">
+            Nenhum requisito extraído para este edital.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Storage helpers ───────────────────────────────────────────────────────────
 
 function storageKey(editalId: string) {
@@ -229,6 +383,90 @@ function WritingPageInner() {
   const [sectionLoading, setSectionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  // Checklist state
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [checklistLoaded, setChecklistLoaded] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [showChecklist, setShowChecklist] = useState(false);
+
+  async function loadChecklist() {
+    if (!sessionId || checklistLoaded) return;
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/writing/${sessionId}/checklist`);
+      if (res.ok) {
+        const data = await res.json();
+        setChecklist(data.items ?? []);
+        setChecklistLoaded(true);
+      }
+    } catch { /* silently ignore */ }
+  }
+
+  async function handleChecklistToggle(id: string, status: ChecklistItem["status"]) {
+    if (!sessionId) return;
+    setChecklist(prev => prev.map(i => i.id === id ? { ...i, status } : i));
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/writing/${sessionId}/checklist/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_id: id, status }),
+    });
+  }
+
+  async function handleAutoReview() {
+    if (!sessionId) return;
+    setReviewing(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/writing/${sessionId}/checklist/auto-review`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setChecklist(data.items ?? []);
+      }
+    } finally {
+      setReviewing(false);
+    }
+  }
+
+  // Load checklist when session is ready
+  useEffect(() => {
+    if (sessionId && !checklistLoaded) loadChecklist();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
+
+  // Document editor state
+  const [docContents, setDocContents] = useState<Record<string, string>>({});
+  const [docSaving, setDocSaving] = useState(false);
+
+  const activeDocContent = activeSection ? (docContents[activeSection] ?? sectionDrafts[activeSection] ?? "") : "";
+
+  function handleDocChange(value: string) {
+    if (!activeSection) return;
+    setDocContents((prev) => ({ ...prev, [activeSection]: value }));
+  }
+
+  function handleInsertToSection(text: string) {
+    if (!activeSection) return;
+    setDocContents((prev) => {
+      const existing = prev[activeSection] ?? sectionDrafts[activeSection] ?? "";
+      return { ...prev, [activeSection]: existing ? `${existing}\n\n${text}` : text };
+    });
+  }
+
+  async function handleDocSave() {
+    if (!sessionId || !activeSection) return;
+    setDocSaving(true);
+    try {
+      await saveDocumentSection(sessionId, activeSection, activeDocContent);
+    } finally {
+      setDocSaving(false);
+    }
+  }
+
+  async function handleExport() {
+    if (!sessionId) return;
+    const result = await exportDocument(sessionId);
+    navigator.clipboard.writeText(result.markdown);
+  }
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const messages = activeSection ? (sectionHistories[activeSection] ?? []) : [];
@@ -359,7 +597,7 @@ function WritingPageInner() {
       <div className="flex gap-0 h-[calc(100vh-130px)] rounded-xl border border-border overflow-hidden bg-white">
 
         {/* ── Left: checklist ──────────────────────────────────────────── */}
-        <div className="w-52 shrink-0 border-r border-border flex flex-col">
+        <div className="w-48 shrink-0 border-r border-border flex flex-col">
           {sections.length > 0 ? (
             <>
               <SectionChecklist
@@ -367,12 +605,27 @@ function WritingPageInner() {
                 active={activeSection}
                 onSelect={handleSelectSection}
               />
-              <div className="p-3 border-t border-border">
+              <div className="p-3 border-t border-border space-y-1">
+                <button
+                  onClick={() => setShowChecklist(c => !c)}
+                  className={cn(
+                    "w-full text-xs font-sans text-center transition-colors py-1",
+                    showChecklist ? "text-primary font-medium" : "text-content-secondary hover:text-content-primary"
+                  )}
+                >
+                  {showChecklist ? "← Seções" : "Requisitos ✓"}
+                </button>
                 <button
                   onClick={() => setShowModal(true)}
                   className="w-full text-xs font-sans text-center text-primary hover:text-primary-hover transition-colors py-1"
                 >
-                  Ver proposta completa →
+                  Ver proposta →
+                </button>
+                <button
+                  onClick={handleExport}
+                  className="w-full text-xs font-sans text-center text-content-secondary hover:text-content-primary transition-colors py-1"
+                >
+                  Copiar Markdown
                 </button>
               </div>
             </>
@@ -389,8 +642,31 @@ function WritingPageInner() {
           )}
         </div>
 
+        {/* ── Checklist overlay (replaces checklist sidebar) */}
+        {showChecklist && (
+          <div className="w-72 shrink-0 border-r border-border flex flex-col bg-white">
+            <ChecklistPanel
+              items={checklist}
+              onToggle={handleChecklistToggle}
+              onAutoReview={handleAutoReview}
+              reviewing={reviewing}
+            />
+          </div>
+        )}
+
+        {/* ── Middle: document editor ───────────────────────────────────── */}
+        <div className="flex-[3] border-r border-border flex flex-col min-w-0">
+          <DocumentEditor
+            sectionTitle={activeSection}
+            content={activeDocContent}
+            onChange={handleDocChange}
+            onSave={handleDocSave}
+            saving={docSaving}
+          />
+        </div>
+
         {/* ── Right: chat ──────────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-[2] flex flex-col min-w-0">
           {/* Chat header */}
           <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
             <div>
@@ -451,7 +727,11 @@ function WritingPageInner() {
                   </div>
                 )}
                 {messages.map((msg, i) => (
-                  <MessageBubble key={i} msg={msg} />
+                  <MessageBubble
+                    key={i}
+                    msg={msg}
+                    onInsert={msg.role === "assistant" ? handleInsertToSection : undefined}
+                  />
                 ))}
                 {loading && (
                   <div className="flex justify-start">

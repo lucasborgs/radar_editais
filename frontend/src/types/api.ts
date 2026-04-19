@@ -28,6 +28,32 @@ export interface SectionStartResponse {
   section_title: string;
 }
 
+// Content Library
+
+export type ContentItemType =
+  | "proposal"
+  | "project_description"
+  | "team_bio"
+  | "technical_doc"
+  | "other";
+
+export interface ContentItemSummary {
+  id: string;
+  title: string;
+  type: ContentItemType;
+  tags: string[];
+  summary: string;
+  themes: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContentItemFull extends ContentItemSummary {
+  content: string;
+  key_facts: string[];
+  source_url: string | null;
+}
+
 // Profile extraction (onboarding por URL)
 
 export type FieldConfidence = "high" | "missing";

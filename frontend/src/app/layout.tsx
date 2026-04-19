@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Fragment_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -33,7 +34,7 @@ export default function RootLayout({
       className={`${inter.variable} ${fragmentMono.variable}`}
     >
       <body className="font-sans antialiased bg-app-bg text-content-primary">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

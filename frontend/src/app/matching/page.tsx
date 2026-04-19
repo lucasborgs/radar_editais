@@ -206,9 +206,36 @@ function TagInput({
   );
 }
 
+const DIM_LABELS: Record<string, string> = {
+  elegibilidade: "Elegibilidade",
+  tematico:      "Temático",
+  trl:           "TRL",
+  mecanismo:     "Mecanismo",
+  contrapartida: "Contrapartida",
+};
+
+function ScoreDimBar({ label, score, max }: { label: string; score: number; max: number }) {
+  const pct = max > 0 ? Math.round((score / max) * 100) : 0;
+  const color = pct >= 80 ? "#1DB954" : pct >= 50 ? "#f59e0b" : "#ef4444";
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] font-sans text-content-secondary w-24 shrink-0">{label}</span>
+      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <span className="text-[10px] font-data text-content-secondary w-10 text-right shrink-0">
+        {score}/{max}
+      </span>
+    </div>
+  );
+}
+
 function MatchCard({ match }: { match: KGMatchResult }) {
   const router = useRouter();
   const color = scoreColor(match.score);
+  const [expanded, setExpanded] = useState(false);
+  const dims = match.match_dimensions ?? {};
+  const hasDims = Object.keys(dims).length > 0;
 
   return (
     <div className="rounded-xl border border-border bg-white p-4 transition-colors hover:bg-gray-50">
@@ -239,6 +266,30 @@ function MatchCard({ match }: { match: KGMatchResult }) {
       <p className="text-xs text-content-secondary font-sans mb-3 line-clamp-2">
         {match.justificativa}
       </p>
+
+      {/* Score breakdown */}
+      {hasDims && (
+        <div className="mb-3">
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="text-[10px] font-sans text-primary hover:underline mb-1"
+          >
+            {expanded ? "▲ Ocultar detalhes" : "▼ Ver score por dimensão"}
+          </button>
+          {expanded && (
+            <div className="space-y-1.5 pt-1">
+              {Object.entries(dims).map(([key, dim]) => (
+                <ScoreDimBar
+                  key={key}
+                  label={DIM_LABELS[key] ?? key}
+                  score={dim.score}
+                  max={dim.max}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {match.key_requirements && match.key_requirements.length > 0 && (
         <ul className="space-y-0.5 mb-3">
@@ -310,15 +361,14 @@ function ProfileCompletionBar({ profile }: { profile: CompanyProfile }) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MatchingPage() {
-  const [profile, setProfile] = useState<CompanyProfile>(() => {
-    if (typeof window === "undefined") return EMPTY_PROFILE;
+  const [profile, setProfile] = useState<CompanyProfile>(EMPTY_PROFILE);
+
+  useEffect(() => {
     try {
       const saved = localStorage.getItem(PROFILE_STORAGE_KEY);
-      return saved ? { ...EMPTY_PROFILE, ...JSON.parse(saved) } : EMPTY_PROFILE;
-    } catch {
-      return EMPTY_PROFILE;
-    }
-  });
+      if (saved) setProfile({ ...EMPTY_PROFILE, ...JSON.parse(saved) });
+    } catch { /* ignore */ }
+  }, []);
 
   const [results, setResults] = useState<KGMatchResult[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -391,6 +441,14 @@ export default function MatchingPage() {
                   value={profile.cnpj}
                   onChange={(e) => set("cnpj", e.target.value)}
                   placeholder="00.000.000/0001-00"
+                />
+              </Field>
+              <Field label="Site da empresa">
+                <input
+                  className={INPUT_CLS}
+                  value={profile.url_site}
+                  onChange={(e) => set("url_site", e.target.value)}
+                  placeholder="https://suaempresa.com.br"
                 />
               </Field>
               <Field label="Porte">
