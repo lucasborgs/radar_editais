@@ -1,17 +1,21 @@
 """
-Writing Session (Radar de Editais)
+Writing Session (Radar de Editais) — NotebookLM style
 
-Gerencia uma sessão conversacional de escrita de proposta para um edital específico.
+Fluxo:
+  1. __init__: carrega todos os PDFs do edital do disco (raw sources)
+               gera o outline da proposta via LLM (1 chamada)
+  2. turn: Writer LLM recebe prefixo estático (perfil + documentos) + histórico + mensagem
+           O prefixo é fixo em todos os turnos → prompt caching elimina custo de re-processamento
 
-Fluxo por turno:
-  1. Router LLM — recebe mensagem do usuário + títulos das seções disponíveis
-                  → decide quais seções buscar (chamada leve, modelo pequeno)
-  2. SectionRetriever — carrega conteúdo das seções selecionadas
-  3. Writer LLM — gera resposta com: perfil (estático) + seções + histórico comprimido
+Prompt caching:
+  - Gemini Flash: context caching nativo
+  - gpt-4o-mini: caching automático para prompts > 1024 tokens
+  O prefixo [system + perfil + documentos] deve sempre vir primeiro e permanecer idêntico
+  entre turnos para que o cache seja aproveitado.
 
 Gerenciamento de histórico:
   - Mantém os últimos HISTORY_WINDOW turnos verbatim
-  - Após COMPRESS_THRESHOLD turnos, comprime os mais antigos em resumo
+  - Comprime os mais antigos em resumo após COMPRESS_THRESHOLD turnos
 """
 
 import json
@@ -20,15 +24,13 @@ import os
 import re
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import requests
 
+from config import FINEP_PDFS_DIR
 from domain.user_profile import CompanyProfile
-from core.section_retriever import SectionRetriever
-from core.live_fetcher import LiveFetcher
-
-_LIBRARY_CONTEXT_HEADER = "NARRATIVAS DA EMPRESA (propostas e projetos anteriores):"
 
 logger = logging.getLogger(__name__)
 
@@ -36,47 +38,46 @@ logger = logging.getLogger(__name__)
 # CONFIGURAÇÃO
 # =============================================================================
 
-LLM_BACKEND   = os.getenv("LLM_BACKEND", "ollama")
-OLLAMA_URL    = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
-OLLAMA_MODEL  = os.getenv("OLLAMA_MODEL", "llama3.2")
+LLM_BACKEND    = os.getenv("LLM_BACKEND", "ollama")
+OLLAMA_URL     = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
+OLLAMA_MODEL   = os.getenv("OLLAMA_MODEL", "llama3.2")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL  = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
-HISTORY_WINDOW      = 6   # turnos recentes mantidos verbatim
-COMPRESS_THRESHOLD  = 10  # a partir deste número de turnos, comprime os mais antigos
+HISTORY_WINDOW     = 6
+COMPRESS_THRESHOLD = 10
+
+# PDFs a ignorar (mesma lista do etl_process)
+_SKIP_KEYWORDS = [
+    "minuta", "declaracao", "carta_de_manifestacao", "faq",
+    "apresentacao", "resultado", "oficio", "telas_fap",
+    "orientacoes_para_apresentacao", "tabela_com_requisitos",
+    "orientacoes_para_despesas", "relatorio_parcial",
+]
 
 # =============================================================================
 # PROMPTS
 # =============================================================================
 
-ROUTER_SYSTEM_PROMPT = """Você é um navegador de documentos.
-Dado o pedido do usuário e a lista de seções disponíveis no edital,
-retorne um JSON array com os títulos das seções necessárias para responder ao pedido.
-Inclua apenas seções diretamente relevantes. Retorne [] se nenhuma seção específica for necessária.
-Responda APENAS com o JSON array, sem explicações."""
+OUTLINE_SYSTEM = """Você é um especialista em propostas para editais de fomento no Brasil.
+Com base no edital abaixo, gere o outline das seções que a proposta deve conter.
+Retorne APENAS um JSON array de strings com os títulos das seções, na ordem correta.
+Exemplo: ["1. Identificação da empresa", "2. Objeto do projeto", "3. Justificativa"]"""
 
-WRITER_SYSTEM_PROMPT = """Você é um especialista em redação de propostas para editais de fomento no Brasil.
-Seu papel é ajudar o usuário a escrever uma proposta técnica de alta qualidade para o edital selecionado.
+WRITER_SYSTEM = """Você é um especialista em redação de propostas para editais de fomento no Brasil.
+Seu papel é ajudar o usuário a escrever uma proposta técnica de alta qualidade.
 
 Diretrizes:
-- Responda diretamente ao pedido do usuário com conteúdo concreto e redigido.
 - Baseie-se nas informações do edital e no perfil da empresa fornecidos.
 - Use Markdown para estruturar o texto quando produzir trechos da proposta.
 - Quando produzir um trecho, seja propositivo: não diga "poderíamos fazer", diga "faremos".
 - Nunca invente dados numéricos que não estejam no perfil ou no edital.
 - Use [COMPLETAR: descrição] para lacunas que dependem de informação do usuário.
-- Para perguntas conceituais ou de esclarecimento, responda de forma direta sem redigir trecho.
-- Quando uma seção ativa for indicada, concentre a resposta nessa seção específica."""
+- Quando uma seção ativa for indicada, concentre a resposta nessa seção."""
 
-SECTION_STARTER_SYSTEM = """Você é um especialista em redação de propostas para editais de fomento no Brasil.
-Gere uma mensagem de boas-vindas curta (máx. 3 frases) para introduzir o usuário à seção indicada.
-Mencione o que essa seção deve conter e como o perfil da empresa se conecta ao edital.
-Termine com uma pergunta ou sugestão de por onde começar. Seja direto e propositivo."""
-
-COMPRESS_SYSTEM_PROMPT = """Você é um assistente que resume conversas.
-Resuma os turnos abaixo em um parágrafo conciso (máx. 200 palavras),
-preservando: decisões tomadas, trechos aprovados pelo usuário e informações adicionais fornecidas.
-Responda apenas com o resumo, sem prefácios."""
+COMPRESS_SYSTEM = """Resuma os turnos abaixo em um parágrafo conciso (máx. 200 palavras).
+Preserve: decisões tomadas, trechos aprovados pelo usuário e informações adicionais fornecidas.
+Responda apenas com o resumo."""
 
 
 # =============================================================================
@@ -85,303 +86,248 @@ Responda apenas com o resumo, sem prefácios."""
 
 class WritingSession:
     """
-    Sessão conversacional de escrita de proposta.
+    Sessão de escrita no estilo NotebookLM.
 
-    Args:
-        edital_id: ID do edital selecionado
-        profile: Perfil da empresa
-        session_id: UUID da sessão (gerado automaticamente se omitido)
-        llm_backend: "ollama" | "openai"
-        model: Nome do modelo a usar
+    Os PDFs do edital são carregados uma vez no __init__ e mantidos como
+    prefixo estático em todos os turnos — o prompt caching do modelo evita
+    re-processamento a cada turno.
     """
 
     def __init__(
         self,
         edital_id: str,
         profile: CompanyProfile,
-        edital_url: str = "",
         session_id: Optional[str] = None,
         llm_backend: Optional[str] = None,
         model: Optional[str] = None,
         library_items: Optional[list[dict]] = None,
     ):
-        self.session_id   = session_id or str(uuid.uuid4())
-        self.edital_id    = edital_id
-        self.profile      = profile
-        self.backend      = llm_backend or LLM_BACKEND
-        self.model        = model or (OLLAMA_MODEL if self.backend == "ollama" else OPENAI_MODEL)
-        self.created_at   = datetime.now().isoformat()
+        self.session_id  = session_id or str(uuid.uuid4())
+        self.edital_id   = edital_id
+        self.profile     = profile
+        self.backend     = llm_backend or LLM_BACKEND
+        self.model       = model or (OLLAMA_MODEL if self.backend == "ollama" else OPENAI_MODEL)
+        self.created_at  = datetime.now().isoformat()
 
-        self._retriever   = SectionRetriever()
-        self._history: list[dict] = []       # {"role": "user"|"assistant", "content": "..."}
-        self._history_summary: str = ""      # resumo comprimido dos turnos antigos
-        self._turn_count  = 0
-        self._content_source = "section_index"
-        self._doc_sections: dict[str, str] = {}  # {section_title: content editado}
+        self._history: list[dict] = []
+        self._history_summary: str = ""
+        self._turn_count = 0
+        self._doc_sections: dict[str, str] = {}
 
-        # Cache estático: perfil, biblioteca e metadados do edital (imutáveis na sessão)
-        self._profile_context   = profile.to_context()
-        self._library_context   = self._build_library_context(library_items or [])
-        self._section_titles    = self._retriever.list_sections(edital_id)
+        # Prefixo estático — enviado identicamente em todos os turnos (prompt caching)
+        self._profile_context  = profile.to_context()
+        self._documents_text   = self._load_documents(edital_id)
+        self._library_context  = self._build_library_context(library_items or [])
 
-        # Se não há section_index local, busca conteúdo ao vivo
-        if not self._section_titles and edital_url:
-            logger.info(f"[{self.session_id}] section_index ausente — iniciando live fetch")
-            LiveFetcher().fetch_and_save(edital_id, edital_url)
-            self._section_titles = self._retriever.list_sections(edital_id)
-            self._content_source = "live_fetch"
+        # Outline da proposta gerado uma vez por sessão
+        self._proposal_outline = self._generate_outline()
 
         logger.info(
-            f"WritingSession {self.session_id} | edital={edital_id} "
-            f"| {len(self._section_titles)} seções [{self._content_source}] "
-            f"| {self.backend}/{self.model}"
+            "WritingSession %s | edital=%s | %d seções | %s/%s",
+            self.session_id, edital_id, len(self._proposal_outline),
+            self.backend, self.model,
         )
+
+    # ------------------------------------------------------------------
+    # Carregamento dos documentos
+    # ------------------------------------------------------------------
+
+    def _load_documents(self, edital_id: str) -> str:
+        """Carrega todos os PDFs relevantes do edital e retorna texto concatenado."""
+        pdf_dir = FINEP_PDFS_DIR / edital_id
+        if not pdf_dir.exists():
+            logger.warning("Diretório de PDFs não encontrado: %s", pdf_dir)
+            return ""
+
+        parts = []
+        for pdf_path in sorted(pdf_dir.glob("*.pdf")):
+            if any(kw in pdf_path.stem.lower() for kw in _SKIP_KEYWORDS):
+                continue
+            text = self._extract_pdf(pdf_path)
+            if text.strip():
+                parts.append(f"### {pdf_path.stem}\n{text}")
+
+        result = "\n\n".join(parts)
+        logger.info("Documentos carregados: %d chars de %s", len(result), edital_id)
+        return result
+
+    @staticmethod
+    def _extract_pdf(pdf_path: Path) -> str:
+        try:
+            import pdfplumber
+            pages = []
+            with pdfplumber.open(pdf_path) as pdf:
+                for page in pdf.pages:
+                    pages.append(page.extract_text() or "")
+            return "\n".join(pages)
+        except Exception as e:
+            logger.warning("Erro ao extrair %s: %s", pdf_path.name, e)
+            return ""
+
+    # ------------------------------------------------------------------
+    # Outline da proposta
+    # ------------------------------------------------------------------
+
+    def _generate_outline(self) -> list[str]:
+        """Gera o outline das seções da proposta via LLM (1 chamada por sessão)."""
+        if not self._documents_text:
+            return self._default_outline()
+
+        context = self._documents_text[:12000]  # resumo para geração do outline
+        messages = [
+            {"role": "system", "content": OUTLINE_SYSTEM},
+            {"role": "user",   "content": f"DOCUMENTOS DO EDITAL:\n{context}"},
+        ]
+        success, text, _ = self._call_llm(messages, temperature=0.1, max_tokens=500)
+
+        if success:
+            try:
+                outline = json.loads(text)
+                if isinstance(outline, list) and outline:
+                    return [str(s) for s in outline]
+            except json.JSONDecodeError:
+                match = re.search(r"\[.*?\]", text, re.DOTALL)
+                if match:
+                    try:
+                        outline = json.loads(match.group(0))
+                        if isinstance(outline, list):
+                            return [str(s) for s in outline]
+                    except json.JSONDecodeError:
+                        pass
+
+        return self._default_outline()
+
+    @staticmethod
+    def _default_outline() -> list[str]:
+        return [
+            "1. Identificação da empresa",
+            "2. Objeto do projeto",
+            "3. Justificativa e relevância",
+            "4. Objetivos",
+            "5. Metodologia e plano de trabalho",
+            "6. Equipe técnica",
+            "7. Cronograma",
+            "8. Orçamento",
+        ]
 
     # ------------------------------------------------------------------
     # API pública
     # ------------------------------------------------------------------
 
+    def get_info(self) -> dict:
+        return {
+            "session_id":       self.session_id,
+            "edital_id":        self.edital_id,
+            "section_titles":   self._proposal_outline,
+            "has_documents":    bool(self._documents_text),
+            "turn_count":       self._turn_count,
+            "created_at":       self.created_at,
+        }
+
     def turn(self, user_message: str, section_hint: Optional[str] = None) -> dict:
-        """
-        Processa um turno da conversa.
-
-        Args:
-            user_message: Mensagem do usuário.
-            section_hint: Título da seção ativa no frontend (opcional).
-
-        Returns:
-            {session_id, assistant_message, sections_used, turn_number, success, error}
-        """
         self._turn_count += 1
-        logger.info(f"[{self.session_id}] Turno {self._turn_count}: {user_message[:80]}...")
+        logger.info("[%s] Turno %d", self.session_id, self._turn_count)
 
         try:
-            # 1. Router: decide quais seções buscar
-            sections_to_fetch = self._route_sections(user_message, section_hint)
-
-            # 2. Retriever: carrega conteúdo das seções selecionadas
-            sections_text = self._retriever.get_sections(self.edital_id, sections_to_fetch)
-
-            # 3. Comprime histórico se necessário
             if self._turn_count > COMPRESS_THRESHOLD:
                 self._compress_history()
 
-            # 4. Writer: gera resposta
-            messages = self._build_writer_messages(user_message, sections_text, section_hint)
+            messages = self._build_messages(user_message, section_hint)
             success, response_text, error_type = self._call_llm(messages)
 
             if not success:
                 return self._error_result(response_text, error_type)
 
-            # 5. Atualiza histórico
             self._history.append({"role": "user",      "content": user_message})
             self._history.append({"role": "assistant", "content": response_text})
 
             return {
                 "session_id":        self.session_id,
                 "assistant_message": response_text,
-                "sections_used":     sections_to_fetch,
                 "turn_number":       self._turn_count,
                 "success":           True,
                 "error":             None,
             }
 
         except Exception as e:
-            logger.error(f"[{self.session_id}] Erro no turno {self._turn_count}: {e}")
+            logger.error("[%s] Erro no turno %d: %s", self.session_id, self._turn_count, e)
             return self._error_result(str(e), "INTERNAL_ERROR")
 
     def get_section_starter(self, section_title: str) -> str:
-        """
-        Gera mensagem inicial para uma seção específica da proposta.
-        Busca fatos relevantes do edital para contextualizar.
-        """
-        section_text = self._retriever.get_sections(self.edital_id, [section_title])
-
-        user_content = (
-            f"Seção da proposta: {section_title}\n\n"
-            f"Perfil da empresa:\n{self._profile_context[:800]}\n\n"
-        )
-        if section_text:
-            user_content += f"Conteúdo do edital para esta seção:\n{section_text[:1200]}"
-
+        """Mensagem inicial contextualizada para uma seção da proposta."""
         messages = [
-            {"role": "system", "content": SECTION_STARTER_SYSTEM},
-            {"role": "user", "content": user_content},
+            {"role": "system", "content": WRITER_SYSTEM},
+            {"role": "user",   "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
         ]
+        if self._documents_text:
+            messages.append({
+                "role": "user",
+                "content": f"DOCUMENTOS DO EDITAL:\n{self._documents_text}",
+            })
+        messages.append({
+            "role": "user",
+            "content": (
+                f"Gere uma mensagem de boas-vindas curta (máx. 3 frases) para a seção "
+                f"'{section_title}'. Mencione o que deve conter e como o perfil da empresa "
+                f"se conecta ao edital. Termine com uma sugestão de por onde começar."
+            ),
+        })
         success, text, _ = self._call_llm(messages, temperature=0.4, max_tokens=300)
-        if success:
-            return text
-        return (
-            f"Vamos trabalhar na seção **{section_title}**. "
-            "Como posso ajudar você a começar?"
-        )
-
-    @staticmethod
-    def _build_library_context(items: list[dict]) -> str:
-        """Monta bloco de contexto com key_facts dos itens da biblioteca."""
-        if not items:
-            return ""
-        parts = [_LIBRARY_CONTEXT_HEADER]
-        for item in items:
-            parts.append(f"\n[{item.get('type', 'doc').upper()}] {item.get('title', '')}")
-            for fact in item.get("key_facts", [])[:10]:
-                parts.append(f"  • {fact}")
-        return "\n".join(parts)
-
-    def get_info(self) -> dict:
-        """Retorna metadados da sessão (para o endpoint /writing/start)."""
-        return {
-            "session_id":      self.session_id,
-            "edital_id":       self.edital_id,
-            "section_titles":  self._section_titles,
-            "content_source":  self._content_source,
-            "turn_count":      self._turn_count,
-            "created_at":      self.created_at,
-        }
+        return text if success else f"Vamos trabalhar na seção **{section_title}**. Como posso ajudar?"
 
     # ------------------------------------------------------------------
-    # Document state (P1-A)
+    # Document state
     # ------------------------------------------------------------------
 
     def get_document(self) -> dict:
-        """Retorna o estado atual do documento como lista de seções."""
         return {
             "session_id": self.session_id,
             "sections": [
                 {"title": t, "content": self._doc_sections.get(t, "")}
-                for t in self._section_titles
+                for t in self._proposal_outline
             ],
         }
 
     def set_section_content(self, section_title: str, content: str) -> None:
-        """Salva conteúdo editado pelo usuário para uma seção."""
         self._doc_sections[section_title] = content
 
     def get_export(self) -> str:
-        """Exporta o documento completo como Markdown."""
         parts = []
-        for title in self._section_titles:
+        for title in self._proposal_outline:
             content = self._doc_sections.get(title, "")
             parts.append(f"## {title}\n\n{content}" if content else f"## {title}\n\n*[A preencher]*")
         return "\n\n---\n\n".join(parts)
 
     # ------------------------------------------------------------------
-    # Router LLM
+    # Montagem do prompt (prefixo estático → prompt caching)
     # ------------------------------------------------------------------
 
-    def _route_sections(self, user_message: str, section_hint: Optional[str] = None) -> list[str]:
+    def _build_messages(self, user_message: str, section_hint: Optional[str] = None) -> list[dict]:
         """
-        Chama o Router LLM para decidir quais seções são relevantes ao turno.
-        Se section_hint fornecido, prioriza essa seção.
-        Retorna lista de títulos. Fallback: retorna todas as seções disponíveis.
-        """
-        if not self._section_titles:
-            return []
-
-        sections_list = "\n".join(f"- {t}" for t in self._section_titles)
-        hint_line = f"Seção ativa na interface: {section_hint}\n" if section_hint else ""
-        user_content = (
-            f"Seções disponíveis no edital:\n{sections_list}\n\n"
-            f"{hint_line}"
-            f"Pedido do usuário: {user_message}"
-        )
-
-        messages = [
-            {"role": "system", "content": ROUTER_SYSTEM_PROMPT},
-            {"role": "user",   "content": user_content},
-        ]
-
-        success, text, _ = self._call_llm(messages, temperature=0.0, max_tokens=200)
-
-        if not success:
-            logger.warning(f"[{self.session_id}] Router LLM falhou — usando todas as seções")
-            return self._section_titles
-
-        selected = self._parse_json_list(text)
-        if not selected:
-            logger.debug(f"[{self.session_id}] Router retornou [] — sem seções específicas")
-            return []
-
-        # Valida: mantém apenas títulos que realmente existem
-        valid = [t for t in selected if t in self._section_titles]
-        if not valid:
-            # Tenta matching parcial (Router pode retornar título levemente diferente)
-            valid = [
-                available for available in self._section_titles
-                if any(sel.lower() in available.lower() or available.lower() in sel.lower()
-                       for sel in selected)
-            ]
-
-        logger.info(f"[{self.session_id}] Router selecionou: {valid}")
-        return valid or self._section_titles
-
-    # ------------------------------------------------------------------
-    # Compressão de histórico
-    # ------------------------------------------------------------------
-
-    def _compress_history(self) -> None:
-        """
-        Comprime os turnos mais antigos em um resumo de texto.
-        Mantém os últimos HISTORY_WINDOW turnos verbatim.
-        """
-        if len(self._history) <= HISTORY_WINDOW * 2:
-            return
-
-        to_compress = self._history[: -(HISTORY_WINDOW * 2)]
-        self._history  = self._history[-(HISTORY_WINDOW * 2):]
-
-        turns_text = "\n".join(
-            f"{msg['role'].upper()}: {msg['content']}" for msg in to_compress
-        )
-        compress_input = (
-            f"Turnos anteriores da conversa de escrita de proposta:\n\n{turns_text}"
-        )
-
-        messages = [
-            {"role": "system", "content": COMPRESS_SYSTEM_PROMPT},
-            {"role": "user",   "content": compress_input},
-        ]
-
-        success, summary, _ = self._call_llm(messages, temperature=0.3, max_tokens=300)
-
-        if success and summary.strip():
-            prefix = f"[Resumo dos turnos anteriores: {summary.strip()}]\n\n"
-            self._history_summary = prefix + self._history_summary
-            logger.info(f"[{self.session_id}] Histórico comprimido ({len(to_compress)} msgs → resumo)")
-        else:
-            # Fallback: descarta os turnos antigos sem resumo
-            logger.warning(f"[{self.session_id}] Compressão falhou — turnos antigos descartados")
-
-    # ------------------------------------------------------------------
-    # Montagem do prompt do Writer LLM
-    # ------------------------------------------------------------------
-
-    def _build_writer_messages(self, user_message: str, sections_text: str, section_hint: Optional[str] = None) -> list[dict]:
-        """
-        Monta a lista de mensagens para o Writer LLM.
-
-        Estrutura (do mais estático ao mais dinâmico):
-          system  : WRITER_SYSTEM_PROMPT
-          user    : perfil da empresa (imutável na sessão → cacheable)
-          user    : seções do edital (varia por turno)
-          ...     : histórico (resumo + janela recente)
-          user    : mensagem atual
+        Estrutura do prompt (estático primeiro para maximizar cache hit):
+          system   — WRITER_SYSTEM (imutável)
+          user     — perfil da empresa (imutável na sessão)
+          user     — documentos do edital (imutável na sessão)
+          user     — contexto da biblioteca (imutável na sessão)
+          ...      — histórico comprimido + janela recente
+          user     — seção ativa (se houver)
+          user     — mensagem atual
         """
         messages: list[dict] = [
-            {"role": "system", "content": WRITER_SYSTEM_PROMPT},
+            {"role": "system", "content": WRITER_SYSTEM},
             {"role": "user",   "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
         ]
+
+        if self._documents_text:
+            messages.append({
+                "role":    "user",
+                "content": f"DOCUMENTOS DO EDITAL:\n{self._documents_text}",
+            })
 
         if self._library_context:
             messages.append({
                 "role":    "user",
                 "content": self._library_context,
-            })
-
-        if sections_text:
-            messages.append({
-                "role":    "user",
-                "content": f"SEÇÕES RELEVANTES DO EDITAL:\n{sections_text}",
             })
 
         if self._history_summary:
@@ -390,16 +336,51 @@ class WritingSession:
                 "content": self._history_summary,
             })
 
-        if section_hint:
-            messages.append({
-                "role": "user",
-                "content": f"[Seção ativa: {section_hint}]",
-            })
-
         messages.extend(self._history)
-        messages.append({"role": "user", "content": user_message})
 
+        if section_hint:
+            messages.append({"role": "user", "content": f"[Seção ativa: {section_hint}]"})
+
+        messages.append({"role": "user", "content": user_message})
         return messages
+
+    # ------------------------------------------------------------------
+    # Compressão de histórico
+    # ------------------------------------------------------------------
+
+    def _compress_history(self) -> None:
+        if len(self._history) <= HISTORY_WINDOW * 2:
+            return
+
+        to_compress = self._history[:-(HISTORY_WINDOW * 2)]
+        self._history = self._history[-(HISTORY_WINDOW * 2):]
+
+        turns_text = "\n".join(
+            f"{msg['role'].upper()}: {msg['content']}" for msg in to_compress
+        )
+        messages = [
+            {"role": "system", "content": COMPRESS_SYSTEM},
+            {"role": "user",   "content": f"Turnos anteriores:\n\n{turns_text}"},
+        ]
+        success, summary, _ = self._call_llm(messages, temperature=0.3, max_tokens=300)
+        if success and summary.strip():
+            self._history_summary = f"[Resumo anterior: {summary.strip()}]\n\n" + self._history_summary
+            logger.info("[%s] Histórico comprimido", self.session_id)
+
+    # ------------------------------------------------------------------
+    # Content Library
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_library_context(items: list[dict]) -> str:
+        if not items:
+            return ""
+        parts = ["NARRATIVAS DA EMPRESA (propostas e projetos anteriores):"]
+        for item in items:
+            parts.append(f"\n[{item.get('type', 'doc').upper()}] {item.get('title', '')}")
+            for fact in item.get("key_facts", [])[:10]:
+                parts.append(f"  • {fact}")
+        return "\n".join(parts)
 
     # ------------------------------------------------------------------
     # Chamadas LLM
@@ -415,20 +396,15 @@ class WritingSession:
             return self._call_ollama(messages, temperature, max_tokens)
         return self._call_openai(messages, temperature, max_tokens)
 
-    def _call_ollama(
-        self,
-        messages: list[dict],
-        temperature: float,
-        max_tokens: int,
-    ) -> tuple[bool, str, Optional[str]]:
+    def _call_ollama(self, messages, temperature, max_tokens):
         try:
             response = requests.post(
                 OLLAMA_URL,
                 json={
-                    "model":   self.model,
+                    "model":    self.model,
                     "messages": messages,
-                    "stream":  False,
-                    "options": {"temperature": temperature, "num_predict": max_tokens},
+                    "stream":   False,
+                    "options":  {"temperature": temperature, "num_predict": max_tokens},
                 },
                 timeout=300,
             )
@@ -440,15 +416,9 @@ class WritingSession:
         except requests.exceptions.ConnectionError:
             return False, "Ollama não acessível", "CONNECTION_ERROR"
         except Exception as e:
-            logger.error(f"Erro Ollama: {e}")
             return False, str(e), "UNKNOWN_ERROR"
 
-    def _call_openai(
-        self,
-        messages: list[dict],
-        temperature: float,
-        max_tokens: int,
-    ) -> tuple[bool, str, Optional[str]]:
+    def _call_openai(self, messages, temperature, max_tokens):
         if not OPENAI_API_KEY:
             return False, "OPENAI_API_KEY não configurada", "CONFIG_ERROR"
         try:
@@ -464,37 +434,16 @@ class WritingSession:
         except ImportError:
             return False, "Biblioteca openai não instalada", "DEPENDENCY_ERROR"
         except Exception as e:
-            logger.error(f"Erro OpenAI: {e}")
             return False, str(e), "API_ERROR"
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
-    def _parse_json_list(self, text: str) -> list[str]:
-        """Extrai JSON array da resposta do Router LLM com tolerância a ruído."""
-        text = text.strip()
-        try:
-            result = json.loads(text)
-            if isinstance(result, list):
-                return [str(i) for i in result]
-        except json.JSONDecodeError:
-            pass
-        match = re.search(r"\[.*?\]", text, re.DOTALL)
-        if match:
-            try:
-                result = json.loads(match.group(0))
-                if isinstance(result, list):
-                    return [str(i) for i in result]
-            except json.JSONDecodeError:
-                pass
-        return []
-
     def _error_result(self, message: str, error_type: Optional[str]) -> dict:
         return {
             "session_id":        self.session_id,
             "assistant_message": f"Erro ao processar: {message}",
-            "sections_used":     [],
             "turn_number":       self._turn_count,
             "success":           False,
             "error":             message,

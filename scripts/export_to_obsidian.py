@@ -21,10 +21,10 @@ import re
 import unicodedata
 from pathlib import Path
 
-from config import KNOWLEDGE_GRAPH_DIR, FINEP_FACTS_DIR
+from config import KNOWLEDGE_GRAPH_DIR, FINEP_PDFS_DIR
 
 INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"  # vigentes por padrão; use --historico para todos
-FACTS_DIR = FINEP_FACTS_DIR
+FACTS_DIR = FINEP_PDFS_DIR
 
 STATUS_EMOJI = {
     "ABERTA": "🟢",
@@ -372,10 +372,10 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     index_entries = {e["id"]: e for e in index.get("editais", [])}
 
     # Enriquece com dados do card quando disponível
-    from config import KG_CARDS_DIR
+    from config import KG_WIKI_DIR
     editais = []
     for eid, entry in index_entries.items():
-        card_file = KG_CARDS_DIR / f"{eid}.json"
+        card_file = KG_WIKI_DIR / f"{eid}.json"
         if card_file.exists():
             try:
                 card = json.loads(card_file.read_text(encoding="utf-8"))

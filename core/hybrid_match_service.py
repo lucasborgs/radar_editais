@@ -1,7 +1,7 @@
 """
 HybridMatchService — Matching em dois estágios.
 
-Stage 1 (determinístico): compara campos estruturados do card com o CompanyProfile.
+Stage 1 (determinístico): compara campos estruturados da wiki page com o CompanyProfile.
   - Pontuação por dimensão (100 pts total)
   - Elimina incompatíveis antes de chamar a LLM
 
@@ -9,8 +9,6 @@ Stage 2 (semântico): LLM avalia alinhamento temático para os editais elegívei
   - Recebe apenas os editais que passaram no Stage 1
   - Usa descricao_atividades + portfolio_projetos (texto livre)
   - Retorna justificativa por edital
-
-Quando não há cards gerados, cai no modo Karpathy puro (índice completo → LLM).
 """
 from __future__ import annotations
 
@@ -21,7 +19,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from config import KNOWLEDGE_GRAPH_DIR, KG_CARDS_DIR
+from config import KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -377,11 +375,11 @@ class HybridMatchService:
             self._index = json.loads(self.INDEX_FILE.read_text(encoding="utf-8"))
             self._index_mtime = mtime
 
-    def _load_card(self, edital_id: str) -> dict | None:
-        card_file = KG_CARDS_DIR / f"{edital_id}.json"
-        if card_file.exists():
+    def _load_wiki_page(self, edital_id: str) -> dict | None:
+        wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+        if wiki_file.exists():
             try:
-                return json.loads(card_file.read_text(encoding="utf-8"))
+                return json.loads(wiki_file.read_text(encoding="utf-8"))
             except Exception:
                 pass
         return None
@@ -391,21 +389,21 @@ class HybridMatchService:
         self._load_index()
         result = []
         for entry in self._index.get("editais", []):
-            card = self._load_card(entry["id"])
+            card = self._load_wiki_page(entry["id"])
             result.append(card if card else entry)
         return result
 
     def get_stats(self) -> dict:
         self._load_index()
         summary = self._index.get("summary", {})
-        n_cards = len(list(KG_CARDS_DIR.glob("*.json"))) if KG_CARDS_DIR.exists() else 0
+        n_wiki_pages = len(list(KG_WIKI_DIR.glob("*.json"))) if KG_WIKI_DIR.exists() else 0
         return {
             "total_editais": self._index.get("total_editais", 0),
             "last_updated": self._index.get("last_updated", ""),
             "by_status": summary.get("by_status", {}),
             "n_themes": summary.get("n_themes", 0),
             "n_fontes": summary.get("n_fontes", 0),
-            "n_cards": n_cards,
+            "n_wiki_pages": n_wiki_pages,
         }
 
     def list_editais(self, status: str | None = None, tema: str | None = None, limit: int = 100) -> list[dict]:
@@ -419,7 +417,7 @@ class HybridMatchService:
         return editais[:limit]
 
     def get_edital_by_id(self, edital_id: str) -> dict | None:
-        card = self._load_card(edital_id)
+        card = self._load_wiki_page(edital_id)
         if card:
             return card
         self._load_index()
@@ -431,8 +429,8 @@ class HybridMatchService:
     def match(self, profile: CompanyProfile, top_k: int = 10) -> list[dict]:
         """Executa matching híbrido e retorna top_k editais rankeados."""
         editais = self._get_editais_with_cards()
-        has_cards = any(KG_CARDS_DIR / f"{e['id']}.json" for e in editais
-                        if (KG_CARDS_DIR / f"{e['id']}.json").exists())
+        has_cards = any(KG_WIKI_DIR / f"{e['id']}.json" for e in editais
+                        if (KG_WIKI_DIR / f"{e['id']}.json").exists())
 
         # --- Stage 1: scoring determinístico ---
         stage1_results = [score_stage1(e, profile) for e in editais]

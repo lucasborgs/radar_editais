@@ -13,7 +13,6 @@ from datetime import datetime
 import requests
 
 from domain.user_profile import CompanyProfile
-from core.section_retriever import SectionRetriever
 
 # Seções prioritárias para geração de proposta one-shot
 _PROPOSAL_SECTIONS = [
@@ -173,7 +172,7 @@ class ProposalDrafter:
 
         Args:
             company_profile: Perfil da empresa
-            edital_id: ID do edital — usa SectionRetriever para buscar seções relevantes
+            edital_id: ID do edital — documentos carregados pela WritingSession
             edital_context: Fallback quando edital_id não é fornecido ou section index não existe
             style: Estilo de escrita (formal, consultivo, academico)
             edital_metadata: Metadados do edital (titulo, fonte, prazo, valor)
@@ -195,20 +194,7 @@ class ProposalDrafter:
 
         system_prompt = DRAFT_SYSTEM_PROMPT.replace("{style}", style_key).replace("{style_desc}", style_desc)
 
-        # Resolve conteúdo do edital — SectionRetriever tem prioridade sobre edital_context
         resolved_context = edital_context
-        if edital_id:
-            retriever = SectionRetriever()
-            if retriever.exists(edital_id):
-                available = retriever.list_sections(edital_id)
-                selected = [
-                    t for t in available
-                    if any(kw in t.lower() for kw in _PROPOSAL_SECTIONS)
-                ] or available  # fallback: todas as seções
-                resolved_context = retriever.get_sections(edital_id, selected)
-                logger.info(f"SectionRetriever: {len(selected)}/{len(available)} seções para proposta")
-            else:
-                logger.warning(f"Section index não encontrado para {edital_id} — usando edital_context")
 
         # Monta info do edital
         edital_section = ""

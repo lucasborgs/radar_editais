@@ -1,14 +1,11 @@
 """
-ETL Process — geração de card + section index por edital.
+ETL Process — geração da wiki page por edital.
 
-Substitui etl_finep_facts.py + etl_finep_cards.py.
+A LLM lê todos os PDFs do edital + metadados HTML em uma única chamada e produz
+a wiki page estruturada → knowledge_graph/wiki/{id}.json
 
-A LLM lê todos os PDFs do edital + metadados HTML em uma única chamada e produz:
-  - card estruturado  → knowledge_graph/cards/{id}.json       (matching Stage 1)
-  - section index     → silver_data/section_index/{id}.json   (WritingSession)
-
-O section index preserva o texto original dos PDFs organizado por seção —
-sem síntese, sem reformulação. O card é a única camada de interpretação.
+A wiki page é o único artefato gerado. Os PDFs brutos permanecem como raw sources
+e são lidos diretamente pela WritingSession quando o usuário seleciona um edital.
 
 Cache por hash MD5 do conteúdo de todos os PDFs + metadados do index.json.
 Só reprocessa se algum documento mudar (retificação, aditivo).
@@ -32,12 +29,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from config import (
-    FINEP_PDFS_DIR,
-    KNOWLEDGE_GRAPH_DIR,
-    KG_CARDS_DIR,
-    SECTION_INDEX_DIR,
-)
+from config import FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +39,8 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-INDEX_FILE  = KNOWLEDGE_GRAPH_DIR / "index.json"
-CACHE_FILE  = KG_CARDS_DIR / ".etl_process_cache.json"
+INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
+CACHE_FILE = KG_WIKI_DIR / ".etl_process_cache.json"
 
 # PDFs a ignorar (documentos auxiliares sem conteúdo normativo útil)
 _SKIP_KEYWORDS = [
@@ -58,6 +50,12 @@ _SKIP_KEYWORDS = [
     "orientacoes_para_despesas", "relatorio_parcial",
 ]
 
+# Tokens disponíveis por modelo (reserva para prompt overhead + output)
+_MODEL_CHAR_BUDGET = {
+    "gemini-2.5-flash": 900_000 * 4,  # ~900k tokens × 4 chars/token
+    "gpt-4o-mini":       80_000 * 4,  # ~80k tokens × 4 chars/token
+}
+
 
 # =============================================================================
 # PROMPT
@@ -65,7 +63,7 @@ _SKIP_KEYWORDS = [
 
 _PROMPT = """Você é um especialista em editais de fomento à inovação no Brasil.
 
-Leia os documentos abaixo de uma chamada pública e produza dois artefatos em JSON.
+Leia os documentos abaixo de uma chamada pública e produza a wiki page estruturada em JSON.
 
 ---
 METADADOS (do portal web):
@@ -79,33 +77,19 @@ DOCUMENTOS (PDFs da chamada):
 Produza APENAS o JSON abaixo, sem markdown ou texto extra:
 
 {{
-  "card": {{
-    "objective": "síntese em 2-3 frases do que este edital financia e para quem",
-    "mechanism": "subvencao|reembolsavel|investimento|misto|null",
-    "eligible_entities": ["empresas", "startups", "ICTs"],
-    "eligible_sectors": ["setor1", "setor2"],
-    "value_range": {{"min_brl": null, "max_brl": null}},
-    "trl_range": {{"min": null, "max": null}},
-    "required_certifications": [],
-    "counterpart_required": false,
-    "key_requirements": ["máx 5 requisitos concretos e objetivos"],
-    "key_facts": ["5 fatos mais relevantes para uma empresa decidir se candidatar"]
-  }},
-  "sections": [
-    {{
-      "title": "título da seção",
-      "content": "texto original desta seção, sem reformulação ou síntese"
-    }}
-  ]
+  "objective": "síntese em 2-3 frases do que este edital financia e para quem",
+  "mechanism": "subvencao|reembolsavel|investimento|misto|null",
+  "eligible_entities": ["empresas", "startups", "ICTs"],
+  "eligible_sectors": ["setor1", "setor2"],
+  "value_range": {{"min_brl": null, "max_brl": null}},
+  "trl_range": {{"min": null, "max": null}},
+  "required_certifications": [],
+  "counterpart_required": false,
+  "key_requirements": ["máx 5 requisitos concretos e objetivos"],
+  "key_facts": ["5 fatos mais relevantes para uma empresa decidir se candidatar"]
 }}
 
-Regras para sections:
-- Identifique as seções lógicas dos documentos (objeto, elegibilidade, recursos, cronograma, etc.)
-- Preserve o texto original — não sintetize nem reformule
-- Inclua apenas seções com conteúdo normativo útil (ignore capas, sumários, bases legais puras)
-- Títulos das seções em português, claros e curtos
-
-Regras para card:
+Regras:
 - mechanism: classifique pelo mecanismo financeiro principal
 - trl_range: inteiros 1-9, null se não mencionado
 - value_range: valores em reais como inteiros, null se não mencionado
@@ -131,22 +115,41 @@ def _extract_pdf_text(pdf_path: Path) -> str:
 
 
 def _should_skip(pdf_path: Path) -> bool:
-    name = pdf_path.stem.lower()
-    return any(kw in name for kw in _SKIP_KEYWORDS)
+    return any(kw in pdf_path.stem.lower() for kw in _SKIP_KEYWORDS)
 
 
 def _load_pdfs(edital_id: str) -> list[tuple[str, str]]:
-    """Retorna lista de (nome_arquivo, texto) para os PDFs do edital."""
+    """Retorna lista de (nome_arquivo, texto) para os PDFs relevantes do edital."""
     pdf_dir = FINEP_PDFS_DIR / edital_id
     if not pdf_dir.exists():
         return []
-    pdfs = sorted(pdf_dir.glob("*.pdf"))
     result = []
-    for pdf in pdfs:
+    for pdf in sorted(pdf_dir.glob("*.pdf")):
         if not _should_skip(pdf):
             text = _extract_pdf_text(pdf)
             if text.strip():
                 result.append((pdf.stem, text))
+    return result
+
+
+def _fit_to_budget(pdfs: list[tuple[str, str]], model: str) -> list[tuple[str, str]]:
+    """
+    Distribui o budget de caracteres entre os PDFs.
+    PDFs menores entram completos primeiro; os maiores preenchem o espaço restante.
+    """
+    budget = _MODEL_CHAR_BUDGET.get(model, 80_000 * 4)
+    total_chars = sum(len(t) for _, t in pdfs)
+    if total_chars <= budget:
+        return pdfs
+
+    pdfs_sorted = sorted(pdfs, key=lambda x: len(x[1]))
+    remaining = budget
+    result = []
+    for name, text in pdfs_sorted:
+        result.append((name, text[:remaining]))
+        remaining -= len(text)
+        if remaining <= 0:
+            break
     return result
 
 
@@ -165,7 +168,7 @@ def _load_cache() -> dict:
 
 
 def _save_cache(cache: dict) -> None:
-    KG_CARDS_DIR.mkdir(parents=True, exist_ok=True)
+    KG_WIKI_DIR.mkdir(parents=True, exist_ok=True)
     CACHE_FILE.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
@@ -188,18 +191,17 @@ def _make_client(backend: str):
 
 def _call_llm(client, model: str, metadata: dict, pdfs: list[tuple[str, str]]) -> dict:
     metadata_str = json.dumps({
-        "title":        metadata.get("title", ""),
-        "status":       metadata.get("status", ""),
-        "deadline":     metadata.get("deadline", ""),
-        "themes":       metadata.get("themes", []),
-        "publico_alvo": metadata.get("publico_alvo", []),
-        "fonte_recurso":metadata.get("fonte_recurso", []),
-        "link":         metadata.get("link", ""),
+        "title":         metadata.get("title", ""),
+        "status":        metadata.get("status", ""),
+        "deadline":      metadata.get("deadline", ""),
+        "themes":        metadata.get("themes", []),
+        "publico_alvo":  metadata.get("publico_alvo", []),
+        "fonte_recurso": metadata.get("fonte_recurso", []),
+        "link":          metadata.get("link", ""),
     }, ensure_ascii=False, indent=2)
 
-    docs_parts = []
-    for name, text in pdfs:
-        docs_parts.append(f"### {name}\n{text[:8000]}")
+    fitted_pdfs = _fit_to_budget(pdfs, model)
+    docs_parts = [f"### {name}\n{text}" for name, text in fitted_pdfs]
     documents_str = "\n\n".join(docs_parts) if docs_parts else "(sem documentos PDF disponíveis)"
 
     prompt = _PROMPT.format(metadata=metadata_str, documents=documents_str)
@@ -208,7 +210,7 @@ def _call_llm(client, model: str, metadata: dict, pdfs: list[tuple[str, str]]) -
         model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.1,
-        max_tokens=3000,
+        max_tokens=1500,
     )
     raw = response.choices[0].message.content.strip()
     if "```" in raw:
@@ -220,81 +222,64 @@ def _call_llm(client, model: str, metadata: dict, pdfs: list[tuple[str, str]]) -
 # SAÍDA
 # =============================================================================
 
-def _save_card(entry: dict, synthesized: dict) -> None:
-    card = {
-        "id":           entry["id"],
-        "title":        entry["title"],
-        "status":       entry["status"],
-        "deadline":     entry["deadline"],
-        "pub_date":     entry.get("pub_date", ""),
-        "link":         entry["link"],
-        "themes":       entry.get("themes", []),
-        "publico_alvo": entry.get("publico_alvo", []),
-        "fonte_recurso":entry.get("fonte_recurso", []),
-        "objective":    synthesized.get("objective"),
-        "mechanism":    synthesized.get("mechanism"),
-        "eligible_entities":      synthesized.get("eligible_entities", entry.get("publico_alvo", [])),
-        "eligible_sectors":       synthesized.get("eligible_sectors", entry.get("themes", [])),
-        "value_range":            synthesized.get("value_range", {"min_brl": None, "max_brl": None}),
-        "trl_range":              synthesized.get("trl_range", {"min": None, "max": None}),
-        "required_certifications":synthesized.get("required_certifications", []),
-        "counterpart_required":   synthesized.get("counterpart_required", False),
-        "key_requirements":       synthesized.get("key_requirements", []),
-        "key_facts":              synthesized.get("key_facts", []),
-        "generated_at": datetime.now().strftime("%Y-%m-%d"),
-        "source":       "etl_process",
+def _save_wiki_page(entry: dict, synthesized: dict) -> None:
+    wiki_page = {
+        "id":            entry["id"],
+        "title":         entry["title"],
+        "status":        entry["status"],
+        "deadline":      entry["deadline"],
+        "pub_date":      entry.get("pub_date", ""),
+        "link":          entry["link"],
+        "themes":        entry.get("themes", []),
+        "publico_alvo":  entry.get("publico_alvo", []),
+        "fonte_recurso": entry.get("fonte_recurso", []),
+        "objective":               synthesized.get("objective"),
+        "mechanism":               synthesized.get("mechanism"),
+        "eligible_entities":       synthesized.get("eligible_entities", entry.get("publico_alvo", [])),
+        "eligible_sectors":        synthesized.get("eligible_sectors", entry.get("themes", [])),
+        "value_range":             synthesized.get("value_range", {"min_brl": None, "max_brl": None}),
+        "trl_range":               synthesized.get("trl_range", {"min": None, "max": None}),
+        "required_certifications": synthesized.get("required_certifications", []),
+        "counterpart_required":    synthesized.get("counterpart_required", False),
+        "key_requirements":        synthesized.get("key_requirements", []),
+        "key_facts":               synthesized.get("key_facts", []),
+        "generated_at":            datetime.now().strftime("%Y-%m-%d"),
+        "source":                  "etl_process",
     }
-    KG_CARDS_DIR.mkdir(parents=True, exist_ok=True)
-    (KG_CARDS_DIR / f"{entry['id']}.json").write_text(
-        json.dumps(card, indent=2, ensure_ascii=False), encoding="utf-8"
+    KG_WIKI_DIR.mkdir(parents=True, exist_ok=True)
+    (KG_WIKI_DIR / f"{entry['id']}.json").write_text(
+        json.dumps(wiki_page, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
 
-def _save_section_index(entry: dict, sections: list[dict]) -> None:
-    payload = {
-        "edital_id": entry["id"],
-        "title":     entry["title"],
-        "source":    "etl_process",
-        "sections":  [
-            {"title": s["title"], "content": s["content"]}
-            for s in sections
-            if s.get("title") and s.get("content")
-        ],
+def _save_minimal_wiki_page(entry: dict) -> None:
+    """Wiki page mínima para editais sem PDFs disponíveis (sem chamada LLM)."""
+    wiki_page = {
+        "id":            entry["id"],
+        "title":         entry["title"],
+        "status":        entry["status"],
+        "deadline":      entry["deadline"],
+        "pub_date":      entry.get("pub_date", ""),
+        "link":          entry["link"],
+        "themes":        entry.get("themes", []),
+        "publico_alvo":  entry.get("publico_alvo", []),
+        "fonte_recurso": entry.get("fonte_recurso", []),
+        "objective":               None,
+        "mechanism":               None,
+        "eligible_entities":       entry.get("publico_alvo", []),
+        "eligible_sectors":        entry.get("themes", []),
+        "value_range":             {"min_brl": None, "max_brl": None},
+        "trl_range":               {"min": None, "max": None},
+        "required_certifications": [],
+        "counterpart_required":    False,
+        "key_requirements":        [],
+        "key_facts":               [],
+        "generated_at":            datetime.now().strftime("%Y-%m-%d"),
+        "source":                  "metadata_only",
     }
-    SECTION_INDEX_DIR.mkdir(parents=True, exist_ok=True)
-    (SECTION_INDEX_DIR / f"{entry['id']}.json").write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-
-
-def _save_minimal(entry: dict) -> None:
-    """Card mínimo para editais sem PDFs (sem chamada LLM)."""
-    card = {
-        "id":           entry["id"],
-        "title":        entry["title"],
-        "status":       entry["status"],
-        "deadline":     entry["deadline"],
-        "pub_date":     entry.get("pub_date", ""),
-        "link":         entry["link"],
-        "themes":       entry.get("themes", []),
-        "publico_alvo": entry.get("publico_alvo", []),
-        "fonte_recurso":entry.get("fonte_recurso", []),
-        "objective":    None,
-        "mechanism":    None,
-        "eligible_entities":      entry.get("publico_alvo", []),
-        "eligible_sectors":       entry.get("themes", []),
-        "value_range":            {"min_brl": None, "max_brl": None},
-        "trl_range":              {"min": None, "max": None},
-        "required_certifications":[],
-        "counterpart_required":   False,
-        "key_requirements":       [],
-        "key_facts":              [],
-        "generated_at": datetime.now().strftime("%Y-%m-%d"),
-        "source":       "metadata_only",
-    }
-    KG_CARDS_DIR.mkdir(parents=True, exist_ok=True)
-    (KG_CARDS_DIR / f"{entry['id']}.json").write_text(
-        json.dumps(card, indent=2, ensure_ascii=False), encoding="utf-8"
+    KG_WIKI_DIR.mkdir(parents=True, exist_ok=True)
+    (KG_WIKI_DIR / f"{entry['id']}.json").write_text(
+        json.dumps(wiki_page, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
 
@@ -309,7 +294,7 @@ def main(
     delay: float = 1.5,
 ) -> None:
     print("=" * 60)
-    print("ETL PROCESS — card + section index por edital")
+    print("ETL PROCESS — wiki page por edital")
     print("=" * 60)
 
     if not INDEX_FILE.exists():
@@ -336,10 +321,9 @@ def main(
         eid = entry["id"]
         pdfs = _load_pdfs(eid)
         content_hash = _content_hash(entry, pdfs)
-        cache_key = eid
 
-        if not skip_cache and cache.get(cache_key) == content_hash \
-                and (KG_CARDS_DIR / f"{eid}.json").exists():
+        if not skip_cache and cache.get(eid) == content_hash \
+                and (KG_WIKI_DIR / f"{eid}.json").exists():
             logger.info("[%d/%d] %s — cache hit", i, len(entries), eid)
             skipped += 1
             continue
@@ -347,33 +331,31 @@ def main(
         logger.info("[%d/%d] %s — %d PDFs", i, len(entries), eid, len(pdfs))
 
         if not pdfs or client is None:
-            _save_minimal(entry)
+            _save_minimal_wiki_page(entry)
             minimal += 1
         else:
             try:
                 result = _call_llm(client, model, entry, pdfs)
-                _save_card(entry, result.get("card", {}))
-                _save_section_index(entry, result.get("sections", []))
+                _save_wiki_page(entry, result)
                 time.sleep(delay)
                 processed += 1
             except Exception as e:
-                logger.error("Erro em %s: %s — salvando card mínimo", eid, e)
-                _save_minimal(entry)
+                logger.error("Erro em %s: %s — salvando wiki page mínima", eid, e)
+                _save_minimal_wiki_page(entry)
                 errors += 1
                 continue
 
-        cache[cache_key] = content_hash
+        cache[eid] = content_hash
         _save_cache(cache)
 
     print(f"\n{'=' * 60}")
-    print(f"RESUMO: {processed} LLM, {minimal} mínimos, {skipped} cache, {errors} erros")
-    print(f"Cards:    {KG_CARDS_DIR}/")
-    print(f"Sections: {SECTION_INDEX_DIR}/")
+    print(f"RESUMO: {processed} LLM, {minimal} mínimas, {skipped} cache, {errors} erros")
+    print(f"Wiki pages: {KG_WIKI_DIR}/")
     print(f"{'=' * 60}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="ETL Process — card + sections por edital")
+    parser = argparse.ArgumentParser(description="ETL Process — wiki page por edital")
     parser.add_argument("--backend", default="gemini", choices=["gemini", "openai"])
     parser.add_argument("--edital", nargs="+", dest="edital_ids", help="IDs específicos")
     parser.add_argument("--skip-cache", action="store_true", help="Ignora cache e reprocessa tudo")

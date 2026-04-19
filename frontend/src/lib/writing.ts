@@ -6,57 +6,25 @@ export interface ProposalSection {
   isGeneral?: boolean;
 }
 
-const DEFAULT_SECTIONS = [
-  "Contextualização / Problema",
-  "Objetivos",
-  "Metodologia / Plano de trabalho",
-  "Equipe executora",
-  "Cronograma",
-  "Orçamento",
-  "Resultados esperados / Impacto",
+// Outline padrão usado como fallback se a sessão não retornar títulos
+const DEFAULT_OUTLINE = [
+  "1. Identificação da empresa",
+  "2. Objeto do projeto",
+  "3. Justificativa e relevância",
+  "4. Objetivos",
+  "5. Metodologia e plano de trabalho",
+  "6. Equipe técnica",
+  "7. Cronograma",
+  "8. Orçamento",
 ];
 
-const SECTION_KEYWORDS: Record<string, string[]> = {
-  "Contextualização / Problema": ["contexto", "problem", "justif", "introdução"],
-  "Objetivos": ["objetivo", "meta", "finalidade"],
-  "Metodologia / Plano de trabalho": ["metodolog", "plano", "atividade", "trabalho"],
-  "Equipe executora": ["equipe", "pesquisador", "coordenador", "executor"],
-  "Cronograma": ["cronograma", "prazo", "etapa", "fase"],
-  "Orçamento": ["orçamento", "custo", "recurso", "financeiro", "valor"],
-  "Resultados esperados / Impacto": ["resultado", "impacto", "entregável", "produto"],
-};
-
-function matchSection(editalTitle: string): string | null {
-  const lower = editalTitle.toLowerCase();
-  for (const [canonical, keywords] of Object.entries(SECTION_KEYWORDS)) {
-    if (keywords.some((kw) => lower.includes(kw))) return canonical;
-  }
-  return null;
-}
-
-export function getProposalSections(editalSectionTitles: string[]): ProposalSection[] {
-  const used = new Set<string>();
-  const sections: ProposalSection[] = [];
-
-  // Tenta mapear seções do edital para seções canônicas
-  for (const title of editalSectionTitles) {
-    const canonical = matchSection(title);
-    if (canonical && !used.has(canonical)) {
-      used.add(canonical);
-      sections.push({ title: canonical, status: "pending" });
-    }
-  }
-
-  // Adiciona seções padrão não cobertas
-  for (const def of DEFAULT_SECTIONS) {
-    if (!used.has(def)) {
-      sections.push({ title: def, status: "pending" });
-    }
-  }
-
-  // Seção geral sempre ao final
+export function getProposalSections(outlineTitles: string[]): ProposalSection[] {
+  const titles = outlineTitles.length > 0 ? outlineTitles : DEFAULT_OUTLINE;
+  const sections: ProposalSection[] = titles.map((title) => ({
+    title,
+    status: "pending",
+  }));
   sections.push({ title: "Geral", status: "pending", isGeneral: true });
-
   return sections;
 }
 

@@ -1,16 +1,15 @@
 """
 Health Check — Knowledge Base FINEP.
 
-4 checks por edital:
-  1. card_quality    — card existe e tem campos essenciais preenchidos
-  2. section_coverage — section index existe e cobre seções esperadas
-  3. staleness        — card gerado há mais de 30 dias (pode estar desatualizado)
-  4. new_pdfs         — PDFs em disco não refletidos no cache (retificação pendente)
+3 checks por edital:
+  1. wiki_page_quality — wiki page existe e tem campos essenciais preenchidos
+  2. staleness         — wiki page gerada há mais de 30 dias (pode estar desatualizada)
+  3. new_pdfs          — PDFs em disco não refletidos no cache (retificação pendente)
 
 Uso:
     python pipeline/health_check.py
     python pipeline/health_check.py --edital 782
-    python pipeline/health_check.py --check card_quality section_coverage
+    python pipeline/health_check.py --check wiki_page_quality new_pdfs
     python pipeline/health_check.py --dry-run
 """
 from __future__ import annotations
@@ -18,10 +17,10 @@ from __future__ import annotations
 import json
 import logging
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
-from config import KNOWLEDGE_GRAPH_DIR, KG_CARDS_DIR, SECTION_INDEX_DIR, FINEP_PDFS_DIR
+from config import KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR, FINEP_PDFS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -31,106 +30,64 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-INDEX_FILE  = KNOWLEDGE_GRAPH_DIR / "index.json"
-CACHE_FILE  = KG_CARDS_DIR / ".etl_process_cache.json"
-LOG_FILE    = KNOWLEDGE_GRAPH_DIR / "health_check_log.jsonl"
+INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
+CACHE_FILE = KG_WIKI_DIR / ".etl_process_cache.json"
+LOG_FILE   = KNOWLEDGE_GRAPH_DIR / "health_check_log.jsonl"
 
 STALENESS_DAYS = 30
 
-# Seções esperadas no section index de um edital completo
-EXPECTED_SECTION_KEYWORDS = [
-    "objeto", "objetivo",
-    "elegib", "participan",
-    "recurso", "valor", "financ",
-    "cronograma", "prazo",
-]
+REQUIRED_WIKI_PAGE_FIELDS = ["objective", "mechanism", "eligible_entities", "eligible_sectors"]
 
-# Campos do card que devem estar preenchidos num card de qualidade
-REQUIRED_CARD_FIELDS = ["objective", "mechanism", "eligible_entities", "eligible_sectors"]
-
-ALL_CHECKS = ["card_quality", "section_coverage", "staleness", "new_pdfs"]
+ALL_CHECKS = ["wiki_page_quality", "staleness", "new_pdfs"]
 
 
 # =============================================================================
 # CHECKS
 # =============================================================================
 
-def check_card_quality(edital_id: str) -> dict:
-    """Verifica se o card existe e tem campos essenciais não-nulos."""
-    card_file = KG_CARDS_DIR / f"{edital_id}.json"
+def check_wiki_page_quality(edital_id: str) -> dict:
+    """Verifica se a wiki page existe e tem campos essenciais preenchidos."""
+    wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
 
-    if not card_file.exists():
-        return {"check": "card_quality", "status": "MISSING", "issues": ["card.json não encontrado"]}
+    if not wiki_file.exists():
+        return {"check": "wiki_page_quality", "status": "MISSING",
+                "issues": ["wiki page não encontrada — executar etl_process"]}
 
     try:
-        card = json.loads(card_file.read_text(encoding="utf-8"))
+        wiki_page = json.loads(wiki_file.read_text(encoding="utf-8"))
     except Exception as e:
-        return {"check": "card_quality", "status": "ERROR", "issues": [str(e)]}
+        return {"check": "wiki_page_quality", "status": "ERROR", "issues": [str(e)]}
 
     issues = []
 
-    # Card mínimo (sem PDFs) — avisa mas não é crítico
-    if card.get("source") == "metadata_only":
-        issues.append("card gerado apenas de metadados HTML (sem PDFs)")
+    if wiki_page.get("source") == "metadata_only":
+        issues.append("wiki page gerada apenas de metadados HTML (sem PDFs)")
 
-    # Campos essenciais nulos
-    null_fields = [f for f in REQUIRED_CARD_FIELDS if not card.get(f)]
+    null_fields = [f for f in REQUIRED_WIKI_PAGE_FIELDS if not wiki_page.get(f)]
     if null_fields:
         issues.append(f"campos nulos: {', '.join(null_fields)}")
 
-    # key_requirements e key_facts vazios num card com PDFs
-    if card.get("source") != "metadata_only":
-        if not card.get("key_requirements"):
+    if wiki_page.get("source") != "metadata_only":
+        if not wiki_page.get("key_requirements"):
             issues.append("key_requirements vazio")
-        if not card.get("key_facts"):
+        if not wiki_page.get("key_facts"):
             issues.append("key_facts vazio")
 
-    status = "OK" if not issues else ("WARN" if card.get("source") == "metadata_only" else "ISSUE")
-    return {"check": "card_quality", "status": status, "issues": issues}
-
-
-def check_section_coverage(edital_id: str) -> dict:
-    """Verifica se o section index existe e cobre seções essenciais."""
-    index_file = SECTION_INDEX_DIR / f"{edital_id}.json"
-
-    if not index_file.exists():
-        return {"check": "section_coverage", "status": "MISSING", "missing": [], "found": []}
-
-    try:
-        payload = json.loads(index_file.read_text(encoding="utf-8"))
-    except Exception as e:
-        return {"check": "section_coverage", "status": "ERROR", "issues": [str(e)]}
-
-    sections = payload.get("sections", [])
-    titles_lower = [s["title"].lower() for s in sections]
-
-    missing = [
-        kw for kw in EXPECTED_SECTION_KEYWORDS
-        if not any(kw in t for t in titles_lower)
-    ]
-
-    # Deduplicar: se "objeto" e "objetivo" ambos faltam, contar só uma vez
-    missing_dedup = list({kw.split("|")[0] for kw in missing})
-
-    status = "OK" if len(missing_dedup) <= 2 else "GAP"
-    return {
-        "check": "section_coverage",
-        "status": status,
-        "section_count": len(sections),
-        "found": [s["title"] for s in sections],
-        "missing_keywords": missing_dedup,
-    }
+    status = "OK" if not issues else (
+        "WARN" if wiki_page.get("source") == "metadata_only" else "ISSUE"
+    )
+    return {"check": "wiki_page_quality", "status": status, "issues": issues}
 
 
 def check_staleness(edital_id: str) -> dict:
-    """Verifica se o card foi gerado há mais de STALENESS_DAYS dias."""
-    card_file = KG_CARDS_DIR / f"{edital_id}.json"
-    if not card_file.exists():
-        return {"check": "staleness", "status": "NO_CARD"}
+    """Verifica se a wiki page foi gerada há mais de STALENESS_DAYS dias."""
+    wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+    if not wiki_file.exists():
+        return {"check": "staleness", "status": "NO_WIKI_PAGE"}
 
     try:
-        card = json.loads(card_file.read_text(encoding="utf-8"))
-        generated_at = card.get("generated_at", "")
+        wiki_page = json.loads(wiki_file.read_text(encoding="utf-8"))
+        generated_at = wiki_page.get("generated_at", "")
         if not generated_at:
             return {"check": "staleness", "status": "NO_DATE"}
 
@@ -138,7 +95,8 @@ def check_staleness(edital_id: str) -> dict:
         age_days = (datetime.now().date() - generated_date).days
 
         status = "OK" if age_days <= STALENESS_DAYS else "STALE"
-        return {"check": "staleness", "status": status, "age_days": age_days, "generated_at": generated_at}
+        return {"check": "staleness", "status": status,
+                "age_days": age_days, "generated_at": generated_at}
     except Exception as e:
         return {"check": "staleness", "status": "ERROR", "issues": [str(e)]}
 
@@ -154,7 +112,6 @@ def check_new_pdfs(edital_id: str) -> dict:
 
     pdfs_on_disk = sorted(p.name for p in pdf_dir.glob("*.pdf"))
 
-    # Verifica se o cache existe e se o edital está nele
     if not CACHE_FILE.exists():
         return {"check": "new_pdfs", "status": "NO_CACHE", "pdfs_on_disk": pdfs_on_disk}
 
@@ -164,22 +121,17 @@ def check_new_pdfs(edital_id: str) -> dict:
         return {"check": "new_pdfs", "status": "CACHE_ERROR"}
 
     if edital_id not in cache:
-        return {
-            "check": "new_pdfs",
-            "status": "NOT_PROCESSED",
-            "pdfs_on_disk": pdfs_on_disk,
-        }
+        return {"check": "new_pdfs", "status": "NOT_PROCESSED", "pdfs_on_disk": pdfs_on_disk}
 
-    # Se o cache existe mas o card tem source=metadata_only, pode ter PDFs novos
-    card_file = KG_CARDS_DIR / f"{edital_id}.json"
-    if card_file.exists():
-        card = json.loads(card_file.read_text(encoding="utf-8"))
-        if card.get("source") == "metadata_only" and pdfs_on_disk:
+    wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+    if wiki_file.exists():
+        wiki_page = json.loads(wiki_file.read_text(encoding="utf-8"))
+        if wiki_page.get("source") == "metadata_only" and pdfs_on_disk:
             return {
                 "check": "new_pdfs",
                 "status": "PDFS_NOT_USED",
                 "pdfs_on_disk": pdfs_on_disk,
-                "note": "card gerado sem PDFs mas há PDFs em disco — re-executar etl_process",
+                "note": "wiki page gerada sem PDFs mas há PDFs em disco — re-executar etl_process",
             }
 
     return {"check": "new_pdfs", "status": "OK", "pdfs_on_disk": pdfs_on_disk}
@@ -221,20 +173,19 @@ def run_health_check(
         print("MODO DRY-RUN\n")
 
     CHECK_FN = {
-        "card_quality":     check_card_quality,
-        "section_coverage": check_section_coverage,
-        "staleness":        check_staleness,
-        "new_pdfs":         check_new_pdfs,
+        "wiki_page_quality": check_wiki_page_quality,
+        "staleness":         check_staleness,
+        "new_pdfs":          check_new_pdfs,
     }
 
     all_results = []
 
     for edital_id in target_ids:
         edital_result = {
-            "edital_id":   edital_id,
-            "checked_at":  datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "results":     {},
-            "issues":      [],
+            "edital_id":  edital_id,
+            "checked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "results":    {},
+            "issues":     [],
         }
 
         for check in checks:
@@ -246,17 +197,16 @@ def run_health_check(
 
         all_results.append(edital_result)
 
-        # Log em disco
         KNOWLEDGE_GRAPH_DIR.mkdir(parents=True, exist_ok=True)
         with LOG_FILE.open("a", encoding="utf-8") as f:
             f.write(json.dumps(edital_result, ensure_ascii=False) + "\n")
 
-        # Saída no terminal
-        status_str = "OK" if not edital_result["issues"] else f"{'  |  '.join(edital_result['issues'])}"
+        status_str = "OK" if not edital_result["issues"] else "  |  ".join(edital_result["issues"])
         print(f"  [{edital_id}] {status_str}")
         for check, r in edital_result["results"].items():
             if r.get("status") not in ("OK", "NO_PDF_DIR"):
-                detail = r.get("issues") or r.get("missing_keywords") or r.get("note") or r.get("pdfs_on_disk") or ""
+                detail = (r.get("issues") or r.get("note") or
+                          r.get("pdfs_on_disk") or "")
                 if detail:
                     print(f"    → {check}: {detail}")
 

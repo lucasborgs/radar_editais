@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from config import KNOWLEDGE_GRAPH_DIR, KG_CARDS_DIR
+from config import KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -189,7 +189,7 @@ class KGMatchService:
 
     def get_edital_by_id(self, edital_id: str) -> dict | None:
         """Retorna card rico se disponível, senão entry do índice."""
-        card_file = KG_CARDS_DIR / f"{edital_id}.json"
+        card_file = KG_WIKI_DIR / f"{edital_id}.json"
         if card_file.exists():
             try:
                 return json.loads(card_file.read_text(encoding="utf-8"))

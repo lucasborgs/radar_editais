@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from config import FINEP_FACTS_DIR, KG_CARDS_DIR
+from config import KG_WIKI_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -75,12 +75,12 @@ def build_checklist(edital_id: str) -> list[dict]:
     items: list[dict] = []
     seen: set[str] = set()
 
-    # 1. Card key_requirements
-    card_file = KG_CARDS_DIR / f"{edital_id}.json"
-    if card_file.exists():
+    # 1. Wiki page key_requirements
+    wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+    if wiki_file.exists():
         try:
-            card = json.loads(card_file.read_text(encoding="utf-8"))
-            for req in card.get("key_requirements", []):
+            wiki_page = json.loads(wiki_file.read_text(encoding="utf-8"))
+            for req in wiki_page.get("key_requirements", []):
                 if req and req not in seen:
                     seen.add(req)
                     items.append({
@@ -91,27 +91,7 @@ def build_checklist(edital_id: str) -> list[dict]:
                         "source": "key_requirements",
                     })
         except Exception as e:
-            logger.warning("Erro ao ler card %s: %s", edital_id, e)
-
-    # 2. Fatos Tier 1 com verbos de obrigação
-    facts_dir = FINEP_FACTS_DIR / edital_id
-    if facts_dir.exists():
-        for fact_file in sorted(facts_dir.glob("tier1_*.json")):
-            try:
-                facts = json.loads(fact_file.read_text(encoding="utf-8"))
-                for fact in facts.get("facts", []):
-                    text = fact if isinstance(fact, str) else fact.get("fact", "")
-                    if _OBLIGATION_PATTERN.search(text) and text not in seen:
-                        seen.add(text)
-                        items.append({
-                            "id": f"req_{len(items)}",
-                            "requirement": text,
-                            "section": _infer_section(text),
-                            "status": "pending",
-                            "source": "tier1_fact",
-                        })
-            except Exception as e:
-                logger.warning("Erro ao ler fatos %s: %s", fact_file, e)
+            logger.warning("Erro ao ler wiki page %s: %s", edital_id, e)
 
     return items
 
