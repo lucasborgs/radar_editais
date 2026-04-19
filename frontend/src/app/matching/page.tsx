@@ -361,27 +361,30 @@ function ProfileCompletionBar({ profile }: { profile: CompanyProfile }) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MatchingPage() {
-  const [profile, setProfile] = useState<CompanyProfile>(EMPTY_PROFILE);
-
-  useEffect(() => {
+  const [profile, setProfile] = useState<CompanyProfile>(() => {
+    if (typeof window === "undefined") return EMPTY_PROFILE;
     try {
       const saved = localStorage.getItem(PROFILE_STORAGE_KEY);
-      if (saved) setProfile({ ...EMPTY_PROFILE, ...JSON.parse(saved) });
-    } catch { /* ignore */ }
-  }, []);
+      return saved ? { ...EMPTY_PROFILE, ...JSON.parse(saved) } : EMPTY_PROFILE;
+    } catch { return EMPTY_PROFILE; }
+  });
 
   const [results, setResults] = useState<KGMatchResult[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
 
-  // Persist profile to localStorage on change
+  useEffect(() => { setHasMounted(true); }, []);
+
+  // Persist profile to localStorage somente após mount (evita sobrescrever no primeiro render)
   useEffect(() => {
+    if (!hasMounted) return;
     saveProfileToStorage(profile);
     setSaved(true);
     const t = setTimeout(() => setSaved(false), 1500);
     return () => clearTimeout(t);
-  }, [profile]);
+  }, [profile, hasMounted]);
 
   function set<K extends keyof CompanyProfile>(key: K, value: CompanyProfile[K]) {
     setProfile((prev) => ({ ...prev, [key]: value }));
