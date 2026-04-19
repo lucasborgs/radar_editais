@@ -137,7 +137,7 @@ def _score_elegibilidade(card: dict, profile: CompanyProfile) -> int:
 
 def _score_tematico(card: dict, profile: CompanyProfile) -> int:
     """Interseção de keywords do perfil com themes/eligible_sectors do edital."""
-    edital_themes = card.get("themes", []) + card.get("eligible_sectors", [])
+    edital_themes = (card.get("themes") or []) + (card.get("eligible_sectors") or [])
     if not edital_themes:
         return _WEIGHTS["tematico"] // 2  # sem info → neutro
 
@@ -272,19 +272,19 @@ Para cada edital, retorne uma pontuação temática de 0.0 a 10.0 e uma justific
 Considere: área de atuação da empresa vs temas/setores do edital, experiência prévia relevante,
 e aderência do problema/solução ao foco do programa.
 
-{
+{{
   "avaliacoes": [
-    {
+    {{
       "id": "id_do_edital",
       "score_tematico": 8.5,
       "justificativa": "A empresa atua em bioeconomia, alinhada ao foco do edital em...",
-      "dimensoes": {
+      "dimensoes": {{
         "setor": "explicação em 1 frase",
         "problema_solucao": "explicação em 1 frase"
-      }
-    }
+      }}
+    }}
   ]
-}"""
+}}"""
 
 
 def _make_client():
