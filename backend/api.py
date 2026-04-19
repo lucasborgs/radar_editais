@@ -55,7 +55,7 @@ app.include_router(library_router)
 # SINGLETONS
 # =============================================================================
 
-kg_matcher = HybridMatchService()
+wiki_matcher = HybridMatchService()
 
 
 @app.exception_handler(Exception)
@@ -174,7 +174,7 @@ def root():
 
 @app.get("/stats", summary="Estatísticas do catálogo FINEP")
 def get_stats():
-    return kg_matcher.get_stats()
+    return wiki_matcher.get_stats()
 
 
 @app.get("/editais", summary="Lista editais FINEP com filtros opcionais")
@@ -183,12 +183,12 @@ def list_editais(
     tema: Optional[str] = Query(None, description="Filtro por tema (substring)"),
     limit: int = Query(200, ge=1, le=500),
 ):
-    return kg_matcher.list_editais(status=status, tema=tema, limit=limit)
+    return wiki_matcher.list_editais(status=status, tema=tema, limit=limit)
 
 
 @app.get("/editais/{edital_id}", summary="Card completo de um edital")
 def get_edital(edital_id: str):
-    edital = kg_matcher.get_edital_by_id(edital_id)
+    edital = wiki_matcher.get_edital_by_id(edital_id)
     if edital is None:
         raise HTTPException(status_code=404, detail=f"Edital '{edital_id}' não encontrado")
     return edital
@@ -211,7 +211,7 @@ def match_editais(req: MatchRequest):
             status_code=422,
             detail="Perfil incompleto. Preencha pelo menos nome e descricao_atividades.",
         )
-    return {"matches": kg_matcher.match(profile=profile, top_k=req.top_k)}
+    return {"matches": wiki_matcher.match(profile=profile, top_k=req.top_k)}
 
 
 # =============================================================================
@@ -225,12 +225,11 @@ def writing_start(req: WritingStartRequest, request: Request):
     Cria uma sessão de escrita para o edital selecionado.
     Retorna session_id e títulos das seções disponíveis.
     """
-    edital = kg_matcher.get_edital_by_id(req.edital_id)
+    edital = wiki_matcher.get_edital_by_id(req.edital_id)
     if edital is None:
         raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
 
     profile = _to_py_profile(req.profile)
-    edital_url = str(edital.get("link") or "")
 
     library_items: list[dict] = []
     if req.library_item_ids:
@@ -251,7 +250,6 @@ def writing_start(req: WritingStartRequest, request: Request):
     session = WritingSession(
         edital_id=req.edital_id,
         profile=profile,
-        edital_url=edital_url,
         library_items=library_items,
     )
     _writing_sessions[session.session_id] = session
@@ -263,7 +261,7 @@ def writing_start(req: WritingStartRequest, request: Request):
 def writing_turn(req: WritingTurnRequest):
     """
     Processa um turno da conversa de escrita.
-    O Router LLM seleciona seções relevantes; o Writer LLM gera a resposta.
+    O Writer LLM recebe os documentos do edital como contexto estático e gera a resposta.
     """
     session = _writing_sessions.get(req.session_id)
     if session is None:

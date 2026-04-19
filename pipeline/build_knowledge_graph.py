@@ -22,7 +22,7 @@ from collections import defaultdict
 from datetime import date, datetime
 from pathlib import Path
 
-from config import BRONZE_DIR, FINEP_FACTS_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR
+from config import BRONZE_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR
 
 # =============================================================================
 # PATHS
@@ -111,14 +111,6 @@ def _build_editais(chamadas: list[dict]) -> list[dict]:
         n_pdfs = len(list((FINEP_PDFS_DIR / cid).glob("*.pdf"))) \
             if (FINEP_PDFS_DIR / cid).exists() else 0
 
-        facts_file = FINEP_FACTS_DIR / f"{cid}.json"
-        n_facts = 0
-        if facts_file.exists():
-            try:
-                n_facts = len(json.loads(facts_file.read_text(encoding="utf-8")).get("facts", []))
-            except Exception:
-                pass
-
         deadline_str = ch.get("prazo_envio", "")
         raw_status = ch.get("status", "Desconhecido")
         # Se o prazo é futuro, o edital está obrigatoriamente aberto
@@ -141,7 +133,6 @@ def _build_editais(chamadas: list[dict]) -> list[dict]:
             "publico_alvo": _split_multi(ch.get("publico_alvo")),
             "fonte_recurso": _split_multi(ch.get("fonte_recurso")),
             "n_pdfs": n_pdfs,
-            "n_facts": n_facts,
         })
 
     status_order = {"ABERTA": 0, "Desconhecido": 1, "ENCERRADA": 2}

@@ -12,7 +12,8 @@ import os
 import re
 from dataclasses import dataclass
 
-from core.live_fetcher import LiveFetcher
+import requests
+from bs4 import BeautifulSoup
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -55,12 +56,24 @@ class ExtractResult:
 class ProfileExtractor:
     """Extrai CompanyProfile a partir da URL do site da empresa."""
 
+    @staticmethod
+    def _fetch_url(url: str, timeout: int = 12) -> tuple[str, str]:
+        """Faz HTTP GET e extrai texto limpo do HTML."""
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; RadarEditais/1.0)"}
+        resp = requests.get(url, headers=headers, timeout=timeout)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for tag in soup(["script", "style", "nav", "footer", "header"]):
+            tag.decompose()
+        text = " ".join(soup.get_text(separator=" ").split())
+        title = soup.title.string.strip() if soup.title else url
+        return text[:12000], title
+
     def extract(self, url: str) -> ExtractResult:
-        fetcher = LiveFetcher(timeout=12)
         try:
-            text, source_title = fetcher.fetch_text(url)
+            text, source_title = self._fetch_url(url)
         except Exception as e:
-            logger.error("fetch_text falhou para %s: %s", url, e)
+            logger.error("fetch falhou para %s: %s", url, e)
             return self._empty_result(error=f"Não foi possível acessar o site: {e}")
 
         if not text.strip():
