@@ -86,7 +86,11 @@ Produza APENAS o JSON abaixo, sem markdown ou texto extra:
   "required_certifications": [],
   "counterpart_required": false,
   "key_requirements": ["máx 5 requisitos concretos e objetivos"],
-  "key_facts": ["5 fatos mais relevantes para uma empresa decidir se candidatar"]
+  "key_facts": ["5 fatos mais relevantes para uma empresa decidir se candidatar"],
+  "proposal_sections": [
+    "1. Título e identificação do projeto",
+    "2. ..."
+  ]
 }}
 
 Regras:
@@ -94,7 +98,10 @@ Regras:
 - trl_range: inteiros 1-9, null se não mencionado
 - value_range: valores em reais como inteiros, null se não mencionado
 - key_requirements: máx 5 itens, cada um autocontido e verificável
-- key_facts: os 5 fatos que uma empresa usaria para decidir se vale candidatar"""
+- key_facts: os 5 fatos que uma empresa usaria para decidir se vale candidatar
+- proposal_sections: seções obrigatórias da proposta na ordem exigida pelo edital,
+  extraídas das instruções de inscrição e formulários. Se o edital não especificar
+  estrutura, derive do objeto e dos critérios de avaliação. Entre 6 e 12 seções."""
 
 
 # =============================================================================
@@ -243,6 +250,7 @@ def _save_wiki_page(entry: dict, synthesized: dict) -> None:
         "counterpart_required":    synthesized.get("counterpart_required", False),
         "key_requirements":        synthesized.get("key_requirements", []),
         "key_facts":               synthesized.get("key_facts", []),
+        "proposal_sections":       synthesized.get("proposal_sections", []),
         "generated_at":            datetime.now().strftime("%Y-%m-%d"),
         "source":                  "etl_process",
     }
@@ -274,6 +282,7 @@ def _save_minimal_wiki_page(entry: dict) -> None:
         "counterpart_required":    False,
         "key_requirements":        [],
         "key_facts":               [],
+        "proposal_sections":       [],
         "generated_at":            datetime.now().strftime("%Y-%m-%d"),
         "source":                  "metadata_only",
     }

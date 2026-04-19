@@ -29,7 +29,7 @@ from typing import Optional
 
 import requests
 
-from config import FINEP_PDFS_DIR
+from config import FINEP_PDFS_DIR, KG_WIKI_DIR
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -119,8 +119,9 @@ class WritingSession:
         self._documents_text   = self._load_documents(edital_id)
         self._library_context  = self._build_library_context(library_items or [])
 
-        # Outline da proposta gerado uma vez por sessão
-        self._proposal_outline = self._generate_outline()
+        # Outline da proposta: lê da wiki page; gera via LLM só se ausente
+        self._proposal_outline = self._load_outline_from_wiki(edital_id) \
+                                 or self._generate_outline()
 
         logger.info(
             "WritingSession %s | edital=%s | %d seções | %s/%s",
@@ -167,6 +168,19 @@ class WritingSession:
     # ------------------------------------------------------------------
     # Outline da proposta
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _load_outline_from_wiki(edital_id: str) -> list[str]:
+        """Lê proposal_sections da wiki page — zero custo de LLM."""
+        wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+        if not wiki_file.exists():
+            return []
+        try:
+            wiki_page = json.loads(wiki_file.read_text(encoding="utf-8"))
+            sections = wiki_page.get("proposal_sections", [])
+            return [str(s) for s in sections] if sections else []
+        except Exception:
+            return []
 
     def _generate_outline(self) -> list[str]:
         """Gera o outline das seções da proposta via LLM (1 chamada por sessão)."""
