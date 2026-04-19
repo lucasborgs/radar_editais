@@ -23,6 +23,7 @@ class CompanyProfile:
     # ── Identificação ──────────────────────────────────────────────────────
     nome: str = ""
     cnpj: str = ""
+    url_site: str = ""
     tipo_entidade: str = "empresa"  # "empresa" | "startup" | "universidade" | "ICT"
 
     # ── Descrição da empresa ───────────────────────────────────────────────
@@ -96,8 +97,15 @@ class CompanyProfile:
         return "\n".join(parts) if parts else "Perfil da empresa nao preenchido."
 
     def is_complete(self) -> bool:
-        """Verifica se os campos minimos estao preenchidos."""
-        return bool(self.nome and self.descricao_atividades)
+        """Verifica se os campos mínimos para um match de qualidade estão preenchidos."""
+        return bool(
+            self.nome
+            and self.tipo_entidade
+            and self.tamanho_empresa
+            and self.descricao_atividades
+            and self.trl is not None
+            and self.tipos_financiamento_interesse
+        )
 
     def completion_pct(self) -> int:
         """Retorna percentual de preenchimento do perfil."""
