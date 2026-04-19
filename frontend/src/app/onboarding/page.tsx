@@ -13,7 +13,8 @@ import {
   type UsoFinanciamento,
 } from "@/types/profile";
 import { PORTE_LABELS } from "@/lib/constants";
-import { extractProfileFromUrl } from "@/lib/api";
+import { extractProfileFromUrl, saveProfile } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import type { FieldConfidence } from "@/types/api";
 
 // ── Shared UI primitives ─────────────────────────────────────────────────────
@@ -250,6 +251,14 @@ function Step1({
           value={profile.cnpj}
           onChange={(e) => set("cnpj", e.target.value)}
           placeholder="00.000.000/0001-00"
+        />
+      </Field>
+      <Field label="Site da empresa">
+        <input
+          className={INPUT_CLS}
+          value={profile.url_site}
+          onChange={(e) => set("url_site", e.target.value)}
+          placeholder="https://suaempresa.com.br"
         />
       </Field>
       <Field label="Tipo de entidade" required confidence={confidence.tipo_entidade}>
@@ -490,11 +499,13 @@ function OnboardingInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/matching";
+  const { getToken } = useAuth();
 
   const [mode, setMode] = useState<OnboardingMode>("url-input");
   const [step, setStep] = useState(0);
   const [profile, setProfile] = useState<CompanyProfile>(EMPTY_PROFILE);
   const [confidence, setConfidence] = useState<Record<string, FieldConfidence>>({});
+  const [saving, setSaving] = useState(false);
 
   // URL extraction state
   const [urlInput, setUrlInput] = useState("");
@@ -506,8 +517,17 @@ function OnboardingInner() {
     setProfile((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleFinish() {
+  async function handleFinish() {
+    setSaving(true);
     saveProfileToStorage(profile);
+    try {
+      const token = await getToken();
+      if (token) await saveProfile(profile, token);
+    } catch {
+      // localStorage fallback já salvo — continua sem bloquear
+    } finally {
+      setSaving(false);
+    }
     router.push(next);
   }
 
@@ -529,7 +549,7 @@ function OnboardingInner() {
         );
         return;
       }
-      setProfile({ ...EMPTY_PROFILE, ...res.profile });
+      setProfile({ ...EMPTY_PROFILE, ...res.profile, url_site: url });
       setConfidence(res.confidence);
       setMode("wizard");
       setStep(0);
@@ -708,7 +728,12 @@ function OnboardingInner() {
                 "focus:outline-none focus:ring-2 focus:ring-primary/50"
               )}
             >
-              {isLast ? "Começar a explorar →" : "Próximo →"}
+              {isLast && saving ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Salvando...
+                </span>
+              ) : isLast ? "Começar a explorar →" : "Próximo →"}
             </button>
           </div>
         </div>

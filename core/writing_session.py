@@ -28,6 +28,8 @@ from domain.user_profile import CompanyProfile
 from core.section_retriever import SectionRetriever
 from core.live_fetcher import LiveFetcher
 
+_LIBRARY_CONTEXT_HEADER = "NARRATIVAS DA EMPRESA (propostas e projetos anteriores):"
+
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -101,6 +103,7 @@ class WritingSession:
         session_id: Optional[str] = None,
         llm_backend: Optional[str] = None,
         model: Optional[str] = None,
+        library_items: Optional[list[dict]] = None,
     ):
         self.session_id   = session_id or str(uuid.uuid4())
         self.edital_id    = edital_id
@@ -114,10 +117,12 @@ class WritingSession:
         self._history_summary: str = ""      # resumo comprimido dos turnos antigos
         self._turn_count  = 0
         self._content_source = "section_index"
+        self._doc_sections: dict[str, str] = {}  # {section_title: content editado}
 
-        # Cache estático: perfil e metadados do edital (imutáveis na sessão)
-        self._profile_context = profile.to_context()
-        self._section_titles  = self._retriever.list_sections(edital_id)
+        # Cache estático: perfil, biblioteca e metadados do edital (imutáveis na sessão)
+        self._profile_context   = profile.to_context()
+        self._library_context   = self._build_library_context(library_items or [])
+        self._section_titles    = self._retriever.list_sections(edital_id)
 
         # Se não há section_index local, busca conteúdo ao vivo
         if not self._section_titles and edital_url:
@@ -211,6 +216,18 @@ class WritingSession:
             "Como posso ajudar você a começar?"
         )
 
+    @staticmethod
+    def _build_library_context(items: list[dict]) -> str:
+        """Monta bloco de contexto com key_facts dos itens da biblioteca."""
+        if not items:
+            return ""
+        parts = [_LIBRARY_CONTEXT_HEADER]
+        for item in items:
+            parts.append(f"\n[{item.get('type', 'doc').upper()}] {item.get('title', '')}")
+            for fact in item.get("key_facts", [])[:10]:
+                parts.append(f"  • {fact}")
+        return "\n".join(parts)
+
     def get_info(self) -> dict:
         """Retorna metadados da sessão (para o endpoint /writing/start)."""
         return {
@@ -221,6 +238,32 @@ class WritingSession:
             "turn_count":      self._turn_count,
             "created_at":      self.created_at,
         }
+
+    # ------------------------------------------------------------------
+    # Document state (P1-A)
+    # ------------------------------------------------------------------
+
+    def get_document(self) -> dict:
+        """Retorna o estado atual do documento como lista de seções."""
+        return {
+            "session_id": self.session_id,
+            "sections": [
+                {"title": t, "content": self._doc_sections.get(t, "")}
+                for t in self._section_titles
+            ],
+        }
+
+    def set_section_content(self, section_title: str, content: str) -> None:
+        """Salva conteúdo editado pelo usuário para uma seção."""
+        self._doc_sections[section_title] = content
+
+    def get_export(self) -> str:
+        """Exporta o documento completo como Markdown."""
+        parts = []
+        for title in self._section_titles:
+            content = self._doc_sections.get(title, "")
+            parts.append(f"## {title}\n\n{content}" if content else f"## {title}\n\n*[A preencher]*")
+        return "\n\n---\n\n".join(parts)
 
     # ------------------------------------------------------------------
     # Router LLM
@@ -328,6 +371,12 @@ class WritingSession:
             {"role": "system", "content": WRITER_SYSTEM_PROMPT},
             {"role": "user",   "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
         ]
+
+        if self._library_context:
+            messages.append({
+                "role":    "user",
+                "content": self._library_context,
+            })
 
         if sections_text:
             messages.append({
