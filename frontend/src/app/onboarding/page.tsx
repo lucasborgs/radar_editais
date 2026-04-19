@@ -281,7 +281,7 @@ function Step1({
         </div>
       </Field>
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Porte">
+        <Field label="Porte" required confidence={confidence.tamanho_empresa}>
           <select
             className={INPUT_CLS}
             value={profile.tamanho_empresa}
@@ -398,7 +398,7 @@ function Step2({
           placeholder="Descreva o que a empresa faz, tecnologias utilizadas, mercado de atuação..."
         />
       </Field>
-      <Field label="TRL atual do projeto principal" hint="Technology Readiness Level (maturidade tecnológica)">
+      <Field label="TRL atual do projeto principal" required hint="Technology Readiness Level (maturidade tecnológica) — impacta diretamente o matching">
         <select
           className={INPUT_CLS}
           value={profile.trl ?? ""}
@@ -432,7 +432,7 @@ function Step3({
 }) {
   return (
     <div className="space-y-5">
-      <Field label="Tipos de financiamento de interesse" hint="Selecione todos que se aplicam." required>
+      <Field label="Tipos de financiamento de interesse" hint="Obrigatório — define quais mecanismos de editais são compatíveis." required>
         <CheckGroup<TipoFinanciamento>
           options={FINANCIAMENTO_OPTIONS}
           value={profile.tipos_financiamento_interesse}
@@ -487,9 +487,9 @@ const STEPS = [
 ];
 
 function canAdvance(profile: CompanyProfile, step: number): boolean {
-  if (step === 0) return !!profile.nome && !!profile.tipo_entidade;
-  if (step === 1) return !!profile.one_liner && !!profile.descricao_atividades;
-  if (step === 2) return true;
+  if (step === 0) return !!profile.nome && !!profile.tipo_entidade && !!profile.tamanho_empresa;
+  if (step === 1) return !!profile.one_liner && !!profile.descricao_atividades && profile.trl !== null;
+  if (step === 2) return profile.tipos_financiamento_interesse.length > 0;
   return false;
 }
 
