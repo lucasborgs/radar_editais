@@ -20,9 +20,13 @@ import json
 import re
 from collections import defaultdict
 from datetime import date, datetime
-from pathlib import Path
 
 from config import BRONZE_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR
+from core import wiki_schema
+from domain.vocabulary import canonicalize_themes
+
+# Schema autoritativo em WIKI.md (ver core.wiki_schema)
+_SOURCE = "finep"
 
 # =============================================================================
 # PATHS
@@ -30,25 +34,6 @@ from config import BRONZE_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR
 
 INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
 INDEX_HISTORICO_FILE = KNOWLEDGE_GRAPH_DIR / "index_historico.json"
-
-
-# =============================================================================
-# VIGÊNCIA
-# =============================================================================
-
-def _parse_deadline(value: str | None) -> date | None:
-    if not value:
-        return None
-    try:
-        return datetime.strptime(value.strip(), "%d/%m/%Y").date()
-    except ValueError:
-        return None
-
-
-def _is_vigente(entry: dict) -> bool:
-    """Retorna True apenas se o edital tem prazo preenchido e após hoje."""
-    d = _parse_deadline(entry.get("deadline"))
-    return d is not None and d > date.today()
 
 
 # =============================================================================
@@ -80,10 +65,42 @@ def load_finep_bronze() -> list[dict]:
 # NORMALIZAÇÃO
 # =============================================================================
 
+def _normalize_fonte(raw: str) -> list[str]:
+    """Divide e normaliza um valor de fonte_recurso para nomes canônicos (§5.4 WIKI.md)."""
+    # divide por ; , | /
+    parts = re.split(r"[;,|/]", raw)
+    result: list[str] = []
+    fontes_canonicas = wiki_schema.fontes_canonicas()
+    for part in parts:
+        # extrai siglas conhecidas (ex: "FNDCT – Subvenção Econômica" → "FNDCT")
+        for key, canonical in fontes_canonicas.items():
+            if re.search(rf"\b{key}\b", part, re.IGNORECASE):
+                if canonical not in result:
+                    result.append(canonical)
+                break
+        else:
+            # sem correspondência conhecida → mantém limpo se não vazio
+            clean = part.strip()
+            if clean and clean not in result:
+                result.append(clean)
+    return result
+
+
 def _split_multi(value: str | None) -> list[str]:
     if not value:
         return []
     return [p.strip() for p in re.split(r"[;,|]", value) if p.strip()]
+
+
+def _split_fontes(value: str | None) -> list[str]:
+    if not value:
+        return []
+    seen: list[str] = []
+    for item in re.split(r"[;,]", value):
+        for f in _normalize_fonte(item.strip()):
+            if f not in seen:
+                seen.append(f)
+    return seen
 
 
 def _extract_id(chamada: dict) -> str:
@@ -113,30 +130,27 @@ def _build_editais(chamadas: list[dict]) -> list[dict]:
 
         deadline_str = ch.get("prazo_envio", "")
         raw_status = ch.get("status", "Desconhecido")
-        # Se o prazo é futuro, o edital está obrigatoriamente aberto
-        deadline_date = _parse_deadline(deadline_str)
-        if deadline_date and deadline_date > date.today():
-            status = "ABERTA"
-        elif raw_status == "ENCERRADA":
-            status = "ENCERRADA"
-        else:
-            status = raw_status
+        # Normalização conforme §7.2 WIKI.md (prazo futuro → ABERTA)
+        status = wiki_schema.normalize_status(raw_status, deadline_str)
 
+        themes_raw = _split_multi(ch.get("tema"))
+        pub_date = ch.get("data_publicacao", "")
         editais.append({
             "id": cid,
             "title": ch.get("titulo", ""),
             "status": status,
             "deadline": deadline_str,
-            "pub_date": ch.get("data_publicacao", ""),
+            "pub_date": pub_date,
+            "pub_year": wiki_schema.parse_pub_year(pub_date),
             "link": ch.get("link", ""),
-            "themes": _split_multi(ch.get("tema")),
+            "themes": canonicalize_themes(themes_raw),
+            "themes_raw": themes_raw,
             "publico_alvo": _split_multi(ch.get("publico_alvo")),
-            "fonte_recurso": _split_multi(ch.get("fonte_recurso")),
+            "fonte_recurso": _split_fontes(ch.get("fonte_recurso")),
             "n_pdfs": n_pdfs,
         })
 
-    status_order = {"ABERTA": 0, "Desconhecido": 1, "ENCERRADA": 2}
-    editais.sort(key=lambda e: (status_order.get(e["status"], 9), e.get("deadline") or ""))
+    editais.sort(key=lambda e: (wiki_schema.status_order(e["status"]), e.get("deadline") or ""))
     return editais
 
 
@@ -155,6 +169,7 @@ def _make_index(editais: list[dict], label: str) -> dict:
     themes_idx: dict[str, list] = defaultdict(list)
     publico_idx: dict[str, list] = defaultdict(list)
     fonte_idx: dict[str, list] = defaultdict(list)
+    ano_idx: dict[str, list] = defaultdict(list)
 
     for e in editais:
         for t in e["themes"]:
@@ -163,6 +178,7 @@ def _make_index(editais: list[dict], label: str) -> dict:
             publico_idx[p].append(e["id"])
         for f in e["fonte_recurso"]:
             fonte_idx[f].append(e["id"])
+        ano_idx[str(e["pub_year"])].append(e["id"])
 
     return {
         "total_editais": len(editais),
@@ -171,21 +187,24 @@ def _make_index(editais: list[dict], label: str) -> dict:
         "reference_date": date.today().strftime("%Y-%m-%d"),
         "summary": {
             "by_status": _count_by(editais, "status"),
+            "by_year":   _count_by(editais, "pub_year"),
             "n_themes": len(themes_idx),
             "n_publico_alvo": len(publico_idx),
             "n_fontes": len(fonte_idx),
+            "n_anos":   len(ano_idx),
         },
         "editais": editais,
         "themes_index": dict(themes_idx),
         "publico_index": dict(publico_idx),
         "fonte_index": dict(fonte_idx),
+        "ano_index":    dict(ano_idx),
     }
 
 
 def build_indices(chamadas: list[dict]) -> tuple[dict, dict]:
     """Retorna (index_vigentes, index_historico)."""
     all_editais = _build_editais(chamadas)
-    vigentes = [e for e in all_editais if _is_vigente(e)]
+    vigentes = [e for e in all_editais if wiki_schema.is_vigente(e.get("deadline"))]
     return _make_index(vigentes, "vigentes"), _make_index(all_editais, "historico")
 
 

@@ -29,7 +29,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from config import FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR
+from config import BRONZE_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR
+from core import wiki_schema
 
 logger = logging.getLogger(__name__)
 
@@ -39,69 +40,12 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
-CACHE_FILE = KG_WIKI_DIR / ".etl_process_cache.json"
+# Schema autoritativo em WIKI.md + wikis/finep.md (ver core.wiki_schema)
+_SOURCE = "finep"
 
-# PDFs a ignorar (documentos auxiliares sem conteúdo normativo útil)
-_SKIP_KEYWORDS = [
-    "minuta", "declaracao", "carta_de_manifestacao", "faq",
-    "apresentacao", "resultado", "oficio", "telas_fap",
-    "orientacoes_para_apresentacao", "tabela_com_requisitos",
-    "orientacoes_para_despesas", "relatorio_parcial",
-]
-
-# Tokens disponíveis por modelo (reserva para prompt overhead + output)
-_MODEL_CHAR_BUDGET = {
-    "gemini-2.5-flash": 900_000 * 4,  # ~900k tokens × 4 chars/token
-    "gpt-4o-mini":       80_000 * 4,  # ~80k tokens × 4 chars/token
-}
-
-
-# =============================================================================
-# PROMPT
-# =============================================================================
-
-_PROMPT = """Você é um especialista em editais de fomento à inovação no Brasil.
-
-Leia os documentos abaixo de uma chamada pública e produza a wiki page estruturada em JSON.
-
----
-METADADOS (do portal web):
-{metadata}
-
----
-DOCUMENTOS (PDFs da chamada):
-{documents}
-
----
-Produza APENAS o JSON abaixo, sem markdown ou texto extra:
-
-{{
-  "objective": "síntese em 2-3 frases do que este edital financia e para quem",
-  "mechanism": "subvencao|reembolsavel|investimento|misto|null",
-  "eligible_entities": ["empresas", "startups", "ICTs"],
-  "eligible_sectors": ["setor1", "setor2"],
-  "value_range": {{"min_brl": null, "max_brl": null}},
-  "trl_range": {{"min": null, "max": null}},
-  "required_certifications": [],
-  "counterpart_required": false,
-  "key_requirements": ["máx 5 requisitos concretos e objetivos"],
-  "key_facts": ["5 fatos mais relevantes para uma empresa decidir se candidatar"],
-  "proposal_sections": [
-    "1. Título e identificação do projeto",
-    "2. ..."
-  ]
-}}
-
-Regras:
-- mechanism: classifique pelo mecanismo financeiro principal
-- trl_range: inteiros 1-9, null se não mencionado
-- value_range: valores em reais como inteiros, null se não mencionado
-- key_requirements: máx 5 itens, cada um autocontido e verificável
-- key_facts: os 5 fatos que uma empresa usaria para decidir se vale candidatar
-- proposal_sections: seções obrigatórias da proposta na ordem exigida pelo edital,
-  extraídas das instruções de inscrição e formulários. Se o edital não especificar
-  estrutura, derive do objeto e dos critérios de avaliação. Entre 6 e 12 seções."""
+INDEX_FILE           = KNOWLEDGE_GRAPH_DIR / "index.json"
+INDEX_HISTORICO_FILE = KNOWLEDGE_GRAPH_DIR / "index_historico.json"
+CACHE_FILE           = KG_WIKI_DIR / ".etl_process_cache.json"
 
 
 # =============================================================================
@@ -121,22 +65,54 @@ def _extract_pdf_text(pdf_path: Path) -> str:
         return ""
 
 
-def _should_skip(pdf_path: Path) -> bool:
-    return any(kw in pdf_path.stem.lower() for kw in _SKIP_KEYWORDS)
+def _should_skip(name: str) -> bool:
+    return any(kw in name.lower() for kw in wiki_schema.skip_keywords(_SOURCE))
 
 
 def _load_pdfs(edital_id: str) -> list[tuple[str, str]]:
-    """Retorna lista de (nome_arquivo, texto) para os PDFs relevantes do edital."""
+    """Retorna lista de (nome, texto) para os PDFs relevantes do edital.
+
+    Tenta primeiro os PDFs físicos em FINEP_PDFS_DIR; se o diretório não
+    existir, cai no fallback de pdf_texts embutido no JSON bronze.
+    """
     pdf_dir = FINEP_PDFS_DIR / edital_id
-    if not pdf_dir.exists():
+    if pdf_dir.exists():
+        result = []
+        for pdf in sorted(pdf_dir.glob("*.pdf")):
+            if not _should_skip(pdf.stem):
+                text = _extract_pdf_text(pdf)
+                if text.strip():
+                    result.append((pdf.stem, text))
+        return result
+
+    return _load_pdfs_from_bronze(edital_id)
+
+
+def _load_pdfs_from_bronze(edital_id: str) -> list[tuple[str, str]]:
+    """Fallback: lê pdf_texts do JSON bronze mais recente."""
+    raw_dir = BRONZE_DIR / "finep_raw"
+    if not raw_dir.exists():
         return []
-    result = []
-    for pdf in sorted(pdf_dir.glob("*.pdf")):
-        if not _should_skip(pdf):
-            text = _extract_pdf_text(pdf)
-            if text.strip():
-                result.append((pdf.stem, text))
-    return result
+
+    # Arquivo bronze mais recente
+    bronze_files = sorted(raw_dir.glob("*.json"), reverse=True)
+    for bf in bronze_files:
+        try:
+            chamadas = json.loads(bf.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        for ch in chamadas:
+            cid = str(ch.get("chamada_id", ""))
+            if cid != edital_id:
+                continue
+            pdf_texts = ch.get("pdf_texts") or {}
+            result = [
+                (nome, texto)
+                for nome, texto in pdf_texts.items()
+                if texto and not _should_skip(nome)
+            ]
+            return sorted(result, key=lambda x: x[0])
+    return []
 
 
 def _fit_to_budget(pdfs: list[tuple[str, str]], model: str) -> list[tuple[str, str]]:
@@ -144,7 +120,8 @@ def _fit_to_budget(pdfs: list[tuple[str, str]], model: str) -> list[tuple[str, s
     Distribui o budget de caracteres entre os PDFs.
     PDFs menores entram completos primeiro; os maiores preenchem o espaço restante.
     """
-    budget = _MODEL_CHAR_BUDGET.get(model, 80_000 * 4)
+    budgets = wiki_schema.llm_params().get("model_char_budgets", {})
+    budget = budgets.get(model, 80_000 * 4)
     total_chars = sum(len(t) for _, t in pdfs)
     if total_chars <= budget:
         return pdfs
@@ -197,27 +174,24 @@ def _make_client(backend: str):
 
 
 def _call_llm(client, model: str, metadata: dict, pdfs: list[tuple[str, str]]) -> dict:
-    metadata_str = json.dumps({
-        "title":         metadata.get("title", ""),
-        "status":        metadata.get("status", ""),
-        "deadline":      metadata.get("deadline", ""),
-        "themes":        metadata.get("themes", []),
-        "publico_alvo":  metadata.get("publico_alvo", []),
-        "fonte_recurso": metadata.get("fonte_recurso", []),
-        "link":          metadata.get("link", ""),
-    }, ensure_ascii=False, indent=2)
+    metadata_keys = wiki_schema.metadata_to_llm_keys(_SOURCE)
+    metadata_str = json.dumps(
+        {k: metadata.get(k, [] if k in ("themes", "publico_alvo", "fonte_recurso") else "") for k in metadata_keys},
+        ensure_ascii=False, indent=2,
+    )
 
     fitted_pdfs = _fit_to_budget(pdfs, model)
     docs_parts = [f"### {name}\n{text}" for name, text in fitted_pdfs]
     documents_str = "\n\n".join(docs_parts) if docs_parts else "(sem documentos PDF disponíveis)"
 
-    prompt = _PROMPT.format(metadata=metadata_str, documents=documents_str)
+    prompt = wiki_schema.extraction_prompt(_SOURCE).format(metadata=metadata_str, documents=documents_str)
 
+    llm_params = wiki_schema.llm_params()
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.1,
-        max_tokens=1500,
+        temperature=llm_params.get("temperature", 0.1),
+        max_tokens=llm_params.get("max_tokens", 1500),
     )
     raw = response.choices[0].message.content.strip()
     if "```" in raw:
@@ -243,7 +217,6 @@ def _save_wiki_page(entry: dict, synthesized: dict) -> None:
         "objective":               synthesized.get("objective"),
         "mechanism":               synthesized.get("mechanism"),
         "eligible_entities":       synthesized.get("eligible_entities", entry.get("publico_alvo", [])),
-        "eligible_sectors":        synthesized.get("eligible_sectors", entry.get("themes", [])),
         "value_range":             synthesized.get("value_range", {"min_brl": None, "max_brl": None}),
         "trl_range":               synthesized.get("trl_range", {"min": None, "max": None}),
         "required_certifications": synthesized.get("required_certifications", []),
@@ -275,7 +248,6 @@ def _save_minimal_wiki_page(entry: dict) -> None:
         "objective":               None,
         "mechanism":               None,
         "eligible_entities":       entry.get("publico_alvo", []),
-        "eligible_sectors":        entry.get("themes", []),
         "value_range":             {"min_brl": None, "max_brl": None},
         "trl_range":               {"min": None, "max": None},
         "required_certifications": [],
@@ -301,17 +273,25 @@ def main(
     edital_ids: list[str] | None = None,
     skip_cache: bool = False,
     delay: float = 1.5,
+    historico: bool = False,
 ) -> None:
     print("=" * 60)
     print("ETL PROCESS — wiki page por edital")
     print("=" * 60)
 
-    if not INDEX_FILE.exists():
-        print(f"ERRO: {INDEX_FILE} não encontrado. Execute build_knowledge_graph primeiro.")
+    index_path = INDEX_HISTORICO_FILE if historico else INDEX_FILE
+    if not index_path.exists():
+        print(f"ERRO: {index_path} não encontrado. Execute build_knowledge_graph primeiro.")
         return
 
-    index = json.loads(INDEX_FILE.read_text(encoding="utf-8"))
+    index = json.loads(index_path.read_text(encoding="utf-8"))
     entries = index.get("editais", [])
+
+    if historico:
+        # Processa apenas encerrados (vigentes já foram processados)
+        wiki_dir = KG_WIKI_DIR
+        entries = [e for e in entries if not (wiki_dir / f"{e['id']}.json").exists()]
+        print(f"Modo histórico — editais sem wiki page: {len(entries)}")
 
     if edital_ids:
         entries = [e for e in entries if e["id"] in edital_ids]
@@ -369,6 +349,7 @@ if __name__ == "__main__":
     parser.add_argument("--edital", nargs="+", dest="edital_ids", help="IDs específicos")
     parser.add_argument("--skip-cache", action="store_true", help="Ignora cache e reprocessa tudo")
     parser.add_argument("--delay", type=float, default=1.5, help="Delay entre chamadas LLM (s)")
+    parser.add_argument("--historico", action="store_true", help="Processa editais históricos (encerrados)")
     args = parser.parse_args()
 
     main(
@@ -376,4 +357,5 @@ if __name__ == "__main__":
         edital_ids=args.edital_ids,
         skip_cache=args.skip_cache,
         delay=args.delay,
+        historico=args.historico,
     )

@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Schema autoritativo
+
+Regras de criação de wiki pages, nós/links do grafo, vocabulários, workflows de ingestão e manutenção vivem em [WIKI.md](WIKI.md) (global) e [wikis/](wikis/)`<fonte>.md` (por fonte). O código lê o schema via [core/wiki_schema.py](core/wiki_schema.py). **Mudanças em regras → edite os docs, não o código.** O validador [tests/test_wiki_schema_consistency.py](tests/test_wiki_schema_consistency.py) garante que doc e código não divergem.
+
 ## Project Overview
 
 **Radar de Editais** matches companies with Brazilian public funding opportunities (editais) using a medallion ETL pipeline, semantic search, and LLM agents.
