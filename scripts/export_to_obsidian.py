@@ -9,7 +9,8 @@ Estrutura de pastas gerada no vault:
   ├── editais/     → uma nota por edital
   ├── temas/       → uma nota por tema
   ├── fontes/      → uma nota por fonte de recurso
-  └── publicos/    → uma nota por público-alvo
+  ├── publicos/    → uma nota por público-alvo
+  └── anos/        → uma nota por ano de publicação (dimensão longitudinal)
 
 Uso:
     python scripts/export_to_obsidian.py --vault ~/Documents/Obsidian/MeuVault
@@ -17,28 +18,16 @@ Uso:
 """
 import argparse
 import json
-import re
-import unicodedata
 from pathlib import Path
 
 from config import KNOWLEDGE_GRAPH_DIR, FINEP_PDFS_DIR
+from core import wiki_schema
+
+# Schema autoritativo em WIKI.md + wikis/finep.md (ver core.wiki_schema)
+_SOURCE = "finep"
 
 INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"  # vigentes por padrão; use --historico para todos
 FACTS_DIR = FINEP_PDFS_DIR
-
-STATUS_EMOJI = {
-    "ABERTA": "🟢",
-    "ENCERRADA": "🔴",
-    "RESULTADO_DIVULGADO": "🟡",
-    "Desconhecido": "⚪",
-}
-
-STATUS_TAG = {
-    "ABERTA": "aberta",
-    "ENCERRADA": "encerrada",
-    "RESULTADO_DIVULGADO": "resultado",
-    "Desconhecido": "desconhecido",
-}
 
 
 # =============================================================================
@@ -46,14 +35,16 @@ STATUS_TAG = {
 # =============================================================================
 
 def slugify(text: str) -> str:
-    """Converte texto em slug seguro para nome de arquivo Obsidian."""
-    s = unicodedata.normalize("NFD", text)
-    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
-    s = s.lower().strip()
-    s = re.sub(r"[^\w\s-]", "", s)
-    s = re.sub(r"[\s_]+", "-", s)
-    s = re.sub(r"-+", "-", s)
-    return s.strip("-")[:80] or "sem-nome"
+    """Wrapper para core.wiki_schema.slugify (§6.3 WIKI.md)."""
+    return wiki_schema.slugify(text)
+
+
+def _status_emoji(status: str) -> str:
+    return wiki_schema.status_info(status)["emoji"]
+
+
+def _status_tag(status: str) -> str:
+    return wiki_schema.status_info(status)["tag"]
 
 
 def safe_yaml_str(text: str) -> str:
@@ -61,25 +52,13 @@ def safe_yaml_str(text: str) -> str:
     return text.replace('"', '\\"')
 
 
-# =============================================================================
-# GERADORES DE NOTAS
-# =============================================================================
-
-_MECHANISM_LABEL = {
-    "subvencao":    "Subvenção (não reembolsável)",
-    "reembolsavel": "Crédito reembolsável",
-    "investimento": "Investimento direto",
-    "misto":        "Misto",
-}
-
-
 def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais") -> str:
     """Gera nota Markdown para um edital, incluindo dados do card quando disponíveis."""
     eid = edital["id"]
     title = edital.get("title", "")
     status = edital.get("status", "Desconhecido")
-    emoji = STATUS_EMOJI.get(status, "⚪")
-    tag = STATUS_TAG.get(status, "desconhecido")
+    emoji = _status_emoji(status)
+    tag = _status_tag(status)
     deadline = edital.get("deadline", "") or ""
     pub_date = edital.get("pub_date", "") or ""
     link = edital.get("link", "")
@@ -89,6 +68,7 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
     themes = edital.get("themes", [])
     publicos = edital.get("publico_alvo", [])
     fontes = edital.get("fonte_recurso", [])
+    pub_year = edital.get("pub_year", wiki_schema.parse_pub_year(pub_date))
 
     # Campos do card (gerados por LLM)
     objective = edital.get("objective")
@@ -129,6 +109,7 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
         lines.append(f"  - mecanismo/{mechanism}")
     for theme in themes:
         lines.append(f"  - tema/{slugify(theme)}")
+    lines.append(f"  - ano/{pub_year}")
     lines.append("---")
     lines.append("")
 
@@ -159,6 +140,10 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
             lines.append(f"- [[{subfolder}/publicos/{slugify(p)}|{p}]]")
         lines.append("")
 
+    lines.append("## Ano de Publicação")
+    lines.append(f"- [[{subfolder}/anos/{pub_year}|{pub_year}]]")
+    lines.append("")
+
     # Informações básicas
     lines.append("## Informações")
     lines.append("")
@@ -170,7 +155,7 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
     if pub_date:
         lines.append(f"| Publicação | {pub_date} |")
     if mechanism:
-        lines.append(f"| Mecanismo | {_MECHANISM_LABEL.get(mechanism, mechanism)} |")
+        lines.append(f"| Mecanismo | {wiki_schema.mechanism_label(mechanism)} |")
     if value_range.get("min_brl") or value_range.get("max_brl"):
         v_min = f"R$ {value_range['min_brl']:,.0f}" if value_range.get("min_brl") else "—"
         v_max = f"R$ {value_range['max_brl']:,.0f}" if value_range.get("max_brl") else "—"
@@ -246,7 +231,7 @@ def tema_note(tema_label: str, editais_ids: list[str], edital_by_id: dict, subfo
         edital = edital_by_id.get(eid, {})
         title = edital.get("title", f"Edital {eid}")
         status = edital.get("status", "")
-        emoji = STATUS_EMOJI.get(status, "⚪")
+        emoji = _status_emoji(status)
         lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
 
     lines.append("")
@@ -273,7 +258,7 @@ def fonte_note(fonte_label: str, editais_ids: list[str], edital_by_id: dict, sub
         edital = edital_by_id.get(eid, {})
         title = edital.get("title", f"Edital {eid}")
         status = edital.get("status", "")
-        emoji = STATUS_EMOJI.get(status, "⚪")
+        emoji = _status_emoji(status)
         lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
 
     lines.append("")
@@ -300,7 +285,34 @@ def publico_note(publico_label: str, editais_ids: list[str], edital_by_id: dict,
         edital = edital_by_id.get(eid, {})
         title = edital.get("title", f"Edital {eid}")
         status = edital.get("status", "")
-        emoji = STATUS_EMOJI.get(status, "⚪")
+        emoji = _status_emoji(status)
+        lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def ano_note(ano_label: str, editais_ids: list[str], edital_by_id: dict, subfolder: str = "radar-editais") -> str:
+    """Gera nota Markdown para um ano de publicação (dimensão longitudinal)."""
+    lines = ["---"]
+    lines.append(f'title: "Ano {ano_label}"')
+    lines.append("tags:")
+    lines.append("  - finep")
+    lines.append("  - ano")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# 📅 Ano: {ano_label}")
+    lines.append("")
+    lines.append(f"**{len(editais_ids)} editais** publicados neste período.")
+    lines.append("")
+    lines.append("## Editais")
+    lines.append("")
+
+    for eid in editais_ids:
+        edital = edital_by_id.get(eid, {})
+        title = edital.get("title", f"Edital {eid}")
+        status = edital.get("status", "")
+        emoji = _status_emoji(status)
         lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
 
     lines.append("")
@@ -330,11 +342,12 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
     lines.append(f"|---|---|")
     lines.append(f"| Total de editais | {total} |")
     for status, count in sorted(by_status.items()):
-        emoji = STATUS_EMOJI.get(status, "⚪")
+        emoji = _status_emoji(status)
         lines.append(f"| {emoji} {status} | {count} |")
     lines.append(f"| Temas únicos | {summary.get('n_themes', 0)} |")
     lines.append(f"| Fontes de recurso | {summary.get('n_fontes', 0)} |")
     lines.append(f"| Públicos-alvo | {summary.get('n_publico_alvo', 0)} |")
+    lines.append(f"| Anos cobertos | {summary.get('n_anos', 0)} |")
     lines.append("")
     lines.append("## Navegação")
     lines.append("")
@@ -342,6 +355,7 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
     lines.append(f"- 🏷️ [[{subfolder}/temas/]] — por tema")
     lines.append(f"- 💰 [[{subfolder}/fontes/]] — por fonte de recurso")
     lines.append(f"- 👥 [[{subfolder}/publicos/]] — por público-alvo")
+    lines.append(f"- 📅 [[{subfolder}/anos/]] — por ano de publicação")
     lines.append("")
     lines.append("## Editais Abertos")
     lines.append("")
@@ -393,7 +407,7 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
 
     # Base do vault — limpa notas antigas antes de re-exportar
     base = vault_path / subfolder
-    for subfld in ("editais", "temas", "fontes", "publicos"):
+    for subfld in ("editais", "temas", "fontes", "publicos", "anos"):
         folder = base / subfld
         if folder.exists():
             for f in folder.glob("*.md"):
@@ -463,7 +477,18 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
 
     print(f"  Públicos: {n_publicos} notas → {base}/publicos/")
 
-    total = n_editais + n_temas + n_fontes + n_publicos + 1
+    # Notas de ano
+    ano_index = index.get("ano_index", {})
+    n_anos = 0
+    for ano_label, editais_ids in ano_index.items():
+        content = ano_note(ano_label, editais_ids, edital_by_id, subfolder)
+        note_path = base / "anos" / f"{ano_label}.md"
+        note_path.write_text(content, encoding="utf-8")
+        n_anos += 1
+
+    print(f"  Anos: {n_anos} notas → {base}/anos/")
+
+    total = n_editais + n_temas + n_fontes + n_publicos + n_anos + 1
     print(f"\n✓ {total} notas exportadas para: {base}")
     print(f"\nPróximos passos no Obsidian:")
     print(f"  1. Abra o vault em: {vault_path}")
@@ -496,8 +521,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.historico:
-        import pipeline.build_knowledge_graph as _kg
-        _kg.INDEX_FILE = _kg.INDEX_HISTORICO_FILE  # type: ignore
+        INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index_historico.json"  # noqa: F841 — rebinds module global
 
     vault = Path(args.vault).expanduser().resolve()
     if not vault.exists():

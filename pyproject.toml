@@ -16,6 +16,7 @@ dependencies = [
     "requests>=2.31",
     "supabase>=2.4",
     "PyJWT>=2.8",
+    "PyYAML>=6.0",
 ]
 
 [tool.setuptools.packages.find]
