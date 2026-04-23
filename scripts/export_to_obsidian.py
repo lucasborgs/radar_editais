@@ -6,11 +6,14 @@ O Graph View nativo do Obsidian mostra as conexões automaticamente.
 
 Estrutura de pastas gerada no vault:
   finep/
-  ├── editais/     → uma nota por edital
-  ├── temas/       → uma nota por tema
-  ├── fontes/      → uma nota por fonte de recurso
-  ├── publicos/    → uma nota por público-alvo
-  └── anos/        → uma nota por ano de publicação (dimensão longitudinal)
+  ├── editais/       → uma nota por edital
+  ├── temas/         → uma nota por tema
+  ├── fontes/        → uma nota por fonte de recurso
+  ├── publicos/      → uma nota por público-alvo
+  ├── anos/          → uma nota por ano de publicação (dimensão longitudinal)
+  ├── mecanismos/    → uma nota por mecanismo financeiro (§5.1 WIKI.md)
+  ├── subprogramas/  → uma nota por subprograma / fundo setorial (§5.6 WIKI.md)
+  └── trl/           → uma nota por faixa TRL (§5.8 WIKI.md)
 
 Uso:
     python scripts/export_to_obsidian.py --vault ~/Documents/Obsidian/MeuVault
@@ -68,6 +71,7 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
     themes = edital.get("themes", [])
     publicos = edital.get("publico_alvo", [])
     fontes = edital.get("fonte_recurso", [])
+    subprogramas = edital.get("subprogramas", [])
     pub_year = edital.get("pub_year", wiki_schema.parse_pub_year(pub_date))
 
     # Campos do card (gerados por LLM)
@@ -101,6 +105,7 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
     lines.append(f"n_facts: {n_facts}")
     if link:
         lines.append(f"link: {link}")
+    trl_faixa_keys = wiki_schema.trl_range_to_faixas(trl_range.get("min"), trl_range.get("max"))
     lines.append("tags:")
     lines.append("  - finep")
     lines.append("  - edital")
@@ -109,6 +114,10 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
         lines.append(f"  - mecanismo/{mechanism}")
     for theme in themes:
         lines.append(f"  - tema/{slugify(theme)}")
+    for sp in subprogramas:
+        lines.append(f"  - subprograma/{slugify(sp)}")
+    for fk in trl_faixa_keys:
+        lines.append(f"  - trl/{fk}")
     lines.append(f"  - ano/{pub_year}")
     lines.append("---")
     lines.append("")
@@ -138,6 +147,25 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
         lines.append("## Público-Alvo")
         for p in publicos:
             lines.append(f"- [[{subfolder}/publicos/{slugify(p)}|{p}]]")
+        lines.append("")
+
+    if mechanism:
+        lines.append("## Mecanismo")
+        lines.append(f"- [[{subfolder}/mecanismos/{mechanism}|{wiki_schema.mechanism_label(mechanism)}]]")
+        lines.append("")
+
+    if subprogramas:
+        lines.append("## Subprograma")
+        for sp in subprogramas:
+            lines.append(f"- [[{subfolder}/subprogramas/{slugify(sp)}|{sp}]]")
+        lines.append("")
+
+    if trl_faixa_keys:
+        faixas_vocab = wiki_schema.trl_faixas()
+        lines.append("## Faixa TRL")
+        for fk in trl_faixa_keys:
+            label = faixas_vocab.get(fk, {}).get("label", fk)
+            lines.append(f"- [[{subfolder}/trl/{fk}|{label}]]")
         lines.append("")
 
     lines.append("## Ano de Publicação")
@@ -319,6 +347,84 @@ def ano_note(ano_label: str, editais_ids: list[str], edital_by_id: dict, subfold
     return "\n".join(lines)
 
 
+def mechanism_note(mech_key: str, editais_ids: list[str], edital_by_id: dict, subfolder: str = "radar-editais") -> str:
+    """Gera nota Markdown para um mecanismo financeiro (§5.1 WIKI.md)."""
+    label = wiki_schema.mechanism_label(mech_key)
+    lines = ["---"]
+    lines.append(f'title: "{safe_yaml_str(label)}"')
+    lines.append("tags:")
+    lines.append("  - finep")
+    lines.append("  - mecanismo")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# ⚙️ Mecanismo: {label}")
+    lines.append("")
+    lines.append(f"**{len(editais_ids)} editais** operam por este mecanismo financeiro.")
+    lines.append("")
+    lines.append("## Editais")
+    lines.append("")
+    for eid in editais_ids:
+        edital = edital_by_id.get(eid, {})
+        title = edital.get("title", f"Edital {eid}")
+        status = edital.get("status", "")
+        emoji = _status_emoji(status)
+        lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def subprograma_note(sp_label: str, editais_ids: list[str], edital_by_id: dict, subfolder: str = "radar-editais") -> str:
+    """Gera nota Markdown para um subprograma / fundo setorial (§5.6 WIKI.md)."""
+    lines = ["---"]
+    lines.append(f'title: "{safe_yaml_str(sp_label)}"')
+    lines.append("tags:")
+    lines.append("  - finep")
+    lines.append("  - subprograma")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# 🏛️ Subprograma: {sp_label}")
+    lines.append("")
+    lines.append(f"**{len(editais_ids)} editais** vinculados a este subprograma.")
+    lines.append("")
+    lines.append("## Editais")
+    lines.append("")
+    for eid in editais_ids:
+        edital = edital_by_id.get(eid, {})
+        title = edital.get("title", f"Edital {eid}")
+        status = edital.get("status", "")
+        emoji = _status_emoji(status)
+        lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def trl_note(faixa_key: str, editais_ids: list[str], edital_by_id: dict, subfolder: str = "radar-editais") -> str:
+    """Gera nota Markdown para uma faixa TRL (§5.8 WIKI.md)."""
+    faixa = wiki_schema.trl_faixas().get(faixa_key, {})
+    label = faixa.get("label", faixa_key)
+    lines = ["---"]
+    lines.append(f'title: "{safe_yaml_str(label)}"')
+    lines.append("tags:")
+    lines.append("  - finep")
+    lines.append("  - trl")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# 📈 Faixa TRL: {label}")
+    lines.append("")
+    lines.append(f"**{len(editais_ids)} editais** aceitam projetos nesta faixa de maturidade tecnológica.")
+    lines.append("")
+    lines.append("## Editais")
+    lines.append("")
+    for eid in editais_ids:
+        edital = edital_by_id.get(eid, {})
+        title = edital.get("title", f"Edital {eid}")
+        status = edital.get("status", "")
+        emoji = _status_emoji(status)
+        lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def home_note(index: dict, subfolder: str = "radar-editais") -> str:
     """Gera nota de índice (HOME do vault)."""
     summary = index.get("summary", {})
@@ -347,6 +453,7 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
     lines.append(f"| Temas únicos | {summary.get('n_themes', 0)} |")
     lines.append(f"| Fontes de recurso | {summary.get('n_fontes', 0)} |")
     lines.append(f"| Públicos-alvo | {summary.get('n_publico_alvo', 0)} |")
+    lines.append(f"| Subprogramas | {summary.get('n_subprogramas', 0)} |")
     lines.append(f"| Anos cobertos | {summary.get('n_anos', 0)} |")
     lines.append("")
     lines.append("## Navegação")
@@ -355,6 +462,9 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
     lines.append(f"- 🏷️ [[{subfolder}/temas/]] — por tema")
     lines.append(f"- 💰 [[{subfolder}/fontes/]] — por fonte de recurso")
     lines.append(f"- 👥 [[{subfolder}/publicos/]] — por público-alvo")
+    lines.append(f"- ⚙️ [[{subfolder}/mecanismos/]] — por mecanismo financeiro")
+    lines.append(f"- 🏛️ [[{subfolder}/subprogramas/]] — por subprograma / fundo setorial")
+    lines.append(f"- 📈 [[{subfolder}/trl/]] — por faixa de maturidade tecnológica")
     lines.append(f"- 📅 [[{subfolder}/anos/]] — por ano de publicação")
     lines.append("")
     lines.append("## Editais Abertos")
@@ -385,29 +495,43 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     index = json.loads(INDEX_FILE.read_text(encoding="utf-8"))
     index_entries = {e["id"]: e for e in index.get("editais", [])}
 
-    # Enriquece com dados do card quando disponível
+    # Enriquece com dados do card (synthesized fields) quando disponível.
+    # Índice é autoridade sobre inherited fields (§4.1 WIKI.md) — sobrescreve
+    # o que está congelado no card. Card é autoridade sobre synthesized fields
+    # (§4.2). Derived: subprogramas, n_pdfs, n_facts vêm do índice.
     from config import KG_WIKI_DIR
+    inherited_keys = wiki_schema.wiki_page_fields("finep")["inherited"]
+    overridable_keys = list(inherited_keys) + ["subprogramas", "n_pdfs", "n_facts"]
     editais = []
     for eid, entry in index_entries.items():
         card_file = KG_WIKI_DIR / f"{eid}.json"
+        merged = entry.copy()
         if card_file.exists():
             try:
                 card = json.loads(card_file.read_text(encoding="utf-8"))
-                # Garante campos do índice presentes no card
-                for k in ("n_pdfs", "n_facts"):
-                    if k not in card:
-                        card[k] = entry.get(k, 0)
-                editais.append(card)
-                continue
+                # Card fornece synthesized fields; índice sobrescreve inherited
+                merged = {**card, **{k: entry[k] for k in overridable_keys if k in entry}}
             except Exception:
                 pass
-        editais.append(entry)
+        editais.append(merged)
 
     edital_by_id = {e["id"]: e for e in editais}
 
     # Base do vault — limpa notas antigas antes de re-exportar
     base = vault_path / subfolder
-    for subfld in ("editais", "temas", "fontes", "publicos", "anos"):
+    expected_subfolders = {"editais", "temas", "fontes", "publicos", "anos",
+                           "mecanismos", "subprogramas", "trl"}
+
+    # Detecta aninhamento: se `base/<subfolder>` já existe, significa que um export
+    # anterior rodou com `--vault` apontando para dentro de `base`, criando estrutura
+    # duplicada. Avisa antes de prosseguir (não deleta automaticamente).
+    nested = base / subfolder
+    if nested.is_dir():
+        print(f"⚠️  Encontrei pasta aninhada stale: {nested}")
+        print(f"    Provavelmente de um export anterior com --vault errado.")
+        print(f"    Remova manualmente: rm -rf {nested}")
+
+    for subfld in expected_subfolders:
         folder = base / subfld
         if folder.exists():
             for f in folder.glob("*.md"):
@@ -488,7 +612,51 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
 
     print(f"  Anos: {n_anos} notas → {base}/anos/")
 
-    total = n_editais + n_temas + n_fontes + n_publicos + n_anos + 1
+    # Notas de subprograma (vem do índice, populado pelo build_knowledge_graph)
+    subprograma_index = index.get("subprograma_index", {})
+    n_sub = 0
+    for sp_label, editais_ids in subprograma_index.items():
+        content = subprograma_note(sp_label, editais_ids, edital_by_id, subfolder)
+        slug = slugify(sp_label)
+        note_path = base / "subprogramas" / f"{slug}.md"
+        note_path.write_text(content, encoding="utf-8")
+        n_sub += 1
+
+    print(f"  Subprogramas: {n_sub} notas → {base}/subprogramas/")
+
+    # Notas de mechanism e TRL — agregadas das wiki pages (campos synthesized,
+    # não presentes no index.json)
+    mechanism_index: dict[str, list[str]] = {}
+    trl_faixa_index: dict[str, list[str]] = {}
+    valid_mechs = set(wiki_schema.mechanism_vocab().keys())
+    for edital in editais:
+        eid = edital["id"]
+        mech = edital.get("mechanism")
+        if mech and mech in valid_mechs:
+            mechanism_index.setdefault(mech, []).append(eid)
+        trl = edital.get("trl_range") or {}
+        for fk in wiki_schema.trl_range_to_faixas(trl.get("min"), trl.get("max")):
+            trl_faixa_index.setdefault(fk, []).append(eid)
+
+    n_mech = 0
+    for mech_key, editais_ids in mechanism_index.items():
+        content = mechanism_note(mech_key, editais_ids, edital_by_id, subfolder)
+        note_path = base / "mecanismos" / f"{mech_key}.md"
+        note_path.write_text(content, encoding="utf-8")
+        n_mech += 1
+
+    print(f"  Mecanismos: {n_mech} notas → {base}/mecanismos/")
+
+    n_trl = 0
+    for faixa_key, editais_ids in trl_faixa_index.items():
+        content = trl_note(faixa_key, editais_ids, edital_by_id, subfolder)
+        note_path = base / "trl" / f"{faixa_key}.md"
+        note_path.write_text(content, encoding="utf-8")
+        n_trl += 1
+
+    print(f"  Faixas TRL: {n_trl} notas → {base}/trl/")
+
+    total = n_editais + n_temas + n_fontes + n_publicos + n_anos + n_sub + n_mech + n_trl + 1
     print(f"\n✓ {total} notas exportadas para: {base}")
     print(f"\nPróximos passos no Obsidian:")
     print(f"  1. Abra o vault em: {vault_path}")

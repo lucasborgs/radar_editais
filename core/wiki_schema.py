@@ -104,6 +104,33 @@ def fontes_canonicas() -> dict:
     return load().get("fontes_canonicas", {})
 
 
+def publicos_canonicos() -> dict:
+    return load().get("publicos_canonicos", {})
+
+
+def subprogramas_canonicos() -> dict:
+    return load().get("subprogramas_canonicos", {})
+
+
+def modalidades_drop_list() -> list[str]:
+    return load().get("modalidades_drop_list", [])
+
+
+def trl_faixas() -> dict:
+    return load().get("trl_faixas", {})
+
+
+def trl_range_to_faixas(trl_min: int | None, trl_max: int | None) -> list[str]:
+    """Mapeia um `trl_range` (§4.2) para as faixas semânticas (§5.8) que sobrepõem."""
+    if trl_min is None or trl_max is None:
+        return []
+    out: list[str] = []
+    for key, faixa in trl_faixas().items():
+        if max(trl_min, faixa["min"]) <= min(trl_max, faixa["max"]):
+            out.append(key)
+    return out
+
+
 # =============================================================================
 # VIGÊNCIA
 # =============================================================================
