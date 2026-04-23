@@ -119,10 +119,13 @@ graph_overrides:
   node_base_tag: finep
   subfolder_default: radar-editais
   folders:
-    editais: editais
-    temas:   temas
-    fontes:  fontes
-    publico: publicos
+    editais:      editais
+    temas:        temas
+    fontes:       fontes
+    publico:      publicos
+    mecanismos:   mecanismos
+    subprogramas: subprogramas
+    trl:          trl
   home_title: "📡 Radar de Editais — FINEP"
 ```
 
@@ -134,10 +137,13 @@ Estrutura de pastas gerada no vault:
 ├── editais/{id}.md
 ├── temas/{slug}.md
 ├── fontes/{slug}.md
-└── publicos/{slug}.md
+├── publicos/{slug}.md
+├── mecanismos/{slug}.md
+├── subprogramas/{slug}.md
+└── trl/{slug}.md
 ```
 
-Limpeza: antes de re-exportar, todos os `.md` das 4 subpastas são deletados.
+Limpeza: antes de re-exportar, todos os `.md` das 7 subpastas são deletados.
 
 ---
 
@@ -145,4 +151,12 @@ Limpeza: antes de re-exportar, todos os `.md` das 4 subpastas são deletados.
 
 - **Status do portal é pouco confiável.** Muitos editais aparecem como "Desconhecido" mesmo vigentes. Regra de normalização (§7.2 WIKI.md) recupera isso via prazo futuro.
 - **`chamada_id`** nem sempre vem preenchido. Fallbacks: regex `/chamadapublica/(\d+)` no link, depois último segmento do link.
-- **`fonte_recurso`** frequentemente vem como string livre com múltiplas fontes concatenadas (ex.: "FNDCT – Subvenção Econômica; BNDES"). Normalização extrai siglas conhecidas e preserva strings não reconhecidas.
+- **`fonte_recurso` mistura quatro dimensões numa string.** O portal FINEP emite strings como `"FNDCT – Subvenção Econômica ; BNDES"`, `"FINEP/FNDCT"`, `"CT-Infra"` ou `"Petrobras – Cláusula de PD&I, conforme Resolução nº 918/2023 da ANP."`. O normalizador aplica três extractors em cascata sobre a mesma string bruta (após split por `[;|]`):
+  1. Fontes canônicas (§5.4 WIKI.md) — `FNDCT`, `BNDES`, `Petrobras` etc.
+  2. Subprogramas (§5.6 WIKI.md) — `CT-Infra`, `MOVER` etc.
+  3. Drop-list de modalidades (§5.7 WIKI.md) — `subvenção`, `reembolsável`, `recursos próprios` etc.
+
+  Cada extractor pode emitir múltiplas matches da mesma string (sem early-break no regex). Fragmentos que não casam com nenhum são descartados silenciosamente. Contexto regulatório não-financiador (ex.: ANP em editais de Cláusula PD&I da Petrobras) não vira nó do grafo — fica apenas em `key_facts` / `key_requirements` da wiki page, extraído pela LLM dos PDFs.
+- **`publico_alvo`** pode vir com qualificadores específicos (ex.: `"ICT (Pública ou Privada) credenciada na ANP"`). Normalizador colapsa para canônico (§5.5 WIKI.md); detalhe específico preserva-se em `key_requirements` da wiki page.
+- **`tema`** frequentemente tem vírgula dentro do nome composto (ex.: `"Agricultura, agronegócio e saúde animal"`, `"Petróleo, gás e etanol"`). Por isso o splitter usa apenas `[;|]`, nunca vírgula. A canonicalização (em `domain/vocabulary.py`) mapeia cada variação completa para o tema canônico.
+- **Wiki pages armazenam inherited fields congelados no momento da geração** (§4.1 WIKI.md). Quando a ingestão do índice muda (nova canonicalização, novo vocabulário), as wiki pages existentes ficam defasadas em `fonte_recurso`, `publico_alvo`, `themes`, `subprogramas`. O exporter Obsidian resolve isso **mesclando** card + índice a cada export: synthesized fields vêm do card (§4.2), inherited fields + `subprogramas` vêm do índice (autoridade). Não é necessário reprocessar com `--skip-cache` só por mudanças de vocabulário.

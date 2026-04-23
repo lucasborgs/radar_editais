@@ -141,22 +141,108 @@ status:
 
 ### 5.4 Fontes canônicas (siglas)
 
-Mapeamento case-insensitive → sigla canônica. Usado pelo normalizador de `fonte_recurso`.
+Mapeamento case-insensitive → sigla canônica. Usado pelo normalizador de `fonte_recurso`. **Uma fonte é uma instituição que paga** (agência de fomento, banco público, empresa com cláusula regulatória de PD&I, bloco internacional). Modalidades de aplicação (subvenção, reembolsável) pertencem a §5.7; fundos setoriais e programas específicos pertencem a §5.6.
 
 ```yaml
 fontes_canonicas:
-  finep:    FINEP
-  fndct:    FNDCT
-  mcti:     MCTI
-  mec:      MEC
-  bndes:    BNDES
-  capes:    CAPES
-  cnpq:     CNPq
-  embrapii: EMBRAPII
-  sebrae:   SEBRAE
+  finep:          FINEP
+  fndct:          FNDCT
+  mcti:           MCTI
+  mec:            MEC
+  bndes:          BNDES
+  capes:          CAPES
+  cnpq:           CNPq
+  embrapii:       EMBRAPII
+  sebrae:         SEBRAE
+  petrobras:      Petrobras
+  eletrobras:     Eletrobras
+  bb:             BB
+  caixa:          CAIXA
+  bnb:            BNB
+  uniao europeia: União Europeia
+  ue:             União Europeia
 ```
 
-Split de valores multi-fonte por: `;` `,` `|` `/`. Extração por regex `\b{sigla}\b` case-insensitive.
+Split de valores multi-fonte por: `;` `|`. **Não** usar `,` (aparece legitimamente dentro de nomes de temas, ex.: `"Agricultura, agronegócio e saúde animal"`) nem `/` no splitter global (tratado pelo normalizador: `FINEP/FNDCT` → extrai ambas as siglas da mesma string via regex `\b{sigla}\b` case-insensitive, **sem** early-break).
+
+Fragmentos que não casam com nenhuma canônica, nem com §5.6, nem com §5.7 são descartados silenciosamente. Contexto regulatório não-financiador (ex.: `"conforme Resolução nº 918/2023 da ANP"`) fica preservado em `key_facts` / `key_requirements` da wiki page, não no grafo.
+
+### 5.5 Públicos canônicos
+
+Lista fechada de tipos de proponente aceitos. Modificadores em parênteses (ex.: `"(Fundações)"`, `"(Pública ou Privada)"`) são descartados — a especificidade fica em `key_requirements` da wiki page.
+
+```yaml
+publicos_canonicos:
+  empresa:                                             Empresas
+  empresas:                                            Empresas
+  startup:                                             Startups
+  startups:                                            Startups
+  ict:                                                 ICTs
+  icts:                                                ICTs
+  instituicao de pesquisa:                             Instituições de pesquisa
+  instituicoes de pesquisa:                            Instituições de pesquisa
+  universidade:                                        Universidades
+  universidades:                                       Universidades
+  cooperativa:                                         Cooperativas
+  cooperativas:                                        Cooperativas
+  gestor de fip:                                       Gestores de FIP
+  gestores de fip:                                     Gestores de FIP
+  gestores de fundos de investimento em participacoes: Gestores de FIP
+```
+
+Normalização: lowercase + strip de acentos + match por substring. Strings que não casam com nenhum valor canônico (ex.: prosa longa com qualificadores específicos) são descartadas.
+
+### 5.6 Subprogramas e fundos setoriais
+
+Programas específicos e fundos setoriais que não são fontes financiadoras em si, mas agrupam editais de uma linha temática ou regime regulatório próprio. Nó de grafo separado de fonte (§5.4) e de mechanism (§5.1).
+
+```yaml
+subprogramas_canonicos:
+  ct-infra:   CT-Infra
+  ctinfra:    CT-Infra
+  ct-hidro:   CT-Hidro
+  ct-agro:    CT-Agro
+  funttel:    Funttel
+  rota 2030:  Rota 2030
+  mover:      MOVER
+```
+
+Extração na mesma string de `fonte_recurso` bruta, após §5.4. Case-insensitive, regex `\b{alias}\b`. Múltiplas matches na mesma string são permitidas.
+
+### 5.7 Drop-list de modalidades
+
+Termos que aparecem no campo `fonte_recurso` do portal mas **não são fontes** — são modalidades financeiras (já cobertas por `mechanism` em §5.1 e pelo nó `mechanism` em §6.1). Descartados silenciosamente pelo normalizador.
+
+```yaml
+modalidades_drop_list:
+  - subvencao
+  - subvencao economica
+  - reembolsavel
+  - investimento direto
+  - cooperativo
+  - cooperativo ict
+  - cooperacao internacional
+  - acao transversal
+  - acoes transversais
+  - recursos proprios
+  - proprios
+  - proprio
+```
+
+Match: lowercase + strip de acentos + comparação por substring. Uma string bruta pode cair simultaneamente em §5.4, §5.6 e §5.7 — cada normalizador extrai o que reconhece da mesma string.
+
+### 5.8 Faixas TRL
+
+O campo `trl_range: {min, max}` (§4.2) é numérico (1-9). Para navegação no grafo, colapsa-se em 3 faixas semânticas. Um edital conecta a todas as faixas que sobrepõem seu range.
+
+```yaml
+trl_faixas:
+  trl_pesquisa:   { min: 1, max: 3, label: "TRL 1-3 (Pesquisa)" }
+  trl_prototipo:  { min: 4, max: 6, label: "TRL 4-6 (Protótipo)" }
+  trl_industrial: { min: 7, max: 9, label: "TRL 7-9 (Industrial)" }
+```
+
+Regra de mapeamento: edital com `trl_range = {min: a, max: b}` conecta à faixa `f` se `max(a, f.min) <= min(b, f.max)`. Se `trl_range` é `{null, null}`, não há link.
 
 ---
 
@@ -189,6 +275,18 @@ node_types:
     tags: [finep, ano]
     emoji: "📅"
     unknown_label: desconhecido   # slug/label quando pub_year não pôde ser derivado
+  mechanism:
+    folder: mecanismos
+    tags: [finep, mecanismo]
+    emoji: "⚙️"
+  subprograma:
+    folder: subprogramas
+    tags: [finep, subprograma]
+    emoji: "🏛️"
+  trl_faixa:
+    folder: trl
+    tags: [finep, trl]
+    emoji: "📈"
   home:
     folder: ""
     tags: [finep, home]
@@ -219,8 +317,20 @@ link_types:
     from: edital
     to: ano
     section: "## Ano de Publicação"
+  edital_has_mechanism:
+    from: edital
+    to: mechanism
+    section: "## Mecanismo"
+  edital_has_subprograma:
+    from: edital
+    to: subprograma
+    section: "## Subprograma"
+  edital_has_trl_faixa:
+    from: edital
+    to: trl_faixa
+    section: "## Faixa TRL"
   aggregator_lists_edital:
-    from: [tema, fonte, publico, ano, home]
+    from: [tema, fonte, publico, ano, mechanism, subprograma, trl_faixa, home]
     to: edital
     section: "## Editais"
 ```
