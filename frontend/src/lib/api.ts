@@ -28,7 +28,13 @@ async function apiFetch<T>(
 // ── Auth / Profile ─────────────────────────────────────────
 
 export const getMe = (token: string) =>
-  apiFetch<{ user_id: string; workspace_id: string; profile: Partial<CompanyProfile> }>(
+  apiFetch<{
+    user_id: string;
+    workspace_id: string;
+    profile: Partial<CompanyProfile>;
+    preferences?: UserPreferences;
+    contribute_to_global_weights?: boolean;
+  }>(
     "/me",
     undefined,
     token
@@ -110,13 +116,22 @@ export const extractProfileFromUrl = (url: string) =>
 
 // ── Content Library ────────────────────────────────────────
 
-export const getLibraryItems = (token: string, type?: string, q?: string) => {
+export const getLibraryItems = (
+  token: string,
+  type?: string,
+  q?: string,
+  includeArchived?: boolean
+) => {
   const params = new URLSearchParams();
   if (type) params.set("type", type);
   if (q) params.set("q", q);
+  if (includeArchived) params.set("include_archived", "true");
   const qs = params.toString();
   return apiFetch<ContentItemSummary[]>(`/library${qs ? `?${qs}` : ""}`, undefined, token);
 };
+
+export const archiveLibraryItem = (id: string, token: string) =>
+  apiFetch<{ success: boolean }>(`/library/${id}/archive`, { method: "POST" }, token);
 
 export const getLibraryItem = (id: string, token: string) =>
   apiFetch<ContentItemFull>(`/library/${id}`, undefined, token);
@@ -168,3 +183,33 @@ export const saveDocumentSection = (
 
 export const exportDocument = (sessionId: string) =>
   apiFetch<{ markdown: string; session_id: string }>(`/writing/${sessionId}/export`);
+
+// ── Writing Sessions list (resumable) ──────────────────────
+
+export interface WritingSessionSummary {
+  session_id: string;
+  edital_id: string;
+  edital_title?: string;
+  status: "active" | "completed" | "abandoned";
+  turn_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export const listWritingSessions = (token: string) =>
+  apiFetch<{ sessions: WritingSessionSummary[] }>("/writing/sessions", undefined, token);
+
+// ── User preferences ───────────────────────────────────────
+
+export interface UserPreferences {
+  contribute_to_global_weights: boolean;
+}
+
+export const getMyPreferences = (token: string) =>
+  apiFetch<UserPreferences>("/me/preferences", undefined, token);
+
+export const updateMyPreferences = (prefs: Partial<UserPreferences>, token: string) =>
+  apiFetch<UserPreferences>("/me/preferences", {
+    method: "PUT",
+    body: JSON.stringify(prefs),
+  }, token);

@@ -5,9 +5,8 @@ Gera rascunhos de propostas tecnicas conectando
 as exigencias do edital com o portfolio da empresa.
 """
 
-import os
 import logging
-from typing import Optional
+import os
 from datetime import datetime
 
 import requests
@@ -108,13 +107,13 @@ class ProposalDrafter:
 
         logger.info(f"ProposalDrafter inicializado ({self.backend}/{self.model})")
 
-    def _call_llm(self, messages: list[dict]) -> tuple[bool, str, Optional[str]]:
+    def _call_llm(self, messages: list[dict]) -> tuple[bool, str, str | None]:
         """Chama o LLM configurado."""
         if self.backend == "ollama":
             return self._call_ollama(messages)
         return self._call_openai(messages)
 
-    def _call_ollama(self, messages: list[dict]) -> tuple[bool, str, Optional[str]]:
+    def _call_ollama(self, messages: list[dict]) -> tuple[bool, str, str | None]:
         try:
             response = requests.post(
                 OLLAMA_URL,
@@ -140,7 +139,7 @@ class ProposalDrafter:
             logger.error(f"Erro Ollama: {e}")
             return (False, str(e), "UNKNOWN_ERROR")
 
-    def _call_openai(self, messages: list[dict]) -> tuple[bool, str, Optional[str]]:
+    def _call_openai(self, messages: list[dict]) -> tuple[bool, str, str | None]:
         if not OPENAI_API_KEY:
             return (False, "OPENAI_API_KEY nao configurada", "CONFIG_ERROR")
         try:
@@ -162,10 +161,10 @@ class ProposalDrafter:
     def draft_proposal(
         self,
         company_profile: CompanyProfile,
-        edital_id: Optional[str] = None,
+        edital_id: str | None = None,
         edital_context: str = "",
         style: str = "formal",
-        edital_metadata: Optional[dict] = None,
+        edital_metadata: dict | None = None,
     ) -> dict:
         """
         Gera rascunho de proposta tecnica.

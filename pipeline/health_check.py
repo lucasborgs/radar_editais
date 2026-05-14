@@ -14,13 +14,12 @@ Uso:
 """
 from __future__ import annotations
 
+import argparse
 import json
 import logging
-import argparse
 from datetime import datetime
-from pathlib import Path
 
-from config import KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR, FINEP_PDFS_DIR
+from config import FINEP_PDFS_DIR, KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +171,7 @@ def run_health_check(
     if dry_run:
         print("MODO DRY-RUN\n")
 
-    CHECK_FN = {
+    CHECK_FN = {  # noqa: N806
         "wiki_page_quality": check_wiki_page_quality,
         "staleness":         check_staleness,
         "new_pdfs":          check_new_pdfs,

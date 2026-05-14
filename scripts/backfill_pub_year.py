@@ -8,7 +8,6 @@ Uso:
     python scripts/backfill_pub_year.py
 """
 import json
-from pathlib import Path
 
 from config import KG_WIKI_DIR
 from core import wiki_schema

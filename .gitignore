@@ -51,3 +51,6 @@ eval_results/
 
 # macOS
 .DS_Store
+
+# Python virtualenv
+.venv/

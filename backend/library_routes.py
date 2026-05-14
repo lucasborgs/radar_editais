@@ -1,21 +1,23 @@
 """
 Endpoints da Content Library.
 """
+
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
-from typing import Optional
 
-from core.auth import CurrentUserId
+from core.auth import CurrentUserId, DbClient
 from core.content_library import (
+    CONTENT_TYPES,
+    archive_item,
+    create_item,
+    delete_item,
+    extract_text_from_pdf,
+    get_item,
     get_workspace_id,
     list_items,
-    get_item,
-    create_item,
-    update_item,
-    delete_item,
     search_items,
-    extract_text_from_pdf,
-    CONTENT_TYPES,
+    unarchive_item,
+    update_item,
 )
 
 router = APIRouter(prefix="/library", tags=["library"])
@@ -32,24 +34,20 @@ class CreateItemRequest(BaseModel):
     type: str
     content: str
     tags: list[str] = []
-    source_url: Optional[str] = None
+    source_url: str | None = None
 
 
 class UpdateItemRequest(BaseModel):
-    title: Optional[str] = None
-    type: Optional[str] = None
-    content: Optional[str] = None
-    tags: Optional[list[str]] = None
-    source_url: Optional[str] = None
+    title: str | None = None
+    type: str | None = None
+    content: str | None = None
+    tags: list[str] | None = None
+    source_url: str | None = None
 
 
 # =============================================================================
 # HELPERS
 # =============================================================================
-
-def _workspace(user_id: str) -> str:
-    return get_workspace_id(user_id)
-
 
 def _validate_type(type_: str):
     if type_ not in CONTENT_TYPES:
@@ -66,34 +64,56 @@ def _validate_type(type_: str):
 @router.get("", summary="Lista items da biblioteca")
 def library_list(
     user_id: CurrentUserId,
-    type: Optional[str] = None,
-    q: Optional[str] = None,
+    db: DbClient,
+    type: str | None = None,
+    q: str | None = None,
+    include_archived: bool = False,
 ):
-    workspace_id = _workspace(user_id)
+    workspace_id = get_workspace_id(db, user_id)
     if q:
-        return search_items(workspace_id, q, type_filter=type)
-    items = list_items(workspace_id)
+        return search_items(db, workspace_id, q, type_filter=type)
+    items = list_items(db, workspace_id, include_archived=include_archived)
     if type:
         items = [i for i in items if i["type"] == type]
     return items
 
 
+@router.get("/recommend", summary="Recupera items mais relevantes via scoring multi-critério (Fase 2 #16)")
+def library_recommend(
+    user_id: CurrentUserId,
+    db: DbClient,
+    q: str,
+    k: int = 10,
+):
+    """Multi-criteria retrieval: 0.4·recency + 0.3·importance(decay) + 0.3·cosine.
+
+    Usado para autocomplete de @ mentions (substitui o ilike simples quando
+    embeddings estão populados) e seleção automática de library_items para
+    WritingSession. Items sem embedding ainda gerado são silenciosamente
+    excluídos — retorna lista possivelmente menor que k até backfill completar.
+    """
+    workspace_id = get_workspace_id(db, user_id)
+    from core.retriever import retrieve_library_items
+    return retrieve_library_items(workspace_id, query=q, k=k)
+
+
 @router.get("/{item_id}", summary="Retorna item completo (com key_facts)")
-def library_get(item_id: str, user_id: CurrentUserId):
-    workspace_id = _workspace(user_id)
-    item = get_item(item_id, workspace_id)
+def library_get(item_id: str, user_id: CurrentUserId, db: DbClient):
+    workspace_id = get_workspace_id(db, user_id)
+    item = get_item(db, item_id, workspace_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item não encontrado")
     return item
 
 
 @router.post("", status_code=201, summary="Cria item (texto)")
-def library_create(req: CreateItemRequest, user_id: CurrentUserId):
+async def library_create(req: CreateItemRequest, user_id: CurrentUserId, db: DbClient):
     _validate_type(req.type)
     if not req.content.strip():
         raise HTTPException(status_code=422, detail="content não pode estar vazio")
-    workspace_id = _workspace(user_id)
-    return create_item(
+    workspace_id = get_workspace_id(db, user_id)
+    return await create_item(
+        db,
         workspace_id=workspace_id,
         title=req.title,
         type_=req.type,
@@ -106,6 +126,7 @@ def library_create(req: CreateItemRequest, user_id: CurrentUserId):
 @router.post("/upload-pdf", status_code=201, summary="Upload de PDF — extrai texto e cria item")
 async def library_upload_pdf(
     user_id: CurrentUserId,
+    db: DbClient,
     file: UploadFile = File(...),
     title: str = Form(...),
     type: str = Form("technical_doc"),
@@ -120,14 +141,15 @@ async def library_upload_pdf(
     try:
         text = extract_text_from_pdf(content)
     except RuntimeError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
     if not text.strip():
         raise HTTPException(status_code=422, detail="Não foi possível extrair texto do PDF")
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()]
-    workspace_id = _workspace(user_id)
-    return create_item(
+    workspace_id = get_workspace_id(db, user_id)
+    return await create_item(
+        db,
         workspace_id=workspace_id,
         title=title,
         type_=type,
@@ -137,18 +159,32 @@ async def library_upload_pdf(
 
 
 @router.put("/{item_id}", summary="Atualiza item")
-def library_update(item_id: str, req: UpdateItemRequest, user_id: CurrentUserId):
+def library_update(item_id: str, req: UpdateItemRequest, user_id: CurrentUserId, db: DbClient):
     if req.type:
         _validate_type(req.type)
-    workspace_id = _workspace(user_id)
-    updated = update_item(item_id, workspace_id, req.model_dump(exclude_none=True))
+    workspace_id = get_workspace_id(db, user_id)
+    updated = update_item(db, item_id, workspace_id, req.model_dump(exclude_none=True))
     if updated is None:
         raise HTTPException(status_code=404, detail="Item não encontrado")
     return updated
 
 
 @router.delete("/{item_id}", status_code=204, summary="Remove item")
-def library_delete(item_id: str, user_id: CurrentUserId):
-    workspace_id = _workspace(user_id)
-    if not delete_item(item_id, workspace_id):
+def library_delete(item_id: str, user_id: CurrentUserId, db: DbClient):
+    workspace_id = get_workspace_id(db, user_id)
+    if not delete_item(db, item_id, workspace_id):
+        raise HTTPException(status_code=404, detail="Item não encontrado")
+
+
+@router.post("/{item_id}/archive", status_code=204, summary="Arquiva item (soft-delete)")
+def library_archive(item_id: str, user_id: CurrentUserId, db: DbClient):
+    workspace_id = get_workspace_id(db, user_id)
+    if not archive_item(db, item_id, workspace_id):
+        raise HTTPException(status_code=404, detail="Item não encontrado ou já arquivado")
+
+
+@router.post("/{item_id}/unarchive", status_code=204, summary="Desarquiva item")
+def library_unarchive(item_id: str, user_id: CurrentUserId, db: DbClient):
+    workspace_id = get_workspace_id(db, user_id)
+    if not unarchive_item(db, item_id, workspace_id):
         raise HTTPException(status_code=404, detail="Item não encontrado")

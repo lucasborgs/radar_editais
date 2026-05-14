@@ -1,87 +1,107 @@
 """
-Scraper para chamadas públicas da FINEP.
+Scraper para chamadas públicas da FINEP — versão API.
 
-Modo produção (padrão):
-  Acessa http://www.finep.gov.br/chamadas-publicas/chamadas-publicas
-  → captura editais abertos + encerrados recentes listados na página principal.
-  → para cada chamada, busca página de detalhe (descrição, PDFs).
-  → baixa todos os PDFs para bronze_data/finep_pdfs/{chamada_id}/.
+Em 2026 o site da FINEP migrou para Liferay SPA. O scraping HTML deixou de
+funcionar (listagem carregada via JS, redirects do site legacy para o novo).
+Esta nova implementação usa a **API Liferay Headless** que o próprio frontend
+do site usa internamente — ver `pipeline.extractors.finep_api` para detalhes
+do protocolo (OAuth2 público + endpoint REST estruturado).
 
-Modo histórico (include_historical=True):
-  Acessa chamadaspublicas?situacao=encerrada com paginação (&start=N, 10/pág).
-  Existem ~34 páginas de encerradas (desde 2001).
-  Por padrão, faz max_pages=20 páginas (≈200 chamadas encerradas).
+Vantagens vs. scraping anterior:
+  • Dados estruturados (situacao, publicoAlvo, datas, tema) em vez de HTML
+  • Filtro server-side (`situacao=aberta|encerrada`) — sem paginação cega
+  • Documentos retornados embutidos com URLs absolutas — sem detecção HTML
+  • Sem dependência de seletores CSS frágeis
+
+Compatibilidade: mantém o mesmo shape de output do scraper anterior para que
+`pipeline/etl_finep_cards.py`, `etl_finep_facts.py` e `build_knowledge_graph.py`
+não precisem mudar.
+
+Modos:
+    extract(include_historical=False)  — só `situacao=aberta` (default)
+    extract(include_historical=True)   — aberta + encerrada (todas as páginas)
 """
-import io
-import re
+from __future__ import annotations
+
+import logging
 import time
 from pathlib import Path
 
-from .base import BaseScraper
-
 from config import FINEP_PDFS_DIR
+
+from .base import BaseScraper
+from .finep_api import FinepAPI, FinepAPIError, chamada_url_publica
+
+logger = logging.getLogger(__name__)
 
 
 class FINEPScraper(BaseScraper):
-    """Scraper para editais da FINEP."""
+    """Scraper FINEP usando a API Liferay Headless do site novo (2026+)."""
 
-    BASE_URL = "http://www.finep.gov.br/chamadas-publicas/chamadas-publicas"
-
-    # URL com todas as chamadas abertas (listagem completa)
-    ABERTAS_URL = "http://www.finep.gov.br/chamadas-publicas/chamadaspublicas?situacao=aberta"
-
-    # URL da listagem de encerradas (usada no modo histórico)
-    ENCERRADAS_URL = "http://www.finep.gov.br/chamadas-publicas/chamadaspublicas"
-    ENCERRADAS_PARAMS = "?situacao=encerrada&filter_order=ordering&filter_order_Dir=asc"
-
-    ITEMS_PER_PAGE = 10
-    THROTTLE_SECONDS = 2
+    PAGE_SIZE = 50            # Liferay default cap = 100
+    DOWNLOAD_THROTTLE = 0.5   # segundos entre downloads de PDFs (ser educado)
 
     def __init__(self):
         super().__init__(source_name="FINEP", output_subdir="finep_raw")
-        self._date_re = re.compile(r"(\d{1,2}/\d{1,2}/\d{4})")
+        self._api = FinepAPI()
+        FINEP_PDFS_DIR.mkdir(parents=True, exist_ok=True)
 
-    def extract(self, include_historical: bool = False, max_pages: int = 20) -> list:
-        """Extrai chamadas públicas da FINEP.
+    # ------------------------------------------------------------------
+    # API pública
+    # ------------------------------------------------------------------
+
+    def extract(self, include_historical: bool = False, max_pages: int | None = None) -> list:
+        """Extrai chamadas FINEP.
 
         Args:
-            include_historical: Se True, acessa a listagem de encerradas com
-                                paginação completa + busca descrição nas páginas
-                                de detalhe de cada chamada.
-            max_pages:          Número máximo de páginas de encerradas a buscar
-                                (cada página tem 10 chamadas). Default: 20 (≈200 chamadas).
+            include_historical: se True, também busca `situacao=encerrada`.
+            max_pages: limite de páginas por situacao (None = todas).
+
+        Returns:
+            Lista de dicts compatível com o shape do scraper anterior:
+              {
+                fonte, chamada_id, titulo, link, status,
+                data_publicacao, prazo_envio, fonte_recurso,
+                publico_alvo, tema, descricao, raw_html,
+                pdf_urls, pdf_texts, data_extracao
+              }
         """
-        all_results = []
-        seen_links: set = set()
+        all_results: list[dict] = []
 
-        # Página principal (abertos + recentes)
-        for item in self._scrape_page(self.BASE_URL):
-            link = item.get("link", "")
-            if link not in seen_links:
-                seen_links.add(link)
-                all_results.append(item)
+        situacoes = ["aberta", "encerrada"] if include_historical else ["aberta"]
+        for situacao in situacoes:
+            try:
+                print(f"\n>>> FINEP: listando chamadas situacao={situacao}...")
+                raw = self._api.list_chamadas(
+                    situacao=situacao,
+                    page_size=self.PAGE_SIZE,
+                    with_documentos=True,
+                    max_pages=max_pages,
+                )
+                print(f"    → {len(raw)} chamadas recebidas via API")
+            except FinepAPIError as e:
+                logger.error("Falha ao listar chamadas (%s): %s", situacao, e)
+                continue
 
-        # Listagem completa de chamadas abertas (com paginação)
-        for item in self._scrape_paginated(self.ABERTAS_URL, max_pages=50):
-            link = item.get("link", "")
-            if link not in seen_links:
-                seen_links.add(link)
-                all_results.append(item)
+            for chamada in raw:
+                try:
+                    normalized = self._normalize(chamada)
+                    all_results.append(normalized)
+                except Exception as e:
+                    logger.warning(
+                        "Falha ao normalizar chamada databaseId=%s: %s",
+                        chamada.get("databaseId"), e,
+                    )
 
-        # Enriquece cada chamada com detalhe + PDFs
-        print(f"\nEnriquecendo {len(all_results)} chamadas (detalhe + PDFs)...")
-        for i, chamada in enumerate(all_results, 1):
-            print(f"  [{i}/{len(all_results)}] {chamada['titulo'][:60]}...")
-            self._enrich_chamada(chamada)
-            time.sleep(self.THROTTLE_SECONDS)
-
-        if include_historical:
-            print(f"\nModo histórico FINEP: buscando encerradas ({max_pages} páginas × {self.ITEMS_PER_PAGE}/pág)...")
-            for item in self._scrape_encerradas(max_pages=max_pages):
-                link = item.get("link", "")
-                if link not in seen_links:
-                    seen_links.add(link)
-                    all_results.append(item)
+        # Enriquece com download de PDFs (separado para deixar normalização rápida)
+        print(f"\n>>> FINEP: baixando PDFs para {len(all_results)} chamadas...")
+        for i, item in enumerate(all_results, 1):
+            n_pdfs = len(item["pdf_urls"])
+            if n_pdfs == 0:
+                continue
+            print(f"  [{i}/{len(all_results)}] {item['titulo'][:60]} — {n_pdfs} PDFs")
+            self._download_pdfs(item)
+            time.sleep(self.DOWNLOAD_THROTTLE)
 
         if all_results:
             prefix = "finep_historical" if include_historical else "finep_chamadas"
@@ -89,427 +109,153 @@ class FINEPScraper(BaseScraper):
 
         return all_results
 
-    # =========================================================================
-    # Enriquecimento: detalhe + PDFs
-    # =========================================================================
+    # ------------------------------------------------------------------
+    # Normalização: API schema → schema legado do pipeline
+    # ------------------------------------------------------------------
 
-    def _enrich_chamada(self, chamada: dict) -> None:
-        """Busca página de detalhe, extrai descrição, PDFs e baixa para disco."""
-        url = chamada.get("link", "")
-        if not url:
-            return
+    def _normalize(self, raw: dict) -> dict:
+        """Converte um item cru da API Liferay para o shape legacy do pipeline.
 
-        soup = self._fetch_detail_soup(url)
-        if not soup:
-            return
-
-        # Descrição e HTML bruto
-        chamada["descricao"] = self._get_html_description(soup)
-        chamada["raw_html"] = self._get_raw_html_content(soup)
-
-        # Todas as URLs de PDFs da tabela de documentos
-        pdf_urls = self._find_all_pdf_urls(soup)
-        chamada["pdf_urls"] = pdf_urls
-
-        # Download de PDFs para disco
-        chamada_id = self._extract_chamada_id(url)
-        chamada["chamada_id"] = chamada_id
-
-        if pdf_urls and chamada_id:
-            pdf_texts = self._download_all_pdfs(chamada_id, pdf_urls)
-            chamada["pdf_texts"] = pdf_texts
-        else:
-            chamada["pdf_texts"] = {}
-
-    def _extract_chamada_id(self, url: str) -> str:
-        """Extrai ID numérico da URL da chamada.
-
-        Ex: http://www.finep.gov.br/chamadas-publicas/chamadapublica/782 → '782'
+        Mapeamento de campos:
+          API.databaseId            → chamada_id
+          API.titulo                → titulo
+          chamada_url_publica()     → link (URL do humano no browser)
+          API.situacao.name         → status (Aberta/Encerrada)
+          API.dataDePublicacao      → data_publicacao
+          API.vigenciaFim           → prazo_envio
+          API.publicoAlvo[]         → publico_alvo (string concat)
+          API.tema                  → tema
+          API.temaPrincipal.name    → tema (fallback)
+          API.descricaoRawText      → descricao
+          API.descricao             → raw_html
+          API.documentos[].link     → pdf_urls (lista de URLs absolutas)
         """
-        m = re.search(r"/chamadapublica/(\d+)", url)
-        return m.group(1) if m else ""
+        chamada_id = str(raw.get("databaseId") or raw.get("id") or "")
+        # Normaliza status para caixa alta (esquema do build_knowledge_graph + wiki_schema)
+        situacao_raw = (raw.get("situacao") or {}).get("name") or "Desconhecido"
+        status_map = {
+            "Aberta": "ABERTA",
+            "Encerrada": "ENCERRADA",
+            "Em análise": "EM_ANALISE",
+            "Resultado divulgado": "RESULTADO_DIVULGADO",
+        }
+        situacao = status_map.get(situacao_raw, situacao_raw.upper().replace(" ", "_"))
+        publico = ", ".join(p.get("name", "") for p in (raw.get("publicoAlvo") or []) if p)
+        tema = raw.get("tema") or (raw.get("temaPrincipal") or {}).get("name") or ""
 
-    def _find_all_pdf_urls(self, soup) -> list[dict]:
-        """Encontra TODOS os PDFs na tabela de documentos da página de detalhe.
-
-        Returns:
-            Lista de dicts: [{"nome": "Edital", "url": "http://..."}, ...]
-        """
-        table = soup.find("table", class_="document")
-        if not table:
-            return []
-
-        tbody = table.find("tbody") or table
-        rows = tbody.find_all("tr")
-        pdfs = []
-
-        for row in rows:
-            cells = row.find_all("td")
-            if len(cells) < 3:
-                continue
-
-            doc_name = cells[1].get_text(strip=True)
-
-            # Tenta na coluna de formatos (índice 2), depois na coluna 0
-            pdf_link = cells[2].find("a", href=lambda h: h and h.lower().endswith(".pdf"))
-            if not pdf_link:
-                pdf_link = cells[0].find("a", href=lambda h: h and h.lower().endswith(".pdf"))
-            if not pdf_link:
-                continue
-
-            href = pdf_link.get("href", "")
-            url = f"http://www.finep.gov.br{href}" if href.startswith("/") else href
-
-            pdfs.append({"nome": doc_name, "url": url})
-
-        return pdfs
-
-    def _download_all_pdfs(self, chamada_id: str, pdf_urls: list[dict]) -> dict[str, str]:
-        """Baixa todos os PDFs de uma chamada para disco e extrai texto.
-
-        Args:
-            chamada_id: ID numérico da chamada (ex: "782")
-            pdf_urls: Lista de {"nome": ..., "url": ...}
-
-        Returns:
-            Dict nome_slug → texto extraído do PDF.
-        """
-        dest_dir = FINEP_PDFS_DIR / chamada_id
-        dest_dir.mkdir(parents=True, exist_ok=True)
-
-        pdf_texts = {}
-
-        for pdf_info in pdf_urls:
-            nome = pdf_info["nome"]
-            url = pdf_info["url"]
-
-            # Slug para nome de arquivo
-            slug = self._slugify(nome)
-            dest_path = dest_dir / f"{slug}.pdf"
-
-            # Skip se já existe (cache em disco)
-            if dest_path.exists() and dest_path.stat().st_size > 0:
-                print(f"    PDF já existe: {dest_path.name}")
-                text = self._extract_pdf_from_file(dest_path)
-            else:
-                print(f"    Baixando: {nome} → {dest_path.name}")
-                ok = self._download_pdf(url, dest_path)
-                if ok:
-                    text = self._extract_pdf_from_file(dest_path)
-                else:
-                    text = ""
-
-            if text:
-                pdf_texts[slug] = text
-
-        return pdf_texts
-
-    def _download_pdf(self, url: str, dest: Path, max_mb: int = 15) -> bool:
-        """Baixa um PDF para o path indicado."""
-        import requests
-
-        try:
-            resp = requests.get(url, headers=self.headers, timeout=30, stream=True)
-            if resp.status_code != 200:
-                print(f"    Aviso: HTTP {resp.status_code} para {url}")
-                return False
-
-            chunks = []
-            total = 0
-            max_bytes = max_mb * 1024 * 1024
-            for chunk in resp.iter_content(chunk_size=8192):
-                chunks.append(chunk)
-                total += len(chunk)
-                if total > max_bytes:
-                    print(f"    Aviso: PDF excede {max_mb}MB — truncando")
-                    break
-
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(b"".join(chunks))
-            return True
-
-        except Exception as e:
-            print(f"    Erro ao baixar {url}: {e}")
-            return False
-
-    def _extract_pdf_from_file(self, pdf_path: Path) -> str:
-        """Extrai texto de um PDF local com pdfplumber."""
-        try:
-            import pdfplumber
-        except ImportError:
-            print("    Aviso: pdfplumber não instalado — instale com 'pip install pdfplumber'")
-            return ""
-
-        try:
-            text_parts = []
-            with pdfplumber.open(pdf_path) as pdf:
-                for page in pdf.pages:
-                    text_parts.append(page.extract_text() or "")
-            return "\n".join(text_parts)
-        except Exception as e:
-            print(f"    Aviso: falha ao parsear {pdf_path.name}: {e}")
-            return ""
-
-    def _slugify(self, name: str) -> str:
-        """Converte nome de documento em slug seguro para filename."""
-        import unicodedata
-        # NFD decompose + strip combining marks
-        s = unicodedata.normalize("NFD", name)
-        s = "".join(c for c in s if unicodedata.category(c) != "Mn")
-        s = s.lower().strip()
-        s = re.sub(r"[^\w\s-]", "", s)
-        s = re.sub(r"[\s_-]+", "_", s)
-        return s[:80] or "documento"
-
-    # =========================================================================
-    # Scraping da página principal
-    # =========================================================================
-
-    def _scrape_page(self, url: str) -> list:
-        """Extrai chamadas de uma URL de listagem da FINEP."""
-        print(f"Acessando: {url}")
-        try:
-            soup = self._fetch_page(url, timeout=15)
-        except Exception as e:
-            print(f"Erro ao acessar {url}: {e}")
-            return []
-
-        content_div = soup.find("div", id="conteudoChamada")
-        if not content_div:
-            print(f"AVISO: Container 'div#conteudoChamada' não encontrado em {url}")
-            return []
-
-        items = content_div.find_all("div", class_="item")
-        print(f"Encontrados {len(items)} candidatos a editais.")
-
-        chamadas = []
-        for item in items:
-            try:
-                chamada = self._parse_item(item)
-                if chamada:
-                    chamadas.append(chamada)
-            except Exception as e:
-                print(f"Erro ao processar item: {e}")
-        return chamadas
-
-    def _scrape_paginated(self, base_url: str, max_pages: int = 50) -> list:
-        """Percorre uma listagem FINEP com paginação (&start=N)."""
-        all_items = []
-        for page_num in range(max_pages):
-            start = page_num * self.ITEMS_PER_PAGE
-            sep = "&" if "?" in base_url else "?"
-            url = f"{base_url}{sep}start={start}" if start > 0 else base_url
-            items = self._scrape_page(url)
-            if not items:
-                break
-            all_items.extend(items)
-            if len(items) < self.ITEMS_PER_PAGE:
-                break  # última página
-        return all_items
-
-    # =========================================================================
-    # Scraping das encerradas (modo histórico)
-    # =========================================================================
-
-    def _scrape_encerradas(self, max_pages: int = 20) -> list:
-        """Percorre a listagem de encerradas página a página."""
-        all_items = []
-
-        for page_num in range(max_pages):
-            start = page_num * self.ITEMS_PER_PAGE
-            url = f"{self.ENCERRADAS_URL}{self.ENCERRADAS_PARAMS}&start={start}"
-            print(f"  [Pág {page_num + 1}/{max_pages}] {url}")
-
-            try:
-                soup = self._fetch_page(url, timeout=20)
-            except Exception as e:
-                print(f"  Erro na página {page_num + 1}: {e} — parando")
-                break
-
-            content_div = soup.find("div", id="conteudoChamada")
-            if not content_div:
-                print(f"  Container não encontrado — parando")
-                break
-
-            items = content_div.find_all("div", class_="item")
-            if not items:
-                print(f"  Sem itens na página {page_num + 1} — parando")
-                break
-
-            page_items = []
-            for item in items:
-                try:
-                    chamada = self._parse_item(item, default_status="ENCERRADA")
-                    if chamada:
-                        page_items.append(chamada)
-                except Exception as e:
-                    print(f"  Erro ao parsear item: {e}")
-
-            # Enriquece cada chamada com detalhe + PDFs
-            for chamada in page_items:
-                self._enrich_chamada(chamada)
-                time.sleep(self.THROTTLE_SECONDS)
-
-            all_items.extend(page_items)
-            print(f"  → {len(page_items)} itens | total acumulado: {len(all_items)}")
-
-            # Verifica se existe próxima página
-            if not self._has_next_page(soup, start):
-                print(f"  Última página atingida na pág {page_num + 1}.")
-                break
-
-        return all_items
-
-    def _has_next_page(self, soup, current_start: int) -> bool:
-        """Verifica se há próxima página na paginação."""
-        pag = soup.find(class_=lambda x: x and "pagin" in x.lower())
-        if not pag:
-            return False
-        next_start = current_start + self.ITEMS_PER_PAGE
-        return any(
-            f"start={next_start}" in (a.get("href") or "")
-            for a in pag.find_all("a", href=True)
-        )
-
-    # =========================================================================
-    # Extração de detalhe: HTML + PDF do Regulamento
-    # =========================================================================
-
-    def _fetch_detail_soup(self, url: str):
-        """Faz o fetch da página de detalhe e retorna o BeautifulSoup (ou None)."""
-        if not url:
-            return None
-        try:
-            return self._fetch_page(url, timeout=20)
-        except Exception as e:
-            print(f"    Aviso: falha ao acessar detalhe {url}: {e}")
-            return None
-
-    def _get_html_description(self, soup) -> str:
-        """Extrai texto da div.item_fields (metadados estruturados da página de detalhe)."""
-        el = soup.find("div", class_="item_fields")
-        if not el:
-            return ""
-        for tag in el.find_all(["script", "style"]):
-            tag.decompose()
-        return " ".join(el.get_text(" ", strip=True).split())
-
-    def _get_raw_html_content(self, soup) -> str:
-        """Retorna o HTML bruto do elemento de conteúdo principal."""
-        el = soup.find("div", class_="item_fields")
-        if el:
-            for tag in el.find_all(["script", "style"]):
-                tag.decompose()
-            return el.decode_contents()
-        return ""
-
-    def _extract_pdf_text(self, pdf_url: str) -> str:
-        """Baixa um PDF e extrai texto via pdfplumber. Retorna '' em caso de falha."""
-        try:
-            import pdfplumber
-        except ImportError:
-            print("    Aviso: pdfplumber não instalado — instale com 'pip install pdfplumber'")
-            return ""
-
-        try:
-            import requests
-            resp = requests.get(pdf_url, timeout=20, stream=True)
-            if resp.status_code != 200:
-                return ""
-
-            chunks, total = [], 0
-            MAX_BYTES = 10 * 1024 * 1024  # 10 MB
-            for chunk in resp.iter_content(chunk_size=8192):
-                chunks.append(chunk)
-                total += len(chunk)
-                if total > MAX_BYTES:
-                    break
-            pdf_bytes = b"".join(chunks)
-
-            text_parts = []
-            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-                for page in pdf.pages:
-                    text_parts.append(page.extract_text() or "")
-
-            return " ".join(" ".join(t.split()) for t in text_parts)
-
-        except Exception as e:
-            print(f"    Aviso: falha ao extrair PDF {pdf_url}: {e}")
-            return ""
-
-    # =========================================================================
-    # Parse de item individual
-    # =========================================================================
-
-    def _parse_item(self, item, default_status: str = None) -> dict:
-        """Parseia um <div class='item'> da listagem FINEP."""
-        header = item.find("h3")
-        if not header:
-            return None
-        title_tag = header.find("a")
-        if not title_tag:
-            return None
-
-        titulo = self._clean_text(title_tag.get_text())
-        href = title_tag.get("href", "")
-        link = f"http://www.finep.gov.br{href}" if href.startswith("/") else href
-
-        data_publicacao = self._extract_span_text(item, "data_pub")
-        prazo = self._extract_span_text(item, "prazo")
-        fonte_recurso = self._extract_span_text(item, "fonte")
-        publico_alvo = self._extract_span_text(item, "publico", span_class="tag")
-        tema = self._extract_span_text(item, "tema")
-
-        status = default_status or self._get_status(item)
-        chamada_id = self._extract_chamada_id(link)
+        pdf_pairs = self._api.extract_pdf_urls(raw, prefer_pdf=True)
+        pdf_urls = [url for _legenda, url in pdf_pairs]
 
         return {
             "fonte": self.source_name,
             "chamada_id": chamada_id,
-            "titulo": titulo,
-            "link": link,
-            "status": status,
-            "data_publicacao": data_publicacao,
-            "prazo_envio": prazo,
-            "fonte_recurso": fonte_recurso,
-            "publico_alvo": publico_alvo,
+            "titulo": raw.get("titulo") or "",
+            "link": chamada_url_publica(int(chamada_id)) if chamada_id.isdigit() else "",
+            "status": situacao,
+            "data_publicacao": (raw.get("dataDePublicacao") or "")[:10] or None,
+            "prazo_envio": (raw.get("vigenciaFim") or "")[:10] or None,
+            "fonte_recurso": "",                       # campo `fonteDeRecurso` exige outro endpoint
+            "publico_alvo": publico,
             "tema": tema,
-            "descricao": "",       # preenchido por _enrich_chamada
-            "raw_html": "",        # preenchido por _enrich_chamada
-            "pdf_urls": [],        # preenchido por _enrich_chamada
-            "pdf_texts": {},       # preenchido por _enrich_chamada
+            "descricao": raw.get("descricaoRawText") or "",
+            "raw_html": raw.get("descricao") or "",
+            "pdf_urls": pdf_urls,
+            "pdf_legendas": [legenda for legenda, _url in pdf_pairs],
+            "pdf_texts": {},                           # preenchido em _download_pdfs
             "data_extracao": self._get_timestamp(),
+            # Campos extras vindos da API — úteis para o pipeline pular re-extração LLM:
+            "api_regiao": (raw.get("regiao") or {}).get("name") or "",
+            "api_tipo_oportunidade": (raw.get("tipoDeOportunidade") or {}).get("name") or "",
+            "api_tipo_cooperacao": (raw.get("tipoCooperacao") or {}).get("name") or "",
+            "api_contrapartida": (raw.get("contrapartida") or {}).get("name") or "",
+            "api_vigencia_inicio": (raw.get("vigenciaInicio") or "")[:10] or None,
+            "api_publico_alvo_keys": [p.get("key") for p in (raw.get("publicoAlvo") or []) if p],
+            "api_taxonomy_categories": [
+                t.get("taxonomyCategoryName") for t in (raw.get("taxonomyCategoryBriefs") or [])
+            ],
         }
 
-    def _extract_span_text(self, item, div_class: str, span_class: str = None) -> str:
-        """Extrai texto de span dentro de div com a classe dada (suporta multi-class)."""
-        div = item.find("div", class_=div_class)
-        if not div:
-            return None
-        span = div.find("span", class_=span_class) if span_class else div.find("span")
-        if not span:
-            return None
-        return self._clean_text(span.get_text())
+    # ------------------------------------------------------------------
+    # Download de PDFs
+    # ------------------------------------------------------------------
 
-    def _get_status(self, item) -> str:
-        """Determina status a partir da seção pai (apenas na página principal)."""
-        parent_section = item.find_parent("div", class_="item-separator-conteudo")
-        if not parent_section:
-            return "Desconhecido"
-        section_header = parent_section.find("h2", class_="header")
-        if not section_header:
-            return "Desconhecido"
-        text = section_header.get_text().strip().lower()
-        if "aberta" in text:
-            return "ABERTA"
-        elif "encerrada" in text:
-            return "ENCERRADA"
-        elif "resultado" in text:
-            return "RESULTADO_DIVULGADO"
-        return "Desconhecido"
+    def _download_pdfs(self, item: dict) -> None:
+        """Baixa os PDFs da chamada para `bronze_data/finep_pdfs/<chamada_id>/`."""
+        chamada_id = item.get("chamada_id") or ""
+        if not chamada_id:
+            return
+        dest_dir = FINEP_PDFS_DIR / chamada_id
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        pdf_texts: dict[str, str] = {}
+        legendas = item.get("pdf_legendas") or []
+        for i, url in enumerate(item["pdf_urls"]):
+            # Nome local: usa a legenda quando disponível, senão indexa por número
+            legenda = legendas[i] if i < len(legendas) else f"doc{i+1}"
+            ext = self._extension_from_url(url)
+            safe_name = self._safe_filename(legenda) + ext
+            dest = dest_dir / safe_name
+
+            if dest.exists() and dest.stat().st_size > 0:
+                logger.debug("PDF já existe, pulando: %s", dest.name)
+            else:
+                ok = self._api.download_pdf(url, str(dest))
+                if not ok:
+                    continue
+
+            # Best-effort: extrai texto para o dict de saída (compatível com pipeline antigo)
+            text = self._extract_pdf_text(dest)
+            if text:
+                pdf_texts[safe_name] = text
+
+        item["pdf_texts"] = pdf_texts
+
+    @staticmethod
+    def _safe_filename(name: str) -> str:
+        """Sanitiza string para nome de arquivo: alfanuméricos + _ + -."""
+        keep = "".join(c if c.isalnum() or c in (" ", "-", "_") else "_" for c in name)
+        return "_".join(keep.split())[:80] or "documento"
+
+    @staticmethod
+    def _extension_from_url(url: str) -> str:
+        """Extrai extensão de URLs FINEP no formato `.../filename.pdf/<uuid>?query`.
+
+        O Liferay coloca o nome de arquivo + extensão no penúltimo segmento
+        do path (o último segmento é o UUID do asset). `Path(url).suffix` pega
+        o sufixo errado (vazio para UUIDs). Esta função descobre a extensão
+        olhando os 2 últimos segmentos.
+
+        Returns: extensão com ponto (ex: '.pdf'), ou '' se não encontrar.
+        """
+        from urllib.parse import urlparse
+        path = urlparse(url).path
+        segments = [s for s in path.split("/") if s]
+        for seg in reversed(segments):
+            suffix = Path(seg).suffix.lower()
+            if suffix in (".pdf", ".odt", ".doc", ".docx", ".xls", ".xlsx", ".zip"):
+                return suffix
+        return ".pdf"  # fallback razoável — quase tudo do FINEP é PDF
+
+    @staticmethod
+    def _extract_pdf_text(pdf_path: Path) -> str:
+        """Extrai texto do PDF com pdfplumber (melhor que pypdf para layouts complexos)."""
+        try:
+            import pdfplumber
+            with pdfplumber.open(pdf_path) as pdf:
+                return "\n".join(p.extract_text() or "" for p in pdf.pages)
+        except ImportError:
+            logger.warning("pdfplumber não instalado — texto de PDF não extraído")
+            return ""
+        except Exception as e:
+            logger.warning("Falha ao extrair texto de %s: %s", pdf_path.name, e)
+            return ""
 
 
-# Permite execução direta do arquivo
+# Permite execução direta para teste manual
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     scraper = FINEPScraper()
-    scraper.run()
+    results = scraper.extract(include_historical=False)
+    print(f"\n=== Extraídas {len(results)} chamadas ===")
+    for r in results[:3]:
+        print(f"  {r['chamada_id']} | {r['titulo'][:60]} | {len(r['pdf_urls'])} PDFs")

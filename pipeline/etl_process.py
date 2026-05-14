@@ -29,7 +29,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from config import BRONZE_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR
+from config import BRONZE_DIR, FINEP_PDFS_DIR, KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
 from core import wiki_schema
 
 logger = logging.getLogger(__name__)

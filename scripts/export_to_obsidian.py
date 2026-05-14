@@ -23,7 +23,7 @@ import argparse
 import json
 from pathlib import Path
 
-from config import KNOWLEDGE_GRAPH_DIR, FINEP_PDFS_DIR
+from config import FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR
 from core import wiki_schema
 
 # Schema autoritativo em WIKI.md + wikis/finep.md (ver core.wiki_schema)
@@ -78,14 +78,12 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
     objective = edital.get("objective")
     mechanism = edital.get("mechanism")
     eligible_entities = edital.get("eligible_entities") or []
-    eligible_sectors = edital.get("eligible_sectors") or []
     value_range = edital.get("value_range") or {}
     trl_range = edital.get("trl_range") or {}
     required_certifications = edital.get("required_certifications") or []
     counterpart = edital.get("counterpart_required", False)
     key_requirements = edital.get("key_requirements") or []
     key_facts = edital.get("key_facts") or []
-    card_source = edital.get("source", "")
 
     # Frontmatter YAML
     lines = ["---"]
@@ -444,8 +442,8 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
     lines.append("")
     lines.append("## Resumo")
     lines.append("")
-    lines.append(f"| Métrica | Valor |")
-    lines.append(f"|---|---|")
+    lines.append("| Métrica | Valor |")
+    lines.append("|---|---|")
     lines.append(f"| Total de editais | {total} |")
     for status, count in sorted(by_status.items()):
         emoji = _status_emoji(status)
@@ -528,7 +526,7 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     nested = base / subfolder
     if nested.is_dir():
         print(f"⚠️  Encontrei pasta aninhada stale: {nested}")
-        print(f"    Provavelmente de um export anterior com --vault errado.")
+        print("    Provavelmente de um export anterior com --vault errado.")
         print(f"    Remova manualmente: rm -rf {nested}")
 
     for subfld in expected_subfolders:
@@ -658,11 +656,11 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
 
     total = n_editais + n_temas + n_fontes + n_publicos + n_anos + n_sub + n_mech + n_trl + 1
     print(f"\n✓ {total} notas exportadas para: {base}")
-    print(f"\nPróximos passos no Obsidian:")
+    print("\nPróximos passos no Obsidian:")
     print(f"  1. Abra o vault em: {vault_path}")
     print(f"  2. Acesse a nota HOME em: {subfolder}/HOME")
-    print(f"  3. Clique no ícone de grafo (canto superior direito) ou Ctrl+G")
-    print(f"  4. No Graph View, filtre por #finep para ver apenas os editais")
+    print("  3. Clique no ícone de grafo (canto superior direito) ou Ctrl+G")
+    print("  4. No Graph View, filtre por #finep para ver apenas os editais")
 
 
 # =============================================================================

@@ -17,6 +17,7 @@ Cada unidade retorna:
 import re
 import time
 from datetime import datetime
+
 from .base import BaseScraper
 
 try:
@@ -40,7 +41,7 @@ class EMBRAPIIScraper(BaseScraper):
     # ------------------------------------------------------------------
 
     def extract(self) -> list:
-        print(f"[EMBRAPII] Iniciando extração do diretório de unidades")
+        print("[EMBRAPII] Iniciando extração do diretório de unidades")
 
         results = self._try_xls_export()
         if results:
@@ -93,7 +94,7 @@ class EMBRAPIIScraper(BaseScraper):
             if resp is None:
                 return []
             content_type = resp.headers.get("Content-Type", "")
-            if "spreadsheet" not in content_type and "excel" not in content_type and not resp.content[:4] in (b'PK\x03\x04',):
+            if "spreadsheet" not in content_type and "excel" not in content_type and resp.content[:4] not in (b'PK\x03\x04',):
                 # Não é um arquivo XLS/XLSX válido
                 return []
             wb = openpyxl.load_workbook(io.BytesIO(resp.content), read_only=True)

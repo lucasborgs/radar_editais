@@ -30,6 +30,8 @@ import {
 } from "@/lib/writing";
 import { loadProfileFromStorage, EMPTY_PROFILE } from "@/types/profile";
 import type { WritingMessage } from "@/types/api";
+import { MentionsTextarea } from "@/components/ui/MentionsTextarea";
+import { useAuth } from "@/lib/auth";
 
 // ── Typing indicator ─────────────────────────────────────────────────────────
 
@@ -360,6 +362,11 @@ function WritingPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const editalId = searchParams.get("edital");
+  const { getToken } = useAuth();
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  useEffect(() => {
+    getToken().then(setAuthToken);
+  }, [getToken]);
 
   const profile = loadProfileFromStorage() ?? EMPTY_PROFILE;
 
@@ -745,19 +752,15 @@ function WritingPageInner() {
 
               {/* Input */}
               <div className="p-3 border-t border-border flex gap-2">
-                <textarea
+                <MentionsTextarea
                   rows={2}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  placeholder="Escreva sua mensagem... (Enter para enviar)"
+                  onChange={setInput}
+                  onSubmitEnter={handleSend}
+                  token={authToken}
+                  placeholder="Escreva sua mensagem... (@ para mencionar biblioteca, Enter para enviar)"
                   className={cn(
-                    "flex-1 rounded-xl border border-border px-3 py-2.5 text-sm font-sans",
+                    "w-full rounded-xl border border-border px-3 py-2.5 text-sm font-sans",
                     "text-content-primary placeholder:text-content-secondary resize-none",
                     "focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
                   )}

@@ -18,6 +18,7 @@ export interface CompanyProfile {
   // Identificação
   nome: string;
   cnpj: string;
+  url_site: string;
   tipo_entidade: TipoEntidade | "";
   // Descrição
   one_liner: string;
@@ -43,6 +44,7 @@ export interface CompanyProfile {
 export const EMPTY_PROFILE: CompanyProfile = {
   nome: "",
   cnpj: "",
+  url_site: "",
   tipo_entidade: "",
   one_liner: "",
   problem_statement: "",

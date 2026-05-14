@@ -253,7 +253,7 @@ function Step1({
           placeholder="00.000.000/0001-00"
         />
       </Field>
-      <Field label="Site da empresa">
+      <Field label="Site da empresa" confidence={confidence.url_site}>
         <input
           className={INPUT_CLS}
           value={profile.url_site}
@@ -363,6 +363,7 @@ function Step2({
       <Field
         label="Problema que a empresa resolve"
         hint="Qual dor ou ineficiência do mercado vocês atacam?"
+        confidence={confidence.problem_statement}
       >
         <textarea
           rows={2}
@@ -375,6 +376,7 @@ function Step2({
       <Field
         label="Solução / tecnologia"
         hint="Como vocês resolvem esse problema? Qual abordagem ou tecnologia usam?"
+        confidence={confidence.solution_summary}
       >
         <textarea
           rows={2}
@@ -410,7 +412,7 @@ function Step2({
           ))}
         </select>
       </Field>
-      <Field label="Equipe técnica">
+      <Field label="Equipe técnica" confidence={confidence.equipe_resumo}>
         <textarea
           rows={2}
           className={cn(INPUT_CLS, "resize-none")}
@@ -426,9 +428,11 @@ function Step2({
 function Step3({
   profile,
   set,
+  confidence,
 }: {
   profile: CompanyProfile;
   set: <K extends keyof CompanyProfile>(k: K, v: CompanyProfile[K]) => void;
+  confidence: Record<string, FieldConfidence>;
 }) {
   return (
     <div className="space-y-5">
@@ -457,7 +461,7 @@ function Step3({
           placeholder="Ex: 1000000"
         />
       </Field>
-      <Field label="Portfólio de projetos">
+      <Field label="Portfólio de projetos" confidence={confidence.portfolio_projetos}>
         <textarea
           rows={3}
           className={cn(INPUT_CLS, "resize-none")}
@@ -466,7 +470,7 @@ function Step3({
           placeholder="Cite projetos de P&D, inovação ou financiados anteriormente..."
         />
       </Field>
-      <Field label="Certificações">
+      <Field label="Certificações" confidence={confidence.certificacoes}>
         <TagInput
           value={profile.certificacoes}
           onChange={(v) => set("certificacoes", v)}
@@ -632,13 +636,19 @@ function OnboardingInner() {
             )}
           </div>
 
+          <div className="mt-4 flex items-center gap-2 text-xs text-content-secondary">
+            <div className="flex-1 h-px bg-border" />
+            <span className="font-sans">ou</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
           <p className="text-center mt-4">
             <button
               type="button"
               onClick={() => setMode("wizard")}
-              className="text-xs text-content-secondary hover:text-content-primary font-sans transition-colors"
+              className="text-xs text-content-secondary hover:text-content-primary font-sans transition-colors underline-offset-2 hover:underline"
             >
-              Prefiro preencher manualmente →
+              Ainda não tenho um site — preencher manualmente →
             </button>
           </p>
         </div>
@@ -703,7 +713,7 @@ function OnboardingInner() {
         <div className="bg-white rounded-2xl border border-border p-6 shadow-card">
           {step === 0 && <Step1 profile={profile} set={set} confidence={confidence} />}
           {step === 1 && <Step2 profile={profile} set={set} confidence={confidence} />}
-          {step === 2 && <Step3 profile={profile} set={set} />}
+          {step === 2 && <Step3 profile={profile} set={set} confidence={confidence} />}
 
           {/* Navigation */}
           <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
