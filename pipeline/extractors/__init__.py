@@ -1,12 +1,15 @@
 # Módulo de extratores de editais
 # SCRAPER_REGISTRY contém apenas as fontes ativas na v1 (FINEP).
 # INACTIVE_SCRAPERS preserva as demais fontes para implementação na v2.
+# Para ativar uma fonte inativa: mover a entry de INACTIVE_SCRAPERS para
+# SCRAPER_REGISTRY e rodar `python scripts/run_all.py` (Fase 4 #27).
 
 from .base import BaseScraper
+from .bndes import BNDESScraper
+from .cnpq import CNPqScraper
+from .embrapii import EMBRAPIIScraper
 from .fapesp import FAPESPScraper
 from .finep import FINEPScraper
-from .bndes import BNDESScraper
-from .embrapii import EMBRAPIIScraper
 
 # =============================================================================
 # FONTES ATIVAS — v1
@@ -21,7 +24,7 @@ SCRAPER_REGISTRY = {
 }
 
 # =============================================================================
-# FONTES INATIVAS — v2
+# FONTES INATIVAS — v2 (scrapers implementados, aguardando ativação)
 # =============================================================================
 
 INACTIVE_SCRAPERS = {
@@ -41,9 +44,22 @@ INACTIVE_SCRAPERS = {
     ),
 }
 
+# =============================================================================
+# FONTES STUB — implementação pendente (Fase 4 #27)
+# =============================================================================
+# CNPq existe como stub em cnpq.py mas sua lógica de scraping não foi mapeada.
+# Não entra em SCRAPER_REGISTRY até que `extract()` seja implementado.
+STUB_SCRAPERS = {
+    "CNPq": dict(
+        source_name="CNPq", bronze_dir="cnpq_raw",
+        cls=CNPqScraper, kwargs={},
+    ),
+}
+
 __all__ = [
     "BaseScraper",
     "SCRAPER_REGISTRY",
     "INACTIVE_SCRAPERS",
-    "FAPESPScraper", "FINEPScraper", "BNDESScraper", "EMBRAPIIScraper",
+    "STUB_SCRAPERS",
+    "FAPESPScraper", "FINEPScraper", "BNDESScraper", "EMBRAPIIScraper", "CNPqScraper",
 ]

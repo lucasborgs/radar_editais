@@ -5,13 +5,8 @@ Estrutura os dados da empresa do usuario para comparacao
 com editais (Contexto A vs Contexto B).
 """
 
-import json
 import logging
-from pathlib import Path
-from dataclasses import dataclass, field, asdict, fields as dataclass_fields
-from typing import Optional
-
-from config import PROFILES_DIR
+from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +32,11 @@ class CompanyProfile:
     tamanho_empresa: str = ""        # MEI, ME, EPP, MEDIO, GRANDE
     faturamento_anual_faixa: str = ""  # "<500K" | "500K-5M" | "5M-50M" | ">50M"
     localizacao: str = ""
-    capital_social: Optional[float] = None
+    capital_social: float | None = None
     certificacoes: list[str] = field(default_factory=list)
 
     # ── Perfil tecnológico ─────────────────────────────────────────────────
-    trl: Optional[int] = None       # Technology Readiness Level atual do projeto (1-9)
+    trl: int | None = None       # Technology Readiness Level atual do projeto (1-9)
     equipe_resumo: str = ""
 
     # ── Intenção de financiamento ──────────────────────────────────────────
@@ -51,7 +46,7 @@ class CompanyProfile:
     uso_financiamento: list[str] = field(default_factory=list)
     # Valores: "P&D_interno" | "contratacao" | "equipamento"
     #          | "prototipagem" | "internacionalizacao" | "marketing"
-    valor_buscado: Optional[float] = None  # Valor em BRL que busca
+    valor_buscado: float | None = None  # Valor em BRL que busca
 
     def to_context(self) -> str:
         """Gera texto de contexto para uso em prompts LLM."""
@@ -127,29 +122,3 @@ class CompanyProfile:
             self.valor_buscado is not None,
         ]
         return int(sum(fields_check) / len(fields_check) * 100)
-
-    def save(self, path: Optional[Path] = None) -> Path:
-        """Salva perfil em disco como JSON."""
-        if path is None:
-            PROFILES_DIR.mkdir(exist_ok=True)
-            slug = self.cnpj.replace("/", "").replace(".", "").replace("-", "") if self.cnpj else "default"
-            path = PROFILES_DIR / f"{slug}.json"
-
-        path.write_text(json.dumps(asdict(self), ensure_ascii=False, indent=2), encoding="utf-8")
-        logger.info(f"Perfil salvo em {path}")
-        return path
-
-    @classmethod
-    def load(cls, path: Path) -> "CompanyProfile":
-        """Carrega perfil de disco."""
-        data = json.loads(path.read_text(encoding="utf-8"))
-        valid = {f.name for f in dataclass_fields(cls)}
-        return cls(**{k: v for k, v in data.items() if k in valid})
-
-    @classmethod
-    def load_default(cls) -> "CompanyProfile":
-        """Carrega perfil default se existir, senao retorna vazio."""
-        default_path = PROFILES_DIR / "default.json"
-        if default_path.exists():
-            return cls.load(default_path)
-        return cls()

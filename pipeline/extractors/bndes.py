@@ -259,7 +259,7 @@ class BNDESScraper(BaseScraper):
 
         # Título: primeira linha não-vazia e de tamanho razoável
         title = next(
-            (l.strip() for l in full_text.splitlines() if 10 < len(l.strip()) < 120),
+            (line.strip() for line in full_text.splitlines() if 10 < len(line.strip()) < 120),
             filepath.stem,
         )
 
@@ -314,8 +314,8 @@ class BNDESScraper(BaseScraper):
         return self._extract_via_paragraphs(soup)
 
     def _extract_via_h2_sections(self, soup) -> tuple[str, str]:
-        QUEM_KW = re.compile(r"quem pode|público.alvo|elegibili|beneficiári|quem participa", re.I)
-        FIN_KW  = re.compile(r"o que (pode|é|financia)|apoio|produto|financi|benefício", re.I)
+        QUEM_KW = re.compile(r"quem pode|público.alvo|elegibili|beneficiári|quem participa", re.I)  # noqa: N806
+        FIN_KW  = re.compile(r"o que (pode|é|financia)|apoio|produto|financi|benefício", re.I)  # noqa: N806
 
         quem_parts: list[str] = []
         fin_parts:  list[str] = []

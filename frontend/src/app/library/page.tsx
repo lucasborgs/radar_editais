@@ -8,9 +8,10 @@ import {
   createLibraryItem,
   uploadLibraryPdf,
   deleteLibraryItem,
+  archiveLibraryItem,
 } from "@/lib/api";
 import type { ContentItemSummary, ContentItemType } from "@/types/api";
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -203,12 +204,83 @@ function AddModal({
 
 // ── Item Card ─────────────────────────────────────────────────────────────────
 
+function ItemActionMenu({
+  onArchive,
+  onDelete,
+}: {
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointer(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    window.addEventListener("mousedown", onPointer);
+    return () => window.removeEventListener("mousedown", onPointer);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-label="Ações"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        className={cn(
+          "w-7 h-7 rounded-md flex items-center justify-center text-content-secondary",
+          "hover:bg-gray-100 hover:text-content-primary transition-colors",
+          "opacity-0 group-hover:opacity-100",
+          open && "opacity-100 bg-gray-100"
+        )}
+      >
+        <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor">
+          <circle cx="4" cy="10" r="1.6" />
+          <circle cx="10" cy="10" r="1.6" />
+          <circle cx="16" cy="10" r="1.6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-8 z-30 w-40 rounded-lg border border-border bg-white shadow-lg py-1">
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onArchive();
+            }}
+            className="w-full text-left px-3 py-1.5 text-xs font-sans text-content-primary hover:bg-gray-50"
+          >
+            Arquivar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+            className="w-full text-left px-3 py-1.5 text-xs font-sans text-red-600 hover:bg-red-50"
+          >
+            Excluir
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ItemCard({
   item,
   onDelete,
+  onArchive,
 }: {
   item: ContentItemSummary;
   onDelete: (id: string) => void;
+  onArchive: (id: string) => void;
 }) {
   return (
     <div className="bg-white rounded-xl border border-border p-4 space-y-2 hover:border-primary/30 transition-colors group">
@@ -223,12 +295,10 @@ function ItemCard({
             </span>
           ))}
         </div>
-        <button
-          onClick={() => onDelete(item.id)}
-          className="opacity-0 group-hover:opacity-100 text-content-secondary hover:text-red-500 transition-all text-sm leading-none"
-        >
-          ×
-        </button>
+        <ItemActionMenu
+          onArchive={() => onArchive(item.id)}
+          onDelete={() => onDelete(item.id)}
+        />
       </div>
 
       <p className="text-sm font-semibold text-content-primary font-sans leading-snug">{item.title}</p>
@@ -252,6 +322,18 @@ function ItemCard({
   );
 }
 
+function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+  useEffect(() => {
+    const handle = setTimeout(onClose, 3000);
+    return () => clearTimeout(handle);
+  }, [onClose]);
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-content-primary text-white px-4 py-2 rounded-full shadow-lg text-xs font-sans">
+      {message}
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function LibraryPage() {
@@ -262,12 +344,15 @@ export default function LibraryPage() {
   const [showModal, setShowModal] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [includeArchived, setIncludeArchived] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     getToken().then(t => {
       setToken(t);
       if (t) loadItems(t);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadItems(t?: string) {
@@ -275,7 +360,12 @@ export default function LibraryPage() {
     if (!tk) return;
     setLoading(true);
     try {
-      const data = await getLibraryItems(tk, activeTab !== "all" ? activeTab : undefined, search || undefined);
+      const data = await getLibraryItems(
+        tk,
+        activeTab !== "all" ? activeTab : undefined,
+        search || undefined,
+        includeArchived
+      );
       setItems(data);
     } finally {
       setLoading(false);
@@ -284,12 +374,40 @@ export default function LibraryPage() {
 
   useEffect(() => {
     if (token) loadItems();
-  }, [activeTab, token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, token, includeArchived]);
 
   async function handleDelete(id: string) {
     if (!token) return;
-    await deleteLibraryItem(id, token);
     setItems(prev => prev.filter(i => i.id !== id));
+    try {
+      await deleteLibraryItem(id, token);
+      setToast("Item excluído");
+    } catch {
+      setToast("Erro ao excluir — recarregando…");
+      loadItems();
+    }
+  }
+
+  async function handleArchive(id: string) {
+    if (!token) return;
+    // optimistic remove (or keep if viewing archived)
+    if (!includeArchived) {
+      setItems(prev => prev.filter(i => i.id !== id));
+    }
+    try {
+      await archiveLibraryItem(id, token);
+      setToast("Item arquivado");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "";
+      if (msg.includes("404")) {
+        // backend endpoint not yet deployed — surface gentle hint
+        setToast("Arquivar ainda não está disponível (404). Recarregando…");
+      } else {
+        setToast("Erro ao arquivar — recarregando…");
+      }
+      loadItems();
+    }
   }
 
   return (
@@ -335,6 +453,17 @@ export default function LibraryPage() {
                 {tab.label}
               </button>
             ))}
+            <div className="ml-auto flex items-center gap-2 pl-2">
+              <label className="text-xs font-sans text-content-secondary flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeArchived}
+                  onChange={e => setIncludeArchived(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-primary"
+                />
+                Ver arquivados
+              </label>
+            </div>
           </div>
         </div>
 
@@ -367,7 +496,12 @@ export default function LibraryPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {items.map(item => (
-              <ItemCard key={item.id} item={item} onDelete={handleDelete} />
+              <ItemCard
+                key={item.id}
+                item={item}
+                onDelete={handleDelete}
+                onArchive={handleArchive}
+              />
             ))}
           </div>
         )}
@@ -380,6 +514,8 @@ export default function LibraryPage() {
           onSaved={() => loadItems()}
         />
       )}
+
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </DashboardLayout>
   );
 }

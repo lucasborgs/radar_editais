@@ -8,20 +8,27 @@ Docs automáticos: http://localhost:8000/docs
 """
 
 from dotenv import load_dotenv
+
 load_dotenv()
+
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import Optional
 
-from core.hybrid_match_service import HybridMatchService
-from core.writing_session import WritingSession
-from core.profile_extractor import ProfileExtractor
-from domain.user_profile import CompanyProfile as PyCompanyProfile
 from backend.auth_routes import router as auth_router
 from backend.library_routes import router as library_router
+from core.auth import CurrentUserId, DbClient
+from core.content_library import get_item, get_workspace_id
+from core.hybrid_match_service import HybridMatchService
+from core.profile_extractor import ProfileExtractor
+from core.writing_session import (
+    WritingSession,
+    get_session_document,
+    list_sessions,
+)
+from domain.user_profile import CompanyProfile as PyCompanyProfile
 
 # =============================================================================
 # APP + CORS
@@ -66,8 +73,6 @@ async def global_exception_handler(request: Request, exc: Exception):
         headers={"Access-Control-Allow-Origin": "http://localhost:3000"},
     )
 
-# Session store em memória: {session_id: WritingSession}
-_writing_sessions: dict[str, WritingSession] = {}
 
 # =============================================================================
 # SCHEMAS PYDANTIC
@@ -87,13 +92,13 @@ class CompanyProfileSchema(BaseModel):
     tamanho_empresa: str = ""
     faturamento_anual_faixa: str = ""
     localizacao: str = ""
-    capital_social: Optional[float] = None
+    capital_social: float | None = None
     certificacoes: list[str] = []
     equipe_resumo: str = ""
-    trl: Optional[int] = None
+    trl: int | None = None
     tipos_financiamento_interesse: list[str] = []
     uso_financiamento: list[str] = []
-    valor_buscado: Optional[float] = None
+    valor_buscado: float | None = None
 
 
 class MatchRequest(BaseModel):
@@ -110,12 +115,17 @@ class WritingStartRequest(BaseModel):
 class WritingTurnRequest(BaseModel):
     session_id: str
     user_message: str
-    section_hint: Optional[str] = None
+    section_hint: str | None = None
+    profile: CompanyProfileSchema | None = None
+    library_item_ids: list[str] = []
+    model_tier: str | None = None  # Fase 4 #24: 'fast' | 'auto' | 'pro'
 
 
 class WritingSectionStartRequest(BaseModel):
     session_id: str
     section_title: str
+    profile: CompanyProfileSchema | None = None
+    library_item_ids: list[str] = []
 
 
 class WritingSectionSaveRequest(BaseModel):
@@ -134,7 +144,7 @@ class ProfileExtractRequest(BaseModel):
 
 
 # =============================================================================
-# HELPER
+# HELPERS
 # =============================================================================
 
 
@@ -162,6 +172,40 @@ def _to_py_profile(schema: CompanyProfileSchema) -> PyCompanyProfile:
     )
 
 
+def _load_library_items(db, workspace_id: str, item_ids: list[str]) -> list[dict]:
+    if not item_ids:
+        return []
+    return [
+        item for item_id in item_ids
+        if (item := get_item(db, item_id, workspace_id)) is not None
+    ]
+
+
+def _profile_from_workspace(db, workspace_id: str) -> PyCompanyProfile:
+    """Lê workspaces.profile e instancia CompanyProfile.
+
+    Fallback usado quando o cliente não envia o profile no payload (resumir
+    sessão a partir de session_id puro).
+    """
+    result = (
+        db.table("workspaces")
+        .select("profile")
+        .eq("id", workspace_id)
+        .maybe_single()
+        .execute()
+    )
+    raw = (result.data or {}).get("profile") or {}
+    allowed = {
+        "nome", "cnpj", "url_site", "tipo_entidade", "one_liner",
+        "problem_statement", "solution_summary", "descricao_atividades",
+        "portfolio_projetos", "tamanho_empresa", "faturamento_anual_faixa",
+        "localizacao", "capital_social", "certificacoes", "equipe_resumo",
+        "trl", "tipos_financiamento_interesse", "uso_financiamento",
+        "valor_buscado",
+    }
+    return PyCompanyProfile(**{k: v for k, v in raw.items() if k in allowed})
+
+
 # =============================================================================
 # ENDPOINTS — EDITAIS
 # =============================================================================
@@ -179,8 +223,8 @@ def get_stats():
 
 @app.get("/editais", summary="Lista editais FINEP com filtros opcionais")
 def list_editais(
-    status: Optional[str] = Query(None, description="ABERTA | ENCERRADA | Desconhecido"),
-    tema: Optional[str] = Query(None, description="Filtro por tema (substring)"),
+    status: str | None = Query(None, description="ABERTA | ENCERRADA | Desconhecido"),
+    tema: str | None = Query(None, description="Filtro por tema (substring)"),
     limit: int = Query(200, ge=1, le=500),
 ):
     return wiki_matcher.list_editais(status=status, tema=tema, limit=limit)
@@ -200,10 +244,13 @@ def get_edital(edital_id: str):
 
 
 @app.post("/match", summary="Rankeamento de editais via LLM (Karpathy-style)")
-def match_editais(req: MatchRequest):
+def match_editais(req: MatchRequest, user_id: CurrentUserId, db: DbClient):
     """
     Recebe um perfil de empresa e retorna editais FINEP rankeados por relevância.
     A LLM lê o catálogo completo e justifica cada recomendação por dimensão.
+
+    O workspace_id do usuário é derivado do JWT e plumbado para o matcher
+    para permitir pesos customizados (matching_weights) com fallback global.
     """
     profile = _to_py_profile(req.profile)
     if not profile.is_complete():
@@ -211,145 +258,471 @@ def match_editais(req: MatchRequest):
             status_code=422,
             detail="Perfil incompleto. Preencha pelo menos nome e descricao_atividades.",
         )
-    return {"matches": wiki_matcher.match(profile=profile, top_k=req.top_k)}
+    workspace_id = get_workspace_id(db, user_id)
+    return {
+        "matches": wiki_matcher.match(
+            profile=profile, top_k=req.top_k, workspace_id=workspace_id
+        )
+    }
 
 
 # =============================================================================
-# ENDPOINTS — WRITING SESSION
+# ENDPOINTS — OPPORTUNITY BRIEF (Fase 3 #21)
+# =============================================================================
+
+class OpportunityBriefRequest(BaseModel):
+    edital_id: str
+    profile: CompanyProfileSchema | None = None
+    model_tier: str | None = None  # Fase 4 #24
+
+
+_VALID_STATUS_TRANSITIONS = {
+    "matched", "brief_gerado", "proposta_iniciada",
+    "submetida", "em_analise", "aprovada", "reprovada", "desistiu",
+}
+
+
+class ApplicationStatusUpdate(BaseModel):
+    status: str
+    feedback_notas: str | None = None
+
+
+@app.put("/applications/{application_id}/status", summary="Atualiza status de uma application_log (Fase 3 #23)")
+def update_application_status(
+    application_id: str,
+    payload: ApplicationStatusUpdate,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """Atualiza status manualmente (submetida, aprovada, reprovada, desistiu).
+
+    O trigger log_application_event registra a transição em application_events
+    automaticamente. RLS garante que o usuário só atualiza applications do
+    próprio workspace.
+    """
+    if payload.status not in _VALID_STATUS_TRANSITIONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Status inválido. Use: {', '.join(sorted(_VALID_STATUS_TRANSITIONS))}",
+        )
+    update: dict = {"status": payload.status}
+    if payload.feedback_notas is not None:
+        update["feedback_notas"] = payload.feedback_notas
+
+    result = (
+        db.table("application_log")
+        .update(update)
+        .eq("id", application_id)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="application_log não encontrada")
+    return result.data[0]
+
+
+@app.get("/commands", summary="Lista slash commands disponíveis e LLM tiers (Fase 4 #24/#25)")
+def list_commands():
+    """Registry de slash commands + model tiers para o frontend popular UI.
+
+    Cada comando mapeia para um endpoint existente; o frontend renderiza
+    autocomplete quando o usuário digita /xxx no chat. Não exige auth (apenas
+    catálogo público de capacidades).
+    """
+    from core.llm_router import list_tiers
+    from core.skills import available_skills
+    return {
+        "commands": [
+            {
+                "name": "match",
+                "endpoint": "POST /match",
+                "description": "Rankeia editais para o perfil da empresa",
+                "args": ["top_k?"],
+            },
+            {
+                "name": "brief",
+                "endpoint": "POST /opportunity/brief",
+                "description": "Brief de Oportunidade (decision matrix + GO/NO-GO) para um edital",
+                "args": ["edital_id"],
+            },
+            {
+                "name": "draft",
+                "endpoint": "POST /writing/start",
+                "description": "Inicia sessão de escrita de proposta",
+                "args": ["edital_id", "library_item_ids?"],
+            },
+            {
+                "name": "review",
+                "endpoint": "POST /writing/{session_id}/checklist/auto-review",
+                "description": "Roda 3 passes de revisão (compliance + qualidade + completude)",
+                "args": [],
+            },
+            {
+                "name": "reflect",
+                "endpoint": "POST /me/reflect",
+                "description": "Síntese de outcomes anteriores em insights",
+                "args": [],
+            },
+        ],
+        "model_tiers": list_tiers(),
+        "skills": available_skills(),
+    }
+
+
+@app.post("/opportunity/brief", summary="Gera Brief de Oportunidade para um edital (decision matrix + GO/NO-GO)")
+def opportunity_brief(
+    req: OpportunityBriefRequest, user_id: CurrentUserId, db: DbClient
+):
+    """Avaliação formal antes de iniciar uma proposta (ADR §3.6, RADAR Gap 6).
+
+    Score determinístico (HybridMatch Stage 1) + narrativa LLM. Persiste
+    automaticamente em application_log com status='brief_gerado' (trigger
+    em application_events registra o evento).
+
+    Se `profile` não for enviado, lê de workspaces.profile.
+    """
+    from core.opportunity_brief_service import generate_brief
+
+    workspace_id = get_workspace_id(db, user_id)
+    profile = (
+        _to_py_profile(req.profile) if req.profile
+        else _profile_from_workspace(db, workspace_id)
+    )
+    return generate_brief(db, workspace_id, profile, req.edital_id, model_tier=req.model_tier)
+
+
+# =============================================================================
+# ENDPOINTS — WRITING SESSION (persistido em Postgres — ADR B1)
 # =============================================================================
 
 
 @app.post("/writing/start", summary="Inicia sessão de escrita de proposta")
-def writing_start(req: WritingStartRequest, request: Request):
+def writing_start(
+    req: WritingStartRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
     """
-    Cria uma sessão de escrita para o edital selecionado.
-    Retorna session_id e títulos das seções disponíveis.
+    Cria uma sessão de escrita persistida em Postgres para o edital selecionado.
+    Retorna session_id, títulos das seções e contexto da sessão.
     """
     edital = wiki_matcher.get_edital_by_id(req.edital_id)
     if edital is None:
         raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
 
+    workspace_id = get_workspace_id(db, user_id)
     profile = _to_py_profile(req.profile)
-
-    library_items: list[dict] = []
-    if req.library_item_ids:
-        try:
-            from core.content_library import get_workspace_id, get_item
-            from core.auth import _decode_token
-            auth_header = request.headers.get("Authorization", "")
-            if auth_header.startswith("Bearer "):
-                payload = _decode_token(auth_header[7:])
-                workspace_id = get_workspace_id(payload["sub"])
-                library_items = [
-                    item for item_id in req.library_item_ids
-                    if (item := get_item(item_id, workspace_id)) is not None
-                ]
-        except Exception:
-            pass
+    library_items = _load_library_items(db, workspace_id, req.library_item_ids)
 
     session = WritingSession(
-        edital_id=req.edital_id,
+        db=db,
+        workspace_id=workspace_id,
         profile=profile,
+        edital_id=req.edital_id,
         library_items=library_items,
     )
-    _writing_sessions[session.session_id] = session
-
     return session.get_info()
 
 
 @app.post("/writing/turn", summary="Turno da sessão de escrita")
-def writing_turn(req: WritingTurnRequest):
+async def writing_turn(
+    req: WritingTurnRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
     """
     Processa um turno da conversa de escrita.
-    O Writer LLM recebe os documentos do edital como contexto estático e gera a resposta.
+
+    Roda LLM principal + ComplianceMonitor em paralelo via asyncio.gather (ADR A4).
+    Como ComplianceMonitor avalia a mensagem do USUÁRIO (não a resposta do LLM),
+    ambos podem rodar simultaneamente — latência total ≈ max(LLM, monitor) ≈ LLM.
+    Retorna draft + compliance_flags numa única resposta.
+
+    Constrói o objeto WritingSession a partir do estado em Postgres (sem cache
+    de instâncias entre requests). Esta abordagem troca uma pequena latência
+    de carregamento por correção em deploys multi-instância.
     """
-    session = _writing_sessions.get(req.session_id)
-    if session is None:
+    import asyncio
+
+    from core.compliance_monitor import check_compliance
+    from core.llm_router import resolve_model
+
+    workspace_id = get_workspace_id(db, user_id)
+    profile = (
+        _to_py_profile(req.profile) if req.profile
+        else _profile_from_workspace(db, workspace_id)
+    )
+    library_items = _load_library_items(db, workspace_id, req.library_item_ids)
+
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            session_id=req.session_id,
+            library_items=library_items,
+            model=resolve_model(req.model_tier),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    # Run LLM turn and compliance check in parallel (ADR A4).
+    turn_result, compliance_flags = await asyncio.gather(
+        asyncio.to_thread(session.turn, req.user_message, req.section_hint),
+        asyncio.to_thread(check_compliance, req.user_message, session.edital_id),
+    )
+    return {**turn_result, "compliance_flags": compliance_flags}
+
+
+@app.get("/writing/sessions", summary="Lista sessões de escrita do workspace")
+def writing_list_sessions(
+    user_id: CurrentUserId,
+    db: DbClient,
+    status: str | None = Query(None, description="active | completed | abandoned"),
+):
+    workspace_id = get_workspace_id(db, user_id)
+    return {"sessions": list_sessions(db, workspace_id, status=status)}
+
+
+@app.get(
+    "/writing/sessions/{session_id}/document",
+    summary="Retorna documento (section_drafts) salvo da sessão",
+)
+def writing_session_document(
+    session_id: str,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    workspace_id = get_workspace_id(db, user_id)
+    doc = get_session_document(db, session_id, workspace_id)
+    if doc is None:
         raise HTTPException(
             status_code=404,
-            detail=f"Sessão '{req.session_id}' não encontrada ou expirada",
+            detail=f"Sessão '{session_id}' não encontrada",
         )
-    return session.turn(req.user_message, section_hint=req.section_hint)
+    return doc
 
 
 @app.get("/writing/{session_id}/checklist", summary="Checklist de requisitos do edital")
-def writing_checklist(session_id: str):
+def writing_checklist(session_id: str, user_id: CurrentUserId, db: DbClient):
+    """Reconstrói o checklist a partir do edital. Estado de marcação não é
+    persistido nesta wave — o frontend deve re-aplicar as marcações localmente.
+    """
     from core.checklist_service import build_checklist
-    session = _writing_sessions.get(session_id)
-    if session is None:
+    workspace_id = get_workspace_id(db, user_id)
+    doc = get_session_document(db, session_id, workspace_id)
+    if doc is None:
         raise HTTPException(status_code=404, detail=f"Sessão '{session_id}' não encontrada")
-
-    if not hasattr(session, "_checklist"):
-        session._checklist = build_checklist(session.edital_id)
-    return {"session_id": session_id, "items": session._checklist}
+    return {"session_id": session_id, "items": build_checklist(doc["edital_id"])}
 
 
 @app.put("/writing/{session_id}/checklist/{item_id}", summary="Atualiza status de requisito")
-def writing_checklist_update(session_id: str, item_id: str, req: ChecklistUpdateRequest):
-    session = _writing_sessions.get(session_id)
-    if session is None:
+def writing_checklist_update(
+    session_id: str,
+    item_id: str,
+    req: ChecklistUpdateRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """Stateless — devolve o item atualizado. Persistência do checklist será
+    adicionada em uma wave posterior (não existe coluna dedicada hoje).
+    """
+    from core.checklist_service import build_checklist
+    workspace_id = get_workspace_id(db, user_id)
+    doc = get_session_document(db, session_id, workspace_id)
+    if doc is None:
         raise HTTPException(status_code=404, detail=f"Sessão '{session_id}' não encontrada")
-    if not hasattr(session, "_checklist"):
-        raise HTTPException(status_code=404, detail="Checklist não inicializado")
-    for item in session._checklist:
+    for item in build_checklist(doc["edital_id"]):
         if item["id"] == item_id:
             item["status"] = req.status
             return {"success": True, "item": item}
     raise HTTPException(status_code=404, detail=f"Item '{item_id}' não encontrado")
 
 
-@app.post("/writing/{session_id}/checklist/auto-review", summary="LLM revisa documento e atualiza checklist")
-def writing_checklist_auto_review(session_id: str):
-    from core.checklist_service import build_checklist, auto_review_checklist
-    session = _writing_sessions.get(session_id)
-    if session is None:
+@app.post(
+    "/writing/{session_id}/checklist/auto-review",
+    summary="LLM revisa documento em 3 passes paralelas (compliance, qualidade, completude)",
+)
+async def writing_checklist_auto_review(
+    session_id: str,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """
+    Roda 3 passes de revisão em paralelo (ADR C4):
+      - compliance:   requisitos obrigatórios do edital cobertos?
+      - quality:      clareza, coerência, persuasão, tom
+      - completeness: seções presentes e com profundidade adequada
+    """
+    from core.checklist_service import auto_review_checklist, build_checklist
+    workspace_id = get_workspace_id(db, user_id)
+    doc = get_session_document(db, session_id, workspace_id)
+    if doc is None:
         raise HTTPException(status_code=404, detail=f"Sessão '{session_id}' não encontrada")
 
-    if not hasattr(session, "_checklist"):
-        session._checklist = build_checklist(session.edital_id)
-
-    document = session.get_export()
-    session._checklist = auto_review_checklist(session._checklist, document)
-    return {"session_id": session_id, "items": session._checklist}
+    document = "\n\n---\n\n".join(
+        f"## {s['title']}\n\n{s['content']}" if s["content"]
+        else f"## {s['title']}\n\n*[A preencher]*"
+        for s in doc["sections"]
+    )
+    outline = [s["title"] for s in doc["sections"]]
+    review = await auto_review_checklist(
+        proposal=document,
+        edital_requirements=build_checklist(doc["edital_id"]),
+        outline=outline,
+    )
+    return {"session_id": session_id, "review": review}
 
 
 @app.get("/writing/{session_id}/document", summary="Retorna estado atual do documento")
-def writing_get_document(session_id: str):
-    session = _writing_sessions.get(session_id)
-    if session is None:
+def writing_get_document(session_id: str, user_id: CurrentUserId, db: DbClient):
+    workspace_id = get_workspace_id(db, user_id)
+    doc = get_session_document(db, session_id, workspace_id)
+    if doc is None:
         raise HTTPException(status_code=404, detail=f"Sessão '{session_id}' não encontrada")
-    return session.get_document()
+    return doc
 
 
 @app.put("/writing/{session_id}/section", summary="Salva conteúdo editado de uma seção")
-def writing_save_section(session_id: str, req: WritingSectionSaveRequest):
-    session = _writing_sessions.get(req.session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail=f"Sessão '{req.session_id}' não encontrada")
+def writing_save_section(
+    session_id: str,
+    req: WritingSectionSaveRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    workspace_id = get_workspace_id(db, user_id)
+    profile = _profile_from_workspace(db, workspace_id)
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            session_id=req.session_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
     session.set_section_content(req.section_title, req.content)
     return {"success": True, "section_title": req.section_title}
 
 
 @app.get("/writing/{session_id}/export", summary="Exporta documento completo como Markdown")
-def writing_export(session_id: str):
-    session = _writing_sessions.get(session_id)
-    if session is None:
+def writing_export(session_id: str, user_id: CurrentUserId, db: DbClient):
+    workspace_id = get_workspace_id(db, user_id)
+    doc = get_session_document(db, session_id, workspace_id)
+    if doc is None:
         raise HTTPException(status_code=404, detail=f"Sessão '{session_id}' não encontrada")
-    return {"markdown": session.get_export(), "session_id": session_id}
+    parts = []
+    for s in doc["sections"]:
+        if s["content"]:
+            parts.append(f"## {s['title']}\n\n{s['content']}")
+        else:
+            parts.append(f"## {s['title']}\n\n*[A preencher]*")
+    return {"markdown": "\n\n---\n\n".join(parts), "session_id": session_id}
+
+
+# =============================================================================
+# FILE TREE / Supabase Storage (Fase 3 #22)
+# =============================================================================
+
+@app.post("/writing/{session_id}/save-to-storage", summary="Salva export da sessão em Supabase Storage")
+def writing_save_to_storage(session_id: str, user_id: CurrentUserId, db: DbClient):
+    """Exporta a sessão como markdown e faz upload para o bucket `proposals`.
+
+    Path: <workspace_id>/<session_id>/<timestamp>.md
+    RLS em storage.objects garante isolamento por workspace (ver migration 006).
+    Retorna o path final + signed URL com TTL de 1 hora.
+    """
+    from datetime import datetime
+
+    workspace_id = get_workspace_id(db, user_id)
+    doc = get_session_document(db, session_id, workspace_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"Sessão '{session_id}' não encontrada")
+    parts = []
+    for s in doc["sections"]:
+        if s["content"]:
+            parts.append(f"## {s['title']}\n\n{s['content']}")
+        else:
+            parts.append(f"## {s['title']}\n\n*[A preencher]*")
+    markdown = "\n\n---\n\n".join(parts)
+
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+    path = f"{workspace_id}/{session_id}/proposal_{ts}.md"
+
+    try:
+        db.storage.from_("proposals").upload(
+            path,
+            markdown.encode("utf-8"),
+            file_options={"content-type": "text/markdown", "upsert": "true"},
+        )
+        signed = db.storage.from_("proposals").create_signed_url(path, 3600)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Falha ao salvar no storage: {e}",
+        ) from e
+
+    return {"path": path, "signed_url": signed.get("signedURL"), "session_id": session_id}
+
+
+@app.get("/files", summary="Lista arquivos do workspace no storage (file tree)")
+def files_list(user_id: CurrentUserId, db: DbClient, prefix: str | None = None):
+    """File tree do workspace. RLS filtra automaticamente para o workspace do user.
+
+    Path estrutura: <workspace_id>/<session_id>/<filename>. Se `prefix` for None,
+    lista tudo dentro do workspace; se for "<session_id>", lista só dessa sessão.
+    """
+    workspace_id = get_workspace_id(db, user_id)
+    base_prefix = f"{workspace_id}/" if prefix is None else f"{workspace_id}/{prefix}"
+    try:
+        result = db.storage.from_("proposals").list(base_prefix)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Falha ao listar storage: {e}",
+        ) from e
+    return {"prefix": base_prefix, "files": result}
+
+
+@app.get("/files/signed-url", summary="Gera signed URL para download de um arquivo")
+def files_signed_url(path: str, user_id: CurrentUserId, db: DbClient, expires_in: int = 3600):
+    """Retorna signed URL com TTL. RLS no storage protege contra cross-workspace access."""
+    workspace_id = get_workspace_id(db, user_id)
+    if not path.startswith(f"{workspace_id}/"):
+        # Defense-in-depth — RLS já protege, mas falhamos cedo.
+        raise HTTPException(status_code=403, detail="Path fora do workspace")
+    try:
+        signed = db.storage.from_("proposals").create_signed_url(path, expires_in)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Falha ao gerar signed URL: {e}",
+        ) from e
+    return {"path": path, "signed_url": signed.get("signedURL"), "expires_in": expires_in}
 
 
 @app.post("/writing/section-start", summary="Mensagem inicial para uma seção da proposta")
-def writing_section_start(req: WritingSectionStartRequest):
+def writing_section_start(
+    req: WritingSectionStartRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
     """
     Gera a mensagem de boas-vindas contextualizada para a seção selecionada.
-    Chamado pelo frontend ao clicar em uma seção do checklist.
+    Reconstrói a WritingSession a partir do DB para reaproveitar o contexto.
     """
-    session = _writing_sessions.get(req.session_id)
-    if session is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Sessão '{req.session_id}' não encontrada ou expirada",
+    workspace_id = get_workspace_id(db, user_id)
+    profile = (
+        _to_py_profile(req.profile) if req.profile
+        else _profile_from_workspace(db, workspace_id)
+    )
+    library_items = _load_library_items(db, workspace_id, req.library_item_ids)
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            session_id=req.session_id,
+            library_items=library_items,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
     starter = session.get_section_starter(req.section_title)
     return {"starter_message": starter, "section_title": req.section_title}
 

@@ -18,9 +18,6 @@ BRONZE_DIR = ROOT / "bronze_data"
 # Dados Silver
 SILVER_DIR = ROOT / "silver_data"
 
-# Perfis de empresa
-PROFILES_DIR = ROOT / "profiles"
-
 # FINEP PDFs organizados por chamada_id
 FINEP_PDFS_DIR = BRONZE_DIR / "finep_pdfs"
 

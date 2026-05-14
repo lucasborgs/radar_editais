@@ -8,13 +8,12 @@ Usage:
     python scripts/audit_finep_structure.py
 """
 
-import io
 import json
+import logging
 import re
 import time
-import logging
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
@@ -216,7 +215,7 @@ def find_all_pdfs(soup: BeautifulSoup) -> list[dict]:
 
 def pick_main_pdf(pdfs: list[dict]) -> dict | None:
     """Seleciona o PDF principal (regulamento > edital > chamada > primeiro)."""
-    PRIORITY = ["regulamento", "edital", "chamada"]
+    PRIORITY = ["regulamento", "edital", "chamada"]  # noqa: N806
     best = None
     best_rank = len(PRIORITY)
 
@@ -474,7 +473,7 @@ def main():
             if not main_pdf:
                 item["pdf_error"] = "nenhum PDF encontrado na página"
                 failed += 1
-                logger.warning(f"    Nenhum PDF encontrado")
+                logger.warning("    Nenhum PDF encontrado")
                 continue
 
             item["main_pdf_name"] = main_pdf["nome"]
@@ -529,7 +528,7 @@ def main():
 
             text = extract_pdf_text(pdf_path)
             if not text:
-                logger.warning(f"    Texto vazio")
+                logger.warning("    Texto vazio")
                 continue
 
             sections = detect_sections(text)
@@ -583,7 +582,7 @@ def main():
     type_by_year: dict[int, dict[str, int]] = {}
     all_types_seen: set[str] = set()
 
-    for key, data in results.items():
+    for _key, data in results.items():
         year = data["year"]
         if year not in type_by_year:
             type_by_year[year] = {}
@@ -614,7 +613,7 @@ def main():
     # Estrutura por edital
     print("\n\nDetalhe por edital:")
     print("=" * 100)
-    for key, data in sorted(results.items()):
+    for _key, data in sorted(results.items()):
         year = data["year"]
         title = data["title"][:70]
         n_chars = data["n_chars"]
@@ -627,11 +626,11 @@ def main():
         print(f"\n[{year}] {title}")
         print(f"  PDF: {data.get('main_pdf', '?')} | {n_chars:,} chars | {len(secs)} seções detectadas")
         if top_level:
-            print(f"  Seções de nível 1:")
+            print("  Seções de nível 1:")
             for s in top_level:
                 print(f"    {s['number']:>4}  {s['title']:<50}  → {s['section_type']}")
         else:
-            print(f"  (Sem seções numeradas de nível 1 detectadas)")
+            print("  (Sem seções numeradas de nível 1 detectadas)")
 
     # Salva relatório
     report_path = AUDIT_DIR / "report.txt"

@@ -17,6 +17,22 @@ dependencies = [
     "supabase>=2.4",
     "PyJWT>=2.8",
     "PyYAML>=6.0",
+    "python-multipart>=0.0.9",       # FastAPI form parsing (upload PDF)
+    "pypdf>=4.0",                    # PDF extraction (content_library)
+    "beautifulsoup4>=4.12",           # HTML parsing (ProfileExtractor + scrapers)
+    "pdfplumber>=0.10",              # PDF extraction estrutural (WritingSession, chunker)
+    # procrastinate ships an async-capable PsycopgConnector by default (psycopg 3 + asyncio).
+    # No [asyncpg] extra exists upstream — the base install already brings psycopg[pool].
+    "procrastinate>=2.0",
+    "psycopg[binary,pool]>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
 ]
 
 [tool.setuptools.packages.find]
@@ -25,3 +41,45 @@ include = ["backend*", "pipeline*", "core*", "agents*", "domain*", "scripts*"]
 
 [tool.setuptools]
 py-modules = ["config"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["chroma_db", "bronze_data", "silver_data", "silver_data_enriched", "gold_vectors", "knowledge_graph", "profiles", "__pycache__"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B"]
+ignore = ["E501"]  # line too long handled by formatter
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
+# load_dotenv() must run before module imports that read os.environ at import time
+"backend/api.py" = ["E402"]
+"core/hybrid_match_service.py" = ["E402"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency injection helpers are evaluated once per request, not at definition time
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Body",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Header",
+    "fastapi.Cookie",
+]
+
+[tool.mypy]
+python_version = "3.10"
+check_untyped_defs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+exclude = ["pipeline/", "chroma_db/", "bronze_data/", "silver_data/", "gold_vectors/", "knowledge_graph/"]
+
+[[tool.mypy.overrides]]
+module = "pipeline.*"
+ignore_errors = true

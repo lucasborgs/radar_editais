@@ -2,12 +2,13 @@
 Classe base para todos os scrapers de editais.
 Fornece funcionalidades comuns: headers, limpeza de texto, salvamento.
 """
-import requests
-from bs4 import BeautifulSoup
 import json
 import os
-from datetime import datetime
 from abc import ABC, abstractmethod
+from datetime import datetime
+
+import requests
+from bs4 import BeautifulSoup
 
 from config import BRONZE_DIR
 
@@ -88,7 +89,8 @@ class BaseScraper(ABC):
                 + (item.get("descricao", item.get("description", "")) or "")[:500]
             )
 
-        import hashlib, pathlib
+        import hashlib
+        import pathlib
         new_hash = hashlib.md5(
             "|".join(sorted(_item_fingerprint(i) for i in data)).encode()
         ).hexdigest()

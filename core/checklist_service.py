@@ -1,18 +1,24 @@
 """
-ChecklistService — extrai requisitos obrigatórios do edital e avalia cobertura.
+ChecklistService — extrai requisitos obrigatórios do edital e roda auto-review em 3 passes paralelas.
 
 Fontes de requisitos (em ordem de prioridade):
-  1. card.key_requirements  — gerados pelo etl_finep_cards.py
+  1. wiki_page.key_requirements  — gerados pelo etl_finep_cards.py
   2. Fatos Tier 1 que contêm verbos de obrigatoriedade
+
+Auto-review (LLM):
+  Pass 1 — Compliance:      requisitos obrigatórios do edital cobertos?
+  Pass 2 — Qualidade:       clareza, coerência, persuasão, tom.
+  Pass 3 — Completude:      seções presentes e com profundidade adequada.
+
+Os 3 passes rodam em paralelo via asyncio.gather (ADR C4: latência cai ~3×).
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 import re
-from pathlib import Path
-from typing import Optional
 
 from config import KG_WIKI_DIR
 
@@ -34,30 +40,107 @@ _SECTION_KEYWORDS: dict[str, list[str]] = {
     "Documentação":                    ["documento", "certidão", "declaração", "anexo"],
 }
 
-_AUTO_REVIEW_SYSTEM = """Você é um revisor especializado em propostas de P&D para editais de fomento no Brasil.
+
+# ---------------------------------------------------------------------------
+# Prompts — 3 passes
+# ---------------------------------------------------------------------------
+
+_COMPLIANCE_SYSTEM = """Você é um revisor especializado em propostas de P&D para editais de fomento no Brasil.
 Dado o documento da proposta e a lista de requisitos obrigatórios do edital,
-identifique quais requisitos estão cobertos (addressed) e quais estão pendentes (pending).
+avalie quais requisitos estão cobertos, parcialmente cobertos ou ausentes.
 Responda APENAS com JSON válido."""
 
-_AUTO_REVIEW_USER = """DOCUMENTO DA PROPOSTA:
+_COMPLIANCE_USER = """DOCUMENTO DA PROPOSTA:
 \"\"\"
 {document}
 \"\"\"
 
-REQUISITOS OBRIGATÓRIOS:
+REQUISITOS OBRIGATÓRIOS DO EDITAL:
 {requirements}
 
-Para cada requisito, retorne se ele está coberto no documento.
+Para cada requisito, retorne se está coberto, com evidência do texto e sugestão de melhoria caso necessário.
+Atribua também um score 0-100 representando a aderência global da proposta aos requisitos.
+
+Formato esperado:
 {{
-  "review": [
+  "issues": [
     {{
       "requirement": "texto do requisito",
-      "status": "addressed" | "pending",
-      "reason": "1 frase explicando"
+      "status": "ok" | "missing" | "partial",
+      "evidence": "trecho curto da proposta (vazio se ausente)",
+      "suggestion": "1 frase de melhoria (vazio se status=ok)"
     }}
-  ]
+  ],
+  "score": 0
 }}"""
 
+_QUALITY_SYSTEM = """Você é um editor sênior especializado em propostas técnicas para editais de fomento.
+Analise o texto fornecido sob a ótica de qualidade narrativa: clareza, coerência, persuasão e tom adequado.
+Aponte problemas específicos, com trechos curtos como evidência (excerpt) e sugestão acionável.
+Responda APENAS com JSON válido."""
+
+_QUALITY_USER = """DOCUMENTO DA PROPOSTA:
+\"\"\"
+{document}
+\"\"\"
+
+Avalie a qualidade narrativa do texto. Para cada problema encontrado, classifique a categoria
+(clarity, coherence, persuasion ou tone) e a severidade (low, medium ou high).
+Inclua um trecho curto (excerpt) que evidencie o problema e uma sugestão de reescrita ou ajuste.
+Atribua um overall_score 0-100 para a qualidade global da redação.
+
+Formato esperado:
+{{
+  "issues": [
+    {{
+      "category": "clarity" | "coherence" | "persuasion" | "tone",
+      "severity": "low" | "medium" | "high",
+      "excerpt": "trecho curto (até ~25 palavras) do documento",
+      "suggestion": "1-2 frases de melhoria concreta"
+    }}
+  ],
+  "overall_score": 0
+}}"""
+
+_COMPLETENESS_SYSTEM = """Você é um revisor estrutural de propostas para editais de fomento.
+Sua função é avaliar se a proposta cobre todas as seções esperadas e se cada seção tem profundidade adequada.
+Responda APENAS com JSON válido."""
+
+_COMPLETENESS_USER = """DOCUMENTO DA PROPOSTA (cada seção começa com '## <título>'):
+\"\"\"
+{document}
+\"\"\"
+
+SEÇÕES ESPERADAS (outline da proposta):
+{outline}
+
+Para cada seção do outline, avalie:
+  - status: "empty"     — seção ausente ou marcada como [A preencher]
+            "shallow"   — presente mas raso (poucas linhas, sem detalhamento)
+            "adequate"  — cobre os pontos esperados, suficiente
+            "thorough"  — desenvolvido, com detalhes, dados ou referências
+  - suggestion: 1 frase indicando o que falta (vazio se thorough).
+
+Liste em missing_sections os títulos com status "empty".
+Atribua um overall_score 0-100 para a completude global do documento.
+
+Formato esperado:
+{{
+  "sections": [
+    {{
+      "title": "título da seção (igual ao outline)",
+      "status": "empty" | "shallow" | "adequate" | "thorough",
+      "suggestion": "1 frase (vazio se thorough)"
+    }}
+  ],
+  "missing_sections": ["..."],
+  "overall_score": 0
+}}"""
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _infer_section(requirement: str) -> str:
     req_lower = requirement.lower()
@@ -67,15 +150,37 @@ def _infer_section(requirement: str) -> str:
     return "Geral"
 
 
+def _strip_code_fence(raw: str) -> str:
+    raw = raw.strip()
+    if "```" in raw:
+        raw = re.sub(r"```(?:json)?", "", raw).strip()
+    return raw
+
+
+def _llm_config() -> tuple[str, str, str | None]:
+    """Retorna (api_key, model, base_url|None) baseado em LLM_BACKEND."""
+    backend = os.getenv("LLM_BACKEND", "openai").lower()
+    if backend == "gemini":
+        return (
+            os.environ["GEMINI_API_KEY"],
+            "gemini-2.5-flash",
+            "https://generativelanguage.googleapis.com/v1beta/openai/",
+        )
+    return (
+        os.environ["OPENAI_API_KEY"],
+        os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        None,
+    )
+
+
 def build_checklist(edital_id: str) -> list[dict]:
     """
     Constrói checklist de requisitos para o edital.
-    Prioridade: card.key_requirements > fatos Tier 1 com verbos de obrigação.
+    Prioridade: wiki_page.key_requirements > fatos Tier 1 com verbos de obrigação.
     """
     items: list[dict] = []
     seen: set[str] = set()
 
-    # 1. Wiki page key_requirements
     wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
     if wiki_file.exists():
         try:
@@ -96,53 +201,194 @@ def build_checklist(edital_id: str) -> list[dict]:
     return items
 
 
-def auto_review_checklist(items: list[dict], document: str) -> list[dict]:
-    """Usa LLM para marcar quais requisitos estão cobertos no documento."""
-    if not items or not document.strip():
-        return items
+# ---------------------------------------------------------------------------
+# Passes (async, rodam em paralelo)
+# ---------------------------------------------------------------------------
+
+async def _call_llm(client, model: str, system: str, user: str, max_tokens: int = 2000) -> dict:
+    """Chama o LLM e parseia o JSON da resposta."""
+    response = await client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        temperature=0.1,
+        max_tokens=max_tokens,
+    )
+    raw = _strip_code_fence(response.choices[0].message.content or "")
+    return json.loads(raw)
+
+
+async def _pass_compliance(
+    proposal: str,
+    edital_requirements: list[dict],
+    client,
+    model: str,
+) -> dict:
+    """Pass 1 — requisitos obrigatórios do edital cobertos?"""
+    if not edital_requirements:
+        return {"issues": [], "score": 100}
+
+    reqs_text = "\n".join(f"- {item['requirement']}" for item in edital_requirements)
+    data = await _call_llm(
+        client,
+        model,
+        _COMPLIANCE_SYSTEM,
+        _COMPLIANCE_USER.format(document=proposal[:6000], requirements=reqs_text),
+        max_tokens=2000,
+    )
+    issues = data.get("issues") or []
+    if not isinstance(issues, list):
+        issues = []
+    try:
+        score = int(data.get("score", 0))
+    except (TypeError, ValueError):
+        score = 0
+    return {"issues": issues, "score": max(0, min(100, score))}
+
+
+async def _pass_quality(proposal: str, client, model: str) -> dict:
+    """Pass 2 — qualidade narrativa: clareza, coerência, persuasão, tom."""
+    if not proposal.strip():
+        return {"issues": [], "overall_score": 0}
+
+    data = await _call_llm(
+        client,
+        model,
+        _QUALITY_SYSTEM,
+        _QUALITY_USER.format(document=proposal[:6000]),
+        max_tokens=2000,
+    )
+    issues = data.get("issues") or []
+    if not isinstance(issues, list):
+        issues = []
+    try:
+        score = int(data.get("overall_score", 0))
+    except (TypeError, ValueError):
+        score = 0
+    return {"issues": issues, "overall_score": max(0, min(100, score))}
+
+
+async def _pass_completeness(
+    proposal: str,
+    outline: list[str],
+    client,
+    model: str,
+) -> dict:
+    """Pass 3 — completude das seções."""
+    if not outline:
+        return {"sections": [], "missing_sections": [], "overall_score": 0}
+
+    outline_text = "\n".join(f"- {t}" for t in outline)
+    data = await _call_llm(
+        client,
+        model,
+        _COMPLETENESS_SYSTEM,
+        _COMPLETENESS_USER.format(document=proposal[:6000], outline=outline_text),
+        max_tokens=2000,
+    )
+    sections = data.get("sections") or []
+    if not isinstance(sections, list):
+        sections = []
+    missing = data.get("missing_sections") or []
+    if not isinstance(missing, list):
+        missing = []
+    try:
+        score = int(data.get("overall_score", 0))
+    except (TypeError, ValueError):
+        score = 0
+    return {
+        "sections": sections,
+        "missing_sections": missing,
+        "overall_score": max(0, min(100, score)),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Fallbacks (quando um pass falha)
+# ---------------------------------------------------------------------------
+
+_FALLBACK_COMPLIANCE = {"issues": [], "score": 0}
+_FALLBACK_QUALITY = {"issues": [], "overall_score": 0}
+_FALLBACK_COMPLETENESS = {"sections": [], "missing_sections": [], "overall_score": 0}
+
+
+# ---------------------------------------------------------------------------
+# Entry point (async): roda os 3 passes em paralelo
+# ---------------------------------------------------------------------------
+
+async def auto_review_checklist(
+    proposal: str,
+    edital_requirements: list[dict] | None = None,
+    outline: list[str] | None = None,
+) -> dict:
+    """
+    Executa as 3 passes de revisão em paralelo via asyncio.gather.
+
+    Retorna um dict com:
+      - compliance:   {issues, score}
+      - quality:      {issues, overall_score}
+      - completeness: {sections, missing_sections, overall_score}
+      - error:        None ou lista de {pass, message} para passes que falharam
+    """
+    edital_requirements = edital_requirements or []
+    outline = outline or []
+
+    # Sem proposta, nada a revisar — retorne fallback estruturado.
+    if not proposal or not proposal.strip():
+        return {
+            "compliance":   dict(_FALLBACK_COMPLIANCE),
+            "quality":      dict(_FALLBACK_QUALITY),
+            "completeness": dict(_FALLBACK_COMPLETENESS),
+            "error":        None,
+        }
 
     try:
-        from openai import OpenAI
-        backend = os.getenv("LLM_BACKEND", "openai").lower()
-        if backend == "gemini":
-            client = OpenAI(
-                api_key=os.environ["GEMINI_API_KEY"],
-                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-            )
-            model = "gemini-2.5-flash"
-        else:
-            client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-            model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        from openai import AsyncOpenAI
+    except ImportError as e:
+        logger.error("AsyncOpenAI indisponível: %s", e)
+        return {
+            "compliance":   dict(_FALLBACK_COMPLIANCE),
+            "quality":      dict(_FALLBACK_QUALITY),
+            "completeness": dict(_FALLBACK_COMPLETENESS),
+            "error":        [{"pass": "all", "message": str(e)}],
+        }
 
-        reqs_text = "\n".join(f"- {item['requirement']}" for item in items)
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": _AUTO_REVIEW_SYSTEM},
-                {"role": "user", "content": _AUTO_REVIEW_USER.format(
-                    document=document[:6000],
-                    requirements=reqs_text,
-                )},
-            ],
-            temperature=0.1,
-            max_tokens=2000,
+    api_key, model, base_url = _llm_config()
+    client_kwargs = {"api_key": api_key}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+
+    async with AsyncOpenAI(**client_kwargs) as client:
+        results = await asyncio.gather(
+            _pass_compliance(proposal, edital_requirements, client, model),
+            _pass_quality(proposal, client, model),
+            _pass_completeness(proposal, outline, client, model),
+            return_exceptions=True,
         )
-        raw = response.choices[0].message.content.strip()
-        if "```" in raw:
-            raw = re.sub(r"```(?:json)?", "", raw).strip()
-        data = json.loads(raw)
 
-        review_map = {r["requirement"]: r for r in data.get("review", [])}
-        updated = []
-        for item in items:
-            rev = review_map.get(item["requirement"], {})
-            updated.append({
-                **item,
-                "status": rev.get("status", item["status"]),
-                "reason": rev.get("reason"),
-            })
-        return updated
+    compliance_res, quality_res, completeness_res = results
+    errors: list[dict] = []
 
-    except Exception as e:
-        logger.error("Erro no auto-review: %s", e)
-        return items
+    if isinstance(compliance_res, BaseException):
+        logger.error("Pass compliance falhou: %s", compliance_res)
+        errors.append({"pass": "compliance", "message": str(compliance_res)})
+        compliance_res = dict(_FALLBACK_COMPLIANCE)
+
+    if isinstance(quality_res, BaseException):
+        logger.error("Pass quality falhou: %s", quality_res)
+        errors.append({"pass": "quality", "message": str(quality_res)})
+        quality_res = dict(_FALLBACK_QUALITY)
+
+    if isinstance(completeness_res, BaseException):
+        logger.error("Pass completeness falhou: %s", completeness_res)
+        errors.append({"pass": "completeness", "message": str(completeness_res)})
+        completeness_res = dict(_FALLBACK_COMPLETENESS)
+
+    return {
+        "compliance":   compliance_res,
+        "quality":      quality_res,
+        "completeness": completeness_res,
+        "error":        errors or None,
+    }

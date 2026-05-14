@@ -16,10 +16,10 @@ import json
 import logging
 import os
 import re
+import time
 from dataclasses import dataclass
-from pathlib import Path
 
-from config import KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR
+from config import KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,8 @@ _STOP_WORDS = {
     "mais", "entre", "sobre", "também", "pela", "pelo", "pelas", "pelos",
 }
 
-# Pesos das dimensões (total = 100)
+# Pesos das dimensões (total = 100) — fallback hardcoded usado se DB indisponível
+# ou se a tabela matching_weights ainda não foi criada (migration 004 não aplicada).
 _WEIGHTS = {
     "elegibilidade":    30,
     "tematico":         25,
@@ -78,6 +79,86 @@ _WEIGHTS = {
 
 # Editais abaixo desse score no Stage 1 são eliminados
 _ELIMINATION_THRESHOLD = 25
+
+
+# =============================================================================
+# CACHE DE PESOS (ADR A5)
+# =============================================================================
+# In-memory TTL cache para evitar bater no Postgres a cada match.
+# Chave: workspace_id (str UUID) ou "__global__" quando workspace_id é None.
+# Valor: (timestamp_monotonic_segundos, dict de pesos).
+
+_WEIGHTS_CACHE_TTL_SECONDS = 60.0
+_weights_cache: dict[str, tuple[float, dict[str, float]]] = {}
+
+
+def _cache_key(workspace_id: str | None) -> str:
+    return workspace_id or "__global__"
+
+
+def get_weights(workspace_id: str | None = None) -> dict[str, float]:
+    """Lê pesos da tabela matching_weights, com cache TTL de 60s.
+
+    Lógica de merge: começa com pesos globais (workspace_id IS NULL) e
+    sobrepõe com pesos específicos do workspace quando existirem (overrides
+    têm prioridade).
+
+    Em qualquer falha (DB indisponível, tabela inexistente antes da migration
+    004, RLS, etc.) cai no fallback `_WEIGHTS` hardcoded — matching nunca
+    deve quebrar por ausência de configuração.
+    """
+    key = _cache_key(workspace_id)
+    now = time.monotonic()
+    cached = _weights_cache.get(key)
+    if cached is not None and (now - cached[0]) < _WEIGHTS_CACHE_TTL_SECONDS:
+        return cached[1]
+
+    try:
+        # Service-role: leitura não-sensível, e RLS exigiria o JWT do request
+        # — o que tornaria a função difícil de chamar de pipelines/jobs.
+        from core.db import get_supabase_service
+        client = get_supabase_service()
+
+        # Pesos globais (workspace_id IS NULL)
+        global_rows = (
+            client.table("matching_weights")
+            .select("dimension, weight")
+            .is_("workspace_id", "null")
+            .execute()
+        )
+        merged: dict[str, float] = {
+            row["dimension"]: float(row["weight"])
+            for row in (global_rows.data or [])
+        }
+
+        # Overrides do workspace específico
+        if workspace_id:
+            ws_rows = (
+                client.table("matching_weights")
+                .select("dimension, weight")
+                .eq("workspace_id", workspace_id)
+                .execute()
+            )
+            for row in (ws_rows.data or []):
+                merged[row["dimension"]] = float(row["weight"])
+
+        if not merged:
+            # DB conectou mas não há rows globais — usa fallback para não
+            # devolver dict vazio (cenário esperado se a migration 004 rodou
+            # parcialmente sem seed).
+            merged = {k: float(v) for k, v in _WEIGHTS.items()}
+
+        _weights_cache[key] = (now, merged)
+        return merged
+
+    except Exception as e:
+        # Fallback gracioso: tabela não existe, conexão caiu, etc.
+        # Log em DEBUG porque é esperado em ambientes sem Supabase (testes).
+        logger.debug("get_weights: fallback para _WEIGHTS (%s)", e)
+        fallback = {k: float(v) for k, v in _WEIGHTS.items()}
+        # Cacheia o fallback também para evitar retentativas em loop.
+        _weights_cache[key] = (now, fallback)
+        return fallback
 
 
 # =============================================================================
@@ -110,34 +191,45 @@ def _keywords(text: str) -> set[str]:
     return {w for w in words if len(w) > 4 and w not in _STOP_WORDS}
 
 
-def _score_elegibilidade(card: dict, profile: CompanyProfile) -> int:
+def _w(weights: dict[str, float], dim: str) -> float:
+    """Lê peso, caindo no fallback hardcoded se a dimensão estiver ausente."""
+    return float(weights.get(dim, _WEIGHTS[dim]))
+
+
+def _score_elegibilidade(
+    card: dict, profile: CompanyProfile, weights: dict[str, float]
+) -> float:
     """Verifica se o tipo de entidade e porte da empresa se encaixam no edital."""
+    w = _w(weights, "elegibilidade")
     eligible = {
         _normalize(e)
         for e in card.get("eligible_entities", []) + card.get("publico_alvo", [])
     }
     if not eligible:
-        return _WEIGHTS["elegibilidade"] // 2  # sem info → neutro
+        return w / 2  # sem info → neutro
 
     entity_labels = _ENTITY_MAP.get(_normalize(profile.tipo_entidade), set())
     porte_labels = _PORTE_MAP.get(profile.tamanho_empresa or "", set())
     all_labels = entity_labels | porte_labels
 
     if all_labels & eligible:
-        return _WEIGHTS["elegibilidade"]
+        return w
 
     # Fallback: se "empresas" está no edital e temos qualquer empresa
     if profile.tipo_entidade in ("empresa", "startup") and "empresas" in eligible:
-        return _WEIGHTS["elegibilidade"]
+        return w
 
     return 0
 
 
-def _score_tematico(card: dict, profile: CompanyProfile) -> int:
+def _score_tematico(
+    card: dict, profile: CompanyProfile, weights: dict[str, float]
+) -> float:
     """Interseção de keywords do perfil com themes/eligible_sectors do edital."""
+    w = _w(weights, "tematico")
     edital_themes = (card.get("themes") or []) + (card.get("eligible_sectors") or [])
     if not edital_themes:
-        return _WEIGHTS["tematico"] // 2  # sem info → neutro
+        return w / 2  # sem info → neutro
 
     edital_kw = set()
     for theme in edital_themes:
@@ -149,96 +241,116 @@ def _score_tematico(card: dict, profile: CompanyProfile) -> int:
         profile.descricao_atividades[:600] if profile.descricao_atividades else "",
     ]))
     if not profile_text.strip():
-        return _WEIGHTS["tematico"] // 2
+        return w / 2
 
     profile_kw = _keywords(profile_text)
 
     if not edital_kw:
-        return _WEIGHTS["tematico"] // 2
+        return w / 2
 
     overlap = len(edital_kw & profile_kw)
     # Normaliza pelo número de keywords do edital (máx 5 para evitar inflação)
     coverage = min(overlap / min(len(edital_kw), 5), 1.0)
-    return round(_WEIGHTS["tematico"] * coverage)
+    return w * coverage
 
 
-def _score_trl(card: dict, profile: CompanyProfile) -> int:
+def _score_trl(
+    card: dict, profile: CompanyProfile, weights: dict[str, float]
+) -> float:
+    w = _w(weights, "trl")
     trl_range = card.get("trl_range") or {}
     trl_min = trl_range.get("min")
     trl_max = trl_range.get("max")
 
     if trl_min is None and trl_max is None:
-        return _WEIGHTS["trl"] // 2  # sem info → neutro
+        return w / 2  # sem info → neutro
 
     if profile.trl is None:
-        return _WEIGHTS["trl"] // 2
+        return w / 2
 
     trl_min = trl_min or 1
     trl_max = trl_max or 9
 
     if trl_min <= profile.trl <= trl_max:
-        return _WEIGHTS["trl"]
+        return w
 
     # Parcial: 1 nível de distância
     if abs(profile.trl - trl_min) == 1 or abs(profile.trl - trl_max) == 1:
-        return _WEIGHTS["trl"] // 2
+        return w / 2
 
     return 0
 
 
-def _score_mecanismo(card: dict, profile: CompanyProfile) -> int:
+def _score_mecanismo(
+    card: dict, profile: CompanyProfile, weights: dict[str, float]
+) -> float:
+    w = _w(weights, "mecanismo")
     card_mechanism = _normalize(card.get("mechanism") or "")
     if not card_mechanism:
-        return _WEIGHTS["mecanismo"] // 2  # sem info → neutro
+        return w / 2  # sem info → neutro
 
     if not profile.tipos_financiamento_interesse:
-        return _WEIGHTS["mecanismo"] // 2
+        return w / 2
 
     for interesse in profile.tipos_financiamento_interesse:
         accepted = _MECHANISM_MAP.get(_normalize(interesse), set())
         if card_mechanism in accepted:
-            return _WEIGHTS["mecanismo"]
+            return w
 
     return 0
 
 
-def _score_contrapartida(card: dict, profile: CompanyProfile) -> int:
+def _score_contrapartida(
+    card: dict, profile: CompanyProfile, weights: dict[str, float]
+) -> float:
     """Avalia se a empresa tem capacidade de arcar com contrapartida quando exigida."""
+    w = _w(weights, "contrapartida")
     counterpart_required = card.get("counterpart_required")
 
     # Edital não exige contrapartida → ponto cheio
     if not counterpart_required:
-        return _WEIGHTS["contrapartida"]
+        return w
 
     # Exige contrapartida: verifica porte/capital
     porte = profile.tamanho_empresa or ""
     if porte in _PORTE_CONTRAPARTIDA_OK:
-        return _WEIGHTS["contrapartida"]
+        return w
 
     if porte in _PORTE_CONTRAPARTIDA_PARCIAL:
-        return _WEIGHTS["contrapartida"] // 2
+        return w / 2
 
     # MEI/ME: capital social pode salvar se suficientemente alto
     if profile.capital_social and profile.capital_social >= 500_000:
-        return _WEIGHTS["contrapartida"] // 2
+        return w / 2
 
     if porte in ("MEI", "ME"):
         return 0
 
     # Sem info de porte → neutro
-    return _WEIGHTS["contrapartida"] // 2
+    return w / 2
 
 
-def score_stage1(edital: dict, profile: CompanyProfile) -> Stage1Result:
-    """Pontua um edital contra o perfil de empresa (Stage 1 determinístico)."""
-    breakdown = {
-        "elegibilidade": _score_elegibilidade(edital, profile),
-        "tematico":      _score_tematico(edital, profile),
-        "trl":           _score_trl(edital, profile),
-        "mecanismo":     _score_mecanismo(edital, profile),
-        "contrapartida": _score_contrapartida(edital, profile),
+def score_stage1(
+    edital: dict,
+    profile: CompanyProfile,
+    weights: dict[str, float] | None = None,
+) -> Stage1Result:
+    """Pontua um edital contra o perfil de empresa (Stage 1 determinístico).
+
+    `weights` é opcional para compatibilidade retroativa; se None, usa o
+    fallback hardcoded `_WEIGHTS`.
+    """
+    w = weights if weights is not None else {k: float(v) for k, v in _WEIGHTS.items()}
+    breakdown_float = {
+        "elegibilidade": _score_elegibilidade(edital, profile, w),
+        "tematico":      _score_tematico(edital, profile, w),
+        "trl":           _score_trl(edital, profile, w),
+        "mecanismo":     _score_mecanismo(edital, profile, w),
+        "contrapartida": _score_contrapartida(edital, profile, w),
     }
-    total = sum(breakdown.values())
+    # Mantém contrato pré-existente: breakdown em ints arredondados.
+    breakdown = {k: round(v) for k, v in breakdown_float.items()}
+    total = round(sum(breakdown_float.values()))
 
     return Stage1Result(
         edital_id=edital["id"],
@@ -426,14 +538,22 @@ class HybridMatchService:
                 return e
         return None
 
-    def match(self, profile: CompanyProfile, top_k: int = 10) -> list[dict]:
-        """Executa matching híbrido e retorna top_k editais rankeados."""
+    def match(
+        self,
+        profile: CompanyProfile,
+        top_k: int = 10,
+        workspace_id: str | None = None,
+    ) -> list[dict]:
+        """Executa matching híbrido e retorna top_k editais rankeados.
+
+        `workspace_id` permite usar pesos customizados do workspace (com
+        merge sobre os globais). Default lê apenas os globais.
+        """
+        weights = get_weights(workspace_id)
         editais = self._get_editais_with_cards()
-        has_cards = any(KG_WIKI_DIR / f"{e['id']}.json" for e in editais
-                        if (KG_WIKI_DIR / f"{e['id']}.json").exists())
 
         # --- Stage 1: scoring determinístico ---
-        stage1_results = [score_stage1(e, profile) for e in editais]
+        stage1_results = [score_stage1(e, profile, weights) for e in editais]
         eligible = [r for r in stage1_results if r.eligible]
         eliminated = len(stage1_results) - len(eligible)
 
@@ -467,7 +587,7 @@ class HybridMatchService:
                 "score_deterministic": r.score,
                 "score_tematico": score_tematico,
                 "match_dimensions": {
-                    dim: {"score": pts, "max": _WEIGHTS[dim]}
+                    dim: {"score": pts, "max": round(_w(weights, dim))}
                     for dim, pts in r.breakdown.items()
                 },
                 "dimensoes_semanticas": sem.get("dimensoes", {}),

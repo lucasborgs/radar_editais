@@ -14,11 +14,8 @@ import json
 import logging
 import os
 import re
-import time
-from pathlib import Path
-from typing import Any
 
-from config import KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR
+from config import KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)

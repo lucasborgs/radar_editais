@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 import requests
 from bs4 import BeautifulSoup
+
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)

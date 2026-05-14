@@ -22,9 +22,10 @@ import unicodedata
 from collections import defaultdict
 from datetime import date, datetime
 
+from domain.vocabulary import canonicalize_themes
+
 from config import BRONZE_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR
 from core import wiki_schema
-from domain.vocabulary import canonicalize_themes
 
 # Schema autoritativo em WIKI.md (ver core.wiki_schema)
 _SOURCE = "finep"
@@ -251,9 +252,18 @@ def _make_index(editais: list[dict], label: str) -> dict:
 
 
 def build_indices(chamadas: list[dict]) -> tuple[dict, dict]:
-    """Retorna (index_vigentes, index_historico)."""
+    """Retorna (index_vigentes, index_historico).
+
+    Vigência (§7.1 WIKI.md):
+      - status == ABERTA                          → vigente (sempre, mesmo sem prazo)
+      - deadline parseável e futuro               → vigente
+      - status == ENCERRADA ou prazo passado/None → histórico
+    """
     all_editais = _build_editais(chamadas)
-    vigentes = [e for e in all_editais if wiki_schema.is_vigente(e.get("deadline"))]
+    vigentes = [
+        e for e in all_editais
+        if e.get("status") == "ABERTA" or wiki_schema.is_vigente(e.get("deadline"))
+    ]
     return _make_index(vigentes, "vigentes"), _make_index(all_editais, "historico")
 
 
@@ -293,7 +303,7 @@ def main() -> None:
     index_vigentes, index_historico = build_indices(chamadas)
     save_indices(index_vigentes, index_historico)
 
-    print(f"\nVigentes por status:")
+    print("\nVigentes por status:")
     for status, count in index_vigentes["summary"]["by_status"].items():
         print(f"  {status}: {count}")
 
