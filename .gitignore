@@ -54,3 +54,7 @@ eval_results/
 
 # Python virtualenv
 .venv/
+
+# Supabase CLI internal state
+supabase/.branches/
+supabase/.temp/
