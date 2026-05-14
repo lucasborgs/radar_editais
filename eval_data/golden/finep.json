@@ -1,0 +1,319 @@
+{
+  "source": "finep",
+  "generated_at": "2026-05-13T20:41:57.665653+00:00",
+  "generator": "gpt-4o-mini",
+  "queries": [
+    {
+      "id": "finep_768_q1",
+      "edital_id": "768",
+      "query": "Quais são as condições para as despesas relacionadas a bolsas no edital da chamada pública MCTI/FINEP/FNDCT?",
+      "expected": [
+        {
+          "source_file": "Anexo_V__Condições_para_Despesas_Relativas_a_Bolsas__2ª_Rerratificação_.pdf",
+          "section": null
+        }
+      ],
+      "category": "expenses",
+      "_source_chunk_index": 36
+    },
+    {
+      "id": "finep_768_q2",
+      "edital_id": "768",
+      "query": "Quais são os subtemas que podem ser abordados em projetos voltados para a agroindústria dentro da Linha Temática 1?",
+      "expected": [
+        {
+          "source_file": "Anexo_I__Detalhamento_dos_Temas_e_Subtemas.pdf",
+          "section": null
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 23
+    },
+    {
+      "id": "finep_768_q3",
+      "edital_id": "768",
+      "query": "Quais instituições podem se inscrever para participar da chamada pública MCTI/FINEP/FNDCT e quantas propostas cada uma pode apresentar como Executora Principal?",
+      "expected": [
+        {
+          "source_file": "Guia_Rápido.pdf",
+          "section": null
+        }
+      ],
+      "category": "eligibility",
+      "_source_chunk_index": 51
+    },
+    {
+      "id": "finep_768_q4",
+      "edital_id": "768",
+      "query": "Quais critérios vão ser considerados para a avaliação da minha proposta e qual é a nota mínima que eu preciso obter para não ser eliminado?",
+      "expected": [
+        {
+          "source_file": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+          "section": null
+        }
+      ],
+      "category": "eligibility",
+      "_source_chunk_index": 11
+    },
+    {
+      "id": "finep_768_q5",
+      "edital_id": "768",
+      "query": "Quais são as consequências se a proposta não estiver de acordo com os itens da Seleção Pública?",
+      "expected": [
+        {
+          "source_file": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "18. DISPOSIÇÕES FINAIS"
+        }
+      ],
+      "category": "eligibility",
+      "_source_chunk_index": 16
+    },
+    {
+      "id": "finep_768_q6",
+      "edital_id": "768",
+      "query": "Quais documentos preciso anexar à proposta para a execução dos itens de orçamento do projeto?",
+      "expected": [
+        {
+          "source_file": "Anexo_IV__Exigências_para_Avaliação_dos_Itens_de_Orçamento.pdf",
+          "section": null
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 20
+    },
+    {
+      "id": "finep_768_q7",
+      "edital_id": "768",
+      "query": "Como faço para preencher a proposta na plataforma de Apoio e Financiamento da Finep?",
+      "expected": [
+        {
+          "source_file": "Telas_do_FAP.pdf",
+          "section": null
+        }
+      ],
+      "category": "eligibility",
+      "_source_chunk_index": 52
+    },
+    {
+      "id": "finep_768_q8",
+      "edital_id": "768",
+      "query": "Quais são os requisitos que um especialista visitante deve atender para participar do projeto?",
+      "expected": [
+        {
+          "source_file": "Anexo_V__Condições_para_Despesas_Relativas_a_Bolsas.pdf",
+          "section": null
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 33
+    },
+    {
+      "id": "finep_762_q9",
+      "edital_id": "762",
+      "query": "Quais são as condições para a apresentação da proposta e como serão avaliadas as notas dos avaliadores?",
+      "expected": [
+        {
+          "source_file": "Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
+          "section": null
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 27
+    },
+    {
+      "id": "finep_762_q10",
+      "edital_id": "762",
+      "query": "Quais são os critérios de desempate caso haja empate na classificação das propostas?",
+      "expected": [
+        {
+          "source_file": "2ª_Rerratificação_-_Edital_rerratificado.pdf",
+          "section": null
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 5
+    },
+    {
+      "id": "finep_762_q11",
+      "edital_id": "762",
+      "query": "Quais informações preciso fornecer sobre o parceiro que estou propondo para a minha iniciativa?",
+      "expected": [
+        {
+          "source_file": "Anexos_do_Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
+          "section": "4. GOVERNANÇA E RELAÇÃO COM OS INVESTIDORES"
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 11
+    },
+    {
+      "id": "finep_762_q12",
+      "edital_id": "762",
+      "query": "Quais são os direitos que eu, como titular dos meus dados pessoais, tenho em relação ao tratamento dessas informações?",
+      "expected": [
+        {
+          "source_file": "Anexos_do_Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
+          "section": "3. DOS DIREITOS DOS TITULARES"
+        }
+      ],
+      "category": "criteria",
+      "_source_chunk_index": 16
+    },
+    {
+      "id": "finep_762_q13",
+      "edital_id": "762",
+      "query": "Quais são os requisitos que minha proposta deve atender para ser habilitada na primeira etapa do processo de seleção?",
+      "expected": [
+        {
+          "source_file": "Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
+          "section": "4. PROCESSO DE SELEÇÃO"
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 26
+    },
+    {
+      "id": "finep_762_q14",
+      "edital_id": "762",
+      "query": "Quais são as taxas e custos que devo considerar ao submeter minha proposta para o FUNDO, incluindo a Taxa de Administração, Taxa de Performance e outros custos relevantes?",
+      "expected": [
+        {
+          "source_file": "Anexos_do_Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
+          "section": "5. CUSTOS DO FUNDO"
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 12
+    },
+    {
+      "id": "finep_762_q15",
+      "edital_id": "762",
+      "query": "Qual é a nova data para o término do período de envio de propostas?",
+      "expected": [
+        {
+          "source_file": "Aviso_de_1ª_Rerratificação.pdf",
+          "section": null
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 20
+    },
+    {
+      "id": "finep_762_q16",
+      "edital_id": "762",
+      "query": "Quais são as responsabilidades da pessoa jurídica em relação ao tratamento de dados pessoais conforme o Aviso de Privacidade?",
+      "expected": [
+        {
+          "source_file": "Anexos_do_Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
+          "section": "1. DEFINIÇÕES DE EXPRESSÕES"
+        }
+      ],
+      "category": "eligibility",
+      "_source_chunk_index": 15
+    },
+    {
+      "id": "finep_743_q17",
+      "edital_id": "743",
+      "query": "Quais são as entidades com as quais os dados pessoais coletados podem ser compartilhados?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "6. DO COMPARTILHAMENTO DE DADOS PESSOAIS E DADOS PESSOAIS SENSÍVEIS"
+        }
+      ],
+      "category": "criteria",
+      "_source_chunk_index": 19
+    },
+    {
+      "id": "finep_743_q18",
+      "edital_id": "743",
+      "query": "Qual é o faturamento mínimo e máximo que uma startup deve ter para poder receber investimento do Fundo?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": null
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 5
+    },
+    {
+      "id": "finep_743_q19",
+      "edital_id": "743",
+      "query": "Quais documentos eu preciso apresentar junto com a minha proposta para o gestor e o administrador do fundo?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "5. CUSTOS DO FUNDO"
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 14
+    },
+    {
+      "id": "finep_743_q20",
+      "edital_id": "743",
+      "query": "Qual é o valor mínimo de capital necessário para o primeiro fechamento de captação do Fundo Nordeste Capital Semente?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "3. CARACTERÍSTICAS GERAIS DO FUNDO"
+        }
+      ],
+      "category": "eligibility",
+      "_source_chunk_index": 4
+    },
+    {
+      "id": "finep_743_q21",
+      "edital_id": "743",
+      "query": "Como posso interpor um recurso após a divulgação do resultado preliminar da minha proposta?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "5. RECURSOS"
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 9
+    },
+    {
+      "id": "finep_743_q22",
+      "edital_id": "743",
+      "query": "Quais informações devo fornecer sobre o administrador e as parcerias previstas para o fundo?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "3. CARACTERIZAÇÃO DO FUNDO"
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 13
+    },
+    {
+      "id": "finep_743_q23",
+      "edital_id": "743",
+      "query": "Quem é o encarregado pela proteção de dados pessoais na FINEP e como posso entrar em contato com ele?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "4. DAS BASES LEGAIS PARA TRATAMENTO DE DADOS PELAS PARTES"
+        }
+      ],
+      "category": "criteria",
+      "_source_chunk_index": 18
+    },
+    {
+      "id": "finep_743_q24",
+      "edital_id": "743",
+      "query": "Quais informações sobre a equipe de gestão e sua experiência são necessárias para a submissão da proposta?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "1. CARACTERIZAÇÃO DO GESTOR E DE SUA EQUIPE"
+        }
+      ],
+      "category": "financial",
+      "_source_chunk_index": 12
+    }
+  ]
+}

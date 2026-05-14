@@ -45,3 +45,9 @@ frontend/.env.local
 
 # Logs
 *.log
+
+# RAG eval — outputs gerados a cada run
+eval_results/
+
+# macOS
+.DS_Store
