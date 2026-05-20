@@ -18,7 +18,11 @@ O sistema atende dois propósitos:
 
 **Inteligência (foco longitudinal).** Memória de longo prazo sobre a evolução das agências de fomento. Os editais encerrados **não são descartados** — compõem o corpus histórico usado para analisar mudanças de critérios, heurísticas de aprovação "não escritas" (extraídas via feedback loops) e tendências tecnológicas ao longo dos anos.
 
-Implicação de design: o pipeline preserva wiki pages de editais encerrados mesmo após deleção dos PDFs originais; o grafo inclui dimensão temporal (ver §6, nó `ano`) para permitir consultas longitudinais.
+Implicação de design: o pipeline preserva wiki pages de editais encerrados mesmo após deleção dos PDFs originais; a dimensão temporal é mantida como tag `ano/<pub_year>` (§6.1.1) para permitir consultas longitudinais.
+
+> **Arquitetura de camadas:** o vocabulário oficial das camadas, a fronteira
+> agnóstico/individualizado e o contrato de Documento Canônico estão em **§12**.
+> Termos ad-hoc anteriores ("Ramo A/B") estão depreciados — ver §12.
 
 ---
 
@@ -30,7 +34,8 @@ Implicação de design: o pipeline preserva wiki pages de editais encerrados mes
 | Índice histórico | `knowledge_graph/index_historico.json` | Todos os editais já scraped |
 | Wiki page | `knowledge_graph/wiki/{id}.json` | Uma por edital, gerada pela LLM |
 | Cache de ingestão | `knowledge_graph/wiki/.etl_process_cache.json` | Hash MD5 por edital (evita reprocessar) |
-| Vault Obsidian | (externo) | Espelho Markdown do grafo, exportado sob demanda |
+| Doc estruturado (silver) | `silver_data/structured_docs/{source}/{id}.jsonl` | Linearização limpa + rotulada dos PDFs (1 passada LLM/página). Insumo compartilhado da wiki (Ramo A) e do chunkeamento RAG (Ramo B). Ver §11 |
+| Vault Obsidian | `obsidian_vault/` | Espelho Markdown do grafo, unificado no projeto, exportado sob demanda |
 
 ---
 
@@ -194,7 +199,7 @@ Normalização: lowercase + strip de acentos + match por substring. Strings que 
 
 ### 5.6 Subprogramas e fundos setoriais
 
-Programas específicos e fundos setoriais que não são fontes financiadoras em si, mas agrupam editais de uma linha temática ou regime regulatório próprio. Nó de grafo separado de fonte (§5.4) e de mechanism (§5.1).
+Programas específicos e fundos setoriais que não são fontes financiadoras em si, mas agrupam editais de uma linha temática ou regime regulatório próprio. Nó de grafo separado de fonte (§5.4); distinto da modalidade financeira `mechanism` (§5.1), que é tag.
 
 ```yaml
 subprogramas_canonicos:
@@ -211,7 +216,7 @@ Extração na mesma string de `fonte_recurso` bruta, após §5.4. Case-insensiti
 
 ### 5.7 Drop-list de modalidades
 
-Termos que aparecem no campo `fonte_recurso` do portal mas **não são fontes** — são modalidades financeiras (já cobertas por `mechanism` em §5.1 e pelo nó `mechanism` em §6.1). Descartados silenciosamente pelo normalizador.
+Termos que aparecem no campo `fonte_recurso` do portal mas **não são fontes** — são modalidades financeiras (já cobertas pela tag `mechanism`, §5.1 / §6.1.1). Descartados silenciosamente pelo normalizador.
 
 ```yaml
 modalidades_drop_list:
@@ -233,7 +238,7 @@ Match: lowercase + strip de acentos + comparação por substring. Uma string bru
 
 ### 5.8 Faixas TRL
 
-O campo `trl_range: {min, max}` (§4.2) é numérico (1-9). Para navegação no grafo, colapsa-se em 3 faixas semânticas. Um edital conecta a todas as faixas que sobrepõem seu range.
+O campo `trl_range: {min, max}` (§4.2) é numérico (1-9). Colapsa-se em 3 faixas semânticas, usadas como **tag** do edital (`trl/<faixa>`) e dimensão de matching/filtro — não como nó de grafo (§6.1.1). Um edital recebe a tag de todas as faixas que sobrepõem seu range.
 
 ```yaml
 trl_faixas:
@@ -242,7 +247,7 @@ trl_faixas:
   trl_industrial: { min: 7, max: 9, label: "TRL 7-9 (Industrial)" }
 ```
 
-Regra de mapeamento: edital com `trl_range = {min: a, max: b}` conecta à faixa `f` se `max(a, f.min) <= min(b, f.max)`. Se `trl_range` é `{null, null}`, não há link.
+Regra de mapeamento: edital com `trl_range = {min: a, max: b}` recebe a faixa `f` se `max(a, f.min) <= min(b, f.max)`. Se `trl_range` é `{null, null}`, sem tag de faixa.
 
 ---
 
@@ -252,11 +257,17 @@ Regra de mapeamento: edital com `trl_range = {min: a, max: b}` conecta à faixa 
 
 Cada tipo de nó vira uma subpasta no vault Obsidian e um grupo no `graph.json`.
 
+**Critério nó vs tag:** um tipo é **nó** só se for hub de navegação (pivota-se por ele
+para *descobrir* editais) **e** tiver identidade própria. Enums de baixa cardinalidade
+(2-3 valores) que apenas *filtram* — `mechanism`, `ano`, `trl_faixa` — são **tags** no
+frontmatter do edital (§6.1.1), não nós, para não poluir o grafo com mega-hubs sem
+semântica. Política vale para todas as fontes.
+
 ```yaml
 node_types:
   edital:
     folder: editais
-    tags: [finep, edital, "<status_tag>", "mecanismo/<mechanism>", "tema/<slug>", "ano/<pub_year>"]
+    tags: [finep, edital, "<status_tag>", "mecanismo/<mechanism>", "tema/<slug>", "subprograma/<slug>", "trl/<faixa>", "ano/<pub_year>"]
     emoji: "<status_emoji>"
   tema:
     folder: temas
@@ -270,23 +281,10 @@ node_types:
     folder: publicos
     tags: [finep, publico-alvo]
     emoji: "👥"
-  ano:
-    folder: anos
-    tags: [finep, ano]
-    emoji: "📅"
-    unknown_label: desconhecido   # slug/label quando pub_year não pôde ser derivado
-  mechanism:
-    folder: mecanismos
-    tags: [finep, mecanismo]
-    emoji: "⚙️"
   subprograma:
     folder: subprogramas
     tags: [finep, subprograma]
     emoji: "🏛️"
-  trl_faixa:
-    folder: trl
-    tags: [finep, trl]
-    emoji: "📈"
   home:
     folder: ""
     tags: [finep, home]
@@ -294,6 +292,13 @@ node_types:
 ```
 
 Tags fonte-específicas (ex.: `finep`) vêm de `wikis/<fonte>.md`.
+
+#### 6.1.1 Dimensões rebaixadas a tag
+
+`mechanism` (§5.1), `ano` (derivado de `pub_date`) e `trl_faixa` (§5.8) **não são
+nós**. São propriedades do edital, expressas como tag no frontmatter
+(`mecanismo/<key>`, `ano/<pub_year>`, `trl/<faixa>`) e consumidas pelo matching/filtro —
+nunca como wikilink/aresta. `ano` sem `pub_date` parseável → tag `ano/desconhecido`.
 
 ### 6.2 Tipos de link
 
@@ -313,24 +318,12 @@ link_types:
     from: edital
     to: publico
     section: "## Público-Alvo"
-  edital_published_in_year:
-    from: edital
-    to: ano
-    section: "## Ano de Publicação"
-  edital_has_mechanism:
-    from: edital
-    to: mechanism
-    section: "## Mecanismo"
   edital_has_subprograma:
     from: edital
     to: subprograma
     section: "## Subprograma"
-  edital_has_trl_faixa:
-    from: edital
-    to: trl_faixa
-    section: "## Faixa TRL"
   aggregator_lists_edital:
-    from: [tema, fonte, publico, ano, mechanism, subprograma, trl_faixa, home]
+    from: [tema, fonte, publico, subprograma, home]
     to: edital
     section: "## Editais"
 ```
@@ -481,3 +474,210 @@ Por `link`. Primeiro arquivo bronze lido (ordem alfabética) vence.
 3. Se o scraper retorna campos que mapeiam 1:1 para o schema comum, não precisa tocar em `build_knowledge_graph.py`. Caso contrário, adicionar adaptador na seção `bronze_mapping` do doc da fonte.
 4. Rodar validador: `pytest tests/test_wiki_schema_consistency.py`.
 5. Rodar pipeline: campos do schema comum são produzidos automaticamente; campos fonte-específicos vêm do doc da fonte.
+
+---
+
+## 11. Documento estruturado (camada silver)
+
+Artefato intermediário entre o bronze (PDFs crus) e os dois consumidores: a
+síntese da wiki page (**Ramo A**, `etl_process`) e o chunkeamento RAG
+(**Ramo B**, `chunker`). Uma única passada LLM sobre os PDFs serve aos dois.
+
+**Invariante — a camada é "burra":** ela só lineariza, limpa e rotula
+estrutura. **Não** sintetiza (não infere `objective`/`mechanism` — isso é §4.2)
+e **não** fatia (não decide tamanho de chunk — isso é política do Ramo B). Todo
+campo opinativo aqui reacopla A e B e invalida os caches independentes (§11.4).
+Code review deve barrar qualquer campo que não seja estrutura fiel.
+
+A passada é **por página**: 1 chamada LLM por página do PDF, paralelizável. A
+continuidade de seção entre páginas é preservada via `carry_section_path` (o
+último `section_path` aberto na página anterior é passado como contexto).
+
+### 11.1 Schema do bloco
+
+O artefato é um JSONL: uma linha por bloco, ordem global preservada.
+
+```yaml
+structured_doc_schema:
+  block_fields:
+    idx:          { type: "int",       desc: "ordem global no documento, 0-based" }
+    doc:          { type: "str",       desc: "PDF de origem (ex: Edital.pdf, Anexo_II.pdf)" }
+    page:         { type: "int",       desc: "página de origem, 1-based" }
+    section_path: { type: "list[str]", desc: "hierarquia da seção; [] se fora de seção" }
+    kind:         { type: "enum",      desc: "tipo do elemento (ver kinds)" }
+    text:         { type: "str",       desc: "texto limpo, verbatim, sem artefato de layout" }
+  kinds: [heading, paragraph, table, list, signature, boilerplate]
+  meta_sidecar:                       # silver_data/structured_docs/{source}/{id}.meta.json
+    silver_version:           "str — versão do schema do bloco (bump = re-roda A e B)"
+    structurer_prompt_version: "str — versão do prompt §11.3"
+    structurer_model:         "str — modelo usado"
+    source_hash:              "str — hash do texto dos PDFs de origem"
+```
+
+`kind=boilerplate|signature` permite ao Ramo A descartar ruído (rodapé,
+assinaturas) sem heurística. `section_path` resolve o problema de chunks
+"sem seção" de forma **fonte-agnóstica** — derivado pela LLM, não por regex
+de `Art./§`.
+
+### 11.2 Parâmetros do structurer
+
+```yaml
+structurer_params:
+  silver_version: "1"
+  prompt_version: "2"
+  temperature: 0.0
+  max_tokens: 4000
+  per_page: true
+  carry_section_path: true        # encadeia o último section_path entre páginas
+  max_concurrent_docs: 8          # docs em paralelo; páginas serial intra-doc (carry)
+```
+
+### 11.3 Prompt do structurer (por página)
+
+Fonte-agnóstico — fala de estrutura de documento, não de fomento. Fontes
+**não** sobrescrevem (a estrutura é universal). Placeholders:
+`{doc_name}`, `{page_num}`, `{page_text}`, `{carry_section_path}`.
+
+```yaml
+structurer_prompt: |
+  Você segmenta uma página de um documento oficial em blocos estruturais.
+  NÃO resuma, NÃO interprete, NÃO invente. Preserve o texto VERBATIM.
+
+  Documento: {doc_name} — página {page_num}
+  Seção aberta na página anterior (herde se a página começa no meio dela):
+  {carry_section_path}
+
+  ---
+  TEXTO DA PÁGINA:
+  {page_text}
+  ---
+
+  Produza APENAS um JSON array de blocos, na ordem em que aparecem:
+
+  [
+    {{
+      "section_path": ["3. Critérios", "3.2 Pontuação"],
+      "kind": "heading|paragraph|table|list|signature|boilerplate",
+      "text": "texto exato do bloco, sem reescrever"
+    }}
+  ]
+
+  Regras:
+  - Todo bloco PERTENCE a uma seção. section_path = [] só se NÃO houver
+    nenhum título antes dele no documento (raríssimo — capa pura sem texto).
+  - Um bloco kind=heading ANCORA sua própria seção: o section_path dele
+    INCLUI ele mesmo. Ex.: o heading "3. Critérios" tem
+    section_path ["3. Critérios"]; o sub-heading "3.2 Pontuação" tem
+    ["3. Critérios", "3.2 Pontuação"]. Os blocos seguintes herdam o
+    section_path do último heading até aparecer o próximo.
+  - Título de documento/anexo (ex.: "ANEXO 1", "Formulário para Inscrição")
+    É um heading e vira a RAIZ do section_path de tudo naquele anexo. Rótulos
+    de campo de formulário (ex.: "Título do Projeto", "Contatos") são heading
+    e entram como nível seguinte sob a raiz do anexo.
+  - Se a página começa no meio de uma seção sem repetir o título, herde de
+    carry_section_path.
+  - kind=boilerplate: cabeçalho/rodapé/numeração de página repetida.
+    kind=signature: bloco de assinatura.
+  - text: VERBATIM. Tabela → preserve como texto (markdown simples). Não
+    concatene blocos de seções diferentes.
+  - Não emita campo nenhum além de section_path, kind, text.
+```
+
+### 11.4 Versionamento & cache (desacoplamento)
+
+Três chaves de invalidação independentes — é o que mantém A e B desacoplados:
+
+| Camada | Chave de cache | Re-roda quando |
+|---|---|---|
+| Silver | `hash(pdf_text + prompt_version + model)` | PDF muda OU structurer versiona |
+| Ramo A | `hash(silver_id + silver_version + wiki_prompt + metadata)` | schema da wiki (§4) muda |
+| Ramo B | `hash(silver_id + silver_version + chunk_policy + embed_model)` | política de chunk muda |
+
+Consequência: mexer no schema da wiki re-roda **só a Knowledge gold**
+(transform barato, sem re-ler a fonte). Mexer na política de chunk re-roda
+**só a Retrieval gold** (re-segmenta + re-embeda, **zero LLM**). Mexer no
+structurer re-roda ambas (esperado — é a raiz compartilhada). Sem conteúdo ou
+falha LLM: silver vazio → Knowledge cai no `_save_minimal_wiki_page`,
+Retrieval não indexa (comportamento atual preservado).
+
+> Nomenclatura: "Ramo A" = **Knowledge gold** (§12, L3a); "Ramo B" =
+> **Retrieval gold** (§12, L3b). Ver §12 para o stack completo.
+
+---
+
+## 12. Arquitetura de camadas (vocabulário oficial)
+
+Este é o modelo canônico. Substitui termos ad-hoc ("Ramo A/B"). O sistema é
+**multi-fonte**: a estratégia de RAG e síntese é **agnóstica à fonte**; só a
+extração e disponibilização do conteúdo é **individualizada por fonte**.
+
+### 12.1 A fronteira
+
+```
+   INDIVIDUALIZADO          ┃  AGNÓSTICO À FONTE
+   (muda por fonte)         ┃  (nunca sabe qual é a fonte)
+                            ┃
+   L0 raw → L1 SourceAdapter ┃→ L2 structured → L3a Knowledge gold
+                            ┃                 → L3b Retrieval gold
+              └─ fronteira: CONTRATO DocumentoCanônico ─┘
+```
+
+**Invariante:** nada à direita da fronteira abre arquivo de fonte específica
+nem ramifica por fonte. PDF, HTML, API — tudo já chega como Documento
+Canônico. Code review barra `pdfplumber`, paths de fonte ou `if source ==`
+em qualquer camada ≥ L2.
+
+### 12.2 Stack
+
+| Camada | Nome oficial | Escopo | Conteúdo |
+|---|---|---|---|
+| L0 | `raw` (bronze) | **por fonte** | dump cru do scraper em `bronze_data/{source}_raw/` |
+| L1 | **Source Adapter** | **por fonte** | converte raw → Documento Canônico. FINEP: lê PDFs. FAPESP: `texto_cru`. BNDES: `contexto_capturado` |
+| — | **Documento Canônico** | **fronteira** | contrato agnóstico (§12.3) |
+| L2 | `structured` (silver) | agnóstico | blocos do structurer — detalhe em §11 |
+| L3a | **Knowledge gold** | agnóstico | wiki page (§4) + grafo (§6) |
+| L3b | **Retrieval gold** | agnóstico | `edital_chunks` (chunk + embedding) |
+
+### 12.3 Contrato do Documento Canônico
+
+A saída do Source Adapter e a única entrada do structurer (L2). Texto já
+extraído por unidade lógica ("página") — o structurer **não** abre arquivo.
+
+```yaml
+canonical_doc:
+  shape: "list[{ doc_name: str, units: list[str] }]"
+  notes:
+    - "doc_name: rótulo do documento (ex: Edital.pdf, pagina_chamada). Vira `doc` no bloco silver."
+    - "units: texto por unidade lógica. PDF → 1 unit/página. HTML → 1 unit (ou split por âncora)."
+    - "Vazio (sem conteúdo) → silver vazio → fallback preservado (§11.4)."
+```
+
+### 12.4 Registro de Source Adapters
+
+Mapeamento fonte → adapter, schema-driven (como `bronze_mapping`). Adicionar
+fonte = escrever o adapter + registrar aqui; nada em L2/L3 muda.
+
+```yaml
+source_adapters:
+  finep:
+    module: "pipeline.adapters.finep"
+    raw_dir: "finep_raw"
+    strategy: "pdf"          # lê FINEP_PDFS_DIR/{id}/*.pdf, 1 unit/página
+  fapesp:
+    module: "pipeline.adapters.fapesp"
+    raw_dir: "fapesp_raw"
+    strategy: "html_body"    # texto_cru do bronze como 1 doc
+    status: "planejado"
+  bndes:
+    module: "pipeline.adapters.bndes"
+    raw_dir: "bndes_raw"
+    strategy: "html_body"    # contexto_capturado
+    status: "planejado"
+```
+
+### 12.5 Onde o código viola isto hoje
+
+Débito conhecido, a ser pago no rename (Fase 2). O structurer faz `pdfplumber`
+— extração é trabalho de L1, não de L2. `_SOURCE = "finep"` e
+`FINEP_PDFS_DIR` em etl_process/tasks fixam a fonte. O alvo: extração migra
+pro Source Adapter; L2/L3 passam a consumir Documento Canônico, source-neutro.

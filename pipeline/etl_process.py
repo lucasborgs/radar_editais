@@ -1,14 +1,16 @@
 """
-ETL Process — geração da wiki page por edital.
+ETL Process — Knowledge gold (L3a, WIKI.md §12).
 
-A LLM lê todos os PDFs do edital + metadados HTML em uma única chamada e produz
-a wiki page estruturada → knowledge_graph/wiki/{id}.json
+A LLM lê o Documento Canônico (via Source Adapter L1) já estruturado pela
+camada silver (L2) e produz a wiki page → knowledge_graph/wiki/{id}.json.
 
-A wiki page é o único artefato gerado. Os PDFs brutos permanecem como raw sources
-e são lidos diretamente pela WritingSession quando o usuário seleciona um edital.
+Fase 4: deixou de re-ler PDFs crus + truncar — agora consome blocos silver
+(boilerplate/signature filtrados, texto limpo). O LLM da síntese recebe
+texto de maior sinal por token, e a leitura LLM dos PDFs é amortizada com
+a Retrieval gold (a mesma silver alimenta os dois).
 
-Cache por hash MD5 do conteúdo de todos os PDFs + metadados do index.json.
-Só reprocessa se algum documento mudar (retificação, aditivo).
+Cache do etl_process: invalida quando o silver muda (silver_version,
+prompt_version, source_hash) OU quando o metadata muda. §11.4.
 
 Uso:
     python pipeline/etl_process.py
@@ -27,10 +29,11 @@ import os
 import re
 import time
 from datetime import datetime
-from pathlib import Path
 
-from config import BRONZE_DIR, FINEP_PDFS_DIR, KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
+from config import KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
 from core import wiki_schema
+from core.structurer import build_or_load_structured_doc
+from pipeline.adapters.base import get_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +44,9 @@ logging.basicConfig(
 )
 
 # Schema autoritativo em WIKI.md + wikis/finep.md (ver core.wiki_schema)
-_SOURCE = "finep"
+# Source parametrizado via env (§12). Default "finep" preserva comportamento;
+# adapter por fonte + leitura via L1 entram na Fase 4 (migração da Knowledge gold).
+_SOURCE = os.getenv("RADAR_SOURCE", "finep")
 
 INDEX_FILE           = KNOWLEDGE_GRAPH_DIR / "index.json"
 INDEX_HISTORICO_FILE = KNOWLEDGE_GRAPH_DIR / "index_historico.json"
@@ -52,67 +57,51 @@ CACHE_FILE           = KG_WIKI_DIR / ".etl_process_cache.json"
 # UTILITÁRIOS
 # =============================================================================
 
-def _extract_pdf_text(pdf_path: Path) -> str:
-    try:
-        import pdfplumber
-        parts = []
-        with pdfplumber.open(pdf_path) as pdf:
-            for page in pdf.pages:
-                parts.append(page.extract_text() or "")
-        return "\n".join(parts)
-    except Exception as e:
-        logger.warning("Erro ao extrair %s: %s", pdf_path.name, e)
-        return ""
+_DROP_KINDS_FOR_SYNTHESIS = {"boilerplate", "signature"}
 
 
-def _should_skip(name: str) -> bool:
-    return any(kw in name.lower() for kw in wiki_schema.skip_keywords(_SOURCE))
+def _load_documents_via_silver(edital_id: str) -> tuple[list[tuple[str, str]], dict]:
+    """Carrega o conteúdo do edital via Source Adapter (L1) + silver (L2).
 
+    Retorna `(documents, silver_meta)`:
+      - documents: list[(doc_name, texto_limpo)] reagrupada por doc a partir
+        dos blocos silver, filtrando boilerplate/signature.
+      - silver_meta: dict com silver_version/prompt_version/source_hash
+        (entra no cache hash do etl_process — §11.4).
 
-def _load_pdfs(edital_id: str) -> list[tuple[str, str]]:
-    """Retorna lista de (nome, texto) para os PDFs relevantes do edital.
-
-    Tenta primeiro os PDFs físicos em FINEP_PDFS_DIR; se o diretório não
-    existir, cai no fallback de pdf_texts embutido no JSON bronze.
+    Vazio em ambos os retornos = sem conteúdo extraível; caller decide
+    o fallback (`_save_minimal_wiki_page`).
     """
-    pdf_dir = FINEP_PDFS_DIR / edital_id
-    if pdf_dir.exists():
-        result = []
-        for pdf in sorted(pdf_dir.glob("*.pdf")):
-            if not _should_skip(pdf.stem):
-                text = _extract_pdf_text(pdf)
-                if text.strip():
-                    result.append((pdf.stem, text))
-        return result
+    adapter = get_adapter(_SOURCE)
+    canonical = adapter.to_documents(edital_id)
+    if not canonical:
+        return [], {}
 
-    return _load_pdfs_from_bronze(edital_id)
+    blocks = build_or_load_structured_doc(_SOURCE, edital_id, canonical)
+    if not blocks:
+        return [], {}
 
-
-def _load_pdfs_from_bronze(edital_id: str) -> list[tuple[str, str]]:
-    """Fallback: lê pdf_texts do JSON bronze mais recente."""
-    raw_dir = BRONZE_DIR / "finep_raw"
-    if not raw_dir.exists():
-        return []
-
-    # Arquivo bronze mais recente
-    bronze_files = sorted(raw_dir.glob("*.json"), reverse=True)
-    for bf in bronze_files:
-        try:
-            chamadas = json.loads(bf.read_text(encoding="utf-8"))
-        except Exception:
+    by_doc: dict[str, list[str]] = {}
+    for b in blocks:
+        if b.get("kind") in _DROP_KINDS_FOR_SYNTHESIS:
             continue
-        for ch in chamadas:
-            cid = str(ch.get("chamada_id", ""))
-            if cid != edital_id:
-                continue
-            pdf_texts = ch.get("pdf_texts") or {}
-            result = [
-                (nome, texto)
-                for nome, texto in pdf_texts.items()
-                if texto and not _should_skip(nome)
-            ]
-            return sorted(result, key=lambda x: x[0])
-    return []
+        text = (b.get("text") or "").strip()
+        if not text:
+            continue
+        by_doc.setdefault(b["doc"], []).append(text)
+    documents = [(name, "\n\n".join(parts)) for name, parts in by_doc.items()]
+    documents.sort(key=lambda x: x[0])
+
+    # silver_meta vem do sidecar gravado pelo structurer (§11.4).
+    from core.structurer import _silver_paths  # noqa: PLC0415 — split-helper interno
+    _, meta_path = _silver_paths(_SOURCE, edital_id)
+    silver_meta: dict = {}
+    if meta_path.exists():
+        try:
+            silver_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return documents, silver_meta
 
 
 def _fit_to_budget(pdfs: list[tuple[str, str]], model: str) -> list[tuple[str, str]]:
@@ -137,8 +126,11 @@ def _fit_to_budget(pdfs: list[tuple[str, str]], model: str) -> list[tuple[str, s
     return result
 
 
-def _content_hash(metadata: dict, pdfs: list[tuple[str, str]]) -> str:
-    payload = json.dumps(metadata, sort_keys=True) + "".join(t for _, t in pdfs)
+def _content_hash(metadata: dict, silver_meta: dict) -> str:
+    """Cache do etl_process invalida quando o silver muda (silver_version /
+    prompt_version / source_hash) OU quando o metadata muda. Mais barato e
+    semanticamente mais correto que hashear o texto inteiro dos PDFs."""
+    payload = json.dumps(metadata, sort_keys=True) + json.dumps(silver_meta, sort_keys=True)
     return hashlib.md5(payload.encode()).hexdigest()
 
 
@@ -210,6 +202,7 @@ def _save_wiki_page(entry: dict, synthesized: dict) -> None:
         "status":        entry["status"],
         "deadline":      entry["deadline"],
         "pub_date":      entry.get("pub_date", ""),
+        "pub_year":      entry.get("pub_year", "desconhecido"),
         "link":          entry["link"],
         "themes":        entry.get("themes", []),
         "publico_alvo":  entry.get("publico_alvo", []),
@@ -241,6 +234,7 @@ def _save_minimal_wiki_page(entry: dict) -> None:
         "status":        entry["status"],
         "deadline":      entry["deadline"],
         "pub_date":      entry.get("pub_date", ""),
+        "pub_year":      entry.get("pub_year", "desconhecido"),
         "link":          entry["link"],
         "themes":        entry.get("themes", []),
         "publico_alvo":  entry.get("publico_alvo", []),
@@ -298,18 +292,19 @@ def main(
 
     print(f"Editais: {len(entries)}")
 
-    needs_llm = any(_load_pdfs(e["id"]) for e in entries)
-    client, model = (None, "") if not needs_llm else _make_client(backend)
-    if needs_llm:
-        print(f"Backend: {backend} | Model: {model}")
+    # Cliente LLM da síntese — só constrói se ao menos um edital tem
+    # silver disponível (caso contrário tudo cai no minimal).
+    client, model = _make_client(backend)
+    print(f"Backend: {backend} | Model: {model}")
 
     cache = {} if skip_cache else _load_cache()
     processed = skipped = minimal = errors = 0
 
     for i, entry in enumerate(entries, 1):
         eid = entry["id"]
-        pdfs = _load_pdfs(eid)
-        content_hash = _content_hash(entry, pdfs)
+        # L1+L2: documento canônico → silver (cache hit se já indexado p/ B).
+        documents, silver_meta = _load_documents_via_silver(eid)
+        content_hash = _content_hash(entry, silver_meta)
 
         if not skip_cache and cache.get(eid) == content_hash \
                 and (KG_WIKI_DIR / f"{eid}.json").exists():
@@ -317,14 +312,14 @@ def main(
             skipped += 1
             continue
 
-        logger.info("[%d/%d] %s — %d PDFs", i, len(entries), eid, len(pdfs))
+        logger.info("[%d/%d] %s — %d docs (silver)", i, len(entries), eid, len(documents))
 
-        if not pdfs or client is None:
+        if not documents:
             _save_minimal_wiki_page(entry)
             minimal += 1
         else:
             try:
-                result = _call_llm(client, model, entry, pdfs)
+                result = _call_llm(client, model, entry, documents)
                 _save_wiki_page(entry, result)
                 time.sleep(delay)
                 processed += 1

@@ -132,6 +132,36 @@ def test_extraction_prompt_mentions_synthesized_fields():
 
 
 # -----------------------------------------------------------------------------
+# DOCUMENTO ESTRUTURADO (silver — WIKI.md §11)
+# -----------------------------------------------------------------------------
+
+def test_structured_doc_schema_well_formed():
+    """§11.1: block_fields e kinds declarados e coerentes com o invariante burro."""
+    sd = ws.structured_doc_schema()
+    assert sd, "structured_doc_schema ausente em WIKI.md §11.1"
+    fields = set(sd.get("block_fields", {}).keys())
+    assert {"idx", "doc", "page", "section_path", "kind", "text"} <= fields, \
+        f"block_fields incompleto: {fields}"
+    kinds = set(sd.get("kinds", []))
+    assert {"heading", "paragraph", "table", "boilerplate"} <= kinds, \
+        f"kinds essenciais faltando: {kinds}"
+
+
+def test_structurer_prompt_has_placeholders():
+    """§11.3: prompt por página tem os 4 placeholders que o structurer injeta."""
+    prompt = ws.structurer_prompt()
+    for ph in ("{doc_name}", "{page_num}", "{page_text}", "{carry_section_path}"):
+        assert ph in prompt, f"structurer_prompt sem placeholder {ph}"
+
+
+def test_structurer_params_versioned():
+    """§11.2: silver_version e prompt_version existem (chaves de cache §11.4)."""
+    p = ws.structurer_params()
+    assert p.get("silver_version"), "structurer_params.silver_version ausente"
+    assert p.get("prompt_version"), "structurer_params.prompt_version ausente"
+
+
+# -----------------------------------------------------------------------------
 # RUNNER
 # -----------------------------------------------------------------------------
 
