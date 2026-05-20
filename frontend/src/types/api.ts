@@ -4,6 +4,7 @@ export interface WritingMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  draftSaved?: boolean;
 }
 
 export interface WritingStartResponse {
@@ -17,6 +18,7 @@ export interface WritingStartResponse {
 export interface WritingTurnResponse {
   session_id: string;
   assistant_message: string;
+  draft_content?: string | null;
   sections_used: string[];
   turn_number: number;
   success: boolean;

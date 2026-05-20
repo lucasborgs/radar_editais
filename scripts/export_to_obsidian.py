@@ -23,7 +23,7 @@ import argparse
 import json
 from pathlib import Path
 
-from config import FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR
+from config import FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, OBSIDIAN_VAULT_DIR
 from core import wiki_schema
 
 # Schema autoritativo em WIKI.md + wikis/finep.md (ver core.wiki_schema)
@@ -147,28 +147,13 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
             lines.append(f"- [[{subfolder}/publicos/{slugify(p)}|{p}]]")
         lines.append("")
 
-    if mechanism:
-        lines.append("## Mecanismo")
-        lines.append(f"- [[{subfolder}/mecanismos/{mechanism}|{wiki_schema.mechanism_label(mechanism)}]]")
-        lines.append("")
-
     if subprogramas:
         lines.append("## Subprograma")
         for sp in subprogramas:
             lines.append(f"- [[{subfolder}/subprogramas/{slugify(sp)}|{sp}]]")
         lines.append("")
 
-    if trl_faixa_keys:
-        faixas_vocab = wiki_schema.trl_faixas()
-        lines.append("## Faixa TRL")
-        for fk in trl_faixa_keys:
-            label = faixas_vocab.get(fk, {}).get("label", fk)
-            lines.append(f"- [[{subfolder}/trl/{fk}|{label}]]")
-        lines.append("")
-
-    lines.append("## Ano de Publicação")
-    lines.append(f"- [[{subfolder}/anos/{pub_year}|{pub_year}]]")
-    lines.append("")
+    # mechanism, trl_faixa e ano são tags (frontmatter), não nós/wikilinks — §6.1.1
 
     # Informações básicas
     lines.append("## Informações")
@@ -318,59 +303,6 @@ def publico_note(publico_label: str, editais_ids: list[str], edital_by_id: dict,
     return "\n".join(lines)
 
 
-def ano_note(ano_label: str, editais_ids: list[str], edital_by_id: dict, subfolder: str = "radar-editais") -> str:
-    """Gera nota Markdown para um ano de publicação (dimensão longitudinal)."""
-    lines = ["---"]
-    lines.append(f'title: "Ano {ano_label}"')
-    lines.append("tags:")
-    lines.append("  - finep")
-    lines.append("  - ano")
-    lines.append("---")
-    lines.append("")
-    lines.append(f"# 📅 Ano: {ano_label}")
-    lines.append("")
-    lines.append(f"**{len(editais_ids)} editais** publicados neste período.")
-    lines.append("")
-    lines.append("## Editais")
-    lines.append("")
-
-    for eid in editais_ids:
-        edital = edital_by_id.get(eid, {})
-        title = edital.get("title", f"Edital {eid}")
-        status = edital.get("status", "")
-        emoji = _status_emoji(status)
-        lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
-
-    lines.append("")
-    return "\n".join(lines)
-
-
-def mechanism_note(mech_key: str, editais_ids: list[str], edital_by_id: dict, subfolder: str = "radar-editais") -> str:
-    """Gera nota Markdown para um mecanismo financeiro (§5.1 WIKI.md)."""
-    label = wiki_schema.mechanism_label(mech_key)
-    lines = ["---"]
-    lines.append(f'title: "{safe_yaml_str(label)}"')
-    lines.append("tags:")
-    lines.append("  - finep")
-    lines.append("  - mecanismo")
-    lines.append("---")
-    lines.append("")
-    lines.append(f"# ⚙️ Mecanismo: {label}")
-    lines.append("")
-    lines.append(f"**{len(editais_ids)} editais** operam por este mecanismo financeiro.")
-    lines.append("")
-    lines.append("## Editais")
-    lines.append("")
-    for eid in editais_ids:
-        edital = edital_by_id.get(eid, {})
-        title = edital.get("title", f"Edital {eid}")
-        status = edital.get("status", "")
-        emoji = _status_emoji(status)
-        lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
-    lines.append("")
-    return "\n".join(lines)
-
-
 def subprograma_note(sp_label: str, editais_ids: list[str], edital_by_id: dict, subfolder: str = "radar-editais") -> str:
     """Gera nota Markdown para um subprograma / fundo setorial (§5.6 WIKI.md)."""
     lines = ["---"]
@@ -383,33 +315,6 @@ def subprograma_note(sp_label: str, editais_ids: list[str], edital_by_id: dict, 
     lines.append(f"# 🏛️ Subprograma: {sp_label}")
     lines.append("")
     lines.append(f"**{len(editais_ids)} editais** vinculados a este subprograma.")
-    lines.append("")
-    lines.append("## Editais")
-    lines.append("")
-    for eid in editais_ids:
-        edital = edital_by_id.get(eid, {})
-        title = edital.get("title", f"Edital {eid}")
-        status = edital.get("status", "")
-        emoji = _status_emoji(status)
-        lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
-    lines.append("")
-    return "\n".join(lines)
-
-
-def trl_note(faixa_key: str, editais_ids: list[str], edital_by_id: dict, subfolder: str = "radar-editais") -> str:
-    """Gera nota Markdown para uma faixa TRL (§5.8 WIKI.md)."""
-    faixa = wiki_schema.trl_faixas().get(faixa_key, {})
-    label = faixa.get("label", faixa_key)
-    lines = ["---"]
-    lines.append(f'title: "{safe_yaml_str(label)}"')
-    lines.append("tags:")
-    lines.append("  - finep")
-    lines.append("  - trl")
-    lines.append("---")
-    lines.append("")
-    lines.append(f"# 📈 Faixa TRL: {label}")
-    lines.append("")
-    lines.append(f"**{len(editais_ids)} editais** aceitam projetos nesta faixa de maturidade tecnológica.")
     lines.append("")
     lines.append("## Editais")
     lines.append("")
@@ -460,10 +365,7 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
     lines.append(f"- 🏷️ [[{subfolder}/temas/]] — por tema")
     lines.append(f"- 💰 [[{subfolder}/fontes/]] — por fonte de recurso")
     lines.append(f"- 👥 [[{subfolder}/publicos/]] — por público-alvo")
-    lines.append(f"- ⚙️ [[{subfolder}/mecanismos/]] — por mecanismo financeiro")
     lines.append(f"- 🏛️ [[{subfolder}/subprogramas/]] — por subprograma / fundo setorial")
-    lines.append(f"- 📈 [[{subfolder}/trl/]] — por faixa de maturidade tecnológica")
-    lines.append(f"- 📅 [[{subfolder}/anos/]] — por ano de publicação")
     lines.append("")
     lines.append("## Editais Abertos")
     lines.append("")
@@ -517,8 +419,8 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
 
     # Base do vault — limpa notas antigas antes de re-exportar
     base = vault_path / subfolder
-    expected_subfolders = {"editais", "temas", "fontes", "publicos", "anos",
-                           "mecanismos", "subprogramas", "trl"}
+    # mechanism/ano/trl_faixa são tags, não nós (§6.1.1) — sem subpasta.
+    expected_subfolders = {"editais", "temas", "fontes", "publicos", "subprogramas"}
 
     # Detecta aninhamento: se `base/<subfolder>` já existe, significa que um export
     # anterior rodou com `--vault` apontando para dentro de `base`, criando estrutura
@@ -599,17 +501,6 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
 
     print(f"  Públicos: {n_publicos} notas → {base}/publicos/")
 
-    # Notas de ano
-    ano_index = index.get("ano_index", {})
-    n_anos = 0
-    for ano_label, editais_ids in ano_index.items():
-        content = ano_note(ano_label, editais_ids, edital_by_id, subfolder)
-        note_path = base / "anos" / f"{ano_label}.md"
-        note_path.write_text(content, encoding="utf-8")
-        n_anos += 1
-
-    print(f"  Anos: {n_anos} notas → {base}/anos/")
-
     # Notas de subprograma (vem do índice, populado pelo build_knowledge_graph)
     subprograma_index = index.get("subprograma_index", {})
     n_sub = 0
@@ -622,39 +513,7 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
 
     print(f"  Subprogramas: {n_sub} notas → {base}/subprogramas/")
 
-    # Notas de mechanism e TRL — agregadas das wiki pages (campos synthesized,
-    # não presentes no index.json)
-    mechanism_index: dict[str, list[str]] = {}
-    trl_faixa_index: dict[str, list[str]] = {}
-    valid_mechs = set(wiki_schema.mechanism_vocab().keys())
-    for edital in editais:
-        eid = edital["id"]
-        mech = edital.get("mechanism")
-        if mech and mech in valid_mechs:
-            mechanism_index.setdefault(mech, []).append(eid)
-        trl = edital.get("trl_range") or {}
-        for fk in wiki_schema.trl_range_to_faixas(trl.get("min"), trl.get("max")):
-            trl_faixa_index.setdefault(fk, []).append(eid)
-
-    n_mech = 0
-    for mech_key, editais_ids in mechanism_index.items():
-        content = mechanism_note(mech_key, editais_ids, edital_by_id, subfolder)
-        note_path = base / "mecanismos" / f"{mech_key}.md"
-        note_path.write_text(content, encoding="utf-8")
-        n_mech += 1
-
-    print(f"  Mecanismos: {n_mech} notas → {base}/mecanismos/")
-
-    n_trl = 0
-    for faixa_key, editais_ids in trl_faixa_index.items():
-        content = trl_note(faixa_key, editais_ids, edital_by_id, subfolder)
-        note_path = base / "trl" / f"{faixa_key}.md"
-        note_path.write_text(content, encoding="utf-8")
-        n_trl += 1
-
-    print(f"  Faixas TRL: {n_trl} notas → {base}/trl/")
-
-    total = n_editais + n_temas + n_fontes + n_publicos + n_anos + n_sub + n_mech + n_trl + 1
+    total = n_editais + n_temas + n_fontes + n_publicos + n_sub + 1
     print(f"\n✓ {total} notas exportadas para: {base}")
     print("\nPróximos passos no Obsidian:")
     print(f"  1. Abra o vault em: {vault_path}")
@@ -671,8 +530,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Exporta Knowledge Graph para Obsidian")
     parser.add_argument(
         "--vault",
-        required=True,
-        help="Caminho do vault Obsidian (ex: ~/Documents/Obsidian/MeuVault)",
+        default=str(OBSIDIAN_VAULT_DIR),
+        help=f"Caminho do vault Obsidian (default: vault unificado no projeto — {OBSIDIAN_VAULT_DIR})",
     )
     parser.add_argument(
         "--subfolder",
@@ -690,10 +549,7 @@ if __name__ == "__main__":
         INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index_historico.json"  # noqa: F841 — rebinds module global
 
     vault = Path(args.vault).expanduser().resolve()
-    if not vault.exists():
-        print(f"Vault não encontrado: {vault}")
-        print("Verifique o caminho com: ls ~/Documents/Obsidian/")
-        exit(1)
+    vault.mkdir(parents=True, exist_ok=True)
 
     modo = "histórico (todos)" if args.historico else "vigentes"
     print(f"Exportando para: {vault / args.subfolder}  [{modo}]")

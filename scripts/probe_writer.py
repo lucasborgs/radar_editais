@@ -6,14 +6,17 @@ Constrói um WritingSession com service-role + profile mockado, instrumenta
 `_call_llm` para capturar as messages enviadas ao LLM, chama `turn()`
 com uma query real, e imprime:
 
-  1. Cada mensagem do prompt (system / user / RAG chunks / etc.)
+  1. Cada mensagem do prompt (system / user / RAG chunks / library context)
   2. A resposta do LLM
-  3. Indicação clara se RAG disparou (presença de "TRECHOS RELEVANTES DO EDITAL")
+  3. Indicação clara se RAG disparou (TRECHOS RELEVANTES DO EDITAL)
+  4. Se library auto-retrieval injetou contexto (POSSÍVEL CONTEXTO DA BIBLIOTECA)
+  5. draft_content extraído pelo modelo Grantable (se section-hint fornecido)
 
 Uso:
     python scripts/probe_writer.py
-    python scripts/probe_writer.py --edital 762 --query "qual o prazo?"
-    python scripts/probe_writer.py --verbose       # mostra a mensagem inteira (sem truncar)
+    python scripts/probe_writer.py --edital 762 --section-hint "problema"
+    python scripts/probe_writer.py --seed-library   # semeia um content_item de teste
+    python scripts/probe_writer.py --verbose        # mostra a mensagem inteira (sem truncar)
 """
 from __future__ import annotations
 
@@ -104,13 +107,7 @@ def _mock_profile() -> CompanyProfile:
         cnpj="12.345.678/0001-90",
         tipo_entidade="empresa",
         tamanho_empresa="EPP",
-        faturamento_anual_faixa="500K-5M",
-        localizacao="São Paulo/SP",
         one_liner="Desenvolvemos enzimas industriais via ML pra biorrefino mais eficiente.",
-        problem_statement=(
-            "A indústria brasileira de bioprodutos depende de enzimas importadas "
-            "com custo elevado e prazo longo de fornecimento."
-        ),
         solution_summary=(
             "Plataforma de descoberta de enzimas via machine learning combinada "
             "com escala fermentativa em biorreatores de 100L."
@@ -118,9 +115,59 @@ def _mock_profile() -> CompanyProfile:
         descricao_atividades="Pesquisa aplicada em biotecnologia, prototipagem de enzimas, escalonamento.",
         trl=5,
         tipos_financiamento_interesse=["subvencao_nao_reembolsavel"],
-        uso_financiamento=["P&D_interno", "equipamento"],
-        valor_buscado=2_000_000.0,
     )
+
+
+def _seed_library_item(db, workspace_id: str) -> None:
+    """Insere (idempotente) um content_item de teste no workspace."""
+    existing = (
+        db.table("content_items")
+        .select("id")
+        .eq("workspace_id", workspace_id)
+        .eq("title", "[probe] Relatório técnico BioFarm 2024")
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        print(f"[probe] library item já existe ({existing.data[0]['id']}) — seed pulado.")
+        return
+
+    from core.embedder import embed_query as _embed
+    import uuid as _uuid
+
+    item_id = str(_uuid.uuid4())
+    text_to_embed = (
+        "Relatório técnico BioFarm Tech 2024. "
+        "Celulases industriais com +40% atividade. TRL 5 em biorreator 100L. "
+        "Parceria USP-ESALQ. P&D = 35% receita."
+    )
+    print("[probe] gerando embedding do item de teste...")
+    vec = _embed(text_to_embed)  # list[float] — supabase-py serializa automaticamente
+
+    result = db.table("content_items").insert({
+        "id": item_id,
+        "workspace_id": workspace_id,
+        "title": "[probe] Relatório técnico BioFarm 2024",
+        "type": "technical_doc",
+        "content": (
+            "Relatório técnico anual BioFarm Tech 2024.\n"
+            "Desenvolvemos 3 variantes de celulase com atividade 40% maior que o estado da arte. "
+            "TRL 5 confirmado em fermentador de 100L. Parceria com USP-ESALQ em andamento. "
+            "CNPJ: 12.345.678/0001-90. Faturamento 2023: R$ 1,2M. P&D: 35% da receita."
+        ),
+        "summary": "Celulases industriais com ganho de 40% em atividade; TRL 5; parceria USP-ESALQ.",
+        "key_facts": [
+            "3 variantes de celulase com +40% de atividade",
+            "TRL 5 validado em biorreator 100L",
+            "Parceria formal com USP-ESALQ",
+            "P&D = 35% da receita 2023",
+        ],
+        "themes": ["biotecnologia", "enzimas", "bioeconomia"],
+        "importance_score": 8,
+        "enrichment_status": "done",
+        "embedding": vec,
+    }).execute()
+    print(f"[probe] library item criado com embedding: {result.data[0]['id']}")
 
 
 def _print_message(idx: int, msg: dict, max_chars: int, verbose: bool) -> None:
@@ -151,6 +198,8 @@ def main() -> int:
                         help="Mostra prompt completo do 1º turn (não só a aba de chunks)")
     parser.add_argument("--max-chars", type=int, default=1500,
                         help="Max chars por message no print quando --verbose")
+    parser.add_argument("--seed-library", action="store_true",
+                        help="Semeia um content_item de teste no workspace (para exercitar library auto-retrieval)")
     args = parser.parse_args()
 
     # Logs verbosos do WritingSession (retrieve_chunks, etc).
@@ -178,6 +227,9 @@ def main() -> int:
     print(f"[probe] workspace_id = {workspace_id}")
 
     profile = _mock_profile()
+
+    if args.seed_library:
+        _seed_library_item(db, workspace_id)
 
     print(f"[probe] construindo WritingSession (edital={args.edital})...")
     session = WritingSession(
@@ -219,6 +271,8 @@ def main() -> int:
             for i, msg in enumerate(messages):
                 _print_message(i, msg, args.max_chars, verbose=True)
 
+        import re as _re
+
         # Sumário dos chunks recuperados (sempre).
         rag_msg = next(
             (m for m in messages if "TRECHOS RELEVANTES DO EDITAL" in (m.get("content") or "")),
@@ -226,14 +280,24 @@ def main() -> int:
         )
         print()
         if rag_msg:
-            print(f"  📚 RAG disparou: {len(rag_msg['content'])} chars de chunks no prompt")
-            # Extrai linhas de header dos chunks: "[Trecho N — seção] arquivo.pdf"
-            import re as _re
+            print(f"  [RAG] disparou: {len(rag_msg['content'])} chars de chunks no prompt")
             headers = _re.findall(r"\[Trecho \d+ — [^\]]+\][^\n]*", rag_msg["content"] or "")
             for h in headers[:7]:
                 print(f"     {h}")
         else:
-            print("  ✗ RAG NÃO disparou nesse turn (chunks vazio).")
+            print("  [RAG] nao disparou nesse turn.")
+
+        # Indicador de library auto-retrieval.
+        lib_context = ""
+        for m in messages:
+            if "POSSÍVEL CONTEXTO DA BIBLIOTECA" in (m.get("content") or ""):
+                lib_context = m["content"]
+                break
+        if lib_context:
+            titles = _re.findall(r"\[[A-Z_]+\]\s*(.+)", lib_context)
+            print(f"  [LIB] auto-retrieval injetou {len(lib_context)} chars | itens: {titles}")
+        else:
+            print("  [LIB] auto-retrieval nao injetou contexto (sem itens ou relevancia baixa).")
 
         print()
         print("  💬 RESPOSTA DO LLM:")
@@ -248,6 +312,19 @@ def main() -> int:
             print(response[:limit])
             if len(response) > limit:
                 print(f"\n... (+{len(response) - limit} chars — use --verbose pra ver tudo)")
+
+        # Grantable: draft_content auto-salvo na seção.
+        draft = result.get("draft_content")
+        if draft:
+            print()
+            print(f"  [GRANTABLE] draft auto-salvo ({len(draft)} chars):")
+            print("─" * 80)
+            print(draft[:1000])
+            if len(draft) > 1000:
+                print(f"  ... (+{len(draft) - 1000} chars)")
+        elif args.section_hint:
+            print()
+            print("  [GRANTABLE] LLM nao gerou <draft> nesse turn (sem auto-save).")
 
         if not result.get("success", True):
             print(f"\n  ⚠ erro: {result.get('error')}")

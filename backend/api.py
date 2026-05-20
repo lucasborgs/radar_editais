@@ -22,6 +22,7 @@ from backend.library_routes import router as library_router
 from core.auth import CurrentUserId, DbClient
 from core.content_library import get_item, get_workspace_id
 from core.hybrid_match_service import HybridMatchService
+from core.kg_match_service import KGMatchService
 from core.profile_extractor import ProfileExtractor
 from core.writing_session import (
     WritingSession,
@@ -63,6 +64,7 @@ app.include_router(library_router)
 # =============================================================================
 
 wiki_matcher = HybridMatchService()
+kg_service = KGMatchService()
 
 
 @app.exception_handler(Exception)
@@ -85,20 +87,14 @@ class CompanyProfileSchema(BaseModel):
     url_site: str = ""
     tipo_entidade: str = "empresa"
     one_liner: str = ""
-    problem_statement: str = ""
     solution_summary: str = ""
     descricao_atividades: str = ""
     portfolio_projetos: str = ""
     tamanho_empresa: str = ""
-    faturamento_anual_faixa: str = ""
-    localizacao: str = ""
     capital_social: float | None = None
-    certificacoes: list[str] = []
     equipe_resumo: str = ""
     trl: int | None = None
     tipos_financiamento_interesse: list[str] = []
-    uso_financiamento: list[str] = []
-    valor_buscado: float | None = None
 
 
 class MatchRequest(BaseModel):
@@ -155,20 +151,14 @@ def _to_py_profile(schema: CompanyProfileSchema) -> PyCompanyProfile:
         url_site=schema.url_site,
         tipo_entidade=schema.tipo_entidade,
         one_liner=schema.one_liner,
-        problem_statement=schema.problem_statement,
         solution_summary=schema.solution_summary,
         descricao_atividades=schema.descricao_atividades,
         portfolio_projetos=schema.portfolio_projetos,
         tamanho_empresa=schema.tamanho_empresa,
-        faturamento_anual_faixa=schema.faturamento_anual_faixa,
-        localizacao=schema.localizacao,
         capital_social=schema.capital_social,
-        certificacoes=schema.certificacoes,
         equipe_resumo=schema.equipe_resumo,
         trl=schema.trl,
         tipos_financiamento_interesse=schema.tipos_financiamento_interesse,
-        uso_financiamento=schema.uso_financiamento,
-        valor_buscado=schema.valor_buscado,
     )
 
 
@@ -194,14 +184,12 @@ def _profile_from_workspace(db, workspace_id: str) -> PyCompanyProfile:
         .maybe_single()
         .execute()
     )
-    raw = (result.data or {}).get("profile") or {}
+    raw = ((result.data if result else None) or {}).get("profile") or {}
     allowed = {
         "nome", "cnpj", "url_site", "tipo_entidade", "one_liner",
-        "problem_statement", "solution_summary", "descricao_atividades",
-        "portfolio_projetos", "tamanho_empresa", "faturamento_anual_faixa",
-        "localizacao", "capital_social", "certificacoes", "equipe_resumo",
-        "trl", "tipos_financiamento_interesse", "uso_financiamento",
-        "valor_buscado",
+        "solution_summary", "descricao_atividades", "portfolio_projetos",
+        "tamanho_empresa", "capital_social", "equipe_resumo", "trl",
+        "tipos_financiamento_interesse",
     }
     return PyCompanyProfile(**{k: v for k, v in raw.items() if k in allowed})
 
@@ -236,6 +224,39 @@ def get_edital(edital_id: str):
     if edital is None:
         raise HTTPException(status_code=404, detail=f"Edital '{edital_id}' não encontrado")
     return edital
+
+
+# =============================================================================
+# ENDPOINTS — KNOWLEDGE GRAPH (público, sem auth — vitrine do Dashboard)
+# =============================================================================
+
+
+class KGExploreRequest(BaseModel):
+    message: str
+    history: list[dict] = []
+    edital_ids: list[str] = []
+
+
+@app.get("/graph", summary="Nós + arestas do knowledge graph (público)")
+def get_graph():
+    """Grafo Obsidian-style do catálogo: editais, temas e públicos-alvo.
+
+    Público — alimenta a visualização do Dashboard sem exigir login.
+    """
+    return kg_service.get_graph()
+
+
+@app.post("/kg-explore", summary="Chat exploratório sobre o catálogo (público, sem perfil)")
+def kg_explore(req: KGExploreRequest):
+    """Conversa stateless com o knowledge graph — sem perfil, sem sessão.
+
+    Vitrine do produto: o visitante explora o landscape de fomento antes de
+    se cadastrar. O histórico é mantido pelo cliente e reenviado a cada turno.
+    """
+    if not req.message.strip():
+        raise HTTPException(status_code=422, detail="Mensagem vazia.")
+    answer = kg_service.explore(req.message, req.history, req.edital_ids)
+    return {"answer": answer}
 
 
 # =============================================================================
@@ -750,20 +771,14 @@ def extract_profile(req: ProfileExtractRequest):
             "cnpj": result.profile.cnpj,
             "tipo_entidade": result.profile.tipo_entidade,
             "one_liner": result.profile.one_liner,
-            "problem_statement": result.profile.problem_statement,
             "solution_summary": result.profile.solution_summary,
             "descricao_atividades": result.profile.descricao_atividades,
             "portfolio_projetos": result.profile.portfolio_projetos,
             "tamanho_empresa": result.profile.tamanho_empresa,
-            "faturamento_anual_faixa": result.profile.faturamento_anual_faixa,
-            "localizacao": result.profile.localizacao,
             "capital_social": result.profile.capital_social,
-            "certificacoes": result.profile.certificacoes,
             "trl": result.profile.trl,
             "equipe_resumo": result.profile.equipe_resumo,
             "tipos_financiamento_interesse": result.profile.tipos_financiamento_interesse,
-            "uso_financiamento": result.profile.uso_financiamento,
-            "valor_buscado": result.profile.valor_buscado,
         },
         "confidence": result.confidence,
         "source_title": result.source_title,

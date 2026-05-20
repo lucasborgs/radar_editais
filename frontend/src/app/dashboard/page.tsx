@@ -1,203 +1,197 @@
 "use client";
 
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { MetricCard, DataTable, StatusBadge } from "@/components/ui";
-import { STATUS_CONFIG } from "@/lib/constants";
-import { truncate } from "@/lib/utils";
-import { getDashboardStats, getEditais } from "@/lib/api";
+import { KnowledgeGraph } from "@/components/KnowledgeGraph";
+import { getGraph, kgExplore } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
-import type { Column } from "@/components/ui";
-import type { EditalEntry, DashboardStats } from "@/types/edital";
+import type { GraphData, KGChatMessage } from "@/lib/api";
 
-// ── Table columns ───────────────────────────────────────────────────────────
+const GREETING: KGChatMessage = {
+  role: "assistant",
+  content:
+    "Olá! Sou o assistente do Radar de Editais. Posso te mostrar oportunidades " +
+    "de fomento da FINEP — pergunte algo como \"quais editais aceitam startups?\" " +
+    "ou clique num nó do grafo ao lado. Quando quiser um ranking personalizado " +
+    "para a sua empresa, é só usar o Match.",
+};
 
-const COLUMNS: Column<EditalEntry>[] = [
-  {
-    key: "id",
-    header: "ID",
-    numeric: true,
-    render: (v) => (
-      <span className="font-data text-xs text-content-secondary">{String(v)}</span>
-    ),
-  },
-  {
-    key: "title",
-    header: "Título",
-    render: (v) => (
-      <span className="font-medium">{truncate(String(v), 60)}</span>
-    ),
-  },
-  {
-    key: "status",
-    header: "Status",
-    render: (v) => <StatusBadge status={v as EditalEntry["status"]} />,
-  },
-  {
-    key: "deadline",
-    header: "Prazo",
-    numeric: true,
-    render: (v) => (
-      <span className="text-xs">{String(v || "—")}</span>
-    ),
-  },
-  {
-    key: "themes",
-    header: "Temas",
-    render: (v) => (
-      <span className="text-xs text-content-secondary">
-        {Array.isArray(v) ? (v as string[]).slice(0, 2).join(", ") : String(v)}
-      </span>
-    ),
-  },
-];
+// ── Chat bubble ──────────────────────────────────────────────────────────────
 
-// ── Error banner ────────────────────────────────────────────────────────────
-
-function ErrorBanner({ message }: { message: string }) {
+function Bubble({ msg }: { msg: KGChatMessage }) {
+  const isUser = msg.role === "user";
   return (
-    <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-sans flex items-start gap-2">
-      <span className="shrink-0 mt-0.5">⚠</span>
-      <span>
-        <strong>Erro ao carregar dados:</strong> {message}
-        <br />
-        <span className="text-xs text-red-600">
-          Verifique se o servidor FastAPI está rodando em{" "}
-          <code className="font-data">http://localhost:8000</code>
-        </span>
-      </span>
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm font-sans whitespace-pre-wrap ${
+          isUser
+            ? "bg-primary text-white"
+            : "bg-white border border-border text-content-primary"
+        }`}
+      >
+        {msg.content}
+      </div>
     </div>
   );
 }
 
-// ── Page ────────────────────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const {
-    data: stats,
-    loading: statsLoading,
-    error: statsError,
-  } = useAsync<DashboardStats>(() => getDashboardStats(), []);
+  const router = useRouter();
+  const { data: graph, loading: graphLoading } = useAsync<GraphData>(
+    () => getGraph(),
+    []
+  );
 
-  const {
-    data: editais,
-    loading: editaisLoading,
-    error: editaisError,
-  } = useAsync<EditalEntry[]>(() => getEditais({ limit: 10 }), []);
+  const [messages, setMessages] = useState<KGChatMessage[]>([GREETING]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const error = statsError ?? editaisError;
-  const loading = statsLoading || editaisLoading;
+  useEffect(() => {
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages]);
 
-  // ── Derived chart data ────────────────────────────────────
-  const byStatusData = stats
-    ? [
-        {
-          label: STATUS_CONFIG.ABERTA.label,
-          value: stats.by_status["ABERTA"] ?? 0,
-          color: "#1DB954",
-        },
-        {
-          label: STATUS_CONFIG.ENCERRADA.label,
-          value: stats.by_status["ENCERRADA"] ?? 0,
-          color: "#6B7280",
-        },
-        {
-          label: STATUS_CONFIG.Desconhecido.label,
-          value: stats.by_status["Desconhecido"] ?? 0,
-          color: "#3b82f6",
-        },
-      ]
-    : [];
+  const send = useCallback(
+    async (text: string, editalIds: string[] = []) => {
+      const trimmed = text.trim();
+      if (!trimmed || sending) return;
 
-  const totalForPct = byStatusData.reduce((s, d) => s + d.value, 0) || 1;
+      const userMsg: KGChatMessage = { role: "user", content: trimmed };
+      // history = tudo menos o greeting inicial (não é contexto real de conversa)
+      const history = messages.filter((m) => m !== GREETING);
+      setMessages((prev) => [...prev, userMsg]);
+      setInput("");
+      setSending(true);
+
+      try {
+        const { answer } = await kgExplore(
+          trimmed,
+          [...history, userMsg],
+          editalIds
+        );
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: answer },
+        ]);
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "Não consegui falar com o servidor. Confirme se o backend está " +
+              "rodando em http://localhost:8000.",
+          },
+        ]);
+      } finally {
+        setSending(false);
+      }
+    },
+    [messages, sending]
+  );
+
+  const handleEditalClick = useCallback(
+    (label: string, editalId: string) => {
+      send(`Me fale sobre o edital "${label}".`, [editalId]);
+    },
+    [send]
+  );
 
   return (
     <DashboardLayout title="Dashboard">
-      <div className="space-y-6">
-        {/* Error banner */}
-        {error && !loading && <ErrorBanner message={error} />}
-
-        {/* KPI Row */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <MetricCard
-            label="Total de Editais"
-            value={stats ? stats.total_editais : "—"}
-            subtext="chamadas FINEP monitoradas"
-          />
-          <MetricCard
-            label="Editais Abertos"
-            value={stats ? (stats.by_status["ABERTA"] ?? 0) : "—"}
-            subtext="com prazo vigente"
-          />
-          <MetricCard
-            label="Temáticas Únicas"
-            value={stats ? stats.n_themes : "—"}
-            subtext="categorias identificadas"
-          />
-          <MetricCard
-            label="Fontes de Recurso"
-            value={stats ? stats.n_fontes : "—"}
-            subtext="programas distintos"
-          />
-        </div>
-
-        {/* Charts row */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {/* Status distribution */}
-          <div className="bg-white rounded-xl border border-border p-5 shadow-card">
-            <p className="text-sm font-semibold text-content-primary font-sans mb-4">
-              Distribuição por Status
+      <div className="flex gap-6 h-[calc(100vh-6.5rem)]">
+        {/* ── Chat (esquerda) ─────────────────────────────── */}
+        <div className="w-2/5 flex flex-col bg-app-bg rounded-xl border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-white">
+            <p className="text-sm font-semibold text-content-primary font-sans">
+              Converse com o catálogo
             </p>
-            {statsLoading ? (
-              <div className="h-[220px] flex items-center justify-center">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : (
-              <div className="space-y-4 mt-4">
-                {byStatusData.map(({ label, value, color }) => (
-                  <div key={label}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-content-secondary font-sans">
-                        {label}
-                      </span>
-                      <span className="font-data text-xs text-content-primary">
-                        {value}
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${(value / totalForPct) * 100}%`,
-                          backgroundColor: color,
-                        }}
-                      />
-                    </div>
+            <p className="text-xs text-content-secondary font-sans mt-0.5">
+              Sem cadastro · explore as oportunidades
+            </p>
+          </div>
+
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto p-4 space-y-3"
+          >
+            {messages.map((m, i) => (
+              <Bubble key={i} msg={m} />
+            ))}
+            {sending && (
+              <div className="flex justify-start">
+                <div className="bg-white border border-border rounded-xl px-3.5 py-2.5">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-content-secondary rounded-full animate-bounce" />
+                    <span className="w-1.5 h-1.5 bg-content-secondary rounded-full animate-bounce [animation-delay:0.15s]" />
+                    <span className="w-1.5 h-1.5 bg-content-secondary rounded-full animate-bounce [animation-delay:0.3s]" />
                   </div>
-                ))}
+                </div>
               </div>
             )}
           </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              send(input);
+            }}
+            className="p-3 border-t border-border bg-white flex gap-2"
+          >
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Pergunte sobre os editais…"
+              className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <button
+              type="submit"
+              disabled={sending || !input.trim()}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white font-sans disabled:opacity-40 transition-opacity"
+            >
+              Enviar
+            </button>
+          </form>
         </div>
 
-        {/* Recent editais table */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-content-primary font-sans">
-              Editais Recentes
-            </p>
-            <a
-              href="/editais"
-              className="text-xs text-primary hover:text-primary-hover font-medium font-sans transition-colors"
-            >
-              Ver todos →
-            </a>
+        {/* ── Grafo (direita) ─────────────────────────────── */}
+        <div className="flex-1 relative bg-white rounded-xl border border-border overflow-hidden">
+          <div className="absolute top-3 left-4 z-10 flex flex-wrap gap-x-3 gap-y-1 text-xs font-sans text-content-secondary max-w-[70%]">
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#1DB954]" /> Edital
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]" /> Tema
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#8b5cf6]" /> Público
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#0ea5e9]" /> Fonte
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#a855f7]" /> Programa
+            </span>
           </div>
-          <DataTable
-            data={editais ?? []}
-            columns={COLUMNS}
-            loading={editaisLoading}
-            emptyMessage="Nenhum edital disponível. Verifique se o backend está rodando."
-          />
+          {graphLoading || !graph ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <KnowledgeGraph data={graph} onEditalClick={handleEditalClick} />
+          )}
+          <button
+            onClick={() => router.push("/matching")}
+            className="absolute bottom-4 right-4 z-10 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white font-sans shadow-card hover:bg-primary-hover transition-colors"
+          >
+            Calcular meu match →
+          </button>
         </div>
       </div>
     </DashboardLayout>

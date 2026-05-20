@@ -29,35 +29,21 @@ import asyncio  # noqa: E402
 import json  # noqa: E402
 import logging  # noqa: E402
 import os  # noqa: E402
-import re  # noqa: E402
-from pathlib import Path  # noqa: E402
 
 from procrastinate import App, PsycopgConnector  # noqa: E402
 
-from config import FINEP_PDFS_DIR  # noqa: E402
-from core.chunker import chunk_edital  # noqa: E402
+from core.chunker import chunk_from_blocks  # noqa: E402
 from core.content_library import enrich_content  # noqa: E402
 from core.db import get_supabase_service  # noqa: E402
 from core.embedder import embed_texts  # noqa: E402
+from core.structurer import build_or_load_structured_doc  # noqa: E402
+from pipeline.adapters.base import get_adapter  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 # Same list used by WritingSession to skip non-edital boilerplate PDFs.
-# Filtro de boilerplate na ingestão de PDFs.
-#
-# Critério: cair fora se o PDF é (a) formulário em branco/minuta, (b) comunicação
-# administrativa, (c) resultado/relatório de chamadas passadas, ou (d) material
-# institucional sem regra técnica.
-#
-# `faq` e `tabela_com_requisitos` FORAM removidos da lista — FAQs trazem
-# esclarecimentos oficiais da Finep úteis pra escrita, e tabelas de requisitos
-# carregam valores e limites de compliance. Avaliação: 2026-05-13.
-_SKIP_KEYWORDS = [
-    "minuta", "declaracao", "carta_de_manifestacao",
-    "apresentacao", "resultado", "oficio", "telas_fap",
-    "orientacoes_para_apresentacao",
-    "orientacoes_para_despesas", "relatorio_parcial", "ebook",
-]
+# Descoberta de PDFs e dedup de versão são L1 (FINEP-específico) — vivem em
+# pipeline/adapters/finep.py. Aqui (L3) tasks.py consome Documento Canônico.
 
 
 def _build_app() -> App:
@@ -212,285 +198,39 @@ async def reflect_workspace_task(workspace_id: str) -> None:
 # RAG indexing
 # =============================================================================
 
-# =============================================================================
-# PDF extraction — table-aware + header/footer cleanup
-# =============================================================================
-# Editais FINEP/Petrobras têm dois problemas crônicos:
-#   1. Tabelas viram texto linearizado embaralhado (`pdfplumber.extract_text()`
-#      caminha célula-por-célula sem preservar layout).
-#   2. Cabeçalho institucional ("MINISTÉRIO DA…", "GOVERNO DO BRASIL…") e
-#      rodapé de paginação ("Página X de N") aparecem em toda página,
-#      poluindo chunks com tokens sem valor semântico.
-#
-# Solução:
-#   • `_extract_page_with_tables` — detecta tabelas via `find_tables()`,
-#     remove o bbox da extração de texto principal (via `page.filter`), e
-#     re-anexa cada tabela como bloco Markdown ao final do texto da página.
-#   • `_clean_edital_text` — descarta linhas conhecidas de header/footer.
-#
-# As tabelas em Markdown aparecem no `text` do chunk e são detectadas pelo
-# campo `metadata.contem_tabela` em `core.chunker._detect_metadata` via
-# busca pelo separador "|---" (que só existe em tabelas Markdown).
-
-_HEADER_FOOTER_TERMS = (
-    "MINISTÉRIO DA",
-    "CIÊNCIA, TECNOLOGIA",
-    "CIÊNCIA TECNOLOGIA",  # variante quando a vírgula some na extração
-    "E INOVAÇÃO",
-    "DO LADO DO POVO BRASILEIRO",
-    "GOVERNO DO BRASIL",
-)
-_PAGINATION_RE = re.compile(r"^Página\s+\d+\s+de\s+\d+$")
-
-
-def _table_to_markdown(rows: list[list]) -> str:
-    """Converte uma tabela 2D (lista de listas, 1ª linha = header) em Markdown.
-
-    Pula linhas inteiramente vazias. Pad/truncate de linhas curtas/longas
-    pra largura do header — tabelas FINEP às vezes têm células mescladas
-    que o pdfplumber reporta como linhas com colunas faltando.
-    """
-    if not rows or not rows[0]:
-        return ""
-
-    def cell(v) -> str:
-        if v is None:
-            return ""
-        # Newlines em célula quebram o formato Markdown — colapsa em espaço.
-        return str(v).strip().replace("\n", " ").replace("|", "\\|")
-
-    n_cols = len(rows[0])
-    header = "| " + " | ".join(cell(c) for c in rows[0]) + " |"
-    sep = "| " + " | ".join("---" for _ in range(n_cols)) + " |"
-    body: list[str] = []
-    for row in rows[1:]:
-        padded = (list(row) + [None] * n_cols)[:n_cols]
-        if not any(cell(v) for v in padded):
-            continue
-        body.append("| " + " | ".join(cell(c) for c in padded) + " |")
-    if not body:
-        return ""
-    return "\n".join([header, sep] + body)
-
-
-def _clean_edital_text(text: str) -> str:
-    """Remove cabeçalho institucional e rodapé de paginação."""
-    if not text:
-        return ""
-    out: list[str] = []
-    for line in text.split("\n"):
-        stripped = line.strip()
-        if _PAGINATION_RE.match(stripped):
-            continue
-        if any(term in stripped for term in _HEADER_FOOTER_TERMS):
-            continue
-        out.append(line)
-    cleaned = "\n".join(out)
-    # Colapsa 3+ newlines em 2 (evita blank-line storms após a limpeza).
-    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
-    return cleaned.strip()
-
-
-def _extract_page_with_tables(page) -> str:
-    """Extrai texto da página tratando tabelas como blocos Markdown separados.
-
-    Estratégia:
-        1. `find_tables()` localiza tabelas (bbox + dados).
-        2. `page.filter(predicate)` produz uma página virtual sem os
-           caracteres dentro de qualquer bbox de tabela — `extract_text`
-           dessa página dá só o texto fora das tabelas, sem o "embaralhado".
-        3. Cada tabela é renderizada como bloco Markdown e anexada ao
-           final do texto da página.
-
-    Fallback (se `page.filter` falhar): extract_text() normal — aceita
-    duplicação do conteúdo da tabela em vez de quebrar a extração.
-    """
-    tables = page.find_tables()
-    if not tables:
-        return page.extract_text() or ""
-
-    bboxes = [t.bbox for t in tables]
-
-    def _outside_tables(obj) -> bool:
-        for (x0, top, x1, bottom) in bboxes:
-            if (obj["x0"] >= x0 and obj["x1"] <= x1
-                    and obj["top"] >= top and obj["bottom"] <= bottom):
-                return False
-        return True
-
-    try:
-        main_text = page.filter(_outside_tables).extract_text() or ""
-    except Exception as e:
-        logger.debug("page.filter falhou (%s), caindo pra extract_text padrão", e)
-        main_text = page.extract_text() or ""
-
-    md_blocks: list[str] = []
-    for t in tables:
-        try:
-            md = _table_to_markdown(t.extract() or [])
-        except Exception as e:
-            logger.debug("table.extract() falhou: %s", e)
-            continue
-        if md:
-            md_blocks.append(md)
-
-    if md_blocks:
-        return main_text + "\n\n" + "\n\n".join(md_blocks)
-    return main_text
-
-
-def _extract_pdf_sync(pdf_path: Path) -> str:
-    """Read a PDF and return its concatenated text. Empty string on failure.
-
-    Mirrors WritingSession._extract_pdf — kept duplicated here to avoid a
-    circular dependency (writing_session imports may grow heavy).
-    """
-    try:
-        import pdfplumber
-        pages: list[str] = []
-        with pdfplumber.open(pdf_path) as pdf:
-            for page in pdf.pages:
-                raw = _extract_page_with_tables(page)
-                cleaned = _clean_edital_text(raw)
-                if cleaned:
-                    pages.append(cleaned)
-        # Junta com \n\n pra preservar limites de parágrafo entre páginas —
-        # importante pro fallback `_split_oversize` no chunker.
-        return "\n\n".join(pages)
-    except Exception as e:
-        logger.warning("chunk_edital_task: erro ao extrair %s: %s", pdf_path.name, e)
-        return ""
-
-
-# =============================================================================
-# Version dedup: keep only the latest version of FAQ and Edital regulamento
-# =============================================================================
-# Editais FINEP vêm com múltiplas versões do FAQ (`FAQ.pdf`, `FAQ_Versão_2.pdf`,
-# `FAQ_Versão_4_-_atualizado_em_06_04_2026.pdf`, …) e múltiplas rerratificações
-# do regulamento (`Edital.pdf`, `Rerratificação_-_Edital_rerratificado.pdf`,
-# `2ª_Rerratificação_-_Edital_rerratificado.pdf`, …). Versões antigas estão
-# SUPERSEDED pela mais recente — chunkar todas polui o retrieval com texto que
-# pode contradizer o vigente.
-#
-# Heurística deliberadamente conservadora: só agrupamos quando temos certeza.
-#   • Group `__faq__`: stem começa com "faq" OU contém tokens "perguntas" +
-#     "frequentes".
-#   • Group `__edital__`: tem token "edital" E (token "rerratificado" OU stem
-#     é exatamente "edital").
-#   • Qualquer outro arquivo (anexos, avisos, comunicados, orientações, …)
-#     é sua própria fonte — não há tentativa de agrupar.
-#
-# Recency: maior número de rerratificação > rerratificação sem número (= 1ª)
-#          > original. Pra FAQ: número de versão * 1000 + data DDMMYYYY.
-#
-# Notar: a comparação por token usa `re.split` em separadores comuns
-# (`_-. \s`) porque `\b` (word boundary) NÃO funciona entre underscore e
-# letra — `_` é word-char em regex.
-
-_FAQ_VERSION_RE = re.compile(r"vers[aã]o[_\s\-]*(\d+)")
-_FAQ_DATE_RE = re.compile(r"(\d{2})[_\s\-]?(\d{2})[_\s\-]?(\d{4})")
-_EDITAL_RERR_NUM_RE = re.compile(r"(\d+)[ªº°][_\s\-]*rerratifica")
-_FILENAME_TOKEN_RE = re.compile(r"[_\s\-.]+")
-
-
-def _version_info(stem: str) -> tuple[str | None, int]:
-    """Classifica um PDF num grupo de versionamento + score de recência.
-
-    Retorna `(group, recency)`. `group=None` significa "não-versionado" —
-    deve ser preservado como-está. Recency é monotônico: maior = mais novo.
-    """
-    s = stem.lower()
-    tokens = [t for t in _FILENAME_TOKEN_RE.split(s) if t]
-    if not tokens:
-        return (None, 0)
-
-    # FAQ group
-    is_faq = (tokens[0] == "faq"
-              or ("perguntas" in tokens and "frequentes" in tokens))
-    if is_faq:
-        recency = 0
-        m = _FAQ_VERSION_RE.search(s)
-        if m:
-            recency += int(m.group(1)) * 1000
-        m = _FAQ_DATE_RE.search(s)
-        if m:
-            d, mo, y = m.groups()
-            recency += int(y) * 10000 + int(mo) * 100 + int(d)
-        return ("__faq__", recency)
-
-    # Edital regulamento group
-    has_edital_tok = "edital" in tokens
-    has_rerr_tok = any("rerratificad" in t for t in tokens)
-    if has_edital_tok and (has_rerr_tok or s == "edital"):
-        recency = 0
-        m = _EDITAL_RERR_NUM_RE.search(s)
-        if m:
-            recency = int(m.group(1)) * 1000
-        elif has_rerr_tok:
-            recency = 500  # 1ª rerratificação sem número explícito
-        # Edital.pdf original fica com recency 0 (perde pra qualquer rerratificação).
-        return ("__edital__", recency)
-
-    return (None, 0)
-
-
-def _filter_to_latest_versions(pdfs: list[Path]) -> list[Path]:
-    """Filtra uma lista de PDFs mantendo só a versão mais recente de cada
-    grupo de versionamento conhecido. Arquivos não-versionados passam livres.
-    """
-    groups: dict[str, list[tuple[int, Path]]] = {}
-    keep: list[Path] = []
-    for pdf in pdfs:
-        group, recency = _version_info(pdf.stem)
-        if group is None:
-            keep.append(pdf)
-            continue
-        groups.setdefault(group, []).append((recency, pdf))
-
-    for group, items in groups.items():
-        items.sort(key=lambda x: x[0], reverse=True)
-        winner = items[0][1]
-        keep.append(winner)
-        for _, loser in items[1:]:
-            logger.info(
-                "chunk_edital_task: versão antiga descartada (group=%s, vencedor=%s): %s",
-                group, winner.name, loser.name,
-            )
-
-    # Preserva a ordem alfabética original — facilita reprodutibilidade dos chunk_index.
-    return sorted(keep)
+# Extração de PDF (table-aware, descoberta, dedup de versão) é L1 FINEP —
+# vive em pipeline/adapters/finep.py via o Source Adapter (WIKI.md §12).
 
 
 def _build_chunks_for_edital(edital_id: str) -> list[dict]:
-    """Walk FINEP_PDFS_DIR/<edital_id>, extract+chunk each PDF, return a
-    globally-renumbered chunk list. Pure synchronous worker — call from a
-    thread via asyncio.to_thread."""
-    pdf_dir = FINEP_PDFS_DIR / edital_id
-    if not pdf_dir.exists():
-        logger.warning("chunk_edital_task: diretório não encontrado: %s", pdf_dir)
+    """Pipeline da Retrieval gold (L3b, §12): Source Adapter → Documento
+    Canônico → structurer/silver → chunk_from_blocks.
+
+    Síncrono — chamar via asyncio.to_thread. Falha silenciosa do structurer
+    (silver vazio) → retorna [] e o caller limpa as linhas antigas, conforme
+    o contrato §11.4 ("falha LLM → B não indexa").
+    """
+    adapter = get_adapter("finep")
+    documents = adapter.to_documents(edital_id)
+    if not documents:
+        logger.warning(
+            "chunk_edital_task: adapter não retornou conteúdo p/ edital=%s",
+            edital_id,
+        )
         return []
 
-    # 1. Lista PDFs e filtra boilerplate por keyword.
-    candidates = [p for p in sorted(pdf_dir.glob("*.pdf"))
-                  if not any(kw in p.stem.lower() for kw in _SKIP_KEYWORDS)]
+    blocks = build_or_load_structured_doc("finep", edital_id, documents)
+    if not blocks:
+        logger.warning(
+            "chunk_edital_task: silver vazio p/ edital=%s (structurer falhou)",
+            edital_id,
+        )
+        return []
 
-    # 2. Mantém só a versão mais recente de cada grupo (FAQ, Edital regulamento).
-    candidates = _filter_to_latest_versions(candidates)
-
-    # 3. Chunk cada PDF sobrevivente.
-    all_chunks: list[dict] = []
-    for pdf_path in candidates:
-        text = _extract_pdf_sync(pdf_path)
-        if not text.strip():
-            continue
-        pdf_chunks = chunk_edital(text, source_file=pdf_path.name)
-        # chunk_edital uses local indexing — we reassign globally below.
-        all_chunks.extend(pdf_chunks)
-
-    # Global chunk_index across all PDFs of this edital.
-    for global_idx, chunk in enumerate(all_chunks):
+    chunks = chunk_from_blocks(blocks)
+    for global_idx, chunk in enumerate(chunks):
         chunk["chunk_index"] = global_idx
-    return all_chunks
+    return chunks
 
 
 @app.task(name="chunk_edital", queue="default")

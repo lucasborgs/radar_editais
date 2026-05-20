@@ -28,6 +28,7 @@ import time
 from pathlib import Path
 
 from config import FINEP_PDFS_DIR
+from core.wiki_schema import iso_to_br_date
 
 from .base import BaseScraper
 from .finep_api import FinepAPI, FinepAPIError, chamada_url_publica
@@ -152,8 +153,9 @@ class FINEPScraper(BaseScraper):
             "titulo": raw.get("titulo") or "",
             "link": chamada_url_publica(int(chamada_id)) if chamada_id.isdigit() else "",
             "status": situacao,
-            "data_publicacao": (raw.get("dataDePublicacao") or "")[:10] or None,
-            "prazo_envio": (raw.get("vigenciaFim") or "")[:10] or None,
+            # Liferay entrega ISO; schema exige dd/mm/yyyy (WIKI.md §4.1).
+            "data_publicacao": iso_to_br_date(raw.get("dataDePublicacao")) or None,
+            "prazo_envio": iso_to_br_date(raw.get("vigenciaFim")) or None,
             "fonte_recurso": "",                       # campo `fonteDeRecurso` exige outro endpoint
             "publico_alvo": publico,
             "tema": tema,

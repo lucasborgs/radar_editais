@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { DataTable, SidebarFilter, StatusBadge, EMPTY_FILTER } from "@/components/ui";
+import { DataTable, SidebarFilter, StatusBadge, EMPTY_FILTER, MetricCard } from "@/components/ui";
 import type { FilterState, Column } from "@/components/ui";
 import { truncate } from "@/lib/utils";
-import { getEditais } from "@/lib/api";
-import type { EditalEntry } from "@/types/edital";
+import { getEditais, getDashboardStats } from "@/lib/api";
+import { useAsync } from "@/lib/hooks";
+import type { EditalEntry, DashboardStats } from "@/types/edital";
 
 // ── Table columns ───────────────────────────────────────────────────────────
 
@@ -53,6 +54,7 @@ const COLUMNS: Column<EditalEntry>[] = [
 
 export default function EditaisPage() {
   const router = useRouter();
+  const { data: stats } = useAsync<DashboardStats>(() => getDashboardStats(), []);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTER);
   const [allEditais, setAllEditais] = useState<EditalEntry[]>([]);
   const [availableSources, setAvailableSources] = useState<string[]>([]);
@@ -136,6 +138,30 @@ export default function EditaisPage() {
           </span>
         </div>
       )}
+
+      {/* KPI row (migrado do Dashboard) */}
+      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <MetricCard
+          label="Total de Editais"
+          value={stats ? stats.total_editais : "—"}
+          subtext="chamadas FINEP monitoradas"
+        />
+        <MetricCard
+          label="Editais Abertos"
+          value={stats ? (stats.by_status["ABERTA"] ?? 0) : "—"}
+          subtext="com prazo vigente"
+        />
+        <MetricCard
+          label="Temáticas Únicas"
+          value={stats ? stats.n_themes : "—"}
+          subtext="categorias identificadas"
+        />
+        <MetricCard
+          label="Fontes de Recurso"
+          value={stats ? stats.n_fontes : "—"}
+          subtext="programas distintos"
+        />
+      </div>
 
       {/* Count row */}
       {!loading && !error && (

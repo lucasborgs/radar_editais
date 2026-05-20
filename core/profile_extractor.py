@@ -30,13 +30,10 @@ Schema de saída:
   "nome": string | null,
   "tipo_entidade": "empresa" | "startup" | "universidade" | "ICT" | null,
   "one_liner": string | null,
-  "problem_statement": string | null,
   "solution_summary": string | null,
   "descricao_atividades": string | null,
   "tamanho_empresa": "MEI" | "ME" | "EPP" | "MEDIO" | "GRANDE" | null,
-  "localizacao": string | null,
-  "trl": int | null,
-  "certificacoes": string[] | null
+  "trl": int | null
 }}
 
 Texto do site:
@@ -146,13 +143,10 @@ class ProfileExtractor:
             nome=get("nome") or "",
             tipo_entidade=get("tipo_entidade") or "",
             one_liner=get("one_liner") or "",
-            problem_statement=get("problem_statement") or "",
             solution_summary=get("solution_summary") or "",
             descricao_atividades=get("descricao_atividades") or "",
             tamanho_empresa=get("tamanho_empresa") or "",
-            localizacao=get("localizacao") or "",
             trl=get("trl"),
-            certificacoes=get("certificacoes") or [],
         )
         return profile, confidence
 

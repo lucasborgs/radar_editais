@@ -51,13 +51,7 @@ function TypingDots() {
 
 // ── Message bubble ────────────────────────────────────────────────────────────
 
-function MessageBubble({
-  msg,
-  onInsert,
-}: {
-  msg: WritingMessage;
-  onInsert?: (text: string) => void;
-}) {
+function MessageBubble({ msg }: { msg: WritingMessage }) {
   const isUser = msg.role === "user";
   return (
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
@@ -74,13 +68,10 @@ function MessageBubble({
           {msg.timestamp}
         </p>
       </div>
-      {!isUser && onInsert && (
-        <button
-          onClick={() => onInsert(msg.content)}
-          className="mt-1 text-[10px] font-sans text-primary hover:underline px-1"
-        >
-          ↑ Inserir na seção
-        </button>
+      {!isUser && msg.draftSaved && (
+        <span className="mt-1 text-[10px] font-sans text-green-600 px-1">
+          ↗ Salvo no documento
+        </span>
       )}
     </div>
   );
@@ -451,14 +442,6 @@ function WritingPageInner() {
     setDocContents((prev) => ({ ...prev, [activeSection]: value }));
   }
 
-  function handleInsertToSection(text: string) {
-    if (!activeSection) return;
-    setDocContents((prev) => {
-      const existing = prev[activeSection] ?? sectionDrafts[activeSection] ?? "";
-      return { ...prev, [activeSection]: existing ? `${existing}\n\n${text}` : text };
-    });
-  }
-
   async function handleDocSave() {
     if (!sessionId || !activeSection) return;
     setDocSaving(true);
@@ -561,17 +544,23 @@ function WritingPageInner() {
 
     try {
       const res = await sendWritingTurn(sessionId, userMsg.content, activeSection);
+      const draft = res.draft_content ?? null;
       const assistantMsg: WritingMessage = {
         role: "assistant",
         content: res.assistant_message,
         timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        draftSaved: !!draft,
       };
       setSectionHistories((prev) => ({
         ...prev,
         [activeSection]: [...(prev[activeSection] ?? []), assistantMsg],
       }));
-      // Salva último rascunho da seção
-      setSectionDrafts((prev) => ({ ...prev, [activeSection]: res.assistant_message }));
+      // Grantable: o backend já persistiu o draft em section_drafts (DB).
+      // Aqui só refletimos no estado local — editor + modal/export.
+      if (draft) {
+        setDocContents((prev) => ({ ...prev, [activeSection]: draft }));
+        setSectionDrafts((prev) => ({ ...prev, [activeSection]: draft }));
+      }
       setSections((prev) =>
         prev.map((s) => s.title === activeSection && s.status === "pending" ? { ...s, status: "draft" } : s)
       );
@@ -661,19 +650,8 @@ function WritingPageInner() {
           </div>
         )}
 
-        {/* ── Middle: document editor ───────────────────────────────────── */}
-        <div className="flex-[3] border-r border-border flex flex-col min-w-0">
-          <DocumentEditor
-            sectionTitle={activeSection}
-            content={activeDocContent}
-            onChange={handleDocChange}
-            onSave={handleDocSave}
-            saving={docSaving}
-          />
-        </div>
-
-        {/* ── Right: chat ──────────────────────────────────────────────── */}
-        <div className="flex-[2] flex flex-col min-w-0">
+        {/* ── Middle: chat ─────────────────────────────────────────────── */}
+        <div className="flex-[2] border-r border-border flex flex-col min-w-0">
           {/* Chat header */}
           <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
             <div>
@@ -691,11 +669,11 @@ function WritingPageInner() {
                 onClick={handleMarkReviewed}
                 className="text-xs font-sans text-content-secondary border border-border rounded-lg px-2.5 py-1 hover:border-green-400 hover:text-green-600 transition-colors"
               >
-                Marcar como revisado ✓
+                Concluída ✓
               </button>
             )}
             {activeSection && activeStatus === "reviewed" && (
-              <span className="text-xs font-sans text-green-600">✓ Revisado</span>
+              <span className="text-xs font-sans text-green-600">✓ Concluída</span>
             )}
           </div>
 
@@ -734,11 +712,7 @@ function WritingPageInner() {
                   </div>
                 )}
                 {messages.map((msg, i) => (
-                  <MessageBubble
-                    key={i}
-                    msg={msg}
-                    onInsert={msg.role === "assistant" ? handleInsertToSection : undefined}
-                  />
+                  <MessageBubble key={i} msg={msg} />
                 ))}
                 {loading && (
                   <div className="flex justify-start">
@@ -780,6 +754,17 @@ function WritingPageInner() {
               </div>
             </>
           )}
+        </div>
+
+        {/* ── Right: document editor ───────────────────────────────────── */}
+        <div className="flex-[3] flex flex-col min-w-0">
+          <DocumentEditor
+            sectionTitle={activeSection}
+            content={activeDocContent}
+            onChange={handleDocChange}
+            onSave={handleDocSave}
+            saving={docSaving}
+          />
         </div>
       </div>
     </DashboardLayout>

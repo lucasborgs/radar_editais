@@ -125,9 +125,9 @@ def get_workspace_id(db: Client, user_id: str) -> str:
     Recebe o cliente Supabase do caller para que a operação respeite RLS
     (cliente autenticado com JWT do request em rotas FastAPI).
     """
-    result = db.table("workspaces").select("id").eq("user_id", user_id).maybe_single().execute()
+    result = db.table("workspaces").select("id").eq("user_id", user_id).limit(1).execute()
     if result.data:
-        return result.data["id"]
+        return result.data[0]["id"]
     created = db.table("workspaces").insert({"user_id": user_id, "profile": {}}).execute()
     return created.data[0]["id"]
 
@@ -160,7 +160,7 @@ def get_item(db: Client, item_id: str, workspace_id: str) -> dict | None:
         .maybe_single()
         .execute()
     )
-    return result.data
+    return result.data if result else None
 
 
 async def create_item(
