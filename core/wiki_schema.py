@@ -81,6 +81,25 @@ def metadata_to_llm_keys(source: str) -> list[str]:
 
 
 # =============================================================================
+# DOCUMENTO ESTRUTURADO (silver — WIKI.md §11)
+# =============================================================================
+
+def structured_doc_schema() -> dict:
+    """Schema do bloco silver: block_fields, kinds, meta_sidecar (§11.1)."""
+    return load().get("structured_doc_schema", {})
+
+
+def structurer_params() -> dict:
+    """Parâmetros do structurer: versões, modelo, per_page (§11.2)."""
+    return load().get("structurer_params", {})
+
+
+def structurer_prompt() -> str:
+    """Prompt por página do structurer (§11.3). Fonte-agnóstico."""
+    return load()["structurer_prompt"]
+
+
+# =============================================================================
 # VOCABULÁRIOS
 # =============================================================================
 
@@ -134,6 +153,27 @@ def trl_range_to_faixas(trl_min: int | None, trl_max: int | None) -> list[str]:
 # =============================================================================
 # VIGÊNCIA
 # =============================================================================
+
+def iso_to_br_date(value: str | None) -> str:
+    """Normaliza data para o contrato do schema: `dd/mm/yyyy` (WIKI.md §4.1).
+
+    A API Liferay da FINEP entrega `yyyy-mm-dd` (ISO, possivelmente com hora).
+    Converte para `dd/mm/yyyy`. Já-`dd/mm/yyyy` passa direto. Vazio/None/
+    inválido → `""`. Boundary de ingestão: tudo a jusante assume dd/mm/yyyy.
+    """
+    if not value:
+        return ""
+    s = str(value).strip()
+    try:
+        return datetime.strptime(s[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+    except ValueError:
+        pass
+    try:
+        datetime.strptime(s, "%d/%m/%Y")  # valida e mantém
+        return s
+    except ValueError:
+        return ""
+
 
 def parse_deadline(value: str | None) -> date | None:
     if not value:
