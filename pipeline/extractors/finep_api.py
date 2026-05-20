@@ -41,6 +41,10 @@ BASE_URL = "https://www.finep.gov.br"
 TOKEN_URL = f"{BASE_URL}/o/oauth2/token"
 CHAMADAS_URL = f"{BASE_URL}/o/c/chamadapublicas"
 
+# groupId Liferay do site FINEP — constante no novo CMS (2026+).
+# Aparece em todas as URLs públicas: /e/chamada-publica/{SITE_GROUP_ID}/{id}
+SITE_GROUP_ID = 222684
+
 # Credenciais públicas embutidas no JS do próprio site FINEP — não são secret.
 # Se mudarem, basta inspecionar window.Finep ou o HTML dos templates.
 PUBLIC_CLIENT_ID = "idClientPRD"
@@ -243,9 +247,13 @@ class FinepAPI:
 
 
 # Helper público — útil para construir URLs de scraping/debug fora da classe
-def chamada_url_publica(database_id: int) -> str:
-    """URL pública da chamada no novo site FINEP (para humanos no browser)."""
-    return f"{BASE_URL}/oportunidades/chamadas-publicas?chamadaId={database_id}"
+def chamada_url_publica(liferay_id: int) -> str:
+    """URL pública da chamada no novo site FINEP (para humanos no browser).
+
+    Usa o Liferay `id` (não o `databaseId` legacy) e o groupId fixo do site.
+    Formato: /e/chamada-publica/{SITE_GROUP_ID}/{id}
+    """
+    return f"{BASE_URL}/e/chamada-publica/{SITE_GROUP_ID}/{liferay_id}"
 
 
 __all__ = ["FinepAPI", "FinepAPIError", "chamada_url_publica", "BASE_URL"]

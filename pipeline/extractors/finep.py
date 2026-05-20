@@ -131,7 +131,8 @@ class FINEPScraper(BaseScraper):
           API.descricao             → raw_html
           API.documentos[].link     → pdf_urls (lista de URLs absolutas)
         """
-        chamada_id = str(raw.get("databaseId") or raw.get("id") or "")
+        chamada_id = str(raw.get("databaseId") or "")
+        liferay_id = raw.get("id")
         # Normaliza status para caixa alta (esquema do build_knowledge_graph + wiki_schema)
         situacao_raw = (raw.get("situacao") or {}).get("name") or "Desconhecido"
         status_map = {
@@ -151,11 +152,12 @@ class FINEPScraper(BaseScraper):
             "fonte": self.source_name,
             "chamada_id": chamada_id,
             "titulo": raw.get("titulo") or "",
-            "link": chamada_url_publica(int(chamada_id)) if chamada_id.isdigit() else "",
+            "link": chamada_url_publica(liferay_id) if liferay_id else "",
             "status": situacao,
             # Liferay entrega ISO; schema exige dd/mm/yyyy (WIKI.md §4.1).
             "data_publicacao": iso_to_br_date(raw.get("dataDePublicacao")) or None,
-            "prazo_envio": iso_to_br_date(raw.get("vigenciaFim")) or None,
+            # prazoProposto é o prazo real de submissão; vigenciaFim é sempre null na API.
+            "prazo_envio": iso_to_br_date(raw.get("prazoProposto")) or None,
             "fonte_recurso": "",                       # campo `fonteDeRecurso` exige outro endpoint
             "publico_alvo": publico,
             "tema": tema,
