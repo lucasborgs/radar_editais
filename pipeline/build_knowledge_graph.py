@@ -258,18 +258,25 @@ def _make_index(editais: list[dict], label: str) -> dict:
     }
 
 
+def _deadline_expired(deadline_str: str | None) -> bool:
+    """True se prazo está definido E já passou. False se sem prazo (programa contínuo)."""
+    d = wiki_schema.parse_deadline(deadline_str)
+    return d is not None and d < date.today()
+
+
 def build_indices(chamadas: list[dict]) -> tuple[dict, dict]:
     """Retorna (index_vigentes, index_historico).
 
     Vigência (§7.1 WIKI.md):
-      - status == ABERTA                          → vigente (sempre, mesmo sem prazo)
-      - deadline parseável e futuro               → vigente
-      - status == ENCERRADA ou prazo passado/None → histórico
+      - status == ABERTA e (sem prazo OU prazo futuro) → vigente
+      - status == ABERTA e prazo passado               → histórico
+      - status == ENCERRADA                            → histórico
     """
     all_editais = _build_editais(chamadas)
     vigentes = [
         e for e in all_editais
-        if e.get("status") == "ABERTA" or wiki_schema.is_vigente(e.get("deadline"))
+        if e.get("status") == "ABERTA"
+        and not _deadline_expired(e.get("deadline"))
     ]
     return _make_index(vigentes, "vigentes"), _make_index(all_editais, "historico")
 
