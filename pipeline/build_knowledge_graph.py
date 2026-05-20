@@ -43,24 +43,31 @@ INDEX_HISTORICO_FILE = KNOWLEDGE_GRAPH_DIR / "index_historico.json"
 # =============================================================================
 
 def load_finep_bronze() -> list[dict]:
-    """Carrega JSONs bronze da FINEP com deduplicação por link."""
+    """Carrega o arquivo bronze FINEP mais recente.
+
+    Usa apenas o último arquivo: a API Liferay filtra situacao=aberta
+    server-side, então o scrape mais recente é a fonte autoritativa do
+    que está aberto agora. Acumular arquivos antigos fazia chamadas
+    encerradas resurgirem no índice.
+    """
     raw_dir = BRONZE_DIR / "finep_raw"
     if not raw_dir.exists():
         print(f"Diretório não encontrado: {raw_dir}")
         return []
 
-    seen: set[str] = set()
-    chamadas: list[dict] = []
-    for f in sorted(raw_dir.glob("*.json")):
-        try:
-            for item in json.loads(f.read_text(encoding="utf-8")):
-                link = item.get("link", "")
-                if link and link not in seen:
-                    seen.add(link)
-                    chamadas.append(item)
-        except Exception as e:
-            print(f"Erro ao ler {f.name}: {e}")
-    return chamadas
+    files = sorted(raw_dir.glob("*.json"))
+    if not files:
+        print(f"Nenhum arquivo bronze em {raw_dir}")
+        return []
+
+    latest = files[-1]
+    try:
+        chamadas = json.loads(latest.read_text(encoding="utf-8"))
+        print(f"Bronze carregado: {latest.name} ({len(chamadas)} chamadas)")
+        return chamadas
+    except Exception as e:
+        print(f"Erro ao ler {latest.name}: {e}")
+        return []
 
 
 # =============================================================================
