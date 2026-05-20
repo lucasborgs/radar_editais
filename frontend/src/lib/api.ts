@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "./constants";
+import { createSupabaseClient } from "./supabase";
 import type { EditalEntry, EditalCard, KGMatchResult, DashboardStats } from "@/types/edital";
 import type { CompanyProfile } from "@/types/profile";
 import type {
@@ -10,13 +11,29 @@ import type {
   ContentItemFull,
 } from "@/types/api";
 
+// Recupera o JWT corrente da sessão Supabase (lazy). Existir aqui evita
+// que cada função de API tenha que receber e propagar o token manualmente —
+// problema antigo onde algumas funções passavam (getMe, saveProfile) e
+// outras não (getMatches, startWritingSession, …), causando 401 em massa.
+async function getAccessToken(): Promise<string | undefined> {
+  try {
+    const supabase = createSupabaseClient();
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function apiFetch<T>(
   path: string,
   options?: RequestInit,
   token?: string
 ): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  // Token explícito > sessão Supabase corrente > sem header (rota pública).
+  const effectiveToken = token ?? (await getAccessToken());
+  if (effectiveToken) headers["Authorization"] = `Bearer ${effectiveToken}`;
   const res = await fetch(`${API_BASE_URL}${path}`, {
     headers,
     ...options,
@@ -68,6 +85,52 @@ export const getEditalById = (id: string) =>
 
 export const getDashboardStats = () =>
   apiFetch<DashboardStats>("/stats");
+
+// ── Knowledge Graph (público — Dashboard) ──────────────────
+
+export type GraphNodeType =
+  | "edital"
+  | "tema"
+  | "fonte"
+  | "publico"
+  | "subprograma"
+  | "home"
+  | "outro";
+
+export interface GraphNode {
+  id: string;
+  type: GraphNodeType;
+  label: string;
+  edital_id?: string;
+  status?: string;
+}
+
+export interface GraphLink {
+  source: string;
+  target: string;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}
+
+export interface KGChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export const getGraph = () => apiFetch<GraphData>("/graph");
+
+export const kgExplore = (
+  message: string,
+  history: KGChatMessage[],
+  editalIds: string[] = []
+) =>
+  apiFetch<{ answer: string }>("/kg-explore", {
+    method: "POST",
+    body: JSON.stringify({ message, history, edital_ids: editalIds }),
+  });
 
 // ── Matching ───────────────────────────────────────────────
 

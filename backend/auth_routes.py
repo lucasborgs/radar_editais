@@ -23,20 +23,14 @@ class ProfilePayload(BaseModel):
     url_site: str = ""
     tipo_entidade: str = "empresa"
     one_liner: str = ""
-    problem_statement: str = ""
     solution_summary: str = ""
     descricao_atividades: str = ""
     portfolio_projetos: str = ""
     tamanho_empresa: str = ""
-    faturamento_anual_faixa: str = ""
-    localizacao: str = ""
     capital_social: float | None = None
-    certificacoes: list[str] = []
     equipe_resumo: str = ""
     trl: int | None = None
     tipos_financiamento_interesse: list[str] = []
-    uso_financiamento: list[str] = []
-    valor_buscado: float | None = None
 
 
 class PreferencesPayload(BaseModel):

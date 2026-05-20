@@ -26,3 +26,8 @@ KNOWLEDGE_GRAPH_DIR = ROOT / "knowledge_graph"
 
 # Wiki pages por edital (Karpathy-style)
 KG_WIKI_DIR = KNOWLEDGE_GRAPH_DIR / "wiki"
+
+# Vault Obsidian unificado dentro do projeto (raiz do vault).
+# As notas vivem em OBSIDIAN_VAULT_DIR/<subfolder>/ (subfolder = "radar-editais").
+# Gerado por scripts/export_to_obsidian.py; lido pelo grafo do dashboard.
+OBSIDIAN_VAULT_DIR = ROOT / "obsidian_vault"

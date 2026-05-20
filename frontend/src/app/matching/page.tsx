@@ -6,22 +6,13 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatusBadge } from "@/components/ui";
 import { getMatches } from "@/lib/api";
 import { PORTE_LABELS, scoreColor } from "@/lib/constants";
-import type { TipoFinanciamento, UsoFinanciamento } from "@/types/profile";
+import type { TipoFinanciamento } from "@/types/profile";
 
 const FINANCIAMENTO_OPTIONS: { value: TipoFinanciamento; label: string }[] = [
   { value: "subvencao_nao_reembolsavel", label: "Subvenção (não reembolsável)" },
   { value: "credito_reembolsavel", label: "Crédito reembolsável" },
   { value: "matching_embrapii", label: "Matching EMBRAPII" },
   { value: "pesquisa_colaborativa", label: "Pesquisa colaborativa" },
-];
-
-const USO_OPTIONS: { value: UsoFinanciamento; label: string }[] = [
-  { value: "P&D_interno", label: "P&D interno" },
-  { value: "contratacao", label: "Contratação" },
-  { value: "equipamento", label: "Equipamento" },
-  { value: "prototipagem", label: "Prototipagem" },
-  { value: "internacionalizacao", label: "Internacionalização" },
-  { value: "marketing", label: "Marketing" },
 ];
 
 function CheckPills<T extends string>({
@@ -64,15 +55,6 @@ import type { CompanyProfile } from "@/types/profile";
 import type { KGMatchResult } from "@/types/edital";
 import { EMPTY_PROFILE, PROFILE_STORAGE_KEY, saveProfileToStorage } from "@/types/profile";
 
-const CERTIFICACOES_SUGERIDAS = [
-  "ISO 9001",
-  "ISO 14001",
-  "ISO/IEC 27001",
-  "CMMI",
-  "SEBRAE-MEI",
-  "Empresa B",
-  "PRONATEC",
-];
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
@@ -119,92 +101,6 @@ const INPUT_CLS = cn(
   "focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary",
   "transition-colors bg-white"
 );
-
-function TagInput({
-  value,
-  onChange,
-  placeholder,
-  suggestions,
-}: {
-  value: string[];
-  onChange: (v: string[]) => void;
-  placeholder?: string;
-  suggestions?: string[];
-}) {
-  const [draft, setDraft] = useState("");
-
-  function add(tag: string) {
-    const t = tag.trim();
-    if (t && !value.includes(t)) onChange([...value, t]);
-    setDraft("");
-  }
-
-  function remove(tag: string) {
-    onChange(value.filter((v) => v !== tag));
-  }
-
-  return (
-    <div>
-      <div className="flex gap-2 mb-1.5">
-        <input
-          className={INPUT_CLS}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === ",") {
-              e.preventDefault();
-              add(draft);
-            }
-          }}
-          placeholder={placeholder ?? "Digite e pressione Enter"}
-        />
-        <button
-          type="button"
-          onClick={() => add(draft)}
-          className="shrink-0 px-3 py-2 rounded-lg border border-border text-xs font-sans text-content-secondary hover:bg-gray-50 transition-colors"
-        >
-          Adicionar
-        </button>
-      </div>
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-1.5">
-          {value.map((tag) => (
-            <span
-              key={tag}
-              className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-sans"
-            >
-              {tag}
-              <button
-                type="button"
-                onClick={() => remove(tag)}
-                className="hover:text-red-500 transition-colors leading-none"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-      {suggestions && suggestions.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {suggestions
-            .filter((s) => !value.includes(s))
-            .slice(0, 5)
-            .map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => add(s)}
-                className="text-xs font-sans text-content-secondary border border-border/60 rounded-full px-2 py-0.5 hover:border-primary/40 hover:text-primary transition-colors"
-              >
-                + {s}
-              </button>
-            ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 const DIM_LABELS: Record<string, string> = {
   elegibilidade: "Elegibilidade",
@@ -331,13 +227,10 @@ function ProfileCompletionBar({ profile }: { profile: CompanyProfile }) {
     !!profile.descricao_atividades,
     !!profile.solution_summary,
     !!profile.tamanho_empresa,
-    !!profile.localizacao,
     profile.trl !== null,
     profile.tipos_financiamento_interesse.length > 0,
-    profile.uso_financiamento.length > 0,
     !!profile.portfolio_projetos,
     profile.capital_social !== null,
-    profile.certificacoes.length > 0,
     !!profile.equipe_resumo,
   ];
   const pct = Math.round((checks.filter(Boolean).length / checks.length) * 100);
@@ -470,14 +363,6 @@ export default function MatchingPage() {
                   ))}
                 </select>
               </Field>
-              <Field label="Localização">
-                <input
-                  className={INPUT_CLS}
-                  value={profile.localizacao}
-                  onChange={(e) => set("localizacao", e.target.value)}
-                  placeholder="Ex: São Paulo/SP"
-                />
-              </Field>
               <Field label="Capital social (R$)">
                 <input
                   type="number"
@@ -558,33 +443,6 @@ export default function MatchingPage() {
                   onChange={(v) => set("tipos_financiamento_interesse", v)}
                 />
               </Field>
-              <Field label="Uso previsto do recurso">
-                <CheckPills<UsoFinanciamento>
-                  options={USO_OPTIONS}
-                  value={profile.uso_financiamento}
-                  onChange={(v) => set("uso_financiamento", v)}
-                />
-              </Field>
-              <Field label="Valor buscado (R$)">
-                <input
-                  type="number"
-                  className={INPUT_CLS}
-                  value={profile.valor_buscado ?? ""}
-                  onChange={(e) =>
-                    set("valor_buscado", e.target.value ? Number(e.target.value) : null)
-                  }
-                  placeholder="Ex: 1000000"
-                />
-              </Field>
-            </FormSection>
-
-            <FormSection title="Certificações">
-              <TagInput
-                value={profile.certificacoes}
-                onChange={(v) => set("certificacoes", v)}
-                placeholder="Ex: ISO 9001"
-                suggestions={CERTIFICACOES_SUGERIDAS}
-              />
             </FormSection>
 
             {/* Search button */}

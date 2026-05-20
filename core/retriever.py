@@ -173,6 +173,7 @@ def retrieve_chunks(
     k: int = DEFAULT_TOP_K,
     fts_weight: float = DEFAULT_FTS_WEIGHT,
     max_per_source: int = DEFAULT_MAX_PER_SOURCE,
+    query_vec: list[float] | None = None,
 ) -> list[dict]:
     """Hybrid retrieval over edital_chunks for a given edital_id.
 
@@ -189,6 +190,9 @@ def retrieve_chunks(
         max_per_source: nº máximo de chunks do mesmo `source_file` no
             top-K. Default 2 evita o caso de "3 versões do mesmo FAQ
             dominando o top-3". Use 0 pra desativar a dedup.
+        query_vec: embedding pré-computado da query. Se fornecido, pula a
+            chamada `embed_query` (reuso entre edital RAG + biblioteca no
+            mesmo turno). Se None, embeda internamente (callers standalone).
 
     Tuning do default
     -----------------
@@ -205,7 +209,9 @@ def retrieve_chunks(
     dense_weight = 1.0 - fts_weight
 
     # 1. Embed the query (sync, blocking ~100ms — acceptable in a turn).
-    query_vec = embed_query(query)
+    #    Reusa o vetor pré-computado quando o caller já embedou (mesmo turno).
+    if query_vec is None:
+        query_vec = embed_query(query)
     vec_literal = _vector_literal(query_vec)
     ts_or_query = _build_or_tsquery(query)
 
@@ -375,6 +381,7 @@ def retrieve_library_items(
     alpha: float = 0.4,
     beta: float = 0.3,
     gamma: float = 0.3,
+    query_vec: list[float] | None = None,
 ) -> list[dict]:
     """Retrieval multi-critério em content_items (ADR §4.3 / RADAR §4.3).
 
@@ -390,7 +397,7 @@ def retrieve_library_items(
     """
     try:
         import psycopg
-        query_embedding = embed_query(query)
+        query_embedding = query_vec if query_vec is not None else embed_query(query)
         embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
 
         with psycopg.connect(_get_dsn()) as conn, conn.cursor() as cur:
