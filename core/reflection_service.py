@@ -88,8 +88,8 @@ Responda com JSON:
 
 
 def _make_client():
-    from openai import OpenAI
-    return OpenAI(api_key=os.environ["OPENAI_API_KEY"]), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    from core.llm_client import make_client
+    return make_client(api_key=os.environ["OPENAI_API_KEY"]), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
 def _load_outcomes(db: Client, workspace_id: str) -> list[dict]:

@@ -29,14 +29,14 @@ def _make_openai_client():
     Replicates the pattern from core.content_library._make_client but does NOT
     consider LLM_BACKEND — embeddings are always OpenAI by policy (A1).
     """
-    from openai import OpenAI
+    from core.llm_client import make_client
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError(
             "OPENAI_API_KEY não configurada — embeddings exigem OpenAI (ADR A1)."
         )
     # text-embedding-3-large lives on the canonical OpenAI endpoint.
-    return OpenAI(api_key=api_key)
+    return make_client(api_key=api_key)
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:

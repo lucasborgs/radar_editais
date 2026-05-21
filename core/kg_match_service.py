@@ -103,27 +103,27 @@ def _make_client():
     backend = os.getenv("LLM_BACKEND", "openai").lower()
 
     if backend == "gemini":
-        from openai import OpenAI
+        from core.llm_client import make_client
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY não definida")
-        return OpenAI(
+        return make_client(
             api_key=api_key,
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
         ), "gemini-2.5-flash"
 
     elif backend == "openai":
-        from openai import OpenAI
+        from core.llm_client import make_client
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY não definida")
         model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        return OpenAI(api_key=api_key), model
+        return make_client(api_key=api_key), model
 
     elif backend == "ollama":
-        from openai import OpenAI
+        from core.llm_client import make_client
         model = os.getenv("OLLAMA_MODEL", "llama3.2")
-        return OpenAI(
+        return make_client(
             api_key="ollama",
             base_url="http://localhost:11434/v1",
         ), model

@@ -97,12 +97,12 @@ class ProfileExtractor:
     def _call_llm(self, text: str) -> dict | None:
         backend = os.getenv("LLM_BACKEND", "openai").lower()
         try:
-            from openai import OpenAI
+            from core.llm_client import make_client
             if backend == "gemini":
                 api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
                 if not api_key:
                     return None
-                client = OpenAI(
+                client = make_client(
                     api_key=api_key,
                     base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
                 )
@@ -111,7 +111,7 @@ class ProfileExtractor:
                 api_key = os.getenv("OPENAI_API_KEY")
                 if not api_key:
                     return None
-                client = OpenAI(api_key=api_key)
+                client = make_client(api_key=api_key)
                 model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
             response = client.chat.completions.create(
