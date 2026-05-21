@@ -358,7 +358,7 @@ def _insert_chunks_psycopg(rows: list[dict]) -> None:
 # persistidas em pipeline_errors (taxonomia ADR §3.7).
 #
 # Para mudar o horário: ajuste o cron expression (formato padrão crontab).
-# Para ativar mais fontes: adicione em SCRAPER_REGISTRY (não em INACTIVE_SCRAPERS).
+# Para ativar mais fontes: implemente um BaseScraper concreto e registre em SCRAPER_REGISTRY.
 
 
 @app.periodic(cron="0 3 * * *")

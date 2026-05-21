@@ -3,8 +3,8 @@
 Radar de Editais matches Brazilian companies with public funding opportunities
 (editais) using a medallion ETL pipeline, semantic search and LLM agents. See
 [CLAUDE.md](CLAUDE.md) for the architecture overview and
-[ADR-001-decisoes-iniciais.md](ADR-001-decisoes-iniciais.md) for the foundational
-decisions, including M4 (local Supabase development).
+[docs/historical/ADR-001-decisoes-iniciais.md](docs/historical/ADR-001-decisoes-iniciais.md)
+for the foundational decisions, including M4 (local Supabase development).
 
 ## Local development
 

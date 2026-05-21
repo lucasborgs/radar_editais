@@ -9,7 +9,7 @@ Pra cada query no golden:
   4. Opcionalmente: chama `judge_faithfulness` pra context relevance.
 
 Saída: `eval_results/<YYYYMMDD_HHMMSS>_<source>.json` com config + summary +
-detalhe por query. Compare runs com `scripts/compare_runs.py`.
+detalhe por query.
 
 Uso:
     python scripts/eval_rag.py                                # source=finep default
