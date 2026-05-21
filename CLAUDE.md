@@ -26,7 +26,6 @@ cd frontend && npm run dev                      # Next.js frontend (port 3000)
 ### Data pipeline
 ```bash
 python scripts/run_all.py               # scrapers + full ETL (incremental, hash-based)
-python scripts/run_finep_pipeline.py    # FINEP only
 ```
 
 ### Fine-tuning pipeline
@@ -53,9 +52,8 @@ OPENAI_MODEL=gpt-4o-mini
 
 ### Data flow
 ```
-Bronze (raw FINEP HTML/PDFs/JSON)
-  → pipeline/etl_finep_facts.py   (LLM extraction de fatos atômicos)
-  → pipeline/etl_finep_cards.py   (LLM síntese de wiki page por edital)
+Bronze (raw FINEP JSON via Liferay API)
+  → pipeline/etl_process.py            (extração + normalização silver)
   → pipeline/build_knowledge_graph.py  (consolida index + wiki/*.json)
 
 Edital chunks (para RAG na WritingSession, ADR M9):
@@ -66,8 +64,6 @@ Edital chunks (para RAG na WritingSession, ADR M9):
 ```
 Paths em `config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR).
 
-Nota: os diretórios `chroma_db/` e `gold_vectors/` em disco são legado de um design anterior já removido do código. Podem ser deletados quando conveniente — nenhum módulo Python os referencia.
-
 ### Package layout
 ```
 backend/       FastAPI app (api.py) + auth_routes + library_routes
@@ -76,9 +72,8 @@ core/          db (Supabase clients), auth (JWT/DbClient), writing_session,
                checklist_service, profile_extractor, wiki_schema,
                chunker, embedder, retriever, tasks (procrastinate)
 domain/        CompanyProfile dataclass (user_profile.py)
-agents/        LLM agents (writer_agent, analyst_agent)
-pipeline/      ETL FINEP (extractors/, build_knowledge_graph, health_check)
-scripts/       CLI: run_all, run_finep_pipeline, reindex_edital, dev, deploy
+pipeline/      ETL FINEP (extractors/, etl_process, build_knowledge_graph, health_check)
+scripts/       CLI: run_all, reindex_edital, dev, deploy
 supabase/      migrations/*.sql + config.toml (local CLI)
 ```
 
@@ -115,10 +110,6 @@ Columns storing Python lists (e.g., `themes`, `keywords`) deserialize from Parqu
 
 ### Imports
 The package is installed via `pip install -e .`. All imports are absolute (`from core.matching_engine import MatchingEngine`). Never add `sys.path` hacks.
-
-### Agents use class, not function
-- `agents/analyst_agent.py` → class `AdherenceAnalyzer` (not a standalone function)
-- `agents/writer_agent.py` → class `ProposalDrafter`
 
 ### LLM enrichment cache
 `.enrichment_cache.json` at root prevents re-calling LLM on unchanged editais. Delete to force re-enrichment.

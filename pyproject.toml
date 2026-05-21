@@ -25,6 +25,7 @@ dependencies = [
     # No [asyncpg] extra exists upstream — the base install already brings psycopg[pool].
     "procrastinate>=2.0",
     "psycopg[binary,pool]>=3.1",
+    "slowapi>=0.1.9",                # rate limiting (proteção de custo LLM)
 ]
 
 [project.optional-dependencies]
@@ -37,7 +38,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["backend*", "pipeline*", "core*", "agents*", "domain*", "scripts*"]
+include = ["backend*", "pipeline*", "core*", "domain*", "scripts*"]
 
 [tool.setuptools]
 py-modules = ["config"]
@@ -45,7 +46,7 @@ py-modules = ["config"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-extend-exclude = ["chroma_db", "bronze_data", "silver_data", "silver_data_enriched", "gold_vectors", "knowledge_graph", "profiles", "__pycache__"]
+extend-exclude = ["bronze_data", "silver_data", "silver_data_enriched", "knowledge_graph", "profiles", "__pycache__"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B"]
@@ -78,7 +79,7 @@ ignore_missing_imports = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-exclude = ["pipeline/", "chroma_db/", "bronze_data/", "silver_data/", "gold_vectors/", "knowledge_graph/"]
+exclude = ["pipeline/", "bronze_data/", "silver_data/", "knowledge_graph/"]
 
 [[tool.mypy.overrides]]
 module = "pipeline.*"

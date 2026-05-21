@@ -4,7 +4,7 @@ Unit tests pra helpers de `core.retriever`:
   • `_dedup_by_source`   — diversidade no top-K (Fix B)
 
 Estes testes NÃO tocam o DB. Cobertura de integração (psycopg + pgvector)
-roda manualmente via `scripts/probe_rag.py`.
+exige fixture com pgvector ativo — TODO.
 """
 from __future__ import annotations
 
