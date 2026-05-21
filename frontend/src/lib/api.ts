@@ -91,7 +91,6 @@ export const getDashboardStats = () =>
 export type GraphNodeType =
   | "edital"
   | "tema"
-  | "fonte"
   | "publico"
   | "subprograma"
   | "home"
@@ -125,11 +124,19 @@ export const getGraph = () => apiFetch<GraphData>("/graph");
 export const kgExplore = (
   message: string,
   history: KGChatMessage[],
-  editalIds: string[] = []
+  editalIds: string[] = [],
+  nodeId?: string,
+  nodeType?: string,
 ) =>
   apiFetch<{ answer: string }>("/kg-explore", {
     method: "POST",
-    body: JSON.stringify({ message, history, edital_ids: editalIds }),
+    body: JSON.stringify({
+      message,
+      history,
+      edital_ids: editalIds,
+      node_id: nodeId,
+      node_type: nodeType,
+    }),
   });
 
 // ── Matching ───────────────────────────────────────────────
@@ -151,10 +158,27 @@ export const startWritingSession = (
     body: JSON.stringify({ edital_id: editalId, profile }),
   });
 
+export type ModelTier = "fast" | "auto" | "pro";
+
+export interface ModelTierInfo {
+  tier: ModelTier;
+  model: string;
+  label: string;
+  use_case: string;
+}
+
+export interface CommandsResponse {
+  commands: Array<{ name: string; description: string; endpoint: string }>;
+  model_tiers: ModelTierInfo[];
+}
+
+export const getCommands = () => apiFetch<CommandsResponse>("/commands");
+
 export const sendWritingTurn = (
   sessionId: string,
   userMessage: string,
-  sectionHint?: string
+  sectionHint?: string,
+  modelTier?: ModelTier
 ) =>
   apiFetch<WritingTurnResponse>("/writing/turn", {
     method: "POST",
@@ -162,6 +186,7 @@ export const sendWritingTurn = (
       session_id: sessionId,
       user_message: userMessage,
       section_hint: sectionHint,
+      model_tier: modelTier,
     }),
   });
 
@@ -261,6 +286,9 @@ export interface WritingSessionSummary {
 
 export const listWritingSessions = (token: string) =>
   apiFetch<{ sessions: WritingSessionSummary[] }>("/writing/sessions", undefined, token);
+
+export const deleteWritingSession = (sessionId: string, token: string) =>
+  apiFetch<{ ok: boolean }>(`/writing/sessions/${sessionId}`, { method: "DELETE" }, token);
 
 // ── User preferences ───────────────────────────────────────
 

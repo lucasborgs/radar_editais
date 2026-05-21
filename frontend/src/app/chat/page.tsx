@@ -9,8 +9,17 @@ import {
   startSectionChat,
   saveDocumentSection,
   exportDocument,
-  type DocumentSection,
+  type ModelTier,
 } from "@/lib/api";
+import { ModelTierSelector } from "@/components/ui/ModelTierSelector";
+
+const MODEL_TIER_STORAGE_KEY = "radar:model-tier";
+
+function loadInitialTier(): ModelTier {
+  if (typeof window === "undefined") return "auto";
+  const stored = window.localStorage.getItem(MODEL_TIER_STORAGE_KEY);
+  return stored === "fast" || stored === "pro" || stored === "auto" ? stored : "auto";
+}
 
 interface ChecklistItem {
   id: string;
@@ -376,6 +385,14 @@ function WritingPageInner() {
   const [sectionDrafts, setSectionDrafts] = useState<Record<string, string>>({});
 
   const [input, setInput] = useState("");
+  const [modelTier, setModelTier] = useState<ModelTier>(loadInitialTier);
+
+  const handleTierChange = useCallback((tier: ModelTier) => {
+    setModelTier(tier);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(MODEL_TIER_STORAGE_KEY, tier);
+    }
+  }, []);
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(false);
   const [sectionLoading, setSectionLoading] = useState(false);
@@ -543,7 +560,7 @@ function WritingPageInner() {
     setLoading(true);
 
     try {
-      const res = await sendWritingTurn(sessionId, userMsg.content, activeSection);
+      const res = await sendWritingTurn(sessionId, userMsg.content, activeSection, modelTier);
       const draft = res.draft_content ?? null;
       const assistantMsg: WritingMessage = {
         role: "assistant",
@@ -725,32 +742,41 @@ function WritingPageInner() {
               </div>
 
               {/* Input */}
-              <div className="p-3 border-t border-border flex gap-2">
-                <MentionsTextarea
-                  rows={2}
-                  value={input}
-                  onChange={setInput}
-                  onSubmitEnter={handleSend}
-                  token={authToken}
-                  placeholder="Escreva sua mensagem... (@ para mencionar biblioteca, Enter para enviar)"
-                  className={cn(
-                    "w-full rounded-xl border border-border px-3 py-2.5 text-sm font-sans",
-                    "text-content-primary placeholder:text-content-secondary resize-none",
-                    "focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                  )}
-                  disabled={!sessionId || loading}
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={!sessionId || loading || !input.trim()}
-                  className={cn(
-                    "self-end px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold font-sans",
-                    "hover:bg-primary-hover transition-colors",
-                    "disabled:opacity-50 disabled:cursor-not-allowed"
-                  )}
-                >
-                  Enviar
-                </button>
+              <div className="p-3 border-t border-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <ModelTierSelector
+                    value={modelTier}
+                    onChange={handleTierChange}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <MentionsTextarea
+                    rows={2}
+                    value={input}
+                    onChange={setInput}
+                    onSubmitEnter={handleSend}
+                    token={authToken}
+                    placeholder="Escreva sua mensagem... (@ para mencionar biblioteca, Enter para enviar)"
+                    className={cn(
+                      "w-full rounded-xl border border-border px-3 py-2.5 text-sm font-sans",
+                      "text-content-primary placeholder:text-content-secondary resize-none",
+                      "focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                    )}
+                    disabled={!sessionId || loading}
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={!sessionId || loading || !input.trim()}
+                    className={cn(
+                      "self-end px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold font-sans",
+                      "hover:bg-primary-hover transition-colors",
+                      "disabled:opacity-50 disabled:cursor-not-allowed"
+                    )}
+                  >
+                    Enviar
+                  </button>
+                </div>
               </div>
             </>
           )}
