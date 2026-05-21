@@ -167,21 +167,26 @@ def _rrf_merge(
 # =============================================================================
 
 def retrieve_chunks(
-    db: Client,  # noqa: ARG001 — reserved for a future stored-function path
-    edital_id: str,
+    db: Client | None,  # noqa: ARG001 — reserved for a future stored-function path
+    edital_ids: list[str],
     query: str,
     k: int = DEFAULT_TOP_K,
     fts_weight: float = DEFAULT_FTS_WEIGHT,
     max_per_source: int = DEFAULT_MAX_PER_SOURCE,
     query_vec: list[float] | None = None,
+    primary_boost: float = 1.5,
 ) -> list[dict]:
-    """Hybrid retrieval over edital_chunks for a given edital_id.
+    """Hybrid retrieval over edital_chunks para um ou mais editais.
 
     Returns top-k dicts with keys:
-        id, chunk_index, text, section, source_file, page_range, score
+        id, edital_id, chunk_index, text, section, source_file, page_range, score
 
     Args:
-        edital_id: ID do edital. Apenas chunks deste edital são considerados.
+        edital_ids: lista de IDs de editais. O PRIMEIRO é tratado como o
+            edital "primário" (o que está sendo redigido); os demais são
+            "análogos" — outros editais cujos chunks podem aparecer no
+            top-K como referência. Chunks são restritos a esses IDs via
+            `edital_id = ANY(%s)`.
         query: pergunta em linguagem natural. Embedada pra dense, tokenizada
             em OR-tsquery pra FTS.
         k: número final de chunks no retorno (após dedup).
@@ -193,6 +198,11 @@ def retrieve_chunks(
         query_vec: embedding pré-computado da query. Se fornecido, pula a
             chamada `embed_query` (reuso entre edital RAG + biblioteca no
             mesmo turno). Se None, embeda internamente (callers standalone).
+        primary_boost: multiplicador aplicado ao score RRF de chunks vindos
+            do `edital_ids[0]` (o primário). Default 1.5: análogos têm sinal
+            valioso (paráfrases, exemplos de regras parecidas) mas NÃO devem
+            dominar o top-K — o foco do turno é o edital primário. Use 1.0
+            pra desativar o boost.
 
     Tuning do default
     -----------------
@@ -202,7 +212,17 @@ def retrieve_chunks(
     por densidade de paráfrase. Em paridade (0.5), FAQs ganham o RRF por
     aparecerem em ambos retrievers — empurrando o regulamento fora do
     top-k. 0.3 mantém o FTS como complemento sem deixá-lo dominar.
+
+    Example:
+        chunks = retrieve_chunks(
+            db, ["601", "602", "603"], "qual o valor máximo?", k=5,
+        )
+        # chunks pode conter trechos do 601 (primário, boosted) e 602/603
+        # (análogos, score original). Use `format_chunks_for_prompt(chunks,
+        # edital_ids=["601", "602", "603"])` para prefixar os análogos.
     """
+    if not edital_ids:
+        return []
     if not query or not query.strip():
         return []
     fts_weight = max(0.0, min(1.0, fts_weight))
@@ -227,18 +247,20 @@ def retrieve_chunks(
             # 2a. Dense retrieval (top _CANDIDATE_LIMIT by cosine distance).
             #     `<=>` is the cosine-distance operator in pgvector.
             #     If fts_weight=1.0 we skip dense to save the index lookup.
+            #     `edital_id = ANY(%s)` aceita lista — psycopg3 converte
+            #     `list[str]` Python para `text[]` Postgres automaticamente.
             dense_rows: list[tuple[Any, ...]] = []
             if dense_weight > 0.0:
                 cur.execute(
                     """
-                    SELECT id::text, chunk_index, text, section, source_file, page_range
+                    SELECT id::text, edital_id, chunk_index, text, section, source_file, page_range
                       FROM public.edital_chunks
-                     WHERE edital_id = %s
+                     WHERE edital_id = ANY(%s)
                        AND embedding IS NOT NULL
                      ORDER BY embedding <=> %s::vector
                      LIMIT %s
                     """,
-                    (edital_id, vec_literal, _CANDIDATE_LIMIT),
+                    (edital_ids, vec_literal, _CANDIDATE_LIMIT),
                 )
                 dense_rows = cur.fetchall()
 
@@ -251,28 +273,29 @@ def retrieve_chunks(
             if fts_weight > 0.0 and ts_or_query:
                 cur.execute(
                     """
-                    SELECT id::text, chunk_index, text, section, source_file, page_range
+                    SELECT id::text, edital_id, chunk_index, text, section, source_file, page_range
                       FROM public.edital_chunks
-                     WHERE edital_id = %s
+                     WHERE edital_id = ANY(%s)
                        AND text_search @@ to_tsquery('portuguese', %s)
                      ORDER BY ts_rank(text_search, to_tsquery('portuguese', %s)) DESC
                      LIMIT %s
                     """,
-                    (edital_id, ts_or_query, ts_or_query, _CANDIDATE_LIMIT),
+                    (edital_ids, ts_or_query, ts_or_query, _CANDIDATE_LIMIT),
                 )
                 sparse_rows = cur.fetchall()
     except Exception as e:
-        logger.error("retrieve_chunks: erro de SQL para edital=%s: %s", edital_id, e)
+        logger.error("retrieve_chunks: erro de SQL para editais=%s: %s", edital_ids, e)
         raise
 
     # 3. Build id→row index for assembly after fusion. The same id may appear
     #    in both lists; we keep one canonical row payload.
     by_id: dict[str, dict] = {}
     for row in dense_rows + sparse_rows:
-        _id, chunk_index, text, section, source_file, page_range = row
+        _id, edital_id_val, chunk_index, text, section, source_file, page_range = row
         if _id not in by_id:
             by_id[_id] = {
                 "id": _id,
+                "edital_id": edital_id_val,
                 "chunk_index": chunk_index,
                 "text": text,
                 "section": section,
@@ -287,6 +310,18 @@ def retrieve_chunks(
     if not scores:
         return []
 
+    # 3a. Boost dos chunks do edital primário. Análogos contribuem com sinal
+    #     útil (regras parecidas, paráfrases) mas não devem dominar o top-K
+    #     — o turno está focado no edital primário. Multiplicar o score RRF
+    #     em vez de filtrar mantém os análogos visíveis quando não há
+    #     concorrência forte do primário (corpus do primário pobre, p.ex.).
+    primary_id = edital_ids[0]
+    if primary_boost != 1.0:
+        scores = {
+            _id: (score * primary_boost if by_id[_id].get("edital_id") == primary_id else score)
+            for _id, score in scores.items()
+        }
+
     # 4. Top-k por RRF score, com dedup por source_file pra diversidade.
     ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
     return _dedup_by_source(ranked, by_id, k, max_per_source)
@@ -297,7 +332,10 @@ def retrieve_chunks(
 # retrieval-side data model is the single source of truth)
 # =============================================================================
 
-def format_chunks_for_prompt(chunks: list[dict]) -> str:
+def format_chunks_for_prompt(
+    chunks: list[dict],
+    edital_ids: list[str] | None = None,
+) -> str:
     """Render a list of retrieved chunks as a prompt-friendly block.
 
     Layout (one trecho per block, blank line between):
@@ -307,8 +345,15 @@ def format_chunks_for_prompt(chunks: list[dict]) -> str:
         [Trecho 1 — <section>] <source_file>, p. <page_range>
         <text>
 
-        [Trecho 2 — ...]
+        [Trecho 2 — Análogo <edital_id> — <section>] ...
         ...
+
+    Args:
+        chunks: lista de dicts retornados por `retrieve_chunks`.
+        edital_ids: se fornecido, o PRIMEIRO é o edital primário (vínculo do
+            turno). Chunks vindos de outros editais recebem o prefixo
+            "Análogo <edital_id> — " no label para o LLM distinguir entre
+            o texto vinculante (primário) e referências de outros editais.
     """
     if not chunks:
         return ""
@@ -317,11 +362,19 @@ def format_chunks_for_prompt(chunks: list[dict]) -> str:
         f"(top-{len(chunks)} mais relevantes para a sua pergunta):"
     )
     blocks: list[str] = [header]
+    primary = edital_ids[0] if edital_ids else None
     for i, c in enumerate(chunks, start=1):
         section = c.get("section") or "sem seção"
         source = c.get("source_file") or "fonte desconhecida"
         page_range = c.get("page_range")
-        meta = f"[Trecho {i} — {section}] {source}"
+        chunk_edital = c.get("edital_id")
+        # Marca explicitamente os análogos: o LLM precisa saber que esse
+        # trecho NÃO é do edital da sessão (não-vinculante, só referência).
+        is_analogue = primary is not None and chunk_edital and chunk_edital != primary
+        section_label = (
+            f"Análogo {chunk_edital} — {section}" if is_analogue else section
+        )
+        meta = f"[Trecho {i} — {section_label}] {source}"
         if page_range:
             meta += f", p. {page_range}"
         blocks.append(f"{meta}\n{c.get('text', '').strip()}")

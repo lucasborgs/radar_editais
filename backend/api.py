@@ -26,6 +26,7 @@ from core.kg_match_service import KGMatchService
 from core.profile_extractor import ProfileExtractor
 from core.writing_session import (
     WritingSession,
+    delete_session,
     get_session_document,
     list_sessions,
 )
@@ -235,6 +236,8 @@ class KGExploreRequest(BaseModel):
     message: str
     history: list[dict] = []
     edital_ids: list[str] = []
+    node_id: str | None = None
+    node_type: str | None = None
 
 
 @app.get("/graph", summary="Nós + arestas do knowledge graph (público)")
@@ -255,7 +258,7 @@ def kg_explore(req: KGExploreRequest):
     """
     if not req.message.strip():
         raise HTTPException(status_code=422, detail="Mensagem vazia.")
-    answer = kg_service.explore(req.message, req.history, req.edital_ids)
+    answer = kg_service.explore(req.message, req.history, req.edital_ids, req.node_id, req.node_type)
     return {"answer": answer}
 
 
@@ -502,6 +505,15 @@ def writing_list_sessions(
 ):
     workspace_id = get_workspace_id(db, user_id)
     return {"sessions": list_sessions(db, workspace_id, status=status)}
+
+
+@app.delete("/writing/sessions/{session_id}", summary="Apaga sessão de escrita")
+def writing_delete_session(session_id: str, user_id: CurrentUserId, db: DbClient):
+    workspace_id = get_workspace_id(db, user_id)
+    ok = delete_session(db, session_id, workspace_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    return {"ok": True}
 
 
 @app.get(
