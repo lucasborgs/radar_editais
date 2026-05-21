@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { KnowledgeGraph } from "@/components/KnowledgeGraph";
 import { getGraph, kgExplore } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
-import type { GraphData, KGChatMessage } from "@/lib/api";
+import type { GraphData, GraphNode, KGChatMessage } from "@/lib/api";
 
 const GREETING: KGChatMessage = {
   role: "assistant",
@@ -24,13 +25,13 @@ function Bubble({ msg }: { msg: KGChatMessage }) {
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm font-sans whitespace-pre-wrap ${
+        className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm font-sans ${
           isUser
-            ? "bg-primary text-white"
-            : "bg-white border border-border text-content-primary"
+            ? "bg-primary text-white whitespace-pre-wrap"
+            : "bg-white border border-border text-content-primary prose prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 prose-headings:font-semibold prose-headings:text-content-primary"
         }`}
       >
-        {msg.content}
+        {isUser ? msg.content : <ReactMarkdown>{msg.content}</ReactMarkdown>}
       </div>
     </div>
   );
@@ -58,7 +59,7 @@ export default function DashboardPage() {
   }, [messages]);
 
   const send = useCallback(
-    async (text: string, editalIds: string[] = []) => {
+    async (text: string, editalIds: string[] = [], nodeId?: string, nodeType?: string) => {
       const trimmed = text.trim();
       if (!trimmed || sending) return;
 
@@ -73,7 +74,9 @@ export default function DashboardPage() {
         const { answer } = await kgExplore(
           trimmed,
           [...history, userMsg],
-          editalIds
+          editalIds,
+          nodeId,
+          nodeType,
         );
         setMessages((prev) => [
           ...prev,
@@ -96,9 +99,25 @@ export default function DashboardPage() {
     [messages, sending]
   );
 
-  const handleEditalClick = useCallback(
-    (label: string, editalId: string) => {
-      send(`Me fale sobre o edital "${label}".`, [editalId]);
+  const handleNodeClick = useCallback(
+    (node: GraphNode) => {
+      if (node.type === "edital" && node.edital_id) {
+        send(`Me fale sobre o edital "${node.label}".`, [node.edital_id]);
+        return;
+      }
+      const typeLabel: Record<string, string> = {
+        tema: "tema",
+        publico: "público-alvo",
+        subprograma: "subprograma",
+        home: "fonte de fomento",
+      };
+      const label = typeLabel[node.type] ?? node.type;
+      send(
+        `Apresente uma visão geral do ${label} "${node.label}": quais editais estão associados, valores disponíveis, prazos, perfis elegíveis e o que diferencia este ${label} no catálogo.`,
+        [],
+        node.id,
+        node.type,
+      );
     },
     [send]
   );
@@ -184,7 +203,7 @@ export default function DashboardPage() {
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
-            <KnowledgeGraph data={graph} onEditalClick={handleEditalClick} />
+            <KnowledgeGraph data={graph} onNodeClick={handleNodeClick} />
           )}
           <button
             onClick={() => router.push("/matching")}

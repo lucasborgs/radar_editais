@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
   listWritingSessions,
+  deleteWritingSession,
   getEditalById,
   type WritingSessionSummary,
 } from "@/lib/api";
@@ -49,6 +50,7 @@ export default function SessionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [titles, setTitles] = useState<Record<string, string>>({});
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +95,23 @@ export default function SessionsPage() {
       cancelled = true;
     };
   }, [getToken]);
+
+  async function handleDelete(e: React.MouseEvent, sessionId: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Excluir esta sessão permanentemente?")) return;
+    setDeleting(sessionId);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      await deleteWritingSession(sessionId, token);
+      setSessions(prev => prev.filter(s => s.session_id !== sessionId));
+    } catch {
+      alert("Erro ao excluir sessão.");
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   return (
     <DashboardLayout title="Sessões de escrita">
@@ -176,9 +195,23 @@ export default function SessionsPage() {
                         </span>
                       </div>
                     </div>
-                    <span className="text-xs text-primary font-sans shrink-0 self-center">
-                      Continuar →
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-primary font-sans">
+                        Continuar →
+                      </span>
+                      <button
+                        onClick={(e) => handleDelete(e, s.session_id)}
+                        disabled={deleting === s.session_id}
+                        className={cn(
+                          "p-1.5 rounded-lg text-content-secondary transition-colors",
+                          "hover:bg-red-50 hover:text-red-500",
+                          deleting === s.session_id && "opacity-40 cursor-not-allowed"
+                        )}
+                        title="Excluir sessão"
+                      >
+                        {deleting === s.session_id ? "…" : "🗑"}
+                      </button>
+                    </div>
                   </div>
                 </Link>
               );

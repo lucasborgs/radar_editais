@@ -219,11 +219,36 @@ class WritingSession:
             )
             self._save_outline()
 
+        # Escopo de RAG: edital primário + análogos (mesmo tema/publico no
+        # grafo). Computado uma vez por sessão — o vault muda raramente e a
+        # WritingSession é stateless entre requests. Falha cai para
+        # [edital_id] silenciosamente (KG indisponível ≠ sessão quebrada).
+        self._scope_edital_ids: list[str] = self._resolve_edital_scope()
+
         logger.info(
             "WritingSession %s | edital=%s | %d seções | turnos=%d | %s/%s",
             self.session_id, self.edital_id, len(self._proposal_outline),
             self._turn_count, self.backend, self.model,
         )
+
+    def _resolve_edital_scope(self) -> list[str]:
+        """edital primário + análogos via KGMatchService.resolve_scope.
+
+        Lazy import porque KGMatchService carrega o índice JSON; não vale
+        puxar no boot do módulo. Cap em 3 análogos para não inflar o
+        retrieval (chunks dos análogos rotulados via format_chunks_for_prompt).
+        """
+        try:
+            from core.kg_match_service import KGMatchService
+            return KGMatchService().resolve_scope(
+                edital_id=self.edital_id, max_analogues=3,
+            )
+        except Exception as e:
+            logger.warning(
+                "[%s] resolve_scope falhou (edital=%s): %s — sessão segue só com primário",
+                self.session_id, self.edital_id, e,
+            )
+            return [self.edital_id]
 
     # ------------------------------------------------------------------
     # Acesso lazy ao texto completo dos PDFs (fallback)
@@ -525,11 +550,13 @@ class WritingSession:
             if query_vec is not None:
                 try:
                     chunks = retrieve_chunks(
-                        self._db, self.edital_id, query=user_message, k=5,
+                        self._db, self._scope_edital_ids, query=user_message, k=5,
                         query_vec=query_vec,
                     )
                     if chunks:
-                        edital_chunks_context = format_chunks_for_prompt(chunks)
+                        edital_chunks_context = format_chunks_for_prompt(
+                            chunks, edital_ids=self._scope_edital_ids,
+                        )
                     else:
                         logger.warning(
                             "[%s] Nenhum chunk retornado para edital=%s — "
@@ -643,8 +670,13 @@ class WritingSession:
         ]
 
         try:
-            chunks = retrieve_chunks(self._db, self.edital_id, query=section_title, k=3)
-            chunks_text = format_chunks_for_prompt(chunks) if chunks else ""
+            chunks = retrieve_chunks(
+                self._db, self._scope_edital_ids, query=section_title, k=3,
+            )
+            chunks_text = (
+                format_chunks_for_prompt(chunks, edital_ids=self._scope_edital_ids)
+                if chunks else ""
+            )
         except Exception as e:
             logger.warning(
                 "[%s] get_section_starter: retrieve_chunks falhou: %s",
@@ -1100,7 +1132,26 @@ def list_sessions(
         for s in sessions:
             s["turn_count"] = 0
 
+    for s in sessions:
+        s["session_id"] = s.pop("id")
+
     return sessions
+
+
+def delete_session(db: Client, session_id: str, workspace_id: str) -> bool:
+    """Apaga a sessão e seus turnos. Retorna False se não pertencer ao workspace."""
+    check = (
+        db.table("writing_sessions")
+        .select("id")
+        .eq("id", session_id)
+        .eq("workspace_id", workspace_id)
+        .execute()
+    )
+    if not check.data:
+        return False
+    db.table("session_turns").delete().eq("session_id", session_id).execute()
+    db.table("writing_sessions").delete().eq("id", session_id).execute()
+    return True
 
 
 def get_session_document(

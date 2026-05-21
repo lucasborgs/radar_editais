@@ -14,7 +14,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.retriever import _build_or_tsquery, _dedup_by_source  # noqa: E402
+from core.retriever import (  # noqa: E402
+    _build_or_tsquery,
+    _dedup_by_source,
+    format_chunks_for_prompt,
+)
 
 
 # =============================================================================
@@ -198,3 +202,87 @@ def test_dedup_source_none_e_tratado_como_chave_propria():
     out = _dedup_by_source(ranked, by_id, k=3, max_per_source=1)
     # c1 entra (source=None), c2 NÃO (mesmo bucket None), c3 entra (Edital)
     assert [r["id"] for r in out] == ["c1", "c3"]
+
+
+# =============================================================================
+# format_chunks_for_prompt — labelling de chunks primário vs análogo (Etapa 2)
+# =============================================================================
+
+def _chunk(
+    edital_id: str | None = None,
+    section: str | None = "Art. 1",
+    source: str | None = "Edital.pdf",
+    text: str = "texto do trecho",
+    page: str | None = "1-2",
+) -> dict:
+    """Helper: monta um dict de chunk como retornado por retrieve_chunks."""
+    return {
+        "id": "abc",
+        "edital_id": edital_id,
+        "chunk_index": 0,
+        "text": text,
+        "section": section,
+        "source_file": source,
+        "page_range": page,
+        "score": 0.5,
+    }
+
+
+def test_format_chunks_empty():
+    """Sem chunks → string vazia (não emite header)."""
+    assert format_chunks_for_prompt([]) == ""
+    assert format_chunks_for_prompt([], edital_ids=["601"]) == ""
+
+
+def test_format_chunks_no_edital_ids():
+    """Sem `edital_ids`, formato igual ao comportamento anterior — nenhum
+    prefixo "Análogo" mesmo que o chunk tenha edital_id."""
+    chunks = [_chunk(edital_id="602", section="Art. 5")]
+    out = format_chunks_for_prompt(chunks)
+    assert "Análogo" not in out
+    assert "[Trecho 1 — Art. 5]" in out
+
+
+def test_format_chunks_primary_no_prefix():
+    """Chunk do edital primário não recebe prefixo."""
+    chunks = [_chunk(edital_id="601", section="Art. 3.2")]
+    out = format_chunks_for_prompt(chunks, edital_ids=["601"])
+    assert "Análogo" not in out
+    assert "[Trecho 1 — Art. 3.2]" in out
+
+
+def test_format_chunks_analogue_prefixed():
+    """Chunk de edital diferente do primário recebe prefixo "Análogo X — "."""
+    chunks = [_chunk(edital_id="602", section="Art. 3.2")]
+    out = format_chunks_for_prompt(chunks, edital_ids=["601", "602"])
+    assert "[Trecho 1 — Análogo 602 — Art. 3.2]" in out
+
+
+def test_format_chunks_mixed():
+    """Mistura: primário sem prefixo, análogo com prefixo."""
+    chunks = [
+        _chunk(edital_id="601", section="Art. 1", source="Edital601.pdf"),
+        _chunk(edital_id="602", section="Art. 2", source="Edital602.pdf"),
+    ]
+    out = format_chunks_for_prompt(chunks, edital_ids=["601", "602"])
+    # Primário sem prefixo
+    assert "[Trecho 1 — Art. 1]" in out
+    # Análogo com prefixo explícito
+    assert "[Trecho 2 — Análogo 602 — Art. 2]" in out
+
+
+def test_format_chunks_analogue_sem_section_usa_fallback():
+    """Quando o chunk não tem `section`, o label do análogo ainda
+    prefixa "Análogo X — sem seção"."""
+    chunks = [_chunk(edital_id="602", section=None)]
+    out = format_chunks_for_prompt(chunks, edital_ids=["601", "602"])
+    assert "Análogo 602 — sem seção" in out
+
+
+def test_format_chunks_sem_edital_id_no_chunk_e_sem_prefixo():
+    """Chunks que (por qualquer motivo) não carregam edital_id NÃO devem
+    receber prefixo de análogo — não há como afirmar que são de outro edital."""
+    chunks = [_chunk(edital_id=None, section="Art. 1")]
+    out = format_chunks_for_prompt(chunks, edital_ids=["601"])
+    assert "Análogo" not in out
+    assert "[Trecho 1 — Art. 1]" in out

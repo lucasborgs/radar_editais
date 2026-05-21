@@ -273,10 +273,6 @@ node_types:
     folder: temas
     tags: [finep, tema]
     emoji: "🏷️"
-  fonte:
-    folder: fontes
-    tags: [finep, fonte-recurso]
-    emoji: "💰"
   publico:
     folder: publicos
     tags: [finep, publico-alvo]
@@ -310,10 +306,6 @@ link_types:
     from: edital
     to: tema
     section: "## Temas"
-  edital_has_funding_source:
-    from: edital
-    to: fonte
-    section: "## Fonte de Recurso"
   edital_has_target_audience:
     from: edital
     to: publico
@@ -323,7 +315,7 @@ link_types:
     to: subprograma
     section: "## Subprograma"
   aggregator_lists_edital:
-    from: [tema, fonte, publico, subprograma, home]
+    from: [tema, publico, subprograma, home]
     to: edital
     section: "## Editais"
 ```

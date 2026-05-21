@@ -48,12 +48,16 @@ mostrar o potencial da plataforma respondendo perguntas sobre o catálogo de edi
 partir do índice estruturado fornecido.
 
 Diretrizes:
-- Responda de forma direta e útil, em português, baseando-se SÓ no contexto fornecido.
+- Responda de forma direta e útil, em português.
 - Cite editais pelo título e ID quando relevante (ex: "Chamada FINEP-CDTI (ID 589)").
 - Nunca invente editais, prazos, valores ou requisitos que não estejam no contexto.
 - Quando houver DETALHES de um edital específico, use-os para responder com profundidade
   (objetivo, elegibilidade, requisitos, prazo). Sem detalhes, responda com o catálogo.
-- Seja conciso. Use listas curtas quando listar editais. Sem markdown pesado."""
+- Para perguntas conceituais (ex: "o que é subvenção?", "como funciona o FNDCT?"):
+  explique brevemente o conceito e ancore no catálogo atual (quais editais do catálogo
+  usam esse mecanismo, quantos, exemplos). Não responda de forma genérica sem conectar
+  ao catálogo.
+- Seja conciso. Use listas curtas quando listar editais."""
 
 EXPLORE_USER_PROMPT = """CATÁLOGO DE EDITAIS FINEP:
 {index_json}
@@ -312,6 +316,12 @@ class KGMatchService:
             if v.get("folder")
         }
 
+    def _node_type_for_parts(self, parts: tuple[str, ...]) -> str | None:
+        """parts = node_id.split('/'). Retorna tipo ou None (fora do schema)."""
+        if len(parts) < 3:
+            return "home" if parts[-1] == "HOME" else None
+        return self._folder_type_map().get(parts[1])
+
     def get_graph(self) -> dict:
         """Constrói o grafo a partir do vault Obsidian unificado no projeto.
 
@@ -327,29 +337,23 @@ class KGMatchService:
             logger.warning("Vault Obsidian não encontrado: %s", vault)
             return {"nodes": [], "links": []}
 
-        folder_type = self._folder_type_map()
         nodes: dict[str, dict] = {}
         edges: set[tuple[str, str]] = set()
-
-        def type_for(parts: tuple[str, ...]) -> str | None:
-            """parts = node_id split por '/'. Resolve o tipo via schema."""
-            if len(parts) < 3:
-                return "home" if parts[-1] == "HOME" else None
-            return folder_type.get(parts[1])
 
         for path in sorted(vault.rglob("*.md")):
             rel = path.relative_to(vault).with_suffix("")
             node_id = "/".join(rel.parts)
-            ntype = type_for(rel.parts)
+            ntype = self._node_type_for_parts(rel.parts)
             if ntype is None:  # pasta fora do schema (tag rebaixada / stray)
                 continue
 
             text = path.read_text(encoding="utf-8")
             fm = self._parse_frontmatter(text)
+            label = "FINEP" if ntype == "home" else (fm.get("title") or path.stem)
             node: dict = {
                 "id": node_id,
                 "type": ntype,
-                "label": fm.get("title") or path.stem,
+                "label": label,
             }
             if ntype == "edital":
                 node["edital_id"] = path.stem
@@ -360,7 +364,7 @@ class KGMatchService:
                 target = target.strip()
                 if target.endswith("/"):  # link de pasta (nav HOME) — sem aresta
                     continue
-                if type_for(tuple(target.split("/"))) is None:
+                if self._node_type_for_parts(tuple(target.split("/"))) is None:
                     continue  # alvo fora do schema (ex.: nó rebaixado a tag)
                 a, b = sorted((node_id, target))
                 edges.add((a, b))
@@ -372,7 +376,7 @@ class KGMatchService:
                     seg = tuple(nid.split("/"))
                     nodes[nid] = {
                         "id": nid,
-                        "type": type_for(seg) or "outro",
+                        "type": self._node_type_for_parts(seg) or "outro",
                         "label": seg[-1],
                     }
 
@@ -443,11 +447,92 @@ class KGMatchService:
             return ""
         return "\nDETALHES DOS EDITAIS EM FOCO:" + "\n".join(blocks) + "\n"
 
+    def _edital_ids_for_node(self, node_id: str) -> list[str]:
+        """Extrai IDs de editais ligados ao nó via wikilinks no MD do vault."""
+        path = OBSIDIAN_VAULT_DIR / f"{node_id}.md"
+        if not path.exists():
+            return []
+        text = path.read_text(encoding="utf-8")
+        ids = []
+        for target, _ in self._WIKILINK_RE.findall(text):
+            parts = target.strip().split("/")
+            if len(parts) >= 2 and parts[-2] == "editais":
+                ids.append(parts[-1])
+        return ids
+
+    def _find_analogue_ids(self, edital_id: str) -> list[str]:
+        """Traversal reverso: edital → temas/publicos/subprogramas → editais análogos.
+
+        Lê a wiki page do edital no vault, segue wikilinks para nós não-edital, e
+        coleta os editais ligados a cada um. Retorna os IDs análogos (sem o
+        próprio edital_id), preservando ordem de descoberta.
+        """
+        edital_path = OBSIDIAN_VAULT_DIR / f"radar-editais/editais/{edital_id}.md"
+        if not edital_path.exists():
+            return []
+
+        text = edital_path.read_text(encoding="utf-8")
+        folder_type = self._folder_type_map()
+
+        neighbour_nodes: list[str] = []
+        for target, _ in self._WIKILINK_RE.findall(text):
+            target = target.strip()
+            if target.endswith("/"):
+                continue
+            parts = target.split("/")
+            if len(parts) < 3:
+                continue
+            folder = parts[1]
+            if folder == "editais" or folder not in folder_type:
+                continue
+            neighbour_nodes.append(target)
+
+        seen: set[str] = {str(edital_id)}
+        analogues: list[str] = []
+        for node_id in neighbour_nodes:
+            for eid in self._edital_ids_for_node(node_id):
+                if eid not in seen:
+                    seen.add(eid)
+                    analogues.append(eid)
+        return analogues
+
+    def resolve_scope(
+        self,
+        edital_id: str | None = None,
+        node_id: str | None = None,
+        node_type: str | None = None,
+        max_analogues: int = 3,
+    ) -> list[str]:
+        """Resolve trigger → list[edital_ids], com o ID primário primeiro.
+
+        Regras:
+          - node_type ∈ {tema, publico, subprograma, fonte, ...}: retorna os IDs
+            que o nó liga via wikilinks (`_edital_ids_for_node`)
+          - node_type == "edital" ou edital_id (sessão): retorna [primary] +
+            análogos (até max_analogues) via traversal reverso
+          - Sem trigger algum: retorna todos os edital_ids do índice
+        """
+        if node_id and node_type and node_type not in ("edital", "home", None):
+            return self._edital_ids_for_node(node_id)
+
+        primary = edital_id
+        if node_id and node_type == "edital":
+            primary = node_id.split("/")[-1]
+
+        if primary:
+            analogues = self._find_analogue_ids(primary)[:max_analogues]
+            return [primary] + analogues
+
+        self._load_index()
+        return [str(e["id"]) for e in self._index.get("editais", [])]
+
     def explore(
         self,
         message: str,
         history: list[dict] | None = None,
         edital_ids: list[str] | None = None,
+        node_id: str | None = None,
+        node_type: str | None = None,
     ) -> str:
         """Chat stateless sobre o catálogo — sem perfil, sem sessão.
 
@@ -455,10 +540,25 @@ class KGMatchService:
         cliente). Mantém a conversa coerente sem persistência no servidor.
         edital_ids: IDs vindos de clique num nó do grafo. Combinados com IDs
         detectados no texto, carregam a wiki page pra resposta profunda.
+        node_id/node_type: quando clicado num nó não-edital (tema, publico,
+        subprograma, home), resolve os editais conectados e usa como contexto.
         """
         self._ensure_client()
         index_str = self._get_index_for_prompt()
-        focus_ids = self._resolve_focus_ids(message, edital_ids)
+
+        # Resolve escopo via resolve_scope: clique em nó-edital agora também
+        # traz análogos (mesmo tema/publico) — antes o clique em edital trazia
+        # só ele próprio. Para nós tema/publico, mantém comportamento (wikilinks
+        # diretos). Sem clique, scope_ids fica None e caímos no comportamento
+        # antigo (focus vem de `edital_ids` passado + detecção no texto).
+        scope_ids: list[str] | None = None
+        if node_id and node_type:
+            primary = (edital_ids[0] if edital_ids and node_type == "edital" else None)
+            scope_ids = self.resolve_scope(
+                edital_id=primary, node_id=node_id, node_type=node_type,
+            )
+
+        focus_ids = self._resolve_focus_ids(message, scope_ids or edital_ids)
         details_block = self._build_edital_details(focus_ids)
 
         messages: list[dict] = [{"role": "system", "content": EXPLORE_SYSTEM_PROMPT}]
