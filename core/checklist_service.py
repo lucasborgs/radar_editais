@@ -345,7 +345,7 @@ async def auto_review_checklist(
         }
 
     try:
-        from openai import AsyncOpenAI
+        from core.llm_client import make_async_client
     except ImportError as e:
         logger.error("AsyncOpenAI indisponível: %s", e)
         return {
@@ -360,7 +360,7 @@ async def auto_review_checklist(
     if base_url:
         client_kwargs["base_url"] = base_url
 
-    async with AsyncOpenAI(**client_kwargs) as client:
+    async with make_async_client(**client_kwargs) as client:
         results = await asyncio.gather(
             _pass_compliance(proposal, edital_requirements, client, model),
             _pass_quality(proposal, client, model),

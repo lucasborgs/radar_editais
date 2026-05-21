@@ -53,14 +53,14 @@ importance_score reflete o valor do documento para escrita de propostas de fomen
 # =============================================================================
 
 def _make_client():
-    from openai import OpenAI
+    from core.llm_client import make_client
     backend = os.getenv("LLM_BACKEND", "openai").lower()
     if backend == "gemini":
-        return OpenAI(
+        return make_client(
             api_key=os.environ["GEMINI_API_KEY"],
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
         ), "gemini-2.5-flash"
-    return OpenAI(api_key=os.environ["OPENAI_API_KEY"]), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    return make_client(api_key=os.environ["OPENAI_API_KEY"]), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
 def enrich_content(content: str) -> dict:

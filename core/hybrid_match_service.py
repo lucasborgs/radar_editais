@@ -398,14 +398,14 @@ e aderência do problema/solução ao foco do programa.
 
 
 def _make_client():
-    from openai import OpenAI
+    from core.llm_client import make_client
     backend = os.getenv("LLM_BACKEND", "openai").lower()
 
     if backend == "gemini":
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY não definida")
-        return OpenAI(
+        return make_client(
             api_key=api_key,
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
         ), "gemini-2.5-flash"
@@ -413,7 +413,7 @@ def _make_client():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY não definida")
-    return OpenAI(api_key=api_key), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    return make_client(api_key=api_key), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
 def _call_stage2(eligible: list[Stage1Result], profile: CompanyProfile) -> dict[str, dict]:

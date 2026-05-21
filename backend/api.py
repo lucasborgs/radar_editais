@@ -12,10 +12,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+import os
+
+import jwt
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from backend.auth_routes import router as auth_router
 from backend.library_routes import router as library_router
@@ -42,16 +48,51 @@ app = FastAPI(
     version="2.0.0",
 )
 
+
+def _allowed_origins() -> list[str]:
+    # localhost sempre liberado para dev; FRONTEND_URL (CSV) adiciona origens de prod.
+    defaults = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    extra = [o.strip() for o in os.getenv("FRONTEND_URL", "").split(",") if o.strip()]
+    return list(dict.fromkeys(defaults + extra))
+
+
+ALLOWED_ORIGINS = _allowed_origins()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# =============================================================================
+# RATE LIMITING (slowapi) — proteção de custo LLM
+# =============================================================================
+
+
+def _rate_limit_key(request: Request) -> str:
+    """Particiona o rate limit por usuário autenticado; cai para IP se anônimo.
+
+    A assinatura do JWT NÃO é verificada aqui — isso serve apenas para escolher
+    a chave do bucket. A validação real do token acontece em cada endpoint via
+    CurrentUserId.
+    """
+    auth = request.headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        try:
+            payload = jwt.decode(auth[7:], options={"verify_signature": False})
+            sub = payload.get("sub")
+            if sub:
+                return f"user:{sub}"
+        except Exception:
+            pass
+    return get_remote_address(request)
+
+
+limiter = Limiter(key_func=_rate_limit_key)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # =============================================================================
 # ROUTERS
@@ -70,10 +111,17 @@ kg_service = KGMatchService()
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    # O 500 é gerado acima do CORSMiddleware, então o header CORS precisa ser
+    # reaplicado manualmente — refletindo o Origin da request se for permitido.
+    origin = request.headers.get("origin", "")
+    headers = {}
+    if origin in ALLOWED_ORIGINS:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
     return JSONResponse(
         status_code=500,
         content={"detail": str(exc)},
-        headers={"Access-Control-Allow-Origin": "http://localhost:3000"},
+        headers=headers,
     )
 
 
@@ -250,7 +298,8 @@ def get_graph():
 
 
 @app.post("/kg-explore", summary="Chat exploratório sobre o catálogo (público, sem perfil)")
-def kg_explore(req: KGExploreRequest):
+@limiter.limit("3/minute")
+def kg_explore(request: Request, req: KGExploreRequest):
     """Conversa stateless com o knowledge graph — sem perfil, sem sessão.
 
     Vitrine do produto: o visitante explora o landscape de fomento antes de
@@ -268,7 +317,8 @@ def kg_explore(req: KGExploreRequest):
 
 
 @app.post("/match", summary="Rankeamento de editais via LLM (Karpathy-style)")
-def match_editais(req: MatchRequest, user_id: CurrentUserId, db: DbClient):
+@limiter.limit("10/minute")
+def match_editais(request: Request, req: MatchRequest, user_id: CurrentUserId, db: DbClient):
     """
     Recebe um perfil de empresa e retorna editais FINEP rankeados por relevância.
     A LLM lê o catálogo completo e justifica cada recomendação por dimensão.
@@ -393,8 +443,9 @@ def list_commands():
 
 
 @app.post("/opportunity/brief", summary="Gera Brief de Oportunidade para um edital (decision matrix + GO/NO-GO)")
+@limiter.limit("10/minute")
 def opportunity_brief(
-    req: OpportunityBriefRequest, user_id: CurrentUserId, db: DbClient
+    request: Request, req: OpportunityBriefRequest, user_id: CurrentUserId, db: DbClient
 ):
     """Avaliação formal antes de iniciar uma proposta (ADR §3.6, RADAR Gap 6).
 
@@ -420,7 +471,9 @@ def opportunity_brief(
 
 
 @app.post("/writing/start", summary="Inicia sessão de escrita de proposta")
+@limiter.limit("10/minute")
 def writing_start(
+    request: Request,
     req: WritingStartRequest,
     user_id: CurrentUserId,
     db: DbClient,
@@ -448,7 +501,9 @@ def writing_start(
 
 
 @app.post("/writing/turn", summary="Turno da sessão de escrita")
+@limiter.limit("10/minute")
 async def writing_turn(
+    request: Request,
     req: WritingTurnRequest,
     user_id: CurrentUserId,
     db: DbClient,
@@ -575,7 +630,9 @@ def writing_checklist_update(
     "/writing/{session_id}/checklist/auto-review",
     summary="LLM revisa documento em 3 passes paralelas (compliance, qualidade, completude)",
 )
+@limiter.limit("10/minute")
 async def writing_checklist_auto_review(
+    request: Request,
     session_id: str,
     user_id: CurrentUserId,
     db: DbClient,
@@ -731,7 +788,9 @@ def files_signed_url(path: str, user_id: CurrentUserId, db: DbClient, expires_in
 
 
 @app.post("/writing/section-start", summary="Mensagem inicial para uma seção da proposta")
+@limiter.limit("10/minute")
 def writing_section_start(
+    request: Request,
     req: WritingSectionStartRequest,
     user_id: CurrentUserId,
     db: DbClient,
@@ -766,7 +825,8 @@ def writing_section_start(
 
 
 @app.post("/profile/extract", summary="Extrai perfil da empresa a partir de URL")
-def extract_profile(req: ProfileExtractRequest):
+@limiter.limit("3/minute")
+def extract_profile(request: Request, req: ProfileExtractRequest):
     """
     Recebe a URL do site da empresa, faz scraping e usa LLM para inferir
     os campos do CompanyProfile. Retorna perfil parcial + mapa de confiança.

@@ -1051,8 +1051,8 @@ class WritingSession:
         if not OPENAI_API_KEY:
             return False, "OPENAI_API_KEY não configurada", "CONFIG_ERROR"
         try:
-            from openai import OpenAI
-            client = OpenAI(api_key=OPENAI_API_KEY)
+            from core.llm_client import make_client
+            client = make_client(api_key=OPENAI_API_KEY)
             response = client.chat.completions.create(
                 model=self.model,
                 messages=messages,

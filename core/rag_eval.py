@@ -226,12 +226,12 @@ def judge_faithfulness(query: str, retrieved_chunks: list[dict]) -> float:
         # for desativado.
         import os
 
-        from openai import OpenAI
+        from core.llm_client import make_client
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             logger.warning("judge_faithfulness: OPENAI_API_KEY ausente — retornando 0.0")
             return 0.0
-        client = OpenAI(api_key=api_key)
+        client = make_client(api_key=api_key)
         prompt = _FAITHFULNESS_PROMPT.format(
             query=query, chunks=_format_chunks_for_judge(retrieved_chunks),
         )
