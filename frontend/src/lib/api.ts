@@ -349,3 +349,66 @@ export const updateMyPreferences = (prefs: Partial<UserPreferences>, token: stri
     method: "PUT",
     body: JSON.stringify(prefs),
   }, token);
+
+// ── Matching weights & reflection suggestions (Gap 2) ─────
+
+export type WeightDimension =
+  | "elegibilidade"
+  | "tematico"
+  | "trl"
+  | "mecanismo"
+  | "contrapartida";
+
+export interface WorkspaceWeight {
+  dimension: WeightDimension;
+  weight: number;
+  source: "manual" | "reflection" | "global_aggregated";
+  scope: "workspace" | "global";
+  approved_from_insight_id?: string;
+  approved_at?: string;
+  updated_at?: string;
+}
+
+export type SuggestionStatus = "pending" | "approved" | "superseded";
+
+export interface PendingSuggestion {
+  dimension: WeightDimension;
+  delta: number;
+  rationale: string;
+  status: SuggestionStatus;
+}
+
+export interface PendingInsight {
+  insight_id: string;
+  insight: string;
+  confidence: "low" | "medium" | "high";
+  created_at: string;
+  suggestions: PendingSuggestion[];
+}
+
+export const getWorkspaceWeights = (token: string) =>
+  apiFetch<{ weights: WorkspaceWeight[] }>("/me/weights", undefined, token);
+
+export const getPendingWeightSuggestions = (token: string) =>
+  apiFetch<{ insights: PendingInsight[] }>("/me/weights/pending", undefined, token);
+
+export const approveWeightSuggestions = (
+  insightId: string,
+  suggestions: Array<{ dimension: WeightDimension; delta: number }>,
+  token: string,
+) =>
+  apiFetch<{ applied: Array<{ dimension: string; weight: number }> }>(
+    "/me/weights/approve",
+    {
+      method: "POST",
+      body: JSON.stringify({ insight_id: insightId, suggestions }),
+    },
+    token,
+  );
+
+export const revertWorkspaceWeight = (dimension: WeightDimension, token: string) =>
+  apiFetch<{ success: boolean; dimension: string }>(
+    `/me/weights/${dimension}`,
+    { method: "DELETE" },
+    token,
+  );
