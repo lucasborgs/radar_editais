@@ -159,11 +159,11 @@ async def library_upload_pdf(
 
 
 @router.put("/{item_id}", summary="Atualiza item")
-def library_update(item_id: str, req: UpdateItemRequest, user_id: CurrentUserId, db: DbClient):
+async def library_update(item_id: str, req: UpdateItemRequest, user_id: CurrentUserId, db: DbClient):
     if req.type:
         _validate_type(req.type)
     workspace_id = get_workspace_id(db, user_id)
-    updated = update_item(db, item_id, workspace_id, req.model_dump(exclude_none=True))
+    updated = await update_item(db, item_id, workspace_id, req.model_dump(exclude_none=True))
     if updated is None:
         raise HTTPException(status_code=404, detail="Item não encontrado")
     return updated
