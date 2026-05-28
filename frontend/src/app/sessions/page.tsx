@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { ProfileDriftBanner } from "@/components/ProfileDriftBanner";
 import {
   listWritingSessions,
   deleteWritingSession,
@@ -116,6 +117,7 @@ export default function SessionsPage() {
   return (
     <DashboardLayout title="Sessões de escrita">
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+        <ProfileDriftBanner />
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-heading text-xl font-bold text-content-primary">

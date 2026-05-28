@@ -212,3 +212,20 @@ def revert_weight(dimension: str, user_id: CurrentUserId, db: DbClient):
     if not reverted:
         raise HTTPException(status_code=404, detail="Sem override para esta dimensão")
     return {"success": True, "dimension": dimension}
+
+
+# =============================================================================
+# PROFILE DRIFT (Gap 4)
+# =============================================================================
+
+@router.get(
+    "/me/profile/drift",
+    summary="Detecta se o CompanyProfile pode estar desatualizado (Gap 4)",
+)
+def get_profile_drift(user_id: CurrentUserId, db: DbClient):
+    """Heurística simples (sem LLM): combina idade do profile + volume de
+    items novos na library. Retorna sinal pro frontend exibir banner —
+    decisão de atualizar fica com o usuário."""
+    from core.profile_drift import detect_profile_drift
+    workspace = _ensure_workspace(user_id, db)
+    return detect_profile_drift(db, workspace["id"])
