@@ -209,15 +209,43 @@ async def create_item(
     return item
 
 
-def update_item(db: Client, item_id: str, workspace_id: str, updates: dict) -> dict | None:
+async def update_item(
+    db: Client, item_id: str, workspace_id: str, updates: dict
+) -> dict | None:
+    """Atualiza item da library.
+
+    Quando `content` muda: zera summary/key_facts/themes/embedding, recoloca
+    importance_score=5 (default neutro), marca enrichment_status='pending' e
+    enfileira `enrich_content_task` (que encadeia `embed_content_task`). Mesma
+    chain do `create_item` — evita inconsistência entre summary/themes novos e
+    embedding stale do conteúdo anterior (Gap 1 / ADR M8).
+
+    Quando só metadados (title/type/tags/source_url) mudam: UPDATE direto, sem
+    LLM, sem queue.
+    """
     allowed = {"title", "type", "content", "tags", "source_url"}
     payload = {k: v for k, v in updates.items() if k in allowed}
     if not payload:
         return get_item(db, item_id, workspace_id)
 
+    content_changed = False
     if "content" in payload:
-        enriched = enrich_content(payload["content"])
-        payload.update(enriched)
+        current = get_item(db, item_id, workspace_id)
+        if current is None:
+            return None
+        if (current.get("content") or "") != payload["content"]:
+            content_changed = True
+
+    if content_changed:
+        # Zera enriched para não servir summary/themes/embedding do conteúdo
+        # antigo enquanto o worker reprocessa. importance volta ao neutro
+        # (default do schema) para não enviesar o retrieval multi-critério.
+        payload["summary"] = ""
+        payload["key_facts"] = []
+        payload["themes"] = []
+        payload["embedding"] = None
+        payload["importance_score"] = 5
+        payload["enrichment_status"] = "pending"
 
     result = (
         db.table("content_items")
@@ -226,7 +254,19 @@ def update_item(db: Client, item_id: str, workspace_id: str, updates: dict) -> d
         .eq("workspace_id", workspace_id)
         .execute()
     )
-    return result.data[0] if result.data else None
+    if not result.data:
+        return None
+
+    if content_changed:
+        # Import local para evitar ciclo: core.tasks importa core.content_library.
+        from core.tasks import app as tasks_app
+
+        async with tasks_app.open_async():
+            await tasks_app.configure_task("enrich_content").defer_async(
+                item_id=str(item_id)
+            )
+
+    return result.data[0]
 
 
 def delete_item(db: Client, item_id: str, workspace_id: str) -> bool:
