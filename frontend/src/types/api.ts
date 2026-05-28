@@ -39,6 +39,8 @@ export type ContentItemType =
   | "technical_doc"
   | "other";
 
+export type EnrichmentStatus = "pending" | "processing" | "done" | "failed";
+
 export interface ContentItemSummary {
   id: string;
   title: string;
@@ -46,6 +48,7 @@ export interface ContentItemSummary {
   tags: string[];
   summary: string;
   themes: string[];
+  enrichment_status?: EnrichmentStatus;
   created_at: string;
   updated_at: string;
 }

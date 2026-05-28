@@ -9,8 +9,10 @@ import {
   uploadLibraryPdf,
   deleteLibraryItem,
   archiveLibraryItem,
+  getLibraryItem,
+  updateLibraryItem,
 } from "@/lib/api";
-import type { ContentItemSummary, ContentItemType } from "@/types/api";
+import type { ContentItemSummary, ContentItemType, ContentItemFull, EnrichmentStatus } from "@/types/api";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -38,6 +40,20 @@ const TYPE_COLORS: Record<ContentItemType, string> = {
   team_bio:            "bg-purple-100 text-purple-700",
   technical_doc:       "bg-amber-100 text-amber-700",
   other:               "bg-gray-100 text-gray-600",
+};
+
+const ENRICHMENT_LABEL: Record<EnrichmentStatus, string> = {
+  pending:    "enriquecendo…",
+  processing: "enriquecendo…",
+  done:       "pronto",
+  failed:     "falhou",
+};
+
+const ENRICHMENT_COLOR: Record<EnrichmentStatus, string> = {
+  pending:    "bg-amber-50 text-amber-700 border border-amber-200",
+  processing: "bg-amber-50 text-amber-700 border border-amber-200",
+  done:       "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  failed:     "bg-red-50 text-red-700 border border-red-200",
 };
 
 const INPUT_CLS = cn(
@@ -205,9 +221,11 @@ function AddModal({
 // ── Item Card ─────────────────────────────────────────────────────────────────
 
 function ItemActionMenu({
+  onEdit,
   onArchive,
   onDelete,
 }: {
+  onEdit: () => void;
   onArchive: () => void;
   onDelete: () => void;
 }) {
@@ -251,6 +269,16 @@ function ItemActionMenu({
             type="button"
             onClick={() => {
               setOpen(false);
+              onEdit();
+            }}
+            className="w-full text-left px-3 py-1.5 text-xs font-sans text-content-primary hover:bg-gray-50"
+          >
+            Editar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
               onArchive();
             }}
             className="w-full text-left px-3 py-1.5 text-xs font-sans text-content-primary hover:bg-gray-50"
@@ -275,13 +303,16 @@ function ItemActionMenu({
 
 function ItemCard({
   item,
+  onEdit,
   onDelete,
   onArchive,
 }: {
   item: ContentItemSummary;
+  onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onArchive: (id: string) => void;
 }) {
+  const status = item.enrichment_status;
   return (
     <div className="bg-white rounded-xl border border-border p-4 space-y-2 hover:border-primary/30 transition-colors group">
       <div className="flex items-start justify-between gap-2">
@@ -289,6 +320,20 @@ function ItemCard({
           <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full font-sans", TYPE_COLORS[item.type])}>
             {TYPE_LABELS[item.type]}
           </span>
+          {status && (
+            <span
+              className={cn(
+                "text-[10px] font-medium px-2 py-0.5 rounded-full font-sans inline-flex items-center gap-1",
+                ENRICHMENT_COLOR[status],
+              )}
+              title={`enrichment_status: ${status}`}
+            >
+              {(status === "pending" || status === "processing") && (
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              )}
+              {ENRICHMENT_LABEL[status]}
+            </span>
+          )}
           {item.tags.slice(0, 3).map(tag => (
             <span key={tag} className="text-[10px] bg-gray-100 text-content-secondary px-1.5 py-0.5 rounded-full font-sans">
               {tag}
@@ -296,6 +341,7 @@ function ItemCard({
           ))}
         </div>
         <ItemActionMenu
+          onEdit={() => onEdit(item.id)}
           onArchive={() => onArchive(item.id)}
           onDelete={() => onDelete(item.id)}
         />
@@ -322,6 +368,156 @@ function ItemCard({
   );
 }
 
+// ── Edit Item Modal ────────────────────────────────────────────────────────────
+
+function EditModal({
+  itemId,
+  onClose,
+  onSaved,
+  token,
+}: {
+  itemId: string;
+  onClose: () => void;
+  onSaved: () => void;
+  token: string;
+}) {
+  const [item, setItem] = useState<ContentItemFull | null>(null);
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState<ContentItemType>("proposal");
+  const [content, setContent] = useState("");
+  const [tags, setTags] = useState("");
+  const [originalContent, setOriginalContent] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getLibraryItem(itemId, token)
+      .then((data) => {
+        if (cancelled) return;
+        setItem(data);
+        setTitle(data.title);
+        setType(data.type);
+        setContent(data.content);
+        setOriginalContent(data.content);
+        setTags(data.tags.join(", "));
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Erro ao carregar item");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [itemId, token]);
+
+  const contentChanged = content !== originalContent;
+
+  async function handleSave() {
+    if (!title.trim()) { setError("Título obrigatório"); return; }
+    if (!content.trim()) { setError("Conteúdo obrigatório"); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      const updates: Partial<{ title: string; type: string; content: string; tags: string[] }> = {
+        title,
+        type,
+        tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+      };
+      if (contentChanged) updates.content = content;
+      await updateLibraryItem(itemId, updates, token);
+      onSaved();
+      onClose();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erro ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="w-full max-w-2xl bg-white rounded-2xl border border-border shadow-xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="text-base font-semibold font-sans text-content-primary">Editar item</h2>
+          <button onClick={onClose} className="text-content-secondary hover:text-content-primary text-lg leading-none">×</button>
+        </div>
+
+        <div className="p-6 space-y-4 overflow-y-auto">
+          {loading ? (
+            <div className="space-y-3 animate-pulse">
+              <div className="h-4 bg-gray-100 rounded w-1/3" />
+              <div className="h-9 bg-gray-100 rounded" />
+              <div className="h-32 bg-gray-100 rounded" />
+            </div>
+          ) : item ? (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-content-secondary font-sans mb-1">Título</label>
+                <input className={INPUT_CLS} value={title} onChange={e => setTitle(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-content-secondary font-sans mb-1">Tipo</label>
+                  <select className={INPUT_CLS} value={type} onChange={e => setType(e.target.value as ContentItemType)}>
+                    {Object.entries(TYPE_LABELS).map(([v, l]) => (
+                      <option key={v} value={v}>{l}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-content-secondary font-sans mb-1">Tags (vírgula)</label>
+                  <input className={INPUT_CLS} value={tags} onChange={e => setTags(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-content-secondary font-sans">Conteúdo</label>
+                  {contentChanged && (
+                    <span className="text-[10px] font-sans text-amber-700">
+                      conteúdo alterado → vai reprocessar (status volta a `pending`)
+                    </span>
+                  )}
+                </div>
+                <textarea
+                  rows={14}
+                  className={cn(INPUT_CLS, "resize-none font-mono text-xs")}
+                  value={content}
+                  onChange={e => setContent(e.target.value)}
+                />
+              </div>
+              {error && (
+                <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-sans">{error}</div>
+              )}
+            </>
+          ) : (
+            <div className="text-sm text-content-secondary font-sans">Falha ao carregar item.</div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-sans text-content-secondary hover:text-content-primary transition-colors">
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || loading || !item}
+            className={cn(
+              "px-5 py-2 rounded-xl text-sm font-semibold font-sans text-white bg-primary hover:bg-primary-hover transition-colors",
+              "disabled:opacity-40 disabled:cursor-not-allowed"
+            )}
+          >
+            {saving ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {
   useEffect(() => {
     const handle = setTimeout(onClose, 3000);
@@ -342,6 +538,7 @@ export default function LibraryPage() {
   const [items, setItems] = useState<ContentItemSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -376,6 +573,18 @@ export default function LibraryPage() {
     if (token) loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, token, includeArchived]);
+
+  // Polling: enquanto algum item estiver em pending/processing, recarrega a cada 4s
+  // pra mostrar a transição pending → done sem o usuário ter que clicar refresh.
+  const hasPendingItems = items.some(
+    i => i.enrichment_status === "pending" || i.enrichment_status === "processing"
+  );
+  useEffect(() => {
+    if (!hasPendingItems || !token) return;
+    const id = setInterval(() => loadItems(), 4000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPendingItems, token]);
 
   async function handleDelete(id: string) {
     if (!token) return;
@@ -499,6 +708,7 @@ export default function LibraryPage() {
               <ItemCard
                 key={item.id}
                 item={item}
+                onEdit={(id) => setEditingId(id)}
                 onDelete={handleDelete}
                 onArchive={handleArchive}
               />
@@ -512,6 +722,18 @@ export default function LibraryPage() {
           token={token}
           onClose={() => setShowModal(false)}
           onSaved={() => loadItems()}
+        />
+      )}
+
+      {editingId && token && (
+        <EditModal
+          itemId={editingId}
+          token={token}
+          onClose={() => setEditingId(null)}
+          onSaved={() => {
+            setToast("Item atualizado");
+            loadItems();
+          }}
         />
       )}
 
