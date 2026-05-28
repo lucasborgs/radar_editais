@@ -142,7 +142,7 @@ def list_items(
     """
     q = (
         db.table("content_items")
-        .select("id, title, type, tags, summary, themes, created_at, updated_at, archived_at")
+        .select("id, title, type, tags, summary, themes, enrichment_status, created_at, updated_at, archived_at")
         .eq("workspace_id", workspace_id)
     )
     if not include_archived:

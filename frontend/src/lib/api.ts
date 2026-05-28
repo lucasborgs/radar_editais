@@ -275,6 +275,16 @@ export const createLibraryItem = (
 ) =>
   apiFetch<ContentItemFull>("/library", { method: "POST", body: JSON.stringify(data) }, token);
 
+export const updateLibraryItem = (
+  id: string,
+  updates: Partial<{ title: string; type: string; content: string; tags: string[]; source_url: string }>,
+  token: string,
+) =>
+  apiFetch<ContentItemFull>(`/library/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(updates),
+  }, token);
+
 export const uploadLibraryPdf = async (
   file: File,
   meta: { title: string; type: string; tags: string },
