@@ -412,3 +412,16 @@ export const revertWorkspaceWeight = (dimension: WeightDimension, token: string)
     { method: "DELETE" },
     token,
   );
+
+// ── Profile drift (Gap 4) ─────────────────────────────────
+
+export interface ProfileDriftSignal {
+  stale: boolean;
+  days_since_update: number;
+  new_items_since: number;
+  profile_updated_at: string | null;
+  recommendation: string | null;
+}
+
+export const getProfileDrift = (token: string) =>
+  apiFetch<ProfileDriftSignal>("/me/profile/drift", undefined, token);
