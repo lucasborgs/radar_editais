@@ -120,8 +120,12 @@ async def enrich_content_task(item_id: str) -> None:
     )
 
     # Encadeia embedding (Fase 2 #15) — gera o vetor para retrieval multi-critério.
-    async with app.open_async():
-        await app.configure_task("embed_content").defer_async(item_id=item_id)
+    # NÃO usar `async with app.open_async()` aqui: a task roda DENTRO do worker,
+    # que já mantém o connector pool aberto. Reabrir + sair do `with` fecha o
+    # pool e quebra a próxima persistência de status do worker (AppNotOpen).
+    # Callers fora do worker (API: create_item/update_item) é que precisam
+    # abrir o app antes do defer_async.
+    await app.configure_task("embed_content").defer_async(item_id=item_id)
 
 
 @app.task(name="embed_content", queue="default")
