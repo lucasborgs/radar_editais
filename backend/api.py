@@ -12,7 +12,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+import logging
 import os
+import uuid
 
 import jwt
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -29,6 +31,7 @@ from core.auth import CurrentUserId, DbClient
 from core.content_library import get_item, get_workspace_id
 from core.hybrid_match_service import HybridMatchService
 from core.kg_match_service import KGMatchService
+from core.logging_config import request_id_var, setup_logging
 from core.profile_extractor import ProfileExtractor
 from core.writing_session import (
     WritingSession,
@@ -37,6 +40,9 @@ from core.writing_session import (
     list_sessions,
 )
 from domain.user_profile import CompanyProfile as PyCompanyProfile
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # APP + CORS
@@ -47,6 +53,40 @@ app = FastAPI(
     description="Plataforma de matching e escrita de propostas para editais FINEP",
     version="2.0.0",
 )
+
+
+class RequestIdMiddleware:
+    """Middleware ASGI puro que atribui um request_id por request.
+
+    Usa ASGI puro (não BaseHTTPMiddleware) para que o contextvar propague
+    corretamente aos logs no mesmo contexto async, e persiste o id em
+    `scope["state"]` para que o exception handler de 500 — que roda acima desta
+    camada na cadeia ASGI — ainda consiga lê-lo via `request.state`.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        incoming = dict(scope.get("headers", []))
+        rid = incoming.get(b"x-request-id", b"").decode() or uuid.uuid4().hex[:12]
+        scope.setdefault("state", {})["request_id"] = rid
+        token = request_id_var.set(rid)
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                headers = message.setdefault("headers", [])
+                headers.append((b"x-request-id", rid.encode()))
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        finally:
+            request_id_var.reset(token)
 
 
 def _allowed_origins() -> list[str]:
@@ -65,6 +105,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Registrado após o CORS → fica mais externo, atribuindo o request_id cedo.
+app.add_middleware(RequestIdMiddleware)
 
 # =============================================================================
 # RATE LIMITING (slowapi) — proteção de custo LLM
@@ -111,16 +153,27 @@ kg_service = KGMatchService()
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    # Este handler roda acima do RequestIdMiddleware na cadeia ASGI, então o
+    # contextvar já foi resetado — recuperamos o id persistido no scope state.
+    rid = getattr(request.state, "request_id", "-")
+    request_id_var.set(rid)
+    # Stack trace completo fica no servidor (correlacionável por request_id);
+    # o cliente recebe só uma mensagem genérica + o id para suporte.
+    logger.error("Erro não tratado em %s %s", request.method, request.url.path, exc_info=exc)
+
     # O 500 é gerado acima do CORSMiddleware, então o header CORS precisa ser
     # reaplicado manualmente — refletindo o Origin da request se for permitido.
     origin = request.headers.get("origin", "")
-    headers = {}
+    headers = {"X-Request-ID": rid}
     if origin in ALLOWED_ORIGINS:
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc)},
+        content={
+            "detail": "Erro interno no servidor. Tente novamente.",
+            "request_id": rid,
+        },
         headers=headers,
     )
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Fragment_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 
@@ -35,6 +36,7 @@ export default function RootLayout({
     >
       <body className="font-sans antialiased bg-app-bg text-content-primary">
         <AuthProvider>{children}</AuthProvider>
+        <Toaster position="top-right" richColors closeButton />
       </body>
     </html>
   );
