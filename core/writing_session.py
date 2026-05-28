@@ -374,9 +374,16 @@ class WritingSession:
             for t in turns
             if t["role"] in ("user", "assistant")
         ]
-        # turn_count = número de turnos completos do usuário.
-        max_idx = max((t["turn_index"] for t in turns), default=0)
-        self._turn_count = max_idx
+        # turn_count = número de turnos lógicos do usuário (1 por par
+        # user+assistant). NÃO usar max(turn_index): o índice físico no DB é
+        # remapeado em _persist_turn (user=2N-1, assistant=2N) por causa da
+        # UNIQUE constraint (session_id, turn_index). Ler o máximo desse
+        # índice e armazená-lo em _turn_count fazia o contador dobrar a cada
+        # reload (sequência 1, 3, 7, 15, 31, 63… porque cada request cria uma
+        # WritingSession nova). Resultado: COMPRESS_THRESHOLD perdia o sentido
+        # (sempre passava cedo demais), e o gate real virava o len(_history)
+        # de _compress_history. Bug latente do M8.
+        self._turn_count = sum(1 for t in turns if t["role"] == "user")
 
         return row["edital_id"]
 

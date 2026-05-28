@@ -347,7 +347,22 @@ export default function MatchingPage() {
                   placeholder="https://suaempresa.com.br"
                 />
               </Field>
-              <Field label="Porte">
+              <Field label="Tipo de entidade" required>
+                <select
+                  className={INPUT_CLS}
+                  value={profile.tipo_entidade}
+                  onChange={(e) =>
+                    set("tipo_entidade", e.target.value as CompanyProfile["tipo_entidade"])
+                  }
+                >
+                  <option value="">Selecionar...</option>
+                  <option value="empresa">Empresa</option>
+                  <option value="startup">Startup</option>
+                  <option value="universidade">Universidade</option>
+                  <option value="ICT">ICT (Instituição Científica e Tecnológica)</option>
+                </select>
+              </Field>
+              <Field label="Porte" required>
                 <select
                   className={INPUT_CLS}
                   value={profile.tamanho_empresa}

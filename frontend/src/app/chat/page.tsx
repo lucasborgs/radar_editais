@@ -9,6 +9,7 @@ import {
   startSectionChat,
   saveDocumentSection,
   exportDocument,
+  getWritingDocument,
   type ModelTier,
 } from "@/lib/api";
 import { ModelTierSelector } from "@/components/ui/ModelTierSelector";
@@ -493,27 +494,50 @@ function WritingPageInner() {
   useEffect(() => {
     if (!editalId || sessionId) return;
 
-    // Try restoring from sessionStorage
-    const saved = loadState(editalId);
-    if (saved?.sessionId) {
-      setSessionId(saved.sessionId);
-      setSections(saved.sections);
-      setSectionHistories(saved.sectionHistories);
-      setSectionDrafts(saved.sectionDrafts);
-      setActiveSection(saved.activeSection);
-      return;
-    }
+    let cancelled = false;
 
-    setInitializing(true);
-    setError(null);
-    startWritingSession(editalId, profile)
-      .then((res) => {
+    async function init() {
+      // Tenta restaurar do sessionStorage — mas valida no backend antes de
+      // confiar. Pode estar stale (workspace diferente, DB reset, sessão
+      // apagada via /sessions, etc.); se inválida, descarta e cria nova
+      // em vez de mostrar "Sessão não encontrada" pro usuário.
+      const saved = loadState(editalId!);
+      if (saved?.sessionId) {
+        try {
+          await getWritingDocument(saved.sessionId);
+          if (cancelled) return;
+          setSessionId(saved.sessionId);
+          setSections(saved.sections);
+          setSectionHistories(saved.sectionHistories);
+          setSectionDrafts(saved.sectionDrafts);
+          setActiveSection(saved.activeSection);
+          return;
+        } catch {
+          // 404/erro → cache stale; limpa e cai pro fluxo de criação.
+          try { sessionStorage.removeItem(storageKey(editalId!)); } catch { /* noop */ }
+        }
+      }
+
+      if (cancelled) return;
+      setInitializing(true);
+      setError(null);
+      try {
+        const res = await startWritingSession(editalId!, profile);
+        if (cancelled) return;
         setSessionId(res.session_id);
         const proposalSections = getProposalSections(res.section_titles ?? []);
         setSections(proposalSections);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Erro ao iniciar sessão"))
-      .finally(() => setInitializing(false));
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Erro ao iniciar sessão");
+      } finally {
+        if (!cancelled) setInitializing(false);
+      }
+    }
+
+    init();
+    return () => {
+      cancelled = true;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editalId]);
 
