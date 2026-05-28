@@ -25,6 +25,51 @@ async function getAccessToken(): Promise<string | undefined> {
   }
 }
 
+// Erro tipado para falhas de API: carrega status, mensagem amigável e o
+// request_id devolvido pelo backend (útil para suporte/correlação de logs).
+export class ApiError extends Error {
+  status: number;
+  requestId?: string;
+  constructor(message: string, status: number, requestId?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.requestId = requestId;
+  }
+}
+
+const STATUS_MESSAGES: Record<number, string> = {
+  401: "Sessão expirada. Faça login novamente.",
+  403: "Você não tem permissão para esta ação.",
+  404: "Recurso não encontrado.",
+  429: "Muitas requisições em pouco tempo. Aguarde um instante e tente novamente.",
+  500: "Erro interno no servidor. Tente novamente.",
+  502: "Servidor indisponível no momento. Tente novamente.",
+  503: "Servidor indisponível no momento. Tente novamente.",
+};
+
+// Constrói um ApiError a partir de uma resposta não-ok, extraindo `detail`
+// (string ou lista de validação do FastAPI) e `request_id` quando presentes.
+async function buildApiError(res: Response): Promise<ApiError> {
+  let detailMsg: string | undefined;
+  let requestId: string | undefined;
+  try {
+    const body = await res.json();
+    requestId = body?.request_id;
+    const detail = body?.detail;
+    if (typeof detail === "string") {
+      detailMsg = detail;
+    } else if (Array.isArray(detail)) {
+      // 422 do FastAPI: [{ loc, msg, type }]
+      detailMsg = detail.map((d) => d?.msg).filter(Boolean).join("; ") || undefined;
+    }
+  } catch {
+    // corpo não-JSON ou vazio
+  }
+  const message = detailMsg || STATUS_MESSAGES[res.status] || "Ocorreu um erro inesperado.";
+  return new ApiError(message, res.status, requestId);
+}
+
 async function apiFetch<T>(
   path: string,
   options?: RequestInit,
@@ -38,7 +83,7 @@ async function apiFetch<T>(
     headers,
     ...options,
   });
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+  if (!res.ok) throw await buildApiError(res);
   return res.json();
 }
 
@@ -245,7 +290,7 @@ export const uploadLibraryPdf = async (
     headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
-  if (!res.ok) throw new Error(`API error ${res.status}: /library/upload-pdf`);
+  if (!res.ok) throw await buildApiError(res);
   return res.json();
 };
 
