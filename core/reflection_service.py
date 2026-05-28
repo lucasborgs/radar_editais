@@ -180,6 +180,9 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
     window_end = outcomes[0]["updated_at"]
     window_start = outcomes[-1]["updated_at"]
 
+    # Normaliza confidence pro check constraint da coluna (low|medium|high).
+    confidence_col = confidence if confidence in ("low", "medium", "high") else "low"
+
     rows_to_insert = []
     for obs in observations:
         rows_to_insert.append({
@@ -189,7 +192,7 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
             "evidence": json.dumps(obs.get("evidence_ids", [])),
             "outcomes_window_start": window_start,
             "outcomes_window_end": window_end,
-            "active": True,
+            "confidence": confidence_col,
         })
     for pat in patterns:
         rows_to_insert.append({
@@ -203,7 +206,7 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
             }),
             "outcomes_window_start": window_start,
             "outcomes_window_end": window_end,
-            "active": True,
+            "confidence": confidence_col,
         })
 
     if rows_to_insert:
@@ -232,15 +235,57 @@ def load_active_insights(db: Client, workspace_id: str, max_total: int = 6) -> l
     """Retorna insights ativos do workspace para injeção em WritingSession (#18).
 
     Prioriza level 2 (padrões) e cai para level 1 (observações) se faltar.
+    Fonte da verdade é `deactivated_at IS NULL` (Gap 3b). A coluna `active`
+    legacy é mantida sincronizada via trigger pra leitores antigos.
     """
     result = (
         db.table("reflection_insights")
         .select("level, insight, created_at")
         .eq("workspace_id", workspace_id)
-        .eq("active", True)
+        .is_("deactivated_at", "null")
         .order("level", desc=True)
         .order("created_at", desc=True)
         .limit(max_total)
         .execute()
     )
     return result.data or []
+
+
+def deactivate_insight(
+    db: Client,
+    insight_id: str,
+    deactivated_by_insight_id: str | None,
+    reason: str,
+) -> bool:
+    """Marca um reflection_insight como desativado, com audit trail (Gap 3b).
+
+    Consumido por Gap 3a (full mode reflection) quando um insight novo supera
+    um antigo. Idempotente sobre insights já desativados — o filtro
+    `is_("deactivated_at", "null")` garante que o timestamp original seja
+    preservado.
+
+    Args:
+        insight_id: id do insight a desativar.
+        deactivated_by_insight_id: id do insight que substituiu este (audit).
+            Pode ser None se a desativação for manual/admin.
+        reason: justificativa em texto livre.
+
+    Returns:
+        True se uma row foi atualizada, False se já estava desativado, não
+        existe, ou pertence a outro workspace (RLS).
+    """
+    payload: dict = {
+        "deactivated_at": "now()",
+        "deactivation_reason": reason,
+    }
+    if deactivated_by_insight_id:
+        payload["deactivated_by_insight_id"] = deactivated_by_insight_id
+
+    result = (
+        db.table("reflection_insights")
+        .update(payload)
+        .eq("id", insight_id)
+        .is_("deactivated_at", "null")
+        .execute()
+    )
+    return bool(result.data)
