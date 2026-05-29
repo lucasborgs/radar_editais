@@ -219,6 +219,35 @@ class WritingTurnRequest(BaseModel):
     model_tier: str | None = None  # Fase 4 #24: 'fast' | 'auto' | 'pro'
 
 
+# Sprint 2 do Cenário B: response do /writing/turn passa a carregar 2 campos
+# opcionais (só presentes no path agente). Frontend usa `pending_user_input`
+# para renderizar prompt destacado; `tool_trace` é exposto para observabilidade
+# (debug + futura visualização). Campos legacy (draft_content) seguem iguais.
+class PendingUserInput(BaseModel):
+    field: str
+    prompt: str
+
+
+class ToolTraceEntry(BaseModel):
+    id: str
+    name: str
+    input: dict
+    output: str
+
+
+class WritingTurnResponse(BaseModel):
+    session_id: str
+    assistant_message: str
+    turn_number: int
+    success: bool
+    error: str | None = None
+    error_type: str | None = None
+    draft_content: str | None = None
+    pending_user_input: PendingUserInput | None = None
+    tool_trace: list[ToolTraceEntry] | None = None
+    compliance_flags: list[dict] = []
+
+
 class WritingSectionStartRequest(BaseModel):
     session_id: str
     section_title: str
@@ -553,7 +582,12 @@ def writing_start(
     return session.get_info()
 
 
-@app.post("/writing/turn", summary="Turno da sessão de escrita")
+@app.post(
+    "/writing/turn",
+    summary="Turno da sessão de escrita",
+    response_model=WritingTurnResponse,
+    response_model_exclude_none=True,
+)
 @limiter.limit("10/minute")
 async def writing_turn(
     request: Request,

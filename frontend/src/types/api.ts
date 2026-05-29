@@ -15,14 +15,35 @@ export interface WritingStartResponse {
   success: boolean;
 }
 
+// Sprint 2 do Cenário B: agente pode pedir info ao usuário via tool dedicada.
+// Quando presente, frontend renderiza prompt destacado em vez de [COMPLETAR: ...].
+export interface PendingUserInput {
+  field: string;   // kebab-case (cnpj, valor-contrapartida, etc.)
+  prompt: string;  // pergunta em PT-BR
+}
+
+// Trace opcional das tools chamadas no turn (path agente apenas). Útil para
+// debug / visualização de "como o agente pensou".
+export interface ToolTraceEntry {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+  output: string;
+}
+
 export interface WritingTurnResponse {
   session_id: string;
   assistant_message: string;
   draft_content?: string | null;
-  sections_used: string[];
+  sections_used?: string[];
   turn_number: number;
   success: boolean;
   error?: string;
+  error_type?: string;
+  // Presentes APENAS quando workspace tem agent_writing_enabled=true.
+  pending_user_input?: PendingUserInput | null;
+  tool_trace?: ToolTraceEntry[];
+  compliance_flags?: Array<Record<string, unknown>>;
 }
 
 export interface SectionStartResponse {

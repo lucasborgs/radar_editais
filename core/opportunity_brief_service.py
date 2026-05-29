@@ -20,9 +20,7 @@ import json
 import logging
 import os
 import re
-from pathlib import Path
 
-from config import KG_WIKI_DIR
 from core.edital_id import wiki_page_path
 from core.hybrid_match_service import get_weights, score_stage1
 from domain.user_profile import CompanyProfile

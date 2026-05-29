@@ -19,7 +19,7 @@ import re
 import time
 from dataclasses import dataclass
 
-from config import KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
+from config import KNOWLEDGE_GRAPH_DIR
 from core.edital_id import iter_wiki_pages, wiki_page_path
 from domain.user_profile import CompanyProfile
 
