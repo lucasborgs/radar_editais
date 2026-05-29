@@ -386,10 +386,20 @@ def kg_explore(request: Request, req: KGExploreRequest):
 
     Vitrine do produto: o visitante explora o landscape de fomento antes de
     se cadastrar. O histórico é mantido pelo cliente e reenviado a cada turno.
+
+    Sprint 3 do Cenário B: quando AGENT_EXPLORE_DEFAULT_ENABLED=true, roda o
+    agente Anthropic com 4 tools (list_editais, get_edital, find_analogues,
+    get_graph_neighbors). Como o endpoint é público (sem workspace), o
+    rollout é controlado por env var em vez de coluna em workspaces.
+    Default OFF — segue o pipeline determinístico (catálogo inteiro no prompt).
     """
     if not req.message.strip():
         raise HTTPException(status_code=422, detail="Mensagem vazia.")
-    answer = kg_service.explore(req.message, req.history, req.edital_ids, req.node_id, req.node_type)
+    agent_enabled = os.getenv("AGENT_EXPLORE_DEFAULT_ENABLED", "false").lower() == "true"
+    answer = kg_service.explore(
+        req.message, req.history, req.edital_ids, req.node_id, req.node_type,
+        agent_enabled=agent_enabled,
+    )
     return {"answer": answer}
 
 

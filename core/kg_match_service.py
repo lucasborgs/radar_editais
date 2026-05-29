@@ -66,6 +66,60 @@ EXPLORE_USER_PROMPT = """CATÁLOGO DE EDITAIS FINEP:
 PERGUNTA DO VISITANTE:
 {message}"""
 
+
+# Sistema prompt do modo agente (Sprint 3 do Cenário B). Substitui o
+# EXPLORE_SYSTEM_PROMPT quando agent_enabled=True. As ferramentas
+# (list_editais, get_edital, find_analogues, get_graph_neighbors) são
+# registradas via core.agent_tools.build_explore_tools.
+EXPLORE_AGENT_SYSTEM = """Você é o assistente do Radar de Editais, uma plataforma que conecta empresas
+a oportunidades de fomento público no Brasil (FINEP, FNDCT, CT&I).
+
+Você conversa com um visitante que ainda NÃO preencheu o perfil da empresa.
+Seu papel é responder perguntas sobre o catálogo de editais usando as
+ferramentas para consultar o índice estruturado.
+
+DIRETRIZES
+- Responda de forma direta e útil, em português.
+- Cite editais pelo título e ID quando relevante (ex.: "FINEP-CDTI (ID 589)").
+- Nunca invente editais, prazos, valores ou requisitos — todo dado citado
+  precisa ter vindo de uma chamada de ferramenta nesta conversa.
+- Seja conciso. Use listas curtas quando enumerar editais.
+- Para perguntas conceituais (ex.: "o que é subvenção?"), explique o conceito
+  brevemente e ancore no catálogo via list_editais quando fizer sentido
+  ("nosso catálogo tem N editais que usam esse mecanismo, por exemplo X").
+
+COMO USAR AS FERRAMENTAS
+- list_editais → para panoramas (abertos hoje, sobre tema X, etc.). Comece
+  restrito (limit 10-20) e amplie se o visitante pedir.
+- get_edital → para detalhes de um edital específico (depois de list_editais
+  OU quando o ID já aparece na pergunta do visitante).
+- find_analogues → para alternativas a um edital específico ("editais
+  parecidos com X", "outras opções similares ao 589").
+- get_graph_neighbors → para explorar uma categoria não-edital (tema,
+  público-alvo, subprograma). O node_id vem do contexto de clique no grafo
+  OU de um termo mencionado pelo visitante.
+
+QUANDO PARAR DE USAR FERRAMENTAS
+- Após responder à pergunta com base nos dados encontrados.
+- Não fique chamando list_editais várias vezes sem motivo claro. Se uma
+  chamada cobriu o necessário, responda.
+
+LIMITES
+- Você AJUDA o visitante a explorar e entender o catálogo. Decisões
+  (qual edital aplicar, prioridades, estratégia) ficam com ele depois que
+  entender as opções. Não recomende um edital específico como "o melhor"
+  sem antes mostrar o critério usado."""
+
+
+# Anthropic Sonnet 4.6 (D1 híbrido). Configurável via env. Sprint 3 herda o
+# default ANTHROPIC_MODEL_AGENT da WritingSession, mas exposto separado para
+# permitir testar modelos diferentes nos 2 agentes.
+ANTHROPIC_MODEL_AGENT_EXPLORE = os.getenv(
+    "ANTHROPIC_MODEL_AGENT_EXPLORE",
+    os.getenv("ANTHROPIC_MODEL_AGENT", "claude-sonnet-4-6"),
+)
+EXPLORE_AGENT_MAX_STEPS = int(os.getenv("EXPLORE_AGENT_MAX_STEPS", "6"))
+
 MATCH_USER_PROMPT = """PERFIL DA EMPRESA:
 {profile_context}
 
@@ -534,16 +588,35 @@ class KGMatchService:
         edital_ids: list[str] | None = None,
         node_id: str | None = None,
         node_type: str | None = None,
+        agent_enabled: bool = False,
     ) -> str:
-        """Chat stateless sobre o catálogo — sem perfil, sem sessão.
+        """Dispatcher do chat stateless sobre o catálogo.
 
-        history: lista de {role, content} dos turnos anteriores (mantida no
-        cliente). Mantém a conversa coerente sem persistência no servidor.
-        edital_ids: IDs vindos de clique num nó do grafo. Combinados com IDs
-        detectados no texto, carregam a wiki page pra resposta profunda.
-        node_id/node_type: quando clicado num nó não-edital (tema, publico,
-        subprograma, home), resolve os editais conectados e usa como contexto.
+        Quando `agent_enabled=True` (rollout do Sprint 3 do Cenário B), roda
+        o agente Anthropic com 4 tools. Caso contrário, mantém o pipeline
+        original (catálogo inteiro no prompt + 1 LLM call). O caller decide
+        o flag — endpoint /explore lê de env / workspace conforme contexto.
+
+        Args iguais aos do path legacy. `agent_enabled` é o único novo.
         """
+        if agent_enabled:
+            return self._explore_agent(
+                message, history, edital_ids, node_id, node_type,
+            )
+        return self._explore_legacy(
+            message, history, edital_ids, node_id, node_type,
+        )
+
+    def _explore_legacy(
+        self,
+        message: str,
+        history: list[dict] | None,
+        edital_ids: list[str] | None,
+        node_id: str | None,
+        node_type: str | None,
+    ) -> str:
+        """Pipeline original (pre-Sprint 3): catálogo inteiro injetado no prompt
+        + 1 LLM call. Mantido durante o rollout do agente."""
         self._ensure_client()
         index_str = self._get_index_for_prompt()
 
@@ -588,6 +661,83 @@ class KGMatchService:
         except Exception as e:
             logger.error("Erro LLM no explore: %s", e)
             return "Desculpe, não consegui processar agora. Tente novamente em instantes."
+
+    def _explore_agent(
+        self,
+        message: str,
+        history: list[dict] | None,
+        edital_ids: list[str] | None,
+        node_id: str | None,
+        node_type: str | None,
+    ) -> str:
+        """Pipeline agente (Sprint 3 do Cenário B): run_agent + 4 tools.
+
+        Diferenças vs legacy:
+          • Sem catálogo inteiro no prompt — agente busca via list_editais
+          • Sem pré-resolução de focus_ids — agente decide via tools
+          • Dica de clique no grafo vira message extra (não substitui análise)
+        """
+        from core.agent_runtime import run_agent
+        from core.agent_tools import build_explore_tools
+
+        self._load_index()  # garante índice carregado (não usa self._client)
+
+        messages: list[dict] = []
+        for turn in (history or [])[-8:]:
+            role = turn.get("role")
+            content = turn.get("content")
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+
+        # Dica de contexto: clique no grafo vira hint pro agente decidir o que
+        # consultar. Sem clique, esta linha não é adicionada.
+        hint = self._build_explore_hint(edital_ids, node_id, node_type)
+        if hint:
+            messages.append({"role": "user", "content": hint})
+
+        messages.append({"role": "user", "content": message})
+
+        tools = build_explore_tools(self)
+        result = run_agent(
+            system=EXPLORE_AGENT_SYSTEM,
+            initial_messages=messages,
+            tools=tools,
+            model=ANTHROPIC_MODEL_AGENT_EXPLORE,
+            provider="anthropic",
+            max_steps=EXPLORE_AGENT_MAX_STEPS,
+        )
+
+        if result.stop_reason == "error":
+            logger.error("explore agent: stop_reason=error após %d steps", len(result.steps))
+            return "Desculpe, não consegui processar agora. Tente novamente em instantes."
+
+        return result.final_text or "Não consegui formular uma resposta agora."
+
+    @staticmethod
+    def _build_explore_hint(
+        edital_ids: list[str] | None,
+        node_id: str | None,
+        node_type: str | None,
+    ) -> str:
+        """Constrói hint textual do clique no grafo para o agente.
+
+        O agente decide se vai usar (chamar get_edital, get_graph_neighbors,
+        etc.) ou ignorar caso a pergunta seja sobre outro tópico.
+        """
+        parts: list[str] = []
+        if node_id and node_type:
+            parts.append(
+                f"[Contexto: o visitante está focado no nó '{node_id}' "
+                f"(tipo={node_type}). Considere usar get_graph_neighbors ou "
+                f"get_edital com isso, conforme a pergunta.]"
+            )
+        if edital_ids:
+            ids_str = ", ".join(str(i) for i in edital_ids[:3])
+            parts.append(
+                f"[Contexto: visitante mencionou ou clicou nos editais: {ids_str}. "
+                f"Considere usar get_edital ou find_analogues nesses IDs.]"
+            )
+        return "\n".join(parts)
 
     def _parse_matches(self, raw: str) -> list[dict]:
         """Extrai lista de matches do JSON retornado pela LLM."""
