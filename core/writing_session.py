@@ -42,6 +42,7 @@ import requests
 
 from config import FINEP_PDFS_DIR, KG_WIKI_DIR
 from core.content_library import get_item, mark_items_referenced
+from core.edital_id import wiki_page_path
 from core.embedder import embed_query
 from core.reflection_service import load_active_insights
 from core.retriever import (
@@ -450,7 +451,7 @@ class WritingSession:
     @staticmethod
     def _load_outline_from_wiki(edital_id: str) -> list[str]:
         """Lê proposal_sections da wiki page — zero custo de LLM."""
-        wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+        wiki_file = wiki_page_path(edital_id)
         if not wiki_file.exists():
             return []
         try:

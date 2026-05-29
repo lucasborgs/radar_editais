@@ -212,12 +212,20 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
     """Pipeline da Retrieval gold (L3b, §12): Source Adapter → Documento
     Canônico → structurer/silver → chunk_from_blocks.
 
+    `edital_id` chega prefixado (`finep:782`). Source vem do prefixo; adapter
+    e structurer recebem o native_id (eles operam em escopo de fonte).
+
     Síncrono — chamar via asyncio.to_thread. Falha silenciosa do structurer
     (silver vazio) → retorna [] e o caller limpa as linhas antigas, conforme
     o contrato §11.4 ("falha LLM → B não indexa").
     """
-    adapter = get_adapter("finep")
-    documents = adapter.to_documents(edital_id)
+    from core.edital_id import native_id_of, source_of  # noqa: PLC0415
+
+    source = source_of(edital_id)
+    native = native_id_of(edital_id)
+
+    adapter = get_adapter(source)
+    documents = adapter.to_documents(native)
     if not documents:
         logger.warning(
             "chunk_edital_task: adapter não retornou conteúdo p/ edital=%s",
@@ -225,7 +233,7 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
         )
         return []
 
-    blocks = build_or_load_structured_doc("finep", edital_id, documents)
+    blocks = build_or_load_structured_doc(source, native, documents)
     if not blocks:
         logger.warning(
             "chunk_edital_task: silver vazio p/ edital=%s (structurer falhou)",
@@ -393,52 +401,61 @@ async def run_daily_etl_task(timestamp: int) -> None:
     # Import tardio para evitar custo no boot do worker
     from pipeline.extractors import SCRAPER_REGISTRY
 
+    from core.edital_id import make_id  # noqa: PLC0415
+
     total_new = 0
-    for source_name, cfg in SCRAPER_REGISTRY.items():
+    for source_key, cfg in SCRAPER_REGISTRY.items():
         cls = cfg["cls"]
+        # Slug canônico do registry (chave) é o source para prefixo §12.
+        # `display_name` (ex: "FINEP") é só pra log/UX, não pra prefixo.
+        source = cfg.get("source", source_key)
+        display_name = cfg.get("display_name", source_key)
         try:
             scraper = cls(**cfg.get("kwargs", {}))
             results = await asyncio.to_thread(scraper.extract)
             new_count = len(results) if results else 0
             total_new += new_count
             logger.info(
-                "run_daily_etl_task: %s — %d resultados", source_name, new_count,
+                "run_daily_etl_task: %s — %d resultados", display_name, new_count,
             )
 
-            # Enfileira chunk_edital_task para cada edital com PDFs novos
+            # Enfileira chunk_edital_task para cada edital com PDFs novos.
+            # ID nativo do scraper é prefixado com a source antes do defer —
+            # tasks consumidoras assumem o formato `{source}:{native}` (§12, Épico B).
             for item in (results or []):
-                edital_id = item.get("chamada_id") or item.get("id")
-                if not edital_id:
+                native_id = item.get("chamada_id") or item.get("id")
+                if not native_id:
                     continue
+                edital_id = make_id(source, str(native_id))
                 try:
                     await app.configure_task("chunk_edital").defer_async(
-                        edital_id=str(edital_id),
+                        edital_id=edital_id,
                     )
                 except Exception as enqueue_err:
                     logger.warning(
                         "Falha ao enfileirar chunk_edital para %s/%s: %s",
-                        source_name, edital_id, enqueue_err,
+                        display_name, edital_id, enqueue_err,
                     )
 
         except PipelineError as e:
             await asyncio.to_thread(
                 log_pipeline_error,
-                source=source_name, error=e,
+                source=source, error=e,
                 context={"stage": "scraper"},
             )
             logger.warning("run_daily_etl_task: %s falhou (%s): %s",
-                          source_name, e.category, e)
+                          display_name, e.category, e)
         except Exception as raw_err:
             # Genérico: tenta classificar (HTTPError → ParseError/Timeout, etc.)
             typed = classify_requests_error(raw_err)
             await asyncio.to_thread(
                 log_pipeline_error,
-                source=source_name, error=typed,
+                source=source, error=typed,
                 context={"stage": "scraper", "original_exception": type(raw_err).__name__},
             )
             logger.warning(
                 "run_daily_etl_task: %s falhou (classificado como %s): %s",
-                source_name, typed.category, raw_err,
+                display_name, typed.category, raw_err,
             )
 
     logger.info("run_daily_etl_task: concluído (total=%d novos)", total_new)

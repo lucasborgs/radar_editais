@@ -399,12 +399,12 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     # Índice é autoridade sobre inherited fields (§4.1 WIKI.md) — sobrescreve
     # o que está congelado no card. Card é autoridade sobre synthesized fields
     # (§4.2). Derived: subprogramas, n_pdfs, n_facts vêm do índice.
-    from config import KG_WIKI_DIR
+    from core.edital_id import wiki_page_path
     inherited_keys = wiki_schema.wiki_page_fields("finep")["inherited"]
     overridable_keys = list(inherited_keys) + ["subprogramas", "n_pdfs", "n_facts"]
     editais = []
     for eid, entry in index_entries.items():
-        card_file = KG_WIKI_DIR / f"{eid}.json"
+        card_file = wiki_page_path(eid)
         merged = entry.copy()
         if card_file.exists():
             try:

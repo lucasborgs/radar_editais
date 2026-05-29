@@ -25,10 +25,12 @@ INDEX_FILE = ROOT / "knowledge_graph" / "index.json"
 
 
 def _load_wiki_pages() -> list[dict]:
+    # rglob — pós-Épico B (Fase 1 multi-fonte) wiki pages vivem em subfolder
+    # por fonte (KG_WIKI_DIR/{source}/{native}.json).
     return [
         json.loads(f.read_text(encoding="utf-8"))
-        for f in WIKI_DIR.glob("*.json")
-        if not f.name.startswith(".")  # pula dotfiles de cache
+        for f in WIKI_DIR.rglob("*.json")
+        if not f.name.startswith(".")
     ]
 
 
@@ -159,6 +161,42 @@ def test_structurer_params_versioned():
     p = ws.structurer_params()
     assert p.get("silver_version"), "structurer_params.silver_version ausente"
     assert p.get("prompt_version"), "structurer_params.prompt_version ausente"
+
+
+# -----------------------------------------------------------------------------
+# FILTRO PME (wikis/_pme_filter.md)
+# -----------------------------------------------------------------------------
+
+def test_pme_filter_rules_well_formed():
+    """wikis/_pme_filter.md expõe programas/publicos/exclusores não-vazios."""
+    rules = ws.pme_filter_rules()
+    assert rules, "target_relevance_rules ausente em wikis/_pme_filter.md"
+    assert rules.get("programas_pme_canonicos"), "programas_pme_canonicos vazio"
+    assert rules.get("publicos_pme_canonicos"), "publicos_pme_canonicos vazio"
+    assert rules.get("exclusores_academicos"), "exclusores_academicos vazio"
+
+
+def test_pme_filter_publicos_subset_of_canonical():
+    """publicos_pme_canonicos deve ser subset dos publicos_canonicos §5.5 —
+    senão o filtro testa contra rótulo que o normalizador nunca produz."""
+    rules = ws.pme_filter_rules()
+    pme_pubs = set(rules.get("publicos_pme_canonicos", []))
+    canonical_vals = set(ws.publicos_canonicos().values())
+    drift = pme_pubs - canonical_vals
+    assert not drift, f"Públicos PME fora do vocab §5.5: {drift}"
+
+
+def test_pme_filter_subprograma_aliases_referenced():
+    """Subprogramas-tag (centelha, mover) também devem ser sinal de
+    programa-whitelist — caso contrário chamadas Centelha/MOVER puras não
+    seriam aceitas pelo filtro."""
+    rules = ws.pme_filter_rules()
+    program_keys = set(rules.get("programas_pme_canonicos", {}).keys())
+    sub_keys = set(ws.subprogramas_canonicos().keys())
+    # centelha e mover precisam estar nos dois vocabulários
+    for alias in ("centelha", "mover"):
+        assert alias in sub_keys, f"{alias!r} ausente em subprogramas_canonicos §5.6"
+        assert alias in program_keys, f"{alias!r} ausente em programas_pme_canonicos"
 
 
 # -----------------------------------------------------------------------------

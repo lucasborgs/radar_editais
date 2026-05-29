@@ -16,6 +16,7 @@ import os
 import re
 
 from config import KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR, OBSIDIAN_VAULT_DIR
+from core.edital_id import wiki_page_path
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -211,7 +212,7 @@ class KGMatchService:
 
     def get_edital_by_id(self, edital_id: str) -> dict | None:
         """Retorna card rico se disponível, senão entry do índice."""
-        card_file = KG_WIKI_DIR / f"{edital_id}.json"
+        card_file = wiki_page_path(edital_id)
         if card_file.exists():
             try:
                 return json.loads(card_file.read_text(encoding="utf-8"))

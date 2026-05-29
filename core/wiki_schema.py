@@ -21,6 +21,7 @@ import yaml
 _ROOT = Path(__file__).resolve().parent.parent
 _WIKI_MD = _ROOT / "WIKI.md"
 _WIKIS_DIR = _ROOT / "wikis"
+_PME_FILTER_MD = _WIKIS_DIR / "_pme_filter.md"
 
 _YAML_BLOCK_RE = re.compile(r"```yaml\n(.*?)```", re.DOTALL)
 
@@ -253,9 +254,28 @@ def bronze_mapping(source: str) -> dict:
 
 
 # =============================================================================
+# FILTRO PME (wikis/_pme_filter.md)
+# =============================================================================
+
+@lru_cache(maxsize=1)
+def pme_filter_rules() -> dict:
+    """Regras determinísticas do filtro PME — programas-whitelist, públicos-
+    whitelist, exclusores acadêmicos. Doc autoritativo: `wikis/_pme_filter.md`.
+
+    Retorna o bloco `target_relevance_rules` com chaves:
+      - programas_pme_canonicos: dict[alias, label]
+      - publicos_pme_canonicos:  list[str]   (subset de §5.5)
+      - exclusores_academicos:   list[str]
+    """
+    parsed = _parse_md(_PME_FILTER_MD)
+    return parsed.get("target_relevance_rules", {})
+
+
+# =============================================================================
 # RELOAD (testes)
 # =============================================================================
 
 def clear_cache() -> None:
     """Limpa o cache do loader (útil em testes após editar os docs)."""
     load.cache_clear()
+    pme_filter_rules.cache_clear()

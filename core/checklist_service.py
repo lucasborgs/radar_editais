@@ -21,6 +21,7 @@ import os
 import re
 
 from config import KG_WIKI_DIR
+from core.edital_id import wiki_page_path
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +182,7 @@ def build_checklist(edital_id: str) -> list[dict]:
     items: list[dict] = []
     seen: set[str] = set()
 
-    wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+    wiki_file = wiki_page_path(edital_id)
     if wiki_file.exists():
         try:
             wiki_page = json.loads(wiki_file.read_text(encoding="utf-8"))
