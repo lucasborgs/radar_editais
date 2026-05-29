@@ -29,6 +29,7 @@ import re
 from pathlib import Path
 
 from config import KG_WIKI_DIR
+from core.edital_id import wiki_page_path
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +69,11 @@ def _load_edital_requirements(edital_id: str) -> tuple[list[str], str]:
 
     Source é usado para carregar skills/<source>_compliance.md (Fase 4 #26).
     """
-    wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+    wiki_file = wiki_page_path(edital_id)
     if not wiki_file.exists():
         return [], ""
     try:
-        data = json.loads(Path(wiki_file).read_text(encoding="utf-8"))
+        data = json.loads(wiki_file.read_text(encoding="utf-8"))
         reqs = data.get("key_requirements", []) or []
         source = str(data.get("source", "") or "")
         return [str(r) for r in reqs], source

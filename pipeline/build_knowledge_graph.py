@@ -26,9 +26,13 @@ from domain.vocabulary import canonicalize_themes
 
 from config import BRONZE_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR
 from core import wiki_schema
+from core.pme_filter import relevance_with_reason
 
-# Schema autoritativo em WIKI.md (ver core.wiki_schema)
-_SOURCE = "finep"
+# Schema autoritativo em WIKI.md (ver core.wiki_schema).
+# Pós-Épico C: source aceito como parâmetro pelas funções públicas. Default
+# preserva FINEP-only (multifonte real entra no Épico D, com loop sobre o
+# SCRAPER_REGISTRY).
+_DEFAULT_SOURCE = "finep"
 
 # =============================================================================
 # PATHS
@@ -36,21 +40,22 @@ _SOURCE = "finep"
 
 INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
 INDEX_HISTORICO_FILE = KNOWLEDGE_GRAPH_DIR / "index_historico.json"
+FILTER_REJECTIONS_LOG = KNOWLEDGE_GRAPH_DIR / ".filter_rejections.jsonl"
 
 
 # =============================================================================
 # CARREGAMENTO BRONZE
 # =============================================================================
 
-def load_finep_bronze() -> list[dict]:
-    """Carrega o arquivo bronze FINEP mais recente.
+def load_bronze(source: str = _DEFAULT_SOURCE) -> list[dict]:
+    """Carrega o arquivo bronze mais recente da fonte.
 
-    Usa apenas o último arquivo: a API Liferay filtra situacao=aberta
-    server-side, então o scrape mais recente é a fonte autoritativa do
-    que está aberto agora. Acumular arquivos antigos fazia chamadas
+    Usa apenas o último arquivo: scrapers de fontes com API filtrada
+    server-side (FINEP/Liferay com `situacao=aberta`) tornam o scrape mais
+    recente autoritativo. Acumular arquivos antigos fazia chamadas
     encerradas resurgirem no índice.
     """
-    raw_dir = BRONZE_DIR / "finep_raw"
+    raw_dir = BRONZE_DIR / f"{source}_raw"
     if not raw_dir.exists():
         print(f"Diretório não encontrado: {raw_dir}")
         return []
@@ -63,11 +68,15 @@ def load_finep_bronze() -> list[dict]:
     latest = files[-1]
     try:
         chamadas = json.loads(latest.read_text(encoding="utf-8"))
-        print(f"Bronze carregado: {latest.name} ({len(chamadas)} chamadas)")
+        print(f"Bronze carregado ({source}): {latest.name} ({len(chamadas)} chamadas)")
         return chamadas
     except Exception as e:
         print(f"Erro ao ler {latest.name}: {e}")
         return []
+
+
+# Alias depreciado — mantido por compat até o próximo commit que renomeie callers.
+load_finep_bronze = load_bronze
 
 
 # =============================================================================
@@ -153,7 +162,7 @@ def _normalize_publico(value: str | None) -> list[str]:
     return result
 
 
-def _extract_id(chamada: dict) -> str:
+def _extract_id_finep(chamada: dict) -> str:
     cid = chamada.get("chamada_id", "")
     if cid:
         return str(cid)
@@ -162,48 +171,129 @@ def _extract_id(chamada: dict) -> str:
     return m.group(1) if m else link.split("/")[-1]
 
 
+_FAPESP_URL_ID_RE = re.compile(r"/(\d+)(?:/|$)")
+
+
+def _extract_id_fapesp(chamada: dict) -> str:
+    url = chamada.get("url", "")
+    m = _FAPESP_URL_ID_RE.search(url)
+    return m.group(1) if m else ""
+
+
+# Função-dispatcher: extrai o `native_id` de acordo com a fonte. Adicionar
+# fonte = registrar a função aqui (paralelo ao SCRAPER_REGISTRY).
+_ID_EXTRACTORS = {
+    "finep": _extract_id_finep,
+    "fapesp": _extract_id_fapesp,
+}
+
+
 # =============================================================================
 # CONSTRUÇÃO DOS EDITAIS
 # =============================================================================
 
-def _build_editais(chamadas: list[dict]) -> list[dict]:
-    """Converte chamadas bronze em entradas de edital normalizadas."""
-    editais: list[dict] = []
+def _normalize_finep(ch: dict) -> dict:
+    """Normaliza um item bronze FINEP → entry parcial (sem id, source, n_pdfs).
+    Schema bronze: chamada_id, titulo, status, prazo_envio, data_publicacao,
+    link, tema, publico_alvo, fonte_recurso."""
+    deadline_str = ch.get("prazo_envio", "")
+    raw_status = ch.get("status", "Desconhecido")
+    themes_raw = _split_multi(ch.get("tema"))
+    pub_date = ch.get("data_publicacao", "")
+    fontes, subprogramas = _split_fontes(ch.get("fonte_recurso"))
+    return {
+        "title":         ch.get("titulo", ""),
+        "status":        wiki_schema.normalize_status(raw_status, deadline_str),
+        "deadline":      deadline_str,
+        "pub_date":      pub_date,
+        "pub_year":      wiki_schema.parse_pub_year(pub_date),
+        "link":          ch.get("link", ""),
+        "themes":        canonicalize_themes(themes_raw),
+        "themes_raw":    themes_raw,
+        "publico_alvo":  _normalize_publico(ch.get("publico_alvo")),
+        "fonte_recurso": fontes,
+        "subprogramas":  subprogramas,
+    }
 
+
+def _normalize_fapesp(ch: dict) -> dict:
+    """Normaliza um item bronze FAPESP → entry parcial.
+    Schema bronze: titulo, url, data_limite (ISO yyyy-mm-dd), status,
+    modalidades, areas, texto_cru, fluxo_continuo. Detalhes: wikis/fapesp.md §3.
+    """
+    # Deadline: bronze FAPESP emite ISO; canônico é dd/mm/yyyy.
+    deadline_iso = ch.get("data_limite") or ""
+    deadline_str = wiki_schema.iso_to_br_date(deadline_iso) if deadline_iso else ""
+    raw_status = ch.get("status") or "Desconhecido"
+    themes_raw = _split_multi(ch.get("areas"))
+    # FAPESP bronze não emite publico_alvo. Filtro PME apoia em modalidade.
+    return {
+        "title":         ch.get("titulo", ""),
+        "status":        wiki_schema.normalize_status(raw_status, deadline_str),
+        "deadline":      deadline_str,
+        "pub_date":      "",
+        "pub_year":      wiki_schema.parse_pub_year(""),
+        "link":          ch.get("url", ""),
+        "themes":        canonicalize_themes(themes_raw),
+        "themes_raw":    themes_raw,
+        "publico_alvo":  [],
+        "fonte_recurso": ["FAPESP"],
+        "subprogramas":  [],
+        # modalidade é campo extra usado pelo filtro PME (e por nada mais)
+        "modalidade":    ch.get("modalidades"),
+    }
+
+
+_NORMALIZERS = {
+    "finep": _normalize_finep,
+    "fapesp": _normalize_fapesp,
+}
+
+
+def _build_editais(chamadas: list[dict], source: str = _DEFAULT_SOURCE) -> list[dict]:
+    """Converte chamadas bronze em entradas de edital normalizadas, agnóstico
+    à fonte. `_NORMALIZERS[source]` lida com o schema bronze específico
+    (§3 wikis/<source>.md); aqui adicionamos id prefixado, campo source e
+    contagem de PDFs.
+    """
+    extractor = _ID_EXTRACTORS.get(source)
+    normalizer = _NORMALIZERS.get(source)
+    if extractor is None or normalizer is None:
+        raise ValueError(f"Fonte sem extractor/normalizer registrado: {source!r}")
+
+    editais: list[dict] = []
     for ch in chamadas:
-        cid = _extract_id(ch)
-        if not cid:
+        native_cid = extractor(ch)
+        if not native_cid:
             continue
 
-        n_pdfs = len(list((FINEP_PDFS_DIR / cid).glob("*.pdf"))) \
-            if (FINEP_PDFS_DIR / cid).exists() else 0
+        cid = f"{source}:{native_cid}"
 
-        deadline_str = ch.get("prazo_envio", "")
-        raw_status = ch.get("status", "Desconhecido")
-        # Normalização conforme §7.2 WIKI.md (prazo futuro → ABERTA)
-        status = wiki_schema.normalize_status(raw_status, deadline_str)
+        # n_pdfs só faz sentido para fontes com PDFs em disco (FINEP).
+        # Fontes html_body (FAPESP) sempre retornam 0.
+        n_pdfs = 0
+        if source == "finep" and (FINEP_PDFS_DIR / native_cid).exists():
+            n_pdfs = len(list((FINEP_PDFS_DIR / native_cid).glob("*.pdf")))
 
-        themes_raw = _split_multi(ch.get("tema"))
-        pub_date = ch.get("data_publicacao", "")
-        fontes, subprogramas = _split_fontes(ch.get("fonte_recurso"))
         editais.append({
             "id": cid,
-            "title": ch.get("titulo", ""),
-            "status": status,
-            "deadline": deadline_str,
-            "pub_date": pub_date,
-            "pub_year": wiki_schema.parse_pub_year(pub_date),
-            "link": ch.get("link", ""),
-            "themes": canonicalize_themes(themes_raw),
-            "themes_raw": themes_raw,
-            "publico_alvo": _normalize_publico(ch.get("publico_alvo")),
-            "fonte_recurso": fontes,
-            "subprogramas": subprogramas,
+            "source": source,
+            **normalizer(ch),
             "n_pdfs": n_pdfs,
         })
 
-    editais.sort(key=lambda e: (wiki_schema.status_order(e["status"]), e.get("deadline") or ""))
-    return editais
+    # Dedup por id (primeira ocorrência vence). Bronze FAPESP legacy tem
+    # duplicatas; FINEP é dedupado upstream mas defensivo aqui não custa.
+    seen: set[str] = set()
+    deduped: list[dict] = []
+    for e in editais:
+        if e["id"] in seen:
+            continue
+        seen.add(e["id"])
+        deduped.append(e)
+
+    deduped.sort(key=lambda e: (wiki_schema.status_order(e["status"]), e.get("deadline") or ""))
+    return deduped
 
 
 # =============================================================================
@@ -264,21 +354,105 @@ def _deadline_expired(deadline_str: str | None) -> bool:
     return d is not None and d < date.today()
 
 
-def build_indices(chamadas: list[dict]) -> tuple[dict, dict]:
-    """Retorna (index_vigentes, index_historico).
+# =============================================================================
+# FILTRO PME (hook §1 + wikis/_pme_filter.md)
+# =============================================================================
 
-    Vigência (§7.1 WIKI.md):
-      - status == ABERTA e (sem prazo OU prazo futuro) → vigente
-      - status == ABERTA e prazo passado               → histórico
-      - status == ENCERRADA                            → histórico
+def _editais_to_filter_metadata(e: dict) -> dict:
+    """Mapeia entry de edital → metadata aceito por core.pme_filter.
+
+    FINEP bronze não emite `modalidade`/`programa` explícitos; usamos
+    `subprogramas` (lista, já normalizada §5.6) como proxy do campo `programa`
+    do filtro. Fontes futuras (FAPESP) preenchem `modalidade` no bronze.
     """
-    all_editais = _build_editais(chamadas)
+    return {
+        "titulo": e.get("title", ""),
+        "modalidade": e.get("modalidade"),
+        "programa": " ".join(e.get("subprogramas", [])) or None,
+        "categoria": e.get("categoria"),
+        "descricao_resumo": e.get("descricao_resumo"),
+        "publico_alvo": e.get("publico_alvo", []),
+    }
+
+
+def _apply_pme_filter(editais: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Aplica o filtro determinístico PME a uma lista de entries.
+
+    Retorna `(accepted, rejections)`:
+      - accepted: entries com decision == "accept"
+      - rejections: lista de dicts pra log estruturado, contendo
+        (edital_id, source, title, decision, reason, deadline, logged_at)
+
+    "unclear" é tratado como reject por enquanto (Fase 1 — fallback LLM
+    é só implementado se taxa unclear > 10%, ver project_multi_fonte_fase1).
+    """
+    accepted: list[dict] = []
+    rejections: list[dict] = []
+    now = datetime.now().isoformat(timespec="seconds")
+    for e in editais:
+        metadata = _editais_to_filter_metadata(e)
+        decision, reason = relevance_with_reason(metadata)
+        if decision == "accept":
+            accepted.append(e)
+        else:
+            rejections.append({
+                "logged_at": now,
+                "source":    e.get("source"),
+                "edital_id": e["id"],
+                "title":     e.get("title", ""),
+                "decision":  decision,
+                "reason":    reason,
+                "deadline":  e.get("deadline", ""),
+            })
+    return accepted, rejections
+
+
+def _truncate_rejections_log() -> None:
+    """Zera o log de rejeições (chamado pelo `main` no início da run).
+
+    Política atual: cada execução de `main` substitui o log — o que está
+    no arquivo reflete *a última run*. Pra acumular histórico, callers
+    fora de `main` devem usar `_log_rejections` diretamente.
+    """
+    KNOWLEDGE_GRAPH_DIR.mkdir(parents=True, exist_ok=True)
+    FILTER_REJECTIONS_LOG.write_text("", encoding="utf-8")
+
+
+def _log_rejections(rejections: list[dict]) -> None:
+    """Append-only em `.filter_rejections.jsonl` (1 JSON por linha)."""
+    if not rejections:
+        return
+    KNOWLEDGE_GRAPH_DIR.mkdir(parents=True, exist_ok=True)
+    with FILTER_REJECTIONS_LOG.open("a", encoding="utf-8") as f:
+        for r in rejections:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+
+# =============================================================================
+# CONSTRUÇÃO DOS ÍNDICES (orquestrador)
+# =============================================================================
+
+def _split_vigencia(editais: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Separa editais em (vigentes, todos). Vigência §7.1 WIKI.md."""
     vigentes = [
-        e for e in all_editais
+        e for e in editais
         if e.get("status") == "ABERTA"
         and not _deadline_expired(e.get("deadline"))
     ]
-    return _make_index(vigentes, "vigentes"), _make_index(all_editais, "historico")
+    return vigentes, editais
+
+
+def build_indices(chamadas: list[dict], source: str = _DEFAULT_SOURCE) -> tuple[dict, dict]:
+    """Retorna (index_vigentes, index_historico) de UMA fonte.
+
+    Aplica o filtro PME e loga rejeições (append). Caller que quer log
+    limpo deve chamar `_truncate_rejections_log()` antes.
+    """
+    all_editais = _build_editais(chamadas, source=source)
+    accepted, rejections = _apply_pme_filter(all_editais)
+    _log_rejections(rejections)
+    vigentes, _ = _split_vigencia(accepted)
+    return _make_index(vigentes, "vigentes"), _make_index(accepted, "historico")
 
 
 # =============================================================================
@@ -303,18 +477,50 @@ def save_indices(index_vigentes: dict, index_historico: dict) -> None:
 # MAIN
 # =============================================================================
 
-def main() -> None:
+def main(source: str | None = None) -> None:
+    """Constrói índice multifonte. Se `source` for dado, processa só essa fonte.
+    Senão, itera o SCRAPER_REGISTRY (todas as fontes registradas).
+
+    Saídas: `index.json` (vigentes), `index_historico.json`, `.filter_rejections.jsonl`
+    (substituído a cada run — uma execução = um snapshot do que foi rejeitado).
+    """
+    from pipeline.extractors import SCRAPER_REGISTRY  # noqa: PLC0415
+
+    sources = [source] if source else list(SCRAPER_REGISTRY.keys())
     print("=" * 60)
-    print("KNOWLEDGE GRAPH — FINEP")
+    print(f"KNOWLEDGE GRAPH — fontes: {', '.join(sources)}")
     print("=" * 60)
 
-    chamadas = load_finep_bronze()
-    print(f"Chamadas bronze carregadas: {len(chamadas)}")
-    if not chamadas:
-        print("Nenhuma chamada encontrada. Execute o scraper FINEP primeiro.")
+    _truncate_rejections_log()
+
+    all_accepted: list[dict] = []
+    total_rejections = 0
+    by_source_summary: list[str] = []
+
+    for src in sources:
+        chamadas = load_bronze(src)
+        if not chamadas:
+            print(f"  [{src}] sem chamadas no bronze, pulando.")
+            continue
+        editais_src = _build_editais(chamadas, source=src)
+        accepted_src, rejections_src = _apply_pme_filter(editais_src)
+        _log_rejections(rejections_src)
+        all_accepted.extend(accepted_src)
+        total_rejections += len(rejections_src)
+        by_source_summary.append(
+            f"  [{src}] {len(editais_src)} entries → {len(accepted_src)} aceitos, "
+            f"{len(rejections_src)} rejeitados pelo filtro PME"
+        )
+
+    print("\n".join(by_source_summary))
+
+    if not all_accepted:
+        print("\nNenhum edital aceito após filtro. Verifique bronze e wikis/_pme_filter.md.")
         return
 
-    index_vigentes, index_historico = build_indices(chamadas)
+    vigentes, _ = _split_vigencia(all_accepted)
+    index_vigentes = _make_index(vigentes, "vigentes")
+    index_historico = _make_index(all_accepted, "historico")
     save_indices(index_vigentes, index_historico)
 
     print("\nVigentes por status:")
@@ -323,10 +529,13 @@ def main() -> None:
 
     n_hist = index_historico["total_editais"] - index_vigentes["total_editais"]
     print(f"\nHistórico (encerrados/sem prazo): {n_hist} editais")
+    print(f"Rejeitados pelo filtro: {total_rejections} (log: {FILTER_REJECTIONS_LOG.name})")
     print(f"Data de referência: {index_vigentes['reference_date']}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Constrói índices FINEP")
-    parser.parse_args()  # mantém interface CLI consistente
-    main()
+    parser = argparse.ArgumentParser(description="Constrói índices do knowledge graph")
+    parser.add_argument("--source", default=None,
+                        help="slug da fonte (finep, fapesp, …). Omitido = todas")
+    args = parser.parse_args()
+    main(source=args.source)

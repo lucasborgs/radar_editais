@@ -20,6 +20,7 @@ import time
 from dataclasses import dataclass
 
 from config import KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
+from core.edital_id import iter_wiki_pages, wiki_page_path
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -488,7 +489,7 @@ class HybridMatchService:
             self._index_mtime = mtime
 
     def _load_wiki_page(self, edital_id: str) -> dict | None:
-        wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+        wiki_file = wiki_page_path(edital_id)
         if wiki_file.exists():
             try:
                 return json.loads(wiki_file.read_text(encoding="utf-8"))
@@ -508,7 +509,7 @@ class HybridMatchService:
     def get_stats(self) -> dict:
         self._load_index()
         summary = self._index.get("summary", {})
-        n_wiki_pages = len(list(KG_WIKI_DIR.glob("*.json"))) if KG_WIKI_DIR.exists() else 0
+        n_wiki_pages = len(iter_wiki_pages())
         return {
             "total_editais": self._index.get("total_editais", 0),
             "last_updated": self._index.get("last_updated", ""),

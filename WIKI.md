@@ -18,6 +18,8 @@ O sistema atende dois propósitos:
 
 **Inteligência (foco longitudinal).** Memória de longo prazo sobre a evolução das agências de fomento. Os editais encerrados **não são descartados** — compõem o corpus histórico usado para analisar mudanças de critérios, heurísticas de aprovação "não escritas" (extraídas via feedback loops) e tendências tecnológicas ao longo dos anos.
 
+> **Escopo do corpus histórico:** apenas editais que **algum dia foram do escopo PME/startup** entram no histórico. Editais nunca-elegíveis (pesquisa acadêmica pura, bolsas individuais) são filtrados em L1 antes de virar wiki page — bronze é gravado para audit, mas nem wiki page mínima é criada. Ver `wikis/_pme_filter.md`.
+
 Implicação de design: o pipeline preserva wiki pages de editais encerrados mesmo após deleção dos PDFs originais; a dimensão temporal é mantida como tag `ano/<pub_year>` (§6.1.1) para permitir consultas longitudinais.
 
 > **Arquitetura de camadas:** o vocabulário oficial das camadas, a fronteira
@@ -46,8 +48,9 @@ Cada fonte tem um schema específico em `wikis/<fonte>.md` que **estende** este 
 | Fonte | Schema | Status |
 |---|---|---|
 | FINEP | [wikis/finep.md](wikis/finep.md) | ativo (v1) |
-| BNDES | `wikis/bndes.md` | planejado |
-| FAPESP | `wikis/fapesp.md` | planejado |
+| FAPESP | [wikis/fapesp.md](wikis/fapesp.md) | ativo (v1) |
+| BNDES | `wikis/bndes.md` | planejado (Fase 2 — portal IBM WebSphere requer headless browser) |
+| FAPERJ | `wikis/faperj.md` | planejado (Fase 2 — portal em migração) |
 | EMBRAPII | `wikis/embrapii.md` | planejado |
 
 ---
@@ -210,6 +213,7 @@ subprogramas_canonicos:
   funttel:    Funttel
   rota 2030:  Rota 2030
   mover:      MOVER
+  centelha:   Centelha
 ```
 
 Extração na mesma string de `fonte_recurso` bruta, após §5.4. Case-insensitive, regex `\b{alias}\b`. Múltiplas matches na mesma string são permitidas.
@@ -659,7 +663,6 @@ source_adapters:
     module: "pipeline.adapters.fapesp"
     raw_dir: "fapesp_raw"
     strategy: "html_body"    # texto_cru do bronze como 1 doc
-    status: "planejado"
   bndes:
     module: "pipeline.adapters.bndes"
     raw_dir: "bndes_raw"

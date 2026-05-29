@@ -32,6 +32,7 @@ from datetime import datetime
 
 from config import KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
 from core import wiki_schema
+from core.edital_id import source_of, wiki_page_path
 from core.structurer import build_or_load_structured_doc
 from pipeline.adapters.base import get_adapter
 
@@ -43,10 +44,9 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-# Schema autoritativo em WIKI.md + wikis/finep.md (ver core.wiki_schema)
-# Source parametrizado via env (§12). Default "finep" preserva comportamento;
-# adapter por fonte + leitura via L1 entram na Fase 4 (migração da Knowledge gold).
-_SOURCE = os.getenv("RADAR_SOURCE", "finep")
+# Schema autoritativo em WIKI.md + wikis/<source>.md. A fonte de cada edital
+# é inferida do seu `edital_id` prefixado (§12 — pós-Épico B/C). Pra processar
+# uma fonte específica, passe `--source` na CLI ou `source=` em main().
 
 INDEX_FILE           = KNOWLEDGE_GRAPH_DIR / "index.json"
 INDEX_HISTORICO_FILE = KNOWLEDGE_GRAPH_DIR / "index_historico.json"
@@ -63,21 +63,23 @@ _DROP_KINDS_FOR_SYNTHESIS = {"boilerplate", "signature"}
 def _load_documents_via_silver(edital_id: str) -> tuple[list[tuple[str, str]], dict]:
     """Carrega o conteúdo do edital via Source Adapter (L1) + silver (L2).
 
-    Retorna `(documents, silver_meta)`:
-      - documents: list[(doc_name, texto_limpo)] reagrupada por doc a partir
-        dos blocos silver, filtrando boilerplate/signature.
-      - silver_meta: dict com silver_version/prompt_version/source_hash
-        (entra no cache hash do etl_process — §11.4).
+    `edital_id` chega prefixado (`finep:782`). Adapter e structurer trabalham
+    em escopo de fonte específica → recebem o native_id. Source vem do prefixo.
 
-    Vazio em ambos os retornos = sem conteúdo extraível; caller decide
-    o fallback (`_save_minimal_wiki_page`).
+    Retorna `(documents, silver_meta)`. Vazio = sem conteúdo extraível;
+    caller decide o fallback (`_save_minimal_wiki_page`).
     """
-    adapter = get_adapter(_SOURCE)
-    canonical = adapter.to_documents(edital_id)
+    from core.edital_id import native_id_of, source_of  # noqa: PLC0415
+
+    source = source_of(edital_id)
+    native = native_id_of(edital_id)
+
+    adapter = get_adapter(source)
+    canonical = adapter.to_documents(native)
     if not canonical:
         return [], {}
 
-    blocks = build_or_load_structured_doc(_SOURCE, edital_id, canonical)
+    blocks = build_or_load_structured_doc(source, native, canonical)
     if not blocks:
         return [], {}
 
@@ -94,7 +96,7 @@ def _load_documents_via_silver(edital_id: str) -> tuple[list[tuple[str, str]], d
 
     # silver_meta vem do sidecar gravado pelo structurer (§11.4).
     from core.structurer import _silver_paths  # noqa: PLC0415 — split-helper interno
-    _, meta_path = _silver_paths(_SOURCE, edital_id)
+    _, meta_path = _silver_paths(source, native)
     silver_meta: dict = {}
     if meta_path.exists():
         try:
@@ -166,7 +168,9 @@ def _make_client(backend: str):
 
 
 def _call_llm(client, model: str, metadata: dict, pdfs: list[tuple[str, str]]) -> dict:
-    metadata_keys = wiki_schema.metadata_to_llm_keys(_SOURCE)
+    """Síntese da wiki page. Source vem do edital_id prefixado do metadata."""
+    source = source_of(metadata["id"])
+    metadata_keys = wiki_schema.metadata_to_llm_keys(source)
     metadata_str = json.dumps(
         {k: metadata.get(k, [] if k in ("themes", "publico_alvo", "fonte_recurso") else "") for k in metadata_keys},
         ensure_ascii=False, indent=2,
@@ -176,7 +180,7 @@ def _call_llm(client, model: str, metadata: dict, pdfs: list[tuple[str, str]]) -
     docs_parts = [f"### {name}\n{text}" for name, text in fitted_pdfs]
     documents_str = "\n\n".join(docs_parts) if docs_parts else "(sem documentos PDF disponíveis)"
 
-    prompt = wiki_schema.extraction_prompt(_SOURCE).format(metadata=metadata_str, documents=documents_str)
+    prompt = wiki_schema.extraction_prompt(source).format(metadata=metadata_str, documents=documents_str)
 
     llm_params = wiki_schema.llm_params()
     response = client.chat.completions.create(
@@ -220,8 +224,9 @@ def _save_wiki_page(entry: dict, synthesized: dict) -> None:
         "generated_at":            datetime.now().strftime("%Y-%m-%d"),
         "source":                  "etl_process",
     }
-    KG_WIKI_DIR.mkdir(parents=True, exist_ok=True)
-    (KG_WIKI_DIR / f"{entry['id']}.json").write_text(
+    page_path = wiki_page_path(entry["id"])
+    page_path.parent.mkdir(parents=True, exist_ok=True)
+    page_path.write_text(
         json.dumps(wiki_page, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
@@ -252,8 +257,9 @@ def _save_minimal_wiki_page(entry: dict) -> None:
         "generated_at":            datetime.now().strftime("%Y-%m-%d"),
         "source":                  "metadata_only",
     }
-    KG_WIKI_DIR.mkdir(parents=True, exist_ok=True)
-    (KG_WIKI_DIR / f"{entry['id']}.json").write_text(
+    page_path = wiki_page_path(entry["id"])
+    page_path.parent.mkdir(parents=True, exist_ok=True)
+    page_path.write_text(
         json.dumps(wiki_page, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
@@ -264,11 +270,17 @@ def _save_minimal_wiki_page(entry: dict) -> None:
 
 def main(
     backend: str = "gemini",
+    source: str | None = None,
     edital_ids: list[str] | None = None,
     skip_cache: bool = False,
     delay: float = 1.5,
     historico: bool = False,
 ) -> None:
+    """Processa editais do índice → wiki pages.
+
+    `source`: se fornecido, processa só editais dessa fonte (`finep`, `fapesp`, …).
+              None = processa todas as fontes presentes no índice (multi-fonte).
+    """
     print("=" * 60)
     print("ETL PROCESS — wiki page por edital")
     print("=" * 60)
@@ -281,10 +293,13 @@ def main(
     index = json.loads(index_path.read_text(encoding="utf-8"))
     entries = index.get("editais", [])
 
+    if source:
+        entries = [e for e in entries if source_of(e["id"]) == source]
+        print(f"Filtro: source={source} → {len(entries)} entries")
+
     if historico:
         # Processa apenas encerrados (vigentes já foram processados)
-        wiki_dir = KG_WIKI_DIR
-        entries = [e for e in entries if not (wiki_dir / f"{e['id']}.json").exists()]
+        entries = [e for e in entries if not wiki_page_path(e["id"]).exists()]
         print(f"Modo histórico — editais sem wiki page: {len(entries)}")
 
     if edital_ids:
@@ -307,7 +322,7 @@ def main(
         content_hash = _content_hash(entry, silver_meta)
 
         if not skip_cache and cache.get(eid) == content_hash \
-                and (KG_WIKI_DIR / f"{eid}.json").exists():
+                and wiki_page_path(eid).exists():
             logger.info("[%d/%d] %s — cache hit", i, len(entries), eid)
             skipped += 1
             continue
@@ -341,7 +356,10 @@ def main(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ETL Process — wiki page por edital")
     parser.add_argument("--backend", default="gemini", choices=["gemini", "openai"])
-    parser.add_argument("--edital", nargs="+", dest="edital_ids", help="IDs específicos")
+    parser.add_argument("--source", default=None,
+                        help="Slug da fonte (finep, fapesp, …). Omitido = todas")
+    parser.add_argument("--edital", nargs="+", dest="edital_ids",
+                        help="IDs específicos (já prefixados, ex.: finep:782)")
     parser.add_argument("--skip-cache", action="store_true", help="Ignora cache e reprocessa tudo")
     parser.add_argument("--delay", type=float, default=1.5, help="Delay entre chamadas LLM (s)")
     parser.add_argument("--historico", action="store_true", help="Processa editais históricos (encerrados)")
@@ -349,6 +367,7 @@ if __name__ == "__main__":
 
     main(
         backend=args.backend,
+        source=args.source,
         edital_ids=args.edital_ids,
         skip_cache=args.skip_cache,
         delay=args.delay,

@@ -23,6 +23,7 @@ import re
 from pathlib import Path
 
 from config import KG_WIKI_DIR
+from core.edital_id import wiki_page_path
 from core.hybrid_match_service import get_weights, score_stage1
 from domain.user_profile import CompanyProfile
 from supabase import Client
@@ -91,12 +92,12 @@ def _make_client(model_override: str | None = None):
 
 def _load_edital(edital_id: str) -> dict | None:
     """Lê a wiki page do edital do KG (não toca em edital_chunks — ADR M9)."""
-    wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+    wiki_file = wiki_page_path(edital_id)
     if not wiki_file.exists():
         logger.warning("OpportunityBrief: wiki page não encontrada para %s", edital_id)
         return None
     try:
-        data = json.loads(Path(wiki_file).read_text(encoding="utf-8"))
+        data = json.loads(wiki_file.read_text(encoding="utf-8"))
         # Garante chave "id" usada pelo score_stage1
         data.setdefault("id", edital_id)
         return data

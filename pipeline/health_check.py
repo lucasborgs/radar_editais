@@ -20,6 +20,7 @@ import logging
 from datetime import datetime
 
 from config import FINEP_PDFS_DIR, KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
+from core.edital_id import native_id_of, wiki_page_path
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ ALL_CHECKS = ["wiki_page_quality", "staleness", "new_pdfs"]
 
 def check_wiki_page_quality(edital_id: str) -> dict:
     """Verifica se a wiki page existe e tem campos essenciais preenchidos."""
-    wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+    wiki_file = wiki_page_path(edital_id)
 
     if not wiki_file.exists():
         return {"check": "wiki_page_quality", "status": "MISSING",
@@ -80,7 +81,7 @@ def check_wiki_page_quality(edital_id: str) -> dict:
 
 def check_staleness(edital_id: str) -> dict:
     """Verifica se a wiki page foi gerada há mais de STALENESS_DAYS dias."""
-    wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+    wiki_file = wiki_page_path(edital_id)
     if not wiki_file.exists():
         return {"check": "staleness", "status": "NO_WIKI_PAGE"}
 
@@ -105,7 +106,8 @@ def check_new_pdfs(edital_id: str) -> dict:
     Verifica se há PDFs em disco não refletidos no cache do etl_process.
     Indica retificação ou aditivo publicado que ainda não foi processado.
     """
-    pdf_dir = FINEP_PDFS_DIR / edital_id
+    # PDFs ficam em FINEP_PDFS_DIR/{native_id}/ — parametrizar por fonte é Épico C
+    pdf_dir = FINEP_PDFS_DIR / native_id_of(edital_id)
     if not pdf_dir.exists():
         return {"check": "new_pdfs", "status": "NO_PDF_DIR"}
 
@@ -121,8 +123,9 @@ def check_new_pdfs(edital_id: str) -> dict:
 
     if edital_id not in cache:
         return {"check": "new_pdfs", "status": "NOT_PROCESSED", "pdfs_on_disk": pdfs_on_disk}
+    # cache é keyed pelo edital_id prefixado pós-migration; nada a fazer aqui
 
-    wiki_file = KG_WIKI_DIR / f"{edital_id}.json"
+    wiki_file = wiki_page_path(edital_id)
     if wiki_file.exists():
         wiki_page = json.loads(wiki_file.read_text(encoding="utf-8"))
         if wiki_page.get("source") == "metadata_only" and pdfs_on_disk:
