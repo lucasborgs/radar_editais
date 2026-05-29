@@ -26,9 +26,7 @@ import json
 import logging
 import os
 import re
-from pathlib import Path
 
-from config import KG_WIKI_DIR
 from core.edital_id import wiki_page_path
 
 logger = logging.getLogger(__name__)

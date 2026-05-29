@@ -39,8 +39,9 @@ import {
   type SectionStatus,
 } from "@/lib/writing";
 import { loadProfileFromStorage, EMPTY_PROFILE } from "@/types/profile";
-import type { WritingMessage } from "@/types/api";
+import type { WritingMessage, PendingUserInput } from "@/types/api";
 import { MentionsTextarea } from "@/components/ui/MentionsTextarea";
+import { PendingUserInputPrompt } from "@/components/writing/PendingUserInputPrompt";
 import { useAuth } from "@/lib/auth";
 
 // ── Typing indicator ─────────────────────────────────────────────────────────
@@ -452,6 +453,9 @@ function WritingPageInner() {
   // Document editor state
   const [docContents, setDocContents] = useState<Record<string, string>>({});
   const [docSaving, setDocSaving] = useState(false);
+  // Sprint 2 do Cenário B: setado pela tool request_user_info (path agente).
+  // Renderiza prompt destacado acima do composer; limpo no próximo turn.
+  const [pendingUserInput, setPendingUserInput] = useState<PendingUserInput | null>(null);
 
   const activeDocContent = activeSection ? (docContents[activeSection] ?? sectionDrafts[activeSection] ?? "") : "";
 
@@ -568,19 +572,24 @@ function WritingPageInner() {
     }
   }, [sessionId, activeSection, sectionHistories]);
 
-  async function handleSend() {
-    if (!input.trim() || !sessionId || !activeSection || loading) return;
+  async function handleSend(messageOverride?: string) {
+    const content = (messageOverride ?? input).trim();
+    if (!content || !sessionId || !activeSection || loading) return;
 
     const userMsg: WritingMessage = {
       role: "user",
-      content: input.trim(),
+      content,
       timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
     };
     setSectionHistories((prev) => ({
       ...prev,
       [activeSection]: [...(prev[activeSection] ?? []), userMsg],
     }));
-    setInput("");
+    // Limpa apenas o input principal (não o override programático).
+    if (messageOverride === undefined) setInput("");
+    // O turn vai consumir / atualizar pending_user_input — limpamos local agora
+    // e deixamos o response repopular se houver nova pergunta.
+    setPendingUserInput(null);
     setLoading(true);
 
     try {
@@ -602,6 +611,8 @@ function WritingPageInner() {
         setDocContents((prev) => ({ ...prev, [activeSection]: draft }));
         setSectionDrafts((prev) => ({ ...prev, [activeSection]: draft }));
       }
+      // Path agente: agente pode ter pedido info ao usuário no fim deste turn.
+      if (res.pending_user_input) setPendingUserInput(res.pending_user_input);
       setSections((prev) =>
         prev.map((s) => s.title === activeSection && s.status === "pending" ? { ...s, status: "draft" } : s)
       );
@@ -767,6 +778,13 @@ function WritingPageInner() {
 
               {/* Input */}
               <div className="p-3 border-t border-border space-y-2">
+                {pendingUserInput && (
+                  <PendingUserInputPrompt
+                    pending={pendingUserInput}
+                    onAnswer={(answer) => { void handleSend(answer); }}
+                    disabled={loading}
+                  />
+                )}
                 <div className="flex items-center justify-between">
                   <ModelTierSelector
                     value={modelTier}
@@ -779,7 +797,7 @@ function WritingPageInner() {
                     rows={2}
                     value={input}
                     onChange={setInput}
-                    onSubmitEnter={handleSend}
+                    onSubmitEnter={() => { void handleSend(); }}
                     token={authToken}
                     placeholder="Escreva sua mensagem... (@ para mencionar biblioteca, Enter para enviar)"
                     className={cn(
@@ -790,7 +808,7 @@ function WritingPageInner() {
                     disabled={!sessionId || loading}
                   />
                   <button
-                    onClick={handleSend}
+                    onClick={() => { void handleSend(); }}
                     disabled={!sessionId || loading || !input.trim()}
                     className={cn(
                       "self-end px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold font-sans",

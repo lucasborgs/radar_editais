@@ -15,7 +15,7 @@ import logging
 import os
 import re
 
-from config import KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR, OBSIDIAN_VAULT_DIR
+from config import KNOWLEDGE_GRAPH_DIR, OBSIDIAN_VAULT_DIR
 from core.edital_id import wiki_page_path
 from domain.user_profile import CompanyProfile
 

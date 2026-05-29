@@ -399,9 +399,8 @@ async def run_daily_etl_task(timestamp: int) -> None:
     logger.info("run_daily_etl_task: iniciando (timestamp=%s)", timestamp)
 
     # Import tardio para evitar custo no boot do worker
-    from pipeline.extractors import SCRAPER_REGISTRY
-
     from core.edital_id import make_id  # noqa: PLC0415
+    from pipeline.extractors import SCRAPER_REGISTRY
 
     total_new = 0
     for source_key, cfg in SCRAPER_REGISTRY.items():

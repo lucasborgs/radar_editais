@@ -19,9 +19,9 @@ from typing import Annotated
 
 import jwt
 from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
-from jwt.algorithms import ECAlgorithm
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt.algorithms import ECAlgorithm
 
 from core.db import get_supabase_user
 from supabase import Client
