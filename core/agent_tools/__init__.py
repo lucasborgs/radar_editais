@@ -9,6 +9,12 @@ isolation. Closure por sessão garante que duas WritingSessions concorrentes
 nunca compartilham handle de DB ou escopo de busca por engano.
 """
 from core.agent_tools.explore_tools import build_explore_tools
+from core.agent_tools.profile_tools import ExtractionState, build_profile_tools
 from core.agent_tools.writing_tools import build_writing_tools
 
-__all__ = ["build_explore_tools", "build_writing_tools"]
+__all__ = [
+    "ExtractionState",
+    "build_explore_tools",
+    "build_profile_tools",
+    "build_writing_tools",
+]
