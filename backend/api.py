@@ -927,12 +927,22 @@ def extract_profile(request: Request, req: ProfileExtractRequest):
     """
     Recebe a URL do site da empresa, faz scraping e usa LLM para inferir
     os campos do CompanyProfile. Retorna perfil parcial + mapa de confiança.
+
+    Sprint 4 do Cenário B: quando AGENT_PROFILE_EXTRACTOR_DEFAULT_ENABLED=true,
+    roda o agente Anthropic com 4 tools (fetch_page, list_links_matching,
+    lookup_cnpj, submit_profile) — investigação multi-página + enriquecimento
+    via BrasilAPI. Default OFF — segue o pipeline determinístico (1 fetch
+    da home + 1 LLM call). Sem workspace (endpoint público no onboarding),
+    rollout é binário via env, igual ao /kg-explore.
     """
     url = req.url.strip()
     if not url.startswith(("http://", "https://")):
         raise HTTPException(status_code=422, detail="URL deve começar com http:// ou https://")
 
-    result = ProfileExtractor().extract(url)
+    agent_enabled = os.getenv(
+        "AGENT_PROFILE_EXTRACTOR_DEFAULT_ENABLED", "false",
+    ).lower() == "true"
+    result = ProfileExtractor().extract(url, agent_enabled=agent_enabled)
 
     return {
         "profile": {
