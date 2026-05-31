@@ -1,7 +1,7 @@
 """
 Skills loader — carrega regras de compliance específicas por fonte de edital.
 
-Fase 4 #26: cada fonte (FINEP, BNDES, FAPESP, CNPq) tem regras de aderência
+Fase 4 #26: cada fonte (FINEP, FAPESP) tem regras de aderência
 particulares — formato de orçamento, contrapartida, prestação de contas,
 linguagem esperada. Em vez de hard-coded no código, vivem em arquivos
 markdown que o ComplianceMonitor e a WritingSession carregam condicionalmente
@@ -36,7 +36,7 @@ def load_skill(source: str, skill_type: str = SKILL_COMPLIANCE) -> str:
     essa fonte (fallback gracioso — nem toda fonte precisa de skill).
 
     Args:
-        source: nome da fonte (campo `source` da wiki page). Ex: "FINEP", "BNDES".
+        source: nome da fonte (campo `source` da wiki page). Ex: "FINEP", "FAPESP".
         skill_type: tipo de skill — "compliance" (default) ou "writing".
     """
     if not source:
