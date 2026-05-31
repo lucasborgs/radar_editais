@@ -23,7 +23,9 @@ Modos:
 """
 from __future__ import annotations
 
+import hashlib
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -200,12 +202,34 @@ class FINEPScraper(BaseScraper):
             safe_name = self._safe_filename(legenda) + ext
             dest = dest_dir / safe_name
 
-            if dest.exists() and dest.stat().st_size > 0:
-                logger.debug("PDF já existe, pulando: %s", dest.name)
-            else:
-                ok = self._api.download_pdf(url, str(dest))
-                if not ok:
-                    continue
+            # Baixa SEMPRE para um arquivo temporário e só substitui o local se o
+            # conteúdo mudou (hash difere). Antes pulávamos qualquer arquivo que
+            # já existisse, o que fazia rerratificações com o mesmo nome de
+            # arquivo nunca serem captadas (requisito 3). Como só reescrevemos
+            # quando muda, o mtime de arquivos inalterados é preservado — e o
+            # gate de reprocessamento (chunk/embed) usa o conteúdo como sinal.
+            tmp = dest.with_suffix(dest.suffix + ".tmp")
+            ok = self._api.download_pdf(url, str(tmp))
+            if not ok:
+                tmp.unlink(missing_ok=True)
+                continue
+            try:
+                new_digest = hashlib.md5(tmp.read_bytes()).hexdigest()
+                unchanged = (
+                    dest.exists()
+                    and dest.stat().st_size > 0
+                    and hashlib.md5(dest.read_bytes()).hexdigest() == new_digest
+                )
+                if unchanged:
+                    logger.debug("PDF inalterado, mantendo: %s", dest.name)
+                    tmp.unlink(missing_ok=True)
+                else:
+                    os.replace(tmp, dest)  # novo ou alterado — troca atômica
+                    logger.info("PDF baixado/atualizado: %s/%s", chamada_id, dest.name)
+            except Exception as e:
+                logger.warning("Falha ao comparar/gravar PDF %s: %s", dest.name, e)
+                tmp.unlink(missing_ok=True)
+                continue
 
             # Best-effort: extrai texto para o dict de saída (compatível com pipeline antigo)
             text = self._extract_pdf_text(dest)

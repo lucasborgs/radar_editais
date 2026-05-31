@@ -25,6 +25,38 @@ logger = logging.getLogger(__name__)
 _BRONZE_DIR = BRONZE_DIR / "fapesp_raw"
 _URL_ID_RE = re.compile(r"/(\d+)(?:/|$)")
 
+# Tamanho-alvo por unidade. O structurer reproduz texto VERBATIM, e o cliente
+# LLM tem timeout de 60s (core.llm_client). gpt-4o-mini gera ~50-80 tok/s, então
+# uma unit que force perto de max_tokens=4000 de saída (~40-80s) estoura o
+# timeout. Mantemos ~3500 chars (~900 tokens → saída verbatim ~1000-1200 tokens)
+# bem abaixo do limite de tempo. Sem split, FAPESP serve o edital inteiro como
+# um corpo de 35k-100k chars e o structurer falhava (truncava → silver vazio, ou
+# timeout). O contrato §12.3 já prevê "HTML → split por âncora".
+_UNIT_MAX_CHARS = 3500
+
+
+def _split_into_units(text: str, max_chars: int = _UNIT_MAX_CHARS) -> list[str]:
+    """Quebra o corpo HTML em unidades ~page-sized, em fronteira de parágrafo.
+
+    Mantém parágrafos inteiros juntos até estourar `max_chars`; cai para quebra
+    por linha simples se não houver parágrafos; nunca devolve lista vazia para
+    texto não-vazio.
+    """
+    paras = [p for p in text.split("\n\n") if p.strip()]
+    if not paras:
+        paras = [p for p in text.split("\n") if p.strip()] or [text]
+    units: list[str] = []
+    buf = ""
+    for p in paras:
+        if buf and len(buf) + len(p) + 2 > max_chars:
+            units.append(buf)
+            buf = p
+        else:
+            buf = f"{buf}\n\n{p}" if buf else p
+    if buf:
+        units.append(buf)
+    return units
+
 
 def _load_latest_bronze() -> list[dict]:
     """Lê o JSON bronze FAPESP mais recente. [] se diretório/arquivos ausentes."""
@@ -81,4 +113,4 @@ class Adapter(SourceAdapter):
             logger.info("fapesp adapter: chamada %s sem texto_cru — sem documento", edital_id)
             return []
 
-        return [{"doc_name": "pagina-chamada", "units": [texto]}]
+        return [{"doc_name": "pagina-chamada", "units": _split_into_units(texto)}]
