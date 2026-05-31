@@ -25,9 +25,10 @@ from pathlib import Path
 
 from config import FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, OBSIDIAN_VAULT_DIR
 from core import wiki_schema
+from core.edital_id import id_to_slug, source_of
 
-# Schema autoritativo em WIKI.md + wikis/finep.md (ver core.wiki_schema)
-_SOURCE = "finep"
+# Multi-fonte (§12 WIKI.md): o export consome o índice unificado (todas as fontes)
+# e deriva a fonte de cada edital do próprio id prefixado. Sem hardcode de fonte.
 
 INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"  # vigentes por padrão; use --historico para todos
 FACTS_DIR = FINEP_PDFS_DIR
@@ -40,6 +41,11 @@ FACTS_DIR = FINEP_PDFS_DIR
 def slugify(text: str) -> str:
     """Wrapper para core.wiki_schema.slugify (§6.3 WIKI.md)."""
     return wiki_schema.slugify(text)
+
+
+# Slug colon-free para nome de nota/wikilink (Obsidian proíbe `:`). Centralizado
+# em core.edital_id (id_to_slug/slug_to_id) — get_graph faz o caminho inverso.
+_edital_slug = id_to_slug
 
 
 def _status_emoji(status: str) -> str:
@@ -105,7 +111,7 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
         lines.append(f"link: {link}")
     trl_faixa_keys = wiki_schema.trl_range_to_faixas(trl_range.get("min"), trl_range.get("max"))
     lines.append("tags:")
-    lines.append("  - finep")
+    lines.append(f"  - {edital.get('source') or source_of(eid)}")
     lines.append("  - edital")
     lines.append(f"  - {tag}")
     if mechanism:
@@ -227,7 +233,6 @@ def tema_note(tema_label: str, editais_ids: list[str], edital_by_id: dict, subfo
     lines = ["---"]
     lines.append(f'title: "{safe_yaml_str(tema_label)}"')
     lines.append("tags:")
-    lines.append("  - finep")
     lines.append("  - tema")
     lines.append("---")
     lines.append("")
@@ -238,12 +243,12 @@ def tema_note(tema_label: str, editais_ids: list[str], edital_by_id: dict, subfo
     lines.append("## Editais")
     lines.append("")
 
-    for eid in editais_ids:
+    for eid in dict.fromkeys(editais_ids):
         edital = edital_by_id.get(eid, {})
         title = edital.get("title", f"Edital {eid}")
         status = edital.get("status", "")
         emoji = _status_emoji(status)
-        lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
+        lines.append(f"- {emoji} [[{subfolder}/editais/{_edital_slug(eid)}|{title}]]")
 
     lines.append("")
     return "\n".join(lines)
@@ -254,7 +259,6 @@ def fonte_note(fonte_label: str, editais_ids: list[str], edital_by_id: dict, sub
     lines = ["---"]
     lines.append(f'title: "{safe_yaml_str(fonte_label)}"')
     lines.append("tags:")
-    lines.append("  - finep")
     lines.append("  - fonte-recurso")
     lines.append("---")
     lines.append("")
@@ -265,12 +269,12 @@ def fonte_note(fonte_label: str, editais_ids: list[str], edital_by_id: dict, sub
     lines.append("## Editais")
     lines.append("")
 
-    for eid in editais_ids:
+    for eid in dict.fromkeys(editais_ids):
         edital = edital_by_id.get(eid, {})
         title = edital.get("title", f"Edital {eid}")
         status = edital.get("status", "")
         emoji = _status_emoji(status)
-        lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
+        lines.append(f"- {emoji} [[{subfolder}/editais/{_edital_slug(eid)}|{title}]]")
 
     lines.append("")
     return "\n".join(lines)
@@ -281,7 +285,6 @@ def publico_note(publico_label: str, editais_ids: list[str], edital_by_id: dict,
     lines = ["---"]
     lines.append(f'title: "{safe_yaml_str(publico_label)}"')
     lines.append("tags:")
-    lines.append("  - finep")
     lines.append("  - publico-alvo")
     lines.append("---")
     lines.append("")
@@ -292,12 +295,12 @@ def publico_note(publico_label: str, editais_ids: list[str], edital_by_id: dict,
     lines.append("## Editais")
     lines.append("")
 
-    for eid in editais_ids:
+    for eid in dict.fromkeys(editais_ids):
         edital = edital_by_id.get(eid, {})
         title = edital.get("title", f"Edital {eid}")
         status = edital.get("status", "")
         emoji = _status_emoji(status)
-        lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
+        lines.append(f"- {emoji} [[{subfolder}/editais/{_edital_slug(eid)}|{title}]]")
 
     lines.append("")
     return "\n".join(lines)
@@ -308,7 +311,6 @@ def subprograma_note(sp_label: str, editais_ids: list[str], edital_by_id: dict, 
     lines = ["---"]
     lines.append(f'title: "{safe_yaml_str(sp_label)}"')
     lines.append("tags:")
-    lines.append("  - finep")
     lines.append("  - subprograma")
     lines.append("---")
     lines.append("")
@@ -318,12 +320,12 @@ def subprograma_note(sp_label: str, editais_ids: list[str], edital_by_id: dict, 
     lines.append("")
     lines.append("## Editais")
     lines.append("")
-    for eid in editais_ids:
+    for eid in dict.fromkeys(editais_ids):
         edital = edital_by_id.get(eid, {})
         title = edital.get("title", f"Edital {eid}")
         status = edital.get("status", "")
         emoji = _status_emoji(status)
-        lines.append(f"- {emoji} [[{subfolder}/editais/{eid}|{title}]]")
+        lines.append(f"- {emoji} [[{subfolder}/editais/{_edital_slug(eid)}|{title}]]")
     lines.append("")
     return "\n".join(lines)
 
@@ -337,11 +339,10 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
 
     lines = ["---"]
     lines.append("tags:")
-    lines.append("  - finep")
     lines.append("  - home")
     lines.append("---")
     lines.append("")
-    lines.append("# 📡 Radar de Editais — FINEP")
+    lines.append("# 📡 Radar de Editais")
     lines.append("")
     lines.append(f"> Última atualização: **{updated}**")
     lines.append("")
@@ -375,7 +376,7 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
             eid = edital["id"]
             title = edital.get("title", "")
             deadline = edital.get("deadline", "")
-            lines.append(f"- 🟢 [[{subfolder}/editais/{eid}|{title}]] — prazo: {deadline}")
+            lines.append(f"- 🟢 [[{subfolder}/editais/{_edital_slug(eid)}|{title}]] — prazo: {deadline}")
 
     lines.append("")
     return "\n".join(lines)
@@ -400,7 +401,7 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     # o que está congelado no card. Card é autoridade sobre synthesized fields
     # (§4.2). Derived: subprogramas, n_pdfs, n_facts vêm do índice.
     from core.edital_id import wiki_page_path
-    inherited_keys = wiki_schema.wiki_page_fields("finep")["inherited"]
+    inherited_keys = wiki_schema.wiki_page_fields()["inherited"]  # global, agnóstico à fonte
     overridable_keys = list(inherited_keys) + ["subprogramas", "n_pdfs", "n_facts"]
     editais = []
     for eid, entry in index_entries.items():
@@ -459,7 +460,7 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     for edital in editais:
         eid = edital["id"]
         content = edital_note(edital, facts_by_id, subfolder)
-        note_path = base / "editais" / f"{eid}.md"
+        note_path = base / "editais" / f"{_edital_slug(eid)}.md"
         note_path.write_text(content, encoding="utf-8")
         n_editais += 1
 
@@ -519,7 +520,7 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     print(f"  1. Abra o vault em: {vault_path}")
     print(f"  2. Acesse a nota HOME em: {subfolder}/HOME")
     print("  3. Clique no ícone de grafo (canto superior direito) ou Ctrl+G")
-    print("  4. No Graph View, filtre por #finep para ver apenas os editais")
+    print("  4. No Graph View, filtre por #edital (ou por #finep / #fapesp por fonte)")
 
 
 # =============================================================================

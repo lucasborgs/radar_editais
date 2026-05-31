@@ -1,7 +1,6 @@
 ---
 title: "espaço - defesa e segurança"
 tags:
-  - finep
   - tema
 ---
 
@@ -11,4 +10,4 @@ tags:
 
 ## Editais
 
-- 🟢 [[radar-editais/editais/775|Finep Mais Inovação Brasil – Rodada 2 - Base Industrial de Defesa]]
+- 🟢 [[radar-editais/editais/finep-775|Finep Mais Inovação Brasil – Rodada 2 - Base Industrial de Defesa]]

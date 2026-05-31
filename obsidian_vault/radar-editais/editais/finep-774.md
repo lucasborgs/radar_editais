@@ -1,16 +1,17 @@
 ---
 title: "Finep Mais Inovação Brasil – Rodada 2 – Cadeias Agroindustriais Sustentáveis"
-chamada_id: 774
+chamada_id: finep:774
 status: ABERTA
+deadline: 30/09/2026
 pub_date: 06/02/2026
 mechanism: subvencao
 trl_min: 3
 trl_max: 8
 n_pdfs: 10
 n_facts: 0
-link: https://www.finep.gov.br/oportunidades/chamadas-publicas?chamadaId=774
+link: https://www.finep.gov.br/e/chamada-publica/222684/754839
 tags:
-  - finep
+  - etl_process
   - edital
   - aberta
   - mecanismo/subvencao
@@ -23,7 +24,7 @@ tags:
 
 # 🟢 Finep Mais Inovação Brasil – Rodada 2 – Cadeias Agroindustriais Sustentáveis
 
-> Este edital financia projetos inovadores e de risco tecnológico nas cadeias agroindustriais sustentáveis, visando o desenvolvimento de produtos ou processos inovadores. As propostas podem ser apresentadas por empresas brasileiras, startups e ICTs.
+> Este edital financia projetos inovadores e de risco tecnológico nas cadeias agroindustriais sustentáveis, visando o desenvolvimento de produtos ou processos inovadores. É direcionado a empresas brasileiras, incluindo startups e cooperativas.
 
 ## Temas
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
@@ -37,6 +38,7 @@ tags:
 | Campo | Valor |
 |---|---|
 | Status | 🟢 ABERTA |
+| Prazo de envio | 30/09/2026 |
 | Publicação | 06/02/2026 |
 | Mecanismo | Subvenção (não reembolsável) |
 | Valor do projeto | R$ 5,000,000 a R$ 40,000,000 |
@@ -45,20 +47,20 @@ tags:
 | Entidades elegíveis | empresas, startups, ICTs |
 | PDFs disponíveis | 10 |
 | Fatos extraídos | 0 |
-| Link | [https://www.finep.gov.br/oportunidades/chamadas-publicas?chamadaId=774](https://www.finep.gov.br/oportunidades/chamadas-publicas?chamadaId=774) |
+| Link | [https://www.finep.gov.br/e/chamada-publica/222684/754839](https://www.finep.gov.br/e/chamada-publica/222684/754839) |
 
 ## Requisitos Principais
 
 - Participação obrigatória de pelo menos uma ICT.
-- Proposta deve ser apresentada por empresa brasileira.
+- Propostas devem ser apresentadas em arranjos simples ou em rede.
 - Valor solicitado deve estar entre R$ 5.000.000,00 e R$ 40.000.000,00.
 - Prazo de execução do projeto deve ser de até 36 meses.
-- Pontuação mínima de 14 pontos na análise de mérito.
+- Propostas devem atender aos critérios de elegibilidade e documentação exigidos.
 
 ## Fatos-chave
 
 - Recursos disponíveis de até R$ 300.000.000,00.
-- Mínimo de R$ 90.000.000,00 destinados a projetos nas regiões Norte, Nordeste ou Centro-Oeste.
-- Apoio a projetos que visem aumentar a produtividade agrícola e segurança alimentar.
+- Mínimo de R$ 90.000.000,00 reservado para projetos nas regiões Norte, Nordeste ou Centro-Oeste.
+- Aprovação de propostas com pontuação mínima de 14 pontos na análise de mérito.
 - Possibilidade de financiamento da contrapartida financeira.
-- Avaliação das propostas em duas etapas: habilitação e análise de mérito.
+- Submissão de propostas até 30/09/2026.

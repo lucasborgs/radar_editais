@@ -1,13 +1,13 @@
 ---
 title: "Programa de Investimento em Startups Inovadoras 2ª Rodada"
-chamada_id: 613
+chamada_id: finep:613
 status: ABERTA
 pub_date: 21/11/2017
 n_pdfs: 0
 n_facts: 0
-link: https://www.finep.gov.br/oportunidades/chamadas-publicas?chamadaId=613
+link: https://www.finep.gov.br/e/chamada-publica/222684/721708
 tags:
-  - finep
+  - metadata_only
   - edital
   - aberta
   - tema/agro-bioeconomia-e-alimentos
@@ -27,4 +27,4 @@ tags:
 | Publicação | 21/11/2017 |
 | PDFs disponíveis | 0 |
 | Fatos extraídos | 0 |
-| Link | [https://www.finep.gov.br/oportunidades/chamadas-publicas?chamadaId=613](https://www.finep.gov.br/oportunidades/chamadas-publicas?chamadaId=613) |
+| Link | [https://www.finep.gov.br/e/chamada-publica/222684/721708](https://www.finep.gov.br/e/chamada-publica/222684/721708) |

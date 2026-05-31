@@ -61,6 +61,27 @@ def native_id_of(edital_id: str) -> str:
     return parse_id(edital_id)[1]
 
 
+def id_to_slug(edital_id: str) -> str:
+    """edital_id prefixado → slug seguro para nome de nota/wikilink Obsidian.
+
+    O Obsidian proíbe `:` em nomes de nota, então o vault usa `{source}-{native}`
+    (ex.: `finep:589` → `finep-589`). É o esquema do grafo (export_to_obsidian +
+    get_graph); difere do layout das wiki pages (`{source}/{native}.json`).
+    """
+    return edital_id.replace(_SEP, "-")
+
+
+def slug_to_id(slug: str) -> str:
+    """Inverso de `id_to_slug`: troca só o PRIMEIRO `-` por `:`.
+
+    Slugs de fonte não contêm `-` (finep, fapesp, bndes...), então o primeiro
+    `-` é sempre o separador fonte↔native; o native pode conter `-`
+    (ex.: `bndes-funtec-2026` → `bndes:funtec-2026`). Um slug sem `-` (id nativo
+    legado, sem fonte) volta inalterado.
+    """
+    return slug.replace("-", _SEP, 1)
+
+
 def wiki_page_path(edital_id: str) -> Path:
     """Caminho da wiki page no filesystem: `KG_WIKI_DIR/{source}/{native}.json`.
 
