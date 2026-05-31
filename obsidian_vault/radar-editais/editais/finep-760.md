@@ -10,7 +10,7 @@ n_pdfs: 1
 n_facts: 0
 link: https://www.finep.gov.br/e/chamada-publica/222684/752871
 tags:
-  - etl_process
+  - finep
   - edital
   - aberta
   - mecanismo/investimento

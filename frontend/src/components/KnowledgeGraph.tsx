@@ -53,7 +53,7 @@ export function KnowledgeGraph({ data, onNodeClick }: Props) {
   const handleNodeClick = useCallback(
     (node: object) => {
       const n = node as GraphNode;
-      const clickable = ["edital", "tema", "publico", "subprograma", "home"];
+      const clickable = ["edital", "tema", "publico", "subprograma", "fonte", "home"];
       if (clickable.includes(n.type)) onNodeClick(n);
     },
     [onNodeClick]
