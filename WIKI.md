@@ -49,7 +49,6 @@ Cada fonte tem um schema específico em `wikis/<fonte>.md` que **estende** este 
 |---|---|---|
 | FINEP | [wikis/finep.md](wikis/finep.md) | ativo (v1) |
 | FAPESP | [wikis/fapesp.md](wikis/fapesp.md) | ativo (v1) |
-| BNDES | `wikis/bndes.md` | planejado (Fase 2 — portal IBM WebSphere requer headless browser) |
 | FAPERJ | `wikis/faperj.md` | planejado (Fase 2 — portal em migração) |
 | EMBRAPII | `wikis/embrapii.md` | planejado |
 
@@ -628,7 +627,7 @@ em qualquer camada ≥ L2.
 | Camada | Nome oficial | Escopo | Conteúdo |
 |---|---|---|---|
 | L0 | `raw` (bronze) | **por fonte** | dump cru do scraper em `bronze_data/{source}_raw/` |
-| L1 | **Source Adapter** | **por fonte** | converte raw → Documento Canônico. FINEP: lê PDFs. FAPESP: `texto_cru`. BNDES: `contexto_capturado` |
+| L1 | **Source Adapter** | **por fonte** | converte raw → Documento Canônico. FINEP: lê PDFs. FAPESP: `texto_cru` |
 | — | **Documento Canônico** | **fronteira** | contrato agnóstico (§12.3) |
 | L2 | `structured` (silver) | agnóstico | blocos do structurer — detalhe em §11 |
 | L3a | **Knowledge gold** | agnóstico | wiki page (§4) + grafo (§6) |
@@ -663,11 +662,6 @@ source_adapters:
     module: "pipeline.adapters.fapesp"
     raw_dir: "fapesp_raw"
     strategy: "html_body"    # texto_cru do bronze como 1 doc
-  bndes:
-    module: "pipeline.adapters.bndes"
-    raw_dir: "bndes_raw"
-    strategy: "html_body"    # contexto_capturado
-    status: "planejado"
 ```
 
 ### 12.5 Onde o código viola isto hoje

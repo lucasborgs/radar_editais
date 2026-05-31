@@ -189,7 +189,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                       formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--source", required=True,
-                        help="Nome da fonte (ex.: finep, bndes, fapesp)")
+                        help="Nome da fonte (ex.: finep, fapesp)")
     parser.add_argument("--editais", nargs="+", required=True,
                         help="IDs dos editais (ex.: 768 762 743)")
     parser.add_argument("--per-edital", type=int, default=DEFAULT_PER_EDITAL,
