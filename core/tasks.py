@@ -26,6 +26,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import asyncio  # noqa: E402
+import hashlib  # noqa: E402
 import json  # noqa: E402
 import logging  # noqa: E402
 import os  # noqa: E402
@@ -247,12 +248,42 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
     return chunks
 
 
+def _existing_content_hash(db, edital_id: str) -> str | None:
+    """Lê o content_hash gravado no chunk_index=0 da última indexação.
+
+    Serve de gate: se o hash do conteúdo recém-gerado bate com este, o edital
+    não mudou desde a última run e pulamos o re-embed (corta custo OpenAI —
+    requisito 3 / decisão 'gate por hash do doc canônico'). None = nunca
+    indexado (ou linha sem o campo, ex.: indexação anterior à introdução do gate).
+    """
+    try:
+        res = (
+            db.table("edital_chunks")
+            .select("metadata")
+            .eq("edital_id", edital_id)
+            .eq("chunk_index", 0)
+            .maybe_single()
+            .execute()
+        )
+        row = res.data if res else None
+        if row and isinstance(row.get("metadata"), dict):
+            return row["metadata"].get("content_hash")
+    except Exception as e:
+        logger.debug("chunk_edital_task: lookup de content_hash falhou p/ %s: %s", edital_id, e)
+    return None
+
+
 @app.task(name="chunk_edital", queue="default")
-async def chunk_edital_task(edital_id: str) -> None:
+async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
     """Index one edital: PDFs → chunks → embeddings → upsert into edital_chunks.
 
     Idempotent: deletes any existing rows for this edital_id before inserting
     the fresh batch. Re-runnable without manual cleanup.
+
+    Gate de conteúdo (requisito 3): grava um `content_hash` (md5 dos textos dos
+    chunks) no metadata do chunk_index=0. Em re-runs, se o hash bater com o
+    indexado, pula o re-embed — só editais cujo conteúdo mudou pagam OpenAI.
+    `force=True` ignora o gate (caminho manual `reindex_edital.py --force`).
 
     Error handling:
       - Extraction failure on one PDF logs and is skipped (the others proceed).
@@ -275,6 +306,18 @@ async def chunk_edital_task(edital_id: str) -> None:
         return
 
     texts = [c["text"] for c in chunks]
+
+    # Gate: se o conteúdo não mudou desde a última indexação, não re-embeda.
+    content_hash = hashlib.md5("\x00".join(texts).encode("utf-8", "ignore")).hexdigest()
+    if not force:
+        existing = await asyncio.to_thread(_existing_content_hash, db, edital_id)
+        if existing == content_hash:
+            logger.info(
+                "chunk_edital_task: edital=%s inalterado (hash=%s) — skip re-embed",
+                edital_id, content_hash[:8],
+            )
+            return
+
     logger.info(
         "chunk_edital_task: edital=%s gerou %d chunks, embedando…",
         edital_id, len(chunks),
@@ -296,7 +339,8 @@ async def chunk_edital_task(edital_id: str) -> None:
             "source_file": c.get("source_file"),
             "page_range": c.get("page_range"),
             "embedding": emb,
-            "metadata": c.get("metadata") or {},
+            # content_hash em todos os chunks (lido do index 0 pelo gate).
+            "metadata": {**(c.get("metadata") or {}), "content_hash": content_hash},
         }
         for c, emb in zip(chunks, embeddings, strict=True)
     ]
@@ -400,6 +444,7 @@ async def run_daily_etl_task(timestamp: int) -> None:
 
     # Import tardio para evitar custo no boot do worker
     from core.edital_id import make_id  # noqa: PLC0415
+    from pipeline.build_knowledge_graph import _ID_EXTRACTORS  # noqa: PLC0415
     from pipeline.extractors import SCRAPER_REGISTRY
 
     total_new = 0
@@ -418,11 +463,17 @@ async def run_daily_etl_task(timestamp: int) -> None:
                 "run_daily_etl_task: %s — %d resultados", display_name, new_count,
             )
 
-            # Enfileira chunk_edital_task para cada edital com PDFs novos.
-            # ID nativo do scraper é prefixado com a source antes do defer —
-            # tasks consumidoras assumem o formato `{source}:{native}` (§12, Épico B).
+            # Enfileira chunk_edital_task para cada edital.
+            # O native_id é extraído pelo extrator da fonte (o mesmo que o
+            # build_knowledge_graph usa): FINEP vem de `chamada_id`/link, FAPESP
+            # da URL. Antes usávamos `item.get("chamada_id") or item.get("id")`,
+            # que era None para FAPESP — e os editais FAPESP nunca eram chunkados.
+            extract_id = _ID_EXTRACTORS.get(source)
             for item in (results or []):
-                native_id = item.get("chamada_id") or item.get("id")
+                native_id = (
+                    extract_id(item) if extract_id
+                    else (item.get("chamada_id") or item.get("id"))
+                )
                 if not native_id:
                     continue
                 edital_id = make_id(source, str(native_id))
@@ -456,5 +507,45 @@ async def run_daily_etl_task(timestamp: int) -> None:
                 "run_daily_etl_task: %s falhou (classificado como %s): %s",
                 display_name, typed.category, raw_err,
             )
+
+    # -------------------------------------------------------------------
+    # Pós-scraping: reconstruir índice e sintetizar wiki pages.
+    # Antes esses dois passos eram CLI manuais — o cron só enfileirava
+    # chunk_edital. Resultado: vigência, prazos e os campos sintetizados
+    # (objective/key_requirements) ficavam congelados entre execuções
+    # manuais. Aqui fechamos o ciclo (requisito 3 + gap de vigência P0).
+    # -------------------------------------------------------------------
+
+    # 1) Índice vigentes/histórico a partir do bronze recém-salvo.
+    #    Pure-Python (sem LLM) — barato e idempotente.
+    try:
+        from pipeline import build_knowledge_graph  # noqa: PLC0415
+        await asyncio.to_thread(build_knowledge_graph.main)
+        logger.info("run_daily_etl_task: índice reconstruído (vigentes + histórico)")
+    except Exception as e:
+        logger.error("run_daily_etl_task: falha ao reconstruir índice: %s", e)
+
+    # 2) Síntese de wiki pages. O etl_process tem cache próprio por hash de
+    #    (metadata + silver) — só chama o LLM para editais que mudaram, então
+    #    rodar todo dia é barato. Guardamos a API key para não cair no getpass
+    #    (que travaria o worker headless).
+    wiki_backend = os.getenv("WIKI_SYNTH_BACKEND", "gemini")
+    key_ok = (
+        os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if wiki_backend == "gemini"
+        else os.getenv("OPENAI_API_KEY")
+    )
+    if key_ok:
+        try:
+            from pipeline import etl_process  # noqa: PLC0415
+            await asyncio.to_thread(lambda: etl_process.main(backend=wiki_backend))
+            logger.info("run_daily_etl_task: wiki pages sintetizadas (backend=%s)", wiki_backend)
+        except Exception as e:
+            logger.error("run_daily_etl_task: falha na síntese de wiki pages: %s", e)
+    else:
+        logger.warning(
+            "run_daily_etl_task: sem API key p/ WIKI_SYNTH_BACKEND=%s — síntese de wiki pulada",
+            wiki_backend,
+        )
 
     logger.info("run_daily_etl_task: concluído (total=%d novos)", total_new)

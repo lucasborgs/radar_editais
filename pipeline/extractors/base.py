@@ -69,7 +69,7 @@ class BaseScraper(ABC):
 
         Antes de gravar, compara o conjunto de URLs extraídas com o último arquivo
         salvo do mesmo prefixo. Se idêntico, pula o salvamento para evitar acúmulo
-        de arquivos redundantes (ex: BNDES sempre retorna os mesmos links estáticos).
+        de arquivos redundantes quando a fonte retorna sempre o mesmo conjunto.
 
         Args:
             data: Lista de dicionários para salvar
@@ -81,12 +81,31 @@ class BaseScraper(ABC):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         prefix = prefix or self.source_name.lower()
 
-        # Hash de conteúdo estável: URL + titulo + descricao, excluindo data_extracao
+        # Hash de conteúdo estável, excluindo data_extracao. Inclui status,
+        # prazo e o conjunto de documentos além de URL/título/descrição: uma
+        # rerratificação que muda só o prazo (ou anexa/atualiza um PDF) PRECISA
+        # gerar um novo bronze — senão build_knowledge_graph lê metadados velhos
+        # e o edital fica com vigência/prazo desatualizados (requisito 2).
         def _item_fingerprint(item: dict) -> str:
+            docs = "|".join(sorted(item.get("pdf_legendas") or item.get("pdf_urls") or []))
+            # `descricao` (FINEP) ou `texto_cru` (FAPESP) — fontes diferentes
+            # nomeiam o corpo de forma distinta; cobrimos ambos para captar
+            # mudança de conteúdo seja qual for a fonte.
+            body = (
+                item.get("descricao")
+                or item.get("description")
+                or item.get("texto_cru")
+                or ""
+            )[:800]
+            extra = (item.get("areas") or "") + (item.get("modalidades") or "")
             return (
                 item.get("url", item.get("link", ""))
                 + (item.get("titulo", item.get("title", "")) or "")
-                + (item.get("descricao", item.get("description", "")) or "")[:500]
+                + body
+                + "|status:" + (item.get("status", "") or "")
+                + "|prazo:" + (item.get("prazo_envio", "") or item.get("data_limite", "") or "")
+                + "|extra:" + extra
+                + "|docs:" + docs
             )
 
         import hashlib

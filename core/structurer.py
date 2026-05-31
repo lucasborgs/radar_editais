@@ -129,9 +129,21 @@ def _structure_single_doc(
     carry: list[str] = []
     doc_name = doc["doc_name"]
     for page_num, page_text in enumerate(doc["units"], start=1):
-        page_blocks = structure_page(
-            client, model, doc_name, page_num, page_text, carry
-        )
+        # Resiliência: uma página que falha (timeout, JSON inválido, etc.) NÃO
+        # deve zerar o documento inteiro. Antes, qualquer exceção aqui subia pelo
+        # ThreadPoolExecutor.map e abortava todos os docs → silver vazio → 0
+        # chunks. Editais grandes (ex.: FAPESP com 100k+ chars / muitas units)
+        # ficavam reféns de um único timeout. Agora pulamos a página e seguimos.
+        try:
+            page_blocks = structure_page(
+                client, model, doc_name, page_num, page_text, carry
+            )
+        except Exception as e:
+            logger.warning(
+                "structurer: página %d de %s falhou (%s) — pulando, doc segue parcial",
+                page_num, doc_name, e,
+            )
+            continue
         for b in page_blocks:
             out.append({
                 "doc": doc_name,

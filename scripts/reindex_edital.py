@@ -62,20 +62,24 @@ def _discover_editais() -> list[str]:
     return sorted(d.name for d in FINEP_PDFS_DIR.iterdir() if d.is_dir())
 
 
-async def _run_sync(edital_id: str) -> None:
+async def _run_sync(edital_id: str, force: bool = False) -> None:
     """Invoke the task function directly in this process — no worker required."""
     # chunk_edital_task is a procrastinate-decorated coroutine; the wrapper
     # exposes the original callable via .func. Calling it directly skips
-    # the queue entirely (we own the event loop here).
+    # the queue entirely (we own the event loop here). `force` ignora o gate
+    # de content_hash da task — sem isso, `--force` em um edital inalterado
+    # seria silenciosamente pulado pelo próprio gate.
     fn = getattr(chunk_edital_task, "func", chunk_edital_task)
-    await fn(edital_id=edital_id)
+    await fn(edital_id=edital_id, force=force)
 
 
-async def _enqueue(edital_id: str) -> None:
+async def _enqueue(edital_id: str, force: bool = False) -> None:
     """Defer the job via procrastinate so a worker can pick it up."""
     from core.tasks import app as tasks_app
     async with tasks_app.open_async():
-        await tasks_app.configure_task("chunk_edital").defer_async(edital_id=edital_id)
+        await tasks_app.configure_task("chunk_edital").defer_async(
+            edital_id=edital_id, force=force,
+        )
 
 
 def _count_chunks(edital_id: str) -> int:
@@ -100,9 +104,9 @@ async def _process_one(edital_id: str, queue: bool, force: bool) -> dict:
 
     try:
         if queue:
-            await _enqueue(edital_id)
+            await _enqueue(edital_id, force=force)
             return {"edital_id": edital_id, "status": "enqueued"}
-        await _run_sync(edital_id)
+        await _run_sync(edital_id, force=force)
         n = _count_chunks(edital_id)
         est_tokens = n * TOKENS_PER_CHUNK_ESTIMATE
         est_cost_usd = (est_tokens / 1_000_000) * EMBEDDING_COST_PER_1M_TOKENS
