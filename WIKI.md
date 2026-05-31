@@ -284,11 +284,19 @@ node_types:
     folder: subprogramas
     tags: [finep, subprograma]
     emoji: "🏛️"
+  fonte:
+    folder: fontes
+    tags: [fonte-recurso]
+    emoji: "💰"
   home:
     folder: ""
     tags: [finep, home]
     emoji: "📡"
 ```
+
+`fonte` (fonte de recurso / agência de fomento — FINEP, FAPESP, FNDCT, BNDES…)
+é nó: hub de navegação com identidade própria, e o eixo natural de agrupamento
+num grafo multi-fonte. Tag sem prefixo de fonte porque agrega editais de várias.
 
 Tags fonte-específicas (ex.: `finep`) vêm de `wikis/<fonte>.md`.
 
@@ -317,8 +325,12 @@ link_types:
     from: edital
     to: subprograma
     section: "## Subprograma"
+  edital_has_fonte:
+    from: edital
+    to: fonte
+    section: "## Fonte de Recurso"
   aggregator_lists_edital:
-    from: [tema, publico, subprograma, home]
+    from: [tema, publico, subprograma, fonte, home]
     to: edital
     section: "## Editais"
 ```

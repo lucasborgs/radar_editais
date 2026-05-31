@@ -7,7 +7,7 @@ n_pdfs: 0
 n_facts: 0
 link: https://www.finep.gov.br/e/chamada-publica/222684/721708
 tags:
-  - metadata_only
+  - finep
   - edital
   - aberta
   - tema/agro-bioeconomia-e-alimentos

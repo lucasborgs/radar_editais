@@ -11,7 +11,7 @@ n_pdfs: 10
 n_facts: 0
 link: https://www.finep.gov.br/e/chamada-publica/222684/754473
 tags:
-  - etl_process
+  - finep
   - edital
   - aberta
   - mecanismo/subvencao

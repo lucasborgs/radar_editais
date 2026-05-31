@@ -111,7 +111,10 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
         lines.append(f"link: {link}")
     trl_faixa_keys = wiki_schema.trl_range_to_faixas(trl_range.get("min"), trl_range.get("max"))
     lines.append("tags:")
-    lines.append(f"  - {edital.get('source') or source_of(eid)}")
+    # Fonte real do edital vem do id prefixado (`finep:589` → `finep`), NÃO do
+    # campo `source` do card — esse guarda como a wiki page foi gerada
+    # (`etl_process`/`metadata_only`), não a agência.
+    lines.append(f"  - {source_of(eid)}")
     lines.append("  - edital")
     lines.append(f"  - {tag}")
     if mechanism:
