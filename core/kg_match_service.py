@@ -16,7 +16,7 @@ import os
 import re
 
 from config import KNOWLEDGE_GRAPH_DIR, OBSIDIAN_VAULT_DIR
-from core.edital_id import wiki_page_path
+from core.edital_id import id_to_slug, slug_to_id, wiki_page_path
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -411,7 +411,11 @@ class KGMatchService:
                 "label": label,
             }
             if ntype == "edital":
-                node["edital_id"] = path.stem
+                # edital_id é o id real prefixado (`finep:589`), lido do
+                # frontmatter — o nome do arquivo é colon-free (`finep-589`)
+                # porque o Obsidian proíbe `:`. O frontend usa este edital_id
+                # para chamar o explore/get_edital, que espera o id prefixado.
+                node["edital_id"] = fm.get("chamada_id") or path.stem
                 node["status"] = fm.get("status", "Desconhecido")
             nodes[node_id] = node
 
@@ -512,7 +516,10 @@ class KGMatchService:
         for target, _ in self._WIKILINK_RE.findall(text):
             parts = target.strip().split("/")
             if len(parts) >= 2 and parts[-2] == "editais":
-                ids.append(parts[-1])
+                # O wikilink aponta para o slug colon-free (`finep-589`);
+                # devolvemos o id real prefixado (`finep:589`) que o resto do
+                # sistema (retrieve_chunks, get_edital_by_id) espera.
+                ids.append(slug_to_id(parts[-1]))
         return ids
 
     def _find_analogue_ids(self, edital_id: str) -> list[str]:
@@ -522,7 +529,7 @@ class KGMatchService:
         coleta os editais ligados a cada um. Retorna os IDs análogos (sem o
         próprio edital_id), preservando ordem de descoberta.
         """
-        edital_path = OBSIDIAN_VAULT_DIR / f"radar-editais/editais/{edital_id}.md"
+        edital_path = OBSIDIAN_VAULT_DIR / f"radar-editais/editais/{id_to_slug(edital_id)}.md"
         if not edital_path.exists():
             return []
 
@@ -572,7 +579,9 @@ class KGMatchService:
 
         primary = edital_id
         if node_id and node_type == "edital":
-            primary = node_id.split("/")[-1]
+            # node_id termina no slug colon-free (`.../editais/finep-589`);
+            # converte de volta ao id real prefixado para casar com chunks/cards.
+            primary = slug_to_id(node_id.split("/")[-1])
 
         if primary:
             analogues = self._find_analogue_ids(primary)[:max_analogues]

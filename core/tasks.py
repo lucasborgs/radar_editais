@@ -548,4 +548,18 @@ async def run_daily_etl_task(timestamp: int) -> None:
             wiki_backend,
         )
 
+    # 3) Regenera o vault Obsidian a partir do índice unificado. É a MESMA fonte
+    #    de dados do grafo do frontend (GET /graph lê OBSIDIAN_VAULT_DIR), então
+    #    isto atualiza Obsidian e frontend de uma vez. Agnóstico à fonte e sem
+    #    duplicar editais (nomes/wikilinks colon-free consistentes + dedup no
+    #    get_graph). `scripts` é importável como namespace package a partir da raiz.
+    try:
+        from config import OBSIDIAN_VAULT_DIR  # noqa: PLC0415
+        from scripts.export_to_obsidian import export as export_obsidian  # noqa: PLC0415
+        OBSIDIAN_VAULT_DIR.mkdir(parents=True, exist_ok=True)
+        await asyncio.to_thread(export_obsidian, OBSIDIAN_VAULT_DIR)
+        logger.info("run_daily_etl_task: vault Obsidian / grafo regenerado")
+    except Exception as e:
+        logger.error("run_daily_etl_task: falha ao regenerar grafo Obsidian: %s", e)
+
     logger.info("run_daily_etl_task: concluído (total=%d novos)", total_new)

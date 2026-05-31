@@ -1,7 +1,6 @@
 ---
 title: "mobilidade e logística"
 tags:
-  - finep
   - tema
 ---
 
@@ -11,4 +10,4 @@ tags:
 
 ## Editais
 
-- 🟢 [[radar-editais/editais/778|Finep Mais Inovação Brasil – Rodada 2 – Mobilidade Sustentável]]
+- 🟢 [[radar-editais/editais/finep-778|Finep Mais Inovação Brasil – Rodada 2 – Mobilidade Sustentável]]

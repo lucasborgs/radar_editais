@@ -1,7 +1,6 @@
 ---
 title: "saúde e ciências da vida"
 tags:
-  - finep
   - tema
 ---
 
@@ -11,4 +10,4 @@ tags:
 
 ## Editais
 
-- 🟢 [[radar-editais/editais/773|Finep Mais Inovação Brasil - Rodada 2 - Saúde / Empresas ]]
+- 🟢 [[radar-editais/editais/finep-773|Finep Mais Inovação Brasil - Rodada 2 - Saúde / Empresas ]]
