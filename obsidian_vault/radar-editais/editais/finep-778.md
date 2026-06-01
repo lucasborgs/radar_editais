@@ -29,6 +29,9 @@ tags:
 ## Temas
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]
 
+## Fonte
+- [[radar-editais/fontes/finep|FINEP]]
+
 ## Público-Alvo
 - [[radar-editais/publicos/startups|Startups]]
 - [[radar-editais/publicos/cooperativas|Cooperativas]]

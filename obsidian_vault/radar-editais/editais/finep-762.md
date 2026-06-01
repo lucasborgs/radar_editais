@@ -19,6 +19,9 @@ tags:
 
 > Este edital financia a seleção de Fundos de Investimento em Participações voltados para bioeconomia e sustentabilidade, convidando gestores de recursos a apresentarem propostas para subscrição de recursos. O foco é em fundos que integrem inovação e uso sustentável da biodiversidade brasileira.
 
+## Fonte
+- [[radar-editais/fontes/finep|FINEP]]
+
 ## Informações
 
 | Campo | Valor |

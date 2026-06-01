@@ -25,6 +25,9 @@ tags:
 
 > Este edital financia o desenvolvimento de produtos ou processos inovadores na área de semicondutores, oferecendo recursos de subvenção econômica para startups e cooperativas. Os projetos devem estar entre os níveis de maturidade tecnológica (TRLs) 3 a 8.
 
+## Fonte
+- [[radar-editais/fontes/finep|FINEP]]
+
 ## Público-Alvo
 - [[radar-editais/publicos/startups|Startups]]
 - [[radar-editais/publicos/cooperativas|Cooperativas]]

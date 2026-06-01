@@ -24,7 +24,7 @@ tags:
 
 > A chamada visa apoiar a execução de pesquisa científica e tecnológica inovativa em pequenas empresas do estado de São Paulo, com foco em desafios tecnológicos de interesse para a empresa ou mercado. O financiamento é destinado a projetos que busquem desenvolver soluções em áreas como Soberania Digital e Inteligência Artificial.
 
-## Fonte de Recurso
+## Fonte
 - [[radar-editais/fontes/fapesp|FAPESP]]
 
 ## Informações

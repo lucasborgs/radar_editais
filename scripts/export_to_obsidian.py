@@ -144,11 +144,14 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
             lines.append(f"- [[{subfolder}/temas/{slugify(t)}|{t}]]")
         lines.append("")
 
-    if fontes:
-        lines.append("## Fonte de Recurso")
-        for f in fontes:
-            lines.append(f"- [[{subfolder}/fontes/{slugify(f)}|{f}]]")
-        lines.append("")
+    # Fonte = agência/instituição de origem do edital, derivada do `source` do
+    # id prefixado (`finep:589` → FINEP). Todo edital pertence a exatamente uma —
+    # é o eixo de agrupamento multi-fonte do grafo. NÃO usa `fonte_recurso` (quem
+    # paga: FNDCT/Petrobras/BNDES), que é outro eixo e frequentemente vazio.
+    src = source_of(eid)
+    lines.append("## Fonte")
+    lines.append(f"- [[{subfolder}/fontes/{src}|{src.upper()}]]")
+    lines.append("")
 
     if publicos:
         lines.append("## Público-Alvo")
@@ -481,17 +484,20 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
 
     print(f"  Temas: {n_temas} notas → {base}/temas/")
 
-    # Notas de fontes
-    fontes_index = index.get("fonte_index", {})
+    # Notas de fonte = agência/instituição (uma por `source`). Derivado do id
+    # prefixado, não de `fonte_recurso` — assim todo edital (qualquer fonte)
+    # pertence a exatamente um nó-agência e nunca fica órfão no grafo.
+    agencia_index: dict[str, list[str]] = {}
+    for e in editais:
+        agencia_index.setdefault(source_of(e["id"]), []).append(e["id"])
     n_fontes = 0
-    for fonte_label, editais_ids in fontes_index.items():
-        content = fonte_note(fonte_label, editais_ids, edital_by_id, subfolder)
-        slug = slugify(fonte_label)
-        note_path = base / "fontes" / f"{slug}.md"
+    for src, editais_ids in agencia_index.items():
+        content = fonte_note(src.upper(), editais_ids, edital_by_id, subfolder)
+        note_path = base / "fontes" / f"{src}.md"
         note_path.write_text(content, encoding="utf-8")
         n_fontes += 1
 
-    print(f"  Fontes: {n_fontes} notas → {base}/fontes/")
+    print(f"  Fontes (agências): {n_fontes} notas → {base}/fontes/")
 
     # Notas de público-alvo
     publico_index = index.get("publico_index", {})

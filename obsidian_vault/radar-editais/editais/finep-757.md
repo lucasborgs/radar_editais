@@ -19,6 +19,9 @@ tags:
 
 > O edital visa selecionar um gestor para um Fundo de Investimento em Participações (FIP) que apoiará companhias do complexo da saúde no Brasil, com foco em inovações tecnológicas e científicas. O objetivo é fortalecer o ecossistema de inovação na área da saúde, priorizando empresas que desenvolvam produtos e serviços para pessoas com deficiência.
 
+## Fonte
+- [[radar-editais/fontes/finep|FINEP]]
+
 ## Informações
 
 | Campo | Valor |

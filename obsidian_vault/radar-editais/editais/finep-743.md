@@ -19,6 +19,9 @@ tags:
 
 > O edital FIP Nordeste Capital Semente visa financiar a estruturação e constituição de um fundo de investimento em participações, destinado exclusivamente a gestores de recursos que buscam investir em startups inovadoras na região Nordeste do Brasil.
 
+## Fonte
+- [[radar-editais/fontes/finep|FINEP]]
+
 ## Informações
 
 | Campo | Valor |

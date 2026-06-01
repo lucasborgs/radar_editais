@@ -28,6 +28,9 @@ tags:
 ## Temas
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 
+## Fonte
+- [[radar-editais/fontes/finep|FINEP]]
+
 ## Público-Alvo
 - [[radar-editais/publicos/cooperativas|Cooperativas]]
 

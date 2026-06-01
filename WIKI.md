@@ -286,7 +286,7 @@ node_types:
     emoji: "🏛️"
   fonte:
     folder: fontes
-    tags: [fonte-recurso]
+    tags: [fonte]
     emoji: "💰"
   home:
     folder: ""
@@ -294,9 +294,11 @@ node_types:
     emoji: "📡"
 ```
 
-`fonte` (fonte de recurso / agência de fomento — FINEP, FAPESP, FNDCT, BNDES…)
-é nó: hub de navegação com identidade própria, e o eixo natural de agrupamento
-num grafo multi-fonte. Tag sem prefixo de fonte porque agrega editais de várias.
+`fonte` = **agência/instituição de origem** do edital (FINEP, FAPESP, …),
+derivada do `source` do id prefixado (`finep:589` → FINEP). Todo edital pertence
+a exatamente uma → é o eixo de agrupamento de um grafo multi-fonte e garante que
+nenhum edital fique órfão. NÃO confundir com `fonte_recurso` (quem paga: FNDCT,
+Petrobras, BNDES…), que é outro eixo, frequentemente vazio, e não vira nó.
 
 Tags fonte-específicas (ex.: `finep`) vêm de `wikis/<fonte>.md`.
 
@@ -328,7 +330,7 @@ link_types:
   edital_has_fonte:
     from: edital
     to: fonte
-    section: "## Fonte de Recurso"
+    section: "## Fonte"
   aggregator_lists_edital:
     from: [tema, publico, subprograma, fonte, home]
     to: edital
