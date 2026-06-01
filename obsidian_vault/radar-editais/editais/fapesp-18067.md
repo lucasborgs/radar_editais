@@ -19,7 +19,7 @@ tags:
 
 > A Chamada de Propostas - Auxílio à Inovação Regular visa financiar projetos de inovação desenvolvidos por pesquisadores vinculados a instituições de pesquisa no estado de São Paulo, promovendo avanços em áreas específicas do conhecimento e setores econômicos.
 
-## Fonte de Recurso
+## Fonte
 - [[radar-editais/fontes/fapesp|FAPESP]]
 
 ## Informações

@@ -24,6 +24,9 @@ tags:
 
 > O edital visa selecionar gestores para um Fundo de Investimento em Participações (FIP) destinado a investir em empresas brasileiras de base tecnológica nos setores de transição energética e descarbonização, com foco em soluções escaláveis e inovadoras.
 
+## Fonte
+- [[radar-editais/fontes/finep|FINEP]]
+
 ## Informações
 
 | Campo | Valor |

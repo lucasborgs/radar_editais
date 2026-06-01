@@ -24,6 +24,9 @@ tags:
 
 > A Chamada Pública conjunta entre a Finep e a Rede Eureka visa financiar projetos de inovação tecnológica que envolvam cooperação internacional entre empresas brasileiras e de outros países participantes, com foco em produtos, processos ou serviços inovadores.
 
+## Fonte
+- [[radar-editais/fontes/finep|FINEP]]
+
 ## Informações
 
 | Campo | Valor |

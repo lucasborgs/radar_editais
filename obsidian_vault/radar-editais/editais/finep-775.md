@@ -29,6 +29,9 @@ tags:
 ## Temas
 - [[radar-editais/temas/espaco-defesa-e-seguranca|espaço - defesa e segurança]]
 
+## Fonte
+- [[radar-editais/fontes/finep|FINEP]]
+
 ## Público-Alvo
 - [[radar-editais/publicos/startups|Startups]]
 - [[radar-editais/publicos/cooperativas|Cooperativas]]
