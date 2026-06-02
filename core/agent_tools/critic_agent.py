@@ -9,8 +9,15 @@ Princípios:
     via retriever, sem custo extra de round-trips.
   • Falha graciosa: erro de LLM ou retriever → CriticResult(approved=True)
     com nota de indisponibilidade. Save nunca bloqueia por falha do critic.
-  • Apenas problemas reais: não bloqueia por estilo, apenas por contradições
-    com o edital ou omissão de requisitos obrigatórios.
+  • Apenas problemas reais: não bloqueia por estilo nem por omissão — apenas
+    por afirmações que CONTRADIZEM o edital, contradizem OUTRA seção já redigida
+    da proposta (coerência interna), ou são internamente inconsistentes.
+
+Coerência interna: ao salvar uma seção, o critic recebe as demais seções já
+redigidas e bloqueia se o rascunho contradiz alguma delas (ex.: a Conclusão
+afirma algo incompatível com a Descrição da Equipe). Como toda edição passa
+por save_draft, a checagem é bidirecional na prática — a seção que está sendo
+salva é sempre cruzada com todas as outras.
 """
 from __future__ import annotations
 
@@ -24,39 +31,86 @@ logger = logging.getLogger(__name__)
 
 _CRITIC_SYSTEM = """Você é um revisor de fatos de propostas para editais de fomento no Brasil.
 Sua única função é IMPEDIR que um rascunho seja salvo quando ele AFIRMA algo FALSO —
-isto é, quando o texto CONTRADIZ o edital ou contém inconsistência factual interna.
+isto é, quando o texto CONTRADIZ o edital, CONTRADIZ outra seção já redigida da proposta,
+ou contém inconsistência factual interna.
 
 Você NÃO avalia completude, abrangência, detalhamento, estilo ou se a seção cobre todos
 os tópicos desejáveis — isso é trabalho de outra etapa (checklist), não sua. A ausência
 de uma informação NUNCA é motivo para bloquear: só o que está ESCRITO e está ERRADO conta.
 
 Bloqueie (approved=false) SOMENTE quando o rascunho AFIRMAR:
-  (a) um fato que contradiz o edital (prazo, valor, TRL, elegibilidade, mecanismo), ou
-  (b) algo internamente inconsistente que torne a proposta incorreta.
+  (a) um fato que contradiz o edital (prazo, valor, TRL, elegibilidade, mecanismo),
+  (b) um fato que contradiz OUTRA seção já redigida da proposta (ex.: número, prazo,
+      escopo, tamanho da equipe, orçamento ou objetivo divergente do que já foi escrito), ou
+  (c) algo internamente inconsistente que torne a proposta incorreta.
 
-Na dúvida, aprove. Sempre responda com JSON válido."""
+Para (b), só conta CONTRADIÇÃO factual entre o que o rascunho afirma e o que outra seção
+afirma — não a mera ausência de um tópico em uma das seções. Na dúvida, aprove.
+Sempre responda com JSON válido."""
 
 _CRITIC_USER = """TRECHOS RELEVANTES DO EDITAL:
 {edital_context}
 
-SEÇÃO: {section_title}
+OUTRAS SEÇÕES JÁ REDIGIDAS DA PROPOSTA:
+{proposal_context}
+
+SEÇÃO SENDO SALVA: {section_title}
 RASCUNHO:
 {draft}
 
-Confira, usando SOMENTE os trechos do edital acima, se o RASCUNHO afirma algo FALSO:
+Confira se o RASCUNHO afirma algo FALSO, usando SOMENTE o edital e as outras seções acima:
 1. Alguma afirmação contradiz o edital (prazo, valor, TRL, elegibilidade, mecanismo)?
-2. Há inconsistência factual interna que torne a proposta incorreta?
+2. Alguma afirmação contradiz uma OUTRA seção já redigida acima (dados, números, escopo,
+   equipe, orçamento, objetivo divergentes)?
+3. Há inconsistência factual interna que torne a proposta incorreta?
 
-NÃO reporte omissões, falta de detalhe ou tópicos ausentes — apenas afirmações erradas.
-`issues` deve conter SOMENTE afirmações falsas/contraditórias que justifiquem NÃO salvar.
+NÃO reporte omissões, falta de detalhe ou tópicos ausentes — apenas afirmações erradas
+ou contraditórias. `issues` deve conter SOMENTE o que justifique NÃO salvar.
 
 Responda com JSON:
 {{
   "approved": true ou false,
-  "issues": ["descrição objetiva de cada afirmação FALSA/contraditória encontrada"],
+  "issues": ["descrição objetiva de cada afirmação FALSA/contraditória (indique se o conflito é com o edital ou com outra seção)"],
   "feedback": "diagnóstico geral em 1 frase"
 }}
-Se o rascunho não afirma nada falso: approved=true, issues=[]."""
+Se o rascunho não afirma nada falso nem contraditório: approved=true, issues=[]."""
+
+# Orçamento de chars para o contexto das outras seções no prompt do critic.
+# read_full_proposal pode ser grande; truncamos para não estourar tokens.
+_PROPOSAL_CTX_BUDGET = 6000
+
+
+def _build_proposal_context(session, current_title: str, budget: int = _PROPOSAL_CTX_BUDGET) -> str:
+    """Concatena as outras seções já redigidas (exclui a que está sendo salva).
+
+    Ordem do outline; cai para ordem de inserção se não houver outline. Trunca
+    no orçamento de chars. Defensivo: se a sessão não expõe seções/outline,
+    devolve aviso de "sem outras seções" em vez de quebrar.
+    """
+    outline = getattr(session, "_proposal_outline", None) or []
+    sections = getattr(session, "_doc_sections", None) or {}
+    titles = outline if outline else list(sections.keys())
+    cur_norm = (current_title or "").strip().lower()
+
+    parts: list[str] = []
+    used = 0
+    for title in titles:
+        if (title or "").strip().lower() == cur_norm:
+            continue  # exclui a própria seção sendo salva
+        content = (sections.get(title) or "").strip()
+        if not content:
+            continue
+        block = f"## {title}\n{content}"
+        if used + len(block) > budget:
+            block = block[: max(0, budget - used)]
+        parts.append(block)
+        used += len(block)
+        if used >= budget:
+            break
+
+    if not parts:
+        return "Nenhuma outra seção foi redigida ainda — não há o que cruzar."
+    return "\n\n".join(parts)
 
 
 @dataclass
@@ -107,8 +161,11 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         or "gpt-4o"
     )
 
+    proposal_context = _build_proposal_context(session, section_title)
+
     user_msg = _CRITIC_USER.format(
         edital_context=edital_context,
+        proposal_context=proposal_context,
         section_title=section_title,
         draft=draft[:3000],
     )
