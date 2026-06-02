@@ -22,7 +22,6 @@ from pipeline.build_knowledge_graph import (  # noqa: E402
     _editais_to_filter_metadata,
 )
 
-
 # =============================================================================
 # FIXTURES — entries pós-_build_editais (shape estável: id, source, title,
 # publico_alvo canonicalizado §5.5, subprogramas §5.6, fonte_recurso §5.4, …)

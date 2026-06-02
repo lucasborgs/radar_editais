@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -16,7 +16,6 @@ sys.path.insert(0, str(ROOT))
 import pytest  # noqa: E402
 
 from pipeline.extractors.fapesp import FAPESPScraper  # noqa: E402
-
 
 # =============================================================================
 # _clean_text — duplo-unescape + strip tags (gotcha §8 wikis/fapesp.md)
