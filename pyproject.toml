@@ -37,6 +37,12 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
 ]
+# Reranker local do RAG de escrita (Front 4). Opcional: dep pesada (torch).
+# Sem ela, RERANK_BACKEND=cross-encoder degrada para RRF puro; use
+# RERANK_BACKEND=llm para rerankear via API sem instalar este extra.
+rerank = [
+    "sentence-transformers>=3.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

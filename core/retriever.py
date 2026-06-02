@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_TOP_K = 5
 DEFAULT_FTS_WEIGHT = 0.3    # ver "Tuning do default" no docstring de `retrieve_chunks`
 DEFAULT_MAX_PER_SOURCE = 2  # diversidade: nº máx de chunks do mesmo PDF no top-K
+DEFAULT_RERANK_CANDIDATES = 20  # tamanho do pool reordenado pelo reranker (Front 4)
 _CANDIDATE_LIMIT = 20       # how many we pull from each retriever before fusion
 _RRF_CONSTANT = 60          # classic RRF k
 
@@ -175,6 +176,8 @@ def retrieve_chunks(
     max_per_source: int = DEFAULT_MAX_PER_SOURCE,
     query_vec: list[float] | None = None,
     primary_boost: float = 1.5,
+    rerank: bool = True,
+    k_candidates: int = DEFAULT_RERANK_CANDIDATES,
 ) -> list[dict]:
     """Hybrid retrieval over edital_chunks para um ou mais editais.
 
@@ -203,6 +206,14 @@ def retrieve_chunks(
             valioso (paráfrases, exemplos de regras parecidas) mas NÃO devem
             dominar o top-K — o foco do turno é o edital primário. Use 1.0
             pra desativar o boost.
+        rerank: se True (default), reordena um pool de `k_candidates` chunks
+            (top-RRF) por relevância à query usando `core.reranker` antes do
+            corte top-k. O `primary_boost` é reaplicado sobre o score do
+            reranker (escala [0,1]) e o dedup `max_per_source` é preservado.
+            Degrada graciosamente: se o backend de rerank falhar/estiver
+            ausente, mantém a ordenação RRF pura.
+        k_candidates: tamanho do pool levado ao reranker (over-fetch). Só tem
+            efeito quando `rerank=True`.
 
     Tuning do default
     -----------------
@@ -322,9 +333,53 @@ def retrieve_chunks(
             for _id, score in scores.items()
         }
 
-    # 4. Top-k por RRF score, com dedup por source_file pra diversidade.
+    # 4. Ordenação por RRF score (com primary_boost já aplicado).
     ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+
+    # 4a. Rerank (Front 4): reordena o pool top-RRF por relevância à query.
+    #     Over-fetch modesto (k_candidates) → rerank → reaplica primary_boost
+    #     sobre o score [0,1] do reranker. Degradação graciosa: rerank_scores
+    #     devolve None se o backend estiver ausente/falhar e mantemos o RRF.
+    if rerank and len(ranked) > 1:
+        ranked = _apply_rerank(ranked, by_id, query, edital_ids[0], primary_boost, k_candidates)
+
+    # 5. Corte top-k com dedup por source_file pra diversidade.
     return _dedup_by_source(ranked, by_id, k, max_per_source)
+
+
+def _apply_rerank(
+    ranked: list[tuple[str, float]],
+    by_id: dict[str, dict],
+    query: str,
+    primary_id: str,
+    primary_boost: float,
+    k_candidates: int,
+) -> list[tuple[str, float]]:
+    """Reordena o pool top-`k_candidates` por relevância à query (Front 4).
+
+    Mantém a cauda (além de k_candidates) na ordem RRF original — só o pool
+    relevante é reordenado. O score do reranker (∈[0,1]) recebe `primary_boost`
+    para chunks do edital primário, preservando a semântica de não deixar
+    análogos dominarem. Se o reranker indisponível (None), devolve `ranked`
+    intacto.
+    """
+    from core.reranker import rerank_scores
+
+    pool = ranked[:k_candidates]
+    tail = ranked[k_candidates:]
+    texts = [(by_id[cid].get("text") or "") for cid, _ in pool]
+
+    rr = rerank_scores(query, texts)
+    if rr is None:
+        return ranked
+
+    rescored: list[tuple[str, float]] = []
+    for (cid, _rrf), rscore in zip(pool, rr, strict=False):
+        boost = primary_boost if by_id[cid].get("edital_id") == primary_id else 1.0
+        rescored.append((cid, rscore * boost))
+    rescored.sort(key=lambda kv: kv[1], reverse=True)
+    # A cauda (não reordenada) vai depois — só vira top-k se o pool não encher.
+    return rescored + tail
 
 
 # =============================================================================
