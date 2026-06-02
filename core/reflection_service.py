@@ -251,6 +251,27 @@ def load_active_insights(db: Client, workspace_id: str, max_total: int = 6) -> l
     return result.data or []
 
 
+def search_insights_for_tool(db: Client, workspace_id: str) -> str:
+    """Retorna insights ativos formatados para consumo como tool response.
+
+    Versão inicial: devolve todos os insights ativos (max 6) sem filtragem
+    semântica — o conjunto costuma ser pequeno e toda informação é relevante.
+    Evolução futura: filtrar por similaridade ao `topic` da query via embeddings.
+    """
+    try:
+        insights = load_active_insights(db, workspace_id, max_total=6)
+    except Exception as e:
+        logger.warning("search_insights_for_tool: falha ao carregar: %s", e)
+        return "Erro ao acessar aprendizados — tente novamente."
+    if not insights:
+        return "Nenhum aprendizado registrado para este workspace ainda."
+    parts = ["Aprendizados de aplicações anteriores desta empresa:"]
+    for ins in insights:
+        label = "Padrão estratégico" if ins.get("level") == 2 else "Observação"
+        parts.append(f"• [{label}] {ins.get('insight', '')}")
+    return "\n".join(parts)
+
+
 def deactivate_insight(
     db: Client,
     insight_id: str,

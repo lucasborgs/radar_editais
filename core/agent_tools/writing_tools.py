@@ -161,15 +161,91 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
         return "\n\n---\n\n".join(parts)
 
     @tool
-    def save_draft(section_title: str, content: str) -> str:
+    def plan_writing_session(focus: str = "") -> str:
+        """Gera um plano de trabalho estratégico para esta sessão de escrita.
+
+        Analisa o estado atual da proposta (quais seções estão vazias, em
+        rascunho ou completas) e sugere a ordem mais estratégica para trabalhar,
+        com justificativa para cada prioridade.
+
+        Use no início de uma sessão, ou quando o usuário pedir orientação sobre
+        por onde começar ou em que focar.
+
+        Args:
+            focus: objetivo específico desta sessão, se houver
+                   (ex: "terminar a parte técnica", "revisar orçamento").
+                   Deixe vazio para plano geral.
+        """
+        import os
+        from core.llm_client import make_client
+
+        outline = session._proposal_outline
+        if not outline:
+            return "Proposta sem outline definido — peça ao usuário que defina as seções primeiro."
+
+        status_lines = []
+        for title in outline:
+            content = session._doc_sections.get(title, "")
+            wc = len(content.split()) if content.strip() else 0
+            if wc == 0:
+                st = "vazia"
+            elif wc < 80:
+                st = f"rascunho inicial ({wc} palavras)"
+            else:
+                st = f"redigida ({wc} palavras)"
+            status_lines.append(f"• {title}: {st}")
+
+        sections_block = "\n".join(status_lines)
+        focus_line = f"\nOBJETIVO DESTA SESSÃO: {focus.strip()}" if focus.strip() else ""
+
+        system = (
+            "Você é um consultor de captação de recursos especializado em estratégia "
+            "de escrita de propostas para editais de fomento no Brasil. "
+            "Seja direto, prático e acionável."
+        )
+        user = (
+            f"ESTADO ATUAL DA PROPOSTA:\n{sections_block}\n{focus_line}\n\n"
+            "Sugira a ordem estratégica para trabalhar as seções nesta sessão. "
+            "Para cada seção priorizada, inclua 1 linha de justificativa. "
+            "Priorize seções que desbloqueiam outras ou têm maior impacto na aprovação."
+        )
+
+        try:
+            client = make_client(api_key=os.environ["OPENAI_API_KEY"])
+            model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                temperature=0.3,
+                max_tokens=600,
+            )
+            return resp.choices[0].message.content.strip()
+        except Exception as e:
+            logger.warning("[%s] plan_writing_session: LLM falhou: %s", session.session_id, e)
+            return (
+                "Plano sem IA (use como ponto de partida):\n"
+                + "\n".join(f"{i + 1}. {t}" for i, t in enumerate(outline))
+            )
+
+    @tool
+    def save_draft(section_title: str, content: str, force: bool = False) -> str:
         """Salva um rascunho completo de uma seção da proposta.
 
-        Use APENAS quando o conteúdo está fechado e pronto para persistir —
-        não use para sketches, listas de bullets exploratórias, ou pedaços
-        parciais. Use o título EXATO da seção (do outline).
+        Por padrão, passa por revisão automática (critic) antes de salvar.
+        Se o critic encontrar problemas, descreve os problemas sem salvar —
+        corrija e chame save_draft novamente, ou use force=True para salvar
+        ignorando a revisão (decisão explícita do usuário).
 
-        O conteúdo deve ser markdown bem formatado. Substituirá qualquer
-        rascunho anterior dessa seção.
+        Use APENAS quando o conteúdo está fechado e pronto para persistir.
+        Use o título EXATO da seção (do outline).
+
+        Args:
+            section_title: título exato da seção conforme o outline
+            content: markdown bem formatado, pronto para persistir
+            force: True para salvar sem revisão do critic
         """
         if not content.strip():
             return (
@@ -177,8 +253,7 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
                 "Se quer limpar a seção, peça confirmação ao usuário primeiro."
             )
 
-        # Validação leve: o título precisa estar no outline. Se não, tenta
-        # encontrar match case-insensitive antes de aceitar.
+        # Validação do título antes de chamar o critic (evita custo desnecessário).
         target_title = section_title
         if target_title not in session._proposal_outline:
             match = next(
@@ -197,15 +272,47 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
                     f"Use uma dessas: {outline_str}..."
                 )
 
+        # Critic review — só pula se force=True (decisão explícita do usuário).
+        if not force:
+            from core.agent_tools.critic_agent import run_critic
+            critic = run_critic(content, target_title, session)
+            if not critic.approved:
+                issues_str = "\n".join(f"• {issue}" for issue in critic.issues)
+                return (
+                    f"Critic encontrou {len(critic.issues)} problema(s) antes de salvar:\n"
+                    f"{issues_str}\n\n"
+                    f"Diagnóstico: {critic.feedback}\n\n"
+                    "Revise o rascunho e tente save_draft novamente, ou chame "
+                    "save_draft com force=True para salvar mesmo assim."
+                )
+
         try:
             session.set_section_content(target_title, content)
+            suffix = "" if force else " (aprovado pelo critic)"
             return (
-                f"Rascunho salvo em '{target_title}' ({len(content)} chars). "
+                f"Rascunho salvo em '{target_title}' ({len(content)} chars){suffix}. "
                 "Continue a conversa ou prossiga para a próxima seção."
             )
         except Exception as e:
             logger.warning("[%s] save_draft falhou: %s", session.session_id, e)
             return f"Erro ao salvar rascunho: {e}"
+
+    @tool
+    def recall_company_learnings(topic: str = "") -> str:
+        """Consulta aprendizados estratégicos de propostas anteriores desta empresa.
+
+        Retorna observações e padrões sintetizados a partir de aplicações
+        passadas (aprovadas, reprovadas, submetidas). Use quando:
+        - O usuário perguntar sobre histórico ou experiência da empresa
+        - Precisar de contexto estratégico além do perfil estrutural
+        - Quiser saber se uma abordagem já foi testada com sucesso ou falhou
+
+        Args:
+            topic: tema de interesse (ex: 'TRL', 'contrapartida', 'orçamento').
+                   Deixe vazio para todos os aprendizados disponíveis.
+        """
+        from core.reflection_service import search_insights_for_tool
+        return search_insights_for_tool(session._db, session.workspace_id)
 
     @tool
     def request_user_info(field: str, prompt: str) -> str:
@@ -235,10 +342,12 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
         )
 
     return [
+        plan_writing_session,
         search_edital,
         search_library,
         read_section,
         read_full_proposal,
         save_draft,
         request_user_info,
+        recall_company_learnings,
     ]
