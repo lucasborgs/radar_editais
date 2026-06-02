@@ -49,6 +49,8 @@ frontend/.env.local
 
 # RAG eval — outputs gerados a cada run
 eval_results/
+eval_writing.json
+eval_matching_results.json
 
 # macOS
 .DS_Store
