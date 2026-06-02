@@ -18,9 +18,11 @@ import os
 import re
 import time
 from dataclasses import dataclass
+from datetime import date
 
 from config import KNOWLEDGE_GRAPH_DIR
 from core.edital_id import iter_wiki_pages, wiki_page_path
+from core.wiki_schema import parse_deadline
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -498,12 +500,32 @@ class HybridMatchService:
         return None
 
     def _get_editais_with_cards(self) -> list[dict]:
-        """Retorna entradas do índice enriquecidas com dados do card quando disponível."""
+        """Retorna entradas do índice enriquecidas com dados do card quando disponível.
+
+        Defesa-em-profundidade de vigência (§7.1 WIKI.md): o índice já é
+        filtrado por prazo no build, mas o cron pode não rebuildar entre dois
+        prazos vencendo — então um edital ABERTA cujo prazo passou ficaria
+        stale no index.json. Re-filtramos em runtime para nunca recomendar
+        edital com prazo vencido. Prazo ausente (fluxo contínuo) = mantido,
+        espelhando `_deadline_expired` do build (None → não expirado).
+        """
         self._load_index()
+        today = date.today()
         result = []
+        skipped_expired = 0
         for entry in self._index.get("editais", []):
+            dl = parse_deadline(entry.get("deadline"))
+            if dl is not None and dl < today:
+                skipped_expired += 1
+                continue
             card = self._load_wiki_page(entry["id"])
             result.append(card if card else entry)
+        if skipped_expired:
+            logger.warning(
+                "%d edital(is) com prazo vencido ignorado(s) em runtime — "
+                "índice stale (reference_date=%s). Rode build_knowledge_graph.",
+                skipped_expired, self._index.get("reference_date", "?"),
+            )
         return result
 
     def get_stats(self) -> dict:
