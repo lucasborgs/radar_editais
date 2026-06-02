@@ -31,11 +31,11 @@
       "instruction": "Escreva a justificativa e relevância do projeto, citando os requisitos e prazos do edital onde fizer sentido. Salve quando concluir."
     },
     {
-      "id": "iflorestal_finep782_objeto",
+      "id": "iflorestal_finep774_objeto",
       "profile": "iflorestal",
-      "edital_id": "finep:782",
+      "edital_id": "finep:774",
       "section": "2. Objeto do projeto",
-      "instruction": "Redija o objeto do projeto para este edital, relativizando o prazo de submissão a hoje. Salve o rascunho."
+      "instruction": "Redija o objeto do projeto para este edital de cadeias agroindustriais, relativizando o prazo de submissão a hoje. Salve o rascunho."
     },
     {
       "id": "iflorestal_finep762_metodologia",

@@ -67,7 +67,9 @@ OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 # agente com tools (search_edital, save_draft com critic, etc.). Modelo e
 # orçamento de passos configuráveis via env.
 ANTHROPIC_MODEL_AGENT = os.getenv("ANTHROPIC_MODEL_AGENT", "claude-sonnet-4-6")
-AGENT_MAX_STEPS = int(os.getenv("AGENT_MAX_STEPS", "8"))
+# Folga para buscar + escrever + salvar + 1 retry do critic no MESMO turno
+# (o agente deve fechar a seção num turno só — ver WRITER_AGENT_SYSTEM).
+AGENT_MAX_STEPS = int(os.getenv("AGENT_MAX_STEPS", "10"))
 
 HISTORY_WINDOW     = 6
 COMPRESS_THRESHOLD = 10
@@ -116,6 +118,11 @@ DIRETRIZES DE REDAÇÃO
 - Quando produzir um trecho, seja propositivo: "faremos", não "poderíamos fazer".
 - Nunca invente dados numéricos. Se faltar, peça ao usuário ou use [COMPLETAR: ...].
 - Quando uma seção ativa for indicada, concentre a resposta nessa seção.
+- Ancore cada afirmação sobre o edital num trecho de search_edital; não cite de
+  memória nem infira requisitos que você não viu.
+- Se a empresa/projeto NÃO se encaixa no escopo do edital, DIGA isso ao usuário
+  em vez de fabricar aderência. Sinalizar o mismatch é melhor que inventar um
+  alinhamento que o edital não sustenta.
 
 COMO USAR AS FERRAMENTAS
 - search_edital → antes de afirmar qualquer requisito formal (prazo, TRL, valor,
@@ -125,8 +132,12 @@ COMO USAR AS FERRAMENTAS
 - read_section / read_full_proposal → antes de redigir conclusão, sumário
   executivo, ou quando o usuário pedir revisão de coerência. Sempre leia o que
   já existe antes de reescrever.
-- save_draft → APENAS quando o trecho está fechado, bem formatado, pronto para
-  ser persistido na seção. Inclui revisão automática antes de salvar.
+- save_draft → SEMPRE que produzir um rascunho de seção a pedido do usuário,
+  persista-o com save_draft NO MESMO TURNO. Colar o texto no chat NÃO conta — um
+  rascunho só "existe" na proposta depois do save_draft. Use o título exato da
+  seção. A revisão (critic) roda no save: se ela bloquear, CORRIJA o ponto
+  apontado e chame save_draft de novo no mesmo turno; só devolva o controle ao
+  usuário se faltar informação que você não tem.
 - request_user_info → APENAS para info concreta e ausente (CNPJ, valor de
   contrapartida, nome de coordenador, TRL específico). NÃO use para decisões
   de escopo, abordagem ou prioridade — essas pertencem ao usuário no chat.
@@ -145,8 +156,10 @@ LIMITES (importante)
 - Você AJUDA o usuário a redigir; ele decide. Não tome decisões terminais
   (submeter, aprovar, desistir). Quando o usuário tem que escolher entre
   alternativas, apresente as opções e peça que ele decida.
-- Não suponha consentimento implícito para mudanças grandes na proposta. Se
-  for reescrever algo já redigido, confirme antes."""
+- Não suponha consentimento implícito para mudanças grandes. Confirme antes
+  APENAS se for REESCREVER/substituir uma seção JÁ redigida. Para a PRIMEIRA
+  redação de uma seção vazia que o usuário pediu, não peça confirmação — escreva
+  e salve."""
 
 COMPRESS_SYSTEM = """Resuma os turnos abaixo em um parágrafo conciso (máx. 200 palavras).
 Preserve: decisões tomadas, trechos aprovados pelo usuário e informações adicionais fornecidas.
