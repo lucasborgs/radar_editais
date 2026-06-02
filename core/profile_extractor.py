@@ -177,7 +177,7 @@ class ProfileExtractor:
           • Output via tool submit_profile (state.submitted_profile) em vez
             de JSON parseado do texto final.
         """
-        from core.agent_runtime import run_agent
+        from core.agent_runtime import resolve_agent_provider, run_agent
         from core.agent_tools import ExtractionState, build_profile_tools
 
         state = ExtractionState()
@@ -193,13 +193,16 @@ class ProfileExtractor:
             },
         ]
 
+        provider, model = resolve_agent_provider(
+            "anthropic", ANTHROPIC_MODEL_AGENT_EXTRACTOR,
+        )
         try:
             result = run_agent(
                 system=EXTRACTOR_AGENT_SYSTEM,
                 initial_messages=initial,
                 tools=tools,
-                model=ANTHROPIC_MODEL_AGENT_EXTRACTOR,
-                provider="anthropic",
+                model=model,
+                provider=provider,
                 max_steps=EXTRACTOR_AGENT_MAX_STEPS,
             )
         except Exception as e:
