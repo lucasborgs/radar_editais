@@ -459,6 +459,13 @@ def _format_tool_results_anthropic(results: list[dict[str, Any]]) -> list[dict[s
 # Loop principal
 # =============================================================================
 
+_REFLECT_PROMPT = (
+    "[Reflexão interna — não é mensagem do usuário] "
+    "Antes de continuar: em 2 frases, o que você já aprendeu com as buscas feitas? "
+    "O que ainda precisa para responder bem ao pedido do usuário?"
+)
+
+
 def run_agent(
     *,
     system: str,
@@ -468,6 +475,7 @@ def run_agent(
     provider: Provider = "anthropic",
     max_steps: int = 8,
     on_step: Callable[[TraceStep], None] | None = None,
+    reflect_every: int | None = None,
 ) -> AgentResult:
     """Executa o loop do agente até `end_turn`, `max_steps` ou erro.
 
@@ -479,6 +487,9 @@ def run_agent(
         provider: "openai" ou "anthropic"
         max_steps: limite de iterações LLM (evita loops infinitos)
         on_step: callback opcional, recebe cada TraceStep recém-criado
+        reflect_every: se não-None, injeta um prompt de reflexão após cada N
+            rodadas de tool-execution completas. Útil para sessões longas onde
+            o agente precisa sintetizar achados antes de continuar.
 
     Returns:
         AgentResult com texto final, trace completo, stop_reason e usage total.
@@ -501,6 +512,7 @@ def run_agent(
     total_out = 0
     last_text = ""
     stop_reason: StopReason = "max_steps"
+    tool_rounds = 0  # rodadas completas de tool-execution (para reflect_every)
 
     # Import lazy pra evitar custo de telemetria em testes que monkeypatcham
     # adapters — o telemetry helper é leve mas o import puxa langfuse stack.
@@ -597,6 +609,14 @@ def run_agent(
                     on_step(tool_trace)
 
             messages.extend(format_results(tool_results))
+
+            # Reflexão periódica: após N rodadas de tools, pede síntese ao modelo.
+            # O modelo responde como assistant antes de continuar — consolida
+            # achados intermediários e ajuda a evitar desvio de objetivo em loops
+            # longos.
+            tool_rounds += 1
+            if reflect_every and tool_rounds % reflect_every == 0:
+                messages.append({"role": "user", "content": _REFLECT_PROMPT})
         else:
             # Esgotou max_steps sem o break interno
             stop_reason = "max_steps"
