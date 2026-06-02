@@ -48,7 +48,7 @@ Para (b), só conta CONTRADIÇÃO factual entre o que o rascunho afirma e o que 
 afirma — não a mera ausência de um tópico em uma das seções. Na dúvida, aprove.
 Sempre responda com JSON válido."""
 
-_CRITIC_USER = """TRECHOS RELEVANTES DO EDITAL:
+_CRITIC_USER = """{temporal_block}TRECHOS RELEVANTES DO EDITAL:
 {edital_context}
 
 OUTRAS SEÇÕES JÁ REDIGIDAS DA PROPOSTA:
@@ -58,8 +58,11 @@ SEÇÃO SENDO SALVA: {section_title}
 RASCUNHO:
 {draft}
 
-Confira se o RASCUNHO afirma algo FALSO, usando SOMENTE o edital e as outras seções acima:
+Confira se o RASCUNHO afirma algo FALSO, usando SOMENTE o edital, o contexto temporal
+e as outras seções acima:
 1. Alguma afirmação contradiz o edital (prazo, valor, TRL, elegibilidade, mecanismo)?
+   Em especial, alguma data/prazo afirmado no rascunho DIVERGE do deadline real do
+   contexto temporal acima?
 2. Alguma afirmação contradiz uma OUTRA seção já redigida acima (dados, números, escopo,
    equipe, orçamento, objetivo divergentes)?
 3. Há inconsistência factual interna que torne a proposta incorreta?
@@ -128,8 +131,8 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         section_title: título da seção (para contexto no prompt)
         session: instância de WritingSession (para acesso a db + scope_edital_ids)
     """
-    from core.retriever import format_chunks_for_prompt, retrieve_chunks
     from core.llm_client import make_client
+    from core.retriever import format_chunks_for_prompt, retrieve_chunks
 
     # Recupera trechos do edital relevantes para o conteúdo do rascunho.
     # Usa os primeiros 500 chars como query — suficiente para capturar tema.
@@ -163,7 +166,21 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
 
     proposal_context = _build_proposal_context(session, section_title)
 
+    # Contexto temporal (Front 3): permite ao critic pegar prazos afirmados no
+    # rascunho que divergem do deadline real. Falha graciosa: bloco vazio.
+    try:
+        from core.temporal import render_temporal_block
+        primary_edital = (
+            getattr(session, "_scope_edital_ids", None) or [getattr(session, "edital_id", "")]
+        )[0]
+        temporal_block = render_temporal_block(primary_edital)
+        temporal_block = f"{temporal_block}\n\n" if temporal_block else ""
+    except Exception as e:
+        logger.debug("critic [%s]: temporal block indisponível: %s", session.session_id, e)
+        temporal_block = ""
+
     user_msg = _CRITIC_USER.format(
+        temporal_block=temporal_block,
         edital_context=edital_context,
         proposal_context=proposal_context,
         section_title=section_title,

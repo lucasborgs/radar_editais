@@ -42,7 +42,7 @@ fraco, diga. Responda APENAS com JSON válido."""
 _BRIEF_USER = """PERFIL DA EMPRESA:
 {profile_context}
 
-EDITAL: {edital_id}
+{temporal_block}EDITAL: {edital_id}
 {edital_summary}
 
 DECISION MATRIX (scoring determinístico já calculado):
@@ -151,8 +151,18 @@ def _llm_narrative(
     model_override: str | None = None,
 ) -> dict:
     """Chama LLM para gerar strengths/risks/next_steps. Fallback robusto se falhar."""
+    # Consciência temporal (Front 3): o brief de um edital com prazo curto deve
+    # destacar a urgência; falha graciosa para bloco vazio.
+    try:
+        from core.temporal import render_temporal_block
+        tb = render_temporal_block(edital_id)
+        temporal_block = f"{tb}\n\n" if tb else ""
+    except Exception as e:
+        logger.debug("OpportunityBrief: temporal block indisponível: %s", e)
+        temporal_block = ""
     user_msg = _BRIEF_USER.format(
         profile_context=profile_context,
+        temporal_block=temporal_block,
         edital_id=edital_id,
         edital_summary=edital_summary,
         matrix_summary=matrix_summary,
