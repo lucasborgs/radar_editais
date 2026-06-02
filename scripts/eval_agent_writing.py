@@ -174,6 +174,9 @@ def main() -> int:
     parser.add_argument("--out", default="eval_writing.json")
     parser.add_argument("--max-turns", type=int, default=4,
                         help="Máx de turnos por caso para o agente salvar a seção")
+    parser.add_argument("--sleep", type=float, default=0.0,
+                        help="Pausa (s) entre casos — drena a janela de TPM da "
+                             "OpenAI em tiers de rate limit baixo")
     parser.add_argument("--report", help="Re-imprime um resultado salvo (sem rodar)")
     args = parser.parse_args()
 
@@ -192,13 +195,18 @@ def main() -> int:
     data = _load_cases(Path(args.cases))
     db = get_supabase_service()
 
+    import time as _time
+
     results: list[dict] = []
-    for case in data["cases"]:
+    for i, case in enumerate(data["cases"]):
         profile_raw = data["profiles"].get(case["profile"])
         if profile_raw is None:
             logger.warning("caso %s referencia perfil inexistente '%s' — pulando",
                            case["id"], case["profile"])
             continue
+        if i > 0 and args.sleep > 0:
+            print(f"  (pausa {args.sleep:.0f}s entre casos)...", file=sys.stderr)
+            _time.sleep(args.sleep)
         profile = _build_profile(profile_raw)
         print(f"→ rodando {case['id']} (edital={case['edital_id']})...", file=sys.stderr)
         try:
