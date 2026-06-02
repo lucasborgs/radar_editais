@@ -454,7 +454,7 @@ class ApplicationStatusUpdate(BaseModel):
 
 
 @app.put("/applications/{application_id}/status", summary="Atualiza status de uma application_log (Fase 3 #23)")
-def update_application_status(
+async def update_application_status(
     application_id: str,
     payload: ApplicationStatusUpdate,
     user_id: CurrentUserId,
@@ -465,6 +465,11 @@ def update_application_status(
     O trigger log_application_event registra a transição em application_events
     automaticamente. RLS garante que o usuário só atualiza applications do
     próprio workspace.
+
+    Quando o novo status é um outcome (submetida/aprovada/reprovada), enfileira
+    `reflect_workspace_task` — fecha o loop de reflexão longitudinal, que antes
+    só rodava on-demand. A task self-gateia em MIN_OUTCOMES_FOR_REFLECTION,
+    então enfileirar a cada outcome é seguro (pula sozinha se ainda há poucos).
     """
     if payload.status not in _VALID_STATUS_TRANSITIONS:
         raise HTTPException(
@@ -483,7 +488,25 @@ def update_application_status(
     )
     if not result.data:
         raise HTTPException(status_code=404, detail="application_log não encontrada")
-    return result.data[0]
+
+    row = result.data[0]
+    from core.reflection_service import OUTCOME_STATUSES
+    workspace_id = row.get("workspace_id")
+    if payload.status in OUTCOME_STATUSES and workspace_id:
+        try:
+            from core.tasks import app as tasks_app
+            async with tasks_app.open_async():
+                await tasks_app.configure_task("reflect_workspace").defer_async(
+                    workspace_id=str(workspace_id)
+                )
+        except Exception as e:
+            # Reflexão é best-effort: nunca derruba o update de status por falha
+            # de enfileiramento (worker offline, DB de filas indisponível, etc).
+            logger.warning(
+                "Falha ao enfileirar reflect_workspace p/ workspace=%s: %s",
+                workspace_id, e,
+            )
+    return row
 
 
 @app.get("/commands", summary="Lista slash commands disponíveis e LLM tiers (Fase 4 #24/#25)")

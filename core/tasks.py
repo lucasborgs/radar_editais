@@ -183,9 +183,14 @@ async def embed_content_task(item_id: str) -> None:
 async def reflect_workspace_task(workspace_id: str) -> None:
     """Gera reflexão sobre outcomes do workspace e persiste em reflection_insights.
 
-    Trigger atual: on-demand via POST /me/reflect ou agendamento manual.
-    Trigger futuro (ADR §4.3): a cada 5 outcomes acumulados em application_log,
-    ouvir via Postgres NOTIFY ou cron periódico procrastinate.
+    Triggers:
+      - Automático: cada transição de status para outcome (submetida/aprovada/
+        reprovada) em PUT /applications/{id}/status enfileira esta task.
+      - On-demand: POST /me/reflect ou agendamento manual.
+
+    A task self-gateia em MIN_OUTCOMES_FOR_REFLECTION (pula se há poucos
+    outcomes) e supersede o lote de insights anterior, então é seguro
+    enfileirar a cada outcome.
     """
     from core.reflection_service import reflect_workspace
 
