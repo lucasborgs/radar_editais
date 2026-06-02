@@ -22,10 +22,19 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
-_CRITIC_SYSTEM = """Você é um revisor especializado em propostas para editais de fomento no Brasil.
-Verifique se o rascunho está correto e alinhado com os requisitos do edital.
-Seja objetivo — identifique apenas problemas reais, não critique estilo ou escolhas de abordagem.
-Sempre responda com JSON válido."""
+_CRITIC_SYSTEM = """Você é um revisor de fatos de propostas para editais de fomento no Brasil.
+Sua única função é IMPEDIR que um rascunho seja salvo quando ele AFIRMA algo FALSO —
+isto é, quando o texto CONTRADIZ o edital ou contém inconsistência factual interna.
+
+Você NÃO avalia completude, abrangência, detalhamento, estilo ou se a seção cobre todos
+os tópicos desejáveis — isso é trabalho de outra etapa (checklist), não sua. A ausência
+de uma informação NUNCA é motivo para bloquear: só o que está ESCRITO e está ERRADO conta.
+
+Bloqueie (approved=false) SOMENTE quando o rascunho AFIRMAR:
+  (a) um fato que contradiz o edital (prazo, valor, TRL, elegibilidade, mecanismo), ou
+  (b) algo internamente inconsistente que torne a proposta incorreta.
+
+Na dúvida, aprove. Sempre responda com JSON válido."""
 
 _CRITIC_USER = """TRECHOS RELEVANTES DO EDITAL:
 {edital_context}
@@ -34,18 +43,20 @@ SEÇÃO: {section_title}
 RASCUNHO:
 {draft}
 
-Verifique:
-1. Há afirmações que contradizem o edital (prazos, valores, TRL, elegibilidade, mecanismo)?
-2. Faltam requisitos obrigatórios mencionados explicitamente no edital para esta seção?
-3. Há inconsistências factuais internas relevantes?
+Confira, usando SOMENTE os trechos do edital acima, se o RASCUNHO afirma algo FALSO:
+1. Alguma afirmação contradiz o edital (prazo, valor, TRL, elegibilidade, mecanismo)?
+2. Há inconsistência factual interna que torne a proposta incorreta?
+
+NÃO reporte omissões, falta de detalhe ou tópicos ausentes — apenas afirmações erradas.
+`issues` deve conter SOMENTE afirmações falsas/contraditórias que justifiquem NÃO salvar.
 
 Responda com JSON:
 {{
   "approved": true ou false,
-  "issues": ["descrição objetiva de cada problema encontrado"],
+  "issues": ["descrição objetiva de cada afirmação FALSA/contraditória encontrada"],
   "feedback": "diagnóstico geral em 1 frase"
 }}
-Se não houver problemas reais: approved=true, issues=[]."""
+Se o rascunho não afirma nada falso: approved=true, issues=[]."""
 
 
 @dataclass
@@ -85,7 +96,16 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         edital_context = "Nenhum trecho do edital disponível para verificação."
 
     client = make_client(api_key=os.environ["OPENAI_API_KEY"])
-    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    # O critic é um fact-checker de precisão crítica: ele decide se um rascunho
+    # pode ser salvo. Modelos fracos (gpt-4o-mini) não seguem de forma confiável
+    # a instrução de "só bloquear por contradição, nunca por omissão" — geram
+    # falsos positivos que travam rascunhos legítimos. Usa um modelo capaz por
+    # default, independente do OPENAI_MODEL barato usado no resto do sistema.
+    model = (
+        os.getenv("OPENAI_MODEL_CRITIC")
+        or os.getenv("OPENAI_MODEL_PRO")
+        or "gpt-4o"
+    )
 
     user_msg = _CRITIC_USER.format(
         edital_context=edital_context,
