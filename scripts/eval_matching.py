@@ -32,6 +32,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+# CLI standalone: carrega .env antes dos imports que leem credenciais.
+from dotenv import load_dotenv  # noqa: E402
+
+load_dotenv()
+
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("eval_matching")
 
