@@ -1,0 +1,41 @@
+{
+  "_comment": "Casos-semente do eval de matching (Front 2). Perfil iFlorestal + sintéticos contrastantes. `expected_top` lista editais que DEVEM aparecer no top-N para o perfil (ex.: finep:612 fit forte com iFlorestal). Ajuste conforme o catálogo indexado.",
+  "profiles": {
+    "iflorestal": {
+      "nome": "iFlorestal Tecnologia",
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "ME",
+      "capital_social": 200000,
+      "trl": 5,
+      "one_liner": "Plataforma de monitoramento florestal por sensoriamento remoto e IA para rastreabilidade de cadeias produtivas da bioeconomia.",
+      "solution_summary": "Combina imagens de satélite, dados de campo e modelos de visão computacional para detectar desmatamento, estimar biomassa e certificar origem de produtos florestais não-madeireiros.",
+      "descricao_atividades": "Desenvolvimento de software de geointeligência florestal; serviços de monitoramento ambiental para cooperativas extrativistas e indústria de base florestal na Amazônia.",
+      "portfolio_projetos": "Piloto de rastreabilidade de castanha-do-brasil; mapeamento de regeneração em áreas degradadas.",
+      "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "pesquisa_colaborativa"]
+    },
+    "fintech_saas": {
+      "nome": "PagAgil",
+      "tipo_entidade": "startup",
+      "tamanho_empresa": "ME",
+      "trl": 7,
+      "one_liner": "Gateway de pagamentos e conciliação financeira para e-commerce.",
+      "solution_summary": "Infraestrutura de pagamentos com antifraude por machine learning.",
+      "descricao_atividades": "Software financeiro B2B; integração com adquirentes e bancos.",
+      "tipos_financiamento_interesse": ["credito_reembolsavel"]
+    }
+  },
+  "cases": [
+    {
+      "id": "iflorestal",
+      "profile": "iflorestal",
+      "expected_top": ["finep:612"],
+      "expected_top_n": 3
+    },
+    {
+      "id": "fintech_saas",
+      "profile": "fintech_saas",
+      "expected_top": [],
+      "expected_top_n": 3
+    }
+  ]
+}

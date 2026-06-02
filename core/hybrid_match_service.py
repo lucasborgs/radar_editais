@@ -378,7 +378,7 @@ Responda APENAS com JSON válido."""
 _STAGE2_USER = """PERFIL DA EMPRESA:
 {profile_context}
 
-EDITAIS ELEGÍVEIS PARA AVALIAÇÃO TEMÁTICA:
+{temporal_block}EDITAIS ELEGÍVEIS PARA AVALIAÇÃO TEMÁTICA:
 {editais_json}
 
 Para cada edital, retorne uma pontuação temática de 0.0 a 10.0 e uma justificativa curta.
@@ -439,7 +439,17 @@ def _call_stage2(eligible: list[Stage1Result], profile: CompanyProfile) -> dict[
             "key_requirements": c.get("key_requirements", [])[:3],
         })
 
+    # Consciência temporal (Front 3): injeta "hoje é X" + instrução de copiar
+    # status/deadline verbatim no Stage 2. Falha graciosa para bloco vazio.
+    try:
+        from core.temporal import render_match_temporal_block
+        temporal_block = render_match_temporal_block()
+    except Exception as e:
+        logger.debug("match Stage 2: temporal block indisponível: %s", e)
+        temporal_block = ""
+
     prompt = _STAGE2_USER.format(
+        temporal_block=f"{temporal_block}\n\n" if temporal_block else "",
         profile_context=profile.to_context(),
         editais_json=json.dumps(editais_summary, ensure_ascii=False, indent=2),
     )
@@ -582,8 +592,18 @@ class HybridMatchService:
 
         logger.info("Stage 1: %d elegíveis, %d eliminados", len(eligible), eliminated)
 
-        if not eligible:
-            logger.warning("Nenhum edital elegível após Stage 1 — devolvendo top sem filtro")
+        # Sinaliza explicitamente o caso "nenhum elegível" em vez de mascarar
+        # (Front 2). Antes, o fallback devolvia o top sem filtro como se fossem
+        # recomendações — podia empurrar um edital inelegível pro usuário. Agora
+        # ainda devolvemos os mais próximos (utilidade), mas cada item carrega
+        # `eligible=False` + um aviso, para o frontend exibir o sinal de que
+        # NENHUM edital passou o Stage 1.
+        no_eligible = not eligible
+        if no_eligible:
+            logger.warning(
+                "Nenhum edital passou o Stage 1 — devolvendo aproximados marcados "
+                "como inelegíveis (eligible=False)",
+            )
             eligible = sorted(stage1_results, key=lambda r: r.score, reverse=True)[:top_k]
 
         # --- Stage 2: alinhamento temático via LLM ---
@@ -601,7 +621,7 @@ class HybridMatchService:
             score_det_norm = r.score / 10.0
             score_final = round(0.6 * score_det_norm + 0.4 * score_tematico, 1)
 
-            combined.append({
+            item = {
                 "id": r.edital_id,
                 "title": r.card.get("title", ""),
                 "status": r.card.get("status", ""),
@@ -609,6 +629,7 @@ class HybridMatchService:
                 "score": min(score_final, 10.0),
                 "score_deterministic": r.score,
                 "score_tematico": score_tematico,
+                "eligible": not no_eligible,
                 "match_dimensions": {
                     dim: {"score": pts, "max": round(_w(weights, dim))}
                     for dim, pts in r.breakdown.items()
@@ -617,7 +638,14 @@ class HybridMatchService:
                 "justificativa": sem.get("justificativa", ""),
                 "key_requirements": r.card.get("key_requirements", []),
                 "objective": r.card.get("objective"),
-            })
+            }
+            if no_eligible:
+                item["eligibility_warning"] = (
+                    "Nenhum edital passou o filtro de elegibilidade (Stage 1). "
+                    "Este é um dos mais próximos do seu perfil, mas pode não ser "
+                    "elegível — confira os requisitos antes de aplicar."
+                )
+            combined.append(item)
 
         combined.sort(key=lambda x: x["score"], reverse=True)
         return combined[:top_k]
