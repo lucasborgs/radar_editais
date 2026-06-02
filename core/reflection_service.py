@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime, timezone
 
 from supabase import Client
 
@@ -30,8 +31,11 @@ logger = logging.getLogger(__name__)
 # Status que contam como outcome (ADR C1: terminais + submetida)
 OUTCOME_STATUSES = ("aprovada", "reprovada", "submetida")
 
-# Mínimo de outcomes necessários para gerar reflexão útil
-MIN_OUTCOMES_FOR_REFLECTION = 5
+# Mínimo de outcomes necessários para gerar reflexão útil. Configurável via env:
+# o volume real de uma PME é baixo (poucos editais/ano), então um piso alto faz
+# a reflexão quase nunca disparar. Default 3 (suficiente p/ um padrão mínimo,
+# sem reagir a um único resultado).
+MIN_OUTCOMES_FOR_REFLECTION = int(os.getenv("MIN_OUTCOMES_FOR_REFLECTION", "3"))
 
 # Limite de outcomes considerados em uma única reflexão (evita prompt blowup)
 MAX_OUTCOMES_PER_REFLECTION = 30
@@ -210,6 +214,17 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
         })
 
     if rows_to_insert:
+        # Supersede: desativa o lote de insights anterior deste workspace antes
+        # de inserir o novo, para que `load_active_insights` (deactivated_at IS
+        # NULL) só veja a síntese mais recente. Sem isto, cada reflexão acumula
+        # insights stale — inócuo quando a reflexão é rara, mas com o
+        # auto-trigger por outcome viraria lixo crescente. Só desativa quando há
+        # substituto (rows_to_insert não-vazio), nunca apaga sem repor.
+        now_iso = datetime.now(timezone.utc).isoformat()
+        db.table("reflection_insights").update(
+            {"deactivated_at": now_iso}
+        ).eq("workspace_id", workspace_id).is_("deactivated_at", "null").execute()
+
         db.table("reflection_insights").insert(rows_to_insert).execute()
 
     # Weight suggestions são apenas sugestões — NÃO aplicamos automaticamente
