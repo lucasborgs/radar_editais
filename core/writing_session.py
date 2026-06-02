@@ -164,11 +164,14 @@ COMO USAR AS FERRAMENTAS
   executivo, ou quando o usuário pedir revisão de coerência. Sempre leia o que
   já existe antes de reescrever.
 - save_draft → APENAS quando o trecho está fechado, bem formatado, pronto para
-  ser persistido na seção. Não use para sketches, listas exploratórias ou
-  pedaços parciais.
+  ser persistido na seção. Inclui revisão automática antes de salvar.
 - request_user_info → APENAS para info concreta e ausente (CNPJ, valor de
   contrapartida, nome de coordenador, TRL específico). NÃO use para decisões
   de escopo, abordagem ou prioridade — essas pertencem ao usuário no chat.
+- recall_company_learnings → quando o usuário perguntar sobre histórico ou
+  quando contexto estratégico de aplicações passadas for relevante para a seção.
+- plan_writing_session → no início de uma sessão ou quando o usuário pedir
+  orientação sobre por onde começar ou em que focar.
 
 QUANDO PARAR DE USAR FERRAMENTAS
 - Após responder à pergunta do usuário com clareza.
@@ -756,6 +759,7 @@ class WritingSession:
             model=ANTHROPIC_MODEL_AGENT,
             provider="anthropic",
             max_steps=AGENT_MAX_STEPS,
+            reflect_every=3,
         )
 
         if result.stop_reason == "error":
@@ -887,8 +891,6 @@ class WritingSession:
         ]
         if self._library_context:
             messages.append({"role": "user", "content": self._library_context})
-        if self._reflection_insights_context:
-            messages.append({"role": "user", "content": self._reflection_insights_context})
         if self._history_summary:
             messages.append({"role": "user", "content": self._history_summary})
 
