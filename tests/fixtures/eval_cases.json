@@ -1,0 +1,48 @@
+{
+  "_comment": "Casos-semente do eval de escrita (Front 1.5). Cada caso = (perfil, edital, seção, instrução). O perfil é inline para o harness rodar sem depender do estado do workspace no DB; ajuste os campos para refletir o perfil real (ex.: iFlorestal). Os edital_id devem ter chunks indexados (rode scripts/reindex_edital.py se necessário).",
+  "profiles": {
+    "iflorestal": {
+      "nome": "iFlorestal Tecnologia",
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "ME",
+      "capital_social": 200000,
+      "trl": 5,
+      "one_liner": "Plataforma de monitoramento florestal por sensoriamento remoto e IA para rastreabilidade de cadeias produtivas da bioeconomia.",
+      "solution_summary": "Combina imagens de satélite, dados de campo e modelos de visão computacional para detectar desmatamento, estimar biomassa e certificar origem de produtos florestais não-madeireiros.",
+      "descricao_atividades": "Desenvolvimento de software de geointeligência florestal; serviços de monitoramento ambiental para cooperativas extrativistas e indústria de base florestal na Amazônia.",
+      "portfolio_projetos": "Piloto de rastreabilidade de castanha-do-brasil com cooperativa no Acre; mapeamento de regeneração em áreas degradadas no Pará.",
+      "equipe_resumo": "3 engenheiros florestais, 2 cientistas de dados, 1 especialista em sensoriamento remoto.",
+      "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "pesquisa_colaborativa"]
+    }
+  },
+  "cases": [
+    {
+      "id": "iflorestal_finep612_objeto",
+      "profile": "iflorestal",
+      "edital_id": "finep:612",
+      "section": "2. Objeto do projeto",
+      "instruction": "Redija a seção de objeto do projeto, alinhando nossa solução de monitoramento florestal ao foco do edital. Salve o rascunho quando estiver pronto."
+    },
+    {
+      "id": "iflorestal_finep612_justificativa",
+      "profile": "iflorestal",
+      "edital_id": "finep:612",
+      "section": "3. Justificativa e relevância",
+      "instruction": "Escreva a justificativa e relevância do projeto, citando os requisitos e prazos do edital onde fizer sentido. Salve quando concluir."
+    },
+    {
+      "id": "iflorestal_finep782_objeto",
+      "profile": "iflorestal",
+      "edital_id": "finep:782",
+      "section": "2. Objeto do projeto",
+      "instruction": "Redija o objeto do projeto para este edital, relativizando o prazo de submissão a hoje. Salve o rascunho."
+    },
+    {
+      "id": "iflorestal_finep762_metodologia",
+      "profile": "iflorestal",
+      "edital_id": "finep:762",
+      "section": "5. Metodologia e plano de trabalho",
+      "instruction": "Descreva a metodologia e o plano de trabalho, ancorando nas exigências técnicas do edital. Salve quando estiver fechado."
+    }
+  ]
+}
