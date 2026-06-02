@@ -20,7 +20,6 @@ from core.pme_filter import (  # noqa: E402
     relevance_with_reason,
 )
 
-
 # Garante leitura limpa do doc autoritativo a cada execução de teste
 wiki_schema.clear_cache()
 
