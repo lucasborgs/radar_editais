@@ -177,6 +177,7 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
                    Deixe vazio para plano geral.
         """
         import os
+
         from core.llm_client import make_client
 
         outline = session._proposal_outline

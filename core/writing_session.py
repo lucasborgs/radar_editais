@@ -43,12 +43,10 @@ import requests
 from config import FINEP_PDFS_DIR
 from core.content_library import get_item, mark_items_referenced
 from core.edital_id import wiki_page_path
-from core.embedder import embed_query
 from core.reflection_service import load_active_insights
 from core.retriever import (
     format_chunks_for_prompt,
     retrieve_chunks,
-    retrieve_library_items,
 )
 from domain.user_profile import CompanyProfile
 from supabase import Client
@@ -65,21 +63,14 @@ OLLAMA_MODEL   = os.getenv("OLLAMA_MODEL", "llama3.2")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
-# Sprint 2 do Cenário B: agente Anthropic (D1 híbrido).
-# Quando workspaces.agent_writing_enabled = true, turn() roda o agente em vez
-# do pipeline determinístico. Modelo configurável via env.
+# Agente Anthropic (D1 híbrido). Único path de escrita: turn() sempre roda o
+# agente com tools (search_edital, save_draft com critic, etc.). Modelo e
+# orçamento de passos configuráveis via env.
 ANTHROPIC_MODEL_AGENT = os.getenv("ANTHROPIC_MODEL_AGENT", "claude-sonnet-4-6")
 AGENT_MAX_STEPS = int(os.getenv("AGENT_MAX_STEPS", "8"))
 
 HISTORY_WINDOW     = 6
 COMPRESS_THRESHOLD = 10
-
-# Retrieval automático da biblioteca por turno (Fase 2 #16). Quantos items
-# injetar e o piso de similaridade (cosine) abaixo do qual o match é
-# considerado ruído e descartado — evita despejar contexto irrelevante
-# quando a biblioteca não tem nada a ver com a pergunta.
-LIBRARY_RETRIEVAL_K   = 3
-LIBRARY_RELEVANCE_MIN = 0.25
 
 # @ mentions: usuário pode referenciar items da library no input com @<uuid>.
 # O resolver injeta o conteúdo do item como contexto adicional e atualiza
@@ -88,24 +79,6 @@ _MENTION_RE = re.compile(
     r"@([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
     re.IGNORECASE,
 )
-
-# Grantable: o LLM envolve rascunhos completos em <draft>...</draft>. O texto
-# dentro da tag é auto-salvo na seção ativa; o resto vira mensagem de chat.
-_DRAFT_RE = re.compile(r"<draft>(.*?)</draft>", re.IGNORECASE | re.DOTALL)
-
-
-def _extract_draft(text: str) -> tuple[str, str | None]:
-    """Separa o conteúdo de <draft>...</draft> do texto de chat.
-
-    Retorna (texto_sem_tag, conteúdo_do_draft | None). Se não houver tag, o
-    texto volta intacto e o draft é None.
-    """
-    match = _DRAFT_RE.search(text)
-    if not match:
-        return text, None
-    draft = match.group(1).strip()
-    clean = _DRAFT_RE.sub("", text).strip()
-    return clean, (draft or None)
 
 # PDFs a ignorar (deve permanecer sincronizado com `core.tasks._SKIP_KEYWORDS`).
 # faq e tabela_com_requisitos foram removidos em 2026-05-13 — vide tasks.py.
@@ -125,24 +98,13 @@ Com base no edital abaixo, gere o outline das seções que a proposta deve conte
 Retorne APENAS um JSON array de strings com os títulos das seções, na ordem correta.
 Exemplo: ["1. Identificação da empresa", "2. Objeto do projeto", "3. Justificativa"]"""
 
-WRITER_SYSTEM = """Você é um especialista em redação de propostas para editais de fomento no Brasil.
-Seu papel é ajudar o usuário a escrever uma proposta técnica de alta qualidade.
-
-Diretrizes:
-- Baseie-se nas informações do edital e no perfil da empresa fornecidos.
-- Use Markdown para estruturar o texto quando produzir trechos da proposta.
-- Quando produzir um trecho, seja propositivo: não diga "poderíamos fazer", diga "faremos".
-- Nunca invente dados numéricos que não estejam no perfil ou no edital.
-- Use [COMPLETAR: descrição] para lacunas que dependem de informação do usuário.
-- Quando uma seção ativa for indicada, concentre a resposta nessa seção.
-- Quando uma seção ativa estiver indicada e você produzir um rascunho completo para ela,
-  envolva o rascunho em <draft>...</draft>. Use no máximo uma tag <draft> por resposta.
-  O conteúdo dentro de <draft> é salvo automaticamente no documento; explicações,
-  comentários e perguntas ficam fora da tag."""
+# Mensagem curta de boas-vindas por seção (get_section_starter) — chamada
+# 1-shot, sem tools. Não confundir com WRITER_AGENT_SYSTEM (path agente).
+_SECTION_STARTER_SYSTEM = """Você é um especialista em propostas para editais de fomento no Brasil.
+Gere mensagens curtas e acionáveis para orientar o início de uma seção da proposta."""
 
 
-# Sistema prompt do modo agente (Sprint 2 do Cenário B). Substitui o
-# WRITER_SYSTEM quando workspaces.agent_writing_enabled = true. As ferramentas
+# Sistema prompt do agente de escrita — único path de escrita. As ferramentas
 # (search_edital, search_library, read_section, read_full_proposal, save_draft,
 # request_user_info) são registradas via core.agent_tools.build_writing_tools.
 WRITER_AGENT_SYSTEM = """Você é um especialista em redação de propostas para editais de fomento no Brasil.
@@ -226,13 +188,10 @@ class WritingSession:
         self._turn_count = 0
         self._doc_sections: dict[str, str] = {}
         self._proposal_outline: list[str] = []
-        # Sprint 2 do Cenário B: setado pela tool request_user_info quando o
-        # agente precisa de info do usuário; consumido (esvaziado) na primeira
-        # mensagem do próximo turn. Persistido em writing_sessions.pending_user_input.
+        # Setado pela tool request_user_info quando o agente precisa de info do
+        # usuário; consumido (esvaziado) na primeira mensagem do próximo turn.
+        # Persistido em writing_sessions.pending_user_input.
         self._pending_user_input: dict | None = None
-        # Cache do feature flag agent_writing_enabled — uma query por sessão.
-        # Resolved lazy via `_use_agent()` para não bloquear __init__.
-        self._use_agent_cached: bool | None = None
 
         if session_id:
             # Retomar sessão existente — carrega tudo do Postgres.
@@ -250,6 +209,11 @@ class WritingSession:
         self._profile_context = profile.to_context()
         self._library_context = self._build_library_context(library_items or [])
         self._reflection_insights_context = self._build_reflection_context(workspace_id)
+        # Consciência temporal (Front 3): bloco canônico "hoje é X / prazo do
+        # edital" injetado no prefixo estável. Recomputado por construção (a
+        # data muda dia-a-dia, mas é estável dentro de um request → cache OK).
+        from core.temporal import render_temporal_block
+        self._temporal_block = render_temporal_block(self.edital_id)
 
         # Ids dos items anexados explicitamente — guardados pra dedup contra
         # o retrieval automático da biblioteca em turn() (normalizados lower).
@@ -587,11 +551,13 @@ class WritingSession:
         }
 
     def turn(self, user_message: str, section_hint: str | None = None) -> dict:
-        """Dispatcher do turn: agente (Sprint 2 do Cenário B) ou pipeline legacy.
+        """Processa um turno de escrita via agente (único path).
 
-        Branching por workspaces.agent_writing_enabled. Falha no resolve do flag
-        cai pro legacy — nunca queremos negar o atendimento por erro de leitura
-        do feature flag.
+        Todo turno roda o agente com tools (search_edital, save_draft com
+        critic, coerência interna). O legacy 1-shot por regex `<draft>` foi
+        aposentado (Front 1): não há mais branching por feature flag. Se o
+        agente falhar (stop_reason=error), retorna erro amigável — sem cair
+        em legacy.
         """
         self._turn_count += 1
         user_turn_index = self._turn_count
@@ -606,10 +572,7 @@ class WritingSession:
             if self._turn_count > COMPRESS_THRESHOLD:
                 self._compress_history()
 
-            if self._use_agent():
-                result = self._turn_agent(user_message, section_hint, user_turn_index)
-            else:
-                result = self._turn_legacy(user_message, section_hint, user_turn_index)
+            result = self._turn_agent(user_message, section_hint, user_turn_index)
 
             # Persiste pending_user_input se a tool request_user_info disparou
             # neste turn; OU limpa no DB se consumimos um pendente acima.
@@ -621,127 +584,22 @@ class WritingSession:
             logger.error("[%s] Erro no turno %d: %s", self.session_id, self._turn_count, e)
             return self._error_result(str(e), "INTERNAL_ERROR")
 
-    def _turn_legacy(
-        self,
-        user_message: str,
-        section_hint: str | None,
-        user_turn_index: int,
-    ) -> dict:
-        """Pipeline determinístico (pre-Cenário B): RAG fixo + 1 LLM call.
-
-        Mantido durante o rollout do agente — workspaces com
-        agent_writing_enabled = false continuam aqui.
-        """
-        # @ mentions: resolve referências a library_items no input do usuário.
-        # Items inválidos/inacessíveis (RLS) são silenciosamente ignorados.
-        mentions_context = self._resolve_mentions(user_message)
-
-        # Embeda a mensagem UMA vez — reusada pelo RAG do edital e pelo
-        # retrieval da biblioteca (evita 2 chamadas OpenAI/turno). Se o
-        # embed falhar (OpenAI down), pulamos ambos os retrievals: opera
-        # só com perfil + histórico, mesmo comportamento de antes.
-        query_vec: list[float] | None = None
-        try:
-            query_vec = embed_query(user_message)
-        except Exception as e:
-            logger.warning(
-                "[%s] embed_query falhou: %s — turno sem RAG.",
-                self.session_id, e,
-            )
-
-        # RAG: busca trechos relevantes ANTES de montar o prompt. Falhas
-        # de retrieval (DB offline, edital ainda não indexado, etc.) NÃO
-        # devem fazer fallback para context-stuffing — o ponto da nova
-        # arquitetura é justamente não despejar PDFs inteiros no prompt.
-        # Em caso de falha, operamos só com perfil + histórico e logamos
-        # alto para que o operador possa rodar `scripts/reindex_edital.py`.
-        edital_chunks_context = ""
-        if query_vec is not None:
-            try:
-                chunks = retrieve_chunks(
-                    self._db, self._scope_edital_ids, query=user_message, k=5,
-                    query_vec=query_vec,
-                )
-                if chunks:
-                    edital_chunks_context = format_chunks_for_prompt(
-                        chunks, edital_ids=self._scope_edital_ids,
-                    )
-                else:
-                    logger.warning(
-                        "[%s] Nenhum chunk retornado para edital=%s — "
-                        "edital pode não estar indexado ainda.",
-                        self.session_id, self.edital_id,
-                    )
-            except Exception as e:
-                logger.warning(
-                    "[%s] Falha em retrieve_chunks (edital=%s): %s — "
-                    "seguindo sem contexto de edital.",
-                    self.session_id, self.edital_id, e,
-                )
-
-        # Retrieval automático da biblioteca (Fase 2 #16). Dedup contra
-        # anexos explícitos + @-mentions do turno pra não duplicar docs.
-        retrieved_library_context = ""
-        if query_vec is not None:
-            exclude_ids = self._library_item_ids | {
-                m.lower() for m in _MENTION_RE.findall(user_message)
-            }
-            retrieved_library_context = self._build_retrieved_library_context(
-                user_message, query_vec, exclude_ids,
-            )
-
-        messages = self._build_messages(
-            user_message, section_hint, edital_chunks_context,
-            mentions_context, retrieved_library_context,
-        )
-        success, response_text, error_type = self._call_llm(messages)
-
-        if not success:
-            # Rollback do contador para que o próximo turno reaproveite o índice.
-            self._turn_count -= 1
-            return self._error_result(response_text, error_type)
-
-        # Grantable: separa o rascunho (auto-salvo) do texto de chat.
-        clean_text, draft_content = _extract_draft(response_text)
-
-        self._history.append({"role": "user",      "content": user_message})
-        self._history.append({"role": "assistant", "content": clean_text})
-
-        # Persistência dos dois turnos (best-effort). O histórico guarda o
-        # texto sem a tag — o rascunho vive em section_drafts, não no chat.
-        # tool_use=None marca este turn como legacy.
-        self._persist_turn(user_turn_index, "user", user_message, section_hint)
-        self._persist_turn(user_turn_index, "assistant", clean_text, section_hint)
-
-        # Auto-save: LLM escreve direto no documento quando há seção ativa.
-        # Sobrescreve sem histórico (decisão de design — versionamento flat).
-        if draft_content and section_hint:
-            self.set_section_content(section_hint, draft_content)
-
-        return {
-            "session_id":        self.session_id,
-            "assistant_message": clean_text,
-            "draft_content":     draft_content,
-            "turn_number":       self._turn_count,
-            "success":           True,
-            "error":             None,
-        }
-
     def _turn_agent(
         self,
         user_message: str,
         section_hint: str | None,
         user_turn_index: int,
     ) -> dict:
-        """Pipeline agente (Sprint 2 do Cenário B): run_agent + 6 tools.
+        """Path de escrita: run_agent + tools (search_edital, search_library,
+        read_section, read_full_proposal, save_draft, request_user_info, ...).
 
-        Diferenças vs legacy:
+        Características:
           • Sem RAG eager — o agente decide via search_edital / search_library
           • Sem retrieval auto de library — idem
-          • Tag <draft> substituída por save_draft tool (side effect)
-          • [COMPLETAR: ...] complementado por request_user_info (sinal estruturado
-            pro frontend)
-          • mentions ainda resolvem antes (intenção explícita do usuário)
+          • save_draft tool persiste a seção (com critic) como side effect
+          • request_user_info emite sinal estruturado pro frontend quando falta
+            info concreta do usuário
+          • mentions resolvem antes (intenção explícita do usuário)
         """
         from core.agent_runtime import resolve_agent_provider, run_agent
         from core.agent_tools import build_writing_tools
@@ -835,32 +693,6 @@ class WritingSession:
                 })
         return trace
 
-    def _use_agent(self) -> bool:
-        """Lê workspaces.agent_writing_enabled (cacheado por sessão).
-
-        Falha graciosa: erro de leitura → False (pipeline legado).
-        Workspace inexistente → False.
-        """
-        if self._use_agent_cached is not None:
-            return self._use_agent_cached
-        try:
-            row = (
-                self._db.table("workspaces")
-                .select("agent_writing_enabled")
-                .eq("id", self.workspace_id)
-                .maybe_single()
-                .execute()
-            )
-            enabled = bool(row.data.get("agent_writing_enabled")) if row and row.data else False
-        except Exception as e:
-            logger.warning(
-                "[%s] Falha ao ler agent_writing_enabled: %s — fallback legacy",
-                self.session_id, e,
-            )
-            enabled = False
-        self._use_agent_cached = enabled
-        return enabled
-
     def _save_pending_user_input(self, value: dict | None) -> None:
         """Persiste writing_sessions.pending_user_input (best-effort)."""
         try:
@@ -890,8 +722,12 @@ class WritingSession:
         messages: list[dict] = [
             {"role": "user", "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
         ]
+        if self._temporal_block:
+            messages.append({"role": "user", "content": self._temporal_block})
         if self._library_context:
             messages.append({"role": "user", "content": self._library_context})
+        if self._reflection_insights_context:
+            messages.append({"role": "user", "content": self._reflection_insights_context})
         if self._history_summary:
             messages.append({"role": "user", "content": self._history_summary})
 
@@ -958,7 +794,7 @@ class WritingSession:
         context-stuffing.
         """
         messages = [
-            {"role": "system", "content": WRITER_SYSTEM},
+            {"role": "system", "content": _SECTION_STARTER_SYSTEM},
             {"role": "user",   "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
         ]
 
@@ -1087,90 +923,6 @@ class WritingSession:
         return "\n".join(parts)
 
     # ------------------------------------------------------------------
-    # Montagem do prompt (prefixo estático → prompt caching)
-    # ------------------------------------------------------------------
-
-    def _build_messages(
-        self,
-        user_message: str,
-        section_hint: str | None = None,
-        edital_chunks_context: str = "",
-        mentions_context: str = "",
-        retrieved_library_context: str = "",
-    ) -> list[dict]:
-        """
-        Estrutura do prompt (estático primeiro para maximizar cache hit):
-          system   — WRITER_SYSTEM (imutável)
-          user     — perfil da empresa (imutável na sessão)
-          user     — contexto da biblioteca anexado (imutável na sessão)
-          user     — histórico comprimido (estável dentro de uma janela)
-          ...      — histórico recente (turnos verbatim)
-          user     — TRECHOS DO EDITAL retornados pelo RAG (varia por turno!
-                     fica depois do prefixo estável p/ preservar cache hit)
-          user     — items @-mencionados no turno (varia por turno)
-          user     — items da biblioteca recuperados automaticamente (varia)
-          user     — seção ativa (se houver)
-          user     — mensagem atual
-
-        Note: tudo que varia por turno (RAG, @-mentions, retrieval auto da
-        biblioteca) DEVE ficar depois do prefixo cacheable para não invalidar
-        o cache de prompt. Ordem entre os blocos por-turno: edital (mais
-        autoritativo p/ compliance) → @-mention (sinal humano) → biblioteca
-        auto (especulativo).
-        """
-        messages: list[dict] = [
-            {"role": "system", "content": WRITER_SYSTEM},
-            {"role": "user",   "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
-        ]
-
-        if self._library_context:
-            messages.append({
-                "role":    "user",
-                "content": self._library_context,
-            })
-
-        if self._reflection_insights_context:
-            messages.append({
-                "role":    "user",
-                "content": self._reflection_insights_context,
-            })
-
-        if self._history_summary:
-            messages.append({
-                "role":    "user",
-                "content": self._history_summary,
-            })
-
-        messages.extend(self._history)
-
-        # Trechos do edital (varia por turno) — depois do prefixo estável.
-        if edital_chunks_context:
-            messages.append({
-                "role":    "user",
-                "content": edital_chunks_context,
-            })
-
-        # Items referenciados via @ mention no turno atual.
-        if mentions_context:
-            messages.append({
-                "role":    "user",
-                "content": mentions_context,
-            })
-
-        # Items da biblioteca recuperados automaticamente por relevância.
-        if retrieved_library_context:
-            messages.append({
-                "role":    "user",
-                "content": retrieved_library_context,
-            })
-
-        if section_hint:
-            messages.append({"role": "user", "content": f"[Seção ativa: {section_hint}]"})
-
-        messages.append({"role": "user", "content": user_message})
-        return messages
-
-    # ------------------------------------------------------------------
     # Compressão de histórico
     # ------------------------------------------------------------------
 
@@ -1212,71 +964,6 @@ class WritingSession:
         for item in items:
             parts.append(f"\n[{item.get('type', 'doc').upper()}] {item.get('title', '')}")
             for fact in item.get("key_facts", [])[:10]:
-                parts.append(f"  • {fact}")
-        return "\n".join(parts)
-
-    def _build_retrieved_library_context(
-        self,
-        query: str,
-        query_vec: list[float],
-        exclude_ids: set[str],
-    ) -> str:
-        """Retrieval automático de items relevantes da biblioteca (Fase 2 #16).
-
-        Diferente do anexo explícito (`_build_library_context`) e do @-mention
-        (`_resolve_mentions`), aqui o retrieval é por relevância, sem ação do
-        usuário. Scoring α·recency + β·importance·decay + γ·relevance vem de
-        `retrieve_library_items`.
-
-        Decisões deliberadas:
-          - NÃO chama `mark_items_referenced`: auto-recuperação não pode
-            esquentar o decay temporal, senão cria loop de auto-reforço
-            (recuperado → last_referenced_at fresco → importance_decay sobe →
-            recuperado de novo). Só sinal humano (anexo/@-mention) alimenta o
-            decay.
-          - Dedup contra `exclude_ids` (anexo explícito + @-mentions do turno)
-            pra não injetar o mesmo doc 2–3×.
-          - Filtra por `relevance_score` (cosine) >= LIBRARY_RELEVANCE_MIN —
-            `retrieve_library_items` sempre devolve k items mesmo sem match
-            real; o piso evita despejar ruído.
-
-        Falha graciosa: retorna "" (turno segue sem o bloco).
-        """
-        # Pede k extra pra dedup não deixar o resultado abaixo de K.
-        want = min(LIBRARY_RETRIEVAL_K + len(exclude_ids), 15)
-        try:
-            items = retrieve_library_items(
-                self.workspace_id, query, k=want, query_vec=query_vec,
-            )
-        except Exception as e:
-            logger.warning(
-                "[%s] retrieve_library_items falhou: %s", self.session_id, e,
-            )
-            return ""
-
-        picked: list[dict] = []
-        for it in items:
-            if str(it.get("id", "")).lower() in exclude_ids:
-                continue
-            if (it.get("relevance_score") or 0.0) < LIBRARY_RELEVANCE_MIN:
-                continue
-            picked.append(it)
-            if len(picked) >= LIBRARY_RETRIEVAL_K:
-                break
-
-        if not picked:
-            return ""
-
-        parts = [
-            "POSSÍVEL CONTEXTO DA BIBLIOTECA (recuperado automaticamente — "
-            "use o que se aplicar à seção atual; ignore o que não couber):",
-        ]
-        for it in picked:
-            type_ = (it.get("type") or "doc").upper()
-            parts.append(f"\n[{type_}] {it.get('title', '(sem título)')}")
-            if it.get("summary"):
-                parts.append(f"  {it['summary']}")
-            for fact in (it.get("key_facts") or [])[:4]:
                 parts.append(f"  • {fact}")
         return "\n".join(parts)
 
