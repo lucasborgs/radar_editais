@@ -686,7 +686,7 @@ class KGMatchService:
           • Sem pré-resolução de focus_ids — agente decide via tools
           • Dica de clique no grafo vira message extra (não substitui análise)
         """
-        from core.agent_runtime import run_agent
+        from core.agent_runtime import resolve_agent_provider, run_agent
         from core.agent_tools import build_explore_tools
 
         self._load_index()  # garante índice carregado (não usa self._client)
@@ -707,12 +707,15 @@ class KGMatchService:
         messages.append({"role": "user", "content": message})
 
         tools = build_explore_tools(self)
+        provider, model = resolve_agent_provider(
+            "anthropic", ANTHROPIC_MODEL_AGENT_EXPLORE,
+        )
         result = run_agent(
             system=EXPLORE_AGENT_SYSTEM,
             initial_messages=messages,
             tools=tools,
-            model=ANTHROPIC_MODEL_AGENT_EXPLORE,
-            provider="anthropic",
+            model=model,
+            provider=provider,
             max_steps=EXPLORE_AGENT_MAX_STEPS,
         )
 

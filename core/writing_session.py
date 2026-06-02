@@ -743,7 +743,7 @@ class WritingSession:
             pro frontend)
           • mentions ainda resolvem antes (intenção explícita do usuário)
         """
-        from core.agent_runtime import run_agent
+        from core.agent_runtime import resolve_agent_provider, run_agent
         from core.agent_tools import build_writing_tools
 
         mentions_context = self._resolve_mentions(user_message)
@@ -752,12 +752,13 @@ class WritingSession:
         )
         tools = build_writing_tools(self)
 
+        provider, model = resolve_agent_provider("anthropic", ANTHROPIC_MODEL_AGENT)
         result = run_agent(
             system=WRITER_AGENT_SYSTEM,
             initial_messages=messages,
             tools=tools,
-            model=ANTHROPIC_MODEL_AGENT,
-            provider="anthropic",
+            model=model,
+            provider=provider,
             max_steps=AGENT_MAX_STEPS,
             reflect_every=3,
         )

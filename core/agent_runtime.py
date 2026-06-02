@@ -466,6 +466,66 @@ _REFLECT_PROMPT = (
 )
 
 
+def resolve_agent_provider(
+    preferred: Provider,
+    model: str,
+    *,
+    openai_model: str | None = None,
+    anthropic_model: str | None = None,
+) -> tuple[Provider, str]:
+    """Escolhe (provider, model) conforme as API keys disponíveis no ambiente.
+
+    Resiliência multi-modelo: o sistema não deve depender de um único
+    fornecedor. Quando o provider preferido não tem credencial, degrada de
+    forma graciosa para o outro (logando em WARNING). O loop do agente é
+    provider-agnóstico (ver `run_agent`), então o fallback é transparente.
+
+    Args:
+        preferred: provider desejado pelo call site.
+        model: modelo desejado para o provider preferido.
+        openai_model: modelo a usar se cair para OpenAI. Default: env
+            OPENAI_MODEL_AGENT → OPENAI_MODEL_PRO → "gpt-4o" (tool-loops
+            pedem um modelo capaz, não o mini).
+        anthropic_model: modelo a usar se cair para Anthropic. Default: env
+            ANTHROPIC_MODEL_AGENT → "claude-sonnet-4-6".
+
+    Raises:
+        RuntimeError: se nenhuma API key de LLM estiver disponível.
+    """
+    have = {
+        "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "openai": bool(os.environ.get("OPENAI_API_KEY")),
+    }
+    if have[preferred]:
+        return preferred, model
+
+    fallback: Provider = "openai" if preferred == "anthropic" else "anthropic"
+    if have[fallback]:
+        if fallback == "openai":
+            fb_model = (
+                openai_model
+                or os.getenv("OPENAI_MODEL_AGENT")
+                or os.getenv("OPENAI_MODEL_PRO")
+                or "gpt-4o"
+            )
+        else:
+            fb_model = (
+                anthropic_model
+                or os.getenv("ANTHROPIC_MODEL_AGENT")
+                or "claude-sonnet-4-6"
+            )
+        logger.warning(
+            "resolve_agent_provider: '%s' indisponível (sem API key) — "
+            "fallback para '%s' (%s)", preferred, fallback, fb_model,
+        )
+        return fallback, fb_model
+
+    raise RuntimeError(
+        f"Nenhuma API key de LLM disponível (preferido={preferred}, "
+        f"fallback={fallback}). Configure ANTHROPIC_API_KEY ou OPENAI_API_KEY."
+    )
+
+
 def run_agent(
     *,
     system: str,
