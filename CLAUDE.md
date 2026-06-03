@@ -34,6 +34,18 @@ python pipeline/etl_generate_pairs.py --backend gemini   # generate training pai
 python pipeline/etl_finetune_tsdae.py                    # TSDAE unsupervised pre-training
 ```
 
+### Avaliação (harness unificado)
+```bash
+python -m core.eval matching        # roda uma suíte (Langfuse Experiment se configurado; senão eval_results/*.json)
+python -m core.eval all              # todas as suítes registradas
+python -m core.eval matching --no-push --limit 1   # fallback local, subconjunto (debug)
+```
+Toda suíte é uma `Suite` em `core/eval/` (registro em `core/eval/registry.py`):
+`task` roda o pipeline real, `evaluators` reaproveitam `core/*_eval.py`. Com
+`LANGFUSE_*` no ambiente vira Experiment (scores comparáveis entre commits).
+NÃO criar harnesses novos paralelos — registrar uma suíte aqui. Os scripts
+`scripts/eval_{rag,matching,agent_writing}.py` são legados em migração.
+
 ### Frontend
 ```bash
 cd frontend && npm run build   # production build
