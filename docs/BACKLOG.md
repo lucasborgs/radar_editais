@@ -37,6 +37,17 @@
   normalizado). Verificar se a busca é client-side (pode exigir Playwright).
 - **Status:** aberto.
 
+### Descoberta de Oportunidades (item 2.2) — implementação
+- **O quê:** descoberta web diária de editais/fomento espalhados pelo Brasil →
+  triagem agêntica → staging → extração humana-no-loop → KG.
+- **Por que adiado:** specado, ainda não implementado. Maior valor e maior risco.
+- **Onde:** [spec_descoberta_oportunidades.md](spec_descoberta_oportunidades.md).
+- **Ponto de entrada:** Fase A — `core/opportunity_discovery.py` + migration
+  `016_discovered_opportunities.sql` + task procrastinate. Reusa `core/web_search.py`.
+- **Princípio inviolável:** nada entra no KG sem aprovação humana (Fase B). Fase A
+  não toca o KG.
+- **Status:** aberto (spec pronta).
+
 ### DeepResearch — Fases B e C (Fase A feita)
 - **Feito (Fase A):** `core/web_search.py` (port Tavily REST), `core/deep_research.py`
   (subagente run_agent + anti-fabricação), tool `deep_research` no Redator. Stateless,
