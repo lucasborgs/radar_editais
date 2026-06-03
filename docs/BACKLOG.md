@@ -37,14 +37,18 @@
   normalizado). Verificar se a busca é client-side (pode exigir Playwright).
 - **Status:** aberto.
 
-### DeepResearch — implementação
-- **O quê:** busca web com fonte, como subagente-como-tool; grounding → working
-  memory → gate do usuário → learning na ContentLibrary (nunca no KG).
-- **Por que adiado:** só design por ora; priorizado o mapeamento de ICTs.
+### DeepResearch — Fases B e C (Fase A feita)
+- **Feito (Fase A):** `core/web_search.py` (port Tavily REST), `core/deep_research.py`
+  (subagente run_agent + anti-fabricação), tool `deep_research` no Redator. Stateless,
+  não persiste. Falta `TAVILY_API_KEY` no ambiente para uso real.
+- **Fase B (aberto):** gate de learning — endpoint `POST /library/from-research` +
+  `create_item(type_='web_research', source_url=…, enrich=True)` + painel de "fontes
+  pendentes" no frontend. É onde o fato escolhido vira memória do projeto.
+- **Fase C (aberto):** decay por tipo (`web_research` com meia-vida menor) + tool no
+  Explorador + eval anti-fabricação (casos cuja resposta certa é "não encontrei").
 - **Onde:** [spec_deepresearch.md](spec_deepresearch.md).
-- **Ponto de entrada:** `core/web_search.py` (port Tavily) + `core/agent_tools/research_tools.py`.
-  Backend escolhido: **Tavily**. Reusa `fetch_page` e `enrich_content_task`.
-- **Status:** aberto.
+- **Pré-requisito de uso:** configurar `TAVILY_API_KEY` (e `WEB_SEARCH_BACKEND=tavily`,
+  default). Sem chave, a tool degrada com mensagem.
 
 ---
 
