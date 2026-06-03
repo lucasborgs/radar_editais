@@ -49,10 +49,11 @@ def task(*, item: Any, **_) -> dict:
     inp = get_input(item)
     from core.retriever import retrieve_chunks
     t0 = time.perf_counter()
+    # edital_ids é uma lista; o primeiro é o edital "primário" do retrieval.
     retrieved = retrieve_chunks(
-        db=None,
-        edital_id=inp["edital_id"],
-        query=inp["query"],
+        None,
+        [inp["edital_id"]],
+        inp["query"],
         k=inp["k"],
         fts_weight=inp["fts_weight"],
         max_per_source=inp["max_per_source"],
