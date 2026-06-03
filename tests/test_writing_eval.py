@@ -17,8 +17,10 @@ from core.writing_eval import (  # noqa: E402
     _parse_claims,
     _parse_coherence,
     _parse_errors,
+    _parse_grounded_one,
     _parse_grounding,
     aggregate_writing_runs,
+    score_grounding,
 )
 
 # =============================================================================
@@ -52,6 +54,38 @@ def test_parse_grounding_out_of_range_ignored():
 
 def test_parse_grounding_garbage_all_false():
     assert _parse_grounding("xxx", 2) == [False, False]
+
+
+def test_parse_grounded_one():
+    assert _parse_grounded_one('{"grounded": true}') is True
+    assert _parse_grounded_one('{"grounded": false}') is False
+    assert _parse_grounded_one("lixo") is False
+
+
+def test_score_grounding_per_claim_uses_retrieve_fn(monkeypatch):
+    """Modo per-claim: recupera evidência por afirmação e julga 1-a-1."""
+    calls = []
+
+    def fake_retrieve(query, k):
+        calls.append(query)
+        # devolve um chunk só para a 2ª claim (a 1ª fica sem evidência)
+        return [{"text": "respaldo"}] if "B" in query else []
+
+    monkeypatch.setattr(
+        "core.writing_eval.judge_claim_grounded",
+        lambda claim, chunks: bool(chunks),  # grounded sse há evidência
+    )
+    res = score_grounding(["claim A", "claim B"], retrieve_fn=fake_retrieve)
+    assert calls == ["claim A", "claim B"]  # recuperou por claim
+    assert res.n_claims == 2
+    assert res.n_grounded == 1
+    assert res.pct_grounded == 0.5
+
+
+def test_score_grounding_empty_claims():
+    res = score_grounding([], retrieve_fn=lambda q, k: [])
+    assert res.n_claims == 0
+    assert res.pct_grounded == 0.0
 
 
 def test_parse_errors_ok():
