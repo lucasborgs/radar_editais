@@ -26,13 +26,18 @@ class _FakeTable:
         self._payload = None
 
     def select(self, *a, **k):
-        self._mode = "select"; return self
+        self._mode = "select"
+        return self
 
     def insert(self, payload):
-        self._mode = "insert"; self._payload = payload; return self
+        self._mode = "insert"
+        self._payload = payload
+        return self
 
     def update(self, payload):
-        self._mode = "update"; self._payload = payload; return self
+        self._mode = "update"
+        self._payload = payload
+        return self
 
     # chaináveis no-op
     def eq(self, *a, **k): return self
