@@ -251,8 +251,8 @@ def main() -> int:
     print()
     print(f"[gen] gravado em {out_path}")
     print(f"[gen] total no golden: {len(out['queries'])} ({len(new_queries)} novas)")
-    print(f"[gen] REVISE o JSON antes de rodar eval_rag.py — algumas queries podem estar")
-    print(f"[gen] triviais ou específicas demais. Editar/deletar a mão é parte do processo.")
+    print("[gen] REVISE o JSON antes de rodar eval_rag.py — algumas queries podem estar")
+    print("[gen] triviais ou específicas demais. Editar/deletar a mão é parte do processo.")
     return 0
 
 
