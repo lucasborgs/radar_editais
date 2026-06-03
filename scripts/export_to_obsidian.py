@@ -76,7 +76,6 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
 
     themes = edital.get("themes", [])
     publicos = edital.get("publico_alvo", [])
-    fontes = edital.get("fonte_recurso", [])
     subprogramas = edital.get("subprogramas", [])
     pub_year = edital.get("pub_year", wiki_schema.parse_pub_year(pub_date))
 
