@@ -105,6 +105,7 @@ def test_deep_research_tool_graceful_when_empty(monkeypatch):
 def test_redator_inclui_deep_research():
     """Guard-rail inverso da Fase C: aqui a tool DEVE estar no Redator."""
     import inspect
+
     from core.agent_tools import writing_tools
     src = inspect.getsource(writing_tools.build_writing_tools)
     assert "build_research_tools" in src
