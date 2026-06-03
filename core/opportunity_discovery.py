@@ -22,8 +22,8 @@ import re
 from datetime import datetime, timezone
 
 from config import BRONZE_DIR, KNOWLEDGE_GRAPH_DIR
-from core import wiki_schema as ws
 from core import web_search as websearch
+from core import wiki_schema as ws
 
 logger = logging.getLogger(__name__)
 
