@@ -1,16 +1,17 @@
 """Registro das suítes de avaliação. Adicionar uma suíte = uma linha aqui.
 
-Hoje: matching (wired end-to-end). Próximas (mesma forma de `Suite`): rag
-(reaproveita core/rag_eval.py) e writing (core/writing_eval.py) — ver os
-scripts legados scripts/eval_{rag,agent_writing}.py como fonte do `task`.
+matching (HybridMatch), rag (retriever) e writing (agente de escrita), todas
+wired end-to-end reaproveitando core/{matching,rag,writing}_eval.py.
 """
 from __future__ import annotations
 
-from core.eval import matching
+from core.eval import matching, rag, writing
 from core.eval.harness import Suite
 
 SUITES: dict[str, Suite] = {
     matching.SUITE.name: matching.SUITE,
+    rag.SUITE.name: rag.SUITE,
+    writing.SUITE.name: writing.SUITE,
 }
 
 

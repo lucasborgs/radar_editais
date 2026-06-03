@@ -5,7 +5,8 @@ Gera um golden dataset pra eval do RAG via LLM.
 Para cada edital indicado, lê chunks da tabela `edital_chunks`, faz amostragem
 diversa (por source_file + section quando possível), e pede pro GPT-4o-mini
 gerar uma pergunta natural que aquele chunk responde. Resultado fica em
-`eval_data/golden/<source>.json` no formato consumido por `scripts/eval_rag.py`.
+`eval_data/golden/<source>.json` no formato consumido pela suíte rag
+(`python -m core.eval rag`).
 
 Uso:
     python scripts/generate_golden.py --source finep --editais 768 762 743
@@ -165,7 +166,7 @@ def _infer_category(section: str | None, text: str) -> str:
 # =============================================================================
 
 def _build_entry(source: str, edital_id: str, idx: int, chunk: dict, query: str) -> dict:
-    """Monta um item do golden no formato consumido por eval_rag.py."""
+    """Monta um item do golden no formato consumido pela suíte rag."""
     return {
         "id": f"{source}_{edital_id}_q{idx}",
         "edital_id": edital_id,
@@ -251,7 +252,7 @@ def main() -> int:
     print()
     print(f"[gen] gravado em {out_path}")
     print(f"[gen] total no golden: {len(out['queries'])} ({len(new_queries)} novas)")
-    print("[gen] REVISE o JSON antes de rodar eval_rag.py — algumas queries podem estar")
+    print("[gen] REVISE o JSON antes de rodar `python -m core.eval rag` — algumas queries podem estar")
     print("[gen] triviais ou específicas demais. Editar/deletar a mão é parte do processo.")
     return 0
 

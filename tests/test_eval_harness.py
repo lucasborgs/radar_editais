@@ -78,3 +78,27 @@ def test_prereqs_skip(tmp_path):
 def test_limit(tmp_path):
     res = run_suite(_square_suite(), out_dir=tmp_path, limit=1)
     assert res["n_cases"] == 1
+
+
+# --- suítes reais registradas (sem rodar task/LLM) -------------------------
+
+def test_three_suites_registered():
+    from core.eval.registry import SUITES
+    assert set(SUITES) == {"matching", "rag", "writing"}
+
+
+def test_rag_skips_without_supabase(tmp_path, monkeypatch):
+    """rag deve pular limpo (não estourar) quando faltam creds de retrieval."""
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+    from core.eval.registry import get_suite
+    res = run_suite(get_suite("rag"), out_dir=tmp_path)
+    assert res.get("skipped")
+
+
+def test_writing_skips_without_workspace(tmp_path, monkeypatch):
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("EVAL_WORKSPACE_ID", raising=False)
+    from core.eval.registry import get_suite
+    res = run_suite(get_suite("writing"), out_dir=tmp_path)
+    assert res.get("skipped")
