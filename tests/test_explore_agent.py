@@ -222,6 +222,7 @@ def test_explore_tools_count_and_names():
     names = [t.name for t in tools]
     assert set(names) == {
         "list_editais", "get_edital", "find_analogues", "get_graph_neighbors",
+        "find_ict_partners",
     }
 
 

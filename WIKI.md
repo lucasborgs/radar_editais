@@ -252,6 +252,64 @@ trl_faixas:
 
 Regra de mapeamento: edital com `trl_range = {min: a, max: b}` recebe a faixa `f` se `max(a, f.min) <= min(b, f.max)`. Se `trl_range` é `{null, null}`, sem tag de faixa.
 
+### 5.9 Temas canônicos (áreas estratégicas)
+
+Vocabulário **canônico e autoritativo** de temas-macro (`tema`, §6.1). É o alvo
+único para o qual TODOS os produtores de tema convergem:
+- **Editais**: hoje as fontes (FINEP/FAPESP) já rotulam com essas macro-áreas;
+  `domain/vocabulary.canonicalize_themes` (stub) deve, ao evoluir, mapear
+  variações para esta lista.
+- **ICTs** (§6.1.2): o normalizador fino→macro de `build_ict_graph` mira nesta
+  lista — é o que garante que `ict.themes` e `edital.themes` compartilhem
+  representação (a ponte do grafo).
+
+Um tema só entra aqui quando há **evidência de cobertura** (editais e/ou ICTs que
+o exijam). `materiais, química e manufatura avançada` foi adicionado a partir de
+~66 áreas de expertise de unidades EMBRAPII sem tema-macro correspondente
+(materiais/compósitos/ligas, manufatura/processos, química/insumos, estruturas) —
+ver `themes_proposed_index` em `icts.json`.
+
+```yaml
+tema_vocab:
+  - "agro - bioeconomia e alimentos"
+  - "energia e transição sustentável"
+  - "espaço - defesa e segurança"
+  - "materiais, química e manufatura avançada"
+  - "mobilidade e logística"
+  - "saúde e ciências da vida"
+  - "tecnologias digitais e conectividade"
+```
+
+Invariante (test_wiki_schema_consistency): todo tema usado por editais ou ICTs
+deve estar nesta lista. Tema novo no corpus sem entrada aqui = quebra o
+validador → decida (adicionar ao vocab ou corrigir o produtor).
+
+### 5.10 Exigência de parceria com ICT (`requires_ict_partner`)
+
+Campo booleano **derivado** na entry do edital (`index.json`), indicando se o
+edital exige parceria com ICT (§6.1.2) — o gatilho do matchmaking de parceiros
+(Fase C, `core/ict_match`). **Heurística por regex** (MVP): aplica os patterns
+abaixo sobre o texto do edital (título + descrição + texto integral dos PDFs/
+`texto_cru`). Mira **linguagem de obrigatoriedade/arranjo**, não mera menção —
+"ICT" aparece em boilerplate de quase todo edital FINEP; o que marca é exigir
+ICT como executora/coexecutora ou no arranjo.
+
+Limitação assumida: heurística, não recall perfeito. Falso-positivo (ex.: FAQ
+"a ICT pode ser coexecutora? Não") e falso-negativo (exigência em anexo não
+coletado) existem. Patterns vivem aqui (regra), não no `.py` — tune sem deploy.
+
+```yaml
+ict_requirement_patterns:
+  - 'obrigat[óo]ri[ao][^.]{0,60}(ICT|institui[çc][ãa]o de ci[êe]ncia)'
+  - '(dever[áa]|exig[ei]\w*|necess[áa]ri[ao])[^.]{0,80}(parceria|coopera[çc][ãa]o|coexecu\w*)[^.]{0,40}(ICT|institui[çc][ãa]o de ci[êe]ncia)'
+  - 'em (parceria|coopera[çc][ãa]o) com[^.]{0,30}(uma? )?ICT'
+  - '\bICT\b[^.]{0,30}coexecutora?'
+  - 'participa[çc][ãa]o (obrigat[óo]ria|m[íi]nima) de[^.]{0,30}(uma? )?ICT'
+```
+
+`requires_ict_partner` é **propriedade do edital**, não nó (§6.1.1). Presente em
+toda entry do índice (default `false`).
+
 ---
 
 ## 6. Schema do grafo
@@ -288,6 +346,10 @@ node_types:
     folder: fontes
     tags: [fonte]
     emoji: "💰"
+  ict:
+    folder: icts
+    tags: [ict, "kind/<kind>", "tema/<slug>"]
+    emoji: "🔬"
   home:
     folder: ""
     tags: [finep, home]
@@ -308,6 +370,41 @@ Tags fonte-específicas (ex.: `finep`) vêm de `wikis/<fonte>.md`.
 nós**. São propriedades do edital, expressas como tag no frontmatter
 (`mecanismo/<key>`, `ano/<pub_year>`, `trl/<faixa>`) e consumidas pelo matching/filtro —
 nunca como wikilink/aresta. `ano` sem `pub_date` parseável → tag `ano/desconhecido`.
+
+#### 6.1.2 Nó `ict` (fora do ciclo de edital)
+
+ICTs (Instituições de Ciência e Tecnologia) são **parceiras** que muitos editais
+FINEP/FAPESP exigem para viabilizar a candidatura. **Uma ICT não lança edital** —
+apenas participa de projetos. Logo, o nó `ict` **não** flui pelo ETL de edital
+(sem PDF, status, mechanism, vigência) e **não** entra no `SCRAPER_REGISTRY`.
+Tem pipeline de ingestão e artefato próprios (`icts.json`), e se liga ao grafo de
+editais **pela ponte do nó `tema`**: `edital --edital_has_theme--> tema
+<--ict_has_expertise-- ict`. **Não há aresta direta edital↔ICT** — o casamento
+"este edital pede parceiro; estas ICTs têm a expertise" é computado por interseção
+de `tema` (slugs compartilhados, §6.3). Editais exigem *uma* ICT, não uma nomeada;
+por isso a obrigatoriedade vira tag `requires_ict_partner` no edital (derivada na
+extração), nunca aresta.
+
+A definição legal de "ICT" é ampla; o campo `kind` absorve a variação
+(unidade EMBRAPII, laboratório PNIPE, instituto, universidade) sem exigir
+taxonomia perfeita.
+
+```yaml
+ict_schema:
+  artifact: "knowledge_graph/icts.json"
+  id_format: "<source>:<slug>"          # ex.: embrapii:inteligencia-artificial-ceia-ufg
+  node_fields: [id, name, kind, source, url, about, address, contact, areas_raw, themes, themes_proposed, summary]
+  required_fields: [id, name, kind, source, themes]
+  kinds: [embrapii_unit, laboratorio, instituto, universidade]
+  sources: [embrapii, pnipe]
+  notes:
+    - "themes: temas CANÔNICOS de edital (mesma representação de edital.themes — rótulos, não slugs) que a ICT cobre. É a ponte: edital.themes ∩ ict.themes."
+    - "O alvo do mapeamento é o vocabulário de temas EMERGENTE do index.json (não há vocab fixo; canonicalize_themes é stub). Mapeamento fino→macro é LLM."
+    - "areas_raw: rótulos de expertise crus da fonte (EMBRAPII: action_lines + tech_skills). Display + matching fino futuro."
+    - "themes_proposed: áreas que não casaram com nenhum tema de edital — candidatas à expansão do vocabulário (não entram em themes nem na ponte)."
+    - "contact: dict {responsavel, email, telefone, site, ...} (campos opcionais)."
+    - "icts.json espelha index.json: {icts: [...], total_icts, themes_index, themes_proposed_index, last_updated}."
+```
 
 ### 6.2 Tipos de link
 
@@ -335,6 +432,14 @@ link_types:
     from: [tema, publico, subprograma, fonte, home]
     to: edital
     section: "## Editais"
+  ict_has_expertise:
+    from: ict
+    to: tema
+    section: "## Áreas de Atuação"
+  aggregator_lists_ict:
+    from: [tema]
+    to: ict
+    section: "## ICTs"
 ```
 
 ### 6.3 Slugify

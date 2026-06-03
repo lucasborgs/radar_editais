@@ -250,6 +250,36 @@ _NORMALIZERS = {
 }
 
 
+def _ict_requirement_regex() -> "re.Pattern | None":
+    """Compila os patterns §5.10 numa regex única (lazy, cacheada). None se não
+    houver patterns declarados."""
+    if not hasattr(_ict_requirement_regex, "_cached"):
+        pats = wiki_schema.ict_requirement_patterns()
+        _ict_requirement_regex._cached = (
+            re.compile("|".join(f"(?:{p})" for p in pats), re.IGNORECASE)
+            if pats else None
+        )
+    return _ict_requirement_regex._cached
+
+
+def _edital_text(ch: dict) -> str:
+    """Texto do edital para a heurística §5.10: título + corpo + PDFs. Agnóstico
+    à fonte — cobre FINEP (descricao, pdf_texts dict) e FAPESP (texto_cru)."""
+    parts = [ch.get("titulo", ""), ch.get("descricao", ""), ch.get("texto_cru", "")]
+    pdf_texts = ch.get("pdf_texts")
+    if isinstance(pdf_texts, dict):
+        parts.extend(str(v) for v in pdf_texts.values())
+    elif isinstance(pdf_texts, list):
+        parts.extend(str(v) for v in pdf_texts)
+    return " ".join(p for p in parts if p)
+
+
+def _detect_ict_requirement(ch: dict) -> bool:
+    """True se o texto do edital exige parceria com ICT (heurística §5.10)."""
+    rx = _ict_requirement_regex()
+    return bool(rx.search(_edital_text(ch))) if rx else False
+
+
 def _build_editais(chamadas: list[dict], source: str = _DEFAULT_SOURCE) -> list[dict]:
     """Converte chamadas bronze em entradas de edital normalizadas, agnóstico
     à fonte. `_NORMALIZERS[source]` lida com o schema bronze específico
@@ -280,6 +310,7 @@ def _build_editais(chamadas: list[dict], source: str = _DEFAULT_SOURCE) -> list[
             "source": source,
             **normalizer(ch),
             "n_pdfs": n_pdfs,
+            "requires_ict_partner": _detect_ict_requirement(ch),
         })
 
     # Dedup por id (primeira ocorrência vence). Bronze FAPESP legacy tem

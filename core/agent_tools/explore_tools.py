@@ -1,6 +1,6 @@
 """Tools do agente de KGMatch.explore (Sprint 3 do Cenário B).
 
-Quatro tools que substituem o pipeline atual onde o catálogo inteiro é
+Tools que substituem o pipeline atual onde o catálogo inteiro é
 injetado no prompt a cada turn:
 
   • list_editais     — filtra catálogo por status/tema/limite
@@ -8,6 +8,8 @@ injetado no prompt a cada turn:
   • find_analogues   — editais parecidos com um edital de referência
   • get_graph_neighbors — vizinhos de um nó qualquer no grafo (tema, publico,
                           subprograma, fonte)
+  • find_ict_partners — ICTs parceiras candidatas para um edital (Fase C,
+                        sugestão temática via core.ict_match)
 
 Princípios:
   • Stateless — explore é chat público, sem session/RLS/workspace.
@@ -205,4 +207,56 @@ def build_explore_tools(service: KGMatchService) -> list[Tool]:
             lines.append(f"  ... e mais {len(edital_ids) - 15} editais")
         return "\n".join(lines)
 
-    return [list_editais, get_edital, find_analogues, get_graph_neighbors]
+    @tool
+    def find_ict_partners(edital_id: str) -> str:
+        """Sugere ICTs (instituições de C&T) parceiras para um edital, por
+        afinidade temática.
+
+        Use quando o usuário pergunta sobre parceiros/ICTs para um edital, ou
+        quando o edital exige parceria com ICT. As ICTs são candidatas por
+        sobreposição de tema — é uma SUGESTÃO para o usuário avaliar, não uma
+        parceria firmada. Devolve nome, tipo, temas em comum e contato.
+
+        Args:
+            edital_id: identificador do edital (ex.: "finep:782")
+        """
+        from core import ict_match
+
+        try:
+            entry = ict_match.edital_entry(edital_id)
+            partners = ict_match.find_partners(edital_id, k=5)
+        except Exception as e:
+            return f"Erro ao buscar parceiros ICT de {edital_id}: {e}."
+
+        if entry is None:
+            return (
+                f"Edital {edital_id} não encontrado no índice. "
+                "Use list_editais para descobrir IDs válidos."
+            )
+
+        requires = entry.get("requires_ict_partner", False)
+        header = (
+            f"Edital {edital_id} exige parceria com ICT."
+            if requires else
+            f"Edital {edital_id} NÃO aparenta exigir parceria com ICT "
+            "(sugestões abaixo são por afinidade temática, não exigência)."
+        )
+
+        if not partners:
+            return (
+                f"{header}\n"
+                "Nenhuma ICT com afinidade temática encontrada — o edital pode "
+                "não ter tema mapeado, ou não há ICT compatível no grafo."
+            )
+
+        lines = [header, f"ICTs candidatas (até {len(partners)}, por tema em comum):"]
+        for p in partners:
+            contact = p.contact.get("email") or p.contact.get("site") or "(sem contato)"
+            lines.append(
+                f"  {p.name} [{p.kind}] | temas: {', '.join(p.themes_match)} "
+                f"| {contact} | {p.url}"
+            )
+        return "\n".join(lines)
+
+    return [list_editais, get_edital, find_analogues, get_graph_neighbors,
+            find_ict_partners]
