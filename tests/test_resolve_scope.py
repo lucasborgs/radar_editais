@@ -110,6 +110,9 @@ def test_resolve_scope_edital_sem_vault_page():
 
 def test_resolve_scope_free_trigger():
     """Sem trigger algum → todos os editais do índice (strings)."""
+    if not KGMatchService.INDEX_FILE.exists():
+        import pytest
+        pytest.skip("requer knowledge_graph/index.json gerado (ausente em CI limpo)")
     result = KGMatchService().resolve_scope()
     assert len(result) > 0
     assert all(isinstance(eid, str) for eid in result)
