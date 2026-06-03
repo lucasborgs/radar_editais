@@ -294,9 +294,24 @@ abaixo sobre o texto do edital (título + descrição + texto integral dos PDFs/
 "ICT" aparece em boilerplate de quase todo edital FINEP; o que marca é exigir
 ICT como executora/coexecutora ou no arranjo.
 
-Limitação assumida: heurística, não recall perfeito. Falso-positivo (ex.: FAQ
-"a ICT pode ser coexecutora? Não") e falso-negativo (exigência em anexo não
-coletado) existem. Patterns vivem aqui (regra), não no `.py` — tune sem deploy.
+**Semântica (não tratar como ground-truth):** o flag é um **hint de
+proatividade, não um gate**. A tool `find_ict_partners` funciona para qualquer
+edital — o flag só sinaliza ao agente "provavelmente vale sugerir parceiros
+proativamente". Ele nunca bloqueia nada. Por isso os erros são de **baixo custo**:
+falso-negativo → o agente não sugere proativamente, mas a tool segue disponível;
+falso-positivo → um empurrão proativo errado, que é *sugestão*, não compromisso
+(ver guard-rail em [docs/spec_ict_phase_c.md](docs/spec_ict_phase_c.md)).
+
+Vieses/limites assumidos: (1) **FINEP-enviesado** — depende de "ICT/coexecutora/
+arranjo"; para FAPESP é efetivamente sempre `false`. (2) Heurística, sem
+ground-truth — o pattern [1] faz quase todo o trabalho; "falsos-positivos" como a
+FAQ "a ICT pode ser coexecutora? Não" não são confirmáveis sem rótulo (o edital
+pode exigir ICT como *executora*). (3) Exigência só em anexo não coletado →
+falso-negativo estrutural. **Decisão consciente:** não tunar os patterns às cegas
+agora; revisitar só quando o flag virar load-bearing (UI filtrar/ordenar por ele,
+ou seleção de parceiro virar fluxo primário) — aí rotular amostra + medir
+precisão/recall, e considerar classificador LLM. Ver `docs/BACKLOG.md`. Patterns
+vivem aqui (regra), não no `.py` — tune sem deploy.
 
 ```yaml
 ict_requirement_patterns:

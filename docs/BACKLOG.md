@@ -37,17 +37,6 @@
   normalizado). Verificar se a busca é client-side (pode exigir Playwright).
 - **Status:** aberto.
 
-### ICT — tuning do flag `requires_ict_partner`
-- **O quê:** refinar os patterns regex §5.10 conforme o corpus cresce. Recorrente,
-  não tarefa única.
-- **Por que adiado:** heurística atual (10/20 marcados) é aceitável para MVP; tuning
-  pede mais editais e ground-truth.
-- **Onde:** WIKI.md §5.10 (`ict_requirement_patterns`) — patterns no doc, sem deploy.
-- **Ponto de entrada:** (1) rotular amostra (exige ICT? s/n) → medir precisão/recall;
-  (2) falso-positivo conhecido: FAQ "a ICT pode ser coexecutora? Não"; (3) considerar
-  patterns negativos; (4) se empacar, graduar para classificador LLM no build.
-- **Status:** aberto (recorrente).
-
 ### DeepResearch — implementação
 - **O quê:** busca web com fonte, como subagente-como-tool; grounding → working
   memory → gate do usuário → learning na ContentLibrary (nunca no KG).
@@ -69,6 +58,21 @@
   falso-negativo estrutural (limite da heurística, documentado em §5.10).
 
 ---
+
+## Fechado-adiado (revisitar só no gatilho)
+
+### ICT — tuning do flag `requires_ict_partner`
+- **Decisão (2026-06-03):** **não** tunar agora. O flag é *hint de proatividade,
+  não gate* — `find_ict_partners` funciona independente dele, então os erros são
+  de baixo custo. Otimizar uma heurística não-medida e não-crítica é prematuro.
+- **Estado atual:** 10/20 vigentes marcados (todos FINEP; FAPESP sempre `false`).
+  Pattern [1] faz 9/10. "Falsos-positivos" não confirmáveis sem ground-truth.
+- **Gatilho para revisitar:** o flag virar **load-bearing** — UI filtrar/ordenar
+  editais por ele, OU a seleção de parceiro (C.2) virar fluxo primário.
+- **Como revisitar então:** rotular amostra (exige ICT? s/n) → medir precisão/
+  recall → ajustar patterns §5.10 (incl. contexto negativo); se empacar, graduar
+  para classificador LLM no build.
+- **Onde:** WIKI.md §5.10.
 
 ## Concluídos (referência)
 
