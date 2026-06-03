@@ -23,7 +23,7 @@ from collections import defaultdict
 from datetime import date, datetime
 
 from config import BRONZE_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR
-from core import wiki_schema
+from core import kg_store, wiki_schema
 from core.pme_filter import relevance_with_reason
 from domain.vocabulary import canonicalize_themes
 
@@ -566,16 +566,12 @@ def build_indices(chamadas: list[dict], source: str = _DEFAULT_SOURCE) -> tuple[
 # =============================================================================
 
 def save_indices(index_vigentes: dict, index_historico: dict) -> None:
-    KNOWLEDGE_GRAPH_DIR.mkdir(parents=True, exist_ok=True)
-
-    INDEX_FILE.write_text(
-        json.dumps(index_vigentes, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    # kg_store.save grava o arquivo local E, se o Supabase estiver configurado,
+    # faz upsert na tabela kg_artifacts (publica o índice para a produção).
+    kg_store.save("index", index_vigentes)
     print(f"Index vigentes:  {INDEX_FILE}  ({index_vigentes['total_editais']} editais)")
 
-    INDEX_HISTORICO_FILE.write_text(
-        json.dumps(index_historico, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    kg_store.save("index_historico", index_historico)
     print(f"Index histórico: {INDEX_HISTORICO_FILE}  ({index_historico['total_editais']} editais)")
 
 

@@ -29,6 +29,7 @@ import re
 from datetime import datetime, timezone
 
 from config import BRONZE_DIR, KNOWLEDGE_GRAPH_DIR
+from core import kg_store
 
 logger = logging.getLogger(__name__)
 
@@ -285,10 +286,8 @@ def make_ict_index(icts: list[dict]) -> dict:
 
 
 def save(index: dict) -> None:
-    KNOWLEDGE_GRAPH_DIR.mkdir(parents=True, exist_ok=True)
-    ICTS_FILE.write_text(
-        json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    # Grava icts.json local e publica no Postgres (kg_artifacts) se configurado.
+    kg_store.save("icts", index)
 
 
 # =============================================================================

@@ -12,16 +12,12 @@ Uso (peça 3, tool do Explorador):
 """
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass, field
 
-from config import KNOWLEDGE_GRAPH_DIR
+from core import kg_store
 
 logger = logging.getLogger(__name__)
-
-ICTS_FILE = KNOWLEDGE_GRAPH_DIR / "icts.json"
-INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
 
 
 @dataclass
@@ -79,28 +75,9 @@ def _areas_len(icts: list[dict], ict_id: str) -> int:
     return 0
 
 
-# =============================================================================
-# Carregamento (cache por mtime)
-# =============================================================================
-
-_cache: dict[str, dict] = {"icts": {"mtime": 0.0, "data": {}},
-                           "index": {"mtime": 0.0, "data": {}}}
-
-
-def _load(path, key: str) -> dict:
-    if not path.exists():
-        return {}
-    mtime = path.stat().st_mtime
-    slot = _cache[key]
-    if mtime != slot["mtime"]:
-        slot["data"] = json.loads(path.read_text(encoding="utf-8"))
-        slot["mtime"] = mtime
-    return slot["data"]
-
-
 def edital_entry(edital_id: str) -> dict | None:
     """Entry do edital no index.json. None se não existir."""
-    index = _load(INDEX_FILE, "index")
+    index = kg_store.load_index()
     for e in index.get("editais", []):
         if e.get("id") == edital_id:
             return e
@@ -120,5 +97,5 @@ def find_partners(edital_id: str, k: int = 5) -> list[PartnerSuggestion]:
     if themes is None:
         logger.info("find_partners: edital %s não encontrado no índice", edital_id)
         return []
-    icts = _load(ICTS_FILE, "icts").get("icts", [])
+    icts = kg_store.load_icts()
     return rank_partners(themes, icts, k=k)

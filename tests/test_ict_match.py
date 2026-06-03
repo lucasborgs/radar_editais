@@ -58,11 +58,11 @@ def test_k_limits_results():
 def test_find_partners_smoke_real_artifacts():
     """Se icts.json e index.json existem, find_partners não deve quebrar e deve
     devolver só ICTs com tema compartilhado."""
-    if not im.ICTS_FILE.exists() or not im.INDEX_FILE.exists():
-        return
-    index = im._load(im.INDEX_FILE, "index")
+    from core import kg_store
+
+    index = kg_store.load_index()
     editais = index.get("editais", [])
-    if not editais:
+    if not editais or not kg_store.load_icts():
         return
     eid = editais[0]["id"]
     edital_themes = set(editais[0].get("themes", []))

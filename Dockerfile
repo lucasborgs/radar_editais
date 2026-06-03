@@ -14,7 +14,6 @@ COPY config.py ./
 COPY backend/ ./backend/
 COPY core/ ./core/
 COPY domain/ ./domain/
-COPY agents/ ./agents/
 COPY pipeline/ ./pipeline/
 COPY scripts/ ./scripts/
 COPY wikis/ ./wikis/

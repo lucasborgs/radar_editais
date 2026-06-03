@@ -15,7 +15,8 @@ import logging
 import os
 import re
 
-from config import KNOWLEDGE_GRAPH_DIR, OBSIDIAN_VAULT_DIR
+from config import OBSIDIAN_VAULT_DIR
+from core import kg_store
 from core.edital_id import id_to_slug, slug_to_id, wiki_page_path
 from domain.user_profile import CompanyProfile
 
@@ -194,11 +195,8 @@ def _make_client():
 class KGMatchService:
     """Matching de empresa↔editais via LLM sobre o índice FINEP."""
 
-    INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
-
     def __init__(self):
         self._index: dict = {}
-        self._index_mtime: float = 0.0
         self._client = None
         self._model = ""
         self._load_index()
@@ -208,16 +206,7 @@ class KGMatchService:
     # ------------------------------------------------------------------
 
     def _load_index(self) -> None:
-        if not self.INDEX_FILE.exists():
-            logger.warning("index.json não encontrado: %s", self.INDEX_FILE)
-            self._index = {"editais": []}
-            return
-
-        mtime = self.INDEX_FILE.stat().st_mtime
-        if mtime != self._index_mtime:
-            self._index = json.loads(self.INDEX_FILE.read_text(encoding="utf-8"))
-            self._index_mtime = mtime
-            logger.info("Índice carregado: %d editais", len(self._index.get("editais", [])))
+        self._index = kg_store.load_index()
 
     def _get_index_for_prompt(self) -> str:
         """Formata o índice de forma compacta para o prompt (~150 chars por edital)."""
