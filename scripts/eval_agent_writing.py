@@ -185,6 +185,8 @@ def main() -> int:
     parser.add_argument("--sleep", type=float, default=0.0,
                         help="Pausa (s) entre casos — drena a janela de TPM da "
                              "OpenAI em tiers de rate limit baixo")
+    parser.add_argument("--limit", type=int, default=0,
+                        help="Roda apenas os N primeiros casos (0 = todos)")
     parser.add_argument("--report", help="Re-imprime um resultado salvo (sem rodar)")
     args = parser.parse_args()
 
@@ -205,8 +207,9 @@ def main() -> int:
 
     import time as _time
 
+    cases = data["cases"][: args.limit] if args.limit > 0 else data["cases"]
     results: list[dict] = []
-    for i, case in enumerate(data["cases"]):
+    for i, case in enumerate(cases):
         profile_raw = data["profiles"].get(case["profile"])
         if profile_raw is None:
             logger.warning("caso %s referencia perfil inexistente '%s' — pulando",
