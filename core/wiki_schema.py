@@ -22,6 +22,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 _WIKI_MD = _ROOT / "WIKI.md"
 _WIKIS_DIR = _ROOT / "wikis"
 _PME_FILTER_MD = _WIKIS_DIR / "_pme_filter.md"
+_DISCOVERY_MD = _WIKIS_DIR / "_discovery.md"
 
 _YAML_BLOCK_RE = re.compile(r"```yaml\n(.*?)```", re.DOTALL)
 
@@ -292,6 +293,17 @@ def pme_filter_rules() -> dict:
     """
     parsed = _parse_md(_PME_FILTER_MD)
     return parsed.get("target_relevance_rules", {})
+
+
+# =============================================================================
+# DESCOBERTA DE OPORTUNIDADES (wikis/_discovery.md, item 2.2)
+# =============================================================================
+
+@lru_cache(maxsize=1)
+def discovery_config() -> dict:
+    """Config do agente de descoberta — queries de busca + caps. Doc
+    autoritativo: `wikis/_discovery.md`, bloco `discovery`."""
+    return _parse_md(_DISCOVERY_MD).get("discovery", {})
 
 
 # =============================================================================

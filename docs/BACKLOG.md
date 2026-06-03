@@ -37,17 +37,20 @@
   normalizado). Verificar se a busca é client-side (pode exigir Playwright).
 - **Status:** aberto.
 
-### Descoberta de Oportunidades (item 2.2) — implementação
-- **O quê:** descoberta web diária de editais/fomento espalhados pelo Brasil →
-  triagem agêntica → staging → extração humana-no-loop → KG.
-- **Por que adiado:** specado, ainda não implementado. Maior valor e maior risco.
+### Descoberta de Oportunidades (item 2.2) — Fases B e C (Fase A feita)
+- **Feito (Fase A):** ingestão `verificacao` (§5.11) + `_build_discovery_editais`
+  no build (descoberta → KG provisório, via pme_filter); engine
+  `core/opportunity_discovery.py` (web_search → triagem → extração → bronze
+  discovery_raw/ + ledger de dedup file-based). Vocab em `wikis/_discovery.md`.
+  **Pré-requisito de uso real:** `TAVILY_API_KEY` + chave LLM; rodar o engine e
+  depois `build_knowledge_graph`.
+- **Fase B (aberto):** verificação humana não-bloqueante — endpoint verificar/
+  rejeitar, match/escrita distinguindo provisorio×verificado (rótulo/bucket — item
+  3 das decisões: bucket no MVP), aviso de fonte não-verificada na escrita.
+- **Fase C (aberto):** task procrastinate `discover_opportunities` (encadeia build)
+  + cron diário; graduação de fonte recorrente para extractor próprio (§12.4).
+  Ledger file-based pode graduar para Supabase se virar multi-worker.
 - **Onde:** [spec_descoberta_oportunidades.md](spec_descoberta_oportunidades.md).
-- **Ponto de entrada:** Fase A — `core/opportunity_discovery.py` + migration
-  `016_discovery_ledger.sql` + task procrastinate. Reusa `core/web_search.py`.
-- **Modelo:** descoberta entra no KG já, como `verificacao=provisorio` (matchável/
-  writable, rotulada). Verificação humana é não-bloqueante (provisorio→verificado
-  ou rejeita). KG honesto sobre confiança, sem gate que estrangule o fluxo.
-- **Status:** aberto (spec pronta).
 
 ### DeepResearch — Fases B e C (Fase A feita)
 - **Feito (Fase A):** `core/web_search.py` (port Tavily REST), `core/deep_research.py`
