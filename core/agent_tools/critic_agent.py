@@ -46,6 +46,12 @@ Bloqueie (approved=false) SOMENTE quando o rascunho AFIRMAR:
 
 Para (b), só conta CONTRADIÇÃO factual entre o que o rascunho afirma e o que outra seção
 afirma — não a mera ausência de um tópico em uma das seções. Na dúvida, aprove.
+
+ATENÇÃO AOS ANÁLOGOS: os trechos podem incluir referências marcadas "Análogo <id>".
+Esses são de OUTROS editais (referência de redação), NÃO do edital sob revisão. NUNCA
+bloqueie por divergência entre o rascunho e um trecho "Análogo" — em especial, não trate
+o TEMA/escopo de um análogo como se fosse o do edital desta proposta. Só os trechos SEM
+o rótulo "Análogo" (o edital primário) fundamentam um bloqueio contra o edital.
 Sempre responda com JSON válido."""
 
 _CRITIC_USER = """{temporal_block}TRECHOS RELEVANTES DO EDITAL:
@@ -60,9 +66,10 @@ RASCUNHO:
 
 Confira se o RASCUNHO afirma algo FALSO, usando SOMENTE o edital, o contexto temporal
 e as outras seções acima:
-1. Alguma afirmação contradiz o edital (prazo, valor, TRL, elegibilidade, mecanismo)?
-   Em especial, alguma data/prazo afirmado no rascunho DIVERGE do deadline real do
-   contexto temporal acima?
+1. Alguma afirmação contradiz o edital PRIMÁRIO (trechos SEM o rótulo "Análogo")?
+   Considere prazo, valor, TRL, elegibilidade, mecanismo. Em especial, alguma data/prazo
+   afirmado no rascunho DIVERGE do deadline real do contexto temporal acima? NÃO conte
+   divergência contra trechos "Análogo" (são de outros editais).
 2. Alguma afirmação contradiz uma OUTRA seção já redigida acima (dados, números, escopo,
    equipe, orçamento, objetivo divergentes)?
 3. Há inconsistência factual interna que torne a proposta incorreta?

@@ -1,5 +1,5 @@
 {
-  "_comment": "Casos-semente do eval de escrita (Front 1.5). Perfil iFlorestal inline. Os section titles são VERBATIM do proposal_sections de cada edital (senão save_draft rejeita o título). Editais escolhidos têm chunks indexados e fit com o perfil (agro/bioeconomia/sustentabilidade). Seções de justificativa/metodologia/descrição maximizam afirmações verificáveis sobre o edital — bom para medir grounding.",
+  "_comment": "Casos-semente do eval de escrita (Front 1.5). Perfil iFlorestal inline. Os section titles são VERBATIM do proposal_sections de cada edital (senão save_draft rejeita o título). Editais escolhidos são editais de PROJETO com chunks técnicos e fit com o perfil (agro/bioeconomia/sustentabilidade); seções de justificativa/metodologia/descrição maximizam afirmações verificáveis — bom para medir grounding. NOTA: finep:612 foi removido daqui — é aviso de seleção de investimento (conteúdo administrativo), não edital técnico, então claims de projeto não têm como ancorar nele e o grounding fica 0% por natureza da fonte (permanece válido como fixture de matching em eval_matching.json).",
   "profiles": {
     "iflorestal": {
       "nome": "iFlorestal Tecnologia",
@@ -16,24 +16,6 @@
     }
   },
   "cases": [
-    {
-      "id": "iflorestal_finep612_descricao",
-      "profile": "iflorestal", "edital_id": "finep:612",
-      "section": "2. Descrição do projeto",
-      "instruction": "Redija a descrição do projeto alinhando nossa solução de monitoramento florestal ao foco do edital. Salve quando estiver pronto."
-    },
-    {
-      "id": "iflorestal_finep612_justificativa",
-      "profile": "iflorestal", "edital_id": "finep:612",
-      "section": "3. Justificativa",
-      "instruction": "Escreva a justificativa, citando os requisitos e o foco do edital onde fizer sentido. Salve quando concluir."
-    },
-    {
-      "id": "iflorestal_finep612_metodologia",
-      "profile": "iflorestal", "edital_id": "finep:612",
-      "section": "5. Metodologia",
-      "instruction": "Descreva a metodologia ancorando nas exigências técnicas do edital. Salve quando fechar."
-    },
     {
       "id": "iflorestal_finep769_objetivo",
       "profile": "iflorestal", "edital_id": "finep:769",
