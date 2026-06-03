@@ -342,6 +342,10 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
             "Continue redigindo com [COMPLETAR: ...] como placeholder se for útil."
         )
 
+    # DeepResearch (Fase A): tool stateless de busca web. Subagente-como-tool —
+    # devolve fato COM fonte; NÃO persiste (gate humano → library é a Fase B).
+    from core.agent_tools.research_tools import build_research_tools
+
     return [
         plan_writing_session,
         search_edital,
@@ -351,4 +355,5 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
         save_draft,
         request_user_info,
         recall_company_learnings,
+        *build_research_tools(),
     ]
