@@ -21,7 +21,8 @@ import os
 import re
 from datetime import datetime, timezone
 
-from config import BRONZE_DIR, KNOWLEDGE_GRAPH_DIR
+from config import BRONZE_DIR
+from core import kg_store
 from core import web_search as websearch
 from core import wiki_schema as ws
 
@@ -29,7 +30,6 @@ logger = logging.getLogger(__name__)
 
 DISCOVERY_BRONZE_DIR = BRONZE_DIR / "discovery_raw"
 _LEDGER = DISCOVERY_BRONZE_DIR / ".ledger.json"
-_INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
 
 
 # =============================================================================
@@ -168,12 +168,8 @@ def _save_ledger(urls: set[str]) -> None:
 def _known_urls() -> set[str]:
     """URLs já vistas: ledger ∪ links de editais já no KG (não re-descobrir)."""
     known = _load_ledger()
-    if _INDEX_FILE.exists():
-        try:
-            idx = json.loads(_INDEX_FILE.read_text(encoding="utf-8"))
-            known |= {_norm_url(e.get("link", "")) for e in idx.get("editais", [])}
-        except Exception:
-            pass
+    idx = kg_store.load_index()
+    known |= {_norm_url(e.get("link", "")) for e in idx.get("editais", [])}
     return known
 
 

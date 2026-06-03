@@ -28,4 +28,7 @@ primary_region = "gru"
 [env]
   LLM_BACKEND = "openai"
   OPENAI_MODEL = "gpt-4o-mini"
+  # Lê os blobs do knowledge graph da tabela kg_artifacts (Supabase), não de
+  # arquivos locais — que não existem na imagem. Ver core/kg_store.py + migração 016.
+  KG_STORE_BACKEND = "postgres"
   # Secrets set via: fly secrets set OPENAI_API_KEY=... SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_KEY=... SUPABASE_JWT_SECRET=...

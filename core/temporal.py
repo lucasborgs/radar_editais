@@ -24,32 +24,15 @@ import logging
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from config import KNOWLEDGE_GRAPH_DIR
+from core import kg_store
 from core.edital_id import wiki_page_path
 from core.wiki_schema import parse_deadline
 
 logger = logging.getLogger(__name__)
 
-_INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
-
-# Cache leve: (mtime, index_dict). Reconstruído quando o arquivo muda.
-_index_cache: tuple[float, dict] | None = None
-
 
 def _load_index() -> dict:
-    global _index_cache
-    if not _INDEX_FILE.exists():
-        return {}
-    try:
-        mtime = _INDEX_FILE.stat().st_mtime
-        if _index_cache is not None and _index_cache[0] == mtime:
-            return _index_cache[1]
-        data = json.loads(_INDEX_FILE.read_text(encoding="utf-8"))
-        _index_cache = (mtime, data)
-        return data
-    except Exception as e:
-        logger.warning("temporal: falha ao ler index.json: %s", e)
-        return {}
+    return kg_store.load_index()
 
 
 def _index_entry(edital_id: str) -> dict | None:

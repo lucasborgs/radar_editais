@@ -20,7 +20,7 @@ import time
 from dataclasses import dataclass
 from datetime import date
 
-from config import KNOWLEDGE_GRAPH_DIR
+from core import kg_store
 from core.edital_id import iter_wiki_pages, wiki_page_path
 from core.wiki_schema import parse_deadline
 from domain.user_profile import CompanyProfile
@@ -484,21 +484,12 @@ def _call_stage2(eligible: list[Stage1Result], profile: CompanyProfile) -> dict[
 class HybridMatchService:
     """Matching híbrido: Stage 1 determinístico + Stage 2 semântico."""
 
-    INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
-
     def __init__(self):
         self._index: dict = {}
-        self._index_mtime: float = 0.0
         self._load_index()
 
     def _load_index(self) -> None:
-        if not self.INDEX_FILE.exists():
-            self._index = {"editais": []}
-            return
-        mtime = self.INDEX_FILE.stat().st_mtime
-        if mtime != self._index_mtime:
-            self._index = json.loads(self.INDEX_FILE.read_text(encoding="utf-8"))
-            self._index_mtime = mtime
+        self._index = kg_store.load_index()
 
     def _load_wiki_page(self, edital_id: str) -> dict | None:
         wiki_file = wiki_page_path(edital_id)
