@@ -22,11 +22,10 @@ import unicodedata
 from collections import defaultdict
 from datetime import date, datetime
 
-from domain.vocabulary import canonicalize_themes
-
 from config import BRONZE_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR
 from core import wiki_schema
 from core.pme_filter import relevance_with_reason
+from domain.vocabulary import canonicalize_themes
 
 # Schema autoritativo em WIKI.md (ver core.wiki_schema).
 # Pós-Épico C: source aceito como parâmetro pelas funções públicas. Default
