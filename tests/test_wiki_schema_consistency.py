@@ -22,6 +22,7 @@ from core import wiki_schema as ws
 
 WIKI_DIR   = ROOT / "knowledge_graph" / "wiki"
 INDEX_FILE = ROOT / "knowledge_graph" / "index.json"
+ICTS_FILE  = ROOT / "knowledge_graph" / "icts.json"
 
 
 def _load_wiki_pages() -> list[dict]:
@@ -114,6 +115,92 @@ def test_index_has_ano_dimension():
         assert isinstance(pub_year, int) or pub_year == unknown, \
             f"Entry {entry.get('id')}: pub_year={pub_year!r} inválido (esperado int ou {unknown!r})"
     assert "ano_index" in index, "Índice sem ano_index (§6.1)"
+
+
+def test_index_entries_have_ict_flag():
+    """Toda entry do índice tem requires_ict_partner (bool) — §5.10."""
+    if not INDEX_FILE.exists():
+        return
+    index = json.loads(INDEX_FILE.read_text(encoding="utf-8"))
+    for entry in index.get("editais", []):
+        v = entry.get("requires_ict_partner")
+        assert isinstance(v, bool), \
+            f"Entry {entry.get('id')}: requires_ict_partner={v!r} (esperado bool)"
+
+
+# -----------------------------------------------------------------------------
+# NÓ ICT (WIKI.md §6.1.2 / ict_schema)
+# -----------------------------------------------------------------------------
+
+def _load_icts() -> dict:
+    return json.loads(ICTS_FILE.read_text(encoding="utf-8"))
+
+
+def test_ict_nodes_have_required_fields():
+    """Todo nó ict tem os campos declarados em ict_schema (node_fields/required)."""
+    if not ICTS_FILE.exists():
+        return  # sem artefato = sem teste (não é erro)
+    sch = ws.ict_schema()
+    node_fields = set(sch["node_fields"])
+    required = set(sch["required_fields"])
+    for n in _load_icts().get("icts", []):
+        assert required <= set(n.keys()), \
+            f"ICT {n.get('id')} faltam campos obrigatórios: {required - set(n.keys())}"
+        unexpected = set(n.keys()) - node_fields
+        assert not unexpected, f"ICT {n.get('id')} tem campos fora do schema: {unexpected}"
+
+
+def test_ict_kind_and_source_in_vocab():
+    """kind e source de cada ICT pertencem aos enums declarados em ict_schema."""
+    if not ICTS_FILE.exists():
+        return
+    sch = ws.ict_schema()
+    kinds, sources = set(sch["kinds"]), set(sch["sources"])
+    for n in _load_icts().get("icts", []):
+        assert n["kind"] in kinds, f"ICT {n['id']}: kind={n['kind']!r} fora de {kinds}"
+        assert n["source"] in sources, f"ICT {n['id']}: source={n['source']!r} fora de {sources}"
+
+
+def test_ict_id_format():
+    """id segue '<source>:<slug>' (§6.1.2 id_format)."""
+    if not ICTS_FILE.exists():
+        return
+    for n in _load_icts().get("icts", []):
+        assert ":" in n["id"], f"ICT id sem prefixo de fonte: {n['id']!r}"
+        assert n["id"].startswith(n["source"] + ":"), \
+            f"ICT {n['id']}: prefixo não bate com source={n['source']!r}"
+
+
+def test_ict_themes_in_canonical_vocab():
+    """INVARIANTE DA PONTE: todo tema de ICT está no vocab canônico §5.9 (a mesma
+    autoridade que editais usam). Senão edital.themes ∩ ict.themes nunca casa.
+    Temas sem correspondência ficam em themes_proposed, não em themes."""
+    if not ICTS_FILE.exists():
+        return
+    vocab = set(ws.tema_vocab())
+    if not vocab:
+        return  # vocab não declarado, nada a verificar
+    for n in _load_icts().get("icts", []):
+        drift = set(n["themes"]) - vocab
+        assert not drift, \
+            f"ICT {n['id']}: themes fora do vocab canônico §5.9 (quebra a ponte): {drift}"
+        # themes e themes_proposed são disjuntos por construção (proposto = não-mapeado)
+        overlap = set(n["themes"]) & set(n.get("themes_proposed", []))
+        assert not overlap, f"ICT {n['id']}: tema em themes e themes_proposed: {overlap}"
+
+
+def test_edital_themes_subset_of_canonical_vocab():
+    """Todo tema usado por editais deve estar no vocab canônico §5.9. Tema novo no
+    corpus FINEP/FAPESP sem entrada no vocab quebra aqui → adicione ao §5.9."""
+    if not INDEX_FILE.exists():
+        return
+    vocab = set(ws.tema_vocab())
+    if not vocab:
+        return
+    index = json.loads(INDEX_FILE.read_text(encoding="utf-8"))
+    edital_themes = set(index.get("themes_index", {}).keys())
+    drift = edital_themes - vocab
+    assert not drift, f"Temas de edital fora do vocab canônico §5.9: {drift}"
 
 
 # -----------------------------------------------------------------------------

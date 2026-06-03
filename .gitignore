@@ -30,6 +30,8 @@ knowledge_graph/index_historico.json
 knowledge_graph/health_check_log.jsonl
 knowledge_graph/.filter_rejections.jsonl
 knowledge_graph/**/.etl_process_cache.json
+knowledge_graph/icts.json
+knowledge_graph/.ict_theme_map_cache.json
 
 # OS
 .DS_Store

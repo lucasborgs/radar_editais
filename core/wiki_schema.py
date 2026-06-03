@@ -225,6 +225,23 @@ def graph_overrides(source: str) -> dict:
     return load(source).get("graph_overrides", {})
 
 
+def ict_schema() -> dict:
+    """Schema do nó `ict` e do artefato icts.json (WIKI.md §6.1.2)."""
+    return load().get("ict_schema", {})
+
+
+def tema_vocab() -> list[str]:
+    """Vocabulário canônico de temas-macro (WIKI.md §5.9) — alvo único de
+    editais e ICTs. Lista vazia se não declarado (consumidores degradam)."""
+    return load().get("tema_vocab", [])
+
+
+def ict_requirement_patterns() -> list[str]:
+    """Regex (strings) que detectam exigência de parceria com ICT no texto do
+    edital (WIKI.md §5.10). Heurística do campo `requires_ict_partner`."""
+    return load().get("ict_requirement_patterns", [])
+
+
 def slugify(text: str) -> str:
     """Conforme §6.3 WIKI.md."""
     rules = load().get("slugify_rules", {})
