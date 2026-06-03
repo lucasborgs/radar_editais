@@ -242,6 +242,12 @@ def ict_requirement_patterns() -> list[str]:
     return load().get("ict_requirement_patterns", [])
 
 
+def verificacao_values() -> list[str]:
+    """Valores válidos do campo `verificacao` do edital (WIKI.md §5.11).
+    Default do produtor: 'verificado' (fontes do SCRAPER_REGISTRY)."""
+    return load().get("verificacao_values", ["verificado", "provisorio"])
+
+
 def slugify(text: str) -> str:
     """Conforme §6.3 WIKI.md."""
     rules = load().get("slugify_rules", {})

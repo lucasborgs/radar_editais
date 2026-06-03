@@ -325,6 +325,25 @@ ict_requirement_patterns:
 `requires_ict_partner` é **propriedade do edital**, não nó (§6.1.1). Presente em
 toda entry do índice (default `false`).
 
+### 5.11 Confiança da fonte (`verificacao`)
+
+Campo do edital indicando o nível de confiança da origem (item 2.2 — descoberta
+de oportunidades, ver [docs/spec_descoberta_oportunidades.md](docs/spec_descoberta_oportunidades.md)):
+
+```yaml
+verificacao_values: [verificado, provisorio]
+```
+
+- **`verificado`** — fonte confiável: FINEP, FAPESP e fontes graduadas a extractor
+  próprio (§12.4). **Default** para tudo que vem do `SCRAPER_REGISTRY`.
+- **`provisorio`** — descoberta da web aberta, extraída por LLM e ainda não
+  verificada por humano. Entra no KG (matchável/writable) mas **rotulada**; a
+  verificação humana sobe para `verificado` ou remove (não-bloqueante).
+
+Propriedade do edital, não nó (§6.1.1). Presente em toda entry do índice (default
+`verificado`). Match e escrita devem distinguir provisório de verificado (rótulo/
+bucket) — ver spec 2.2.
+
 ---
 
 ## 6. Schema do grafo
