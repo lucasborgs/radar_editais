@@ -45,6 +45,7 @@ _HOSTILE_CARD = {
 def test_no_eligible_marks_results_ineligible():
     svc = _svc([_HOSTILE_CARD])
     with patch.object(svc, "_load_wiki_page", lambda eid: None), \
+         patch.object(svc, "_load_index", lambda: None), \
          patch("core.hybrid_match_service._call_stage2", lambda eligible, profile: {}):
         results = svc.match(_ineligible_profile(), top_k=5)
 
@@ -66,6 +67,7 @@ def test_eligible_results_marked_true():
     }
     svc = _svc([friendly])
     with patch.object(svc, "_load_wiki_page", lambda eid: None), \
+         patch.object(svc, "_load_index", lambda: None), \
          patch("core.hybrid_match_service._call_stage2",
                lambda eligible, profile: {"finep:OK": {"score_tematico": 8.0}}):
         results = svc.match(_ineligible_profile(), top_k=5)
