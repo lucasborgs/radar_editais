@@ -1,105 +1,118 @@
 # Spec — Descoberta de Oportunidades de Inovação (item 2.2)
 
-> **Objetivo:** capturar editais/chamadas/desafios de fomento que surgem espalhados pelo Brasil (FAPs estaduais, ministérios, SEBRAE, fundações, programas pontuais) — fontes desconhecidas e de formato arbitrário — via descoberta web diária, e canalizá-los para o KG **sob revisão humana**.
+> **Objetivo:** capturar editais/chamadas/desafios de fomento que surgem espalhados pelo Brasil (FAPs estaduais, ministérios, SEBRAE, fundações, programas pontuais) — fontes desconhecidas e de formato arbitrário — via descoberta web diária, e integrá-los ao KG para que entrem nos fluxos de match e escrita.
 > **Base:** branch a criar a partir de `ict-mapping`/`main`. **Data:** 2026-06-03. Reusa `core/web_search.py` (DeepResearch Fase A).
 > **Pré-leitura:** [spec_deepresearch.md](spec_deepresearch.md) (infra de busca), WIKI.md §10 (adicionar fonte), §12.3/§12.4 (Documento Canônico / Source Adapter), §5.9 (tema vocab), §5.10.
 
-## Princípio que comanda tudo: não automatizar o KG
+## Princípio: integrar o KG, com dimensão de confiança (não com gate bloqueante)
 
-O KG é a **memória semântica global compartilhada** — fonte da verdade do produto.
-Deixar um agente escrever nele a partir da web aberta viola "humans decide" e
-arrisca poluir a base para todos os usuários. Logo: **descoberta e triagem podem
-ser agênticas; a entrada no KG é humana-no-loop.** Nada entra no KG sem aprovação.
+Match (KGMatchService/HybridMatch leem `index.json`) e escrita (WritingSession
+ancora em `edital_chunks` de um edital do índice) **só consomem o KG**. Logo,
+oportunidade que não chega ao KG é invisível ao produto — **a descoberta tem que
+integrar o KG**. Um gate humano *antes* do KG viraria gargalo no volume diário e
+deixaria descobertas inúteis na fila.
+
+Resolução: a descoberta entra no KG **já**, marcada como `verificacao=provisorio`
++ proveniência (URL). Fica matchável/writable na hora, **rotulada como não
+verificada**. A revisão humana é camada **não-bloqueante**: sobe a confiança
+(`provisorio → verificado`) ou rejeita/remove. "Humans decide" continua — mas como
+camada de confiança, não como porta que estrangula o fluxo. O KG é **honesto**
+sobre o que é verificado; a poluição é mitigada por status + proveniência +
+grounding, não por bloqueio.
 
 ## A premissa que NÃO é verdade (e o desenho assume isso)
 
 Na discussão inicial assumiu-se "a camada de extração é agnóstica". **Não é.** Os
 extractors atuais são por-fonte (FINEP Liferay API, FAPESP HTML). Extrair edital
-estruturado de página arbitrária e desconhecida é problema de LLM de verdade, com
-precisão variável. O desenho trata isso explicitamente: extração é **assistida +
-revisada**, e fontes que se provam recorrentes **graduam** para extractor
-determinístico (volta ao modelo do `SCRAPER_REGISTRY` / Source Adapter §12.4).
+estruturado de página arbitrária é problema de LLM, com precisão variável — por
+isso o resultado entra **provisório** (não verdade firmada), e fontes recorrentes
+**graduam** para extractor determinístico (volta ao modelo do `SCRAPER_REGISTRY`
+/ Source Adapter §12.4), entrando aí como `verificado`.
 
 ## Decisões travadas
 
 | # | Tópico | Decisão |
 |---|--------|---------|
-| 1 | Faseamento | **A:** descoberta+triagem (sem KG) → **B:** extração humana-no-loop → **C:** recorrência+graduação |
-| 2 | Staging | Candidatos vivem numa tabela **`discovered_opportunities`** (Supabase), **fora do KG** |
-| 3 | Reuso | `web_search` (Tavily) + `run_agent` para descoberta; ingestão final via **bronze → build_knowledge_graph** (reaproveita pme_filter, §5.9, edital_id) |
-| 4 | Gate do KG | Nada entra no KG sem **aprovação humana** de candidato extraído |
-| 5 | Keywords/alvos | Vocabulário de busca no **doc** (tunável sem deploy), não no `.py` |
+| 1 | Entrada no KG | **Provisório no KG, não-bloqueante** — `verificacao` ∈ {provisorio, verificado} + proveniência |
+| 2 | Faseamento | **A:** descoberta+extração → KG provisório → **B:** verificação humana + exposição diferenciada → **C:** cron + graduação |
+| 3 | Reuso | `web_search` (Tavily) + `run_agent`; ingestão via **bronze → build_knowledge_graph** (reaproveita pme_filter, §5.9, §5.10, edital_id) |
+| 4 | Confiança | FINEP/FAPESP e fontes graduadas = `verificado`; web aberta = `provisorio` |
+| 5 | Keywords/alvos | Vocabulário de busca no **doc** (tunável sem deploy) |
 
 ---
 
-## Fase A — Descoberta + triagem (agêntica, zero escrita no KG)
+## Fase A — Descoberta + extração → KG provisório (agêntica)
 
 ### Problema
-Não sabemos quais fontes existem nem quando publicam. Busca manual diária é
-inviável.
+Não sabemos quais fontes existem nem quando publicam; e o que for achado precisa
+chegar ao KG para servir a match/escrita.
 
 ### Design
 Task diária (procrastinate, ao lado de `run_daily_etl` em [core/tasks.py](../core/tasks.py)):
-1. **Descoberta:** para cada query do vocabulário (§novo no doc — ex.: "edital
+1. **Descoberta:** para cada query do vocabulário (novo bloco no doc — ex.: "edital
    inovação 2026 FAP", "chamada fomento PME", "desafio de inovação aberto"),
-   chama `web_search` (Tavily). Acumula candidatos (URL, título, snippet).
-2. **Triagem (agente):** para cada candidato, um `run_agent`/1-shot classifica:
-   *é uma oportunidade de fomento real e vigente?* (s/n) + extrai sinais leves
-   (agência/fonte aparente, prazo se visível). Reusa `web_search`/`fetch_url`.
-3. **Dedup:** contra o KG (`index.json` — URL/título) e contra
-   `discovered_opportunities` já vistos.
-4. **Persistência em staging:** candidatos aprovados na triagem entram em
-   `discovered_opportunities` com `status='pending'`. **Não tocam o KG.**
+   `web_search` (Tavily) → candidatos (URL, título, snippet).
+2. **Triagem (agente):** classifica *é oportunidade de fomento real e vigente?*
+   (s/n) + agência aparente. Reusa `web_search`/`fetch_url`.
+3. **Dedup:** contra o KG (`index.json` por URL/título) e um **ledger de descoberta**
+   (URLs já ingeridas) — para o crawl diário não re-extrair o mesmo (extração é cara).
+4. **Extração assistida:** `fetch_url` + LLM extrai os campos do schema comum.
+5. **Ingestão provisória:** grava no **bronze** como fonte de descoberta
+   (`source` = agência detectada, ou `web`), com `verificacao=provisorio` +
+   `source_url`. `build_knowledge_graph` o processa como qualquer fonte — passa por
+   **pme_filter**, canonicalização de tema (§5.9), `requires_ict_partner` (§5.10),
+   `edital_id` prefixado. **Resultado: edital provisório vivo no KG.**
 
-Vocabulário de busca: bloco no doc (`wikis/_discovery.md` ou WIKI.md §) com
-queries + (opcional) lista de domínios-alvo (FAPs, ministérios). Tunável.
+### Schema (WIKI.md)
+- Novo campo do edital `verificacao` ∈ {`provisorio`, `verificado`} (§5.11 novo).
+  Default `verificado` para FINEP/FAPESP (fontes confiáveis); `provisorio` para
+  descobertas. Propriedade/tag, não nó (§6.1.1). Index-derived (não nos campos
+  herdados das wiki pages — evita regerar wiki pages).
+- Proveniência: reusa `link` do edital (a URL da fonte).
 
 ### Arquivos
-`supabase/migrations/016_discovered_opportunities.sql` (tabela: id, url, title,
-snippet, detected_source, status, dedup_key, first_seen_at, raw payload),
-`core/opportunity_discovery.py` (descoberta+triagem), `core/tasks.py` (task
-`discover_opportunities`), doc do vocabulário, `backend/api.py` (GET fila).
+`supabase/migrations/016_discovery_ledger.sql` (ledger de dedup: url, dedup_key,
+first_seen_at, ingested_edital_id), `core/opportunity_discovery.py` (descoberta +
+triagem + extração), `core/tasks.py` (task `discover_opportunities`), doc do
+vocabulário + WIKI.md §5.11, `pipeline/build_knowledge_graph.py` (carregar
+`verificacao` do bronze), `wikis/web.md` (bronze_mapping da fonte genérica).
 
 ### Critérios de aceitação
-- Task roda, busca, triа, deduplica e grava candidatos em staging.
-- **Nenhuma escrita no KG/index.json** nesta fase (teste por ausência).
-- Dedup: candidato já no KG ou já visto não duplica.
-- Vocabulário de queries vem do doc.
+- Task descobre → tria → extrai → ingere editais `provisorio` no `index.json`.
+- Editais FINEP/FAPESP permanecem `verificado` (default não quebra o existente).
+- Dedup: URL já ingerida não re-extrai nem duplica.
+- Provisório passa no `test_wiki_schema_consistency` (campo válido).
 
 ---
 
-## Fase B — Extração humana-no-loop → KG
+## Fase B — Verificação humana (não-bloqueante) + exposição diferenciada
 
 ### Problema
-Candidato confirmado precisa virar edital estruturado no KG — mas extração de
-página arbitrária é imperfeita e o KG não aceita lixo.
+Provisório é útil mas não confiável; o produto precisa ser honesto sobre isso e
+dar ao humano o controle de confiança.
 
 ### Design
-1. **Extração assistida:** para um candidato `pending`, `fetch_url` + LLM extrai
-   os campos do schema comum (title, deadline, themes→§5.9, publico, etc.). Saída
-   vai para `status='extracted'` com os campos propostos — **não** para o KG.
-2. **Revisão humana:** UI lista candidatos extraídos; o humano corrige/aprova ou
-   rejeita. Aprovar = **ação de decisão** (humans decide).
-3. **Ingestão:** ao aprovar, o edital entra no **bronze** como uma fonte de
-   descoberta (`source` = agência detectada, ou genérico `web`), com `edital_id`
-   prefixado ([core/edital_id.py](../core/edital_id.py)). `build_knowledge_graph`
-   o processa como qualquer outro — passa por **pme_filter**, canonicalização de
-   tema (§5.9) e ganha `requires_ict_partner` (§5.10) de graça.
-
-Isso é o ponto-chave: a entrada no KG **reusa todo o pipeline existente**; a
-descoberta só alimenta o bronze, com um humano no meio.
+- **Match:** editais `provisorio` aparecem **rotulados** ("descoberta não
+  verificada — confira a fonte"), possivelmente em balde separado ou ranqueados
+  abaixo dos verificados.
+- **Escrita:** writable, mas o agente/UI avisa que a fonte é não-verificada; o
+  grounding anti-fabricação ([spec_robustez](spec_robustez_match_escrita.md))
+  continua valendo. **Caveat:** provisório extraído só de snippet tem texto pobre
+  → grounding fraco; quando possível, puxar o documento real do edital para os
+  `edital_chunks` (chunk_edital), senão a escrita fica rasa.
+- **Verificação:** UI lista provisórios; humano **verifica** (`→ verificado`) ou
+  **rejeita** (remove do bronze/KG). Não-bloqueante: o provisório já estava vivo.
 
 ### Arquivos
-`core/opportunity_extraction.py` (LLM → campos), `core/tasks.py` (task
-`extract_opportunity`), `backend/api.py` (POST aprovar/rejeitar → bronze),
-frontend (tela de revisão), possível `wikis/web.md` (bronze_mapping da fonte
-genérica).
+`backend/api.py` (GET provisórios, POST verificar/rejeitar), `core/kg_match_service.py`
++ `core/hybrid_match_service.py` (expor/ranquear por `verificacao`),
+`core/writing_session.py` (aviso de fonte não-verificada), frontend (rótulo + tela
+de verificação).
 
 ### Critérios de aceitação
-- Candidato aprovado vira entry no `index.json` via bronze→build (não por escrita
-  direta).
-- Rejeição não deixa resíduo no KG.
-- Edital ingerido respeita schema (passa no `test_wiki_schema_consistency`).
+- Match distingue provisório de verificado (rótulo/bucket).
+- Verificar muda `verificacao` sem re-ingestão; rejeitar remove do KG.
+- Escrita sobre provisório emite aviso; grounding inalterado.
 
 ---
 
@@ -107,45 +120,46 @@ genérica).
 
 ### Design
 - **Recorrência:** agendar `discover_opportunities` diária (cron procrastinate,
-  como `run_daily_etl`).
-- **Graduação:** fonte que aparece com regularidade e formato estável (ex.: uma
-  FAP estadual específica) ganha **extractor determinístico** dedicado e entra no
-  `SCRAPER_REGISTRY` / Source Adapter (§12.4) — sai do funil agêntico, ruidoso e
-  caro, para o pipeline confiável. O agente de descoberta fica para a cauda longa.
+  como `run_daily_etl`); idempotente via ledger de dedup.
+- **Graduação:** fonte recorrente de formato estável ganha **extractor
+  determinístico** dedicado, entra no `SCRAPER_REGISTRY`/Source Adapter (§12.4) e
+  passa a ingerir como **`verificado`** — sai do funil agêntico (ruidoso/caro)
+  para o pipeline confiável. O agente de descoberta fica para a cauda longa.
 
 ### Critérios de aceitação
-- Crawl diário agendado, idempotente (dedup robusto entre execuções).
-- Documentado o processo de graduar uma fonte recorrente para extractor próprio.
+- Crawl diário agendado e idempotente.
+- Processo de graduar fonte recorrente → extractor próprio documentado.
 
 ---
 
 ## Decisões a confirmar (antes de implementar)
 
-- **Staging: tabela Supabase vs arquivo** em `bronze_data/discovery/`. Recomendo
-  tabela (UI de revisão, status, dedup por query SQL).
-- **`source` dos descobertos:** genérico `web` vs slug por agência detectada.
-  Recomendo por-agência quando detectável (alimenta a graduação da Fase C), com
-  fallback `web`.
-- **Modelo de triagem/extração:** Gemini (já usado no ETL) vs OpenAI. Triagem é
-  alto volume (barato); extração pede modelo capaz.
+- **`source` dos descobertos:** por-agência detectada (recomendo — alimenta a
+  graduação da Fase C) com fallback `web`.
+- **Modelo de triagem/extração:** triagem é alto volume (modelo barato, ex.: Gemini
+  já usado no ETL); extração pede modelo capaz.
+- **Política de ranqueamento de provisório no match:** bucket separado vs penalidade
+  no score do HybridMatch. (Afina na Fase B.)
 
 ## Riscos
 
-- **Precisão/recall da descoberta:** web aberta traz muito ruído. Mitigação:
-  triagem agêntica + gate humano; medir taxa de aprovação e ajustar queries.
-- **Extração de página arbitrária é imperfeita** (a premissa falsa). Mitigação:
-  humano-no-loop sempre; graduar fontes estáveis para extractor próprio.
-- **Poluição do KG** (o risco maior): **eliminado por design** — só entra via
-  aprovação humana + pipeline de bronze com pme_filter.
-- **Custo do crawl diário LLM:** cap de queries/candidatos por execução; triagem
-  com modelo barato; `fetch_url`/extração só em candidatos confirmados.
-- **Dedup cross-execução:** `dedup_key` estável (URL normalizada + título) para o
-  crawl diário não re-enfileirar o mesmo candidato.
+- **Precisão/recall da descoberta:** web aberta é ruidosa. Mitigação: triagem
+  agêntica + status provisório (não polui como verdade) + verificação humana;
+  medir taxa de verificação/rejeição e ajustar queries.
+- **Extração de página arbitrária imperfeita** (premissa falsa): mitigada por
+  entrar provisório + graduar fontes estáveis para extractor próprio.
+- **Confiança do KG:** o risco deixa de ser "lixo entra" e vira "provisório mal
+  rotulado". Mitigação: rótulo claro em match/escrita + grounding + proveniência.
+  **Nunca** deixar provisório se passar por verificado.
+- **Escrita rasa sobre provisório de snippet:** puxar documento real para chunks
+  quando possível; senão o grounding já degrada com aviso de contexto insuficiente.
+- **Custo do crawl diário LLM:** cap de queries/candidatos; triagem barata;
+  extração só em candidatos que passaram na triagem e não estão no ledger.
 
 ## Faseamento (resumo)
 
-| Fase | Entrega | Gate |
-|------|---------|------|
-| **A** | Descoberta+triagem → staging (`discovered_opportunities`) | feed de candidatos para revisão; **zero KG** |
-| **B** | Extração assistida + aprovação humana → bronze → KG | candidato aprovado vira edital no índice |
-| **C** | Cron diário + graduação de fontes recorrentes | crawl idempotente; processo de graduação documentado |
+| Fase | Entrega | Confiança |
+|------|---------|-----------|
+| **A** | Descoberta+extração → editais `provisorio` no KG (matcháveis) | provisório, rotulado |
+| **B** | Verificação humana não-bloqueante + exposição diferenciada em match/escrita | provisório → verificado |
+| **C** | Cron diário + graduação de fontes recorrentes para extractor próprio | graduada → verificado |
