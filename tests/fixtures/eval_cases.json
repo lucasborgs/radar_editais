@@ -1,5 +1,5 @@
 {
-  "_comment": "Casos-semente do eval de escrita (Front 1.5). Cada caso = (perfil, edital, seção, instrução). O perfil é inline para o harness rodar sem depender do estado do workspace no DB; ajuste os campos para refletir o perfil real (ex.: iFlorestal). Os edital_id devem ter chunks indexados (rode scripts/reindex_edital.py se necessário).",
+  "_comment": "Casos-semente do eval de escrita (Front 1.5). Perfil iFlorestal inline. Os section titles são VERBATIM do proposal_sections de cada edital (senão save_draft rejeita o título). Editais escolhidos têm chunks indexados e fit com o perfil (agro/bioeconomia/sustentabilidade). Seções de justificativa/metodologia/descrição maximizam afirmações verificáveis sobre o edital — bom para medir grounding.",
   "profiles": {
     "iflorestal": {
       "nome": "iFlorestal Tecnologia",
@@ -17,32 +17,76 @@
   },
   "cases": [
     {
-      "id": "iflorestal_finep612_objeto",
-      "profile": "iflorestal",
-      "edital_id": "finep:612",
-      "section": "2. Objeto do projeto",
-      "instruction": "Redija a seção de objeto do projeto, alinhando nossa solução de monitoramento florestal ao foco do edital. Salve o rascunho quando estiver pronto."
+      "id": "iflorestal_finep612_descricao",
+      "profile": "iflorestal", "edital_id": "finep:612",
+      "section": "2. Descrição do projeto",
+      "instruction": "Redija a descrição do projeto alinhando nossa solução de monitoramento florestal ao foco do edital. Salve quando estiver pronto."
     },
     {
       "id": "iflorestal_finep612_justificativa",
-      "profile": "iflorestal",
-      "edital_id": "finep:612",
+      "profile": "iflorestal", "edital_id": "finep:612",
+      "section": "3. Justificativa",
+      "instruction": "Escreva a justificativa, citando os requisitos e o foco do edital onde fizer sentido. Salve quando concluir."
+    },
+    {
+      "id": "iflorestal_finep612_metodologia",
+      "profile": "iflorestal", "edital_id": "finep:612",
+      "section": "5. Metodologia",
+      "instruction": "Descreva a metodologia ancorando nas exigências técnicas do edital. Salve quando fechar."
+    },
+    {
+      "id": "iflorestal_finep769_objetivo",
+      "profile": "iflorestal", "edital_id": "finep:769",
+      "section": "2. Objetivo do projeto",
+      "instruction": "Redija o objetivo do projeto alinhado ao foco do edital. Salve o rascunho."
+    },
+    {
+      "id": "iflorestal_finep769_justificativa",
+      "profile": "iflorestal", "edital_id": "finep:769",
+      "section": "3. Justificativa",
+      "instruction": "Escreva a justificativa relacionando nosso projeto aos temas e requisitos do edital. Salve quando concluir."
+    },
+    {
+      "id": "iflorestal_finep769_metodologia",
+      "profile": "iflorestal", "edital_id": "finep:769",
+      "section": "4. Metodologia",
+      "instruction": "Descreva a metodologia ancorando nas exigências do edital. Salve quando fechar."
+    },
+    {
+      "id": "iflorestal_finep777_justificativa",
+      "profile": "iflorestal", "edital_id": "finep:777",
       "section": "3. Justificativa e relevância",
-      "instruction": "Escreva a justificativa e relevância do projeto, citando os requisitos e prazos do edital onde fizer sentido. Salve quando concluir."
+      "instruction": "Escreva a justificativa e relevância, conectando nossa solução ao foco de economia circular do edital. Salve quando concluir."
     },
     {
-      "id": "iflorestal_finep774_objeto",
-      "profile": "iflorestal",
-      "edital_id": "finep:774",
-      "section": "2. Objeto do projeto",
-      "instruction": "Redija o objeto do projeto para este edital de cadeias agroindustriais, relativizando o prazo de submissão a hoje. Salve o rascunho."
+      "id": "iflorestal_finep777_metodologia",
+      "profile": "iflorestal", "edital_id": "finep:777",
+      "section": "5. Metodologia",
+      "instruction": "Descreva a metodologia ancorando nas exigências técnicas do edital. Salve quando fechar."
     },
     {
-      "id": "iflorestal_finep762_metodologia",
-      "profile": "iflorestal",
-      "edital_id": "finep:762",
-      "section": "5. Metodologia e plano de trabalho",
-      "instruction": "Descreva a metodologia e o plano de trabalho, ancorando nas exigências técnicas do edital. Salve quando estiver fechado."
+      "id": "iflorestal_finep772_descricao",
+      "profile": "iflorestal", "edital_id": "finep:772",
+      "section": "2. Descrição do projeto",
+      "instruction": "Redija a descrição do projeto alinhando nossa solução ao foco do edital de transição energética. Salve o rascunho."
+    },
+    {
+      "id": "iflorestal_finep772_metodologia",
+      "profile": "iflorestal", "edital_id": "finep:772",
+      "section": "4. Metodologia",
+      "instruction": "Descreva a metodologia ancorando nas exigências do edital. Salve quando fechar."
+    },
+    {
+      "id": "iflorestal_finep774_justificativa",
+      "profile": "iflorestal", "edital_id": "finep:774",
+      "section": "3. Justificativa",
+      "instruction": "Escreva a justificativa conectando a rastreabilidade de cadeias agroindustriais ao foco do edital. Salve quando concluir."
+    },
+    {
+      "id": "iflorestal_finep774_metodologia",
+      "profile": "iflorestal", "edital_id": "finep:774",
+      "section": "5. Metodologia",
+      "instruction": "Descreva a metodologia ancorando nas exigências técnicas do edital. Salve quando fechar."
     }
   ]
 }

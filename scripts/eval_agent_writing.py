@@ -117,7 +117,15 @@ def _run_case(db, workspace_id: str, profile, case: dict, max_turns: int) -> dic
         chunks, edital_context = [], ""
 
     claims = extract_edital_claims(draft) if draft else []
-    grounding = score_grounding(claims, chunks)
+
+    # Grounding por-claim: a evidência de cada afirmação é recuperada com a
+    # PRÓPRIA afirmação como query, restrita ao edital PRIMÁRIO (não análogos)
+    # — uma claim sobre o edital desta proposta só conta como grounded se um
+    # chunk DESTE edital a sustenta.
+    def _retrieve_for_claim(query: str, k: int) -> list[dict]:
+        return retrieve_chunks(db, [edital_id], query=query, k=k)
+
+    grounding = score_grounding(claims, retrieve_fn=_retrieve_for_claim, k=5)
     temporal_block = render_temporal_block(edital_id)
     proposal_context = _build_proposal_context(session, saved_title or section_hint or "")
     errors = judge_factual_errors(

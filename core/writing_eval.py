@@ -135,16 +135,85 @@ def _parse_grounding(raw: str, n_claims: int) -> list[bool]:
     return grounded
 
 
-def score_grounding(claims: list[str], chunks: list[dict]) -> GroundingResult:
-    """% de claims com respaldo nos chunks recuperados.
+_GROUNDING_ONE_SYSTEM = (
+    "Você verifica se UMA afirmação sobre um edital tem respaldo nos TRECHOS "
+    "recuperados do edital. Responda 'true' apenas se os trechos sustentam a "
+    "afirmação de forma direta; 'false' se a contradizem OU se não há trecho que "
+    'a sustente. Responda APENAS com JSON {"grounded": true|false}.'
+)
 
-    chunks: dicts de `retrieve_chunks` (usa `.text`). Sem claims → resultado
-    vazio (0/0). Falha de LLM → todas as claims contam como não-grounded
-    (conservador: o eval não infla a métrica em caso de erro).
+
+def _parse_grounded_one(raw: str) -> bool:
+    try:
+        data = json.loads(_strip_code_fence(raw))
+    except Exception:
+        return False
+    return bool(data.get("grounded", False)) if isinstance(data, dict) else False
+
+
+def judge_claim_grounded(claim: str, chunks: list[dict]) -> bool:
+    """Juiz de UMA afirmação contra os chunks recuperados PARA ELA. False em falha."""
+    if not chunks:
+        return False
+    chunk_text = "\n\n---\n\n".join((c.get("text") or "").strip()[:1500] for c in chunks)
+    user = f"TRECHOS DO EDITAL:\n{chunk_text}\n\nAFIRMAÇÃO:\n{claim}"
+    try:
+        resp = _client().chat.completions.create(
+            model=_eval_model(),
+            messages=[
+                {"role": "system", "content": _GROUNDING_ONE_SYSTEM},
+                {"role": "user", "content": user},
+            ],
+            temperature=0.0,
+            max_tokens=20,
+        )
+        return _parse_grounded_one(resp.choices[0].message.content or "")
+    except Exception as e:
+        logger.warning("judge_claim_grounded falhou: %s", e)
+        return False
+
+
+def score_grounding(
+    claims: list[str],
+    chunks: list[dict] | None = None,
+    *,
+    retrieve_fn=None,
+    k: int = 5,
+) -> GroundingResult:
+    """% de afirmações com respaldo em chunk.
+
+    Dois modos:
+      • PER-CLAIM (preferido): passe `retrieve_fn(query, k) -> list[chunk]`. Para
+        CADA afirmação, recupera evidência específica daquela afirmação (query =
+        a própria claim) e julga 1-a-1. Evita o viés de medição de checar todas
+        as claims contra um único conjunto de chunks recuperado por uma query
+        genérica (ex.: draft[:500]) que não cobre claims do meio/fim do texto.
+      • BATCH (legado): passe `chunks` fixos; julga todas as claims de uma vez.
+
+    Sem claims → 0/0. Falha de LLM/retrieval → claim conta como não-grounded
+    (conservador: nunca infla a métrica).
     """
     if not claims:
         return GroundingResult(n_claims=0, n_grounded=0)
-    chunk_text = "\n\n---\n\n".join((c.get("text") or "").strip()[:1500] for c in chunks)
+
+    if retrieve_fn is not None:
+        per_claim: list[dict] = []
+        for c in claims:
+            try:
+                evidence = retrieve_fn(c, k)
+            except Exception as e:
+                logger.warning("score_grounding: retrieve_fn falhou p/ claim: %s", e)
+                evidence = []
+            grounded = judge_claim_grounded(c, evidence)
+            per_claim.append({"claim": c, "grounded": grounded, "n_evidence": len(evidence)})
+        return GroundingResult(
+            n_claims=len(claims),
+            n_grounded=sum(1 for p in per_claim if p["grounded"]),
+            per_claim=per_claim,
+        )
+
+    # Caminho batch (legado).
+    chunk_text = "\n\n---\n\n".join((c.get("text") or "").strip()[:1500] for c in (chunks or []))
     numbered = "\n".join(f"[{i}] {c}" for i, c in enumerate(claims))
     user = f"TRECHOS DO EDITAL:\n{chunk_text or '(nenhum)'}\n\nAFIRMAÇÕES:\n{numbered}"
     try:
