@@ -128,6 +128,18 @@ def test_index_entries_have_ict_flag():
             f"Entry {entry.get('id')}: requires_ict_partner={v!r} (esperado bool)"
 
 
+def test_index_entries_have_verificacao():
+    """Toda entry tem verificacao em {verificado, provisorio} — §5.11."""
+    if not INDEX_FILE.exists():
+        return
+    index = json.loads(INDEX_FILE.read_text(encoding="utf-8"))
+    allowed = set(ws.verificacao_values())
+    for entry in index.get("editais", []):
+        v = entry.get("verificacao")
+        assert v in allowed, \
+            f"Entry {entry.get('id')}: verificacao={v!r} fora de {allowed}"
+
+
 # -----------------------------------------------------------------------------
 # NÓ ICT (WIKI.md §6.1.2 / ict_schema)
 # -----------------------------------------------------------------------------
