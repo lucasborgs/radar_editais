@@ -290,7 +290,9 @@ def load_discovery_bronze() -> list[dict]:
         return []
     records: list[dict] = []
     by_prefix: dict = {}
-    for path in sorted(DISCOVERY_BRONZE_DIR.glob("*.json")):
+    # glob específico: NÃO apanhar o `.ledger.json` (lista de URLs) que vive no
+    # mesmo dir — senão suas strings entram em records e quebram a normalização.
+    for path in sorted(DISCOVERY_BRONZE_DIR.glob("discovery_*.json")):
         prefix = path.name.rsplit("_", 2)[0]
         by_prefix[prefix] = path
     for path in by_prefix.values():
