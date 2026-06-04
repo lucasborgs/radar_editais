@@ -40,8 +40,8 @@ python -m core.eval matching        # roda uma suíte (Langfuse Experiment se co
 python -m core.eval all              # todas as suítes registradas
 python -m core.eval matching --no-push --limit 1   # fallback local, subconjunto (debug)
 ```
-Suítes: `matching`, `rag`, `writing` (todas em `core/eval/`, registro em
-`core/eval/registry.py`). Cada uma é uma `Suite`: `task` roda o pipeline real,
+Suítes: `matching`, `rag`, `writing`, `extraction` (todas em `core/eval/`,
+registro em `core/eval/registry.py`). Cada uma é uma `Suite`: `task` roda o pipeline real,
 `evaluators` reaproveitam `core/*_eval.py`. Com `LANGFUSE_*` no ambiente vira
 Experiment (scores comparáveis entre commits); senão grava `eval_results/*.json`.
 NÃO criar harnesses novos paralelos — registrar uma suíte aqui. Prereqs: `rag`

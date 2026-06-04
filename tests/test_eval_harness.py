@@ -82,9 +82,9 @@ def test_limit(tmp_path):
 
 # --- suítes reais registradas (sem rodar task/LLM) -------------------------
 
-def test_three_suites_registered():
+def test_suites_registered():
     from core.eval.registry import SUITES
-    assert set(SUITES) == {"matching", "rag", "writing"}
+    assert set(SUITES) == {"matching", "rag", "writing", "extraction"}
 
 
 def test_rag_skips_without_supabase(tmp_path, monkeypatch):
