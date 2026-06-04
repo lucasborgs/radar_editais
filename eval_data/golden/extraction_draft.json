@@ -12,7 +12,7 @@
           "empresas"
         ],
         "state": "stated",
-        "evidence": "são elegíveis a receber recursos de subvenção econômica à inovação empresas brasileiras"
+        "evidence": "executados por empresas, obrigatoriamente com a parceria de Instituições Científicas, Tecnológicas e de Inovação (ICTs)"
       },
       "themes": {
         "value": [
@@ -35,20 +35,24 @@
         "evidence": "conceder recursos de subvenção econômica"
       },
       "counterpart": {
-        "value": null,
-        "state": "absent",
-        "evidence": null
+        "value": {
+          "required": true,
+          "percentage": null
+        },
+        "state": "stated",
+        "evidence": "A BENEFICIÁRIA DA SUBVENÇÃO se obriga a participar dos custos de elaboração e execução do PROJETO com recursos próprios"
       },
       "requires_ict_partner": {
         "value": true,
         "state": "stated",
-        "evidence": "É obrigatória a participação de Instituições Científicas, Tecnológicas e de Inovação (ICTs) como parceiras nos projetos"
+        "evidence": "obrigatoriamente com a parceria de Instituições Científicas, Tecnológicas e de Inovação (ICTs)"
       },
       "title": "Finep Mais Inovação Brasil – Rodada 2 – Mobilidade Sustentável",
-      "objective": "Conceder recursos de subvenção econômica para atividades de pesquisa, desenvolvimento tecnológico e inovação (PD&I) em projetos inovadores, com risco tecnológico associado, executados por empresas, obrigatoriamente com a parceria de Instituições Científicas, Tecnológicas e de Inovação (ICTs).",
+      "objective": "Conceder recursos de subvenção econômica para atividades de pesquisa, desenvolvimento tecnológico e inovação em projetos inovadores, com risco tecnológico associado, executados por empresas, obrigatoriamente com a parceria de ICTs. A iniciativa busca fomentar o desenvolvimento de tecnologias inovadoras em mobilidade, com impactos na sustentabilidade e no adensamento das cadeias produtivas brasileiras.",
       "key_requirements": [
-        "Ter realizado o registro na Junta Comercial ou no Registro Civil das Pessoas Jurídicas (RCPJ) de sua sede até 31/12 do ano anterior ao de submissão da proposta",
-        "Ter efetuado alguma atividade operacional nos 12 meses anteriores da apresentação do projeto"
+        "Indicar a conta corrente exclusiva, em instituição financeira pública federal, para movimentação dos recursos",
+        "Apresentar a Certidão Conjunta de Débitos Relativos aos Tributos Federais e à Dívida Ativa da União",
+        "Apresentar o Certificado de Regularidade do FGTS (CRF), expedido pela Caixa Econômica Federal"
       ],
       "funding_amount": {
         "min": null,
@@ -57,16 +61,10 @@
       "project_duration_months": null,
       "eligibility_constraints": [
         {
-          "type": "company_age",
-          "description": "Registro na Junta Comercial ou no Registro Civil das Pessoas Jurídicas até 31/12 do ano anterior ao de submissão da proposta",
+          "type": "region",
+          "description": "Manter a sua sede e administração no País",
           "state": "stated",
-          "evidence": "Ter realizado o registro na Junta Comercial ou no Registro Civil das Pessoas Jurídicas (RCPJ) de sua sede até 31/12 do ano anterior ao de submissão da proposta"
-        },
-        {
-          "type": "revenue",
-          "description": "Ter efetuado alguma atividade operacional nos 12 meses anteriores da apresentação do projeto",
-          "state": "stated",
-          "evidence": "Ter efetuado alguma atividade operacional (constatada pela existência de despesas ou receitas), nos 12 (doze) meses anteriores da apresentação do projeto"
+          "evidence": "Manter a sua sede e administração no País"
         }
       ]
     }
@@ -101,9 +99,9 @@
         "evidence": null
       },
       "mechanism": {
-        "value": "subvencao",
+        "value": "investimento",
         "state": "stated",
-        "evidence": "Fundo de Investimento em Participações"
+        "evidence": "gestão de um Fundo de Investimento em Participações"
       },
       "counterpart": {
         "value": null,
@@ -118,8 +116,8 @@
       "title": "FIP Startup Inteligência Artificial",
       "objective": "Investir em startups intensivas em inteligência artificial, que tenham a inteligência artificial como elemento central de seu modelo de negócios e geração de valor.",
       "key_requirements": [
-        "Startups devem ter a inteligência artificial como elemento central do core business.",
-        "Startups devem desenvolver soluções de cibersegurança e ferramentas de governança e compliance."
+        "Comprovação de autorização pela CVM para o exercício das atividades de administração de carteira de valores mobiliários.",
+        "Compromisso firme do Gestor de subscrever, no mínimo, 1% do capital comprometido do Fundo."
       ],
       "funding_amount": {
         "min": null,
@@ -129,9 +127,9 @@
       "eligibility_constraints": [
         {
           "type": "region",
-          "description": "sociedades com sede e administração no Brasil",
+          "description": "30% dos recursos investidos devem ser direcionados para startups localizadas nas regiões Norte, Nordeste e Centro-Oeste.",
           "state": "stated",
-          "evidence": "sociedades com sede e administração no Brasil"
+          "evidence": "30% dos recursos efetivamente investidos pelo FNDCT/FINEP [...] sejam direcionados para startups localizadas nas regiões Norte, Nordeste e Centro-Oeste."
         }
       ]
     }
@@ -149,7 +147,7 @@
           "empresas"
         ],
         "state": "stated",
-        "evidence": "são elegíveis a receber recursos de subvenção econômica à inovação empresas brasileiras"
+        "evidence": "Público-alvo: Empresas"
       },
       "themes": {
         "value": [
@@ -174,22 +172,24 @@
         "evidence": "conceder recursos de subvenção econômica"
       },
       "counterpart": {
-        "value": null,
-        "state": "absent",
-        "evidence": null
+        "value": {
+          "required": true,
+          "percentage": null
+        },
+        "state": "stated",
+        "evidence": "A BENEFICIÁRIA DA SUBVENÇÃO se obriga a participar dos custos de elaboração e execução do PROJETO com recursos próprios"
       },
       "requires_ict_partner": {
         "value": true,
         "state": "stated",
-        "evidence": "é obrigatória a participação de Instituições Científicas, Tecnológicas e de Inovação (ICTs) como parceiras nos projetos"
+        "evidence": "executados por empresas, obrigatoriamente com a parceria de Instituições Científicas, Tecnológicas e de Inovação (ICTs)"
       },
       "title": "Finep Mais Inovação Brasil – Rodada 2 – Transição Energética",
-      "objective": "Conceder recursos de subvenção econômica para atividades de pesquisa, desenvolvimento tecnológico e inovação (PD&I) em projetos inovadores, com risco tecnológico associado, executados por empresas, obrigatoriamente com a parceria de Instituições Científicas, Tecnológicas e de Inovação (ICTs).",
+      "objective": "Esta Seleção Pública tem por objetivo conceder recursos de subvenção econômica para atividades de pesquisa, desenvolvimento tecnológico e inovação (PD&I) em projetos inovadores, com risco tecnológico associado.",
       "key_requirements": [
-        "Ter realizado o registro na Junta Comercial ou no Registro Civil das Pessoas Jurídicas (RCPJ) de sua sede até 31/12 do ano anterior ao de submissão da proposta",
-        "Ter efetuado alguma atividade operacional nos 12 meses anteriores da apresentação do projeto",
-        "Ter objeto social compatível com as atividades a serem desenvolvidas",
-        "A principal atividade de pesquisa e desenvolvimento deve estar localizada no Brasil"
+        "Indicar a conta corrente exclusiva, em instituição financeira pública federal, para movimentação dos recursos",
+        "Apresentar a Certidão Conjunta de Débitos Relativos aos Tributos Federais e à Dívida Ativa da União",
+        "Apresentar o Certificado de Regularidade do FGTS (CRF), expedido pela Caixa Econômica Federal"
       ],
       "funding_amount": {
         "min": null,
@@ -198,16 +198,10 @@
       "project_duration_months": null,
       "eligibility_constraints": [
         {
-          "type": "company_age",
-          "description": "Registro na Junta Comercial ou no Registro Civil das Pessoas Jurídicas até 31/12 do ano anterior ao de submissão da proposta",
+          "type": "region",
+          "description": "Manter a sua sede e administração no País",
           "state": "stated",
-          "evidence": "Ter realizado o registro na Junta Comercial ou no Registro Civil das Pessoas Jurídicas (RCPJ) de sua sede até 31/12 do ano anterior ao de submissão da proposta"
-        },
-        {
-          "type": "revenue",
-          "description": "Ter efetuado alguma atividade operacional nos 12 meses anteriores da apresentação do projeto",
-          "state": "stated",
-          "evidence": "Ter efetuado alguma atividade operacional (constatada pela existência de despesas ou receitas), nos 12 (doze) meses anteriores da apresentação do projeto"
+          "evidence": "Manter a sua sede e administração no País"
         }
       ]
     }
@@ -251,10 +245,10 @@
       "counterpart": {
         "value": {
           "required": true,
-          "percentage": null
+          "percentage": 20.0
         },
         "state": "stated",
-        "evidence": "Todo o regramento deste Edital referente aos gastos e recursos para execução do projeto se aplica aos recursos subvencionados e aos de contrapartida."
+        "evidence": "percentuais mínimos de contrapartida indicados no item 9 do presente edital"
       },
       "requires_ict_partner": {
         "value": false,
@@ -264,25 +258,24 @@
       "title": "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT - Subvenção Econômica à Inovação - DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
       "objective": "Esta Seleção Pública objetiva conceder recursos de subvenção econômica para apoiar o desenvolvimento de um pacote tecnológico de baixo custo, por empresas brasileiras, de modo a promover o aumento da oferta de alimentos, o combate à fome e à pobreza e o desenvolvimento econômico e social brasileiro.",
       "key_requirements": [
-        "Projetos devem prever o atingimento do TRL 8",
-        "Empresas devem ter realizado o registro na Junta Comercial ou no RCPJ até 31/12 do ano anterior",
-        "Empresas devem ter realizado alguma atividade operacional nos 12 meses anteriores"
+        "Ter realizado o registro na Junta Comercial ou no Registro Civil das Pessoas Jurídicas (RCPJ) de sua sede até 31/12 do ano anterior ao da submissão da proposta",
+        "Ter realizado alguma atividade operacional nos 12 meses anteriores ao da apresentação do projeto"
       ],
       "funding_amount": {
-        "min": null,
+        "min": 3000000.0,
         "max": 60000000.0
       },
-      "project_duration_months": null,
+      "project_duration_months": 18,
       "eligibility_constraints": [
         {
           "type": "company_age",
-          "description": "Empresas devem ter realizado o registro na Junta Comercial ou no RCPJ até 31/12 do ano anterior",
+          "description": "Ter realizado o registro na Junta Comercial ou no Registro Civil das Pessoas Jurídicas (RCPJ) de sua sede até 31/12 do ano anterior ao da submissão da proposta",
           "state": "stated",
           "evidence": "Ter realizado o registro na Junta Comercial ou no Registro Civil das Pessoas Jurídicas (RCPJ) de sua sede até 31/12 do ano anterior ao da submissão da proposta"
         },
         {
           "type": "revenue",
-          "description": "Empresas devem ter realizado alguma atividade operacional nos 12 meses anteriores",
+          "description": "Ter realizado alguma atividade operacional nos 12 meses anteriores ao da apresentação do projeto",
           "state": "stated",
           "evidence": "Ter realizado alguma atividade operacional (constatada pela existência de despesas ou receitas) nos 12 meses anteriores ao da apresentação do projeto"
         }
@@ -348,8 +341,11 @@
       "title": "Prêmio Mulheres Inovadoras – 7ª edição – 2026",
       "objective": "O Programa Mulheres Inovadoras é uma iniciativa da Finep e do Ministério da Ciência, Tecnologia e Inovação (MCTI) para estimular startups lideradas por mulheres, de forma a contribuir para o aumento da representatividade feminina no cenário empreendedor nacional, por meio da capacitação e do reconhecimento de empreendimentos que possam favorecer o incremento da competitividade brasileira.",
       "key_requirements": [
-        "Startups lideradas por mulheres",
-        "Participação em aceleração de 8,5 semanas"
+        "Startups brasileiras com sede no Brasil",
+        "Registradas na Junta Comercial ou cartório competentes há, no mínimo, 3 meses",
+        "Constituídas sob a forma de sociedade limitada, sociedade anônima, sociedade simples ou sociedade limitada unipessoal",
+        "Possuir pelo menos uma mulher entre seus empreendedores, na qualidade de sócia e em função executiva ou gerencial",
+        "Receita Operacional Bruta inferior ou igual a R$ 4.800.000,00 no período de 12 meses"
       ],
       "funding_amount": {
         "min": 60000.0,
@@ -358,10 +354,16 @@
       "project_duration_months": null,
       "eligibility_constraints": [
         {
-          "type": "region",
-          "description": "Serão selecionadas 10 startups de cada região do país",
+          "type": "company_age",
+          "description": "Registradas na Junta Comercial ou cartório competentes há, no mínimo, 3 meses",
           "state": "stated",
-          "evidence": "Nesta edição, serão selecionadas 10 startups de cada região do país"
+          "evidence": "sejam registradas na Junta Comercial ou cartório competentes, há, no mínimo, 3 (três) meses a contar do início do período de inscrições neste Programa"
+        },
+        {
+          "type": "revenue",
+          "description": "Receita Operacional Bruta inferior ou igual a R$ 4.800.000,00",
+          "state": "stated",
+          "evidence": "tenham apresentado, no período de 12 (doze) meses, entre 1º de janeiro de 2025 e 31 de dezembro de 2025, Receita Operacional Bruta (ROB) inferior ou igual a R$ 4.800.000,00"
         }
       ]
     }
@@ -407,10 +409,11 @@
         "evidence": null
       },
       "title": "Bolsa de Intercâmbio Internacional PRH-ANP (BEPE ANP) 2026",
-      "objective": "A Bolsa de Intercâmbio Internacional do PRH-ANP (BEPE ANP) tem por finalidade complementar a formação do bolsista PRH-ANP por meio da realização de atividades de pesquisa em instituição estrangeira de excelência, contribuindo simultaneamente para o avanço do projeto individual do bolsista no âmbito do PRH-ANP, o fortalecimento da ciência, tecnologia e inovação (CT&I) na instituição de origem, e o desenvolvimento das áreas estratégicas contempladas pelo PRH-ANP.",
+      "objective": "A Bolsa de Intercâmbio Internacional do PRH-ANP (BEPE ANP) tem por finalidade complementar a formação do bolsista PRH-ANP por meio da realização de atividades de pesquisa em instituição estrangeira de excelência, contribuindo simultaneamente para o avanço do projeto individual do bolsista no âmbito do PRH-ANP, o fortalecimento da ciência, tecnologia e inovação (CT&I) na instituição de origem e o desenvolvimento das áreas estratégicas contempladas pelo PRH-ANP.",
       "key_requirements": [
-        "Acompanhamento mensal por um mentor designado pelo Comitê ANP-FAPESP",
-        "Respeitar as diferenças de objetivos, duração e produtos esperados entre as modalidades de graduação, mestrado e doutorado"
+        "Ter Bolsa PRH-ANP no país vigente",
+        "Estar em dia com os compromissos com o PRH-ANP",
+        "Ter proficiência na língua do país onde será realizado o estágio de pesquisa ou em inglês"
       ],
       "funding_amount": {
         "min": null,
@@ -419,22 +422,10 @@
       "project_duration_months": null,
       "eligibility_constraints": [
         {
-          "type": "company_age",
-          "description": "a partir do sexto (6º) mês como bolsista GRA do PRH-ANP",
+          "type": "region",
+          "description": "Bolsistas PRH-ANP de graduação, mestrado e doutorado",
           "state": "stated",
-          "evidence": "a partir do sexto (6º) mês como bolsista GRA do PRH-ANP"
-        },
-        {
-          "type": "company_age",
-          "description": "a partir do décimo (10º) mês como bolsista MSc do PRH-ANP",
-          "state": "stated",
-          "evidence": "a partir do décimo (10º) mês como bolsista MSc do PRH-ANP"
-        },
-        {
-          "type": "company_age",
-          "description": "a partir do décimo segundo (12º) mês como bolsista Dsc do PRH-ANP",
-          "state": "stated",
-          "evidence": "a partir do décimo segundo (12º) mês como bolsista Dsc do PRH-ANP"
+          "evidence": "Elegibilidade: Bolsistas PRH-ANP de graduação, mestrado e doutorado"
         }
       ]
     }
@@ -463,35 +454,42 @@
         "evidence": null
       },
       "mechanism": {
-        "value": null,
-        "state": "absent",
-        "evidence": null
+        "value": "auxílio",
+        "state": "stated",
+        "evidence": "A modalidade de “Auxílio à Organização de Reunião Científica: Escola São Paulo de Ciência Avançada”"
       },
       "counterpart": {
-        "value": null,
-        "state": "absent",
-        "evidence": null
+        "value": {
+          "required": true,
+          "percentage": null
+        },
+        "state": "stated",
+        "evidence": "É obrigatório haver o compromisso da Instituição Sede com, no mínimo, os seguintes itens de apoio"
       },
       "requires_ict_partner": {
         "value": null,
         "state": "absent",
         "evidence": null
       },
-      "title": "Escolas São Paulo de Ciência Avançada (ESPCA) - 20ª Chamada",
-      "objective": null,
+      "title": "Escola São Paulo de Ciência Avançada (ESPCA) – 20ª Chamada",
+      "objective": "A modalidade de “Auxílio à Organização de Reunião Científica: Escola São Paulo de Ciência Avançada” se destina a apoiar total ou parcialmente a realização de cursos de curta duração sobre temas da fronteira da ciência e da tecnologia, que sejam objeto de pesquisa internacionalmente competitiva sendo realizada no estado de São Paulo.",
       "key_requirements": [
-        "Proposta detalhada da Escola contendo as informações listadas",
-        "Súmula Curricular do pesquisador responsável pela proposta",
-        "Informação aprovada pela Instituição Sede sobre a infraestrutura institucional necessária",
-        "Manifestação do Dirigente da Instituição Sede",
-        "Estratégia de divulgação da Escola, no Brasil e no exterior"
+        "Propostas devem ser submetidas pelo SAGe a partir de 23 de março de 2026",
+        "A proposta deve ser solicitada por pesquisador vinculado a instituição de ensino superior e pesquisa no estado de São Paulo"
       ],
       "funding_amount": {
         "min": null,
         "max": null
       },
       "project_duration_months": null,
-      "eligibility_constraints": []
+      "eligibility_constraints": [
+        {
+          "type": "region",
+          "description": "Chamada de Propostas para pesquisadores do estado de São Paulo",
+          "state": "stated",
+          "evidence": "Chamada de Propostas para pesquisadores do estado de São Paulo"
+        }
+      ]
     }
   },
   {
@@ -510,11 +508,9 @@
         "evidence": "Podem submeter propostas nesta Chamada Pesquisadores Responsáveis por Auxílios à Pesquisa FAPESP vigentes"
       },
       "themes": {
-        "value": [
-          "todas as áreas do conhecimento"
-        ],
-        "state": "stated",
-        "evidence": "Esta Chamada permite a submissão de propostas em todas as áreas do conhecimento."
+        "value": [],
+        "state": "absent",
+        "evidence": null
       },
       "trl_range": {
         "value": null,
@@ -522,9 +518,9 @@
         "evidence": null
       },
       "mechanism": {
-        "value": "bolsa",
+        "value": "mobilidade",
         "state": "stated",
-        "evidence": "Mobilidade de pesquisadores e bolsistas da FAPESP"
+        "evidence": "Modalidade de Apoio: Mobilidade de pesquisadores e bolsistas da FAPESP"
       },
       "counterpart": {
         "value": null,
@@ -537,10 +533,10 @@
         "evidence": null
       },
       "title": "Chamada de Propostas 2026 do PROPASP (Programa de Pesquisa Alemanha – São Paulo) – FAPESP e DAAD",
-      "objective": "O PROPASP é um programa que financia projetos de pesquisa em conjunto de pesquisadores de São Paulo e da Alemanha, em todas as áreas do conhecimento. O objetivo é implementar a cooperação científica e tecnológica entre pesquisadores da Alemanha e do estado de São Paulo, Brasil, por meio do financiamento de projetos conjuntos de pesquisa.",
+      "objective": "O PROPASP é um programa que financia projetos de pesquisa em conjunto de pesquisadores de São Paulo e da Alemanha, em todas as áreas do conhecimento, com o objetivo de implementar a cooperação científica e tecnológica entre pesquisadores da Alemanha e do estado de São Paulo, Brasil.",
       "key_requirements": [
         "Pesquisadores com Auxílio à Pesquisa vigente na FAPESP",
-        "Proposta colaborativa deve ser submetida pelo pesquisador da Alemanha ao DAAD e pelo pesquisador de São Paulo à FAPESP"
+        "A proposta colaborativa deve ser submetida pelo pesquisador da Alemanha ao DAAD e pelo pesquisador de São Paulo à FAPESP"
       ],
       "funding_amount": {
         "min": null,
@@ -550,9 +546,9 @@
       "eligibility_constraints": [
         {
           "type": "region",
-          "description": "Pesquisadores de São Paulo e da Alemanha",
+          "description": "Pesquisadores de São Paulo",
           "state": "stated",
-          "evidence": "O PROPASP é um programa que financia projetos de pesquisa em conjunto de pesquisadores de São Paulo e da Alemanha"
+          "evidence": "Pesquisadores Responsáveis por Auxílios à Pesquisa FAPESP vigentes"
         }
       ]
     }
@@ -567,17 +563,17 @@
       "native_id": "17952",
       "eligible_entities": {
         "value": [
-          "empresas"
+          "pesquisadores"
         ],
         "state": "stated",
-        "evidence": "envolvendo os setores acadêmico, de pesquisa, econômico (empresas), social (organizações governamentais e não governamentais) e/ou comunitário"
+        "evidence": "As propostas devem atender às condições gerais das modalidades: Auxílio à Pesquisa Regular ou Projeto Temático, considerando as especificidades previstas nesta Chamada."
       },
       "themes": {
         "value": [
-          "Tecnologia Disruptiva"
+          "tecnologias disruptivas"
         ],
         "state": "stated",
-        "evidence": "Tecnologia Disruptiva"
+        "evidence": "A IIDTAC representa uma colaboração entre agências de fomento [...] voltadas ao uso de tecnologias disruptivas para o enfrentamento dos principais desafios sociais globais."
       },
       "trl_range": {
         "value": null,
@@ -585,9 +581,9 @@
         "evidence": null
       },
       "mechanism": {
-        "value": "auxilio",
+        "value": "auxílio",
         "state": "stated",
-        "evidence": "Auxílio à Pesquisa - Projeto Temático e Auxílio à Pesquisa Regular"
+        "evidence": "Modalidades de Apoio na FAPESP: Auxílio à Pesquisa - Projeto Temático e Auxílio à Pesquisa Regular"
       },
       "counterpart": {
         "value": null,
@@ -595,19 +591,19 @@
         "evidence": null
       },
       "requires_ict_partner": {
-        "value": true,
-        "state": "stated",
-        "evidence": "A equipe de projeto deve ser composta por pelo menos dois Pesquisadores Responsáveis na Instituição Parceira"
+        "value": false,
+        "state": "absent",
+        "evidence": null
       },
       "title": "Chamada de Propostas - Iniciativa Internacional de Pesquisa sobre o Uso de Tecnologias Disruptivas para o Enfrentamento de Desafios Globais (IIDTAC)",
       "objective": "Aproveitar o potencial das tecnologias disruptivas para oferecer soluções inovadoras aos desafios globais e acelerar o progresso rumo à concretização dos Objetivos de Desenvolvimento Sustentável (ODS).",
       "key_requirements": [
-        "As propostas devem atender às condições gerais das modalidades: Auxílio à Pesquisa Regular ou Projeto Temático.",
+        "As propostas devem abordar pelo menos um ODS e ser interdisciplinares.",
         "A equipe de projeto deve ser elegível para receber recursos de pelo menos três Agências de Fomento."
       ],
       "funding_amount": {
-        "min": null,
-        "max": null
+        "min": 600000.0,
+        "max": 4500000.0
       },
       "project_duration_months": 36,
       "eligibility_constraints": [
@@ -630,10 +626,10 @@
       "native_id": "18067",
       "eligible_entities": {
         "value": [
-          "instituição de pesquisa pública ou privada"
+          "instituições de pesquisa públicas ou privadas"
         ],
         "state": "stated",
-        "evidence": "A Instituição Sede deve assumir compromissos com a guarda e acesso de materiais e equipamentos, com apoio institucional ao projeto de pesquisa e inovação e sobre a gestão da propriedade intelectual eventualmente criada."
+        "evidence": "a Instituição Sede obrigatoriamente deve ser uma instituição de pesquisa pública ou privada"
       },
       "themes": {
         "value": [],
@@ -648,7 +644,7 @@
       "mechanism": {
         "value": "auxílio",
         "state": "stated",
-        "evidence": "Modalidade de Apoio: Auxílio à Inovação Regular (AIR)"
+        "evidence": "Auxílio à Inovação Regular"
       },
       "counterpart": {
         "value": null,
@@ -661,10 +657,10 @@
         "evidence": null
       },
       "title": "Chamada de Propostas - Auxílio à Inovação Regular",
-      "objective": "O Auxílio à Inovação Regular visa a apoiar projetos de desenvolvimento técnico-científicos, com foco na geração de soluções inovadoras e suas aplicações. No contexto desta modalidade, Inovação é a implementação de soluções novas ou significativamente aprimoradas – sejam produtos, processos, modelos de negócio ou serviços – que gerem valor econômico, social ou ambiental.",
+      "objective": "O Auxílio à Inovação Regular visa a apoiar projetos de desenvolvimento técnico-científicos, com foco na geração de soluções inovadoras e suas aplicações.",
       "key_requirements": [
-        "Pesquisador Responsável deve ter experiência demonstrada na liderança de projetos de inovação competitivos.",
-        "Possuir vínculo empregatício com a Instituição Sede do estado de São Paulo."
+        "Pesquisador Responsável deve ter vínculo com a Instituição Sede do estado de São Paulo",
+        "Pesquisador Responsável deve ter título de doutor ou qualificação equivalente"
       ],
       "funding_amount": {
         "min": null,
@@ -676,7 +672,7 @@
           "type": "region",
           "description": "Instituição Sede deve estar no estado de São Paulo",
           "state": "stated",
-          "evidence": "A presente Chamada tem por objetivo selecionar propostas na modalidade Auxílio à Inovação Regular (AIR) a serem desenvolvidas sob a responsabilidade de um Pesquisador Responsável que possua vínculo com a Instituição Sede do estado de São Paulo."
+          "evidence": "Instituição Sede do estado de São Paulo"
         }
       ]
     }
