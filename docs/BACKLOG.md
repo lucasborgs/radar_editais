@@ -30,6 +30,17 @@
 - **Onde:** [spec_extraction_schema.md](spec_extraction_schema.md), domain/edital_extraction.py,
   domain/user_profile.py. **Status:** aberto.
 
+### Eval — sincronizar golden como Langfuse Dataset
+- **O quê:** o harness já manda cada run para `langfuse.run_experiment` (com
+  LANGFUSE_* setadas), agrupado por nome da suíte. Melhoria: criar/sincronizar o
+  golden de cada suíte como um **Langfuse Dataset** e rodar os experiments contra
+  ele → compare **por-item** entre runs (e não só agregados por nome).
+- **Por que adiado:** o agrupamento por nome já entrega search/compare/present
+  básico; Dataset é refino.
+- **Ponto de entrada:** `core/eval/harness.py::_run_langfuse` (hoje passa `data`
+  local) → adicionar `langfuse.create_dataset`/`create_dataset_item` idempotente
+  por suíte. **Status:** aberto.
+
 ### Extração em produção — subir o tier da OpenAI (TPM)
 - **O quê:** o tier atual tem TPM (tokens/min) = 30k. Editais FINEP, mesmo após
   selecionar só o edital (`_finep_edital_text`, sem anexos/duplicatas), batem
