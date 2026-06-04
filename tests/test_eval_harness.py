@@ -80,6 +80,36 @@ def test_limit(tmp_path):
     assert res["n_cases"] == 1
 
 
+def test_langfuse_path_quando_keys_setadas(tmp_path, monkeypatch):
+    """Com LANGFUSE_* setadas, roteia para run_experiment (mockado), captura o
+    URL do run e dá flush. Protege o caminho de produção do eval-storage."""
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-test")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-test")
+    calls: dict = {}
+
+    class _FakeResult:
+        item_results: list = []
+        run_evaluations: list = []
+        dataset_run_url = "https://cloud.langfuse.com/run/abc"
+
+    class _FakeLangfuse:
+        def run_experiment(self, **kw):
+            calls.update(kw)
+            return _FakeResult()
+
+        def flush(self):
+            calls["flushed"] = True
+
+    import langfuse
+    monkeypatch.setattr(langfuse, "Langfuse", lambda *a, **k: _FakeLangfuse())
+
+    res = run_suite(_square_suite(), out_dir=tmp_path)
+    assert res["backend"] == "langfuse"
+    assert res["langfuse_url"] == "https://cloud.langfuse.com/run/abc"
+    assert calls["name"] == "dummy"        # run_experiment chamado com a suíte
+    assert calls.get("flushed") is True     # exportou antes de sair
+
+
 # --- suítes reais registradas (sem rodar task/LLM) -------------------------
 
 def test_suites_registered():
