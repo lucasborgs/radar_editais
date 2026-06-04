@@ -114,6 +114,29 @@ Implicações:
    de domínio aceitável).
 3. **Política de `absent`:** ✅ **excluir do gate** (normalizado; all-absent → provisório).
 
+## v2 — curadoria externa reconciliada com o código (2026-06-04)
+
+Revisão por IAs externas (Gemini + ChatGPT), filtrada pelo que o sistema realmente
+faz. Mudanças aplicadas em `domain/edital_extraction.py` + `domain/user_profile.py`:
+
+- **`evidence` = substring VERBATIM** (não resumo) — âncora de auditoria/anti-alucinação.
+- **`inferred` proibido em GATE_FIELDS** (`eligible_entities`, `themes`, `trl_range`,
+  `mechanism`) — gate sobre inferência é contraditório; o scoring trata inferred≡absent lá.
+- **`themes` = termo CRU verbatim**; canonicalização (`canonicalize_themes`, vocab fechado,
+  sem embeddings) é passo seguinte. `eligible_sectors` **fundido** em `themes` (o código já
+  os tratava igual).
+- **`counterpart`** vira `{required, percentage}` (5% ≠ 50%) — mantido em DECISÃO.
+- **`requires_ict_partner`** (flag, não-gate): o sistema já modela (`_detect_ict_requirement`).
+- **+CONTEXTO:** `funding_amount{min,max}`, `project_duration_months`,
+  `eligibility_constraints[]` (restrições organizacionais ESTRUTURADAS — região/idade/
+  faturamento/CNAE/consórcio — não enterradas em `key_requirements`).
+- **`status`/`deadline` REMOVIDOS** — o pipeline temporal é o dono (SSOT; PDF fica stale).
+- **Alinhamento do perfil:** `CompanyProfile` ganhou `uf`, `faturamento_anual`,
+  `ano_fundacao` (pares dos `eligibility_constraints`). Gate sobre eles = Fase 3.
+
+**Insight-chave:** o teto do matching é o `CompanyProfile`, não o schema do edital —
+campo de decisão no edital só rende com o par no perfil. Itens adiados no BACKLOG.
+
 ## Próximas fases (após validar este schema)
 
 - **Fase 2:** golden rotulado (bootstrap + correção humana; FINEP+FAPESP+web) + suíte

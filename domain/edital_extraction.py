@@ -1,17 +1,17 @@
 """Schema tipado de extração de edital — o contrato entre a extração-LLM e o
-scoring determinístico.
+scoring determinístico (v2).
 
-Materializa em código o que `docs/spec_extraction_schema.md` (Fase 1) definiu:
-  • campos DECISÃO carregam abstenção explícita — `Extracted[T]` com
-    `state ∈ {stated, inferred, absent}` + `evidence` (trecho da fonte). "Não
-    consta" vira estado conhecido, não meio-crédito cego.
-  • campos CONTEXTO são `valor | None` simples — alimentam o Stage 2 semântico /
-    a escrita (que pega profundidade via RAG) / display, e toleram ruído.
+Materializa `docs/spec_extraction_schema.md` + a curadoria externa reconciliada
+com o código (ver BACKLOG). Princípios:
+  • campos DECISÃO carregam abstenção (`Extracted[T]` com `state` + `evidence`).
+  • campos CONTEXTO são `valor | None` (alimentam Stage 2 / escrita; toleram ruído).
+  • `evidence` deve ser SUBSTRING VERBATIM da fonte (âncora de auditoria/anti-alucinação).
+  • `inferred` é PROIBIDO em GATE_FIELDS — o scoring trata inferred≡absent lá
+    (gate determinístico sobre inferência é contraditório). Permitido em contexto.
+  • a canonicalização de `themes` (vocab fechado) é passo SEGUINTE, não da extração:
+    aqui guardamos o termo CRU verbatim; `canonicalize_themes` roda depois.
 
-A extração-LLM (Fase 3) emite uma instância deste modelo via structured outputs;
-o scoring (Fase 3) lê os campos DECISÃO e aplica a política de `absent` validada
-(excluir do gate, elegibilidade normalizada pelos presentes). Aqui só definimos o
-CONTRATO — sem lógica de scoring nem chamadas de modelo.
+Sem lógica de scoring nem chamadas de modelo — só o CONTRATO.
 """
 from __future__ import annotations
 
@@ -25,20 +25,20 @@ T = TypeVar("T")
 
 class FieldState(str, Enum):
     """Origem do valor de um campo DECISÃO."""
-    STATED = "stated"      # explícito na fonte
-    INFERRED = "inferred"  # deduzido pela LLM (confiança menor)
+    STATED = "stated"      # explícito na fonte (evidence = substring verbatim)
+    INFERRED = "inferred"  # deduzido — PROIBIDO em GATE_FIELDS (scoring o trata como absent)
     ABSENT = "absent"      # não consta — a LLM deve abster, não inventar
 
 
 class Extracted(BaseModel, Generic[T]):
-    """Um campo DECISÃO: valor + de onde veio + evidência textual."""
+    """Um campo DECISÃO: valor + de onde veio + evidência textual verbatim."""
     value: T | None = None
     state: FieldState = FieldState.ABSENT
-    evidence: str | None = None  # trecho/citação da fonte; None quando absent
+    evidence: str | None = None  # substring exata da fonte; None quando absent
 
     @property
     def is_present(self) -> bool:
-        """Campo presente = tem base para decidir (não-absent e com valor)."""
+        """Presente = base para decidir (não-absent e com valor)."""
         return self.state is not FieldState.ABSENT and self.value is not None
 
 
@@ -52,64 +52,99 @@ class TrlRange(BaseModel):
     max: int | None = None
 
 
-class EditalExtraction(BaseModel):
-    """Extração canônica de um edital, agnóstica de fonte.
+class Counterpart(BaseModel):
+    """Contrapartida: não basta exigir; o % decide viabilidade (5% ≠ 50%)."""
+    required: bool | None = None
+    percentage: float | None = None  # None = % não informado
 
-    Proveniência (`source`, `native_id`) + campos DECISÃO (com abstenção) +
-    campos CONTEXTO (valor|None) + temporais (pipeline próprio em core/temporal).
+
+class FundingAmount(BaseModel):
+    """Faixa financiável do projeto (contexto p/ escrita e decisão de aplicar)."""
+    min: float | None = None
+    max: float | None = None
+
+
+class EligibilityConstraint(BaseModel):
+    """Restrição organizacional dura (região, idade, faturamento, CNAE, consórcio…).
+
+    Capturada ESTRUTURADA (não enterrada em key_requirements), com abstenção. NÃO
+    entra no gate determinístico ainda — vira sinal de contexto/HITL até o
+    CompanyProfile ter o campo-par para comparar. Ver BACKLOG (perfil é o gargalo).
     """
+    type: str                      # ex.: "region" | "company_age" | "revenue" | "cnae" | "consortium"
+    description: str               # o requisito em texto curto
+    state: FieldState = FieldState.STATED
+    evidence: str | None = None
+
+
+class EditalExtraction(BaseModel):
+    """Extração canônica de um edital, agnóstica de fonte (v2)."""
     # --- proveniência ---
     source: str
     native_id: str
 
     # --- DECISÃO (alimentam elegibilidade/ranking determinístico) ---
     eligible_entities: Extracted[list[str]] = Field(default_factory=absent)
-    themes: Extracted[list[str]] = Field(default_factory=absent)
-    eligible_sectors: Extracted[list[str]] = Field(default_factory=absent)
+    themes: Extracted[list[str]] = Field(default_factory=absent)  # CRU verbatim; canoniza depois
     trl_range: Extracted[TrlRange] = Field(default_factory=absent)
     mechanism: Extracted[str] = Field(default_factory=absent)
-    # Exceção (spec §decisões): ausência tem default de domínio ("não exige") no
-    # scoring — não entra na política de exclusão-por-absent. Ainda assim é
-    # extraível com abstenção, para o eval medir e o scoring decidir.
-    counterpart_required: Extracted[bool] = Field(default_factory=absent)
+    counterpart: Extracted[Counterpart] = Field(default_factory=absent)
+    # Flag (não-gate): o edital exige parceria com ICT? Liga o matchmaking de ICT,
+    # NÃO desqualifica (filosofia: ajudamos a achar a ICT).
+    requires_ict_partner: Extracted[bool] = Field(default_factory=absent)
 
-    # --- CONTEXTO (Stage 2 semântico / escrita / display; tolera ruído) ---
+    # --- CONTEXTO (Stage 2 semântico / escrita; tolera ruído) ---
     title: str | None = None
     objective: str | None = None
     key_requirements: list[str] = Field(default_factory=list)
+    funding_amount: FundingAmount | None = None
+    project_duration_months: int | None = None
+    # Restrições organizacionais estruturadas (capturar agora, gate quando o
+    # perfil tiver o lado oposto).
+    eligibility_constraints: list[EligibilityConstraint] = Field(default_factory=list)
 
-    # --- TEMPORAL (vigência é tratada por core/temporal.py) ---
-    status: str | None = None
-    deadline: str | None = None
+    # status/deadline NÃO vivem aqui: o pipeline temporal (core/temporal.py) é o
+    # dono (SSOT) — o PDF lido na extração fica stale com retificações.
 
 
-# Campos DECISÃO sujeitos à política de exclusão-por-absent (spec §decisões).
-# counterpart_required é DECISÃO mas fica de fora (default de domínio).
+# Campos DECISÃO (estruturados, com abstenção).
 DECISION_FIELDS: tuple[str, ...] = (
     "eligible_entities",
     "themes",
-    "eligible_sectors",
     "trl_range",
     "mechanism",
+    "counterpart",
+    "requires_ict_partner",
 )
 
-# Substantivos cuja ausência TOTAL → sem base de elegibilidade → provisório/HITL.
-SUBSTANTIVE_DECISION_FIELDS: tuple[str, ...] = (
+# GATE_FIELDS: sujeitos à exclusão-por-absent E à proibição de `inferred`.
+# Fora: counterpart (default de domínio "não exige") e requires_ict_partner (flag).
+GATE_FIELDS: tuple[str, ...] = (
     "eligible_entities",
     "themes",
     "trl_range",
     "mechanism",
 )
 
-CONTEXT_FIELDS: tuple[str, ...] = ("title", "objective", "key_requirements")
+CONTEXT_FIELDS: tuple[str, ...] = (
+    "title",
+    "objective",
+    "key_requirements",
+    "funding_amount",
+    "project_duration_months",
+    "eligibility_constraints",
+)
 
 __all__ = [
     "FieldState",
     "Extracted",
     "absent",
     "TrlRange",
+    "Counterpart",
+    "FundingAmount",
+    "EligibilityConstraint",
     "EditalExtraction",
     "DECISION_FIELDS",
-    "SUBSTANTIVE_DECISION_FIELDS",
+    "GATE_FIELDS",
     "CONTEXT_FIELDS",
 ]

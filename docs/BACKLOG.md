@@ -11,6 +11,34 @@
 
 ## Aberto
 
+### Extração v2 — itens adiados da curadoria + "perfil é o teto do matching"
+- **Insight central:** o teto do matching é o `CompanyProfile` (fino), NÃO o schema
+  do edital. Adicionar campo de decisão no edital só rende se houver o PAR no perfil.
+  Criados `uf`/`faturamento_anual`/`ano_fundacao` no perfil; falta o `profile_extractor`
+  preenchê-los e o Stage 1 usá-los.
+- **Adiados (curadoria Gemini+ChatGPT reconciliada com o código):**
+  - **Gate sobre `eligibility_constraints`** (região/idade/faturamento): o
+    `EditalExtraction` v2 já CAPTURA estruturado; falta (a) `profile_extractor`
+    preencher os pares no perfil e (b) wirar no Stage 1. Hoje são contexto/HITL.
+  - **`call_type`** (business_innovation|academic|grant|procurement|challenge):
+    tipologia que muda a interpretação dos campos. Menos urgente — o `pme_filter`
+    já descarta bolsa/acadêmico upstream.
+  - **`absent` → `not_found`/`not_applicable`**: refinar a abstenção (over-eng p/ agora).
+  - **`confidence` numérico** por campo (monitoramento/active-learning).
+  - **CNAE / consórcio** como pares perfil↔edital.
+  - **Versionar retificação ("Aditivo 01")**: atualizar campo específico vs reprocessar.
+- **Onde:** [spec_extraction_schema.md](spec_extraction_schema.md), domain/edital_extraction.py,
+  domain/user_profile.py. **Status:** aberto.
+
+### Ingestão web → matching (Descoberta Fase B)
+- **O quê:** produtizar a ingestão de editais da web (discovery) no matching de prod.
+- **Por que adiado:** FINEP+FAPESP já cobrem volume considerável; discovery foi
+  validado (provou a cegueira do Stage 1, ao vivo) mas productionizar é fluxo à parte,
+  e há outros fluxos a validar antes. Web já roda (`discover_opportunities`), entra no
+  índice local via `build_knowledge_graph`, mas fica fora do índice de prod.
+- **Ponto de entrada:** isolamento prod + qualidade/dedup dos itens `provisorio`.
+- **Status:** adiado conscientemente.
+
 ### Matching Stage 2a — scoring por embeddings em vez de geração-LLM
 - **O quê:** o Stage 2a (pontuação temática de TODOS os elegíveis) é hoje uma
   chamada generativa ao LLM que devolve `{id: score}`. Candidato a virar

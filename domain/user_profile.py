@@ -31,6 +31,14 @@ class CompanyProfile:
     tamanho_empresa: str = ""        # MEI, ME, EPP, MEDIO, GRANDE
     capital_social: float | None = None
 
+    # ── Elegibilidade organizacional ───────────────────────────────────────
+    # Pares dos critérios DUROS que os editais filtram (EditalExtraction v2:
+    # eligibility_constraints). Capturados agora para alinhar os dois lados; o
+    # gate determinístico sobre eles entra na Fase 3 (hoje são sinal/contexto).
+    uf: str = ""                       # UF/estado (elegibilidade geográfica)
+    faturamento_anual: float | None = None   # receita (≠ capital_social)
+    ano_fundacao: int | None = None    # ano de constituição (idade da empresa)
+
     # ── Perfil tecnológico ─────────────────────────────────────────────────
     trl: int | None = None       # Technology Readiness Level atual do projeto (1-9)
     equipe_resumo: str = ""
@@ -54,6 +62,12 @@ class CompanyProfile:
             parts.append(f"Porte: {self.tamanho_empresa}")
         if self.capital_social:
             parts.append(f"Capital Social: R$ {self.capital_social:,.2f}")
+        if self.faturamento_anual:
+            parts.append(f"Faturamento anual: R$ {self.faturamento_anual:,.2f}")
+        if self.uf:
+            parts.append(f"UF: {self.uf}")
+        if self.ano_fundacao:
+            parts.append(f"Ano de fundação: {self.ano_fundacao}")
         if self.trl is not None:
             parts.append(f"TRL atual do projeto: {self.trl}")
         if self.one_liner:
