@@ -113,13 +113,20 @@ partir do texto bruto da fonte, para alimentar um sistema de matching.
 
 REGRAS (críticas):
 - Para cada campo DECISÃO, devolva {{"value", "state", "evidence"}}:
-    state="stated"   → o texto AFIRMA explicitamente o valor (cite o trecho em evidence).
-    state="inferred" → você DEDUZIU de pistas indiretas (evidence = a pista).
-    state="absent"   → o texto NÃO informa. value=null, evidence=null. NÃO INVENTE.
-- "Não consta" é uma resposta válida e desejável. Alucinar elegibilidade é o pior erro.
-- Campos CONTEXTO (title, objective, key_requirements) são valor direto ou null.
+    state="stated" → o texto AFIRMA explicitamente. evidence = SUBSTRING VERBATIM
+                     do texto (copie o trecho exato, não resuma).
+    state="absent" → o texto NÃO informa. value=null, evidence=null. NÃO INVENTE.
+  NÃO use "inferred" para os campos de elegibilidade (eligible_entities, themes,
+  trl_range, mechanism): ou está escrito (stated) ou não está (absent).
+- "Não consta" é resposta válida e desejável. Alucinar elegibilidade é o pior erro.
+- themes: extraia o termo CRU como aparece (ex.: "micromobilidade"), não normalize.
+- counterpart: capture o PERCENTUAL quando houver (5% ≠ 50%).
+- eligibility_constraints: restrições organizacionais DURAS (região, idade da
+  empresa, faturamento, CNAE, consórcio) — estruture aqui, NÃO enterre só no texto.
+- Campos CONTEXTO (title, objective, key_requirements, funding_amount,
+  project_duration_months) são valor direto ou null.
 
-Responda APENAS com JSON no schema fornecido."""
+Responda APENAS com JSON no formato fornecido."""
 
 _USER = """FORMATO DE SAÍDA (use EXATAMENTE estas chaves no nível raiz — NÃO agrupe
 por categoria; preencha cada campo a partir do texto):
@@ -142,19 +149,27 @@ def _extract(item: dict) -> dict:
     # recebe — agrupar por categoria fazia ele aninhar tudo e o validador caía
     # nos defaults (absent). Aqui as chaves são exatamente os campos do schema.
     skeleton = {
-        "eligible_entities": {"value": ["empresas"], "state": "stated|inferred|absent",
-                              "evidence": "trecho da fonte ou null"},
-        "themes": {"value": ["tema"], "state": "...", "evidence": "..."},
-        "eligible_sectors": {"value": ["setor"], "state": "...", "evidence": "..."},
-        "trl_range": {"value": {"min": 4, "max": 6}, "state": "...", "evidence": "..."},
-        "mechanism": {"value": "subvencao|reembolsavel|premio|...", "state": "...",
+        "eligible_entities": {"value": ["empresas"], "state": "stated|absent",
+                              "evidence": "SUBSTRING VERBATIM da fonte ou null"},
+        "themes": {"value": ["tema CRU verbatim, ex.: micromobilidade"],
+                   "state": "stated|absent", "evidence": "..."},
+        "trl_range": {"value": {"min": 4, "max": 6}, "state": "stated|absent",
                       "evidence": "..."},
-        "counterpart_required": {"value": True, "state": "...", "evidence": "..."},
+        "mechanism": {"value": "subvencao|reembolsavel|premio|bolsa|encomenda",
+                      "state": "stated|absent", "evidence": "..."},
+        "counterpart": {"value": {"required": True, "percentage": 20},
+                        "state": "stated|absent", "evidence": "..."},
+        "requires_ict_partner": {"value": True, "state": "stated|absent", "evidence": "..."},
         "title": "título ou null",
         "objective": "objetivo em 2-3 frases ou null",
         "key_requirements": ["requisito 1", "requisito 2"],
-        "status": "ABERTA|ENCERRADA ou null",
-        "deadline": "data ou null",
+        "funding_amount": {"min": 500000, "max": 2000000},
+        "project_duration_months": 24,
+        "eligibility_constraints": [
+            {"type": "region|company_age|revenue|cnae|consortium",
+             "description": "o requisito em texto curto",
+             "state": "stated", "evidence": "substring verbatim"},
+        ],
     }
     user = _USER.format(schema=json.dumps(skeleton, ensure_ascii=False, indent=2),
                         source=item["source"], raw=item["raw"])
@@ -187,7 +202,8 @@ def main() -> int:
     p.add_argument("--dry-run", action="store_true", help="só junta inputs, sem LLM")
     args = p.parse_args()
 
-    sources = [args.source] if args.source else list(_GATHERERS)
+    # Default FINEP+FAPESP (web adiada — ver BACKLOG). Web é opt-in via --source web.
+    sources = [args.source] if args.source else ["finep", "fapesp"]
     items: list[dict] = []
     for s in sources:
         got = _GATHERERS[s](args.n)
