@@ -1,0 +1,863 @@
+[
+  {
+    "source": "finep",
+    "native_id": "778",
+    "title": "Finep Mais Inovação Brasil – Rodada 2 – Mobilidade Sustentável",
+    "input_excerpt": "Finep Mais Inovação Brasil – Rodada 2 – Mobilidade Sustentável\nEsta Seleção Pública tem por objetivo conceder recursos de subvenção econômica para atividades de pesquisa, desenvolvimento tecnológico e inovação (PD&I) em projetos inovadores, com risco tecnológico associado, executados por empresas, obrigatoriamente com a parceria de Instituições Científicas, Tecnológicas e de Inovação (ICTs). A ini",
+    "extraction": {
+      "source": "finep",
+      "native_id": "778",
+      "eligible_entities": {
+        "value": [
+          "empresas brasileiras"
+        ],
+        "state": "stated",
+        "evidence": "são elegíveis a receber recursos de subvenção econômica à inovação empresas brasileiras"
+      },
+      "themes": {
+        "value": [
+          "mobilidade aérea",
+          "metroferroviária",
+          "aquaviária",
+          "micromobilidade"
+        ],
+        "state": "stated",
+        "evidence": "nas seguintes temáticas: mobilidade aérea, metroferroviária, aquaviária e micromobilidade"
+      },
+      "eligible_sectors": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "trl_range": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "mechanism": {
+        "value": "subvencao",
+        "state": "stated",
+        "evidence": "conceder recursos de subvenção econômica"
+      },
+      "counterpart_required": {
+        "value": true,
+        "state": "stated",
+        "evidence": "recursos subvencionados e aos de contrapartida"
+      },
+      "title": "Finep Mais Inovação Brasil – Rodada 2 – Mobilidade Sustentável",
+      "objective": "Conceder recursos de subvenção econômica para atividades de pesquisa, desenvolvimento tecnológico e inovação em projetos inovadores, com risco tecnológico associado, executados por empresas, obrigatoriamente com a parceria de Instituições Científicas, Tecnológicas e de Inovação (ICTs).",
+      "key_requirements": [
+        "Empresas brasileiras devem ter realizado o registro na Junta Comercial ou no Registro Civil das Pessoas Jurídicas até 31/12 do ano anterior ao de submissão da proposta.",
+        "Empresas devem ter efetuado alguma atividade operacional nos 12 meses anteriores da apresentação do projeto."
+      ],
+      "status": null,
+      "deadline": null
+    }
+  },
+  {
+    "source": "finep",
+    "native_id": "784",
+    "title": "FIP Startup Inteligência Artificial",
+    "input_excerpt": "FIP Startup Inteligência Artificial\n  EDITAL DE CHAMADA PÚBLICA PARA A SELEÇÃO DE FUNDO DE INVESTIMENTO EM PARTICIPAÇÕES DE STARTUPS DE INTELIGÊNCIA ARTIFICIAL   A BNDES PARTICIPAÇÕES S.A. - BNDESPAR (“BNDESPAR”), sociedade anônima constituída como subsidiária integral do BANCO NACIONAL DE DESENVOLVIMENTO ECONÔMICO E SOCIAL – BNDES, com sede em Brasília, Distrito Federal, e escritório central de s",
+    "extraction": {
+      "source": "finep",
+      "native_id": "784",
+      "eligible_entities": {
+        "value": [
+          "startups"
+        ],
+        "state": "stated",
+        "evidence": "investir em startups intensivas em inteligência artificial"
+      },
+      "themes": {
+        "value": [
+          "inteligência artificial"
+        ],
+        "state": "stated",
+        "evidence": "startups intensivas em inteligência artificial"
+      },
+      "eligible_sectors": {
+        "value": [
+          "Cadeias agroindustriais",
+          "Saúde",
+          "Infraestrutura, saneamento, mobilidade e logística",
+          "Transformação digital da indústria",
+          "Bioeconomia, descarbonização, soluções para o mercado de carbono, transição e segurança energéticas",
+          "Tecnologias de interesse para a soberania e defesa nacionais, cibersegurança e segurança pública"
+        ],
+        "state": "stated",
+        "evidence": "o Fundo apoiará, preferencialmente, Companhias-Alvo que desenvolvam soluções baseadas em inteligência artificial para os seguintes setores estratégicos"
+      },
+      "trl_range": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "mechanism": {
+        "value": "investimento",
+        "state": "stated",
+        "evidence": "gestão de um Fundo de Investimento em Participações"
+      },
+      "counterpart_required": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "title": "FIP Startup Inteligência Artificial",
+      "objective": "Investir em startups intensivas em inteligência artificial, entendidas como aquelas que tenham a inteligência artificial como elemento central de seu modelo de negócios e geração de valor.",
+      "key_requirements": [
+        "Startups devem ter a inteligência artificial como elemento central do modelo de negócios.",
+        "Companhias-Alvo devem atender aos requisitos de limite de receita bruta anual dispostos na Seção II, do Capítulo V, do Anexo Normativo IV da RCVM 175."
+      ],
+      "status": null,
+      "deadline": null
+    }
+  },
+  {
+    "source": "finep",
+    "native_id": "772",
+    "title": "Finep Mais Inovação Brasil – Rodada 2 – Transição Energética",
+    "input_excerpt": "Finep Mais Inovação Brasil – Rodada 2 – Transição Energética\nEsta Seleção Pública tem por objetivo conceder recursos de subvenção econômica para atividades de pesquisa, desenvolvimento tecnológico e inovação (PD&I) em projetos inovadores, com risco tecnológico associado, executados por empresas, obrigatoriamente com a parceria de Instituições Científicas, Tecnológicas e de Inovação (ICTs). A inici",
+    "extraction": {
+      "source": "finep",
+      "native_id": "772",
+      "eligible_entities": {
+        "value": [
+          "empresas"
+        ],
+        "state": "stated",
+        "evidence": "são elegíveis a receber recursos de subvenção econômica à inovação empresas brasileiras"
+      },
+      "themes": {
+        "value": [
+          "transição energética",
+          "tecnologias para geração de eletricidade",
+          "armazenamento de energia",
+          "hidrogênio de baixa emissão de carbono",
+          "biocombustíveis",
+          "biogás e biometano",
+          "captura de carbono"
+        ],
+        "state": "stated",
+        "evidence": "promover o desenvolvimento de tecnologias essenciais para a transição energética, em temáticas como tecnologias para geração de eletricidade, armazenamento de energia, hidrogênio de baixa emissão de carbono, biocombustíveis, biogás e biometano, captura de carbono"
+      },
+      "eligible_sectors": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "trl_range": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "mechanism": {
+        "value": "subvencao",
+        "state": "stated",
+        "evidence": "conceder recursos de subvenção econômica para atividades de pesquisa, desenvolvimento tecnológico e inovação"
+      },
+      "counterpart_required": {
+        "value": true,
+        "state": "stated",
+        "evidence": "Todo o regramento deste Regulamento referente aos gastos e recursos para execução do projeto se aplica aos recursos subvencionados e aos de contrapartida."
+      },
+      "title": "Finep Mais Inovação Brasil – Rodada 2 – Transição Energética",
+      "objective": "Conceder recursos de subvenção econômica para atividades de pesquisa, desenvolvimento tecnológico e inovação em projetos inovadores, com risco tecnológico associado, executados por empresas, obrigatoriamente com a parceria de Instituições Científicas, Tecnológicas e de Inovação (ICTs).",
+      "key_requirements": [
+        "Empresas brasileiras com sede no território nacional",
+        "Parceria obrigatória com Instituições Científicas, Tecnológicas e de Inovação (ICTs)"
+      ],
+      "status": null,
+      "deadline": null
+    }
+  },
+  {
+    "source": "finep",
+    "native_id": "769",
+    "title": "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT - Subvenção Econômica à Inovação - DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+    "input_excerpt": "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT - Subvenção Econômica à Inovação - DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR\n  Esta Seleção Pública objetiva conceder recursos de subvenção econômica para apoiar o desenvolvimento de um pacote tecnológico de baixo custo, por empresas brasileiras, de modo a promover o aumento da oferta de alimentos, o combate à fome e à pobreza e o desenvolvimento econômico e ",
+    "extraction": {
+      "source": "finep",
+      "native_id": "769",
+      "eligible_entities": {
+        "value": [
+          "empresas brasileiras",
+          "cooperativas"
+        ],
+        "state": "stated",
+        "evidence": "são elegíveis a receber recursos de subvenção econômica à inovação: a) empresas brasileiras, definidas como pessoa jurídica com sede no território nacional que exerce atividade econômica organizada para a produção ou a circulação de bens ou de serviços com intuito lucrativo; b) Cooperativas com sede no território nacional"
+      },
+      "themes": {
+        "value": [
+          "inovação",
+          "agricultura familiar"
+        ],
+        "state": "stated",
+        "evidence": "objetivo é apoiar o desenvolvimento de projetos de inovação voltados para a agricultura familiar"
+      },
+      "eligible_sectors": {
+        "value": [
+          "agricultura"
+        ],
+        "state": "inferred",
+        "evidence": "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR"
+      },
+      "trl_range": {
+        "value": {
+          "min": 3,
+          "max": 8
+        },
+        "state": "stated",
+        "evidence": "atividades estejam compreendidas entre os níveis de maturidade tecnológica (TRL) 3 a 8"
+      },
+      "mechanism": {
+        "value": "subvencao",
+        "state": "stated",
+        "evidence": "objetiva conceder recursos de subvenção econômica"
+      },
+      "counterpart_required": {
+        "value": true,
+        "state": "stated",
+        "evidence": "Todo o regramento deste Edital referente aos gastos e recursos para execução do projeto se aplica aos recursos subvencionados e aos de contrapartida."
+      },
+      "title": "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT - Subvenção Econômica à Inovação - DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+      "objective": "Apoiar o desenvolvimento de um pacote tecnológico de baixo custo por empresas brasileiras para promover o aumento da oferta de alimentos, o combate à fome e à pobreza e o desenvolvimento econômico e social brasileiro.",
+      "key_requirements": [
+        "Empresas brasileiras devem ter registro na Junta Comercial ou no RCPJ até 31/12 do ano anterior à submissão da proposta.",
+        "Empresas devem ter realizado alguma atividade operacional nos 12 meses anteriores à apresentação do projeto."
+      ],
+      "status": null,
+      "deadline": null
+    }
+  },
+  {
+    "source": "finep",
+    "native_id": "781",
+    "title": "Prêmio Mulheres Inovadoras – 7ª edição – 2026",
+    "input_excerpt": "Prêmio Mulheres Inovadoras – 7ª edição – 2026\nO Programa Mulheres Inovadoras é uma iniciativa da Finep e do Ministério da Ciência, Tecnologia e Inovação (MCTI) para estimular startups lideradas por mulheres, de forma a contribuir para o aumento da representatividade feminina no cenário empreendedor nacional, por meio da capacitação e do reconhecimento de empreendimentos que possam favorecer o incr",
+    "extraction": {
+      "source": "finep",
+      "native_id": "781",
+      "eligible_entities": {
+        "value": [
+          "startups lideradas por mulheres"
+        ],
+        "state": "stated",
+        "evidence": "O Programa Mulheres Inovadoras é uma iniciativa da Finep e do Ministério da Ciência, Tecnologia e Inovação (MCTI) para estimular startups lideradas por mulheres"
+      },
+      "themes": {
+        "value": [
+          "Healthtech",
+          "Educação",
+          "Saneamento Básico e Segurança Hídrica",
+          "Agritech",
+          "Foodtech",
+          "Defesa e Segurança Nacional",
+          "Cidades Inteligentes e Sustentáveis",
+          "Energia Renovável e Eficiência Energética",
+          "Bioeconomia",
+          "Tratamento da Poluição e de Resíduos Sólidos",
+          "Monitoramento, prevenção e recuperação de desastres naturais e ambientais",
+          "Preservação ambiental",
+          "Segurança pública e privada",
+          "Nova Indústria Brasil",
+          "Negócios de Impacto"
+        ],
+        "state": "stated",
+        "evidence": "Temas prioritários: Healthtech, Educação; Saneamento Básico e Segurança Hídrica; Agritech; Foodtech; Defesa e Segurança Nacional; Cidades Inteligentes e Sustentáveis; Energia Renovável e Eficiência Energética; Bioeconomia; Tratamento da Poluição e de Resíduos Sólidos; Monitoramento, prevenção e recuperação de desastres naturais e ambientais; Preservação ambiental; Segurança pública e privada; Nova Indústria Brasil; e Negócios de Impacto."
+      },
+      "eligible_sectors": {
+        "value": [
+          "Biotecnologia",
+          "Inteligência Artificial",
+          "Internet das Coisas",
+          "Nanotecnologia",
+          "5G e Wi-fi 6",
+          "Blockchain",
+          "Nuvem",
+          "Realidade Estendida e interfaces imersivas",
+          "Automação de processos robóticos",
+          "Big data"
+        ],
+        "state": "stated",
+        "evidence": "Tecnologias Prioritárias: Biotecnologia; Inteligência Artificial (IA); Internet das Coisas (IoT); Nanotecnologia; 5G e Wi-fi 6; Blockchain; Nuvem; Realidade Estendida (XR) e interfaces imersivas; Automação de processos robóticos (RPA); Big data."
+      },
+      "trl_range": {
+        "value": {
+          "min": 4,
+          "max": 6
+        },
+        "state": "inferred",
+        "evidence": "5 em estágio de validação e 5 em estágios mais avançados de tração e escala"
+      },
+      "mechanism": {
+        "value": "premio",
+        "state": "stated",
+        "evidence": "Aquelas que cumprirem todo o processo de forma satisfatória receberão um prêmio de R$ 60 mil para usar em seu negócio"
+      },
+      "counterpart_required": {
+        "value": false,
+        "state": "inferred",
+        "evidence": "Não há menção de contrapartida exigida para receber o prêmio"
+      },
+      "title": "Prêmio Mulheres Inovadoras – 7ª edição – 2026",
+      "objective": "O Programa Mulheres Inovadoras é uma iniciativa da Finep e do Ministério da Ciência, Tecnologia e Inovação (MCTI) para estimular startups lideradas por mulheres, de forma a contribuir para o aumento da representatividade feminina no cenário empreendedor nacional, por meio da capacitação e do reconhecimento de empreendimentos que possam favorecer o incremento da competitividade brasileira.",
+      "key_requirements": [
+        "Startups lideradas por mulheres",
+        "Participação em aceleração de 8,5 semanas"
+      ],
+      "status": "ABERTA",
+      "deadline": null
+    }
+  },
+  {
+    "source": "fapesp",
+    "native_id": "18041",
+    "title": "Chamada - Bolsa de Intercâmbio Internacional PRH-ANP (BEPE ANP) 2026",
+    "input_excerpt": "Chamada - Bolsa de Intercâmbio Internacional PRH-ANP (BEPE ANP) 2026\nBolsa de Intercâmbio Internacional PRH-ANP (BEPE ANP) 2026\n\nBarra de Ferramentas Aberta\n\nFerramentas de Acessibilidade\n\n \n\nFerramentas de Acessibilidade\n\nAumentar o Texto\n\nAumentar o Texto\n\nDiminuir o Texto\n\nDiminuir o Texto\n\nEscala de Cinza\n\nEscala de Cinza\n\nAlto Contraste\n\nAlto Contraste\n\nContraste Negativo\n\nContraste Negativo\n",
+    "extraction": {
+      "source": "fapesp",
+      "native_id": "18041",
+      "eligible_entities": {
+        "value": [
+          "bolsistas PRH-ANP de graduação, mestrado e doutorado"
+        ],
+        "state": "stated",
+        "evidence": "Elegibilidade: Bolsistas PRH-ANP de graduação, mestrado e doutorado"
+      },
+      "themes": {
+        "value": [
+          "ciência, tecnologia e inovação",
+          "desenvolvimento de áreas estratégicas"
+        ],
+        "state": "inferred",
+        "evidence": "contribuindo simultaneamente para: i) o avanço do projeto individual do bolsista no âmbito do PRH-ANP; ii) o fortalecimento da ciência, tecnologia e inovação (CT&I) na instituição de origem; e iii) o desenvolvimento das áreas estratégicas contempladas pelo PRH-ANP."
+      },
+      "eligible_sectors": {
+        "value": [
+          "petróleo",
+          "gás",
+          "energias renováveis"
+        ],
+        "state": "inferred",
+        "evidence": "mentor: empregador, supervisor de projeto industrial ou colaborador externo com experiência profissional comprovada no setor de petróleo, gás e energias renováveis."
+      },
+      "trl_range": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "mechanism": {
+        "value": "bolsa",
+        "state": "stated",
+        "evidence": "Modalidade de Apoio – FAPESP: Bolsa Estágio de Pesquisa no Exterior (BEPE)"
+      },
+      "counterpart_required": {
+        "value": false,
+        "state": "inferred",
+        "evidence": "Não há menção a contrapartida financeira exigida dos bolsistas."
+      },
+      "title": "Bolsa de Intercâmbio Internacional PRH-ANP (BEPE ANP) 2026",
+      "objective": "A Bolsa de Intercâmbio Internacional do PRH-ANP (BEPE ANP) visa complementar a formação do bolsista PRH-ANP por meio da realização de atividades de pesquisa em instituição estrangeira de excelência, contribuindo para o avanço do projeto individual do bolsista e o fortalecimento da ciência, tecnologia e inovação na instituição de origem.",
+      "key_requirements": [
+        "Ser bolsista PRH-ANP de graduação, mestrado ou doutorado",
+        "Realizar atividades de pesquisa em instituição estrangeira de excelência"
+      ],
+      "status": "ABERTA",
+      "deadline": "31 de maio de 2026, 23h59, horário de São Paulo"
+    }
+  },
+  {
+    "source": "fapesp",
+    "native_id": "18069",
+    "title": "Escolas São Paulo de Ciência Avançada (ESPCA) - 20ª Chamada",
+    "input_excerpt": "Escolas São Paulo de Ciência Avançada (ESPCA) - 20ª Chamada\n“Programas Regulares” > “Auxílios a Pesquisa” > “Organização de Evento Científico” > “Escola São Paulo de Ciência Avançada” > “Chamada de Propostas 2026” > “Confirmar” > “Incluir”.\r\n\r\nOs documentos necessários são:\r\n\r\na) Proposta detalhada da Escola contendo as informações abaixo listadas, as quais são imprescindíveis para a análise:\r\n\r\ni",
+    "extraction": {
+      "source": "fapesp",
+      "native_id": "18069",
+      "eligible_entities": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "themes": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "eligible_sectors": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "trl_range": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "mechanism": {
+        "value": "auxílio",
+        "state": "stated",
+        "evidence": "O Auxílio à Organização de Reunião Científica, que inclui a ESPCA"
+      },
+      "counterpart_required": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "title": "Escolas São Paulo de Ciência Avançada (ESPCA) - 20ª Chamada",
+      "objective": "Organização de evento científico para a Escola São Paulo de Ciência Avançada, com foco em atrair estudantes nacionais e estrangeiros e promover a divulgação científica.",
+      "key_requirements": [
+        "Proposta detalhada da Escola com programa completo do curso",
+        "Indicação da composição da Comissão Organizadora e Científica",
+        "Justificativa da importância da Escola no cenário científico ou tecnológico"
+      ],
+      "status": null,
+      "deadline": null
+    }
+  },
+  {
+    "source": "fapesp",
+    "native_id": "18123",
+    "title": "Chamada de Propostas 2026 do PROPASP (Programa de Pesquisa Alemanha – São Paulo) – FAPESP e DAAD (Serviço Alemão de Intercâmbio Acadêmico)",
+    "input_excerpt": "Chamada de Propostas 2026 do PROPASP (Programa de Pesquisa Alemanha – São Paulo) – FAPESP e DAAD (Serviço Alemão de Intercâmbio Acadêmico)\nChamada de Propostas 2026 do PROPASP (Programa de Pesquisa Alemanha – São Paulo) – FAPESP e DAAD (Serviço Alemão de Intercâmbio Acadêmico)\n\nBarra de Ferramentas Aberta\n\nFerramentas de Acessibilidade\n\n \n\nFerramentas de Acessibilidade\n\nAumentar o Texto\n\nAumentar ",
+    "extraction": {
+      "source": "fapesp",
+      "native_id": "18123",
+      "eligible_entities": {
+        "value": [
+          "pesquisadores"
+        ],
+        "state": "stated",
+        "evidence": "Podem submeter propostas nesta Chamada Pesquisadores Responsáveis por Auxílios à Pesquisa FAPESP vigentes"
+      },
+      "themes": {
+        "value": [
+          "cooperação científica e tecnológica"
+        ],
+        "state": "stated",
+        "evidence": "com o objetivo de implementar a cooperação científica e tecnológica entre pesquisadores da Alemanha e do estado de São Paulo"
+      },
+      "eligible_sectors": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "trl_range": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "mechanism": {
+        "value": "mobilidade",
+        "state": "stated",
+        "evidence": "Modalidade de Apoio: Mobilidade de pesquisadores e bolsistas da FAPESP"
+      },
+      "counterpart_required": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "title": "Chamada de Propostas 2026 do PROPASP (Programa de Pesquisa Alemanha – São Paulo) – FAPESP e DAAD",
+      "objective": "Financiar projetos de pesquisa em conjunto de pesquisadores de São Paulo e da Alemanha, em todas as áreas do conhecimento, para implementar a cooperação científica e tecnológica.",
+      "key_requirements": [
+        "Pesquisadores com Auxílio à Pesquisa vigente na FAPESP",
+        "Proposta colaborativa submetida pelo pesquisador da Alemanha ao DAAD e pelo pesquisador de São Paulo à FAPESP"
+      ],
+      "status": "ABERTA",
+      "deadline": "8 de junho de 2026"
+    }
+  },
+  {
+    "source": "fapesp",
+    "native_id": "17952",
+    "title": "Chamada de Propostas - Iniciativa Internacional de Pesquisa sobre o Uso de Tecnologias Disruptivas para o Enfrentamento de Desafios Globais (IIDTAC)",
+    "input_excerpt": "Chamada de Propostas - Iniciativa Internacional de Pesquisa sobre o Uso de Tecnologias Disruptivas para o Enfrentamento de Desafios Globais (IIDTAC)\nChamada de Propostas - Iniciativa Internacional de Pesquisa sobre o Uso de Tecnologias Disruptivas para o Enfrentamento de Desafios Globais (IIDTAC)\n\nBarra de Ferramentas Aberta\n\nFerramentas de Acessibilidade\n\n \n\nFerramentas de Acessibilidade\n\nAumenta",
+    "extraction": {
+      "source": "fapesp",
+      "native_id": "17952",
+      "eligible_entities": {
+        "value": [
+          "pesquisadores"
+        ],
+        "state": "stated",
+        "evidence": "As equipes de projeto devem ser interdisciplinares, incorporando as expertises disciplinares necessárias."
+      },
+      "themes": {
+        "value": [
+          "tecnologias disruptivas",
+          "desafios globais",
+          "Objetivos de Desenvolvimento Sustentável (ODS)"
+        ],
+        "state": "stated",
+        "evidence": "Esta Chamada visa aproveitar o potencial das tecnologias disruptivas para oferecer soluções inovadoras aos desafios globais e acelerar o progresso rumo à concretização dos Objetivos de Desenvolvimento Sustentável (ODS)."
+      },
+      "eligible_sectors": {
+        "value": [
+          "acadêmico",
+          "pesquisa",
+          "econômico",
+          "social",
+          "comunitário"
+        ],
+        "state": "stated",
+        "evidence": "A abordagem transetorial, envolvendo os setores acadêmico, de pesquisa, econômico (empresas), social (organizações governamentais e não governamentais) e/ou comunitário."
+      },
+      "trl_range": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "mechanism": {
+        "value": "auxílio à pesquisa",
+        "state": "stated",
+        "evidence": "Modalidades de Apoio na FAPESP: Auxílio à Pesquisa - Projeto Temático e Auxílio à Pesquisa Regular"
+      },
+      "counterpart_required": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "title": "Iniciativa Internacional de Pesquisa sobre o Uso de Tecnologias Disruptivas para o Enfrentamento de Desafios Globais (IIDTAC)",
+      "objective": "A IIDTAC representa uma colaboração entre agências de fomento para apoiar pesquisas internacionais, interdisciplinares e transformativas voltadas ao uso de tecnologias disruptivas para o enfrentamento dos principais desafios sociais globais.",
+      "key_requirements": [
+        "Propostas devem atender às condições gerais das modalidades Auxílio à Pesquisa Regular ou Projeto Temático.",
+        "Equipe de projeto deve ser elegível para receber recursos de pelo menos três Agências de Fomento."
+      ],
+      "status": "ABERTA",
+      "deadline": "03 de novembro de 2026"
+    }
+  },
+  {
+    "source": "fapesp",
+    "native_id": "18067",
+    "title": "Chamada de Propostas - Auxílio à Inovação Regular",
+    "input_excerpt": "Chamada de Propostas - Auxílio à Inovação Regular\nChamada de Propostas - Auxílio à Inovação Regular\n\nBarra de Ferramentas Aberta\n\nFerramentas de Acessibilidade\n\n \n\nFerramentas de Acessibilidade\n\nAumentar o Texto\n\nAumentar o Texto\n\nDiminuir o Texto\n\nDiminuir o Texto\n\nEscala de Cinza\n\nEscala de Cinza\n\nAlto Contraste\n\nAlto Contraste\n\nContraste Negativo\n\nContraste Negativo\n\nLinks Sublinhados\n\nLinks Su",
+    "extraction": {
+      "source": "fapesp",
+      "native_id": "18067",
+      "eligible_entities": {
+        "value": [
+          "instituições de pesquisa públicas ou privadas"
+        ],
+        "state": "stated",
+        "evidence": "a Instituição Sede obrigatoriamente deve ser uma instituição de pesquisa pública ou privada"
+      },
+      "themes": {
+        "value": [
+          "inovação",
+          "desenvolvimento técnico-científico"
+        ],
+        "state": "stated",
+        "evidence": "O Auxílio à Inovação Regular visa a apoiar projetos de desenvolvimento técnico-científicos, com foco na geração de soluções inovadoras"
+      },
+      "eligible_sectors": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "trl_range": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "mechanism": {
+        "value": "auxílio",
+        "state": "stated",
+        "evidence": "Modalidade de Apoio: Auxílio à Inovação Regular (AIR)"
+      },
+      "counterpart_required": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "title": "Chamada de Propostas - Auxílio à Inovação Regular",
+      "objective": "Selecionar propostas na modalidade Auxílio à Inovação Regular a serem desenvolvidas sob a responsabilidade de um Pesquisador Responsável que possua vínculo com a Instituição Sede do estado de São Paulo, pública ou privada, que sediará o projeto.",
+      "key_requirements": [
+        "Pesquisador Responsável deve ter título de doutor ou qualificação equivalente",
+        "Instituição Sede deve ser uma instituição de pesquisa pública ou privada com infraestrutura de pesquisa instalada"
+      ],
+      "status": "ABERTA",
+      "deadline": "15/06/2026"
+    }
+  },
+  {
+    "source": "mcti",
+    "native_id": "httpswwwgovbrobrasgovpt-brnoticias2026mais-inovacao-brasil-abre-novo-edital-para",
+    "title": "Mais Inovação Brasil abre novo edital para impulsionar tecnologias voltadas à Economia Circular e Cidades Sustentáveis",
+    "input_excerpt": "Mais Inovação Brasil abre novo edital para impulsionar tecnologias voltadas à Economia Circular e Cidades Sustentáveis EDITAL Mais Inovação Brasil abre novo edital para impulsionar tecnologias voltadas à Economia Circular e Cidades Sustentáveis Iniciativa do MCTI e da Finep apoia projetos inovadores com foco em construção sustentável, digitalização e BIM. Publicado em 02/04/2026 11:20 Compartilhe ",
+    "extraction": {
+      "source": "mcti",
+      "native_id": "httpswwwgovbrobrasgovpt-brnoticias2026mais-inovacao-brasil-abre-novo-edital-para",
+      "eligible_entities": {
+        "value": [
+          "empresas"
+        ],
+        "state": "stated",
+        "evidence": "Podem participar empresas brasileiras de todos os portes que apresentem propostas de pesquisa, desenvolvimento e inovação (PD&I)."
+      },
+      "themes": {
+        "value": [
+          "Economia Circular",
+          "Cidades Sustentáveis"
+        ],
+        "state": "stated",
+        "evidence": "Mais Inovação Brasil abre novo edital para impulsionar tecnologias voltadas à Economia Circular e Cidades Sustentáveis"
+      },
+      "eligible_sectors": {
+        "value": [
+          "construção sustentável",
+          "digitalização",
+          "BIM"
+        ],
+        "state": "stated",
+        "evidence": "apoia projetos inovadores com foco em construção sustentável, digitalização e BIM."
+      },
+      "trl_range": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "mechanism": {
+        "value": "subvencao",
+        "state": "stated",
+        "evidence": "são disponibilizados R$ 150 milhões em recursos não reembolsáveis, por meio de Subvenção Econômica"
+      },
+      "counterpart_required": {
+        "value": false,
+        "state": "inferred",
+        "evidence": "recursos não reembolsáveis"
+      },
+      "title": "Mais Inovação Brasil - Economia Circular e Cidades Sustentáveis",
+      "objective": "Fomentar o desenvolvimento de tecnologias inovadoras em áreas estratégicas para o país, com foco em construção sustentável, digitalização e BIM.",
+      "key_requirements": [
+        "Participação de empresas brasileiras de todos os portes",
+        "Participação de Instituições Científicas e Tecnológicas (ICTs) como prestadoras de serviços de consultoria"
+      ],
+      "status": "ABERTA",
+      "deadline": "31 de agosto de 2026"
+    }
+  },
+  {
+    "source": "fortec",
+    "native_id": "httpsfortecorgbrwp-contentuploads202603edital-premio-fortec-2026pdf",
+    "title": "Prêmio FORTEC de Inovação 2026",
+    "input_excerpt": "%PDF-1.4 %���� 1 0 obj < > endobj 3 0 obj < > endobj 10 0 obj < > stream x����J�`\u0014��Ԃ(��\u000e 28�h��mRpi#\u0016�V!�S�� �IHS�\u0002tspu+.ހ�e(\b\u000e��%���| �:t����� �� � @V�� G�zM��<���$*�xÐ�!��K�����c��\u0019z�\u0007\u0010G��\u0002� ��\u0012>\u0013�&|)�4\u000ec�Ƃ��� � �ٛbw��0\u0012�o�Π?�һY���M�\u0002֩\u0013\u0010УO� > stream ����\u0000\u0010JFIF\u0000\u0001\u0002\u0000\u0000\u0001\u0000\u0001\u0000\u0000��\u0000C\u0000\b\u0006\u0006\u0007\u0006\u0005\b\u0007\u0007\u0007 \b \u0014 \u0019\u0012\u0013\u000f\u0014 \u001a \u001a $.' \",# (7),01444 '9=82<.342��\u0000C\u0001 \u0018 \u00182! !22222222222222222222222222222222222222222222222222��\u0000\u0011\b\u0001",
+    "extraction": {
+      "source": "fortec",
+      "native_id": "httpsfortecorgbrwp-contentuploads202603edital-premio-fortec-2026pdf",
+      "eligible_entities": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "themes": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "eligible_sectors": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "trl_range": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "mechanism": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "counterpart_required": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "title": null,
+      "objective": null,
+      "key_requirements": [],
+      "status": null,
+      "deadline": null
+    }
+  },
+  {
+    "source": "mcti",
+    "native_id": "httpswwwgovbrmctipt-bracompanhe-o-mctinoticias202604edital-de-r-300-milhoes-apoi",
+    "title": "Edital de R$ 300 milhões apoia empresas no desenvolvimento de tecnologias digitais avançadas — Ministério da Ciência, Tecnologia e Inovação",
+    "input_excerpt": "Edital de R$ 300 milhões apoia empresas no desenvolvimento de tecnologias digitais avançadas — Ministério da Ciência, Tecnologia e Inovação Atenção! Seu navegador não pode executar javascript. Alguns recursos podem não funcionar corretamente. Info Notícias FOMENTO À INOVAÇÃO Edital de R$ 300 milhões apoia empresas no desenvolvimento de tecnologias digitais avançadas Chamada integra o programa Mais",
+    "extraction": {
+      "source": "mcti",
+      "native_id": "httpswwwgovbrmctipt-bracompanhe-o-mctinoticias202604edital-de-r-300-milhoes-apoi",
+      "eligible_entities": {
+        "value": [
+          "empresas"
+        ],
+        "state": "stated",
+        "evidence": "Edital de R$ 300 milhões apoia empresas no desenvolvimento de tecnologias digitais avançadas"
+      },
+      "themes": {
+        "value": [
+          "tecnologias digitais",
+          "inteligência artificial",
+          "computação em nuvem",
+          "robótica avançada",
+          "tecnologias quânticas",
+          "proteção digital de crianças e adolescentes"
+        ],
+        "state": "stated",
+        "evidence": "Entre os focos estão: Inteligência artificial (IA), Computação em nuvem e alto desempenho, Robótica avançada, Tecnologias quânticas, Proteção digital de crianças e adolescentes"
+      },
+      "eligible_sectors": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "trl_range": {
+        "value": {
+          "min": 3,
+          "max": 8
+        },
+        "state": "stated",
+        "evidence": "Os projetos devem se enquadrar entre os níveis 3 e 8 de maturidade tecnológica (TRL)"
+      },
+      "mechanism": {
+        "value": "subvencao",
+        "state": "stated",
+        "evidence": "O financiamento ocorre por meio de subvenção econômica"
+      },
+      "counterpart_required": {
+        "value": true,
+        "state": "stated",
+        "evidence": "com exigências de contrapartida financeira conforme o porte da empresa"
+      },
+      "title": "Edital de R$ 300 milhões apoia empresas no desenvolvimento de tecnologias digitais avançadas",
+      "objective": "O objetivo é transformar ideias em soluções concretas para o dia a dia da população ao apoiar financeiramente projetos desde a fase inicial de desenvolvimento até a validação de tecnologias.",
+      "key_requirements": [
+        "Comprovar atuação em pesquisa e desenvolvimento",
+        "Parceria com instituições científicas e tecnológicas"
+      ],
+      "status": "ABERTA",
+      "deadline": "30 de setembro de 2026"
+    }
+  },
+  {
+    "source": "finep",
+    "native_id": "httpscreditoempreendedorcombreditais-de-inovacao20-editais-que-financiam-ideias-",
+    "title": "Finep Mais Inovação – Cadeias Agroindustriais Sustentáveis",
+    "input_excerpt": "20 editais que financiam ideias inovadoras no Brasil em 2026 - Crédito Empreendedor - Buscador de Empréstimo pra CNPJ Se você tem uma ideia disruptiva, mas o que falta é o “empurrãozinho” financeiro (ou um belo aporte), este é o seu momento. Em 2026, o ecossistema brasileiro de inovação está mais aquecido do que nunca, com recursos vindo de agências de fomento, bancos de desenvolvimento e até giga",
+    "extraction": {
+      "source": "finep",
+      "native_id": "httpscreditoempreendedorcombreditais-de-inovacao20-editais-que-financiam-ideias-",
+      "eligible_entities": {
+        "value": [
+          "empresas"
+        ],
+        "state": "stated",
+        "evidence": "Edital focado na repatriação e fixação de pesquisadores de excelência em empresas brasileiras."
+      },
+      "themes": {
+        "value": [
+          "inovação",
+          "sustentabilidade",
+          "tecnologia",
+          "segurança nacional",
+          "energias renováveis"
+        ],
+        "state": "inferred",
+        "evidence": "Focado em empresas que desenvolvem soluções para agricultura, foodtech e saúde animal com foco em sustentabilidade."
+      },
+      "eligible_sectors": {
+        "value": [
+          "agricultura",
+          "foodtech",
+          "saúde animal",
+          "defesa",
+          "indústria",
+          "tecnologia",
+          "mobilidade"
+        ],
+        "state": "inferred",
+        "evidence": "Focado em empresas que desenvolvem soluções para agricultura, foodtech e saúde animal com foco em sustentabilidade."
+      },
+      "trl_range": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "mechanism": {
+        "value": "subvencao",
+        "state": "inferred",
+        "evidence": "O Centelha transforma ideias inovadoras em negócios de sucesso através de subvenção econômica."
+      },
+      "counterpart_required": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "title": "20 editais que financiam ideias inovadoras no Brasil em 2026",
+      "objective": "Facilitar a jornada de empreendedores e empresas em busca de financiamento para ideias inovadoras, destacando oportunidades e editais que movimentam o mercado brasileiro de inovação em 2026.",
+      "key_requirements": [
+        "Leia o Edital (Sim, todo ele)",
+        "Mensure o Impacto",
+        "Cronograma é Rei"
+      ],
+      "status": "ABERTA",
+      "deadline": "30 de setembro de 2026"
+    }
+  },
+  {
+    "source": "ifsuldeminas",
+    "native_id": "httpswwwmuzifsuldeminasedubredital246-editais-reitoria6779-edital-42-2026-seleca",
+    "title": "Edital 42/2026 - Seleção de projetos de inovação e empreendedorismo",
+    "input_excerpt": "Edital 42/2026 - Seleção de projetos de inovação e empreendedorismo Ir direto para menu de acessibilidade. Seu navegador de internet está sem suporte à JavaScript. Por esse motivo algumas funcionalidades do site podem não estar acessíveis. Página inicial > Editais > Editais da Reitoria > Edital 42/2026 - Seleção de projetos de inovação e empreendedorismo Nossas Notícias Gerais Eventos EAD Vestibul",
+    "extraction": {
+      "source": "ifsuldeminas",
+      "native_id": "httpswwwmuzifsuldeminasedubredital246-editais-reitoria6779-edital-42-2026-seleca",
+      "eligible_entities": {
+        "value": [
+          "servidores do IFSULDEMINAS"
+        ],
+        "state": "stated",
+        "evidence": "Quem pode se inscrever: Servidor do IFSULDEMINAS poderá apresentar 1 (uma) proposta"
+      },
+      "themes": {
+        "value": [
+          "inovação",
+          "empreendedorismo"
+        ],
+        "state": "stated",
+        "evidence": "Seleção de projetos de inovação e empreendedorismo"
+      },
+      "eligible_sectors": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "trl_range": {
+        "value": null,
+        "state": "absent",
+        "evidence": null
+      },
+      "mechanism": {
+        "value": "subvencao",
+        "state": "inferred",
+        "evidence": "Cada proposta selecionada poderá ser financiada com recursos de custeio"
+      },
+      "counterpart_required": {
+        "value": false,
+        "state": "inferred",
+        "evidence": "não há menção a contrapartida exigida"
+      },
+      "title": "Edital 42/2026 - Seleção de projetos de inovação e empreendedorismo",
+      "objective": "Fomentar projetos que visem ao fortalecimento, à consolidação e à ampliação do ecossistema de inovação e empreendedorismo do IFSULDEMINAS.",
+      "key_requirements": [
+        "Servidor do IFSULDEMINAS poderá apresentar 1 (uma) proposta"
+      ],
+      "status": "ABERTA",
+      "deadline": "02/04/2026"
+    }
+  }
+]
