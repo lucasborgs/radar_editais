@@ -11,6 +11,45 @@
 
 ## Aberto
 
+### Matching Stage 2a — scoring por embeddings em vez de geração-LLM
+- **O quê:** o Stage 2a (pontuação temática de TODOS os elegíveis) é hoje uma
+  chamada generativa ao LLM que devolve `{id: score}`. Candidato a virar
+  **similaridade vetorial determinística**: embedding do tema/objetivo do edital
+  × embedding do perfil (cosseno), pré-computado no ETL. O LLM ficaria só no
+  Stage 2b (explicar o top-K), onde geração faz sentido.
+- **Por que adiado:** o split 2a/2b + guardrails (commit desta sessão) já matou o
+  truncamento e o `return {}` silencioso — o problema agudo está resolvido. O
+  ganho do embedding é custo/latência/determinismo, não correção. E há um risco
+  real a estudar antes (abaixo).
+- **Por que vale:** scoring determinístico, **zero token por request**, sem
+  truncamento, sem variância LLM no ranking.
+- **Risco / guarda (Lucas, 2026-06-04):** similaridade por embeddings é
+  **muito sensível à estratégia de geração dos embeddings** — o que se embeda
+  (tema canônico? objetivo bruto? título?), qual modelo, normalização,
+  granularidade. Um pipeline de embedding mal calibrado degrada o ranking de
+  forma silenciosa (pior que o LLM, que ao menos "raciocina" o fit). **Não
+  adotar sem um experimento controlado**: rodar a suíte `matching` (precisão@K)
+  com o caminho embeddings vs o caminho LLM, no MESMO golden, e só trocar se
+  empatar/superar. O harness de eval já existe para isso (`python -m core.eval
+  matching`).
+- **Ponto de entrada:** `core/hybrid_match_service.py::_call_stage2_scores`
+  (trocar a implementação, manter a assinatura `{id: float}`); embeddings
+  pré-computados no ETL (`pipeline/build_knowledge_graph.py`) + `core/embedder.py`.
+- **Status:** aberto, em estudo (gated por experimento de eval).
+
+### Matching — fit-forte sub-rankeado (ex.: finep:612 / iFlorestal)
+- **O quê:** com o Stage 2 já consertado, `finep:612` (tema "agro - bioeconomia",
+  fit forte com o perfil iFlorestal, elegível com Stage1 score=60) ainda não
+  entra no top-5; o `expected_hit` da suíte matching segue 0 para esse caso.
+- **Por que adiado:** não é bug — é tuning de qualidade. Pode ser peso do Stage 1
+  (score 60 mediano dilui o fit temático na combinação 60/40) ou a expectativa da
+  fixture estar desatualizada para o catálogo atual.
+- **Ponto de entrada:** investigar o `score_tematico` que o Stage 2 dá a
+  finep:612 vs o breakdown do Stage 1; revisar pesos (`matching_weights`) ou a
+  expectativa em `tests/fixtures/eval_matching.json`. Medir com `python -m
+  core.eval matching`.
+- **Status:** aberto.
+
 ### ICT — Fase C.2: ICT na escrita (peça 4)
 - **O quê:** quando o usuário escolhe um parceiro ICT na tela do grafo, importá-lo
   para a ContentLibrary do workspace (`create_item(type_='ict_partner', …)`) para

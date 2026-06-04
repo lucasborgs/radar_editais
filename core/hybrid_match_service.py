@@ -368,28 +368,53 @@ def score_stage1(
 # STAGE 2 — LLM SEMÂNTICO
 # =============================================================================
 
-_STAGE2_SYSTEM = """Você é um especialista em fomento à inovação no Brasil.
+# Stage 2 é dividido em duas chamadas com cardinalidade e consumidor distintos:
+#   2a SCORING  — só {id: score} de TODOS os elegíveis. Output minúsculo e
+#                 limitado → nunca trunca, mesmo com catálogo grande. É o que o
+#                 ranking precisa.
+#   2b EXPLICAÇÃO — justificativa/dimensões SÓ do top-K exibido. Output limitado
+#                 por K (não pelo tamanho do catálogo). É o que a UI mostra.
+# Antes uma única chamada gerava prosa de todos os editais → estourava
+# max_tokens e o JSON truncado caía num `return {}` silencioso (score 5.0 flat).
 
-Avalie o alinhamento temático entre o perfil de uma empresa e os editais FINEP listados.
-Esses editais já passaram por um filtro estrutural — foque apenas na adequação temática e setorial.
+_STAGE2_SCORE_SYSTEM = """Você é um especialista em fomento à inovação no Brasil.
+Avalie o alinhamento temático entre o perfil de uma empresa e editais de fomento
+que já passaram por um filtro estrutural. Foque apenas na adequação temática e
+setorial. Responda APENAS com JSON válido."""
 
-Responda APENAS com JSON válido."""
-
-_STAGE2_USER = """PERFIL DA EMPRESA:
+_STAGE2_SCORE_USER = """PERFIL DA EMPRESA:
 {profile_context}
 
-{temporal_block}EDITAIS ELEGÍVEIS PARA AVALIAÇÃO TEMÁTICA:
+{temporal_block}EDITAIS PARA AVALIAÇÃO TEMÁTICA:
 {editais_json}
 
-Para cada edital, retorne uma pontuação temática de 0.0 a 10.0 e uma justificativa curta.
-Considere: área de atuação da empresa vs temas/setores do edital, experiência prévia relevante,
-e aderência do problema/solução ao foco do programa.
+Para cada edital, dê uma pontuação temática de 0.0 a 10.0. Considere: área de
+atuação da empresa vs temas/setores do edital, experiência prévia relevante e
+aderência do problema/solução ao foco do programa.
+
+Responda SÓ com o mapa id→score, sem nenhum texto adicional:
 
 {{
-  "avaliacoes": [
+  "scores": {{ "id_do_edital_1": 8.5, "id_do_edital_2": 6.0 }}
+}}"""
+
+_STAGE2_EXPLAIN_SYSTEM = """Você é um especialista em fomento à inovação no Brasil.
+Explique de forma concisa o alinhamento temático entre o perfil de uma empresa e
+cada edital. Responda APENAS com JSON válido."""
+
+_STAGE2_EXPLAIN_USER = """PERFIL DA EMPRESA:
+{profile_context}
+
+EDITAIS:
+{editais_json}
+
+Para cada edital, escreva uma justificativa curta (máx. ~200 caracteres) e duas
+dimensões em 1 frase cada:
+
+{{
+  "explicacoes": [
     {{
       "id": "id_do_edital",
-      "score_tematico": 8.5,
       "justificativa": "A empresa atua em bioeconomia, alinhada ao foco do edital em...",
       "dimensoes": {{
         "setor": "explicação em 1 frase",
@@ -419,18 +444,12 @@ def _make_client():
     return make_client(api_key=api_key), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
-def _call_stage2(eligible: list[Stage1Result], profile: CompanyProfile) -> dict[str, dict]:
-    """Chama LLM para avaliação temática dos editais elegíveis.
-
-    Returns:
-        Dict {edital_id: {score_tematico, justificativa, dimensoes}}
-    """
-    client, model = _make_client()
-
-    editais_summary = []
-    for r in eligible:
+def _editais_summary(results: list[Stage1Result]) -> list[dict]:
+    """Resumo compacto dos editais (campos que o Stage 2 usa para julgar fit)."""
+    out = []
+    for r in results:
         c = r.card
-        editais_summary.append({
+        out.append({
             "id": c["id"],
             "title": c.get("title", ""),
             "themes": c.get("themes", []),
@@ -438,42 +457,107 @@ def _call_stage2(eligible: list[Stage1Result], profile: CompanyProfile) -> dict[
             "objective": c.get("objective"),
             "key_requirements": c.get("key_requirements", [])[:3],
         })
+    return out
 
-    # Consciência temporal (Front 3): injeta "hoje é X" + instrução de copiar
-    # status/deadline verbatim no Stage 2. Falha graciosa para bloco vazio.
+
+def _temporal_block() -> str:
+    """Bloco "hoje é X" para consciência temporal do Stage 2. Vazio se indisponível."""
     try:
         from core.temporal import render_match_temporal_block
-        temporal_block = render_match_temporal_block()
+        return render_match_temporal_block()
     except Exception as e:
         logger.debug("match Stage 2: temporal block indisponível: %s", e)
-        temporal_block = ""
+        return ""
 
-    prompt = _STAGE2_USER.format(
-        temporal_block=f"{temporal_block}\n\n" if temporal_block else "",
-        profile_context=profile.to_context(),
-        editais_json=json.dumps(editais_summary, ensure_ascii=False, indent=2),
+
+def _salvage_scores(raw: str) -> dict:
+    """Recupera pares id→score de um JSON de scores possivelmente truncado.
+
+    O schema 2a é um mapa plano `{"scores": {id: número}}` — então mesmo um corte
+    no meio ainda deixa pares `"id": número` íntegros, que extraímos por regex.
+    Salva o ranking do que o modelo já tinha decidido antes do corte.
+    """
+    scores = {}
+    for k, v in re.findall(r'"([^"]+)"\s*:\s*([0-9]+(?:\.[0-9]+)?)', raw):
+        if k != "scores":  # ignora a chave do wrapper
+            scores[k] = float(v)
+    return {"scores": scores}
+
+
+def _stage2_chat(system: str, user: str, *, max_tokens: int, salvage=None) -> dict:
+    """Chamada do Stage 2 com guardrails.
+
+    `response_format=json_object` garante envelope JSON válido; se ainda assim o
+    modelo parar por `length`, logamos ALTO (não mascaramos) e — quando há
+    `salvage` — recuperamos o parcial em vez de descartar tudo em silêncio.
+    """
+    client, model = _make_client()
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        temperature=0.1,
+        max_tokens=max_tokens,
+        response_format={"type": "json_object"},
     )
-
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": _STAGE2_SYSTEM},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.1,
-            max_tokens=2000,
+    choice = response.choices[0]
+    raw = (choice.message.content or "").strip()
+    if choice.finish_reason == "length":
+        n = getattr(response.usage, "completion_tokens", "?")
+        logger.error(
+            "Stage 2 TRUNCADO (finish_reason=length, %s/%s tokens) — output excedeu "
+            "o orçamento. %s", n, max_tokens,
+            "Salvando o parcial." if salvage else "Sem salvador para este schema.",
         )
-        raw = response.choices[0].message.content.strip()
+        if salvage is not None:
+            return salvage(raw)
+    if "```" in raw:
+        raw = re.sub(r"```(?:json)?", "", raw).strip()
+    return json.loads(raw)
 
-        if "```" in raw:
-            raw = re.sub(r"```(?:json)?", "", raw).strip()
 
-        data = json.loads(raw)
-        return {a["id"]: a for a in data.get("avaliacoes", [])}
+def _call_stage2_scores(eligible: list[Stage1Result], profile: CompanyProfile) -> dict[str, float]:
+    """Stage 2a — pontuação temática de TODOS os elegíveis. `{id: score}`.
 
+    Output minúsculo e limitado (não trunca). Em falha total devolve {} (logado
+    alto); o ranking degrada para Stage 1, mas sem o silêncio do `return {}` antigo.
+    """
+    try:
+        temporal_block = _temporal_block()
+        user = _STAGE2_SCORE_USER.format(
+            temporal_block=f"{temporal_block}\n\n" if temporal_block else "",
+            profile_context=profile.to_context(),
+            editais_json=json.dumps(_editais_summary(eligible), ensure_ascii=False, indent=2),
+        )
+        data = _stage2_chat(_STAGE2_SCORE_SYSTEM, user, max_tokens=1500, salvage=_salvage_scores)
+        return {
+            k: float(v) for k, v in (data.get("scores") or {}).items()
+            if isinstance(v, (int, float))
+        }
     except Exception as e:
-        logger.error("Erro Stage 2 LLM: %s", e)
+        logger.error("Stage 2a (scoring) falhou: %s", e)
+        return {}
+
+
+def _call_stage2_explain(
+    top_results: list[Stage1Result], profile: CompanyProfile
+) -> dict[str, dict]:
+    """Stage 2b — justificativa + dimensões SÓ do top-K exibido.
+
+    Output limitado por K (não pelo catálogo). Em falha devolve {} — é cosmético:
+    o ranking não depende disto, só a prosa de exibição.
+    """
+    try:
+        user = _STAGE2_EXPLAIN_USER.format(
+            profile_context=profile.to_context(),
+            editais_json=json.dumps(_editais_summary(top_results), ensure_ascii=False, indent=2),
+        )
+        data = _stage2_chat(_STAGE2_EXPLAIN_SYSTEM, user, max_tokens=1500)
+        return {a["id"]: a for a in (data.get("explicacoes") or []) if "id" in a}
+    except Exception as e:
+        logger.warning("Stage 2b (explicação) falhou — top-K sem prosa: %s", e)
         return {}
 
 
@@ -597,16 +681,15 @@ class HybridMatchService:
             )
             eligible = sorted(stage1_results, key=lambda r: r.score, reverse=True)[:top_k]
 
-        # --- Stage 2: alinhamento temático via LLM ---
-        semantic_scores: dict[str, dict] = {}
+        # --- Stage 2a: SCORING temático de todos os elegíveis (só {id: score}) ---
+        semantic_scores: dict[str, float] = {}
         if eligible:
-            semantic_scores = _call_stage2(eligible, profile)
+            semantic_scores = _call_stage2_scores(eligible, profile)
 
-        # --- Combina scores e monta resultado final ---
+        # --- Combina scores determinístico + semântico ---
         combined = []
         for r in eligible:
-            sem = semantic_scores.get(r.edital_id, {})
-            score_tematico = float(sem.get("score_tematico", 5.0))
+            score_tematico = float(semantic_scores.get(r.edital_id, 5.0))
 
             # Score final: 60% determinístico (normalizado 0-10) + 40% semântico
             score_det_norm = r.score / 10.0
@@ -625,8 +708,9 @@ class HybridMatchService:
                     dim: {"score": pts, "max": round(_w(weights, dim))}
                     for dim, pts in r.breakdown.items()
                 },
-                "dimensoes_semanticas": sem.get("dimensoes", {}),
-                "justificativa": sem.get("justificativa", ""),
+                # Prosa preenchida no Stage 2b, só para o top-K (abaixo).
+                "dimensoes_semanticas": {},
+                "justificativa": "",
                 "key_requirements": r.card.get("key_requirements", []),
                 "objective": r.card.get("objective"),
             }
@@ -639,4 +723,16 @@ class HybridMatchService:
             combined.append(item)
 
         combined.sort(key=lambda x: x["score"], reverse=True)
-        return combined[:top_k]
+        top = combined[:top_k]
+
+        # --- Stage 2b: EXPLICAÇÃO (justificativa/dimensões) só do top-K exibido ---
+        if top and not no_eligible:
+            top_ids = {it["id"] for it in top}
+            top_results = [r for r in eligible if r.edital_id in top_ids]
+            explanations = _call_stage2_explain(top_results, profile)
+            for it in top:
+                ex = explanations.get(it["id"], {})
+                it["justificativa"] = ex.get("justificativa", "")
+                it["dimensoes_semanticas"] = ex.get("dimensoes", {})
+
+        return top
