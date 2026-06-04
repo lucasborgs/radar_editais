@@ -25,7 +25,11 @@ from domain.edital_extraction import EditalExtraction
 
 logger = logging.getLogger(__name__)
 
-RAW_CAP = 12000  # corta o input cru para controlar tokens
+# Documento INTEIRO na janela do modelo (gpt-4o: 128k tokens). O default cobre
+# os PDFs FINEP (~129k chars ≈ 32k tokens) com folga; só corta o doc patológico.
+# Extração é 1×/edital offline → pagar o doc completo é aceitável (sem truncar
+# campos de seções finais). Ajustável via env. ~250k chars ≈ 62k tokens.
+RAW_CAP = int(os.getenv("EXTRACTION_RAW_CAP", "250000"))
 
 
 # ---------------------------------------------------------------------------
@@ -37,14 +41,45 @@ def _latest(pattern: str) -> Path | None:
     return Path(files[-1]) if files else None
 
 
+# Legendas de PDFs que NÃO são o edital (anexos, avisos, resultados, boilerplate
+# jurídico). Os campos de extração vivem no edital, não nestes — e somá-los
+# triplica tokens (uma chamada FINEP traz o edital repetido por rerratificação +
+# vários anexos), estourando o rate-limit sem ganho de sinal.
+_FINEP_NON_EDITAL = ("anexo", "aviso", "resultado", "outorga", "termo de",
+                     "declaração", "lista de", "modelo de", "especificaç")
+
+
+def _finep_edital_text(r: dict) -> str:
+    """Texto do EDITAL principal de uma chamada FINEP (descarta anexos/duplicatas).
+
+    Mantém só PDFs com legenda de edital (edital/rerratificação), remove anexos e
+    documentos administrativos, dedupa idênticos e fica com o mais longo (o corpo
+    do edital; rerratificações de mesmo tamanho colapsam). Fallback: maior PDF.
+    """
+    pt = r.get("pdf_texts") or {}
+    if not pt:
+        return ""
+    leg = r.get("pdf_legendas") or []
+    names = list(pt.keys())
+    edital: list[str] = []
+    for i, name in enumerate(names):
+        label = (leg[i] if i < len(leg) else name).lower()
+        if any(x in label for x in _FINEP_NON_EDITAL):
+            continue
+        if "edital" in label or "rerratific" in label or "documento" in label:
+            edital.append(pt[name])
+    candidates = list(dict.fromkeys(edital)) or [max(pt.values(), key=len)]
+    return max(candidates, key=len)
+
+
 def _gather_finep(n: int | None) -> list[dict]:
     f = _latest("finep_raw/*.json")
     if not f:
         return []
     out = []
     for r in json.loads(f.read_text(encoding="utf-8"))[:n]:
-        pdf = "\n".join((r.get("pdf_texts") or {}).values())
-        raw = "\n".join(filter(None, [r.get("titulo", ""), r.get("descricao", ""), pdf]))
+        raw = "\n".join(filter(None, [r.get("titulo", ""), r.get("descricao", ""),
+                                      _finep_edital_text(r)]))
         out.append({"source": "finep", "native_id": str(r.get("chamada_id", "")),
                     "title": r.get("titulo", ""), "raw": raw[:RAW_CAP]})
     return out
@@ -157,7 +192,9 @@ _SKELETON = {
 def extract_edital(source: str, native_id: str, raw: str, *, model: str | None = None) -> EditalExtraction:
     """Extrai um `EditalExtraction` do texto bruto via LLM (JSON mode + validação)."""
     from openai import OpenAI
-    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    # max_retries alto: em tiers de TPM baixo, o lote sequencial pode bater o
+    # rate-limit/min; o SDK respeita o Retry-After e re-tenta sozinho.
+    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], max_retries=6)
     model = model or os.getenv("OPENAI_MODEL_PRO", "gpt-4o")
 
     user = _USER.format(schema=json.dumps(_SKELETON, ensure_ascii=False, indent=2),
