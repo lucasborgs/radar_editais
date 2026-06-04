@@ -30,6 +30,19 @@
 - **Onde:** [spec_extraction_schema.md](spec_extraction_schema.md), domain/edital_extraction.py,
   domain/user_profile.py. **Status:** aberto.
 
+### Extração em produção — subir o tier da OpenAI (TPM)
+- **O quê:** o tier atual tem TPM (tokens/min) = 30k. Editais FINEP, mesmo após
+  selecionar só o edital (`_finep_edital_text`, sem anexos/duplicatas), batem
+  ~10-15k tokens/extração. Para o golden (10 editais) os retries do SDK seguram
+  (~3 min), mas para PRODUÇÃO (centenas de editais, 1×/cada no ETL) o lote fica
+  lento/arriscado no rate-limit.
+- **Por que adiado:** o golden roda bem no tier atual; só vira gargalo ao
+  produtizar o extrator (Fase 3/4).
+- **Ponto de entrada:** subir o tier no painel OpenAI (quase imediato após
+  uso/pagamento) OU paralelizar com throttle respeitando o TPM. `core/edital_extractor.py`
+  já tem `max_retries=6` + `RAW_CAP` via env como mitigações.
+- **Status:** aberto.
+
 ### Ingestão web → matching (Descoberta Fase B)
 - **O quê:** produtizar a ingestão de editais da web (discovery) no matching de prod.
 - **Por que adiado:** FINEP+FAPESP já cobrem volume considerável; discovery foi
