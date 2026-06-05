@@ -201,6 +201,24 @@
   ganhou regra anti-fabricação de referências (anexos/artigos não-vistos). 378 testes verdes.
 - **Status:** escrita validada p/ beta; resíduos são rigor de fixture/infra, não bloqueiam.
 
+### RAG/Escrita — editais SEM PDF ficam sem chunks (FAPESP + FINEP-sem-anexo)
+- **O quê:** `scripts/reindex_edital.py`/`chunk_edital_task` chunkam **só PDF** (via
+  `FINEP_PDFS_DIR` + adapter FINEP). Editais cujo conteúdo vive no **registro
+  estruturado** (não em PDF) ficam com `edital_chunks` vazio → na escrita o
+  `search_edital` volta vazio e o agente redige só com perfil+card (menos ancorado;
+  NÃO quebra — degrada). Confirmado no pré-aquecimento do cloud (2026-06-05): 17/20
+  editais do índice com chunks; **3 sem**: `fapesp:18067`, `fapesp:18203` (FAPESP nunca
+  tem PDF) e `finep:613` (FINEP "Programa de Investimento em Startups" — veio sem anexo,
+  só titulo+descricao de ~957 chars; NÃO é falha de download).
+- **Fix (vale p/ os 3):** caminho de chunking a partir do **texto do registro**
+  (`descricao`/`texto_cru`) quando não há PDF — idealmente no mesmo pipeline
+  (`_build_chunks_for_edital` → fallback p/ record-text quando `adapter.to_documents`
+  vier vazio), passando por `chunk_from_blocks` + embed + upsert. Idempotente como o PDF.
+- **Por que não foi feito agora:** one-off frágil p/ 3 editais de conteúdo curto rende
+  pouco sobre o que o card já dá; productizar o path é o certo. Não bloqueia o beta.
+- **Ponto de entrada:** `core/tasks.py::_build_chunks_for_edital`, `core/chunker.py`.
+  **Status:** aberto.
+
 ---
 
 ## Débitos conhecidos (menores)
