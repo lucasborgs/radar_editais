@@ -344,6 +344,89 @@ def test_submit_profile_idempotent_after_first_call():
 
 
 # ============================================================================
+# submit_profile — elegibilidade organizacional (uf / ano_fundacao / faturamento)
+# ============================================================================
+
+def test_submit_profile_threads_eligibility_fields():
+    state = ExtractionState()
+    tools = build_profile_tools(state)
+    sub = next(t for t in tools if t.name == "submit_profile")
+
+    out = sub.call({
+        "nome": "ACME Bio", "tipo_entidade": "startup",
+        "one_liner": "Bioeconomia.", "descricao_atividades": "Produz X.",
+        "uf": "sp", "ano_fundacao": 2019, "faturamento_anual": 1_200_000,
+    })
+    assert "sucesso" in out
+    assert state.submitted_profile["uf"] == "SP"  # normaliza p/ maiúsculo
+    assert state.submitted_profile["ano_fundacao"] == 2019
+    assert state.submitted_profile["faturamento_anual"] == 1_200_000.0
+
+
+def test_submit_profile_rejects_bad_uf():
+    state = ExtractionState()
+    tools = build_profile_tools(state)
+    sub = next(t for t in tools if t.name == "submit_profile")
+    out = sub.call({
+        "nome": "X", "tipo_entidade": "empresa",
+        "one_liner": "x", "descricao_atividades": "y", "uf": "São Paulo",
+    })
+    assert "uf" in out.lower() and "inválida" in out
+    assert state.submitted_profile is None
+
+
+def test_submit_profile_rejects_bad_ano_fundacao():
+    state = ExtractionState()
+    tools = build_profile_tools(state)
+    sub = next(t for t in tools if t.name == "submit_profile")
+    out = sub.call({
+        "nome": "X", "tipo_entidade": "empresa",
+        "one_liner": "x", "descricao_atividades": "y", "ano_fundacao": 1500,
+    })
+    assert "ano_fundacao" in out and "range" in out
+    assert state.submitted_profile is None
+
+
+def test_submit_profile_eligibility_fields_optional():
+    """Sem os campos novos, submit segue funcionando (defaults vazios/None)."""
+    state = ExtractionState()
+    tools = build_profile_tools(state)
+    sub = next(t for t in tools if t.name == "submit_profile")
+    out = sub.call({
+        "nome": "X", "tipo_entidade": "empresa",
+        "one_liner": "x", "descricao_atividades": "y",
+    })
+    assert "sucesso" in out
+    assert state.submitted_profile["uf"] == ""
+    assert state.submitted_profile["ano_fundacao"] is None
+    assert state.submitted_profile["faturamento_anual"] is None
+
+
+def test_extract_agent_threads_eligibility_into_profile(monkeypatch):
+    """_extract_agent mapeia uf/ano_fundacao/faturamento do submit ao CompanyProfile."""
+    pe = ProfileExtractor()
+    fake_result = AgentResult(
+        final_text="ok", steps=[], stop_reason="end_turn",
+        usage={"input_tokens": 1, "output_tokens": 1},
+    )
+
+    def fake_run_agent(**kw):
+        sub = next(t for t in kw["tools"] if t.name == "submit_profile")
+        sub.call({
+            "nome": "ACME Bio", "tipo_entidade": "startup",
+            "one_liner": "Bio.", "descricao_atividades": "Produz X.",
+            "uf": "MG", "ano_fundacao": 2017, "faturamento_anual": 800_000,
+        })
+        return fake_result
+
+    monkeypatch.setattr("core.agent_runtime.run_agent", fake_run_agent)
+    result = pe._extract_agent("https://acme.bio")
+    assert result.profile.uf == "MG"
+    assert result.profile.ano_fundacao == 2017
+    assert result.profile.faturamento_anual == 800_000.0
+
+
+# ============================================================================
 # ProfileExtractor — dispatcher
 # ============================================================================
 

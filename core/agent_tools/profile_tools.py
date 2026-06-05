@@ -250,6 +250,9 @@ def build_profile_tools(state: ExtractionState) -> list[Tool]:
         solution_summary: str = "",
         tamanho_empresa: str = "",
         trl: int | None = None,
+        uf: str = "",
+        ano_fundacao: int | None = None,
+        faturamento_anual: float | None = None,
     ) -> str:
         """Submete o perfil extraído da empresa. Termine sua investigação
         chamando esta tool exatamente uma vez quando tiver coletado dados
@@ -266,6 +269,12 @@ def build_profile_tools(state: ExtractionState) -> list[Tool]:
             tamanho_empresa: "MEI" | "ME" | "EPP" | "MEDIO" | "GRANDE". Vazio
                 se não souber inferir.
             trl: 1-9 (technology readiness level). None se não souber.
+            uf: sigla de 2 letras do estado-sede (ex.: "SP"). Se consultou o
+                CNPJ, use o campo "UF" da Receita. Vazio se não souber.
+            ano_fundacao: ano de constituição (ex.: 2018). Se consultou o CNPJ,
+                derive do ano de "Início de atividade". None se não souber.
+            faturamento_anual: receita bruta anual em R$ (número). Raramente
+                consta no site/Receita — preencha só com evidência. None se não.
         """
         if not nome.strip() or not tipo_entidade.strip():
             return (
@@ -295,6 +304,14 @@ def build_profile_tools(state: ExtractionState) -> list[Tool]:
         if trl is not None and not (1 <= int(trl) <= 9):
             return f"Erro: trl={trl} fora do range 1-9. Use None se não souber."
 
+        uf_clean = (uf or "").strip().upper()
+        if uf_clean and not re.fullmatch(r"[A-Z]{2}", uf_clean):
+            return f"Erro: uf='{uf}' inválida. Use a sigla de 2 letras (ex.: SP) ou vazio."
+
+        from datetime import date
+        if ano_fundacao is not None and not (1900 <= int(ano_fundacao) <= date.today().year):
+            return f"Erro: ano_fundacao={ano_fundacao} fora do range 1900-{date.today().year}. Use None se não souber."
+
         state.submitted_profile = {
             "nome": nome.strip(),
             "tipo_entidade": tipo_entidade.lower(),
@@ -303,6 +320,9 @@ def build_profile_tools(state: ExtractionState) -> list[Tool]:
             "solution_summary": solution_summary.strip(),
             "tamanho_empresa": tamanho_empresa.upper() if tamanho_empresa else "",
             "trl": int(trl) if trl is not None else None,
+            "uf": uf_clean,
+            "ano_fundacao": int(ano_fundacao) if ano_fundacao is not None else None,
+            "faturamento_anual": float(faturamento_anual) if faturamento_anual is not None else None,
         }
         return (
             "Perfil submetido com sucesso. Responda ao usuário com um "

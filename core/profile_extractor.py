@@ -33,7 +33,9 @@ Schema de saída:
   "solution_summary": string | null,
   "descricao_atividades": string | null,
   "tamanho_empresa": "MEI" | "ME" | "EPP" | "MEDIO" | "GRANDE" | null,
-  "trl": int | null
+  "trl": int | null,
+  "uf": string | null,
+  "ano_fundacao": int | null
 }}
 
 Texto do site:
@@ -69,12 +71,20 @@ CAMPOS DO PERFIL (submit_profile)
 - solution_summary: 1 frase sobre solução principal (opcional)
 - tamanho_empresa: porte BNDES (MEI/ME/EPP/MEDIO/GRANDE), opcional
 - trl: 1-9 se for empresa de tecnologia com produto identificável; None se não
+- uf: sigla de 2 letras do estado-sede (ex.: 'SP'), opcional
+- ano_fundacao: ano de constituição (ex.: 2018), opcional
+- faturamento_anual: receita bruta anual em R$, opcional
 
 INFERINDO PORTE E TRL
 - Porte: deduza de receita declarada, número de funcionários, ou
   classificação no CNPJ (se você consultou). Não chute por intuição.
 - TRL: TRL ≤ 3 = pesquisa/conceito; TRL 4-6 = protótipo/piloto; TRL 7-9 =
   produto em produção. Só atribua se tiver evidência clara.
+
+ELEGIBILIDADE ORGANIZACIONAL (uf / ano_fundacao / faturamento_anual)
+- São os pares que os editais filtram (região, idade da empresa, porte/receita).
+- Se você consultou o CNPJ com lookup_cnpj, derive 'uf' do campo "UF" e
+  'ano_fundacao' do ano de "Início de atividade". Não invente sem evidência.
 
 QUANDO PARAR
 - Quando os 4 campos obrigatórios estão preenchidos com dados do site
@@ -291,6 +301,9 @@ class ProfileExtractor:
             descricao_atividades=get("descricao_atividades") or "",
             tamanho_empresa=get("tamanho_empresa") or "",
             trl=get("trl"),
+            uf=(get("uf") or "").strip().upper(),
+            ano_fundacao=get("ano_fundacao"),
+            faturamento_anual=get("faturamento_anual"),
         )
         return profile, confidence
 

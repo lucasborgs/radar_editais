@@ -70,14 +70,20 @@ _STOP_WORDS = {
     "mais", "entre", "sobre", "também", "pela", "pelo", "pelas", "pelos",
 }
 
-# Pesos das dimensões (total = 100) — fallback hardcoded usado se DB indisponível
-# ou se a tabela matching_weights ainda não foi criada (migration 004 não aplicada).
+# Pesos das dimensões — fallback hardcoded usado se DB indisponível ou se a
+# tabela matching_weights ainda não foi criada (migration 004 não aplicada).
+# As 5 primeiras somam 100 (contrato pré-existente). `elegibilidade_dura` é uma
+# dimensão CONDICIONAL: só entra no breakdown quando o card declara
+# `eligibility_constraints` (região/idade/faturamento). Hoje os cards de prod não
+# carregam esse campo → a dimensão fica dormente e não altera o ranking atual; ela
+# liga sozinha quando o extrator v2 popular o campo no card pipeline.
 _WEIGHTS = {
     "elegibilidade":    30,
     "tematico":         25,
     "trl":              20,
     "mecanismo":        15,
     "contrapartida":    10,
+    "elegibilidade_dura": 10,
 }
 
 # Editais abaixo desse score no Stage 1 são eliminados
@@ -333,6 +339,134 @@ def _score_contrapartida(
     return w / 2
 
 
+# --- Elegibilidade dura (dimensão CONDICIONAL): região / idade / faturamento ---
+# Pares perfil↔edital dos critérios organizacionais que os editais filtram. A
+# dimensão só entra no scoring quando o card declara `eligibility_constraints`.
+
+_UF_REGIAO: dict[str, str] = {
+    "AC": "norte", "AP": "norte", "AM": "norte", "PA": "norte", "RO": "norte",
+    "RR": "norte", "TO": "norte",
+    "AL": "nordeste", "BA": "nordeste", "CE": "nordeste", "MA": "nordeste",
+    "PB": "nordeste", "PE": "nordeste", "PI": "nordeste", "RN": "nordeste",
+    "SE": "nordeste",
+    "DF": "centro-oeste", "GO": "centro-oeste", "MT": "centro-oeste", "MS": "centro-oeste",
+    "ES": "sudeste", "MG": "sudeste", "RJ": "sudeste", "SP": "sudeste",
+    "PR": "sul", "RS": "sul", "SC": "sul",
+}
+
+_UF_NOME: dict[str, str] = {
+    "AC": "acre", "AL": "alagoas", "AP": "amapa", "AM": "amazonas", "BA": "bahia",
+    "CE": "ceara", "DF": "distrito federal", "ES": "espirito santo", "GO": "goias",
+    "MA": "maranhao", "MT": "mato grosso", "MS": "mato grosso do sul", "MG": "minas gerais",
+    "PA": "para", "PB": "paraiba", "PR": "parana", "PE": "pernambuco", "PI": "piaui",
+    "RJ": "rio de janeiro", "RN": "rio grande do norte", "RS": "rio grande do sul",
+    "RO": "rondonia", "RR": "roraima", "SC": "santa catarina", "SP": "sao paulo",
+    "SE": "sergipe", "TO": "tocantins",
+}
+
+# Tipos de constraint que sabemos casar com um campo-par do perfil. Outros tipos
+# (cnae, consortium, …) são ignorados — não contam para o máximo da dimensão.
+_CONSTRAINT_TIPOS_SUPORTADOS = {"region", "company_age", "revenue"}
+
+
+def _constraint_text(c: dict) -> str:
+    """Texto normalizado (sem acento, minúsculo) de uma constraint p/ casamento."""
+    return _strip_accents(_normalize(
+        " ".join(filter(None, [c.get("description") or "", c.get("evidence") or ""]))
+    ))
+
+
+def _score_region(c: dict, profile: CompanyProfile) -> float | None:
+    """1.0 se a UF do perfil é elegível, 0.0 se diverge, None se perfil sem UF."""
+    uf = (profile.uf or "").strip().upper()
+    if not uf or uf not in _UF_REGIAO:
+        return None  # perfil sem o par → caller trata como neutro
+    text = _constraint_text(c)
+    if not text:
+        return None
+    # Casa por sigla (token), nome do estado, ou macro-região da UF.
+    sigla = uf.lower()
+    tokens = set(re.findall(r"[a-z]+", text))
+    if sigla in tokens or _UF_NOME.get(uf, "###") in text or _UF_REGIAO[uf] in text:
+        return 1.0
+    return 0.0
+
+
+def _first_number(text: str) -> float | None:
+    """Primeiro número do texto (aceita 1.234,56 / 4,8 / 5). None se nenhum."""
+    m = re.search(r"\d[\d.]*(?:,\d+)?", text)
+    if not m:
+        return None
+    raw = m.group(0).replace(".", "").replace(",", ".")
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def _score_company_age(c: dict, profile: CompanyProfile) -> float | None:
+    """1.0 se a idade da empresa respeita o limite da constraint, 0.0 se excede."""
+    if profile.ano_fundacao is None:
+        return None
+    text = _constraint_text(c)
+    limite = _first_number(text)
+    if limite is None:
+        return None
+    idade = date.today().year - int(profile.ano_fundacao)
+    # Constraints de idade são tetos no domínio ("até X anos de constituição").
+    return 1.0 if idade <= limite else 0.0
+
+
+def _score_revenue(c: dict, profile: CompanyProfile) -> float | None:
+    """1.0 se o faturamento respeita o teto da constraint, 0.0 se excede."""
+    if profile.faturamento_anual is None:
+        return None
+    text = _constraint_text(c)
+    teto = _first_number(text)
+    if teto is None:
+        return None
+    # Heurística de escala: "milhão/milhões" multiplica o número-base.
+    if "milh" in text:
+        teto *= 1_000_000
+    elif "mil" in text:
+        teto *= 1_000
+    return 1.0 if profile.faturamento_anual <= teto else 0.0
+
+
+_CONSTRAINT_SCORERS = {
+    "region": _score_region,
+    "company_age": _score_company_age,
+    "revenue": _score_revenue,
+}
+
+
+def _score_elegibilidade_dura(
+    card: dict, profile: CompanyProfile, weights: dict[str, float]
+) -> float | None:
+    """Dimensão soft sobre `eligibility_constraints` (região/idade/faturamento).
+
+    Retorna None quando a dimensão NÃO se aplica ao card (sem constraints, ou só
+    tipos não-suportados) — nesse caso o caller a omite do breakdown (dormência).
+    Quando se aplica, agrega as sub-pontuações ∈ [0,1] e escala pelo peso:
+      match → 1.0 · w ; mismatch → 0.0 ; constraint presente mas perfil sem o par
+      → 0.5 (sinal HITL). NUNCA elimina o edital (soft) — só re-rankeia.
+    """
+    constraints = card.get("eligibility_constraints") or []
+    sub: list[float] = []
+    for c in constraints:
+        if not isinstance(c, dict):
+            continue
+        scorer = _CONSTRAINT_SCORERS.get((c.get("type") or "").lower())
+        if scorer is None:
+            continue  # tipo não-suportado → não conta para o máximo
+        res = scorer(c, profile)
+        sub.append(0.5 if res is None else res)  # None = perfil sem o par → neutro
+    if not sub:
+        return None
+    w = _w(weights, "elegibilidade_dura")
+    return w * (sum(sub) / len(sub))
+
+
 def score_stage1(
     edital: dict,
     profile: CompanyProfile,
@@ -351,6 +485,13 @@ def score_stage1(
         "mecanismo":     _score_mecanismo(edital, profile, w),
         "contrapartida": _score_contrapartida(edital, profile, w),
     }
+    # Dimensão CONDICIONAL: só entra quando o card declara eligibility_constraints
+    # (região/idade/faturamento). Card sem o campo → None → omitida (dormente,
+    # ranking idêntico ao legado). Liga sozinha quando o extrator v2 popular o card.
+    elig_dura = _score_elegibilidade_dura(edital, profile, w)
+    if elig_dura is not None:
+        breakdown_float["elegibilidade_dura"] = elig_dura
+
     # Mantém contrato pré-existente: breakdown em ints arredondados.
     breakdown = {k: round(v) for k, v in breakdown_float.items()}
     total = round(sum(breakdown_float.values()))
