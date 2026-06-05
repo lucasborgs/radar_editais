@@ -664,7 +664,15 @@ def _call_stage2_scores(eligible: list[Stage1Result], profile: CompanyProfile) -
 
     Output minúsculo e limitado (não trunca). Em falha total devolve {} (logado
     alto); o ranking degrada para Stage 1, mas sem o silêncio do `return {}` antigo.
+
+    Backend selecionável por `MATCH_STAGE2A_BACKEND` (default `llm`). Com
+    `embeddings`, troca a geração-LLM por cosseno(perfil × edital) determinístico
+    (mesmo contrato `{id: float}`). NÃO promovido: default segue LLM; o caminho
+    de embeddings é gated por experimento na suíte `matching` (ver BACKLOG).
     """
+    if os.getenv("MATCH_STAGE2A_BACKEND", "llm").lower() == "embeddings":
+        from core.match_embeddings import score_stage2a_embeddings
+        return score_stage2a_embeddings(eligible, profile)
     try:
         temporal_block = _temporal_block()
         user = _STAGE2_SCORE_USER.format(
