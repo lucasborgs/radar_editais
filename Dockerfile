@@ -26,4 +26,6 @@ USER app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell-form para expandir ${PORT}: Railway injeta uma porta dinâmica; Fly/local
+# caem no fallback 8000 (internal_port do fly.toml). O worker sobrescreve este CMD.
+CMD uvicorn backend.api:app --host 0.0.0.0 --port ${PORT:-8000}

@@ -56,10 +56,17 @@ def _has_existing_chunks(edital_id: str) -> bool:
 
 
 def _discover_editais() -> list[str]:
-    """List edital_ids under FINEP_PDFS_DIR (one subdir per edital)."""
+    """List edital_ids under FINEP_PDFS_DIR (one subdir per edital).
+
+    Os diretórios são nomeados pelo native_id cru (ex.: `769`), mas o
+    `chunk_edital_task` exige o id PREFIXADO (`finep:769`, migration 012) — o
+    adapter resolve o PDF de volta via native_id. Prefixamos aqui (são todos
+    FINEP por definição de FINEP_PDFS_DIR).
+    """
+    from core.edital_id import make_id  # noqa: PLC0415
     if not FINEP_PDFS_DIR.exists():
         return []
-    return sorted(d.name for d in FINEP_PDFS_DIR.iterdir() if d.is_dir())
+    return sorted(make_id("finep", d.name) for d in FINEP_PDFS_DIR.iterdir() if d.is_dir())
 
 
 async def _run_sync(edital_id: str, force: bool = False) -> None:
@@ -98,7 +105,9 @@ async def _process_one(edital_id: str, queue: bool, force: bool) -> dict:
     if not force and _has_existing_chunks(edital_id):
         return {"edital_id": edital_id, "status": "skipped (already indexed)"}
 
-    pdf_dir = FINEP_PDFS_DIR / edital_id
+    # O dir é nomeado pelo native_id cru; o edital_id chega prefixado.
+    from core.edital_id import native_id_of  # noqa: PLC0415
+    pdf_dir = FINEP_PDFS_DIR / native_id_of(edital_id)
     if not pdf_dir.exists():
         return {"edital_id": edital_id, "status": f"error: directory not found ({pdf_dir})"}
 
