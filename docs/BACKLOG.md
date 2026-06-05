@@ -70,29 +70,31 @@
 
 ### Matching Stage 2a — scoring por embeddings em vez de geração-LLM
 - **O quê:** o Stage 2a (pontuação temática de TODOS os elegíveis) é hoje uma
-  chamada generativa ao LLM que devolve `{id: score}`. Candidato a virar
-  **similaridade vetorial determinística**: embedding do tema/objetivo do edital
-  × embedding do perfil (cosseno), pré-computado no ETL. O LLM ficaria só no
-  Stage 2b (explicar o top-K), onde geração faz sentido.
-- **Por que adiado:** o split 2a/2b + guardrails (commit desta sessão) já matou o
-  truncamento e o `return {}` silencioso — o problema agudo está resolvido. O
-  ganho do embedding é custo/latência/determinismo, não correção. E há um risco
-  real a estudar antes (abaixo).
-- **Por que vale:** scoring determinístico, **zero token por request**, sem
-  truncamento, sem variância LLM no ranking.
-- **Risco / guarda (Lucas, 2026-06-04):** similaridade por embeddings é
-  **muito sensível à estratégia de geração dos embeddings** — o que se embeda
-  (tema canônico? objetivo bruto? título?), qual modelo, normalização,
-  granularidade. Um pipeline de embedding mal calibrado degrada o ranking de
-  forma silenciosa (pior que o LLM, que ao menos "raciocina" o fit). **Não
-  adotar sem um experimento controlado**: rodar a suíte `matching` (precisão@K)
-  com o caminho embeddings vs o caminho LLM, no MESMO golden, e só trocar se
-  empatar/superar. O harness de eval já existe para isso (`python -m core.eval
-  matching`).
-- **Ponto de entrada:** `core/hybrid_match_service.py::_call_stage2_scores`
-  (trocar a implementação, manter a assinatura `{id: float}`); embeddings
-  pré-computados no ETL (`pipeline/build_knowledge_graph.py`) + `core/embedder.py`.
-- **Status:** aberto, em estudo (gated por experimento de eval).
+  chamada generativa ao LLM que devolve `{id: score}`. Foi construído um caminho
+  alternativo de **similaridade vetorial determinística** (cosseno perfil × edital).
+- **Veredito (2026-06-05): PARADO.** Construído atrás de flag `MATCH_STAGE2A_BACKEND`
+  (default `llm`), mas **não vale a pena perseguir** — dois motivos que se somam:
+  1. **Economia no eixo errado.** O custo do 2a escala com nº de *requests* de match
+     (user-initiated, baixa frequência), NÃO com o catálogo (vão batched numa chamada).
+     ~$0.0004/match no gpt-4o-mini → ~$4/mês a 10k matches. Otimizar isto é ruído.
+  2. **Latência/disponibilidade não some.** O Stage 2b (explicação do top-K) continua
+     sendo chamada-LLM no MESMO request → trocar só o 2a não tira o LLM do caminho
+     crítico. Troca precisão por quase nada operacional.
+- **Experimento (`core.eval matching`, mesmo golden, 2 casos):** LLM p@3=0.834/p@5=0.800
+  vs Embeddings p@3=0.500/p@5=0.600 → embeddings perde. (Fixture minúscula → confiar só
+  no *sinal* "não ganhou", não nos números.) `objective` ausente (0/34) handicapa o
+  embedding, mas o gap é grande demais p/ o campo explicar sozinho.
+- **Revisitar SÓ se o shape do produto virar:** (a) **pré-computar matches em lote**
+  (cron varrendo perfis × editais → volume N×M, custo/item passa a importar), ou
+  (b) catálogo na casa dos milhares com match em alta frequência, ou (c) exigência de
+  ranking 100% determinístico por princípio (não por custo). Nenhum é a forma atual.
+  Se revisitar: golden de matching MUITO maior + considerar híbrido (embedding
+  pré-filtra, LLM rankeia o topo) em vez de substituir.
+- **Ponto de entrada (já existe):** `core/match_embeddings.py` (cosseno summary-level,
+  cache file-based, sem tocar `retriever.py`/ADR M9); roteamento em
+  `core/hybrid_match_service.py::_call_stage2_scores`. Embeddar = `title`+`objective`+
+  `themes` × pitch do perfil.
+- **Status:** parado conscientemente. Código vive atrás da flag a custo zero.
 
 ### Matching — fit-forte sub-rankeado (ex.: finep:612 / iFlorestal)
 - **O quê:** com o Stage 2 já consertado, `finep:612` (tema "agro - bioeconomia",

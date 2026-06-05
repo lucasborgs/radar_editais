@@ -33,6 +33,10 @@ knowledge_graph/**/.etl_process_cache.json
 knowledge_graph/icts.json
 knowledge_graph/.ict_theme_map_cache.json
 
+# Caches LLM file-based na raiz (regeneráveis; não versionar)
+.enrichment_cache.json
+.match_embedding_cache.json
+
 # OS
 .DS_Store
 *.DS_Store
