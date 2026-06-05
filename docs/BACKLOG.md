@@ -14,12 +14,17 @@
 ### Extração v2 — itens adiados da curadoria + "perfil é o teto do matching"
 - **Insight central:** o teto do matching é o `CompanyProfile` (fino), NÃO o schema
   do edital. Adicionar campo de decisão no edital só rende se houver o PAR no perfil.
-  Criados `uf`/`faturamento_anual`/`ano_fundacao` no perfil; falta o `profile_extractor`
-  preenchê-los e o Stage 1 usá-los.
+  Criados `uf`/`faturamento_anual`/`ano_fundacao` no perfil. **FEITO (2026-06-05):**
+  `profile_extractor`/`submit_profile`/`lookup_cnpj` preenchem os 3 campos, e o
+  Stage 1 tem a dimensão soft `elegibilidade_dura` (região/idade/faturamento).
+- **Pendente desta frente:** a dimensão nasce **DORMENTE** — os cards de prod ainda
+  não carregam `eligibility_constraints` (vêm dos normalizadores, não do extrator v2).
+  Ela liga sozinha quando a Fase 3 do extrator popular o campo no card pipeline.
+  Até lá, ranking idêntico ao legado (provado por teste + eval).
 - **Adiados (curadoria Gemini+ChatGPT reconciliada com o código):**
-  - **Gate sobre `eligibility_constraints`** (região/idade/faturamento): o
-    `EditalExtraction` v2 já CAPTURA estruturado; falta (a) `profile_extractor`
-    preencher os pares no perfil e (b) wirar no Stage 1. Hoje são contexto/HITL.
+  - **Gate sobre `eligibility_constraints`** (região/idade/faturamento): wirado como
+    dimensão SOFT no Stage 1 (nunca elimina). Falta só o extrator v2 popular o campo
+    no card (Fase 3) para a dimensão sair da dormência.
   - **`call_type`** (business_innovation|academic|grant|procurement|challenge):
     tipologia que muda a interpretação dos campos. Menos urgente — o `pme_filter`
     já descarta bolsa/acadêmico upstream.
