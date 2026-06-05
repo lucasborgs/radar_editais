@@ -163,6 +163,44 @@
 - **Pré-requisito de uso:** configurar `TAVILY_API_KEY` (e `WEB_SEARCH_BACKEND=tavily`,
   default). Sem chave, a tool degrada com mensagem.
 
+### RAG — golden `finep` com sections obsoletas (brittle a re-chunk)
+- **O quê:** a suíte `rag` casa `expected` por `source_file` + `section` EXATA
+  (`core/rag_eval.py::_matches`). O golden `eval_data/golden/finep.json` (03/06) tem
+  13/24 queries com `section` específica que **não existe mais** nos chunks atuais —
+  os editais foram re-chunkados e as labels de section deslocaram. Resultado: hit@5
+  aparenta 0.50 mesmo o retriever acertando o PDF no rank 1.
+- **Medição real (2026-06-05, golden relaxado p/ nível-PDF):** hit@5=**1.00**, hit@3=0.92,
+  RR=**0.845**, faithfulness=4.71, null_result=0 → **retriever validado em nível de
+  documento.** O número section-level estava medindo gabarito quebrado, não retrieval.
+- **Ações:** (a) regenerar o golden contra os chunks atuais
+  (`scripts/generate_golden.py --source finep --editais 768 762 743`) + revisão humana
+  (passo crítico, ver docstring do script); (b) decidir o design durável do match: a
+  igualdade EXATA de section é frágil a qualquer re-chunk — considerar matching em
+  nível de PDF (robusto, coarser) ou section fuzzy/normalizada. Golden relaxado em
+  `eval_data/golden/finep_relaxed.json` (sections nulladas) serve de baseline interino.
+- **Status:** retriever OK; golden a regenerar. Não bloqueia hospedar.
+
+### Escrita — eval validado; resíduos de fixture/juiz/TPM
+- **Resultado (2026-06-05, fixture curada + juízes gpt-4o):** saved=1.0, coherent=1.0,
+  **pct_grounded=0.917**, factual_errors=0.33/caso. Agente de escrita VALIDADO (grounding
+  alto = afirmações ancoradas nos chunks). O baseline aparente "0.32" era 100% confound:
+  pares perfil↔edital mismatch + métrica 0-claim=0.0 + juiz em gpt-4o-mini.
+- **Resíduo `factual_errors=0.33`** = lacuna de fit perfil↔CATÁLOGO, não fabricação. O
+  catálogo FINEP local não tem edital que case de verdade com iFlorestal (nicho florestal);
+  o tema canônico "agro-bioeconomia" é grosso, mas as linhas específicas (agro/alimentos/
+  energia/cidades) não cobrem monitoramento florestal. **Ação:** adicionar à fixture de
+  escrita um par perfil↔edital com fit temático REAL (ex.: perfil agro/alimentos × 774, ou
+  energia × 772) para medir escrita sem a penalidade de mismatch estrutural.
+- **Juiz da escrita EXIGE gpt-4o, não mini:** o gpt-4o-mini extrai 0 claims de rascunhos de
+  2500+ chars e flagra fits legítimos como mismatch → mede o juiz, não a escrita. Mas
+  gpt-4o-juiz + gpt-4o-agente disputam os **30k TPM** da OpenAI (mesmo gargalo do
+  [tier OpenAI]). Saídas: subir tier, OU rodar o agente na Anthropic (libera o TPM OpenAI
+  pros juízes). Hoje contornado com `LLM_MAX_RETRIES` alto + fixture pequena (6 casos).
+- **Feito nesta sessão:** fixture curada (removidos 772/777 mismatch), métrica de grounding
+  exclui casos 0-claim (`eval_grounding`→None; novo score `n_claims`), prompt do redator
+  ganhou regra anti-fabricação de referências (anexos/artigos não-vistos). 378 testes verdes.
+- **Status:** escrita validada p/ beta; resíduos são rigor de fixture/infra, não bloqueiam.
+
 ---
 
 ## Débitos conhecidos (menores)

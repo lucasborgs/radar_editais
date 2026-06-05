@@ -155,8 +155,22 @@ def eval_save(*, output, **_) -> Evaluation:
 def eval_grounding(*, output, **_) -> Evaluation | None:
     if not _is_out(output):
         return None
+    # Sem claims extraídos → grounding INDEFINIDO (não 0%). Seções aspiracionais
+    # (ex.: "Objetivo") legitimamente não têm afirmações verificáveis; contá-las
+    # como 0.0 afundava a média artificialmente. Excluímos da agregação (None) e
+    # expomos n_claims como score próprio (eval_n_claims) p/ flagrar rascunho vazio.
+    if not output.get("n_claims"):
+        return None
     return {"name": "pct_grounded", "value": output.get("pct_grounded"),
             "comment": f"{output.get('n_grounded')}/{output.get('n_claims')} claims"}
+
+
+def eval_n_claims(*, output, **_) -> Evaluation | None:
+    """Expõe nº de claims extraídos — flagra rascunho vacuous (0 claims) sem
+    contaminar o grounding. Score operacional, não barra de qualidade."""
+    if not _is_out(output):
+        return None
+    return {"name": "n_claims", "value": output.get("n_claims")}
 
 
 def eval_factual_errors(*, output, **_) -> Evaluation | None:
@@ -196,6 +210,7 @@ SUITE = Suite(
     description="Grounding + erros factuais + coerência + métricas operacionais do agente de escrita.",
     load_data=load_data,
     task=task,
-    evaluators=[eval_save, eval_grounding, eval_factual_errors, eval_coherence, eval_tool_calls],
+    evaluators=[eval_save, eval_grounding, eval_n_claims, eval_factual_errors,
+                eval_coherence, eval_tool_calls],
     prereqs=_prereqs,
 )
