@@ -47,12 +47,17 @@ FILTER_REJECTIONS_LOG = KNOWLEDGE_GRAPH_DIR / ".filter_rejections.jsonl"
 # =============================================================================
 
 def load_bronze(source: str = _DEFAULT_SOURCE) -> list[dict]:
-    """Carrega o arquivo bronze mais recente da fonte.
+    """Carrega o bronze da fonte.
 
-    Usa apenas o último arquivo: scrapers de fontes com API filtrada
+    Por padrão usa apenas o ÚLTIMO arquivo: scrapers de fontes com API filtrada
     server-side (FINEP/Liferay com `situacao=aberta`) tornam o scrape mais
-    recente autoritativo. Acumular arquivos antigos fazia chamadas
-    encerradas resurgirem no índice.
+    recente autoritativo. Acumular arquivos antigos fazia chamadas encerradas
+    resurgirem no índice.
+
+    Exceção `web`: é multi-feeder (WebScraper da seed list manual + Descoberta
+    da busca livre gravam no MESMO bronze). É ADITIVO — unimos todos os
+    arquivos, dedup por `url_hash` (mais novo vence). Espelha
+    `pipeline.adapters.web._load_web_bronze` (o chunking lê o mesmo bronze).
     """
     raw_dir = BRONZE_DIR / f"{source}_raw"
     if not raw_dir.exists():
@@ -63,6 +68,21 @@ def load_bronze(source: str = _DEFAULT_SOURCE) -> list[dict]:
     if not files:
         print(f"Nenhum arquivo bronze em {raw_dir}")
         return []
+
+    if source == "web":
+        by_hash: dict[str, dict] = {}
+        for path in files:
+            try:
+                for it in json.loads(path.read_text(encoding="utf-8")):
+                    h = it.get("url_hash")
+                    if h:
+                        by_hash[h] = it
+            except Exception as e:
+                print(f"Erro ao ler {path.name}: {e}")
+        chamadas = list(by_hash.values())
+        print(f"Bronze carregado (web, multi-feeder): {len(files)} arquivos → "
+              f"{len(chamadas)} páginas únicas")
+        return chamadas
 
     latest = files[-1]
     try:
@@ -179,11 +199,18 @@ def _extract_id_fapesp(chamada: dict) -> str:
     return m.group(1) if m else ""
 
 
+def _extract_id_web(chamada: dict) -> str:
+    # O WebScraper já calcula e grava o `url_hash` (= native_id) no bronze —
+    # aqui só lemos. Único lugar do hash é pipeline/extractors/web.py.
+    return chamada.get("url_hash", "")
+
+
 # Função-dispatcher: extrai o `native_id` de acordo com a fonte. Adicionar
 # fonte = registrar a função aqui (paralelo ao SCRAPER_REGISTRY).
 _ID_EXTRACTORS = {
     "finep": _extract_id_finep,
     "fapesp": _extract_id_fapesp,
+    "web": _extract_id_web,
 }
 
 
@@ -243,9 +270,42 @@ def _normalize_fapesp(ch: dict) -> dict:
     }
 
 
+def _normalize_web(ch: dict) -> dict:
+    """Normaliza um item bronze web → entry parcial.
+    Schema bronze: url, url_hash, title, html|texto_cru, status, verificacao + (da
+    Descoberta) prazo_envio, tema, publico_alvo, descricao.
+
+    web tem DUAS torneiras no mesmo bronze: a seed list manual (WebScraper —
+    metadado fino, prazo/temas vêm da SÍNTESE da wiki page L3a) e a Descoberta
+    (extração LLM — já traz prazo/tema/status). Por isso lemos os metadados de
+    forma OPORTUNISTA: usamos o que o item tiver, caímos para vazio quando não.
+    Temas restritos ao vocab §5.9 (blinda o índice). Ver backlog
+    "proveniência/confiança por campo".
+    """
+    deadline_str = ch.get("prazo_envio", "") or ch.get("deadline", "")
+    raw_status = ch.get("status") or "Desconhecido"
+    themes_raw = _split_multi(ch.get("tema"))
+    vocab = set(wiki_schema.tema_vocab())
+    themes = [t for t in canonicalize_themes(themes_raw) if not vocab or t in vocab]
+    return {
+        "title":         ch.get("title", "") or ch.get("titulo", ""),
+        "status":        wiki_schema.normalize_status(raw_status, deadline_str),
+        "deadline":      deadline_str,
+        "pub_date":      "",
+        "pub_year":      wiki_schema.parse_pub_year(""),
+        "link":          ch.get("url", "") or ch.get("link", ""),
+        "themes":        themes,
+        "themes_raw":    themes_raw,
+        "publico_alvo":  _normalize_publico(ch.get("publico_alvo")),
+        "fonte_recurso": ["Web"],
+        "subprogramas":  [],
+    }
+
+
 _NORMALIZERS = {
     "finep": _normalize_finep,
     "fapesp": _normalize_fapesp,
+    "web": _normalize_web,
 }
 
 
@@ -264,7 +324,8 @@ def _ict_requirement_regex() -> "re.Pattern | None":
 def _edital_text(ch: dict) -> str:
     """Texto do edital para a heurística §5.10: título + corpo + PDFs. Agnóstico
     à fonte — cobre FINEP (descricao, pdf_texts dict) e FAPESP (texto_cru)."""
-    parts = [ch.get("titulo", ""), ch.get("descricao", ""), ch.get("texto_cru", "")]
+    parts = [ch.get("titulo", ""), ch.get("title", ""),
+             ch.get("descricao", ""), ch.get("texto_cru", "")]
     pdf_texts = ch.get("pdf_texts")
     if isinstance(pdf_texts, dict):
         parts.extend(str(v) for v in pdf_texts.values())
@@ -279,80 +340,10 @@ def _detect_ict_requirement(ch: dict) -> bool:
     return bool(rx.search(_edital_text(ch))) if rx else False
 
 
-DISCOVERY_BRONZE_DIR = BRONZE_DIR / "discovery_raw"
-
-
-def load_discovery_bronze() -> list[dict]:
-    """Lê o bronze de descoberta (item 2.2) — oportunidades extraídas da web,
-    cada uma com `source` (agência detectada ou 'web') e `native_id` próprios.
-    Pega o arquivo mais recente por prefixo."""
-    if not DISCOVERY_BRONZE_DIR.exists():
-        return []
-    records: list[dict] = []
-    by_prefix: dict = {}
-    # glob específico: NÃO apanhar o `.ledger.json` (lista de URLs) que vive no
-    # mesmo dir — senão suas strings entram em records e quebram a normalização.
-    for path in sorted(DISCOVERY_BRONZE_DIR.glob("discovery_*.json")):
-        prefix = path.name.rsplit("_", 2)[0]
-        by_prefix[prefix] = path
-    for path in by_prefix.values():
-        records.extend(json.loads(path.read_text(encoding="utf-8")))
-    return records
-
-
-def _normalize_discovery(ch: dict) -> dict:
-    """Normaliza um registro de descoberta → entry parcial. A extração (LLM) já
-    produz campos no schema comum; aqui só canonicalizamos e blindamos invariantes.
-
-    Defensivo: themes ficam restritos ao vocab canônico §5.9 (a extração deve
-    emitir canônicos; o que escapar é descartado para não quebrar a ponte/teste).
-    """
-    deadline_str = ch.get("prazo_envio", "") or ch.get("deadline", "")
-    raw_status = ch.get("status", "Desconhecido")
-    themes_raw = _split_multi(ch.get("tema") or ch.get("themes"))
-    vocab = set(wiki_schema.tema_vocab())
-    themes = [t for t in canonicalize_themes(themes_raw) if not vocab or t in vocab]
-    pub_date = ch.get("data_publicacao", "")
-    return {
-        "title":         ch.get("titulo", "") or ch.get("title", ""),
-        "status":        wiki_schema.normalize_status(raw_status, deadline_str),
-        "deadline":      deadline_str,
-        "pub_date":      pub_date,
-        "pub_year":      wiki_schema.parse_pub_year(pub_date),
-        "link":          ch.get("link", "") or ch.get("source_url", ""),
-        "themes":        themes,
-        "themes_raw":    themes_raw,
-        "publico_alvo":  _normalize_publico(ch.get("publico_alvo")),
-        "fonte_recurso": [],
-        "subprogramas":  [],
-    }
-
-
-def _build_discovery_editais(records: list[dict]) -> list[dict]:
-    """Constrói entradas de edital a partir do bronze de descoberta. Cada
-    registro traz seu próprio `source` (agência ou 'web') e `native_id`; entram
-    sempre como `verificacao=provisorio` (§5.11) — não passam pelo SCRAPER_REGISTRY.
-    """
-    editais: list[dict] = []
-    seen: set[str] = set()
-    for ch in records:
-        source = (ch.get("source") or "web").strip().lower()
-        native_id = ch.get("native_id") or wiki_schema.slugify(
-            ch.get("link", "") or ch.get("titulo", "") or ch.get("title", "")
-        )
-        cid = f"{source}:{native_id}"
-        if not native_id or cid in seen:
-            continue
-        seen.add(cid)
-        editais.append({
-            "id": cid,
-            "source": source,
-            **_normalize_discovery(ch),
-            "n_pdfs": 0,
-            "requires_ict_partner": _detect_ict_requirement(ch),
-            "verificacao": "provisorio",
-        })
-    return editais
+# A Descoberta (busca livre por termos) NÃO tem mais caminho próprio de bronze/
+# índice. Ela é só mais uma TORNEIRA da fonte `web`: grava no mesmo `web_raw/`
+# com `verificacao=provisorio`, e entra no índice pelo `_build_editais("web")`
+# como qualquer página web. Ver core/opportunity_discovery.py + WIKI.md §12.4.
 
 
 def _build_editais(chamadas: list[dict], source: str = _DEFAULT_SOURCE) -> list[dict]:
@@ -386,8 +377,11 @@ def _build_editais(chamadas: list[dict], source: str = _DEFAULT_SOURCE) -> list[
             **normalizer(ch),
             "n_pdfs": n_pdfs,
             "requires_ict_partner": _detect_ict_requirement(ch),
-            # Fontes do SCRAPER_REGISTRY são confiáveis (§5.11).
-            "verificacao": "verificado",
+            # Confiança por-item (§5.11): fontes do SCRAPER_REGISTRY são
+            # "verificado" por padrão; a EXCEÇÃO é web, cujo bronze mistura
+            # seed manual (verificado) e Descoberta (provisorio) — cada item
+            # carrega seu próprio `verificacao`.
+            "verificacao": ch.get("verificacao", "verificado"),
         })
 
     # Dedup por id (primeira ocorrência vence). Bronze FAPESP legacy tem
@@ -618,17 +612,9 @@ def main(source: str | None = None) -> None:
 
     print("\n".join(by_source_summary))
 
-    # Descoberta (item 2.2): oportunidades da web entram como `provisorio`,
-    # fora do SCRAPER_REGISTRY. Passam pelo mesmo pme_filter.
-    discovery_records = load_discovery_bronze()
-    if discovery_records:
-        disc_editais = _build_discovery_editais(discovery_records)
-        disc_accepted, disc_rej = _apply_pme_filter(disc_editais)
-        _log_rejections(disc_rej)
-        all_accepted.extend(disc_accepted)
-        total_rejections += len(disc_rej)
-        print(f"  [descoberta] {len(disc_editais)} entries → "
-              f"{len(disc_accepted)} aceitos, {len(disc_rej)} rejeitados (provisorio)")
+    # NB: a Descoberta (busca livre) não tem mais ramo próprio aqui — ela grava
+    # em web_raw/ e já foi processada acima no loop, na iteração de source=web
+    # (provisorio por-item). Unificação Opção A (WIKI.md §12.4).
 
     if not all_accepted:
         print("\nNenhum edital aceito após filtro. Verifique bronze e wikis/_pme_filter.md.")

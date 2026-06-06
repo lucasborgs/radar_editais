@@ -568,3 +568,61 @@ async def run_daily_etl_task(timestamp: int) -> None:
         logger.error("run_daily_etl_task: falha ao regenerar grafo Obsidian: %s", e)
 
     logger.info("run_daily_etl_task: concluído (total=%d novos)", total_new)
+
+
+# =============================================================================
+# Descoberta — busca livre por termos (torneira automática da fonte web)
+# =============================================================================
+# Procrastinate periodic: cron diário 04:00 UTC (após o ETL das 03:00). Roda a
+# busca livre (Tavily), grava os achados em web_raw/ como `provisorio`, enfileira
+# o chunking de cada um e reconstrói o índice. É a Opção A (WIKI.md §12.4): a
+# Descoberta não tem pipeline próprio — alimenta a MESMA fonte `web` que a seed
+# list manual. Requer TAVILY_API_KEY + chave LLM; sem elas, degrada para no-op.
+
+
+@app.periodic(cron="0 4 * * *")
+@app.task(name="discover_opportunities", queue="etl")
+async def discover_opportunities_task(timestamp: int) -> None:
+    """Cron diário (4am UTC): busca livre → web_raw provisorio → chunk → índice.
+
+    Espelha `run_daily_etl_task`, mas para a torneira automática da fonte web:
+      1. `discover_opportunities` busca/tria/extrai e grava web_raw/web_discovery_*.json
+      2. enfileira `chunk_edital(web:<url_hash>)` para cada achado (RAG da escrita)
+      3. reconstrói o índice (pure-Python) para os provisorios entrarem no KG
+
+    `timestamp` vem do procrastinate periodic (instante agendado, UNIX epoch).
+    """
+    from core.edital_id import make_id  # noqa: PLC0415
+    from core.opportunity_discovery import discover_opportunities  # noqa: PLC0415
+
+    logger.info("discover_opportunities_task: iniciando (timestamp=%s)", timestamp)
+
+    records = await asyncio.to_thread(discover_opportunities, write=True)
+    logger.info("discover_opportunities_task: %d oportunidades novas", len(records))
+
+    for r in records:
+        url_hash = r.get("url_hash")
+        if not url_hash:
+            continue
+        edital_id = make_id("web", url_hash)
+        try:
+            await app.configure_task("chunk_edital").defer_async(edital_id=edital_id)
+        except Exception as e:
+            logger.warning(
+                "discover_opportunities_task: falha ao enfileirar chunk p/ %s: %s",
+                edital_id, e,
+            )
+
+    # Rebuild do índice — os provisorios só entram no KG (match/escrita) após o
+    # build varrer web_raw. Pure-Python, idempotente, barato (sem LLM).
+    if records:
+        try:
+            from pipeline import build_knowledge_graph  # noqa: PLC0415
+            await asyncio.to_thread(build_knowledge_graph.main)
+            logger.info("discover_opportunities_task: índice reconstruído")
+        except Exception as e:
+            logger.error(
+                "discover_opportunities_task: falha ao reconstruir índice: %s", e
+            )
+
+    logger.info("discover_opportunities_task: concluído")

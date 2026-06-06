@@ -11,6 +11,31 @@
 
 ## Aberto
 
+### Budget builder mínimo (paridade Grantable "Build budget")
+- **O quê:** planilha de orçamento por aplicação — line items que o usuário digita,
+  validados contra o envelope do edital. **Não sugere valores** (filosofia
+  "humans decide" / [[project_grantable_philosophy]]); só valida o que o humano põe.
+- **O schema já dá o envelope:** a extração captura `funding_amount` (teto),
+  `counterpart {required, percentage}` (contrapartida) e `mechanism`
+  (`core/edital_extractor.py`). Falta a estrutura interna (rubricas) e a tabela de items.
+- **Desenho (3 peças):**
+  1. **Tabela nova** `application_budget_items` (filha de `application_log`, que já é o
+     header e carrega `edital_id` → herda teto/contrapartida da wiki page):
+     `rubrica` · `descricao` · `valor numeric(14,2)` · `origem ('solicitado'|'contrapartida')`.
+     RLS espelha o padrão de `content_items`/`application_log` (migration 004).
+  2. **Validador puro** (sem LLM, pegada do `core/profile_drift.py`): soma items, lê
+     `funding_amount`+`counterpart.percentage` da wiki page, devolve flags
+     (estouro de teto · contrapartida insuficiente · rubrica vedada).
+  3. **Rubricas permitidas:** v0 hard-coded num skill `skills/finep_budget.md` (padrão
+     dos compliance skills); v1 extrai `allowed_rubricas` da seção de orçamento via
+     `edital_chunks` → novo campo na wiki page (`core/wiki_schema.py` + golden).
+- **Por que adiado:** priorizado pipeline UI + perfil-de-proposta antes. Dificuldade
+  real ~4 (a tabela é filha do log existente; único trabalho de IA = rubricas, opcional na v0).
+- **Ponto de entrada:** `supabase/migrations/` (nova tabela), `backend/api.py` (CRUD +
+  GET com flags), `core/` (validador), frontend nova tela de planilha.
+- **Guard-rail:** o builder NUNCA preenche valores — só valida. Teste de aceitação por grep.
+- **Status:** aberto (desenho fechado, não construído).
+
 ### Extração v2 — itens adiados da curadoria + "perfil é o teto do matching"
 - **Insight central:** o teto do matching é o `CompanyProfile` (fino), NÃO o schema
   do edital. Adicionar campo de decisão no edital só rende se houver o PAR no perfil.
@@ -135,19 +160,26 @@
   normalizado). Verificar se a busca é client-side (pode exigir Playwright).
 - **Status:** aberto.
 
-### Descoberta de Oportunidades (item 2.2) — Fases B e C (Fase A feita)
-- **Feito (Fase A):** ingestão `verificacao` (§5.11) + `_build_discovery_editais`
-  no build (descoberta → KG provisório, via pme_filter); engine
-  `core/opportunity_discovery.py` (web_search → triagem → extração → bronze
-  discovery_raw/ + ledger de dedup file-based). Vocab em `wikis/_discovery.md`.
-  **Pré-requisito de uso real:** `TAVILY_API_KEY` + chave LLM; rodar o engine e
-  depois `build_knowledge_graph`.
+### Descoberta de Oportunidades (item 2.2) — Fase B + graduação (A e C feitas)
+- **Feito (Fase A):** engine `core/opportunity_discovery.py` (web_search → triagem
+  → extração → bronze + ledger de dedup). Vocab em `wikis/_discovery.md`.
+- **Feito (Unificação Opção A + Fase C/recorrência):** a Descoberta deixou de ter
+  bronze/índice próprios — virou a **torneira automática da fonte `web`** (WIKI.md
+  §12.4). Grava `web_raw/web_discovery_*.json` no schema web (`url_hash`/`texto_cru`/
+  `verificacao=provisorio`), entra pelo `_build_editais("web")` e **é chunkada pro
+  RAG** pelo adapter web — fechando o gap "provisório de snippet = escrita rasa".
+  Removidos `_build_discovery_editais`/`_normalize_discovery`/`load_discovery_bronze`.
+  Identidade em `core/web_identity.py`. Task procrastinate `discover_opportunities`
+  + cron diário 04:00 UTC (busca → web_raw → enfileira chunk → rebuild). Ledger
+  file-based mantido. **Pré-requisito de uso:** `TAVILY_API_KEY` + chave LLM.
 - **Fase B (aberto):** verificação humana não-bloqueante — endpoint verificar/
   rejeitar, match/escrita distinguindo provisorio×verificado (rótulo/bucket — item
-  3 das decisões: bucket no MVP), aviso de fonte não-verificada na escrita.
-- **Fase C (aberto):** task procrastinate `discover_opportunities` (encadeia build)
-  + cron diário; graduação de fonte recorrente para extractor próprio (§12.4).
-  Ledger file-based pode graduar para Supabase se virar multi-worker.
+  3 das decisões: bucket no MVP), aviso de fonte não-verificada na escrita. O eixo
+  `verificacao` já é por-item no índice; falta a UI/API e o ranqueamento no match.
+- **Graduação (aberto):** fonte recorrente de formato estável → extractor próprio
+  no `SCRAPER_REGISTRY`/§12.4 (sai de `web:provisorio` → `<fonte>:verificado`). O
+  campo `agency` já é preservado no bronze web para alimentar isto. Ledger
+  file-based pode graduar para Supabase se virar multi-worker.
 - **Onde:** [spec_descoberta_oportunidades.md](spec_descoberta_oportunidades.md).
 
 ### DeepResearch — Fases B e C (Fase A feita)
@@ -218,6 +250,59 @@
   pouco sobre o que o card já dá; productizar o path é o certo. Não bloqueia o beta.
 - **Ponto de entrada:** `core/tasks.py::_build_chunks_for_edital`, `core/chunker.py`.
   **Status:** aberto.
+
+### RAG — melhor estratégia de chunkeamento para fontes HTML longas
+- **O quê:** o chunking de fontes HTML (FAPESP `html_body`, web `html_clean` —
+  edital inteiro num corpo único de texto) gera chunks de qualidade irregular.
+  Investigar uma estratégia melhor antes de escalar fontes web.
+- **Evidência (fapesp:18203, texto_cru de 103.859 chars → 50 chunks):**
+  1. **Units gigantes quando falta `\n\n`:** `split_into_units` (base.py, alvo
+     ~3500 chars, quebra por parágrafo) emitiu 2 units de ~23.8k chars porque o
+     início do corpo não tem quebra de parágrafo (bloco denso de menu/cabeçalho).
+     Unit de 24k força o structurer a um output enorme → risco de timeout (o
+     próprio comentário do adapter FAPESP avisa). Falta um fallback de split por
+     sentença/comprimento quando o parágrafo é grande demais.
+  2. **Micro-chunks por fragmentação de seção:** doc heading-denso (139 headings
+     em 444 blocos) → o `chunk_from_blocks` fecha chunk em CADA fronteira de
+     `section_path`, gerando chunks de 9-84 chars ("só o título"). A regra de
+     merge de `MIN_TOKENS` só funde dentro da MESMA seção, então headings órfãos
+     viram poeira no índice (ruído no retrieval, dilui o top-k).
+- **Direções a avaliar:** (a) split estrutura-aware na fronteira HTML antes do
+  structurer (âncoras `<h1..h3>`, `§12.3` já prevê "split por âncora") em vez de
+  char-count cego; (b) merge de chunks órfãos sub-`MIN_TOKENS` ATRAVÉS de
+  fronteira de seção quando o chunk anterior/seguinte é da mesma raiz; (c)
+  anexar heading ao corpo da seção em vez de virar chunk próprio; (d) medir o
+  impacto no `core.eval rag` (golden FAPESP) antes/depois — não tunar às cegas.
+- **Por que adiado:** não bloqueia o beta (FINEP+FAPESP rendem retrieval útil
+  hoje, 19/20 vigentes com chunks); mas é dívida que cresce com o nº de fontes
+  HTML (web genérica + Descoberta entram pelo mesmo `html_clean`).
+- **Ponto de entrada:** `pipeline/adapters/base.py::split_into_units`,
+  `core/chunker.py::chunk_from_blocks` (regra de fronteira/merge), `core/eval/`
+  suíte `rag`. **Status:** aberto.
+
+### Fontes — proveniência/confiança por campo (dissolver "estruturada vs. cega")
+- **O quê:** hoje há dois caminhos implícitos de metadado. FINEP/FAPESP trazem
+  `status`/`deadline`/`tema` do scrape (confiável, *schema-on-write*); a fonte web
+  genérica (`web:<hash>`, em implementação) não tem listagem estruturada → metadado
+  vem da síntese da wiki (inferido, *schema-on-read*). São duas categorias com code
+  paths distintos (`_NORMALIZERS["web"]` "thin" + resto cai na síntese).
+- **Insight (estado da arte):** o eixo certo a abstrair NÃO é "estruturada vs. cega" —
+  é **confiança/proveniência por campo**. Frameworks de structured-extraction
+  (instructor, LLM-as-extractor) tratam toda fonte igual: extrai-pra-schema, e a fonte
+  estruturada é só o caso `confidence=1.0` com valor pronto; a "cega" é a mesma pipeline
+  com confiança baixa. Some a dicotomia: um path só (síntese roda em todas as fontes;
+  scrape estruturado entra como **prior de alta confiança** que ela confirma).
+- **O que renderia de concreto:** campo `provenance` + `confidence` **por campo** (não
+  por documento) — "deadline veio do scrape FINEP (1.0)" vs. "deadline inferido do texto
+  web (0.6)". Vira sinal de ranking no match e de UI ("verifique este prazo").
+  Casa com o `confidence` numérico por campo já adiado na frente de Extração v2 (acima).
+- **Por que adiado:** o adapter web genérico (path separado) está correto e suficiente
+  para 1 fonte cega. O custo de abstrair só se paga quando "fontes cegas" virarem 5-10.
+- **Gatilho para revisitar:** nº de fontes não-estruturadas crescer (web discovery
+  produtizado + N portais HTML), OU o match passar a precisar do sinal de confiança
+  para des-rankear metadado inferido.
+- **Onde:** `pipeline/adapters/`, `build_knowledge_graph.py` (`_NORMALIZERS`),
+  `pipeline/etl_process.py` (síntese). **Status:** aberto (design nomeado, não construído).
 
 ---
 

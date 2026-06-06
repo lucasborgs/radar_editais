@@ -1,13 +1,17 @@
-"""Engine de descoberta de oportunidades (item 2.2 — Fase A, incremento 2).
+"""Engine de descoberta de oportunidades (item 2.2).
 
 Varre a web por editais/chamadas/desafios de fomento, tria (é oportunidade real?),
-extrai campos no schema comum e grava bronze de descoberta. `build_knowledge_graph`
-depois ingere esse bronze como editais `provisorio` (§5.11).
+extrai campos e grava no bronze da fonte `web`. A Descoberta é a TORNEIRA
+AUTOMÁTICA da fonte web (a outra é a seed list manual em `web_sources`): não tem
+mais bronze/índice próprios. Os registros entram em `web_raw/` com
+`verificacao=provisorio` e, daí pra frente, são páginas web como quaisquer
+outras — `build_knowledge_graph` os ingere via `_build_editais("web")` e o
+adapter `pipeline.adapters.web` os chunka pro RAG (Opção A, WIKI.md §12.4).
 
 Pipeline:
   queries (wikis/_discovery.md) → web_search (Tavily) → dedup (ledger + KG)
     → triagem (LLM barato: é fomento? agência?) → extração (LLM capaz: campos)
-    → bronze discovery_raw/ + ledger
+    → full-fetch do texto da página → web_raw/web_discovery_*.json + ledger
 
 Custo: triagem roda em muitos candidatos (modelo barato); extração só nos que
 passaram (modelo capaz). Nada entra no KG aqui — isso é o build, e tudo provisório.
@@ -25,11 +29,21 @@ from config import BRONZE_DIR
 from core import kg_store
 from core import web_search as websearch
 from core import wiki_schema as ws
+from core.web_identity import normalize_web_url, web_url_hash
 
 logger = logging.getLogger(__name__)
 
-DISCOVERY_BRONZE_DIR = BRONZE_DIR / "discovery_raw"
-_LEDGER = DISCOVERY_BRONZE_DIR / ".ledger.json"
+# Bronze de saída: o MESMO da fonte web (a Descoberta é uma torneira dela).
+_WEB_BRONZE_DIR = BRONZE_DIR / "web_raw"
+# Estado da Descoberta (ledger de dedup cross-execução) — fica num dir próprio,
+# não em web_raw, para não se confundir com os arquivos bronze. O dotfile já
+# seria ignorado pelo glob("*.json"), mas mantê-lo à parte é mais claro.
+_DISCOVERY_STATE_DIR = BRONZE_DIR / "discovery_raw"
+_LEDGER = _DISCOVERY_STATE_DIR / ".ledger.json"
+
+# Cap defensivo do texto guardado por página (o chunker re-fatia depois). Páginas
+# de fomento ficam bem abaixo; evita um caso patológico inflar o bronze.
+_TEXTO_CRU_CAP = 60_000
 
 
 # =============================================================================
@@ -126,19 +140,24 @@ def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, mode
     tema = data.get("tema") or []
     if isinstance(tema, str):
         tema = [tema]
+    # Registro no SCHEMA DA FONTE WEB (não mais um schema de discovery próprio):
+    # url/url_hash dão a identidade `web:<url_hash>` (mesma de páginas manuais);
+    # texto_cru é o corpo pro chunking; verificacao=provisorio marca a origem
+    # automática. `agency` sobrevive como campo (futura graduação Fase C).
     return {
-        "source": ws.slugify(agency) if agency else "web",
-        "native_id": ws.slugify(hit.url)[:80] or ws.slugify(hit.title)[:80],
-        "titulo": data.get("titulo") or hit.title,
-        "link": hit.url,
+        "url": normalize_web_url(hit.url),
+        "url_hash": web_url_hash(hit.url),
+        "title": data.get("titulo") or hit.title,
+        "texto_cru": (page_text or "")[:_TEXTO_CRU_CAP],
         "prazo_envio": data.get("prazo_envio", ""),
         "publico_alvo": data.get("publico_alvo", ""),
         "descricao": data.get("descricao", ""),
         "status": data.get("status", "") or "ABERTA",
         "tema": "; ".join(t for t in tema if isinstance(t, str)),
-        "data_publicacao": "",
-        "data_extracao": datetime.now(timezone.utc).date().isoformat(),
+        "agency": agency or "",
+        "fonte": agency or "Web (descoberta)",
         "verificacao": "provisorio",
+        "data_extracao": datetime.now(timezone.utc).date().isoformat(),
     }
 
 
@@ -160,7 +179,7 @@ def _load_ledger() -> set[str]:
 
 
 def _save_ledger(urls: set[str]) -> None:
-    DISCOVERY_BRONZE_DIR.mkdir(parents=True, exist_ok=True)
+    _DISCOVERY_STATE_DIR.mkdir(parents=True, exist_ok=True)
     _LEDGER.write_text(json.dumps(sorted(urls), ensure_ascii=False, indent=2),
                        encoding="utf-8")
 
@@ -226,27 +245,37 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         verdict = _triage(h, tri_client, tri_model)
         if not verdict["is_opportunity"]:
             continue
-        page_text = h.content or h.snippet
-        if not page_text:
-            from core.agent_tools.profile_tools import _fetch_and_parse
-            try:
-                page_text = _fetch_and_parse(h.url).get("text", "")
-            except Exception:
-                page_text = h.snippet
+        page_text = _page_text(h)
         rec = _extract(h, page_text, verdict["agency"], ext_client, ext_model)
         if rec:
             records.append(rec)
 
     if write and records:
-        DISCOVERY_BRONZE_DIR.mkdir(parents=True, exist_ok=True)
+        _WEB_BRONZE_DIR.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out = DISCOVERY_BRONZE_DIR / f"discovery_{ts}.json"
+        # Prefixo `web_discovery_` distingue a torneira automática da manual
+        # (`web_scan_`) dentro do mesmo bronze; ambas são unidas por url_hash.
+        out = _WEB_BRONZE_DIR / f"web_discovery_{ts}.json"
         out.write_text(json.dumps(records, ensure_ascii=False, indent=2),
                        encoding="utf-8")
-        _save_ledger(known | {_norm_url(r["link"]) for r in records})
+        _save_ledger(known | {_norm_url(r["url"]) for r in records})
         logger.info("descoberta: %d oportunidades → %s", len(records), out.name)
 
     return records
+
+
+def _page_text(hit: websearch.SearchHit) -> str:
+    """Texto da página para extração + chunking. Tenta o fetch COMPLETO (corpo
+    inteiro — o `raw_content` do Tavily vem capado em ~2k chars, raso demais pro
+    RAG); cai para o content capado e por fim o snippet. Nunca levanta."""
+    try:
+        from core.agent_tools.profile_tools import _fetch_and_parse
+        full = (_fetch_and_parse(hit.url) or {}).get("text", "") or ""
+        if len(full) > len(hit.content or ""):
+            return full
+    except Exception as e:
+        logger.debug("descoberta: full-fetch falhou (%s): %s", hit.url, e)
+    return hit.content or hit.snippet or ""
 
 
 if __name__ == "__main__":
@@ -254,4 +283,4 @@ if __name__ == "__main__":
     out = discover_opportunities()
     print(f"\nDescoberta: {len(out)} oportunidades provisórias extraídas.")
     for r in out[:10]:
-        print(f"  [{r['source']}] {r['titulo'][:70]} — {r['link']}")
+        print(f"  [{r.get('fonte', 'web')}] {r['title'][:70]} — {r['url']}")
