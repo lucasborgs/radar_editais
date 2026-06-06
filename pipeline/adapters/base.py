@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import re
 from abc import ABC, abstractmethod
 from typing import TypedDict
 
@@ -93,6 +94,136 @@ def split_into_units(text: str, max_chars: int = _UNIT_MAX_CHARS) -> list[str]:
     if buf:
         units.append(buf)
     return units
+
+
+# Cabeçalho numerado legal no INÍCIO de uma linha: "6.2.2) ...", "7) ...".
+# Lookahead zero-width em `^` (MULTILINE) → posições de quebra de seção.
+_NUMBERED_HEADER_RE = re.compile(r"(?m)^(?=[ \t]*\d+(?:\.\d+)*\)[ \t]+\S)")
+
+
+def split_by_numbering(text: str, max_chars: int = _UNIT_MAX_CHARS) -> list[str]:
+    """Quebra texto plano com hierarquia numerada legal (`6.2.2)`, `7)`) em
+    units alinhadas a fronteira de seção — nunca corta no meio de uma seção.
+
+    Recupera a estrutura que o achatamento HTML→texto deixou só como numeração
+    (caso FAPESP). Segmenta no início de cada cabeçalho numerado, empacota
+    segmentos contíguos até `max_chars`, e sub-divide por parágrafo
+    (`split_into_units`) o segmento que sozinho estourar o teto. Sem numeração
+    suficiente (< 2 cabeçalhos) → cai em `split_into_units` (mesmo contrato).
+
+    Determinístico, sem I/O, sem LLM. É um helper de L1 (fonte-agnóstico no
+    formato: serve qualquer texto com numeração legal — FAPESP, editais
+    convertidos de PDF, etc.).
+    """
+    if not text or not text.strip():
+        return []
+    positions = [m.start() for m in _NUMBERED_HEADER_RE.finditer(text)]
+    if len(positions) < 2:
+        return split_into_units(text, max_chars)
+
+    # Segmentos = [preâmbulo?] + [cabeçalho_i .. cabeçalho_{i+1})
+    bounds = positions + [len(text)]
+    segments: list[str] = []
+    if positions[0] > 0 and text[: positions[0]].strip():
+        segments.append(text[: positions[0]])
+    for i in range(len(positions)):
+        seg = text[bounds[i] : bounds[i + 1]]
+        if seg.strip():
+            segments.append(seg)
+
+    # Empacota segmentos até max_chars; segmento gigante é sub-dividido.
+    units: list[str] = []
+    buf = ""
+    for seg in segments:
+        if len(seg) > max_chars:
+            if buf:
+                units.append(buf)
+                buf = ""
+            units.extend(split_into_units(seg, max_chars))
+            continue
+        if buf and len(buf) + len(seg) + 2 > max_chars:
+            units.append(buf)
+            buf = seg
+        else:
+            buf = f"{buf}\n\n{seg}" if buf else seg
+    if buf:
+        units.append(buf)
+    return units
+
+
+# Prefixo de numeração legal no início de um cabeçalho: "4.1.", "6.2.2)", "7)".
+_NUM_PREFIX_RE = re.compile(r"^\s*(\d+(?:\.\d+)*)[).]")
+
+
+def _heading_number(text: str) -> tuple[int, ...] | None:
+    """Tupla de numeração de um cabeçalho ('4.1' → (4,1)) ou None se não-numerado."""
+    m = _NUM_PREFIX_RE.match(text or "")
+    return tuple(int(x) for x in m.group(1).split(".")) if m else None
+
+
+def _is_ancestor(a: tuple[int, ...], b: tuple[int, ...]) -> bool:
+    """True se `a` é prefixo numérico estrito de `b` ((4,) é ancestral de (4,1))."""
+    return len(a) < len(b) and b[: len(a)] == a
+
+
+def blocks_from_typed(items: list[tuple[str, str]]) -> list[dict]:
+    """Constrói blocos `{section_path, kind, text}` a partir de itens TIPADOS em
+    ordem de leitura — `(kind, text)`, kind ∈ heading/paragraph/list/table.
+
+    O `section_path` (hierarquia) é derivado da NUMERAÇÃO no texto do cabeçalho
+    (compartilhado entre Docling-detecta-heading e FAPESP texto-plano — um
+    construtor de estrutura só, não dois caminhos). Cabeçalho não-numerado vira
+    raiz. Função pura.
+    """
+    path: list[tuple[tuple[int, ...] | None, str]] = []  # (numtuple|None, texto)
+    out: list[dict] = []
+    for kind, raw in items:
+        text = (raw or "").strip()
+        if not text:
+            continue
+        if kind == "heading":
+            num = _heading_number(text)
+            if num is None:
+                path = [(None, text)]  # não-numerado → nova raiz
+            else:
+                path = [e for e in path if e[0] is not None and _is_ancestor(e[0], num)]
+                path.append((num, text))
+        out.append({
+            "section_path": [t for _, t in path],
+            "kind": kind,
+            "text": text,
+        })
+    return out
+
+
+def blocks_from_numbered_text(text: str) -> list[dict]:
+    """Blocos silver `{section_path, kind, text}` a partir de texto-plano com
+    numeração legal (FAPESP) — DETERMINÍSTICO, sem LLM.
+
+    Detecta linhas-cabeçalho numeradas (`6.2.2)`, `7)`) → kind=heading; o corpo
+    entre cabeçalhos → kind=paragraph. O `section_path` sai da numeração via
+    `blocks_from_typed`. É o caminho que dispensa o structurer-LLM para fontes
+    com estrutura machine-readable (Fase 2 do plano). Sem numeração → 1 bloco
+    paragraph (caller cai no fallback LLM se quiser).
+    """
+    if not text or not text.strip():
+        return []
+    positions = [m.start() for m in _NUMBERED_HEADER_RE.finditer(text)]
+    if not positions:
+        return blocks_from_typed([("paragraph", text)])
+
+    items: list[tuple[str, str]] = []
+    if text[: positions[0]].strip():
+        items.append(("paragraph", text[: positions[0]]))
+    bounds = positions + [len(text)]
+    for i, p in enumerate(positions):
+        seg = text[p : bounds[i + 1]]
+        nl = seg.find("\n")
+        header, body = (seg, "") if nl == -1 else (seg[:nl], seg[nl + 1:])
+        items.append(("heading", header))
+        if body.strip():
+            items.append(("paragraph", body))
+    return blocks_from_typed(items)
 
 
 def html_to_text(html: str) -> str:

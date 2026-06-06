@@ -40,7 +40,8 @@ def load_data() -> list[dict]:
                 "max_per_source": DEFAULT_MAX_PER_SOURCE,
             },
             "expected_output": q.get("expected", []),
-            "metadata": {"case_id": q["id"], "edital_id": str(q["edital_id"])},
+            "metadata": {"case_id": q["id"], "edital_id": str(q["edital_id"]),
+                         "gold_text": q.get("gold_text", "")},
         })
     return items
 
@@ -82,6 +83,27 @@ def eval_retrieval(*, output, expected_output, **_) -> list[Evaluation]:
     return evals
 
 
+def eval_gold_text(*, output, metadata, **_) -> list[Evaluation]:
+    """Token-recall sobre `gold_text` (chunking-invariante). Discriminador do
+    bake-off de parsing/chunking: independe da label `section`."""
+    if not isinstance(output, dict) or "error" in output:
+        return []
+    gold = (metadata or {}).get("gold_text", "")
+    if not gold:
+        return []
+    from core.rag_eval import gold_best_chunk_recall_at_k, gold_recall_at_k
+    retrieved = output.get("retrieved", [])
+    evals: list[Evaluation] = []
+    for k in (3, 5):
+        r = gold_recall_at_k(retrieved, gold, k)
+        b = gold_best_chunk_recall_at_k(retrieved, gold, k)
+        if r is not None:
+            evals.append({"name": f"gold_recall_at_{k}", "value": r})
+        if b is not None:
+            evals.append({"name": f"gold_best_chunk_recall_at_{k}", "value": b})
+    return evals
+
+
 def eval_faithfulness(*, output, **_) -> Evaluation | None:
     """Context relevance via juiz LLM (0-5). Pulável com EVAL_NO_FAITHFULNESS=1."""
     if os.getenv("EVAL_NO_FAITHFULNESS"):
@@ -108,6 +130,6 @@ SUITE = Suite(
     description="Recall/Hit@K + reciprocal rank + faithfulness do retriever de chunks.",
     load_data=load_data,
     task=task,
-    evaluators=[eval_retrieval, eval_faithfulness],
+    evaluators=[eval_retrieval, eval_gold_text, eval_faithfulness],
     prereqs=_prereqs,
 )

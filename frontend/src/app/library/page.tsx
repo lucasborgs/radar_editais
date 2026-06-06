@@ -126,7 +126,7 @@ function AddModal({
   async function handleSave() {
     if (!title.trim()) { setError("Título obrigatório"); return; }
     if (mode === "text" && !content.trim()) { setError("Conteúdo obrigatório"); return; }
-    if (mode === "pdf" && !file) { setError("Selecione um arquivo PDF"); return; }
+    if (mode === "pdf" && !file) { setError("Selecione um arquivo"); return; }
 
     setSaving(true);
     setError(null);
@@ -170,7 +170,7 @@ function AddModal({
                   mode === m ? "bg-white text-content-primary shadow-sm" : "text-content-secondary"
                 )}
               >
-                {m === "text" ? "Colar texto" : "Upload PDF"}
+                {m === "text" ? "Colar texto" : "Upload arquivo"}
               </button>
             ))}
           </div>
@@ -208,7 +208,7 @@ function AddModal({
             </div>
           ) : (
             <div>
-              <label className="block text-xs font-medium text-content-secondary font-sans mb-1">Arquivo PDF</label>
+              <label className="block text-xs font-medium text-content-secondary font-sans mb-1">Arquivo</label>
               <div
                 onClick={() => fileRef.current?.click()}
                 className={cn(
@@ -217,11 +217,11 @@ function AddModal({
                   file && "border-primary/40 bg-primary/5"
                 )}
               >
-                <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={e => setFile(e.target.files?.[0] ?? null)} />
+                <input ref={fileRef} type="file" accept=".pdf,.docx,.txt,.md" className="hidden" onChange={e => setFile(e.target.files?.[0] ?? null)} />
                 {file ? (
                   <p className="text-sm font-sans text-content-primary">{file.name}</p>
                 ) : (
-                  <p className="text-sm font-sans text-content-secondary">Clique para selecionar um PDF (máx. 10MB)</p>
+                  <p className="text-sm font-sans text-content-secondary">Clique para selecionar — PDF, DOCX, TXT, MD (máx. 10MB)</p>
                 )}
               </div>
             </div>

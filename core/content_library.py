@@ -115,6 +115,53 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
         raise RuntimeError(f"Falha ao extrair texto do PDF: {e}") from e
 
 
+def _extract_text_from_docx(data: bytes) -> str:
+    """Extrai texto de um .docx via python-docx (parágrafos + tabelas).
+
+    .docx é o formato mais comum de proposta de cliente. Leve (sem torch) —
+    roda no caminho síncrono do upload sem penalizar latência. .doc binário
+    antigo NÃO é suportado pelo python-docx (orientar a salvar como .docx).
+    """
+    try:
+        import docx  # python-docx
+        doc = docx.Document(BytesIO(data))
+        parts = [p.text for p in doc.paragraphs if p.text.strip()]
+        for table in doc.tables:
+            for row in table.rows:
+                cells = [c.text.strip() for c in row.cells]
+                if any(cells):
+                    parts.append(" | ".join(cells))
+        return "\n\n".join(parts)
+    except ImportError:
+        raise RuntimeError("python-docx não instalado. Execute: pip install python-docx") from None
+    except Exception as e:
+        raise RuntimeError(f"Falha ao extrair texto do DOCX: {e}") from e
+
+
+# Formatos aceitos no upload da library (docs do cliente → perfil/escrita).
+SUPPORTED_UPLOAD_EXTS = ("pdf", "docx", "txt", "md")
+
+
+def extract_document_text(data: bytes, filename: str) -> str:
+    """Extrai texto de um documento de cliente, roteando por extensão.
+
+    Multi-formato (docs de cliente são heterogêneos): PDF, DOCX, TXT, MD.
+    Parsers leves no caminho síncrono do upload — Docling (estruturado, pesado)
+    fica reservado ao chunking em background, onde o ganho de layout se aplica.
+    """
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in (filename or "") else ""
+    if ext == "pdf":
+        return extract_text_from_pdf(data)
+    if ext == "docx":
+        return _extract_text_from_docx(data)
+    if ext in ("txt", "md"):
+        return data.decode("utf-8", errors="ignore")
+    raise RuntimeError(
+        f"Formato .{ext or '?'} não suportado. Use: {', '.join(SUPPORTED_UPLOAD_EXTS)} "
+        "(.doc antigo → salve como .docx)."
+    )
+
+
 # =============================================================================
 # CRUD
 # =============================================================================

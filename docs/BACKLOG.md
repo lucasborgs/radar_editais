@@ -11,6 +11,54 @@
 
 ## Aberto
 
+### Parsing/chunking estrutura-aware — INVESTIGADO E REFUTADO (benchmark-driven, 2026-06-06)
+- **Hipótese:** parser estrutura-aware (Docling p/ PDF, numbering p/ FAPESP texto-plano)
+  → modelo de blocos tipado → melhor `section_path` → melhor retrieval. Motivada pela
+  patologia de "unit gigante" (FAPESP texto_cru achatado → units de ~24k chars).
+- **Metodologia (no harness existente):** métrica **chunking-invariante** — token-recall
+  sobre `gold_text` (estilo Chroma) em `core/rag_eval.py` (`gold_recall_at_k`,
+  `gold_best_chunk_recall_at_k`); golden FINEP (24q) + FAPESP (15q) regenerados com
+  `gold_text`. Benches em `scripts/bench_parsing.py` / `bench_fapesp.py` / `bench_contextual.py`
+  (dense-only, isola a variável chunking).
+- **Resultado: SEM ganho de retrieval.**
+  - FINEP (Docling vs baseline pdfplumber+structurer-LLM): Δ gold_recall@5 **−0.005**, best_chunk@5 −0.012.
+  - FAPESP (numbering-determinístico vs baseline): Δ gold_recall@5 **−0.020**, best_chunk@5 −0.055.
+  - O baseline atual (units → structurer-LLM → `chunk_from_blocks`) já é forte (FINEP
+    recall@5=0.92, FAPESP=1.0) **mesmo com as units de 24k** — a "patologia" não degrada o
+    retrieval mensurável. O LLM structurer recupera estrutura bem.
+- **Viés conhecido (documentado):** `gold_text` = texto de um chunk do baseline → vantagem
+  de casa pró-baseline (sobretudo em best_chunk). Na métrica menos enviesada (union recall)
+  é **empate**. De toda forma, nenhum alternativo supera.
+- **Decisão:** NÃO rearquitetar parsing/chunking (sem contrato de blocos tipados, sem Docling
+  no edital, sem structurer-determinístico). Código fica como **experimento arquivado**:
+  `pipeline/adapters/base.py` (`split_by_numbering`, `blocks_from_typed`, `blocks_from_numbered_text`),
+  `pipeline/parsers/docling_blocks.py`, benches. **Docling NÃO é dependência** (não está no
+  pyproject; só os benches o importam lazy — `pip install docling` p/ rodá-los).
+- **ADOTADO desta frente (rendeu):**
+  - **Contextual Retrieval** (Anthropic) — único lever com ganho medido (+1-2pp consistente,
+    FINEP). Wired em `core/tasks.py::chunk_edital_task` via `core/contextual_retrieval.py`
+    (contexto-no-chunk antes do embed; coluna `text` segue original; gateado por content_hash;
+    `CONTEXTUAL_RETRIEVAL=false` desliga). **Pendência operacional:** reindex do catálogo
+    (`scripts/reindex_edital.py --all --force`) p/ contextualizar tudo (hoje só finep:779).
+  - **Upload multi-formato** (docx/txt/md+pdf) — `core/content_library.extract_document_text`,
+    nos endpoints de upload da library e `/profile/extract-from-document`. Resolve o gap real
+    (cliente sobe proposta `.docx`).
+  - **Infra de eval**: token-recall chunking-invariante + `core/parsing_eval.py` (métricas
+    intrínsecas) + `gold_text` no `generate_golden`.
+- **Revisitar SÓ se:** (a) corpus de **docs do cliente** (heterogêneo, multi-formato) for
+  benchmarkado com docs reais — é onde a tese de parsing PODE render (editais são estruturados
+  demais p/ mostrar diferença); (b) aparecerem queries table-specific (onde Docling 97.9% de
+  tabela poderia ganhar). Ver também [[project_data_plane_prod]] (precedente Stage 2a: experimento parado).
+
+### Chunking de docs do cliente (content_items) — adiado p/ benchmark com docs reais
+- **O quê:** hoje `content_items` é embeddado summary-level (M9: `title+summary+content[:6000]`,
+  1 vetor/item); conteúdo completo É armazenado (sem perda) e acessível ao Redator. Chunkar
+  docs do cliente daria retrieval em nível de PASSAGEM (tabela `content_chunks` + path próprio).
+- **Por que adiado:** é feature (não bug), toca o M9 (matching usa summary-level de propósito),
+  e o benchmark precisa de docs de cliente REAIS (inexistentes pré-launch). Decidido medir
+  quando testers subirem documentos.
+- **Status:** adiado conscientemente.
+
 ### Budget builder mínimo (paridade Grantable "Build budget")
 - **O quê:** planilha de orçamento por aplicação — line items que o usuário digita,
   validados contra o envelope do edital. **Não sugere valores** (filosofia
