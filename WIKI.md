@@ -815,7 +815,16 @@ source_adapters:
     module: "pipeline.adapters.fapesp"
     raw_dir: "fapesp_raw"
     strategy: "html_body"    # texto_cru do bronze como 1 doc
+  web:
+    module: "pipeline.adapters.web"
+    raw_dir: "web_raw"
+    strategy: "html_clean"   # HTML cru do bronze → html_to_text → split em units
 ```
+
+> Fonte `web` (genérica): a seed list de URLs é curada na tabela operacional
+> `web_sources` (migration 018), não numa listagem de portal. O bronze guarda
+> HTML **cru**; o adapter re-limpa por run (`base.html_to_text`), o que permite
+> trocar o extrator sem re-fetch. Cada URL = 1 edital `web:<url_hash>`.
 
 ### 12.5 Onde o código viola isto hoje
 

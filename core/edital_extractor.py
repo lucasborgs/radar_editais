@@ -99,21 +99,19 @@ def _gather_fapesp(n: int | None) -> list[dict]:
 
 
 def _gather_web(n: int | None) -> list[dict]:
-    f = _latest("discovery_raw/discovery_*.json")
+    # Pós unificação (Opção A): páginas web (seed manual + Descoberta) vivem em
+    # web_raw/ no schema web. O `texto_cru` já é o corpo completo da página
+    # (a Descoberta faz full-fetch na ingestão), então não há re-fetch aqui.
+    f = _latest("web_raw/*.json")
     if not f:
         return []
     out = []
     for r in json.loads(f.read_text(encoding="utf-8"))[:n]:
-        raw = ""
-        try:
-            from core.agent_tools.profile_tools import _fetch_and_parse
-            raw = _fetch_and_parse(r.get("link", "")).get("text", "")
-        except Exception as e:
-            logger.warning("re-fetch falhou (%s): %s", r.get("link"), e)
-        if not raw:
-            raw = "\n".join(filter(None, [r.get("titulo", ""), r.get("descricao", "")]))
-        out.append({"source": r.get("source", "web"), "native_id": r.get("native_id", ""),
-                    "title": r.get("titulo", ""), "raw": raw[:RAW_CAP]})
+        raw = "\n".join(filter(None, [
+            r.get("title", ""), r.get("texto_cru", "") or r.get("descricao", ""),
+        ]))
+        out.append({"source": "web", "native_id": r.get("url_hash", ""),
+                    "title": r.get("title", ""), "raw": raw[:RAW_CAP]})
     return out
 
 

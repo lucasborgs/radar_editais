@@ -9,6 +9,7 @@
 from .base import BaseScraper
 from .fapesp import FAPESPScraper
 from .finep import FINEPScraper
+from .web import WebScraper
 
 SCRAPER_REGISTRY = {
     "finep": dict(
@@ -22,6 +23,12 @@ SCRAPER_REGISTRY = {
         # FAPESP não tem modo histórico via API; histórico é o que já está em
         # bronze_data/fapesp_raw/. Adapter L1 lê o snapshot mais recente.
     ),
+    "web": dict(
+        source="web", display_name="Web", bronze_dir="web_raw",
+        cls=WebScraper, kwargs={},
+        # Fonte genérica: indexa a seed list curada em `web_sources`
+        # (migration 018), 1 URL = 1 edital `web:<url_hash>`. Sem histórico.
+    ),
 }
 
 __all__ = [
@@ -29,4 +36,5 @@ __all__ = [
     "SCRAPER_REGISTRY",
     "FINEPScraper",
     "FAPESPScraper",
+    "WebScraper",
 ]

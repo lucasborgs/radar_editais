@@ -43,10 +43,15 @@ for name in ("index.json", "index_historico.json"):
         shutil.copy2(src, bak)
         print(f"backup: {src.name} → {bak.name}")
 
-# Exclui o discovery web do build (isolamento de prod) sem mover arquivo.
+# Exclui a fonte `web` do build (isolamento de prod) sem mover arquivo. Pós
+# unificação Opção A, a Descoberta entra como fonte `web` (provisorio) — zerar
+# o bronze de web no build mantém só FINEP+FAPESP no cloud.
 import pipeline.build_knowledge_graph as bkg
 
-bkg.load_discovery_bronze = lambda: []  # noqa: E731 — override pontual do driver
+_orig_load_bronze = bkg.load_bronze
+bkg.load_bronze = (  # noqa: E731 — override pontual do driver
+    lambda source=bkg._DEFAULT_SOURCE: [] if source == "web" else _orig_load_bronze(source)
+)
 
 print(f"\nRebuild FINEP+FAPESP (sem web) → upsert cloud ({os.getenv('SUPABASE_URL')})\n")
 bkg.main()  # rebuilda do bronze, salva local + upsert kg_artifacts no cloud

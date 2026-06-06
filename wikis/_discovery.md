@@ -8,6 +8,13 @@ Princípio: queries amplas o bastante para recall, específicas o bastante para 
 afogar em ruído. Resultados passam por triagem agêntica + entram no KG como
 `provisorio` (§5.11). Ver `docs/spec_descoberta_oportunidades.md`.
 
+**Unificação (Opção A, WIKI.md §12.4):** a Descoberta é a *torneira automática*
+da fonte `web` — não tem bronze/índice próprios. Grava em `bronze_data/web_raw/`
+(prefixo `web_discovery_`) no schema web (`url`/`url_hash`/`texto_cru`/
+`verificacao=provisorio`), e daí entra como qualquer página web: chunkada pro RAG
+pelo adapter `pipeline.adapters.web` e indexada por `_build_editais("web")`. A
+outra torneira do mesmo bronze é a seed list manual (`web_sources`).
+
 ```yaml
 discovery:
   # Queries de busca (Tavily). Tunáveis conforme a taxa de aprovação observada.
