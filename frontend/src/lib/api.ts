@@ -247,6 +247,32 @@ export const extractProfileFromUrl = (url: string) =>
     body: JSON.stringify({ url }),
   });
 
+// Extração de perfil a partir de PDF (onboarding). Rota pública (multipart):
+// não setamos Content-Type — o browser define o boundary. Mandamos o token se
+// houver, igual às demais chamadas semi-públicas. Padrão herdado de uploadLibraryPdf.
+export const extractProfileFromDocument = async (
+  file: File
+): Promise<ExtractProfileResponse> => {
+  const form = new FormData();
+  form.append("file", file);
+  const headers: Record<string, string> = {};
+  const token = await getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE_URL}/profile/extract-from-document`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  if (!res.ok) throw await buildApiError(res);
+  return res.json();
+};
+
+// Extração de perfil a partir de um item da biblioteca (autenticado).
+export const extractProfileFromLibraryItem = (itemId: string, token: string) =>
+  apiFetch<ExtractProfileResponse>(`/profile/extract-from-library/${itemId}`, {
+    method: "POST",
+  }, token);
+
 // ── Content Library ────────────────────────────────────────
 
 export const getLibraryItems = (
@@ -344,6 +370,45 @@ export const listWritingSessions = (token: string) =>
 
 export const deleteWritingSession = (sessionId: string, token: string) =>
   apiFetch<{ ok: boolean }>(`/writing/sessions/${sessionId}`, { method: "DELETE" }, token);
+
+// ── Applications (Pipeline) ────────────────────────────────
+
+export type ApplicationStatus =
+  | "matched"
+  | "brief_gerado"
+  | "proposta_iniciada"
+  | "submetida"
+  | "em_analise"
+  | "aprovada"
+  | "reprovada"
+  | "desistiu";
+
+export interface ApplicationItem {
+  application_id: string;
+  edital_id: string;
+  edital_title: string | null;
+  status: ApplicationStatus;
+  match_score: number | null;
+  deadline: string | null;
+  days_left: number | null;
+  session_id: string | null;
+  progress_pct: number;
+  updated_at: string;
+}
+
+export const listApplications = (token: string) =>
+  apiFetch<ApplicationItem[]>("/applications", undefined, token);
+
+export const updateApplicationStatus = (
+  id: string,
+  status: ApplicationStatus,
+  token: string,
+  feedback_notas?: string,
+) =>
+  apiFetch<{ success: boolean }>(`/applications/${id}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status, feedback_notas }),
+  }, token);
 
 // ── User preferences ───────────────────────────────────────
 

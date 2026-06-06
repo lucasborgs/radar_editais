@@ -15,9 +15,10 @@ load_dotenv()
 import logging
 import os
 import uuid
+from datetime import date
 
 import jwt
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -26,13 +27,15 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from backend.auth_routes import router as auth_router
+from backend.library_routes import MAX_PDF_MB
 from backend.library_routes import router as library_router
 from core.auth import CurrentUserId, DbClient
-from core.content_library import get_item, get_workspace_id
+from core.content_library import extract_text_from_pdf, get_item, get_workspace_id
 from core.hybrid_match_service import HybridMatchService
 from core.kg_match_service import KGMatchService
 from core.logging_config import request_id_var, setup_logging
-from core.profile_extractor import ProfileExtractor
+from core.profile_extractor import ExtractResult, ProfileExtractor
+from core.wiki_schema import parse_deadline
 from core.writing_session import (
     WritingSession,
     delete_session,
@@ -509,6 +512,100 @@ async def update_application_status(
     return row
 
 
+def _session_progress_pct(session: dict | None) -> int:
+    """Calcula % de conclusão de uma proposta a partir da writing_session.
+
+    Espelha a semântica de `completionStats` (frontend/src/lib/writing.ts):
+    total = nº de seções do outline; preenchidas = seções com draft não-vazio.
+    Sem sessão ou outline vazio → 0.
+    """
+    if not session:
+        return 0
+    outline = session.get("proposal_outline") or []
+    total = len(outline)
+    if total == 0:
+        return 0
+    drafts = session.get("section_drafts") or {}
+    filled = sum(
+        1 for v in drafts.values()
+        if isinstance(v, str) and v.strip()
+    )
+    return round(100 * filled / total)
+
+
+def _serialize_application(row: dict, card: dict | None, session: dict | None) -> dict:
+    """Monta um item do pipeline (Kanban) a partir de uma linha de application_log.
+
+    `card` é a wiki page do edital (ou None se ausente); `session` é a
+    writing_session associada (ou None). Resolve título do edital, prazo e
+    days_left, além do progresso da proposta.
+    """
+    deadline = (card or {}).get("deadline") or None
+    parsed = parse_deadline(deadline)
+    days_left = (parsed - date.today()).days if parsed else None
+    return {
+        "application_id": row.get("id"),
+        "edital_id": row.get("edital_id"),
+        "edital_title": (card or {}).get("title") if card else None,
+        "status": row.get("status"),
+        "match_score": row.get("match_score"),
+        "deadline": deadline,
+        "days_left": days_left,
+        "session_id": row.get("session_id"),
+        "progress_pct": _session_progress_pct(session),
+        "updated_at": row.get("updated_at"),
+    }
+
+
+def _build_pipeline_items(rows: list[dict], sessions_by_id: dict[str, dict]) -> list[dict]:
+    """Serializa as linhas de application_log em itens do pipeline.
+
+    Resolve o card do edital (file-based, cacheado em processo) por linha e
+    mapeia a writing_session pré-carregada (batch) por session_id.
+    """
+    items = []
+    for row in rows:
+        card = wiki_matcher.get_edital_by_id(row.get("edital_id"))
+        session = sessions_by_id.get(row.get("session_id")) if row.get("session_id") else None
+        items.append(_serialize_application(row, card, session))
+    return items
+
+
+@app.get("/applications", summary="Lista applications do workspace (pipeline)")
+async def list_applications(user_id: CurrentUserId, db: DbClient):
+    """Lista as applications do workspace com metadados do edital para o Kanban.
+
+    Retorna uma lista plana (o frontend agrupa por status nas colunas do
+    pipeline), ordenada por updated_at desc. RLS escopa ao workspace do usuário.
+
+    Junta o título/prazo do edital (wiki page) e calcula days_left e o
+    progresso da proposta (a partir da writing_session, quando houver). As
+    sessions são buscadas em lote (.in_) para evitar N+1.
+    """
+    result = (
+        db.table("application_log")
+        .select(
+            "id, edital_id, session_id, match_score, status, updated_at"
+        )
+        .order("updated_at", desc=True)
+        .execute()
+    )
+    rows = result.data or []
+
+    session_ids = [r["session_id"] for r in rows if r.get("session_id")]
+    sessions_by_id: dict[str, dict] = {}
+    if session_ids:
+        sess_result = (
+            db.table("writing_sessions")
+            .select("id, proposal_outline, section_drafts")
+            .in_("id", session_ids)
+            .execute()
+        )
+        sessions_by_id = {s["id"]: s for s in (sess_result.data or [])}
+
+    return _build_pipeline_items(rows, sessions_by_id)
+
+
 @app.get("/commands", summary="Lista slash commands disponíveis e LLM tiers (Fase 4 #24/#25)")
 def list_commands():
     """Registry de slash commands + model tiers para o frontend popular UI.
@@ -944,6 +1041,37 @@ def writing_section_start(
 # =============================================================================
 
 
+def _serialize_extract_result(result: ExtractResult) -> dict:
+    """Serializa um ExtractResult no formato de resposta dos endpoints /profile/extract*.
+
+    Centraliza o dict campo-a-campo do perfil para os três endpoints
+    (extract, extract-from-document, extract-from-library).
+    """
+    return {
+        "profile": {
+            "nome": result.profile.nome,
+            "cnpj": result.profile.cnpj,
+            "tipo_entidade": result.profile.tipo_entidade,
+            "one_liner": result.profile.one_liner,
+            "solution_summary": result.profile.solution_summary,
+            "descricao_atividades": result.profile.descricao_atividades,
+            "portfolio_projetos": result.profile.portfolio_projetos,
+            "tamanho_empresa": result.profile.tamanho_empresa,
+            "capital_social": result.profile.capital_social,
+            "uf": result.profile.uf,
+            "faturamento_anual": result.profile.faturamento_anual,
+            "ano_fundacao": result.profile.ano_fundacao,
+            "trl": result.profile.trl,
+            "equipe_resumo": result.profile.equipe_resumo,
+            "tipos_financiamento_interesse": result.profile.tipos_financiamento_interesse,
+        },
+        "confidence": result.confidence,
+        "source_title": result.source_title,
+        "low_confidence": result.low_confidence,
+        "error": result.error,
+    }
+
+
 @app.post("/profile/extract", summary="Extrai perfil da empresa a partir de URL")
 @limiter.limit("3/minute")
 def extract_profile(request: Request, req: ProfileExtractRequest):
@@ -967,23 +1095,52 @@ def extract_profile(request: Request, req: ProfileExtractRequest):
     ).lower() == "true"
     result = ProfileExtractor().extract(url, agent_enabled=agent_enabled)
 
-    return {
-        "profile": {
-            "nome": result.profile.nome,
-            "cnpj": result.profile.cnpj,
-            "tipo_entidade": result.profile.tipo_entidade,
-            "one_liner": result.profile.one_liner,
-            "solution_summary": result.profile.solution_summary,
-            "descricao_atividades": result.profile.descricao_atividades,
-            "portfolio_projetos": result.profile.portfolio_projetos,
-            "tamanho_empresa": result.profile.tamanho_empresa,
-            "capital_social": result.profile.capital_social,
-            "trl": result.profile.trl,
-            "equipe_resumo": result.profile.equipe_resumo,
-            "tipos_financiamento_interesse": result.profile.tipos_financiamento_interesse,
-        },
-        "confidence": result.confidence,
-        "source_title": result.source_title,
-        "low_confidence": result.low_confidence,
-        "error": result.error,
-    }
+    return _serialize_extract_result(result)
+
+
+@app.post(
+    "/profile/extract-from-document",
+    summary="Extrai perfil a partir de uma proposta antiga (PDF) — onboarding",
+)
+@limiter.limit("3/minute")
+async def extract_profile_from_document(request: Request, file: UploadFile = File(...)):
+    """Extrai CompanyProfile sugerido a partir do PDF de uma proposta antiga.
+
+    Público (sem auth), igual a /profile/extract — usado no onboarding antes de
+    existir workspace. Extrai o texto do PDF (mesmo pipeline da library) e roda
+    o LLM. "AI drafts, human reviews": só RETORNA a sugestão + confiança, nunca
+    salva. Texto ilegível/vazio retorna erro controlado (não 500).
+    """
+    content = await file.read()
+    if len(content) > MAX_PDF_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"PDF excede {MAX_PDF_MB}MB")
+
+    try:
+        text = extract_text_from_pdf(content)
+    except RuntimeError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    result = ProfileExtractor().extract_from_text(text, source_title=file.filename or "")
+    return _serialize_extract_result(result)
+
+
+@app.post(
+    "/profile/extract-from-library/{item_id}",
+    summary="Extrai perfil a partir do texto de um item da library",
+)
+def extract_profile_from_library(item_id: str, user_id: CurrentUserId, db: DbClient):
+    """Extrai CompanyProfile sugerido a partir do content de um library_item.
+
+    Autenticado. Aceita qualquer item de texto (tipicamente uma proposta antiga).
+    "AI drafts, human reviews": só RETORNA a sugestão + confiança, nunca salva —
+    o save continua no PUT /me/profile.
+    """
+    workspace_id = get_workspace_id(db, user_id)
+    item = get_item(db, item_id, workspace_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Item não encontrado")
+
+    result = ProfileExtractor().extract_from_text(
+        item.get("content") or "", source_title=item.get("title") or "",
+    )
+    return _serialize_extract_result(result)

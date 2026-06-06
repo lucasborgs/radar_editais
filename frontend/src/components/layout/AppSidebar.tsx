@@ -63,6 +63,25 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/pipeline",
+    label: "Pipeline",
+    icon: (
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.75}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 5a1 1 0 011-1h3a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM15 5a1 1 0 011-1h3a1 1 0 011 1v9a1 1 0 01-1 1h-3a1 1 0 01-1-1V5z"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/library",
     label: "Biblioteca",
     icon: (

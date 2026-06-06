@@ -28,6 +28,9 @@ class ProfilePayload(BaseModel):
     portfolio_projetos: str = ""
     tamanho_empresa: str = ""
     capital_social: float | None = None
+    uf: str = ""
+    faturamento_anual: float | None = None
+    ano_fundacao: int | None = None
     equipe_resumo: str = ""
     trl: int | None = None
     tipos_financiamento_interesse: list[str] = []

@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { KnowledgeGraph } from "@/components/KnowledgeGraph";
+import { ChatBubble } from "@/components/chat/ChatBubble";
+import { ChatMessageList } from "@/components/chat/ChatMessageList";
+import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { getGraph, kgExplore } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import type { GraphData, GraphNode, KGChatMessage } from "@/lib/api";
@@ -23,17 +26,15 @@ const GREETING: KGChatMessage = {
 function Bubble({ msg }: { msg: KGChatMessage }) {
   const isUser = msg.role === "user";
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm font-sans ${
-          isUser
-            ? "bg-primary text-white whitespace-pre-wrap"
-            : "bg-white border border-border text-content-primary prose prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 prose-headings:font-semibold prose-headings:text-content-primary"
-        }`}
-      >
-        {isUser ? msg.content : <ReactMarkdown>{msg.content}</ReactMarkdown>}
-      </div>
-    </div>
+    <ChatBubble role={msg.role}>
+      {isUser ? (
+        <span className="whitespace-pre-wrap">{msg.content}</span>
+      ) : (
+        <div className="prose prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 prose-headings:font-semibold prose-headings:text-content-primary">
+          <ReactMarkdown>{msg.content}</ReactMarkdown>
+        </div>
+      )}
+    </ChatBubble>
   );
 }
 
@@ -49,14 +50,6 @@ export default function DashboardPage() {
   const [messages, setMessages] = useState<KGChatMessage[]>([GREETING]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, [messages]);
 
   const send = useCallback(
     async (text: string, editalIds: string[] = [], nodeId?: string, nodeType?: string) => {
@@ -136,25 +129,18 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div
-            ref={scrollRef}
-            className="flex-1 overflow-y-auto p-4 space-y-3"
-          >
+          <ChatMessageList deps={[sending]}>
             {messages.map((m, i) => (
               <Bubble key={i} msg={m} />
             ))}
             {sending && (
               <div className="flex justify-start">
-                <div className="bg-white border border-border rounded-xl px-3.5 py-2.5">
-                  <div className="flex gap-1">
-                    <span className="w-1.5 h-1.5 bg-content-secondary rounded-full animate-bounce" />
-                    <span className="w-1.5 h-1.5 bg-content-secondary rounded-full animate-bounce [animation-delay:0.15s]" />
-                    <span className="w-1.5 h-1.5 bg-content-secondary rounded-full animate-bounce [animation-delay:0.3s]" />
-                  </div>
+                <div className="bg-white border border-border rounded-2xl rounded-bl-sm px-4 py-3">
+                  <TypingIndicator />
                 </div>
               </div>
             )}
-          </div>
+          </ChatMessageList>
 
           <form
             onSubmit={(e) => {

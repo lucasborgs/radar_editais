@@ -36,6 +36,21 @@
 - **Guard-rail:** o builder NUNCA preenche valores — só valida. Teste de aceitação por grep.
 - **Status:** aberto (desenho fechado, não construído).
 
+### ProfileExtractor — `faturamento_anual` raramente extraído do texto
+- **O quê:** o `extract_from_text`/`_call_llm` ([core/profile_extractor.py](../core/profile_extractor.py))
+  extrai bem `uf`/`ano_fundacao` mas perde `faturamento_anual` mesmo quando o texto
+  o afirma. **Evidência (walkthrough 2026-06-06):** proposta com "Faturamento anual
+  R$ 2 milhões" → `uf='SP'` e `ano_fundacao=2019` vieram `high`, mas
+  `faturamento_anual` veio `missing`/None.
+- **Por que importa:** é um dos 3 campos thin-profile (o "teto do matching"). Agora que
+  a cadeia UI/save foi fechada (o campo flui de ponta a ponta), o gargalo restante é
+  só a extração. Mitigação atual: o usuário digita no campo novo do onboarding.
+- **Ponto de entrada:** prompt `_EXTRACT_SYSTEM`/`_EXTRACT_USER` e o schema de saída em
+  [core/profile_extractor.py](../core/profile_extractor.py) — instruir a capturar valores
+  monetários (R$ X milhões → número) e normalizar a escala. Medir com um caso de golden
+  de extração de perfil (não existe ainda — criar fixture mínima).
+- **Status:** aberto (qualidade de extração, não wiring).
+
 ### Extração v2 — itens adiados da curadoria + "perfil é o teto do matching"
 - **Insight central:** o teto do matching é o `CompanyProfile` (fino), NÃO o schema
   do edital. Adicionar campo de decisão no edital só rende se houver o PAR no perfil.

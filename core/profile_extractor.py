@@ -162,6 +162,28 @@ class ProfileExtractor:
         if not text.strip():
             return self._empty_result(error="O site não retornou conteúdo legível.")
 
+        return self._result_from_text(text, source_title)
+
+    def extract_from_text(self, text: str, source_title: str = "") -> ExtractResult:
+        """Extrai CompanyProfile a partir de texto arbitrário (ex.: proposta antiga).
+
+        Usado pelos endpoints /profile/extract-from-document e
+        /profile/extract-from-library, que alimentam onboarding e enriquecimento
+        da library. "AI drafts, human reviews": só RETORNA a sugestão de perfil
+        + confiança, nunca salva. Sem fetch HTTP — o texto já vem pronto (PDF
+        extraído ou content de um library_item).
+        """
+        if not text or not text.strip():
+            return self._empty_result(error="Texto vazio ou ilegível.")
+        return self._result_from_text(text, source_title)
+
+    def _result_from_text(self, text: str, source_title: str) -> ExtractResult:
+        """Núcleo compartilhado: _call_llm → _build_profile → low_confidence.
+
+        Reaproveitado por _extract_legacy (após fetch da URL) e por
+        extract_from_text (texto já disponível). Mantém a mesma regra de
+        low_confidence (< 2 campos obrigatórios extraídos).
+        """
         llm_result = self._call_llm(text)
         if llm_result is None:
             return self._empty_result(error="llm_unavailable")

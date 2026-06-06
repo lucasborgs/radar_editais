@@ -42,49 +42,28 @@ import { loadProfileFromStorage, EMPTY_PROFILE } from "@/types/profile";
 import type { WritingMessage, PendingUserInput } from "@/types/api";
 import { MentionsTextarea } from "@/components/ui/MentionsTextarea";
 import { PendingUserInputPrompt } from "@/components/writing/PendingUserInputPrompt";
+import { ChatBubble } from "@/components/chat/ChatBubble";
+import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { useAuth } from "@/lib/auth";
-
-// ── Typing indicator ─────────────────────────────────────────────────────────
-
-function TypingDots() {
-  return (
-    <div className="flex items-center gap-1 px-1 py-0.5">
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="w-1.5 h-1.5 bg-content-secondary rounded-full animate-bounce"
-          style={{ animationDelay: `${i * 0.15}s` }}
-        />
-      ))}
-    </div>
-  );
-}
 
 // ── Message bubble ────────────────────────────────────────────────────────────
 
 function MessageBubble({ msg }: { msg: WritingMessage }) {
   const isUser = msg.role === "user";
   return (
-    <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-      <div
-        className={cn(
-          "max-w-[82%] rounded-2xl px-4 py-3 text-sm font-sans leading-relaxed",
-          isUser
-            ? "bg-primary text-white rounded-br-sm"
-            : "bg-white border border-border text-content-primary rounded-bl-sm"
-        )}
-      >
-        <pre className="whitespace-pre-wrap font-sans text-inherit">{msg.content}</pre>
-        <p className={cn("text-[10px] mt-1.5", isUser ? "text-white/60" : "text-content-secondary")}>
-          {msg.timestamp}
-        </p>
-      </div>
-      {!isUser && msg.draftSaved && (
-        <span className="mt-1 text-[10px] font-sans text-green-600 px-1">
-          ↗ Salvo no documento
-        </span>
-      )}
-    </div>
+    <ChatBubble
+      role={msg.role}
+      timestamp={msg.timestamp}
+      footer={
+        !isUser && msg.draftSaved ? (
+          <span className="mt-1 text-[10px] font-sans text-green-600 px-1">
+            ↗ Salvo no documento
+          </span>
+        ) : undefined
+      }
+    >
+      <pre className="whitespace-pre-wrap font-sans text-inherit">{msg.content}</pre>
+    </ChatBubble>
   );
 }
 
@@ -759,7 +738,7 @@ function WritingPageInner() {
                 {sectionLoading && (
                   <div className="flex justify-start">
                     <div className="bg-white border border-border rounded-2xl rounded-bl-sm px-4 py-3">
-                      <TypingDots />
+                      <TypingIndicator />
                     </div>
                   </div>
                 )}
@@ -769,7 +748,7 @@ function WritingPageInner() {
                 {loading && (
                   <div className="flex justify-start">
                     <div className="bg-white border border-border rounded-2xl rounded-bl-sm px-4 py-3">
-                      <TypingDots />
+                      <TypingIndicator />
                     </div>
                   </div>
                 )}
