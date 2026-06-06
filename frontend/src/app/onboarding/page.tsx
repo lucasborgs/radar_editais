@@ -11,9 +11,12 @@ import {
   type TipoFinanciamento,
 } from "@/types/profile";
 import { PORTE_LABELS } from "@/lib/constants";
-import { extractProfileFromUrl, saveProfile } from "@/lib/api";
+import { extractProfileFromUrl, extractProfileFromDocument, saveProfile } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { Tabs } from "@/components/ui";
 import type { FieldConfidence } from "@/types/api";
+
+const MAX_PDF_BYTES = 10 * 1024 * 1024; // backend caps at 10MB
 
 // ── Shared UI primitives ─────────────────────────────────────────────────────
 
@@ -107,6 +110,11 @@ const FINANCIAMENTO_OPTIONS: { value: TipoFinanciamento; label: string }[] = [
   { value: "pesquisa_colaborativa", label: "Pesquisa colaborativa" },
 ];
 
+const UF_OPTIONS = [
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+];
+
 const TRL_LABELS: Record<number, string> = {
   1: "TRL 1 — Princípios básicos observados",
   2: "TRL 2 — Conceito tecnológico formulado",
@@ -188,6 +196,51 @@ function ProfileForm({
             <option key={v} value={v}>{l}</option>
           ))}
         </select>
+      </Field>
+
+      <Field
+        label="UF (sede)"
+        hint="Estado da empresa — usado na elegibilidade geográfica de editais."
+        confidence={confidence.uf}
+      >
+        <select
+          className={INPUT_CLS}
+          value={profile.uf}
+          onChange={(e) => set("uf", e.target.value)}
+        >
+          <option value="">Selecionar...</option>
+          {UF_OPTIONS.map((uf) => (
+            <option key={uf} value={uf}>{uf}</option>
+          ))}
+        </select>
+      </Field>
+
+      <Field
+        label="Ano de fundação"
+        hint="Idade da empresa — alguns editais exigem tempo mínimo de constituição."
+        confidence={confidence.ano_fundacao}
+      >
+        <input
+          type="number"
+          className={INPUT_CLS}
+          value={profile.ano_fundacao ?? ""}
+          onChange={(e) => set("ano_fundacao", e.target.value ? Number(e.target.value) : null)}
+          placeholder="Ex: 2019"
+        />
+      </Field>
+
+      <Field
+        label="Faturamento anual (R$)"
+        hint="Receita bruta anual — usada em tetos/pisos de faturamento de editais."
+        confidence={confidence.faturamento_anual}
+      >
+        <input
+          type="number"
+          className={INPUT_CLS}
+          value={profile.faturamento_anual ?? ""}
+          onChange={(e) => set("faturamento_anual", e.target.value ? Number(e.target.value) : null)}
+          placeholder="Ex: 2000000"
+        />
       </Field>
 
       <Field
@@ -287,6 +340,11 @@ function OnboardingInner() {
   const [extractError, setExtractError] = useState<string | null>(null);
   const urlRef = useRef<HTMLInputElement>(null);
 
+  // Document (PDF) extraction state
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docExtracting, setDocExtracting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
   function set<K extends keyof CompanyProfile>(key: K, value: CompanyProfile[K]) {
     setProfile((prev) => ({ ...prev, [key]: value }));
   }
@@ -333,6 +391,49 @@ function OnboardingInner() {
     }
   }
 
+  function pickFile(f: File | null) {
+    setExtractError(null);
+    if (!f) {
+      setDocFile(null);
+      return;
+    }
+    const isPdf = f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      setExtractError("Envie um arquivo PDF.");
+      setDocFile(null);
+      return;
+    }
+    if (f.size > MAX_PDF_BYTES) {
+      setExtractError("Arquivo muito grande (máx. 10MB).");
+      setDocFile(null);
+      return;
+    }
+    setDocFile(f);
+  }
+
+  async function handleExtractDoc() {
+    if (!docFile) return;
+    setDocExtracting(true);
+    setExtractError(null);
+    try {
+      const res = await extractProfileFromDocument(docFile);
+      if (res.error && res.low_confidence) {
+        setExtractError(res.error === "llm_unavailable"
+          ? "Serviço de IA indisponível. Preencha manualmente."
+          : `Não conseguimos ler o documento: ${res.error}`
+        );
+        return;
+      }
+      setProfile({ ...EMPTY_PROFILE, ...res.profile });
+      setConfidence(res.confidence);
+      setMode("form");
+    } catch {
+      setExtractError("Não foi possível conectar ao servidor.");
+    } finally {
+      setDocExtracting(false);
+    }
+  }
+
   const canFinish = isComplete(profile);
 
   // ── URL-input screen ──────────────────────────────────────────────────────
@@ -352,56 +453,133 @@ function OnboardingInner() {
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl border border-border p-6 shadow-card space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-content-primary font-sans mb-1.5">
-                URL do site da empresa
-              </label>
-              <div className="flex gap-2">
-                <input
-                  ref={urlRef}
-                  type="url"
-                  className={cn(INPUT_CLS, "flex-1")}
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleExtract()}
-                  placeholder="https://suaempresa.com.br"
-                  autoFocus
-                  disabled={extracting}
-                />
-                <button
-                  type="button"
-                  onClick={handleExtract}
-                  disabled={extracting || !urlInput.trim()}
-                  className={cn(
-                    "shrink-0 px-4 py-2 rounded-xl text-sm font-semibold font-sans text-white",
-                    "bg-primary hover:bg-primary-hover transition-colors",
-                    "disabled:opacity-40 disabled:cursor-not-allowed"
-                  )}
-                >
-                  {extracting ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Lendo...
-                    </span>
-                  ) : "Extrair"}
-                </button>
-              </div>
-            </div>
+          <div className="bg-white rounded-2xl border border-border p-6 shadow-card">
+            <Tabs
+              items={[
+                {
+                  value: "url",
+                  label: "URL do site",
+                  content: (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-content-primary font-sans mb-1.5">
+                          URL do site da empresa
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            ref={urlRef}
+                            type="url"
+                            className={cn(INPUT_CLS, "flex-1")}
+                            value={urlInput}
+                            onChange={(e) => setUrlInput(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleExtract()}
+                            placeholder="https://suaempresa.com.br"
+                            disabled={extracting}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleExtract}
+                            disabled={extracting || !urlInput.trim()}
+                            className={cn(
+                              "shrink-0 px-4 py-2 rounded-xl text-sm font-semibold font-sans text-white",
+                              "bg-primary hover:bg-primary-hover transition-colors",
+                              "disabled:opacity-40 disabled:cursor-not-allowed"
+                            )}
+                          >
+                            {extracting ? (
+                              <span className="flex items-center gap-2">
+                                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                Lendo...
+                              </span>
+                            ) : "Extrair"}
+                          </button>
+                        </div>
+                      </div>
 
-            {extractError && (
-              <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-sans">
-                {extractError}
-              </div>
-            )}
+                      {extractError && (
+                        <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-sans">
+                          {extractError}
+                        </div>
+                      )}
 
-            {extracting && (
-              <div className="space-y-2">
-                {[80, 60, 72].map((w, i) => (
-                  <div key={i} className="h-3 bg-gray-100 rounded animate-pulse" style={{ width: `${w}%` }} />
-                ))}
-              </div>
-            )}
+                      {extracting && (
+                        <div className="space-y-2">
+                          {[80, 60, 72].map((w, i) => (
+                            <div key={i} className="h-3 bg-gray-100 rounded animate-pulse" style={{ width: `${w}%` }} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  value: "doc",
+                  label: "Enviar proposta antiga",
+                  content: (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-content-primary font-sans mb-1.5">
+                          Proposta ou documento (PDF)
+                        </label>
+                        <p className="text-xs text-content-secondary font-sans mb-2">
+                          Extraímos o perfil de uma proposta antiga ou apresentação da empresa.
+                        </p>
+                        <div
+                          onClick={() => !docExtracting && fileRef.current?.click()}
+                          className={cn(
+                            "border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer",
+                            "hover:border-primary/40 transition-colors",
+                            docFile && "border-primary/40 bg-primary/5",
+                            docExtracting && "opacity-60 cursor-not-allowed"
+                          )}
+                        >
+                          <input
+                            ref={fileRef}
+                            type="file"
+                            accept=".pdf,application/pdf"
+                            className="hidden"
+                            onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+                          />
+                          {docFile ? (
+                            <p className="text-sm font-sans text-content-primary">{docFile.name}</p>
+                          ) : (
+                            <p className="text-sm font-sans text-content-secondary">
+                              Clique para selecionar um PDF (máx. 10MB)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleExtractDoc}
+                        disabled={docExtracting || !docFile}
+                        className={cn(
+                          "w-full px-4 py-2 rounded-xl text-sm font-semibold font-sans text-white",
+                          "bg-primary hover:bg-primary-hover transition-colors",
+                          "disabled:opacity-40 disabled:cursor-not-allowed"
+                        )}
+                      >
+                        {docExtracting ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Lendo...
+                          </span>
+                        ) : "Extrair perfil"}
+                      </button>
+
+                      {extractError && (
+                        <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-sans">
+                          {extractError}
+                        </div>
+                      )}
+                    </div>
+                  ),
+                },
+              ]}
+              defaultValue="url"
+              onValueChange={() => setExtractError(null)}
+            />
           </div>
 
           <div className="mt-4 flex items-center gap-2 text-xs text-content-secondary">

@@ -5,3 +5,7 @@ export { SidebarFilter } from "./SidebarFilter";
 export type { FilterState } from "./SidebarFilter";
 export { EMPTY_FILTER } from "./SidebarFilter";
 export { StatusBadge } from "./StatusBadge";
+export { Modal } from "./Modal";
+export { Tabs } from "./Tabs";
+export type { TabItem } from "./Tabs";
+export { Skeleton } from "./Skeleton";

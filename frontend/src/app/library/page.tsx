@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import {
@@ -11,9 +12,47 @@ import {
   archiveLibraryItem,
   getLibraryItem,
   updateLibraryItem,
+  extractProfileFromLibraryItem,
+  getMe,
+  saveProfile,
 } from "@/lib/api";
 import type { ContentItemSummary, ContentItemType, ContentItemFull, EnrichmentStatus } from "@/types/api";
+import { EMPTY_PROFILE, type CompanyProfile } from "@/types/profile";
+import { Modal } from "@/components/ui";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+
+// Rótulos amigáveis dos campos do perfil (para o diff/merge de enriquecimento).
+const PROFILE_FIELD_LABELS: Record<keyof CompanyProfile, string> = {
+  nome: "Nome da empresa",
+  cnpj: "CNPJ",
+  url_site: "Site",
+  tipo_entidade: "Tipo de entidade",
+  one_liner: "Proposta de valor",
+  solution_summary: "Solução / tecnologia",
+  descricao_atividades: "Descrição das atividades",
+  portfolio_projetos: "Portfólio de projetos",
+  tamanho_empresa: "Porte",
+  capital_social: "Capital social",
+  uf: "UF",
+  faturamento_anual: "Faturamento anual",
+  ano_fundacao: "Ano de fundação",
+  trl: "TRL",
+  equipe_resumo: "Equipe",
+  tipos_financiamento_interesse: "Financiamento de interesse",
+};
+
+// Renderiza um valor de campo do perfil em texto legível (lida com listas/null).
+function formatProfileValue(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "";
+  if (Array.isArray(v)) return v.join(", ");
+  return String(v);
+}
+
+function isEmptyValue(v: unknown): boolean {
+  if (v === null || v === undefined || v === "") return true;
+  if (Array.isArray(v)) return v.length === 0;
+  return false;
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -306,11 +345,13 @@ function ItemCard({
   onEdit,
   onDelete,
   onArchive,
+  onEnrich,
 }: {
   item: ContentItemSummary;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onArchive: (id: string) => void;
+  onEnrich: (id: string) => void;
 }) {
   const status = item.enrichment_status;
   return (
@@ -361,9 +402,23 @@ function ItemCard({
         </div>
       )}
 
-      <p className="text-[10px] text-content-secondary font-sans">
-        {new Date(item.created_at).toLocaleDateString("pt-BR")}
-      </p>
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <p className="text-[10px] text-content-secondary font-sans">
+          {new Date(item.created_at).toLocaleDateString("pt-BR")}
+        </p>
+        {item.type === "proposal" && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEnrich(item.id);
+            }}
+            className="text-[11px] font-medium font-sans text-primary hover:text-primary-hover transition-colors"
+          >
+            ↑ Enriquecer meu perfil
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -518,15 +573,201 @@ function EditModal({
   );
 }
 
-function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+// ── Enrich Profile Modal ────────────────────────────────────────────────────────
+//
+// "AI drafts, human reviews": extrai sugestões do item, mostra diff campo a campo
+// (atual vs. sugerido) e SÓ aplica o que o usuário marcar. Regra de default:
+// campos vazios no perfil atual já vêm marcados; campos preenchidos vêm
+// desmarcados (nunca sobrescrevemos algo silenciosamente).
+
+interface SuggestionRow {
+  field: keyof CompanyProfile;
+  label: string;
+  current: unknown;
+  suggested: unknown;
+}
+
+function EnrichProfileModal({
+  itemId,
+  token,
+  onClose,
+}: {
+  itemId: string;
+  token: string;
+  onClose: () => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [current, setCurrent] = useState<CompanyProfile>(EMPTY_PROFILE);
+  const [rows, setRows] = useState<SuggestionRow[]>([]);
+  const [accepted, setAccepted] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
-    const handle = setTimeout(onClose, 3000);
-    return () => clearTimeout(handle);
-  }, [onClose]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const [me, extracted] = await Promise.all([
+          getMe(token),
+          extractProfileFromLibraryItem(itemId, token),
+        ]);
+        if (cancelled) return;
+
+        if (extracted.error && extracted.low_confidence) {
+          setError(
+            extracted.error === "llm_unavailable"
+              ? "Serviço de IA indisponível. Tente novamente mais tarde."
+              : `Não conseguimos ler o documento: ${extracted.error}`,
+          );
+          return;
+        }
+
+        const cur: CompanyProfile = { ...EMPTY_PROFILE, ...me.profile };
+        setCurrent(cur);
+
+        // Só campos que a extração trouxe com confiança "high" (sugestões reais).
+        const built: SuggestionRow[] = [];
+        const defaults: Record<string, boolean> = {};
+        (Object.keys(extracted.confidence) as (keyof CompanyProfile)[]).forEach((field) => {
+          if (extracted.confidence[field] !== "high") return;
+          if (!(field in PROFILE_FIELD_LABELS)) return;
+          const suggested = extracted.profile[field];
+          if (isEmptyValue(suggested)) return;
+          built.push({
+            field,
+            label: PROFILE_FIELD_LABELS[field],
+            current: cur[field],
+            suggested,
+          });
+          // default: marcado só quando o atual está vazio.
+          defaults[field] = isEmptyValue(cur[field]);
+        });
+        setRows(built);
+        setAccepted(defaults);
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Erro ao extrair perfil");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [itemId, token]);
+
+  function toggle(field: keyof CompanyProfile) {
+    setAccepted((prev) => ({ ...prev, [field]: !prev[field] }));
+  }
+
+  const acceptedCount = rows.filter((r) => accepted[r.field]).length;
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const merged: CompanyProfile = { ...current };
+      rows.forEach((r) => {
+        if (accepted[r.field]) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (merged as any)[r.field] = r.suggested;
+        }
+      });
+      await saveProfile(merged, token);
+      toast.success("Perfil atualizado");
+      onClose();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar perfil");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-content-primary text-white px-4 py-2 rounded-full shadow-lg text-xs font-sans">
-      {message}
-    </div>
+    <Modal
+      open
+      onClose={onClose}
+      title="Enriquecer meu perfil"
+      size="lg"
+      footer={
+        <>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-sans text-content-secondary hover:text-content-primary transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || loading || !!error || acceptedCount === 0}
+            className={cn(
+              "px-5 py-2 rounded-xl text-sm font-semibold font-sans text-white bg-primary hover:bg-primary-hover transition-colors",
+              "disabled:opacity-40 disabled:cursor-not-allowed",
+            )}
+          >
+            {saving ? "Salvando..." : `Salvar alterações${acceptedCount ? ` (${acceptedCount})` : ""}`}
+          </button>
+        </>
+      }
+    >
+      {loading ? (
+        <div className="space-y-3 animate-pulse">
+          <div className="h-4 bg-gray-100 rounded w-1/2" />
+          <div className="h-16 bg-gray-100 rounded" />
+          <div className="h-16 bg-gray-100 rounded" />
+        </div>
+      ) : error ? (
+        <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-sans">
+          {error}
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-content-secondary font-sans">
+          Não encontramos novas informações para sugerir a partir deste documento.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-xs text-content-secondary font-sans">
+            Revise as sugestões extraídas. Campos já preenchidos não vêm marcados —
+            marque para sobrescrever. Nada é salvo sem você confirmar.
+          </p>
+          {rows.map((r) => {
+            const isChecked = !!accepted[r.field];
+            const curText = formatProfileValue(r.current);
+            const sugText = formatProfileValue(r.suggested);
+            return (
+              <label
+                key={r.field}
+                className={cn(
+                  "flex gap-3 rounded-lg border border-border p-3 cursor-pointer transition-colors",
+                  isChecked ? "border-primary/40 bg-primary/5" : "hover:border-primary/30",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggle(r.field)}
+                  className="mt-0.5 h-4 w-4 accent-primary shrink-0"
+                />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="text-sm font-semibold text-content-primary font-sans">{r.label}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-content-secondary font-sans">Atual</p>
+                      <p className="text-xs text-content-secondary font-sans break-words">
+                        {curText || <span className="italic">vazio</span>}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-primary font-sans">Sugerido</p>
+                      <p className="text-xs text-content-primary font-sans break-words">{sugText}</p>
+                    </div>
+                  </div>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -539,10 +780,10 @@ export default function LibraryPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [includeArchived, setIncludeArchived] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     getToken().then(t => {
@@ -591,9 +832,9 @@ export default function LibraryPage() {
     setItems(prev => prev.filter(i => i.id !== id));
     try {
       await deleteLibraryItem(id, token);
-      setToast("Item excluído");
+      toast.success("Item excluído");
     } catch {
-      setToast("Erro ao excluir — recarregando…");
+      toast.error("Erro ao excluir — recarregando…");
       loadItems();
     }
   }
@@ -606,14 +847,14 @@ export default function LibraryPage() {
     }
     try {
       await archiveLibraryItem(id, token);
-      setToast("Item arquivado");
+      toast.success("Item arquivado");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
       if (msg.includes("404")) {
         // backend endpoint not yet deployed — surface gentle hint
-        setToast("Arquivar ainda não está disponível (404). Recarregando…");
+        toast.error("Arquivar ainda não está disponível (404). Recarregando…");
       } else {
-        setToast("Erro ao arquivar — recarregando…");
+        toast.error("Erro ao arquivar — recarregando…");
       }
       loadItems();
     }
@@ -711,6 +952,7 @@ export default function LibraryPage() {
                 onEdit={(id) => setEditingId(id)}
                 onDelete={handleDelete}
                 onArchive={handleArchive}
+                onEnrich={(id) => setEnrichingId(id)}
               />
             ))}
           </div>
@@ -731,13 +973,19 @@ export default function LibraryPage() {
           token={token}
           onClose={() => setEditingId(null)}
           onSaved={() => {
-            setToast("Item atualizado");
+            toast.success("Item atualizado");
             loadItems();
           }}
         />
       )}
 
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+      {enrichingId && token && (
+        <EnrichProfileModal
+          itemId={enrichingId}
+          token={token}
+          onClose={() => setEnrichingId(null)}
+        />
+      )}
     </DashboardLayout>
   );
 }

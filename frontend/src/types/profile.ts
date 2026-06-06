@@ -20,6 +20,10 @@ export interface CompanyProfile {
   // Classificação
   tamanho_empresa: CompanySize | "";
   capital_social: number | null;
+  // Elegibilidade dura (teto do matching) — região/idade/faturamento
+  uf: string;
+  faturamento_anual: number | null;
+  ano_fundacao: number | null;
   // Perfil tecnológico
   trl: number | null;
   equipe_resumo: string;
@@ -38,6 +42,9 @@ export const EMPTY_PROFILE: CompanyProfile = {
   portfolio_projetos: "",
   tamanho_empresa: "",
   capital_social: null,
+  uf: "",
+  faturamento_anual: null,
+  ano_fundacao: null,
   trl: null,
   equipe_resumo: "",
   tipos_financiamento_interesse: [],
