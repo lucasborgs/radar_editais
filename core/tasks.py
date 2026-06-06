@@ -327,7 +327,12 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
         "chunk_edital_task: edital=%s gerou %d chunks, embedando…",
         edital_id, len(chunks),
     )
-    embeddings = await asyncio.to_thread(embed_texts, texts)
+    # Contextual Retrieval (Anthropic): embeda contexto+corpo; a coluna `text`
+    # segue com o corpo original. Desligável por env; gateado pelo content_hash
+    # acima (só editais que mudaram re-contextualizam). Ver core/contextual_retrieval.
+    from core.contextual_retrieval import contextualize_chunks
+    embed_inputs = await asyncio.to_thread(contextualize_chunks, chunks)
+    embeddings = await asyncio.to_thread(embed_texts, embed_inputs)
 
     if len(embeddings) != len(chunks):
         raise RuntimeError(

@@ -1,0 +1,217 @@
+{
+  "source": "fapesp",
+  "generated_at": "2026-06-06T20:18:21.031002+00:00",
+  "generator": "gpt-4o-mini",
+  "queries": [
+    {
+      "id": "fapesp_fapesp:18067_q1",
+      "edital_id": "fapesp:18067",
+      "query": "Quais documentos são necessários para comprovar a infraestrutura e o apoio institucional na proposta, e como deve ser a assinatura do Dirigente da Instituição Sede?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "9) Formato para apresentação de propostas > 9.3) Documentos adicionais"
+        }
+      ],
+      "gold_text": "[…] confidencialidade e outras. f) Manifestação do Dirigente da Instituição Sede, conforme modelo disponível para download no SAGe. g) Informação aprovada pela Instituição Sede sobre a infraestrutura institucional, conforme modelo do Anexo II disponível para download no SAGe, contendo a descrição do apoio institucional e da infraestrutura disponível e a ser disponibilizada para o desenvolvimento do projeto, incluindo: g.1) Serviços acadêmicos, administrativos e de apoio técnico existentes na Instituição Sede; g.2) Instalações; g.3) Pessoal contratado pela Instituição Sede para apoio ao projeto. Este documento deverá ser assinado pelo Pesquisador Responsável e pelo Dirigente da Instituição Sede com autoridade para garantir os compromissos ali constantes e será anexado ao Termo de Outorga, caso a proposta seja aprovada.\n\nOs seguintes documentos adicionais poderão ser solicitados pela FAPESP:\n\n9.3.1) Para propostas nas quais o Pesquisador Responsável não tenha vínculo empregatício com a Instituição Sede deverá ser apresentado um termo de vinculação não empregatícia estabelecendo, entre outros itens considerados necessários pela Instituição Sede, que:\n\na) Qualquer propriedade intelectual criada durante o estágio do Pesquisador Responsável na Instituição Sede pertencerá à Instituição Sede; e\n\nb) Havendo benefícios com o licenciamento ou comercialização da Propriedade Intelectual os inventores farão jus a parcela destes benefícios de acordo com as normas da Instituição Sede e a Lei",
+      "category": "other",
+      "_source_chunk_index": 39
+    },
+    {
+      "id": "fapesp_fapesp:18067_q2",
+      "edital_id": "fapesp:18067",
+      "query": "Quem pode ser considerado o Pesquisador Responsável em um projeto submetido à FAPESP?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "4) Definições"
+        }
+      ],
+      "gold_text": "[…] 4) Definições\n\na) Pesquisador Responsável (PR): é o pesquisador que assume a responsabilidade pela preparação, submissão da proposta e pela coordenação científica, inovativa e administrativa do projeto, caso seja aprovado pela FAPESP.\n\nb) Pesquisador Associado (PA): pesquisadores da equipe, designados pelo Pesquisador Responsável e aprovados pela FAPESP, que assumem a responsabilidade de contribuir em partes do projeto de pesquisa.\n\nc) Instituição Sede: é a organização que sedia o projeto e no caso do AIR obrigatoriamente deve ser uma instituição de pesquisa pública ou privada que comprovadamente tenha infraestrutura de pesquisa instalada. A Instituição Sede deve assumir compromissos com a guarda e acesso de materiais e equipamentos, com apoio institucional ao projeto de pesquisa e inovação e sobre a gestão da propriedade intelectual eventualmente criada.",
+      "category": "timeline",
+      "_source_chunk_index": 21
+    },
+    {
+      "id": "fapesp_fapesp:18067_q3",
+      "edital_id": "fapesp:18067",
+      "query": "Quais são os critérios que serão analisados na fase de enquadramento da minha proposta de Auxílio à Inovação Regular?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "12) Análise e seleção > 12.1.2) Análise e emissão de parecer pelos pareceristas ad hoc"
+        }
+      ],
+      "gold_text": "[…] Nessa fase é verificado se os requisitos especificados nas seções 5, 8 e 12.1.5.b da presente Chamada são integralmente atendidos. As solicitações de Auxílio à Inovação Regular serão submetidas a uma fase de enquadramento na qual serão analisadas a compatibilidade entre a originalidade e o impacto potencial do projeto de pesquisa frente ao valor solicitado, bem como as qualificações do Pesquisador Responsável quanto à capacidade de gestão e liderança científica e de inovação. Para as solicitações consideradas enquadradas, a Assessoria Científica fará a indicação de pareceristas ad hoc a serem consultados para emissão de parecer. As propostas não enquadradas serão retornadas com um parecer circunstanciado de não enquadramento.\n\nOs pareceristas ad hoc, especialistas na temática dos projetos, analisam as propostas e emitem pareceres que contemplam cada um dos critérios da seção 12.1.5. Os pareceres circunstanciados fundamentam as etapas subsequentes da avaliação.",
+      "category": "financial",
+      "_source_chunk_index": 44
+    },
+    {
+      "id": "fapesp_fapesp:18067_q4",
+      "edital_id": "fapesp:18067",
+      "query": "Quais são os requisitos para a concessão de Bolsas de Pós-Doutorado no meu projeto?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "6) Condições e obrigações exigidas > 6.2) Instituição Sede > 8) Itens financiáveis"
+        }
+      ],
+      "gold_text": "[…] e.5.1) No caso de Bolsas de Pós-Doutorado concedidas como item do orçamento do projeto o processo seletivo deve obrigatoriamente ser internacional e deverá ser documentado no momento da implementação de cada Bolsa. e.5.2) Caso não sejam apresentados, no momento da indicação do bolsista, os documentos que comprovem a realização de processo seletivo público e internacional, a Bolsa não será concedida pela FAPESP.\n\ne.6) Jornalismo Científico (JC).\n\ne.7) Ensino Público - Aperfeiçoamento Pedagógico (EP).\n\ne.8) Treinamento Técnico e Participação em Curso.\n\nAs bolsas solicitadas devem ter sua quantidade máxima de cotas inseridas no orçamento planejado, compondo assim, o custo total da proposta.",
+      "category": "other",
+      "_source_chunk_index": 30
+    },
+    {
+      "id": "fapesp_fapesp:18067_q5",
+      "edital_id": "fapesp:18067",
+      "query": "Qual é a data limite para eu enviar minha proposta para o edital?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "3) Cronograma"
+        }
+      ],
+      "gold_text": "[…] 3) Cronograma\n\nLançamento da Chamada:\n\n17/03/2026\n\nData limite para submissão das propostas no SAGe:\n\n15/06/2026\n\nAnúncio dos projetos selecionados:\n\nA partir de outubro de 2026",
+      "category": "timeline",
+      "_source_chunk_index": 19
+    },
+    {
+      "id": "fapesp_fapesp:18067_q6",
+      "edital_id": "fapesp:18067",
+      "query": "Quais são os critérios que o projeto de pesquisa para inovação deve atender para ser aprovado?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "12) Análise e seleção > 12.1.5) Critérios utilizados na análise > a) Projeto de Pesquisa para Inovação"
+        }
+      ],
+      "gold_text": "[…] Cada solicitação é analisada considerando-se três componentes: a) Projeto de Pesquisa para Inovação; b) Histórico do Pesquisador Responsável; e c) Orçamento solicitado.\n\na) Projeto de Pesquisa para Inovação\n\na.1) Projeto de pesquisa para inovação original, ousado, competitivo internacionalmente e perfeitamente apresentado.\n\na.2) Os desafios de pesquisa para inovação estão perfeitamente formulados e situados frente ao estado da arte e à literatura existente.\n\na.3) A metodologia é adequada e está bem justificada.\n\na.4) Os resultados têm grande possibilidade de gerar inovação apresentando algo novo ou significativamente aprimorado que possa ser disponibilizado para potenciais usuários ou colocado em uso pela instituição.\n\na.5) O projeto de pesquisa para inovação pode ser realizado pelo Pesquisador Responsável e sua equipe no prazo previsto na proposta.\n\na.6) As métricas de acompanhamento são claras e mensuráveis.\n\na.7) Adequação do Plano de Gestão de Dados ao projeto proposto, descrevendo os dados digitais produzidos pelo projeto e políticas para seu acesso. O Plano de Gestão de Dados inclui, dentre outros, descrição dos dados usados e produzidos, software, mecanismos e formatos para armazenar, compartilhar e preservar este material, questões legais ou éticas associadas.",
+      "category": "criteria",
+      "_source_chunk_index": 48
+    },
+    {
+      "id": "fapesp_fapesp:18067_q7",
+      "edital_id": "fapesp:18067",
+      "query": "Quais são os requisitos que o Pesquisador Responsável deve atender para submeter uma proposta ao Auxílio à Inovação Regular?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": null
+        }
+      ],
+      "gold_text": "[…] Estrutura Conselho Superior e Diretoria Assessoria Científica\n\nA presente Chamada tem por objetivo selecionar propostas na modalidade Auxílio à Inovação Regular (AIR) a serem desenvolvidas sob a responsabilidade de um Pesquisador Responsável que possua vínculo com a Instituição Sede do estado de São Paulo, pública ou privada, que sediará o projeto.\n\nOs resultados esperados incluem avanços concretos em áreas específicas do conhecimento ou setores econômicos, promovendo a valorização do conhecimento aplicado, o protagonismo do pesquisador e a indução de trajetórias tecnológicas e empreendedoras promissoras. O estímulo à cultura empreendedora, a articulação com o setor produtivo e o aprimoramento de cadeias de suprimentos, gerando benefícios ampliados para a sociedade, também podem ser objetivos de um projeto apoiado pelo Auxílio à Inovação Regular.\n\nO Pesquisador Responsável deve ter experiência demonstrada na liderança de projetos de inovação competitivos ou demonstrar evidências de grande potencial de realização de projetos de inovação. Sua súmula curricular deverá demonstrar experiência em atividades de inovação de alto nível.\n\nPara a concessão do Auxílio será analisada a importância da contribuição pretendida para a área de conhecimento e potencial de aplicação do resultado do projeto, a adequação do montante de recursos solicitados, equipe proponente, impacto esperado, entre outros componentes da proposta.\n\n2) Duração",
+      "category": "eligibility",
+      "_source_chunk_index": 16
+    },
+    {
+      "id": "fapesp_fapesp:18067_q8",
+      "edital_id": "fapesp:18067",
+      "query": "Qual é o limite de bolsas que posso solicitar para cada área, como Jornalismo Científico e Ensino Público, e como isso deve ser incluído no orçamento da proposta?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "8) Itens financiáveis"
+        }
+      ],
+      "gold_text": "[…] e.6) Jornalismo Científico (JC). e.7) Ensino Público - Aperfeiçoamento Pedagógico (EP). e.8) Treinamento Técnico e Participação em Curso. As bolsas solicitadas devem ter sua quantidade máxima de cotas inseridas no orçamento planejado, compondo assim, o custo total da proposta.\n\n8.2) Reserva Técnica",
+      "category": "other",
+      "_source_chunk_index": 31
+    },
+    {
+      "id": "fapesp_fapesp:18203_q9",
+      "edital_id": "fapesp:18203",
+      "query": "Quais são os documentos obrigatórios que preciso apresentar para a Proposta Simplificada no processo de enquadramento na modalidade PIPE?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "6) Formato para apresentação de propostas > 6.1) Proposta Simplificada para enquadramento"
+        }
+      ],
+      "gold_text": "[…] da análise da Proposta Completa. Caso os documentos apresentados indiquem que a empresa estava constituída no momento da submissão da Proposta Simplificada, a proposta será cancelada. Empresas já constituídas em outros estados obrigatoriamente devem submeter a proposta em nome da empresa constituída, devendo observar as condições do PIPE, no momento da submissão. A não apresentação da documentação no prazo indicado pela FAPESP ou a ausência de resposta levarão ao cancelamento da proposta. As propostas serão analisadas em duas fases: a) Proposta Simplificada para enquadramento na modalidade PIPE; b) Proposta Completa: para as propostas enquadradas, os Pesquisadores Responsáveis serão convidados, por meio de diligência que será aberta pela FAPESP no processo, a apresentar a Proposta Completa.\n\n6.1) Proposta Simplificada para enquadramento\n\nPara o enquadramento, deverão ser providenciadas as seguintes informações e documentos:\n\na) Todos os campos da proposta marcados com asterisco (*) no SAGe são de preenchimento obrigatório;\n\nb) No caso de empresas não cadastradas na FAPESP, o cadastro deve ser solicitado com antecedência mínima de 2 (dois) dias úteis da data de fechamento da Chamada. Para solicitar o cadastramento de uma Empresa brasileira, deve ser acessada a opção “Solicitações > Cadastro de Instituição de Pesquisa/Empresa > Cadastro de Instituição de Pesquisa/Empresa Brasileira”, disponível no link “Solicitações” do menu principal. Para instruções detalhadas, consulte o",
+      "category": "timeline",
+      "_source_chunk_index": 25
+    },
+    {
+      "id": "fapesp_fapesp:18203_q10",
+      "edital_id": "fapesp:18203",
+      "query": "Quais são os itens que não podem ser financiados com os recursos do projeto?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "5) Itens financiáveis"
+        }
+      ],
+      "gold_text": "[…] tipo “Outra”, no processo do próprio Auxílio no SAGe, indicando a qual(is) cota(s) de Bolsa se refere a complementação; (iii) Os mecanismos de complementação, bem como a responsabilidade pelo cumprimento do pactuado são de exclusiva responsabilidade da Empresa Sede, não cabendo à FAPESP intervir nessa relação a qualquer momento; f) A Reserva Técnica poderá ser utilizada para o pagamento de taxa de incubação, sem necessidade de autorização prévia da FAPESP, no caso das incubadoras credenciadas pela FAPESP; g) Além dos itens de custeio do projeto de pesquisa, as propostas submetidas sem empresas constituídas poderão solicitar até R$ 10.000,00 (dez mil reais) em recursos voltados a capacitação a ser contratada junto as incubadoras credenciadas pela FAPESP.\n\n5.3) Itens não financiáveis\n\na) Não são financiáveis salários de qualquer natureza, serviços de terceiros que não de natureza técnica e eventual, obras civis, aquisição de publicações, viagens (exceto para pesquisa de campo e apresentação de trabalhos em eventos de interesse do projeto de pesquisa), materiais e serviços administrativos;\n\nb) Não são financiáveis serviços pagos a instituições de pesquisa e que configurem “contrapartida” da empresa em linhas de fomento de outras agências;\n\nc) Não são financiáveis bens e materiais voltados para atividades de produção de bens ou prestação de serviços com natureza comercial ou que caracterizem infraestrutura física da empresa;\n\nd) O Pesquisador Responsável é vedado de contratar",
+      "category": "financial",
+      "_source_chunk_index": 23
+    },
+    {
+      "id": "fapesp_fapesp:18203_q11",
+      "edital_id": "fapesp:18203",
+      "query": "Os membros da equipe do projeto precisam morar em São Paulo e ter algum vínculo com a empresa para poder participar do PIPE?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "4) Condições de participação > 4.4) Requisitos da equipe"
+        }
+      ],
+      "gold_text": "[…] à carga horária de dedicação, alunos matriculados no mestrado acadêmico ou doutorado não podem ser indicados como Pesquisador Principal no PIPE; c) possuir vínculo empregatício, ser sócio ou possuir contrato formal com a pequena empresa; c.1) caso o vínculo não seja empregatício ou societário, deverá existir um acordo que estabeleça as condições em que se dará o relacionamento entre a empresa e o Pesquisador Principal, seu acesso à infraestrutura da empresa para o desenvolvimento da pesquisa para inovação, propriedade intelectual, sigilo etc.; d) residir no estado de São Paulo durante a execução do projeto; e) não ser pesquisador responsável ou principal de outro PIPE em análise ou em execução no momento da submissão da proposta.\n\nA equipe do projeto deve residir e executar o projeto no estado de São Paulo. Espera-se que a equipe do projeto tenha natureza interdisciplinar e complementar e que seja majoritariamente formada por membros que tenham vínculo com a empresa.",
+      "category": "timeline",
+      "_source_chunk_index": 19
+    },
+    {
+      "id": "fapesp_fapesp:18203_q12",
+      "edital_id": "fapesp:18203",
+      "query": "Quais são os temas que posso escolher para a minha proposta nesta Chamada?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": null
+        }
+      ],
+      "gold_text": "[…] Os temas de interesse são os que constam no Anexo 1.\n\n3) Valor oferecido nesta Chamada",
+      "category": "financial",
+      "_source_chunk_index": 11
+    },
+    {
+      "id": "fapesp_fapesp:18203_q14",
+      "edital_id": "fapesp:18203",
+      "query": "Como posso entrar em contato para esclarecer dúvidas sobre a chamada de propostas relacionada à Soberania Digital e Inteligência Artificial?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "Anexo 1 - Soberania Digital, Inteligência Artificial e Conectividade"
+        }
+      ],
+      "gold_text": "[…] 13) Contato Questões sobre esta Chamada de Propostas devem ser enviadas por e-mail para pipe-jornada@fapesp.br.\n\nAnexo 1 - Soberania Digital, Inteligência Artificial e Conectividade\n\nEsta chamada foca no fortalecimento da infraestrutura tecnológica e capacidade analítica do Estado, apoiando empresas com soluções soberanas em software e hardware. O objetivo é impulsionar transformação digital em setores críticos (governo, educação, segurança, finanças) com uso ético e avançado de IA, posicionando São Paulo na vanguarda de tecnologias emergentes (computação quântica, nova geração de semicondutores, além de outros) e respondendo a desafios de cibersegurança e eficiência operacional em uma sociedade hiperconectada.\n\nTópicos de interesse:\n\n• IA Aplicada e IA Generativa: modelos (incluindo LLMs) e algoritmos para automação de serviços, personalização de ensino (educação), suporte à decisão clínica e otimização de fluxos financeiros, entre outros.\n\n• Tecnologias Quânticas e Sensores: computação quântica, criptografia pós-quântica, sensores quânticos para metrologia, geolocalização, entre outros.\n\n• Microeletrônica e Semicondutores: design/fabricação de chips, circuitos integrados e hardware para indústria local, IoT, infraestrutura de rede, entre outros.\n\n• Cibersegurança e Proteção de Dados: Zero Trust, privacidade, proteção de infraestruturas críticas, combate a fraudes digitais, entre outros.\n\n• Conectividade e Cidades Inteligentes: hardware/software para 5G/6G, satélite e ge",
+      "category": "financial",
+      "_source_chunk_index": 45
+    },
+    {
+      "id": "fapesp_fapesp:18203_q15",
+      "edital_id": "fapesp:18203",
+      "query": "Como devo incluir os consultores na minha proposta e quais documentos eles precisam ter para participar do projeto?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "6) Formato para apresentação de propostas > 6.2) Proposta Completa para propostas enquadradas > 6.2.2) Documentos Necessários"
+        }
+      ],
+      "gold_text": "[…] não sejam remunerados com recursos do projeto solicitados à FAPESP; c) Bolsistas; d) Consultores: quando a proposta incluir a solicitação de recursos para pagamento de serviços de terceiros de consultores. Os consultores devem ser obrigatoriamente inseridos na equipe da proposta, com a respectiva função “Consultor”. Todas as pessoas envolvidas no projeto devem ser incluídas no preenchimento da proposta no SAGe, na aba “Dados Gerais do Projeto” > “Pessoas Envolvidas”. Todos os membros de equipe devem possuir cadastro no SAGe, atualizado, com cópia de documento de identificação e deverão confirmar sua participação na proposta. Recomenda-se ainda que o Currículo Lattes e o Linkedin sejam atualizados, já que a FAPESP poderá consultá-los durante a etapa de análise.\n\n6.2.2) Documentos Necessários",
+      "category": "financial",
+      "_source_chunk_index": 29
+    },
+    {
+      "id": "fapesp_fapesp:18203_q16",
+      "edital_id": "fapesp:18203",
+      "query": "Qual é a carga horária mínima que o Pesquisador Responsável deve dedicar ao projeto se ele também for responsável tecnicamente por ele?",
+      "expected": [
+        {
+          "source_file": "pagina-chamada",
+          "section": "4) Condições de participação"
+        }
+      ],
+      "gold_text": "[…] ou não os conhecimentos críticos para a execução do projeto. Caso também responda tecnicamente pelo projeto, deverá dedicar um mínimo de 24 horas semanais para sua execução e atender os demais requisitos que constam no item 4.3. A carga horária padrão considerada pela FAPESP é de 40 horas semanais. Portanto, o total de horas dedicadas pelo Pesquisador Responsável ao projeto PIPE, somadas às horas dedicadas a outras atividades, não deve exceder 40 horas semanais; d) no caso de proposta submetida sem empresa constituída, o Pesquisador Responsável obrigatoriamente deverá ser um dos sócios da empresa que será constituída; e) não ser pesquisador responsável ou principal de outro PIPE em análise no momento da submissão da proposta.\n\n4.2) Requisitos da Empresa Sede",
+      "category": "timeline",
+      "_source_chunk_index": 16
+    }
+  ]
+}

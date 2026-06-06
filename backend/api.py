@@ -27,10 +27,10 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from backend.auth_routes import router as auth_router
-from backend.library_routes import MAX_PDF_MB
+from backend.library_routes import MAX_UPLOAD_MB
 from backend.library_routes import router as library_router
 from core.auth import CurrentUserId, DbClient
-from core.content_library import extract_text_from_pdf, get_item, get_workspace_id
+from core.content_library import extract_document_text, get_item, get_workspace_id
 from core.hybrid_match_service import HybridMatchService
 from core.kg_match_service import KGMatchService
 from core.logging_config import request_id_var, setup_logging
@@ -1100,23 +1100,23 @@ def extract_profile(request: Request, req: ProfileExtractRequest):
 
 @app.post(
     "/profile/extract-from-document",
-    summary="Extrai perfil a partir de uma proposta antiga (PDF) — onboarding",
+    summary="Extrai perfil a partir de uma proposta antiga (PDF/DOCX/TXT/MD) — onboarding",
 )
 @limiter.limit("3/minute")
 async def extract_profile_from_document(request: Request, file: UploadFile = File(...)):
-    """Extrai CompanyProfile sugerido a partir do PDF de uma proposta antiga.
+    """Extrai CompanyProfile sugerido a partir de uma proposta antiga.
 
     Público (sem auth), igual a /profile/extract — usado no onboarding antes de
-    existir workspace. Extrai o texto do PDF (mesmo pipeline da library) e roda
-    o LLM. "AI drafts, human reviews": só RETORNA a sugestão + confiança, nunca
-    salva. Texto ilegível/vazio retorna erro controlado (não 500).
+    existir workspace. Extrai o texto do documento (multi-formato, mesmo pipeline
+    da library) e roda o LLM. "AI drafts, human reviews": só RETORNA a sugestão +
+    confiança, nunca salva. Texto ilegível/vazio retorna erro controlado (não 500).
     """
     content = await file.read()
-    if len(content) > MAX_PDF_MB * 1024 * 1024:
-        raise HTTPException(status_code=413, detail=f"PDF excede {MAX_PDF_MB}MB")
+    if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"Arquivo excede {MAX_UPLOAD_MB}MB")
 
     try:
-        text = extract_text_from_pdf(content)
+        text = extract_document_text(content, file.filename or "")
     except RuntimeError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

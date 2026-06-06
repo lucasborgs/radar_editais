@@ -175,6 +175,11 @@ def _build_entry(source: str, edital_id: str, idx: int, chunk: dict, query: str)
             "source_file": chunk.get("source_file"),
             "section": chunk.get("section"),
         }],
+        # gold_text: passagem-fonte (texto do chunk que responde a query). Serve
+        # de gabarito CHUNKING-INVARIANTE — token-recall/IoU (estilo Chroma) mede
+        # cobertura desta passagem por QUALQUER estratégia de chunk, sem depender
+        # da label `section` (que muda a cada re-chunk). Capado p/ arquivo enxuto.
+        "gold_text": (chunk.get("text") or "").strip()[:1500],
         "category": _infer_category(chunk.get("section"), chunk.get("text") or ""),
         "_source_chunk_index": chunk.get("chunk_index"),  # rastreio pra revisão
     }

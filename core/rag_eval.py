@@ -26,12 +26,55 @@ Métricas
 from __future__ import annotations
 
 import logging
+import re
 import statistics
 from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_KS: tuple[int, ...] = (1, 3, 5)
+
+
+# =============================================================================
+# Token-recall sobre gold_text (CHUNKING-INVARIANTE, estilo Chroma)
+# =============================================================================
+# Mede cobertura da passagem-resposta (`gold_text`) pelos chunks recuperados,
+# em tokens — sem depender da label `section` (que muda a cada re-chunk). É o
+# discriminador certo p/ comparar estratégias de chunking no bake-off.
+
+_TOKEN_RE = re.compile(r"\w+", re.UNICODE)
+
+
+def _tokens(text: str) -> set[str]:
+    """Tokens de conteúdo (lowercase, >2 chars) — descarta pontuação e
+    artigos curtos que inflariam o overlap com ruído."""
+    return {t for t in _TOKEN_RE.findall((text or "").lower()) if len(t) > 2}
+
+
+def gold_recall_at_k(retrieved: list[dict], gold_text: str, k: int) -> float | None:
+    """Fração dos tokens do `gold_text` presentes na UNIÃO dos top-k chunks.
+    'A resposta foi recuperada (mesmo que espalhada)?' None se sem gold_text."""
+    gold = _tokens(gold_text)
+    if not gold:
+        return None
+    union: set[str] = set()
+    for c in retrieved[:k]:
+        union |= _tokens(c.get("text", ""))
+    return round(len(gold & union) / len(gold), 4)
+
+
+def gold_best_chunk_recall_at_k(retrieved: list[dict], gold_text: str, k: int) -> float | None:
+    """Maior recall de UM único chunk dos top-k. 'Um chunk sozinho capturou a
+    resposta inteira?' — cai se a estratégia partiu a resposta entre chunks
+    (sinal central de qualidade de chunking). None se sem gold_text."""
+    gold = _tokens(gold_text)
+    if not gold:
+        return None
+    best = 0.0
+    for c in retrieved[:k]:
+        ov = len(gold & _tokens(c.get("text", ""))) / len(gold)
+        best = max(best, ov)
+    return round(best, 4)
 
 
 # =============================================================================
@@ -255,6 +298,8 @@ __all__ = [
     "DEFAULT_KS",
     "aggregate_runs",
     "evaluate_query",
+    "gold_best_chunk_recall_at_k",
+    "gold_recall_at_k",
     "hit_at_k",
     "judge_faithfulness",
     "reciprocal_rank",

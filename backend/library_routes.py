@@ -8,10 +8,11 @@ from pydantic import BaseModel
 from core.auth import CurrentUserId, DbClient
 from core.content_library import (
     CONTENT_TYPES,
+    SUPPORTED_UPLOAD_EXTS,
     archive_item,
     create_item,
     delete_item,
-    extract_text_from_pdf,
+    extract_document_text,
     get_item,
     get_workspace_id,
     list_items,
@@ -22,7 +23,7 @@ from core.content_library import (
 
 router = APIRouter(prefix="/library", tags=["library"])
 
-MAX_PDF_MB = 10
+MAX_UPLOAD_MB = 10
 
 
 # =============================================================================
@@ -123,7 +124,8 @@ async def library_create(req: CreateItemRequest, user_id: CurrentUserId, db: DbC
     )
 
 
-@router.post("/upload-pdf", status_code=201, summary="Upload de PDF — extrai texto e cria item")
+@router.post("/upload-pdf", status_code=201,
+             summary="Upload de documento (PDF/DOCX/TXT/MD) — extrai texto e cria item")
 async def library_upload_pdf(
     user_id: CurrentUserId,
     db: DbClient,
@@ -135,16 +137,19 @@ async def library_upload_pdf(
     _validate_type(type)
 
     content = await file.read()
-    if len(content) > MAX_PDF_MB * 1024 * 1024:
-        raise HTTPException(status_code=413, detail=f"PDF excede {MAX_PDF_MB}MB")
+    if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"Arquivo excede {MAX_UPLOAD_MB}MB")
 
     try:
-        text = extract_text_from_pdf(content)
+        text = extract_document_text(content, file.filename or "")
     except RuntimeError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
     if not text.strip():
-        raise HTTPException(status_code=422, detail="Não foi possível extrair texto do PDF")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Não foi possível extrair texto ({', '.join(SUPPORTED_UPLOAD_EXTS)}).",
+        )
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()]
     workspace_id = get_workspace_id(db, user_id)

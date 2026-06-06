@@ -1,319 +1,343 @@
 {
   "source": "finep",
-  "generated_at": "2026-05-13T20:41:57.665653+00:00",
+  "generated_at": "2026-06-06T19:41:13.194583+00:00",
   "generator": "gpt-4o-mini",
   "queries": [
     {
-      "id": "finep_768_q1",
+      "id": "finep_finep:768_q1",
       "edital_id": "finep:768",
-      "query": "Quais são as condições para as despesas relacionadas a bolsas no edital da chamada pública MCTI/FINEP/FNDCT?",
-      "expected": [
-        {
-          "source_file": "Anexo_V__Condições_para_Despesas_Relativas_a_Bolsas__2ª_Rerratificação_.pdf",
-          "section": null
-        }
-      ],
-      "category": "expenses",
-      "_source_chunk_index": 36
-    },
-    {
-      "id": "finep_768_q2",
-      "edital_id": "finep:768",
-      "query": "Quais são os subtemas que podem ser abordados em projetos voltados para a agroindústria dentro da Linha Temática 1?",
-      "expected": [
-        {
-          "source_file": "Anexo_I__Detalhamento_dos_Temas_e_Subtemas.pdf",
-          "section": null
-        }
-      ],
-      "category": "financial",
-      "_source_chunk_index": 23
-    },
-    {
-      "id": "finep_768_q3",
-      "edital_id": "finep:768",
-      "query": "Quais instituições podem se inscrever para participar da chamada pública MCTI/FINEP/FNDCT e quantas propostas cada uma pode apresentar como Executora Principal?",
-      "expected": [
-        {
-          "source_file": "Guia_Rápido.pdf",
-          "section": null
-        }
-      ],
-      "category": "eligibility",
-      "_source_chunk_index": 51
-    },
-    {
-      "id": "finep_768_q4",
-      "edital_id": "finep:768",
-      "query": "Quais critérios vão ser considerados para a avaliação da minha proposta e qual é a nota mínima que eu preciso obter para não ser eliminado?",
+      "query": "As instituições privadas que desejam participar precisam ter quanto tempo de funcionamento regular?",
       "expected": [
         {
           "source_file": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
-          "section": null
+          "section": "4. RECURSOS FINANCEIROS A SEREM CONCEDIDOS > 4.1"
         }
       ],
-      "category": "eligibility",
-      "_source_chunk_index": 11
+      "gold_text": "[…] As instituições privadas deverão ter funcionamento regular nos últimos três anos, em observância ao disposto no art. art. 89, inciso VII, da Lei 15.080/2024 (Lei de Diretrizes Orçamentárias - LDO 2025).\n\nNo âmbito desta Chamada Pública, serão comprometidos recursos não reembolsáveis do Fundo Nacional de Desenvolvimento Científico e Tecnológico (FNDCT) / Ação Transversal e CT-Infra até o limite de R$ 500.000.000,00 (quinhentos milhões de reais).",
+      "category": "financial",
+      "_source_chunk_index": 45
     },
     {
-      "id": "finep_768_q5",
+      "id": "finep_finep:768_q2",
       "edital_id": "finep:768",
-      "query": "Quais são as consequências se a proposta não estiver de acordo com os itens da Seleção Pública?",
+      "query": "Quais são as regras específicas para participar da chamada pública MCTI/FINEP/FNDCT/CENTROS TEMÁTICOS 2025?",
       "expected": [
         {
-          "source_file": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
-          "section": "18. DISPOSIÇÕES FINAIS"
+          "source_file": "Anexo_I__Detalhamento_dos_Temas_e_Subtemas__Rerratificado_.pdf",
+          "section": "CHAMADA PÚBLICA MCTI/FINEP/FNDCT/CENTROS TEMÁTICOS 2025"
         }
       ],
-      "category": "eligibility",
-      "_source_chunk_index": 16
+      "gold_text": "CHAMADA PÚBLICA MCTI/FINEP/FNDCT/CENTROS TEMÁTICOS 2025",
+      "category": "other",
+      "_source_chunk_index": 113
     },
     {
-      "id": "finep_768_q6",
+      "id": "finep_finep:768_q3",
       "edital_id": "finep:768",
-      "query": "Quais documentos preciso anexar à proposta para a execução dos itens de orçamento do projeto?",
+      "query": "Qual é o limite de gastos com pagamento de pessoal para projetos que têm uma fundação de apoio como proponente?",
       "expected": [
         {
-          "source_file": "Anexo_IV__Exigências_para_Avaliação_dos_Itens_de_Orçamento.pdf",
+          "source_file": "2º_Comunicado_de_rerratificação.pdf",
           "section": null
         }
       ],
-      "category": "financial",
-      "_source_chunk_index": 20
-    },
-    {
-      "id": "finep_768_q7",
-      "edital_id": "finep:768",
-      "query": "Como faço para preencher a proposta na plataforma de Apoio e Financiamento da Finep?",
-      "expected": [
-        {
-          "source_file": "Telas_do_FAP.pdf",
-          "section": null
-        }
-      ],
+      "gold_text": "[…] Eu, [NOME DO BOLSISTA], residente e domiciliado em [ENDEREÇO com CEP], inscrito no CPF sob o nº [NÚMERO], declaro à FINANCIADORA DE ESTUDOS E PROJETOS – FINEP [NOME DA CONVENENTE CONCEDENTE DA BOLSA], no âmbito do projeto referência Finep nº XXXX/XX, em atendimento ao disposto no item 3, “a” e “b” da Cláusula Décima Primeira do Convênio nº xxxxxxx, com fundamento legal por analogia ao disposto na Portaria 2262/2025 do CNPq, que:\n\nAlteração 04: Ajuste nos subitens do item “6.3.5. Pagamento de pessoal” do edital:\n\n6.3.5.2. Projetos cuja proponente seja fundação de apoio ou ICT Pública, as despesas classificadas na rubrica de Pagamento de Pessoal estão limitadas a 30,0% do valor solicitado.\n\n6.3.5.3. Projetos cuja proponente seja uma ICT Privada, as despesas classificadas na rubrica de Pagamento de Pessoal estão limitadas a 60,0% do valor solicitado.\n\n6.3.5.4. Os profissionais a serem contratados com recursos do projeto devem estar vinculados a atividades e metas do Plano de Trabalho.\n\nAlteração 05: Ajuste no Critério 12 de Habilitação da Proposta, previsto no quadro do item 11.1 do edital:\n\nNº Requisitos Formais para Habilitação da Proposta Item de Referência\n\n(...)\n\nPara projetos cuja proponente seja fundação de apoio ou ICT Pública, valor total da rubrica de Pagamento de Pessoal atendendo ao limite de 30,0%\n\n12 6.3.5.2 e 6.3.5.3\n\nPara projetos cuja proponente seja uma ICT Privada, valor total da rubrica de Pagamento de Pessoal atendendo ao limite de 60,0%\n\n(...)\n\nAlteraçã",
       "category": "eligibility",
-      "_source_chunk_index": 52
-    },
-    {
-      "id": "finep_768_q8",
-      "edital_id": "finep:768",
-      "query": "Quais são os requisitos que um especialista visitante deve atender para participar do projeto?",
-      "expected": [
-        {
-          "source_file": "Anexo_V__Condições_para_Despesas_Relativas_a_Bolsas.pdf",
-          "section": null
-        }
-      ],
-      "category": "financial",
-      "_source_chunk_index": 33
-    },
-    {
-      "id": "finep_762_q9",
-      "edital_id": "finep:762",
-      "query": "Quais são as condições para a apresentação da proposta e como serão avaliadas as notas dos avaliadores?",
-      "expected": [
-        {
-          "source_file": "Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
-          "section": null
-        }
-      ],
-      "category": "financial",
-      "_source_chunk_index": 27
-    },
-    {
-      "id": "finep_762_q10",
-      "edital_id": "finep:762",
-      "query": "Quais são os critérios de desempate caso haja empate na classificação das propostas?",
-      "expected": [
-        {
-          "source_file": "2ª_Rerratificação_-_Edital_rerratificado.pdf",
-          "section": null
-        }
-      ],
-      "category": "financial",
-      "_source_chunk_index": 5
-    },
-    {
-      "id": "finep_762_q11",
-      "edital_id": "finep:762",
-      "query": "Quais informações preciso fornecer sobre o parceiro que estou propondo para a minha iniciativa?",
-      "expected": [
-        {
-          "source_file": "Anexos_do_Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
-          "section": "4. GOVERNANÇA E RELAÇÃO COM OS INVESTIDORES"
-        }
-      ],
-      "category": "financial",
-      "_source_chunk_index": 11
-    },
-    {
-      "id": "finep_762_q12",
-      "edital_id": "finep:762",
-      "query": "Quais são os direitos que eu, como titular dos meus dados pessoais, tenho em relação ao tratamento dessas informações?",
-      "expected": [
-        {
-          "source_file": "Anexos_do_Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
-          "section": "3. DOS DIREITOS DOS TITULARES"
-        }
-      ],
-      "category": "criteria",
-      "_source_chunk_index": 16
-    },
-    {
-      "id": "finep_762_q13",
-      "edital_id": "finep:762",
-      "query": "Quais são os requisitos que minha proposta deve atender para ser habilitada na primeira etapa do processo de seleção?",
-      "expected": [
-        {
-          "source_file": "Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
-          "section": "4. PROCESSO DE SELEÇÃO"
-        }
-      ],
-      "category": "financial",
-      "_source_chunk_index": 26
-    },
-    {
-      "id": "finep_762_q14",
-      "edital_id": "finep:762",
-      "query": "Quais são as taxas e custos que devo considerar ao submeter minha proposta para o FUNDO, incluindo a Taxa de Administração, Taxa de Performance e outros custos relevantes?",
-      "expected": [
-        {
-          "source_file": "Anexos_do_Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
-          "section": "5. CUSTOS DO FUNDO"
-        }
-      ],
-      "category": "financial",
-      "_source_chunk_index": 12
-    },
-    {
-      "id": "finep_762_q15",
-      "edital_id": "finep:762",
-      "query": "Qual é a nova data para o término do período de envio de propostas?",
-      "expected": [
-        {
-          "source_file": "Aviso_de_1ª_Rerratificação.pdf",
-          "section": null
-        }
-      ],
-      "category": "financial",
-      "_source_chunk_index": 20
-    },
-    {
-      "id": "finep_762_q16",
-      "edital_id": "finep:762",
-      "query": "Quais são as responsabilidades da pessoa jurídica em relação ao tratamento de dados pessoais conforme o Aviso de Privacidade?",
-      "expected": [
-        {
-          "source_file": "Anexos_do_Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
-          "section": "1. DEFINIÇÕES DE EXPRESSÕES"
-        }
-      ],
-      "category": "eligibility",
-      "_source_chunk_index": 15
-    },
-    {
-      "id": "finep_743_q17",
-      "edital_id": "finep:743",
-      "query": "Quais são as entidades com as quais os dados pessoais coletados podem ser compartilhados?",
-      "expected": [
-        {
-          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
-          "section": "6. DO COMPARTILHAMENTO DE DADOS PESSOAIS E DADOS PESSOAIS SENSÍVEIS"
-        }
-      ],
-      "category": "criteria",
-      "_source_chunk_index": 19
-    },
-    {
-      "id": "finep_743_q18",
-      "edital_id": "finep:743",
-      "query": "Qual é o faturamento mínimo e máximo que uma startup deve ter para poder receber investimento do Fundo?",
-      "expected": [
-        {
-          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
-          "section": null
-        }
-      ],
-      "category": "financial",
-      "_source_chunk_index": 5
-    },
-    {
-      "id": "finep_743_q19",
-      "edital_id": "finep:743",
-      "query": "Quais documentos eu preciso apresentar junto com a minha proposta para o gestor e o administrador do fundo?",
-      "expected": [
-        {
-          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
-          "section": "5. CUSTOS DO FUNDO"
-        }
-      ],
-      "category": "financial",
-      "_source_chunk_index": 14
-    },
-    {
-      "id": "finep_743_q20",
-      "edital_id": "finep:743",
-      "query": "Qual é o valor mínimo de capital necessário para o primeiro fechamento de captação do Fundo Nordeste Capital Semente?",
-      "expected": [
-        {
-          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
-          "section": "3. CARACTERÍSTICAS GERAIS DO FUNDO"
-        }
-      ],
-      "category": "eligibility",
-      "_source_chunk_index": 4
-    },
-    {
-      "id": "finep_743_q21",
-      "edital_id": "finep:743",
-      "query": "Como posso interpor um recurso após a divulgação do resultado preliminar da minha proposta?",
-      "expected": [
-        {
-          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
-          "section": "5. RECURSOS"
-        }
-      ],
-      "category": "financial",
       "_source_chunk_index": 9
     },
     {
-      "id": "finep_743_q22",
-      "edital_id": "finep:743",
-      "query": "Quais informações devo fornecer sobre o administrador e as parcerias previstas para o fundo?",
+      "id": "finep_finep:768_q4",
+      "edital_id": "finep:768",
+      "query": "Quais documentos eu preciso apresentar para que minha proposta seja aceita pela Finep?",
       "expected": [
         {
-          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
-          "section": "3. CARACTERIZAÇÃO DO FUNDO"
+          "source_file": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "16. ACOMPANHAMENTO"
         }
       ],
+      "gold_text": "[…] 15.5.2. Das instituições deixarem de apresentar quaisquer dos documentos cuja apresentação seja exigida nesta Chamada ou não comprovarem a sua capacidade para a execução da proposta. 15.6. A Finep poderá solicitar documentos e informações adicionais para a contratação de propostas. 15.7. A liberação de recursos depende da disponibilidade orçamentária e financeira da Finep/FNDCT, bem como do cumprimento das condições prévias fixadas no instrumento contratual.\n\n16.1. O acompanhamento técnico e financeiro das propostas apoiadas será feito pela Finep, por meio de formulários de resultados, de visitas de acompanhamento, reuniões técnicas ou outros mecanismos de avaliação, a critério da Finep.",
       "category": "financial",
-      "_source_chunk_index": 13
+      "_source_chunk_index": 85
     },
     {
-      "id": "finep_743_q23",
-      "edital_id": "finep:743",
-      "query": "Quem é o encarregado pela proteção de dados pessoais na FINEP e como posso entrar em contato com ele?",
+      "id": "finep_finep:768_q5",
+      "edital_id": "finep:768",
+      "query": "Quais são as regras que devo seguir para participar da chamada pública do MCTI/FINEP/FNDCT para os centros temáticos em 2025?",
       "expected": [
         {
-          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
-          "section": "4. DAS BASES LEGAIS PARA TRATAMENTO DE DADOS PELAS PARTES"
+          "source_file": "Anexo_I__Detalhamento_dos_Temas_e_Subtemas.pdf",
+          "section": "CHAMADA PÚBLICA MCTI/FINEP/FNDCT/CENTROS TEMÁTICOS 2025"
         }
       ],
+      "gold_text": "CHAMADA PÚBLICA MCTI/FINEP/FNDCT/CENTROS TEMÁTICOS 2025",
+      "category": "other",
+      "_source_chunk_index": 105
+    },
+    {
+      "id": "finep_finep:768_q6",
+      "edital_id": "finep:768",
+      "query": "Como devo incluir os valores dos itens importados na proposta se eles estiverem em uma moeda estrangeira diferente do dólar?",
+      "expected": [
+        {
+          "source_file": "FAQ_Versão_4_-_atualizado_em_06_04_2026.pdf",
+          "section": "CHAMADA PÚBLICA MCTI/FINEP/FNDCT > Pesquisa Aplicada em CENTROS TEMÁTICOS 2025 > Perguntas Frequentes (FAQ) – Versão 4"
+        }
+      ],
+      "gold_text": "[…] Durante o preenchimento da proposta, deve-se selecionar para cada item importado a moeda estrangeira correspondente e incluir o valor naquela moeda. O sistema fará a conversão em reais automaticamente pela cotação prevista para o edital. As taxas de câmbio utilizadas (Dólar, Euro, Libra Esterlina, Franco Suíço, Renminbi (Yuan), Iene) serão apresentadas na mesma tela. Caso algum item estrangeiro tenha sido cotado em outra moeda não disponível, o valor do item deve ser incluído em dólar e apresentada memória de cálculo para a conversão no campo de justificativas. 26. Posso incluir na equipe executora membros que não estão vinculados à ICT Executora Principal? Apenas se estes forem membros de ICTs Coexecutoras que também participam da proposta.\n\n27. No Anexo VIII podemos inserir membros da equipe executora além daqueles já inseridos na proposta?\n\nSim todos os membros indicados na equipe devem ser incluídos no preenchimento do Anexo VIII (versão em .ODS). O Anexo deve ser preenchido, ao menos, com os dados dos membros da equipe executora e com o perfil de todos os indicados para Pagamento de Pessoal (CLT) e bolsas. Bolsistas serão admitidos exclusivamente em projetos cuja proponente seja fundação de apoio ou ICT pública. O edital também estabelece que todos os profissionais a serem contratados com recursos do projeto devem estar vinculados a atividades e metas do Plano de Trabalho. Se necessário, pode-se incluir mais linhas no arquivo ODS (planilha eletrônica).\n\n28. ICTs Priv",
+      "category": "eligibility",
+      "_source_chunk_index": 198
+    },
+    {
+      "id": "finep_finep:768_q7",
+      "edital_id": "finep:768",
+      "query": "Quais são as áreas de foco dentro da Linha Temática 1 para propostas relacionadas a cadeias agroindustriais sustentáveis?",
+      "expected": [
+        {
+          "source_file": "Guia_Rápido.pdf",
+          "section": "CHAMADA PÚBLICA MCTI/FINEP/FNDCT > PESQUISA APLICADA EM CENTROS TEMÁTICOS 2025 > Guia Rápido > Linha Temática 1: Cadeias Agroindustriais Sustentáveis"
+        }
+      ],
+      "gold_text": "[…] Linha Temática 1: Cadeias Agroindustriais Sustentáveis\n\n• Biotecnologia de precisão;\n\n• Agricultura de baixo carbono e uso eficiente de recursos;\n\n• Agropecuária digital;\n\n• Saúde animal e segurança de alimentos de origem animal; e\n\n• Utilização de bioinsumos, valorização de resíduos agroindustriais e Agricultura Familiar.",
+      "category": "financial",
+      "_source_chunk_index": 210
+    },
+    {
+      "id": "finep_finep:768_q8",
+      "edital_id": "finep:768",
+      "query": "Qual é o valor mensal das bolsas de fomento para os diferentes níveis de bolsistas mencionados no edital?",
+      "expected": [
+        {
+          "source_file": "Anexo_V__Condições_para_Despesas_Relativas_a_Bolsas.pdf",
+          "section": "CHAMADA PÚBLICA MCTI/FINEP/FNDCT > PESQUISA APLICADA EM CENTROS TEMÁTICOS 2025 > ANEXO V – CONDIÇÕES PARA DESPESAS RELATIVAS A BOLSAS > 1. ORIENTAÇÕES DE ÂMBITO GERAL"
+        }
+      ],
+      "gold_text": "[…] previstas no item 1.5.3 poderá ser ampliada, a critério da Finep, não podendo exceder o dobro do prazo originalmente previsto para o projeto, limitado a 60 mensalidades. 1.6. Deverão ser adotados pela Convenente os requisitos mínimos e os valores das Bolsas de Fomento Tecnológico e Extensão Inovadora do CNPq, nas seguintes modalidades: Requisitos Categ. Valor Modalidade Finalidade Sigla para o bolsista /Nível Mensal (R$) Possibilitar o a) ter perfil fortalecimento da A 5.200,00 adequado à equipe responsável atividade a ser pelo desenvolvimento desenvolvida; e Desenvolvimento b) dedicar-se em desenvolvimento ou Tecnológico e tempo adequado DTI B 3.900,00 inovação, por meio da incorporação de profissional qualificado conforme C 1.430,00 para a execução de uma atividade específica.\n\nRequisitos Categ. Valor\nModalidade Finalidade Sigla\npara o bolsista /Nível Mensal (R$)\na) não estar\nvinculado às\n1 6.500,00\ninstituições\nComplementar a participantes do\ncompetência da equipe projeto; e b)\nde execução do dedicar-se em\nEspecialista\nprojeto, por meio da tempo adequado EV 2 4.550,00\nVisitante\nparticipação temporária às necessidades\nde profissional do projeto,\nqualificado. conforme\ndefinido no\n3 3.250,00\nplano de\ntrabalho.\nApoiar profissionais e\nespecialistas visando ao\ndesenvolvimento de\nA 5.200,00\natividades de extensão a) ter\ninovadora ou conhecimento\ntransferência de adequado à\ntecnologia. atividade a ser\nCompreende ações desenvolvida; e\nB 3.900,00\nExtensão no País desenvolvimento",
+      "category": "financial",
+      "_source_chunk_index": 132
+    },
+    {
+      "id": "finep_finep:762_q9",
+      "edital_id": "finep:762",
+      "query": "Qual é o objetivo da Chamada Pública da Finep e quem pode apresentar propostas?",
+      "expected": [
+        {
+          "source_file": "2ª_Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "2. DISPONIBILIDADE DE RECURSOS"
+        }
+      ],
+      "gold_text": "[…] 1. OBJETIVO A Financiadora de Estudos e Projetos (“Finep”), na qualidade de secretaria executiva do Fundo Nacional de Desenvolvimento Científico e Tecnológico (“FNDCT”) vem, por intermédio desta Chamada Pública, convidar Administradores de Carteiras de Valores Mobiliários, registrados na categoria “gestor de recursos” (“GESTOR”), assim definidos pela Resolução CVM nº 21/2021, a apresentarem proposta (“PROPOSTA”) de Fundo de Investimento em Participações (“FUNDO”), conforme as características descritas neste Edital, com o objetivo de subscrição de recursos em até 2 (dois) FUNDOS.\n\n2. DISPONIBILIDADE DE RECURSOS",
+      "category": "financial",
+      "_source_chunk_index": 2
+    },
+    {
+      "id": "finep_finep:762_q10",
+      "edital_id": "finep:762",
+      "query": "Qual é o e-mail para enviar a documentação jurídica e há possibilidade de prorrogação do prazo para isso?",
+      "expected": [
+        {
+          "source_file": "2ª_Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "4. PROCESSO DE SELEÇÃO > 4.7. QUARTA ETAPA: REGULARIDADE TÉCNICA E JURÍDICA (DUE DILIGENCE) > 4.7.6. DUE DILIGENCE JURÍDICA > 4.7.6.4."
+        }
+      ],
+      "gold_text": "[…] O endereço eletrônico para envio da documentação jurídica será cp_fipbioeconomia@finep.gov.br.\n\nA seu exclusivo critério de conveniência e oportunidade, considerada a razoabilidade das justificativas apresentadas pelo GESTOR, a Finep poderá ampliar o prazo de apresentação da documentação jurídica. A Finep poderá solicitar ao GESTOR e ao ADMINISTRADOR a substituição, a reapresentação e/ou a complementação da sua documentação.",
       "category": "criteria",
-      "_source_chunk_index": 18
+      "_source_chunk_index": 64
     },
     {
-      "id": "finep_743_q24",
+      "id": "finep_finep:762_q11",
+      "edital_id": "finep:762",
+      "query": "Qual é o prazo máximo de operação do FUNDO e quanto tempo eu tenho para realizar os investimentos?",
+      "expected": [
+        {
+          "source_file": "2ª_Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "3. O FUNDO > 3.1 CARACTERÍSTICAS GERAIS > 3.1.4"
+        }
+      ],
+      "gold_text": "[…] 3.1.3. A classificação do FUNDO como “Investimento Sustentável” conforme regulamentação aplicável da ANBIMA obtida até momento da submissão da PROPOSTA será considerada positivamente no processo de seleção, como exposto nos itens 4.5.3 e 4.6.3 deste Edital.\n\n3.1.4.\n\nO prazo de operação do FUNDO conforme expresso em seu Regulamento, sem considerar prorrogações, não poderá ultrapassar 15 (quinze) anos a partir da data da primeira integralização por qualquer quotista. O período de investimentos não poderá ultrapassar 8 (oito) anos usando a mesma referência para contagem.",
+      "category": "timeline",
+      "_source_chunk_index": 12
+    },
+    {
+      "id": "finep_finep:762_q12",
+      "edital_id": "finep:762",
+      "query": "Quais são os tipos de projetos que podem ser financiados na seleção de fundos de investimento em bioeconomia e sustentabilidade?",
+      "expected": [
+        {
+          "source_file": "FAQ_-_Perguntas_frequentes_-_Atualizado_em_25_11_2025.pdf",
+          "section": null
+        }
+      ],
+      "gold_text": "SELEÇÃO DE FUNDOS DE INVESTIMENTO EM PARTICIPAÇÕES DE BIOECONOMIA E SUSTENTABILIDADE",
+      "category": "other",
+      "_source_chunk_index": 183
+    },
+    {
+      "id": "finep_finep:762_q13",
+      "edital_id": "finep:762",
+      "query": "Quais são os critérios que o fundo utiliza para escolher parceiros e como isso pode impactar a gestão dos investimentos?",
+      "expected": [
+        {
+          "source_file": "Anexos_do_Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
+          "section": "ANEXO V > PARCERIAS DO GESTOR (EVENTUAIS)"
+        }
+      ],
+      "gold_text": "[…] acompanhamento, agregação de valor nas Sociedades Investidas; 9. Indicadores de performance, ASG e de Impacto; 10. Sistemas e aplicativos adotados para apoio à gestão de investimentos e interação com investidas e Investidores; 11. Relatórios de Investimento, Acompanhamento e Desinvestimento para Investidores; 12. Relatórios exigidos das investidas; 13. Governança das investidas, relação das investidas com o FUNDO; 14. Identificação e prática de gestão dos riscos; 15. Proteção/resolução de conflitos de interesse e potenciais conflitos de interesse; 16. Estruturação financeira e legal das operações de desinvestimento; 17. Identificação e estruturação de saídas, processo de avaliação de oportunidades de saída; 18. Previsão de entrega de Ativos, na hipótese de amortização de cotas ou quando do encerramento do FUNDO.\n\nPARCERIAS DO GESTOR (EVENTUAIS)\n\n1. Tipo de parceria: Cogestor, aceleradora, Instituição de Ensino Superior, Instituição de Ciência e Tecnologia, Parque Tecnológico, outros (especificar);\n\n2. Razão de escolha do parceiro;\n\n3. Histórico de trabalho em conjunto;\n\n4. Equipe-chave do parceiro e currículos;\n\n5. Atividades a serem desenvolvidas pelo parceiro e valor agregado da parceria;\n\n6. Custo anual estimado da parceria;\n\n7. Eventual Comprometimento no capital do FUNDO (em caso de Cogestão).",
+      "category": "financial",
+      "_source_chunk_index": 115
+    },
+    {
+      "id": "finep_finep:762_q14",
+      "edital_id": "finep:762",
+      "query": "Quais são os requisitos para que o administrador do fundo possa exercer suas funções?",
+      "expected": [
+        {
+          "source_file": "2ª_Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "3. O FUNDO > 3.4. ADMINISTRAÇÃO DO FUNDO > 3.4.3"
+        }
+      ],
+      "gold_text": "[…] Observadas as limitações legais e as previstas na regulamentação aplicável, o ADMINISTRADOR terá poderes para praticar os atos necessários à administração do FUNDO, na sua respectiva esfera de atuação.\n\nO ADMINISTRADOR deverá possuir registro na categoria “Administrador de Carteira Valores Mobiliários”, assim definido pela Resolução CVM nº 21/2021.",
+      "category": "financial",
+      "_source_chunk_index": 36
+    },
+    {
+      "id": "finep_finep:762_q15",
+      "edital_id": "finep:762",
+      "query": "Como posso enviar a documentação necessária para a due diligence jurídica e quais são os prazos para isso?",
+      "expected": [
+        {
+          "source_file": "Edital_FIP_Bioeconomia_e_Sustentabilidade.pdf",
+          "section": "4. PROCESSO DE SELEÇÃO > 4.7. > 4.7.6."
+        }
+      ],
+      "gold_text": "[…] e/ou jurídica, a Finep procederá ao agendamento dos encontros, conforme a sua conveniência, informando a pauta ao GESTOR e ao ADMINISTRADOR com antecedência. A Finep poderá solicitar ao GESTOR e ao ADMINISTRADOR informações prévias às reuniões. 4.7.5.5. Caso, por conveniência e oportunidade da Finep, as reuniões sejam virtuais, a Finep disponibilizará o link para a sua realização, devendo o GESTOR e o ADMINISTRADOR se responsabilizar, integralmente, pela infraestrutura de tecnologia da informação compatível e necessária para as reuniões. 4.7.5.6. A resposta satisfatória do GESTOR e do ADMINISTRADOR aos pedidos de informação da Finep é elemento fundamental para subsidiar a due diligence técnica e/ou jurídica. 4.7.5.7. O endereço eletrônico para envio da documentação técnica será cp_fipbioeconomia@finep.gov.br.\n\n4.7.6. DUE DILIGENCE JURÍDICA\n\n4.7.6.1. Na due diligence jurídica, a Finep verificará a regularidade jurídica do GESTOR e do ADMINISTRADOR por meio da análise dos documentos indicados no Anexo VI, no Anexo VII e no Anexo VIII e da consulta perante os cadastros legais referidos no Anexo VI.\n\n4.7.6.2. Os documentos atinentes à sua regularidade jurídica devem ser apresentados pelo GESTOR e pelo ADMINISTRADOR eletronicamente, na data indicada no Cronograma da Seleção Pública, podendo este prazo ser prorrogado a critério da Finep, não sendo aceita, em nenhuma hipótese, documentação encaminhada por via física.\n\n4.7.6.3. O endereço eletrônico para envio da documentação jur",
+      "category": "criteria",
+      "_source_chunk_index": 177
+    },
+    {
+      "id": "finep_finep:762_q16",
+      "edital_id": "finep:762",
+      "query": "Quais são os tipos de fundos de investimento que estão sendo selecionados neste edital?",
+      "expected": [
+        {
+          "source_file": "FAQ_-_Perguntas_frequentes_-_Atualizado_em_25_11_2025.pdf",
+          "section": "SELEÇÃO DE FUNDOS DE INVESTIMENTO EM PARTICIPAÇÕES DE BIOECONOMIA E SUSTENTABILIDADE"
+        }
+      ],
+      "gold_text": "[…] SELEÇÃO DE FUNDOS DE INVESTIMENTO EM PARTICIPAÇÕES DE BIOECONOMIA E SUSTENTABILIDADE\n\nPerguntas e Respostas",
+      "category": "other",
+      "_source_chunk_index": 184
+    },
+    {
+      "id": "finep_finep:743_q17",
       "edital_id": "finep:743",
-      "query": "Quais informações sobre a equipe de gestão e sua experiência são necessárias para a submissão da proposta?",
+      "query": "Quais são as responsabilidades da pessoa jurídica ao fornecer dados pessoais na Chamada Pública e como deve proceder se os titulares não concordarem com o compartilhamento?",
       "expected": [
         {
           "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
-          "section": "1. CARACTERIZAÇÃO DO GESTOR E DE SUA EQUIPE"
+          "section": "ANEXO IX > AVISO DE PRIVACIDADE"
         }
       ],
+      "gold_text": "[…] de que a Finep prestará ao Tribunal de Contas da União (TCU), ao Ministério Público Federal (MPF) e a qualquer outra autoridade competente as informações que sejam requisitadas por estes, com a transferência do dever de sigilo. Os representantes legais da declarante estão cientes de que a falsidade da declaração ora prestada acarretará a aplicação das sanções legais cabíveis, de natureza civil e penal, bem como a desclassificação nos termos do Edital. Observações: 1) A Declarante deve anexar os respectivos documentos que comprovem a regularidade da representação legal. 2) Não há necessidade de reconhecimento de firma do(s) representante(s) legal(is). A assinatura pode ser física (enviada em arquivo digitalizado) ou através de plataforma de assinatura digital.\n\nANEXO IX\n\nAVISO DE PRIVACIDADE\n\nA Finep, secretaria executiva do FNDCT e o BNB (“PARTES”) têm entre seus compromissos a transparência e o respeito à ética, à segurança da informação, à privacidade e proteção de dados pessoais, dentre outros fundamentos e compromissos elencados na Legislação de Proteção à Privacidade e Dados Pessoais.\n\nO Aviso de Privacidade tem por objetivo esclarecer, de forma clara e objetiva, como a Finep, especialmente, se utiliza e com quem compartilha os dados pessoais coletados no âmbito da CHAMADA PÚBLICA PARA O FUNDO DE INVESTIMENTO EM PARTICIPAÇÕES NORDESTE CAPITAL SEMENTE (FIP NORDESTE CAPITAL SEMENTE) (“CHAMADA PÚBLICA”), em atendimento à Legislação de Proteção à Privacidade e Dados Pess",
+      "category": "objective",
+      "_source_chunk_index": 137
+    },
+    {
+      "id": "finep_finep:743_q18",
+      "edital_id": "finep:743",
+      "query": "Quais critérios serão considerados para avaliar a experiência e a reputação do gestor no processo de seleção?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "ANEXO V > ASPECTOS MÍNIMOS A SEREM OBSERVADOS NA DUE DILIGENCE TÉCNICA"
+        }
+      ],
+      "gold_text": "[…] 1. Histórico e reputação; 2. Outros Fundos geridos; 3. Experiência/conhecimento dos mercados relativos à Política de Investimentos do Fundo; 4. Histórico de investimentos em FIP´s, taxas internas de retorno, saídas realizadas, quantidade de empresas geridas com write off, bem como o valor agregado às investidas; 5. Rede de contatos (Network); 6. Estrutura organizacional e Governança; 7. Práticas de Gestão de Riscos, Compliance e Controles; 8. Práticas ASG - Ambiental, Social e de Governança; 9. Relações com Investidores, transparência e facilidade de comunicação; 10. Demonstrações Financeiras do GESTOR.\n\nEQUIPE DE INVESTIMENTOS DO GESTOR",
       "category": "financial",
-      "_source_chunk_index": 12
+      "_source_chunk_index": 127
+    },
+    {
+      "id": "finep_finep:743_q19",
+      "edital_id": "finep:743",
+      "query": "Quais dados pessoais podem ser coletados e tratados relacionados aos sócios e colaboradores da Beneficiária Final?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "ANEXO IX > AVISO DE PRIVACIDADE > 5. DOS DADOS COLETADOS E FINALIDADES DE TRATAMENTO > 5.2. Poderão ser coletados e tratados pelas PARTES, dentre outros, os dados pessoais elencados a seguir: > 5.2.1."
+        }
+      ],
+      "gold_text": "[…] 5.2. Poderão ser coletados e tratados pelas PARTES, dentre outros, os dados pessoais elencados a seguir:\n\n5.2.1. Sócios, administradores, representantes legais, colaboradores e/ou contatos da Beneficiária Final, caso se trate de pessoa física:\n\na) informações de identificação (tais como nome completo e número de inscrição no CPF e de identificação civil) e outras informações pessoais (tais como qualificação, endereço, nacionalidade, telefone, endereço eletrônico, estado civil, regime de casamento, percentual de participação acionária, montante e forma de investimento);\n\nb) dados pessoais sensíveis, como dados biométricos (art. 5º, II, LGPD), a exemplo da imagem e voz dos sócios, administradores, representantes legais, colaboradores, investidores e/ou contatos da Beneficiária Final.",
+      "category": "objective",
+      "_source_chunk_index": 149
+    },
+    {
+      "id": "finep_finep:743_q20",
+      "edital_id": "finep:743",
+      "query": "Qual é o limite de faturamento das empresas que podem receber investimento do Fundo?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "3. CARACTERÍSTICAS GERAIS DO FUNDO > 3.3. Composição da carteira do FUNDO > 3.3.5"
+        }
+      ],
+      "gold_text": "[…] O FUNDO deverá investir em empresas com faturamento de até R$ 4.800.000,00 (quatro milhões e oitocentos mil reais) no ano anterior ao investimento.\n\nAté 20% (vinte por cento) do Capital Comprometido do Fundo poderão ser investidos em startups com faturamento entre R$ 4.800.000,00 (quatro milhões e oitocentos mil reais) e R$ 16.000.000,00 (dezesseis milhões de reais) no ano anterior ao investimento.",
+      "category": "other",
+      "_source_chunk_index": 39
+    },
+    {
+      "id": "finep_finep:743_q21",
+      "edital_id": "finep:743",
+      "query": "Quais são as condições para o pagamento da Taxa de Performance ao GESTOR, caso os ganhos do Fundo superem o capital investido?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "3. CARACTERÍSTICAS GERAIS DO FUNDO > 3.7. Taxas de Gestão, Administração e Performance > 3.7.7"
+        }
+      ],
+      "gold_text": "[…] Durante a negociação do Regulamento do FUNDO, poderão ser estabelecidas metas para o GESTOR. Não atingidas estas metas, a Taxa de Administração poderá ser reduzida.\n\nA PROPOSTA poderá conter a previsão de uma Taxa de Performance a ser paga ao GESTOR quando os ganhos distribuídos pelo Fundo excederem o capital original investido, atualizado pela variação do IPCA, acrescido de uma base de correção (custo de oportunidade). Neste caso, o GESTOR deverá indicar o custo de oportunidade e as condições para recebimento da Taxa de Performance, incluindo a remuneração mínima das PARTES antes do seu pagamento ao GESTOR.",
+      "category": "other",
+      "_source_chunk_index": 67
+    },
+    {
+      "id": "finep_finep:743_q22",
+      "edital_id": "finep:743",
+      "query": "Quais são os critérios que serão considerados na avaliação da minha proposta, especialmente em relação ao histórico de atividades e parcerias na Região Nordeste?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "3. CARACTERÍSTICAS GERAIS DO FUNDO > 3.5. Estrutura de Gestão do Fundo > 3.5.4"
+        }
+      ],
+      "gold_text": "[…] O processo seletivo considerará o histórico das atividades do GESTOR na área de atuação do BNB, bem como a forma com que a PROPOSTA alinha ações e parcerias nesta Região-Alvo. Exemplos de atividades na Região Nordeste são a existência de escritório local, histórico de investimentos em startups originárias do Nordeste, assim como parcerias com outros gestores, aceleradoras, Instituições de Ensino Superior e Parques Tecnológicos ali localizados.\n\nA PROPOSTA poderá prever a cogestão, ou seja, a atuação de outro(s) gestor(es) de qualquer região do país em conjunto com o GESTOR responsável pelo envio da PROPOSTA. No caso de cogestão, todos os gestores apresentados na PROPOSTA serão avaliados segundo os critérios de avaliação previstos neste EDITAL. Neste caso, a PROPOSTA e o REGULAMENTO devem definir claramente as atribuições de cada gestor, sendo que o GESTOR que enviar a PROPOSTA será considerado o líder da cogestão.",
+      "category": "criteria",
+      "_source_chunk_index": 49
+    },
+    {
+      "id": "finep_finep:743_q23",
+      "edital_id": "finep:743",
+      "query": "Como e quando será divulgado o resultado da Terceira Etapa da seleção pública?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "4. PROCESSO DE SELEÇÃO > 4.5. TERCEIRA ETAPA: REGULARIDADE TÉCNICA E JURÍDICA (DUE DILIGENCE) > 4.5.7. DIVULGAÇÃO DO RESULTADO DA TERCEIRA ETAPA"
+        }
+      ],
+      "gold_text": "[…] DIVULGAÇÃO DO RESULTADO DA TERCEIRA ETAPA\n\nA divulgação do resultado preliminar da Terceira Etapa será feita mediante correspondência eletrônica individual ao GESTOR responsável pela PROPOSTA.\n\nO resultado da Terceira Etapa, após apreciação de eventual recurso, será publicado no sítio eletrônico da Finep (www.finep.gov.br).\n\nCaso o resultado da Terceira Etapa seja de indeferimento da PROPOSTA, o processo retornará\n\nao item 11 do Cronograma da Seleção Pública, com a convocação do próximo GESTOR selecionado na Segunda Etapa, o qual terá 15 (quinze) dias para apresentar a documentação técnica e jurídica para realização da due diligence pelas PARTES.",
+      "category": "financial",
+      "_source_chunk_index": 98
+    },
+    {
+      "id": "finep_finep:743_q24",
+      "edital_id": "finep:743",
+      "query": "Quais são as situações em que os dados pessoais podem ser tratados sem o consentimento do titular?",
+      "expected": [
+        {
+          "source_file": "Rerratificação_-_Edital_rerratificado.pdf",
+          "section": "ANEXO IX > AVISO DE PRIVACIDADE > 4. DAS BASES LEGAIS PARA TRATAMENTO DE DADOS PELAS PARTES > 4.2. As PARTES poderão tratar dados pessoais sensíveis"
+        }
+      ],
+      "gold_text": "[…] por órgão de pesquisa, garantida, sempre que possível, a anonimização dos dados pessoais; e) quando necessário para a execução de contrato ou de procedimentos preliminares relacionados a contrato do qual seja parte o titular, a pedido do titular dos dados; f) para o exercício regular de direitos em processo judicial, administrativo ou arbitral, esse último nos termos da Lei nº 9.307, de 23 de setembro de 1996 (Lei de Arbitragem); g) quando necessário para atender aos interesses legítimos das PARTES ou de terceiros, exceto no caso de prevalecerem direitos e liberdades fundamentais do titular que exijam a proteção dos dados pessoais; ou h) para a proteção do crédito, inclusive quanto ao disposto na legislação pertinente.\n\nAs PARTES poderão tratar dados pessoais sensíveis, conforme autorizado pela legislação:\n\na) quando o titular ou seu responsável legal consentir, de forma específica e destacada, para finalidades específicas; ou\nb) sem fornecimento de consentimento do titular, nas hipóteses em que for indispensável para: (i) cumprimento de obrigação legal ou regulatória pelas PARTES; (ii) tratamento compartilhado de dados necessários à execução, pela\n\nadministração pública, de políticas públicas previstas em leis ou regulamentos; (iii) exercício regular de direitos, inclusive em contrato e em processo judicial, administrativo e arbitral, este último nos termos da Lei nº 9.307, de 23 de setembro de 1996 (Lei de Arbitragem).",
+      "category": "objective",
+      "_source_chunk_index": 145
     }
   ]
 }
