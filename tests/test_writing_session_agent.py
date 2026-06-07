@@ -243,6 +243,13 @@ def test_turn_agent_with_tools_persists_trace(monkeypatch):
     assert result["tool_trace"][0]["name"] == "search_edital"
     assert result["tool_trace"][0]["output"] == "trecho: 30/06"
 
+    # Custo/turno (#12): a row assistant grava tokens = input+output de todo o
+    # loop do agente (250+18); a row user fica sem tokens (não há custo nela).
+    inserts = [c.args[0] for c in s._db.table.return_value.insert.call_args_list]
+    turns = {p["role"]: p for p in inserts if isinstance(p, dict) and "role" in p}
+    assert turns["assistant"]["tokens"] == 268
+    assert "tokens" not in turns["user"]
+
 
 def test_turn_agent_error_returns_error_dict(monkeypatch):
     s = _make_session()

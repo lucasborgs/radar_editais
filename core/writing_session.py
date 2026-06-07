@@ -668,10 +668,15 @@ class WritingSession:
 
         # Persiste turn: user sem tool_use, assistant com tool_use (mesmo se vazio,
         # pra distinguir de legacy onde tool_use é NULL).
+        # tokens: soma input+output de TODAS as chamadas LLM do agente neste turn
+        # (result.usage agrega o loop inteiro) — custo/turno fica mensurável. Vai
+        # na row assistant; a row user fica com tokens NULL (não há custo nela).
+        turn_tokens = (result.usage.get("input_tokens", 0)
+                       + result.usage.get("output_tokens", 0)) or None
         self._persist_turn(user_turn_index, "user", user_message, section_hint)
         self._persist_turn(
             user_turn_index, "assistant", assistant_text, section_hint,
-            tool_use=tool_trace,
+            tool_use=tool_trace, tokens=turn_tokens,
         )
 
         return {
@@ -776,6 +781,7 @@ class WritingSession:
         content: str,
         section_hint: str | None,
         tool_use: list[dict] | None = None,
+        tokens: int | None = None,
     ) -> None:
         """INSERT em session_turns. Falhas são logadas mas não interrompem o turno.
 
@@ -805,6 +811,8 @@ class WritingSession:
         }
         if tool_use is not None:
             payload["tool_use"] = tool_use
+        if tokens is not None:
+            payload["tokens"] = tokens
 
         try:
             self._db.table("session_turns").insert(payload).execute()
