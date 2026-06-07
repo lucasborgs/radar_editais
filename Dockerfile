@@ -1,6 +1,8 @@
-# Dockerfile for Radar de Editais backend (Fly.io)
-# The web process uses the CMD below (uvicorn).
-# The worker process overrides this CMD via fly.toml [processes.worker].
+# Dockerfile for Radar de Editais backend (Railway).
+# Imagem única para 2 serviços Railway:
+#   web    → usa o CMD abaixo (uvicorn).
+#   worker → sobrescreve o CMD via Custom Start Command no Railway
+#            (python -m procrastinate --app=core.tasks.app worker). Ver scripts/deploy.sh.
 # See ADR-001-decisoes-iniciais.md (D1, D3, D4).
 
 FROM python:3.11-slim
@@ -26,6 +28,6 @@ USER app
 
 EXPOSE 8000
 
-# Shell-form para expandir ${PORT}: Railway injeta uma porta dinâmica; Fly/local
-# caem no fallback 8000 (internal_port do fly.toml). O worker sobrescreve este CMD.
+# Shell-form para expandir ${PORT}: Railway injeta uma porta dinâmica; local cai
+# no fallback 8000. O serviço worker sobrescreve este CMD (ver cabeçalho).
 CMD uvicorn backend.api:app --host 0.0.0.0 --port ${PORT:-8000}
