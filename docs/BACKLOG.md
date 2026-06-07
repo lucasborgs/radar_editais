@@ -11,6 +11,34 @@
 
 ## Aberto
 
+### Feedback do tester — botão no frontend (P1 launch / build-in-public)
+- **O quê:** o backend já tem o canal (`POST /feedback` em `backend/auth_routes.py`
+  + tabela `user_feedback`, migration 019, RLS por user_id — commit `b46b134b9`).
+  Falta a peça de UI: um botão/modal persistente (ex.: canto inferior) que coleta
+  texto livre e POSTa, anexando `context` leve (`{page, session_id}`) sem PII.
+- **Por que adiado:** o backend fecha o valor mínimo (fundador lê via service role);
+  o botão é a fricção-zero pro tester, mas é trabalho de frontend à parte. Não
+  bloqueia o launch (testers podem reportar por DM/LinkedIn no day-1).
+- **Ponto de entrada:** `frontend/src/lib/api.ts` (novo `submitFeedback`),
+  componente compartilhado em `frontend/src/components/` + montar no layout. Reusar
+  o `Modal`/toast `sonner` ([[project_frontend_conventions]]).
+- **Status:** aberto (backend pronto, falta UI).
+
+### Teto de custo global — kill-switch anti-bill-surpresa (P1 launch)
+- **O quê:** o rate-limit atual (slowapi) é **por user/IP** — protege contra um
+  abusador, NÃO contra o agregado de muitos testers num link público estourar o
+  orçamento OpenAI. Falta um teto **global** (ex.: contador de tokens/dia no
+  Postgres alimentado pelo `session_turns.tokens` que já populamos no #12 + limite
+  via env `DAILY_TOKEN_BUDGET`; ao estourar, endpoints LLM degradam com 503 amigável).
+- **Por que adiado:** o rate-limit por-user já é a primeira linha; o teto global é
+  rede de segurança que só importa sob volume real (que ainda não existe). Mas é
+  barato e dorme tranquilo num launch público.
+- **Ponto de entrada:** `backend/api.py` (middleware/dependency de checagem antes
+  dos endpoints LLM: `/chat`, `/draft`, `/writing/turn`, `/analyze`), leitura
+  agregada de `session_turns.tokens` (custo já mensurável pós-#12). Considerar
+  cache TTL pra não somar a cada request.
+- **Status:** aberto (desenho esboçado, não construído).
+
 ### Parsing/chunking estrutura-aware — INVESTIGADO E REFUTADO (benchmark-driven, 2026-06-06)
 - **Hipótese:** parser estrutura-aware (Docling p/ PDF, numbering p/ FAPESP texto-plano)
   → modelo de blocos tipado → melhor `section_path` → melhor retrieval. Motivada pela
