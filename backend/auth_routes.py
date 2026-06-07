@@ -41,6 +41,13 @@ class PreferencesPayload(BaseModel):
     contribute_to_global_weights: bool
 
 
+class FeedbackPayload(BaseModel):
+    """Feedback livre do tester (build-in-public). `context` carrega metadados
+    leves do cliente (ex.: {"page": "/pipeline"}) — sem PII."""
+    message: str
+    context: dict = {}
+
+
 class WeightSuggestionApproval(BaseModel):
     dimension: str
     delta: int
@@ -89,6 +96,27 @@ def get_me(user_id: CurrentUserId, db: DbClient):
         "contribute_to_global_weights": consent,
         "updated_at": workspace.get("updated_at"),
     }
+
+
+@router.post("/feedback", summary="Feedback livre do tester (build-in-public)")
+def submit_feedback(payload: FeedbackPayload, user_id: CurrentUserId, db: DbClient):
+    """Grava feedback do usuário em `user_feedback` (RLS por user_id).
+
+    Canal de baixa fricção para o beta: o tester relata um problema/ideia e o
+    fundador lê via service role. `user_id` vem do JWT (não do payload) e casa
+    com a policy RLS de INSERT (`user_id = auth.uid()`).
+    """
+    message = payload.message.strip()[:5000]
+    if not message:
+        raise HTTPException(status_code=400, detail="Mensagem de feedback vazia")
+    result = (
+        db.table("user_feedback")
+        .insert({"user_id": user_id, "message": message, "context": payload.context or {}})
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Falha ao salvar feedback")
+    return {"success": True, "id": result.data[0]["id"]}
 
 
 @router.put("/me/profile", summary="Salva perfil da empresa no workspace")

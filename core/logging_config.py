@@ -3,7 +3,7 @@
 Chame `setup_logging()` uma vez no startup (API e worker). Controlado por env:
   LOG_LEVEL   nível raiz (default INFO)
   LOG_FORMAT  "json" (prod, p/ coletor) ou "text" (dev, default)
-  SENTRY_DSN  se presente, ativa Sentry (requer `pip install sentry-sdk`)
+  SENTRY_DSN  se presente, ativa Sentry (sentry-sdk é dep declarada)
 
 `request_id` é propagado via contextvar e incluído em todo log record, para
 correlacionar logs de uma mesma request (ver middleware em backend/api.py).
@@ -61,10 +61,11 @@ def setup_logging() -> None:
 
 
 def _init_sentry() -> None:
-    """Ativa Sentry se SENTRY_DSN estiver setado e o SDK instalado.
+    """Ativa Sentry se SENTRY_DSN estiver setado.
 
-    Mantido como integração opcional: o projeto não declara sentry-sdk como
-    dependência ainda. Basta `pip install sentry-sdk` + setar SENTRY_DSN.
+    `sentry-sdk` é dependência declarada (pyproject) → na imagem de prod basta
+    setar SENTRY_DSN para ligar. O try/except cobre ambientes onde o SDK não
+    está instalado (ex.: suíte local sem reinstalar deps) — degrada para no-op.
     """
     dsn = os.getenv("SENTRY_DSN")
     if not dsn:

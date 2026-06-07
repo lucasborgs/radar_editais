@@ -29,6 +29,7 @@ dependencies = [
     "procrastinate>=2.0",
     "psycopg[binary,pool]>=3.1",
     "slowapi>=0.1.9",                # rate limiting (proteção de custo LLM)
+    "sentry-sdk>=2.0",               # error tracking (no-op sem SENTRY_DSN; ver core/logging_config)
 ]
 
 [project.optional-dependencies]
