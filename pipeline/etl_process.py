@@ -199,14 +199,19 @@ def _call_llm(client, model: str, metadata: dict, pdfs: list[tuple[str, str]]) -
 # SAÍDA
 # =============================================================================
 
-# Campos estruturados que o HybridMatch Stage 1 usa (core/hybrid_match_service.py:
-# _score_mecanismo/_score_trl/_score_contrapartida/_score_elegibilidade). Eles
-# nascem na SÍNTESE (wiki page), não no scrape (index entry). Promovê-los ao index
-# entry os leva ao store DURÁVEL (kg_artifacts/Postgres em cloud) — sem isso, em
-# produção a wiki page (arquivo efêmero) some, o matching cai pro card cru e essas
-# dimensões FLATLINAM (mesmo valor p/ todo edital) → ranking colapsa silenciosamente.
+# Campos sintetizados (wiki page) que o matching precisa no card DURÁVEL — sem eles,
+# em cloud a wiki page (arquivo efêmero) some e o HybridMatch cai pro card cru:
+#   • Stage 1 determinístico (core/hybrid_match_service: _score_mecanismo/_score_trl/
+#     _score_contrapartida/_score_elegibilidade): mechanism, trl_range,
+#     counterpart_required, eligible_entities (+ value_range p/ display/Stage 2).
+#     Sem eles essas dimensões FLATLINAM (mesmo valor p/ todo edital) → ranking colapsa.
+#   • Stage 2 temático (_editais_summary): objective, key_requirements. Já referenciados
+#     no resumo enviado ao LLM; sem eles o Stage 2 raciocina só com title+themes.
+# NÃO incluir campos estruturais extras nem o texto cheio: Stage 2 é só temático (separação
+# de responsabilidades com o Stage 1; mais campos = dupla contagem + ruído + custo).
 _MATCH_FIELDS = ("mechanism", "trl_range", "counterpart_required",
-                 "eligible_entities", "value_range")
+                 "eligible_entities", "value_range",
+                 "objective", "key_requirements")
 
 
 def _promote_match_fields(entry: dict, wiki_page: dict) -> None:

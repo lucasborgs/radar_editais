@@ -30,8 +30,10 @@ W = {"trl": 20, "mecanismo": 15, "contrapartida": 10}
 
 
 def test_promote_match_fields_copies_only_match_fields():
-    """A promoção leva os 5 campos de match da wiki page pro index entry — e só eles
-    (não a página inteira: key_facts/objective/etc. ficam de fora do card)."""
+    """A promoção leva os campos de match da wiki page pro index entry — Stage 1
+    (mechanism/trl_range/counterpart_required/eligible_entities/value_range) + contexto
+    do Stage 2 (objective/key_requirements). E SÓ esses: o resto da página
+    (key_facts/proposal_sections/…) fica de fora do card (separação de responsabilidades)."""
     entry = {"id": "finep:1", "title": "x", "themes": ["agro"]}  # card cru do scrape
     wiki = {
         "mechanism": "subvencao",
@@ -39,14 +41,16 @@ def test_promote_match_fields_copies_only_match_fields():
         "counterpart_required": True,
         "eligible_entities": ["empresas"],
         "value_range": {"min_brl": 0, "max_brl": 1000},
-        "key_facts": ["não deve ir pro card"],
-        "objective": "idem",
+        "objective": "foco em bioeconomia",
+        "key_requirements": ["req A", "req B"],
+        "key_facts": ["NÃO deve ir pro card"],
+        "proposal_sections": ["NÃO deve ir pro card"],
     }
     _promote_match_fields(entry, wiki)
-    for k in _MATCH_FIELDS:
+    for k in _MATCH_FIELDS:  # inclui objective + key_requirements
         assert entry[k] == wiki[k]
     assert "key_facts" not in entry
-    assert "objective" not in entry
+    assert "proposal_sections" not in entry
 
 
 def test_stage1_trl_discriminates_with_card_field_flatlines_without():
