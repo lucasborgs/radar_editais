@@ -20,7 +20,7 @@ import logging
 import os
 import re
 
-from core.edital_id import wiki_page_path
+from core import kg_store
 
 logger = logging.getLogger(__name__)
 
@@ -181,10 +181,9 @@ def build_checklist(edital_id: str) -> list[dict]:
     items: list[dict] = []
     seen: set[str] = set()
 
-    wiki_file = wiki_page_path(edital_id)
-    if wiki_file.exists():
+    wiki_page = kg_store.load_wiki_page(edital_id)
+    if wiki_page:
         try:
-            wiki_page = json.loads(wiki_file.read_text(encoding="utf-8"))
             for req in wiki_page.get("key_requirements", []):
                 if req and req not in seen:
                     seen.add(req)

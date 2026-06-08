@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from core import kg_store
-from core.edital_id import iter_wiki_pages, wiki_page_path
+from core.edital_id import iter_wiki_pages
 from core.wiki_schema import parse_deadline
 from domain.user_profile import CompanyProfile
 
@@ -725,13 +725,9 @@ class HybridMatchService:
         self._index = kg_store.load_index()
 
     def _load_wiki_page(self, edital_id: str) -> dict | None:
-        wiki_file = wiki_page_path(edital_id)
-        if wiki_file.exists():
-            try:
-                return json.loads(wiki_file.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        return None
+        # Tier 2: lê do store durável (Postgres em prod; arquivo em dev) via kg_store
+        # — não mais do arquivo direto, que não existe na imagem de produção.
+        return kg_store.load_wiki_page(edital_id)
 
     def _get_editais_with_cards(self) -> list[dict]:
         """Retorna entradas do índice enriquecidas com dados do card quando disponível.

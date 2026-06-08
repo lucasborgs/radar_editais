@@ -338,6 +338,7 @@ def main(
 
     cache = {} if skip_cache else _load_cache()
     processed = skipped = minimal = errors = 0
+    built_pages: dict[str, dict] = {}  # {edital_id: wiki_page} p/ persistir no blob durável
 
     for i, entry in enumerate(entries, 1):
         eid = entry["id"]
@@ -348,13 +349,13 @@ def main(
         if not skip_cache and cache.get(eid) == content_hash \
                 and wiki_page_path(eid).exists():
             logger.info("[%d/%d] %s — cache hit", i, len(entries), eid)
-            # Mesmo no cache hit, promove os campos de match da wiki page existente
-            # para o índice (idempotente) — garante que o índice durável os carregue
-            # mesmo quando a síntese não re-roda.
+            # Mesmo no cache hit, lê a wiki page existente para (a) promover os
+            # campos de match ao índice e (b) entrar no blob durável — garante que
+            # o Postgres carregue a página mesmo quando a síntese não re-roda.
             try:
-                _promote_match_fields(
-                    entry, json.loads(wiki_page_path(eid).read_text(encoding="utf-8")),
-                )
+                wp = json.loads(wiki_page_path(eid).read_text(encoding="utf-8"))
+                _promote_match_fields(entry, wp)
+                built_pages[eid] = wp
             except Exception:
                 pass
             skipped += 1
@@ -363,17 +364,23 @@ def main(
         logger.info("[%d/%d] %s — %d docs (silver)", i, len(entries), eid, len(documents))
 
         if not documents:
-            _promote_match_fields(entry, _save_minimal_wiki_page(entry))
+            wp = _save_minimal_wiki_page(entry)
+            _promote_match_fields(entry, wp)
+            built_pages[eid] = wp
             minimal += 1
         else:
             try:
                 result = _call_llm(client, model, entry, documents)
-                _promote_match_fields(entry, _save_wiki_page(entry, result))
+                wp = _save_wiki_page(entry, result)
+                _promote_match_fields(entry, wp)
+                built_pages[eid] = wp
                 time.sleep(delay)
                 processed += 1
             except Exception as e:
                 logger.error("Erro em %s: %s — salvando wiki page mínima", eid, e)
-                _promote_match_fields(entry, _save_minimal_wiki_page(entry))
+                wp = _save_minimal_wiki_page(entry)
+                _promote_match_fields(entry, wp)
+                built_pages[eid] = wp
                 errors += 1
                 continue
 
@@ -388,6 +395,13 @@ def main(
     if entries:
         kg_store.save("index_historico" if historico else "index", index)
         print(f"Índice enriquecido persistido ({len(entries)} entradas, campos de match promovidos)")
+
+    # Tier 2: persiste as wiki pages CHEIAS no blob durável (Postgres), p/ os
+    # consumidores (checklist/compliance/brief/KGMatch/HybridMatch) lerem em prod,
+    # onde o arquivo por-edital não existe. MERGE — não apaga páginas fora deste run.
+    if built_pages:
+        kg_store.save_wiki_pages(built_pages)
+        print(f"Wiki pages persistidas no store durável: {len(built_pages)}")
 
     print(f"\n{'=' * 60}")
     print(f"RESUMO: {processed} LLM, {minimal} mínimas, {skipped} cache, {errors} erros")
