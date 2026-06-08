@@ -24,6 +24,7 @@ dependencies = [
     "beautifulsoup4>=4.12",           # HTML parsing (ProfileExtractor + scrapers)
     "trafilatura>=1.8",              # extração de conteúdo principal de HTML (fonte web, base.html_to_text)
     "pdfplumber>=0.10",              # PDF extraction estrutural (WritingSession, chunker)
+    "python-docx>=1.1",              # extração de .docx (content_library.extract_document_text)
     # procrastinate ships an async-capable PsycopgConnector by default (psycopg 3 + asyncio).
     # No [asyncpg] extra exists upstream — the base install already brings psycopg[pool].
     "procrastinate>=2.0",
