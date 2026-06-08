@@ -24,7 +24,6 @@ load_dotenv()
 import psycopg  # noqa: E402
 
 from core.chunker import chunk_from_blocks  # noqa: E402
-from core.embedder import embed_query, embed_texts  # noqa: E402
 from pipeline.adapters.base import blocks_from_numbered_text, get_adapter  # noqa: E402
 from scripts.bench_parsing import _eval_arm  # noqa: E402  (reusa retrieval+métrica)
 

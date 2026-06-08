@@ -15,8 +15,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from backend.auth_routes import FeedbackPayload, submit_feedback  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
+
+from backend.auth_routes import FeedbackPayload, submit_feedback  # noqa: E402
 
 
 def _db_returning(rows):

@@ -37,8 +37,8 @@ def test_boundary_alignment():
     # "2)" após \n\n = fronteira limpa; cabeçalho colado no meio = sujo
     clean_units = ["1) A\n\n2) B"]
     assert boundary_alignment(clean_units, hdr)["pct_em_fronteira"] == 1.0
-    dirty_units = ["1) A texto 2) B colado"]  # "2)" não inicia linha → não casa (?m)^
-    # nesse caso o regex nem casa o colado; usa um que casa em qualquer lugar:
+    # "1) A texto 2) B colado": "2)" não inicia linha → não casa (?m)^. O regex
+    # nem casa o colado; usa um que casa em qualquer lugar:
     hdr_any = re.compile(r"\d+\)\s")
     d = boundary_alignment(["1) A\n\ntexto 2) colado"], hdr_any)
     assert d["n_headers"] == 2 and d["pct_em_fronteira"] == 0.5

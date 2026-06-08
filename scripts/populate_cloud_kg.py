@@ -26,14 +26,14 @@ if not cloud.exists():
     sys.exit(2)
 load_dotenv(cloud, override=True)
 
-import os
+import os  # noqa: E402
 
 if "127.0.0.1" in os.getenv("SUPABASE_URL", "") or not os.getenv("SUPABASE_SERVICE_KEY"):
     print("ABORT: env não aponta pro cloud (SUPABASE_URL/SERVICE_KEY).")
     sys.exit(2)
 
 # Backup do index local (tem itens web) antes do rebuild limpo sobrescrever.
-from config import KNOWLEDGE_GRAPH_DIR
+from config import KNOWLEDGE_GRAPH_DIR  # noqa: E402
 
 stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 for name in ("index.json", "index_historico.json"):
@@ -46,7 +46,7 @@ for name in ("index.json", "index_historico.json"):
 # Exclui a fonte `web` do build (isolamento de prod) sem mover arquivo. Pós
 # unificação Opção A, a Descoberta entra como fonte `web` (provisorio) — zerar
 # o bronze de web no build mantém só FINEP+FAPESP no cloud.
-import pipeline.build_knowledge_graph as bkg
+import pipeline.build_knowledge_graph as bkg  # noqa: E402
 
 _orig_load_bronze = bkg.load_bronze
 bkg.load_bronze = (  # noqa: E731 — override pontual do driver
@@ -59,7 +59,7 @@ bkg.main()  # rebuilda do bronze, salva local + upsert kg_artifacts no cloud
 # Verificação: lê de volta do cloud o que acabou de subir.
 print("\n--- verificação no cloud ---")
 os.environ["KG_STORE_BACKEND"] = "postgres"
-import core.kg_store as kg_store
+import core.kg_store as kg_store  # noqa: E402
 
 kg_store._pg_cache.clear()
 idx = kg_store.load_index()
