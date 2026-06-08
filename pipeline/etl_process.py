@@ -31,7 +31,7 @@ import time
 from datetime import datetime
 
 from config import KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
-from core import wiki_schema
+from core import kg_store, wiki_schema
 from core.edital_id import source_of, wiki_page_path
 from core.structurer import build_or_load_structured_doc
 from pipeline.adapters.base import get_adapter
@@ -199,7 +199,24 @@ def _call_llm(client, model: str, metadata: dict, pdfs: list[tuple[str, str]]) -
 # SAÍDA
 # =============================================================================
 
-def _save_wiki_page(entry: dict, synthesized: dict) -> None:
+# Campos estruturados que o HybridMatch Stage 1 usa (core/hybrid_match_service.py:
+# _score_mecanismo/_score_trl/_score_contrapartida/_score_elegibilidade). Eles
+# nascem na SÍNTESE (wiki page), não no scrape (index entry). Promovê-los ao index
+# entry os leva ao store DURÁVEL (kg_artifacts/Postgres em cloud) — sem isso, em
+# produção a wiki page (arquivo efêmero) some, o matching cai pro card cru e essas
+# dimensões FLATLINAM (mesmo valor p/ todo edital) → ranking colapsa silenciosamente.
+_MATCH_FIELDS = ("mechanism", "trl_range", "counterpart_required",
+                 "eligible_entities", "value_range")
+
+
+def _promote_match_fields(entry: dict, wiki_page: dict) -> None:
+    """Copia os campos de match da wiki page para o index entry (in place)."""
+    for k in _MATCH_FIELDS:
+        if k in wiki_page:
+            entry[k] = wiki_page[k]
+
+
+def _save_wiki_page(entry: dict, synthesized: dict) -> dict:
     wiki_page = {
         "id":            entry["id"],
         "title":         entry["title"],
@@ -229,9 +246,10 @@ def _save_wiki_page(entry: dict, synthesized: dict) -> None:
     page_path.write_text(
         json.dumps(wiki_page, indent=2, ensure_ascii=False), encoding="utf-8"
     )
+    return wiki_page
 
 
-def _save_minimal_wiki_page(entry: dict) -> None:
+def _save_minimal_wiki_page(entry: dict) -> dict:
     """Wiki page mínima para editais sem PDFs disponíveis (sem chamada LLM)."""
     wiki_page = {
         "id":            entry["id"],
@@ -262,6 +280,7 @@ def _save_minimal_wiki_page(entry: dict) -> None:
     page_path.write_text(
         json.dumps(wiki_page, indent=2, ensure_ascii=False), encoding="utf-8"
     )
+    return wiki_page
 
 
 # =============================================================================
@@ -324,28 +343,46 @@ def main(
         if not skip_cache and cache.get(eid) == content_hash \
                 and wiki_page_path(eid).exists():
             logger.info("[%d/%d] %s — cache hit", i, len(entries), eid)
+            # Mesmo no cache hit, promove os campos de match da wiki page existente
+            # para o índice (idempotente) — garante que o índice durável os carregue
+            # mesmo quando a síntese não re-roda.
+            try:
+                _promote_match_fields(
+                    entry, json.loads(wiki_page_path(eid).read_text(encoding="utf-8")),
+                )
+            except Exception:
+                pass
             skipped += 1
             continue
 
         logger.info("[%d/%d] %s — %d docs (silver)", i, len(entries), eid, len(documents))
 
         if not documents:
-            _save_minimal_wiki_page(entry)
+            _promote_match_fields(entry, _save_minimal_wiki_page(entry))
             minimal += 1
         else:
             try:
                 result = _call_llm(client, model, entry, documents)
-                _save_wiki_page(entry, result)
+                _promote_match_fields(entry, _save_wiki_page(entry, result))
                 time.sleep(delay)
                 processed += 1
             except Exception as e:
                 logger.error("Erro em %s: %s — salvando wiki page mínima", eid, e)
-                _save_minimal_wiki_page(entry)
+                _promote_match_fields(entry, _save_minimal_wiki_page(entry))
                 errors += 1
                 continue
 
         cache[eid] = content_hash
         _save_cache(cache)
+
+    # Persiste o índice ENRIQUECIDO (campos de match promovidos das wiki pages)
+    # no store durável. kg_store.save grava o arquivo local SEMPRE + upsert no
+    # Postgres se configurado → em cloud o HybridMatch (que lê o índice do Postgres)
+    # passa a enxergar mechanism/trl/contrapartida/elegibilidade mesmo sem a wiki
+    # page (arquivo) no container web. Sem este save, fecha-se só metade do laço.
+    if entries:
+        kg_store.save("index_historico" if historico else "index", index)
+        print(f"Índice enriquecido persistido ({len(entries)} entradas, campos de match promovidos)")
 
     print(f"\n{'=' * 60}")
     print(f"RESUMO: {processed} LLM, {minimal} mínimas, {skipped} cache, {errors} erros")
