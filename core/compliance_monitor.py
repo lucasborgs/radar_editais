@@ -27,7 +27,7 @@ import logging
 import os
 import re
 
-from core.edital_id import wiki_page_path
+from core import kg_store
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +67,10 @@ def _load_edital_requirements(edital_id: str) -> tuple[list[str], str]:
 
     Source é usado para carregar skills/<source>_compliance.md (Fase 4 #26).
     """
-    wiki_file = wiki_page_path(edital_id)
-    if not wiki_file.exists():
+    data = kg_store.load_wiki_page(edital_id)
+    if not data:
         return [], ""
     try:
-        data = json.loads(wiki_file.read_text(encoding="utf-8"))
         reqs = data.get("key_requirements", []) or []
         source = str(data.get("source", "") or "")
         return [str(r) for r in reqs], source
