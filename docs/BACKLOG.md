@@ -39,6 +39,26 @@
   cache TTL pra não somar a cada request.
 - **Status:** aberto (desenho esboçado, não construído).
 
+### Wiki pages cheias → Postgres (Tier 2 do débito data-plane) — secundário
+- **Contexto:** as wiki pages por-edital são ARQUIVO (`knowledge_graph/wiki/{src}/{id}.json`)
+  e o Dockerfile não copia o dir → somem no cloud (FS efêmero, web≠worker). **Tier 1 já
+  resolveu o crítico** (commit 3eec1201e): os 5 campos de match (`mechanism/trl_range/
+  counterpart_required/eligible_entities/value_range`) foram promovidos pro index card
+  (durável, Postgres) → matching restaurado. Falta o Tier 2.
+- **O quê (Tier 2):** os consumidores SECUNDÁRIos ainda leem a wiki page CHEIA por arquivo
+  (`wiki_page_path`): `checklist_service`, `compliance_monitor`, `opportunity_brief_service`,
+  `kg_match_service` — usam `key_facts`/`key_requirements`/`objective`/`proposal_sections`,
+  que NÃO estão no card. No cloud esses degradam (caem pro pouco que o card dá).
+- **Fix:** mover a wiki page cheia pro store durável via o seam `kg_store` — `load_wiki_page(eid)`
+  + `save_wiki_pages(map)` (blob `wiki` em kg_artifacts p/ ~dezenas de editais; tabela por-row
+  se crescer a milhares). Trocar os 4 leitores de `wiki_page_path().read_text()` por
+  `kg_store.load_wiki_page()`. Escritor (`etl_process`) já tem os dados — só faltaria o save.
+- **Por que adiado:** secundário (não toca o discover/match, que é o core do produto e do
+  build-in-public). As features afetadas são de escrita-assist. Eval-gate antes (não há suíte
+  específica desses serviços; criar fixture mínima).
+- **Ponto de entrada:** `core/kg_store.py`, `pipeline/etl_process.py` (escritor), os 4 leitores.
+  **Status:** aberto (Tier 1 feito; Tier 2 secundário). Ver [[project_data_plane_prod]].
+
 ### Parsing/chunking estrutura-aware — INVESTIGADO E REFUTADO (benchmark-driven, 2026-06-06)
 - **Hipótese:** parser estrutura-aware (Docling p/ PDF, numbering p/ FAPESP texto-plano)
   → modelo de blocos tipado → melhor `section_path` → melhor retrieval. Motivada pela
