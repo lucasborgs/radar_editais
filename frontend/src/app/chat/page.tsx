@@ -487,12 +487,17 @@ function WritingPageInner() {
       const saved = loadState(editalId!);
       if (saved?.sessionId) {
         try {
-          await getWritingDocument(saved.sessionId);
+          const doc = await getWritingDocument(saved.sessionId);
           if (cancelled) return;
+          // Backend é a fonte de verdade do texto salvo (section_drafts); o
+          // cache local guarda só sections/histórico/seção ativa.
+          const byTitle: Record<string, string> = {};
+          for (const s of doc.sections) if (s.content) byTitle[s.title] = s.content;
           setSessionId(saved.sessionId);
           setSections(saved.sections);
           setSectionHistories(saved.sectionHistories);
-          setSectionDrafts(saved.sectionDrafts);
+          setDocContents(byTitle);
+          setSectionDrafts(byTitle);
           setActiveSection(saved.activeSection);
           return;
         } catch {
@@ -573,28 +578,39 @@ function WritingPageInner() {
 
     try {
       const res = await sendWritingTurn(sessionId, userMsg.content, activeSection, modelTier);
-      const draft = res.draft_content ?? null;
+      // Fluxo de agente: a seção é persistida no backend via a tool save_draft
+      // (side effect) e draft_content vem SEMPRE null. A fonte de verdade do
+      // texto é section_drafts no DB — re-buscamos o documento pra refletir o
+      // que foi salvo (o agente normaliza o título e pode salvar outra seção).
+      const savedThisTurn = (res.tool_trace ?? []).some(
+        (t) => t.name === "save_draft" && t.output.startsWith("Rascunho salvo")
+      );
       const assistantMsg: WritingMessage = {
         role: "assistant",
         content: res.assistant_message,
         timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        draftSaved: !!draft,
+        draftSaved: savedThisTurn,
       };
       setSectionHistories((prev) => ({
         ...prev,
         [activeSection]: [...(prev[activeSection] ?? []), assistantMsg],
       }));
-      // Grantable: o backend já persistiu o draft em section_drafts (DB).
-      // Aqui só refletimos no estado local — editor + modal/export.
-      if (draft) {
-        setDocContents((prev) => ({ ...prev, [activeSection]: draft }));
-        setSectionDrafts((prev) => ({ ...prev, [activeSection]: draft }));
+      try {
+        const doc = await getWritingDocument(sessionId);
+        const byTitle: Record<string, string> = {};
+        for (const s of doc.sections) if (s.content) byTitle[s.title] = s.content;
+        setDocContents(byTitle);
+        setSectionDrafts(byTitle);
+        setSections((prev) =>
+          prev.map((s) =>
+            byTitle[s.title] && s.status === "pending" ? { ...s, status: "draft" } : s
+          )
+        );
+      } catch {
+        // Re-busca falhou — mantém estado local; o texto continua salvo no DB.
       }
       // Path agente: agente pode ter pedido info ao usuário no fim deste turn.
       if (res.pending_user_input) setPendingUserInput(res.pending_user_input);
-      setSections((prev) =>
-        prev.map((s) => s.title === activeSection && s.status === "pending" ? { ...s, status: "draft" } : s)
-      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao enviar mensagem");
     } finally {
