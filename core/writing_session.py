@@ -456,13 +456,13 @@ class WritingSession:
     def _load_documents(self, edital_id: str) -> str:
         """Carrega todos os PDFs relevantes do edital e retorna texto concatenado.
 
-        Aplica o mesmo filtro de versões usado no chunker (tasks.py) pra evitar
+        Aplica o mesmo filtro de versões usado no chunker pra evitar
         concatenar 4 versões do FAQ + 4 rerratificações no contexto do outline.
-        Import lazy de `core.tasks._filter_to_latest_versions` pra não puxar
-        `procrastinate` no boot do módulo.
+        A função vive em `pipeline.adapters.finep` (fonte de verdade do dedup
+        de versões); import lazy pra não puxar a stack de pipeline no boot.
         """
-        # Import lazy — procrastinate é pesado e não é precisão pro caso comum.
-        from core.tasks import _filter_to_latest_versions
+        # Import lazy — evita carregar pipeline/pdfplumber no boot do módulo.
+        from pipeline.adapters.finep import _filter_to_latest_versions
 
         pdf_dir = FINEP_PDFS_DIR / edital_id
         if not pdf_dir.exists():
