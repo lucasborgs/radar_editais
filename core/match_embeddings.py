@@ -18,7 +18,6 @@ import hashlib
 import json
 import logging
 import math
-import os
 import threading
 
 from config import ROOT
@@ -62,7 +61,7 @@ def profile_embedding_text(profile) -> str:
 def _key(text: str) -> str:
     """Chave de cache: hash do (modelo + texto). Modelo no namespace evita reuso
     de vetores de outro modelo se EMBEDDING_MODEL mudar."""
-    h = hashlib.sha256(f"{EMBEDDING_MODEL}\x00{text}".encode("utf-8"))
+    h = hashlib.sha256(f"{EMBEDDING_MODEL}\x00{text}".encode())
     return h.hexdigest()
 
 
@@ -106,7 +105,7 @@ def embed_with_cache(texts: list[str]) -> list[list[float]]:
 def _cosine(a: list[float], b: list[float]) -> float:
     if not a or not b or len(a) != len(b):
         return 0.0
-    dot = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=True))
     na = math.sqrt(sum(x * x for x in a))
     nb = math.sqrt(sum(y * y for y in b))
     if na == 0.0 or nb == 0.0:

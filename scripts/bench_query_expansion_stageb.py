@@ -39,7 +39,7 @@ import json  # noqa: E402
 from core.llm_client import make_client  # noqa: E402
 from core.rag_eval import gold_best_chunk_recall_at_k, gold_recall_at_k  # noqa: E402
 from core.retriever import retrieve_chunks  # noqa: E402
-from scripts.bench_query_expansion import GOLDENS, _MODEL, _QR_PROMPT  # noqa: E402
+from scripts.bench_query_expansion import _MODEL, _QR_PROMPT, GOLDENS  # noqa: E402
 
 _CONTROL_QUERY = "Receita de bolo de fubá cremoso com goiabada e queijo coalho."
 _K = 5
