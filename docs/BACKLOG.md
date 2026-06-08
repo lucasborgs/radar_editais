@@ -324,23 +324,22 @@
   ganhou regra anti-fabricação de referências (anexos/artigos não-vistos). 378 testes verdes.
 - **Status:** escrita validada p/ beta; resíduos são rigor de fixture/infra, não bloqueiam.
 
-### RAG/Escrita — editais SEM PDF ficam sem chunks (FAPESP + FINEP-sem-anexo)
-- **O quê:** `scripts/reindex_edital.py`/`chunk_edital_task` chunkam **só PDF** (via
-  `FINEP_PDFS_DIR` + adapter FINEP). Editais cujo conteúdo vive no **registro
-  estruturado** (não em PDF) ficam com `edital_chunks` vazio → na escrita o
-  `search_edital` volta vazio e o agente redige só com perfil+card (menos ancorado;
-  NÃO quebra — degrada). Confirmado no pré-aquecimento do cloud (2026-06-05): 17/20
-  editais do índice com chunks; **3 sem**: `fapesp:18067`, `fapesp:18203` (FAPESP nunca
-  tem PDF) e `finep:613` (FINEP "Programa de Investimento em Startups" — veio sem anexo,
-  só titulo+descricao de ~957 chars; NÃO é falha de download).
-- **Fix (vale p/ os 3):** caminho de chunking a partir do **texto do registro**
-  (`descricao`/`texto_cru`) quando não há PDF — idealmente no mesmo pipeline
-  (`_build_chunks_for_edital` → fallback p/ record-text quando `adapter.to_documents`
-  vier vazio), passando por `chunk_from_blocks` + embed + upsert. Idempotente como o PDF.
-- **Por que não foi feito agora:** one-off frágil p/ 3 editais de conteúdo curto rende
-  pouco sobre o que o card já dá; productizar o path é o certo. Não bloqueia o beta.
-- **Ponto de entrada:** `core/tasks.py::_build_chunks_for_edital`, `core/chunker.py`.
-  **Status:** aberto.
+### RAG/Escrita — editais SEM PDF: código RESOLVIDO; pendência é OPERACIONAL (cloud)
+- **Correção (2026-06-08):** o item antigo dizia que `chunk_edital`/`_build_chunks_for_edital`
+  chunkam "só PDF" — **FALSO hoje.** O refactor source-agnostic (2026-06-06,
+  [[project_source_agnostic_chunking]]) trocou o caminho por `get_adapter(source).to_documents(native)`
+  → o adapter FAPESP devolve o texto do registro/HTML, passa por `chunk_from_blocks → embed →
+  upsert` igual ao PDF. Localmente FAPESP **tem** chunks (bench mediu 104 em 2 editais). Não há
+  fix de código a fazer aqui.
+- **O que sobra (operacional, não código):** o **cloud** está com `edital_chunks` de FAPESP
+  **vazio** porque o `chunk_edital` nunca rodou pra FAPESP lá: o pré-aquecimento (2026-06-05) é
+  ANTERIOR ao refactor, e a `bronze_data/` (fonte FAPESP) **não está na imagem** (Dockerfile não
+  a copia) → re-chunkar no cloud só funciona após o ETL/scrape rodar lá, OU rodando local
+  (com bronze) apontando o Supabase pro cloud. **Ação:** `reindex_edital.py fapesp:18067` /
+  `fapesp:18203` com creds do `.env.cloud`.
+- **Edge remanescente — `finep:613`** ("Programa de Investimento em Startups"): veio sem anexo,
+  só título+descrição (~957 chars). Chunka pouco, mas o card já cobre. Baixa prioridade.
+- **Status:** código resolvido; falta rodar a indexação FAPESP contra o cloud (em andamento).
 
 ### RAG — melhor estratégia de chunkeamento para fontes HTML longas
 - **O quê:** o chunking de fontes HTML (FAPESP `html_body`, web `html_clean` —
