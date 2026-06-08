@@ -27,6 +27,32 @@ _DISCOVERY_MD = _WIKIS_DIR / "_discovery.md"
 _YAML_BLOCK_RE = re.compile(r"```yaml\n(.*?)```", re.DOTALL)
 
 
+# =============================================================================
+# Campos de match: o que o índice (card durável) precisa carregar
+# =============================================================================
+# Os campos estruturados que o HybridMatch Stage 1 + Stage 2 usam nascem na
+# SÍNTESE (wiki page), não no scrape (index entry). Promovê-los ao índice o torna
+# o card durável que o request-path lê em prod (onde a wiki page por-arquivo não
+# existe). Single source p/ etl_process (promove ao sintetizar) E
+# build_knowledge_graph (carrega adiante ao rebuildar, p/ o índice nunca degradar
+# se a síntese ainda não rodou / falhou). Stage 1: mechanism/trl_range/
+# counterpart_required/eligible_entities(+value_range display). Stage 2: objective/
+# key_requirements. NÃO incluir estruturais extras nem texto cheio (ver
+# core/hybrid_match_service: separação Stage1 determinístico × Stage2 temático).
+MATCH_FIELDS: tuple[str, ...] = (
+    "mechanism", "trl_range", "counterpart_required",
+    "eligible_entities", "value_range",
+    "objective", "key_requirements",
+)
+
+
+def promote_match_fields(entry: dict, wiki_page: dict) -> None:
+    """Copia os MATCH_FIELDS da wiki page para o index entry (in place)."""
+    for k in MATCH_FIELDS:
+        if k in wiki_page:
+            entry[k] = wiki_page[k]
+
+
 def _parse_md(md_path: Path) -> dict:
     if not md_path.exists():
         return {}

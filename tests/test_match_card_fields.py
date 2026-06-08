@@ -23,8 +23,9 @@ from core.hybrid_match_service import (  # noqa: E402
     _score_mecanismo,
     _score_trl,
 )
+from core.wiki_schema import MATCH_FIELDS as _MATCH_FIELDS  # noqa: E402
+from core.wiki_schema import promote_match_fields as _promote_match_fields  # noqa: E402
 from domain.user_profile import CompanyProfile  # noqa: E402
-from pipeline.etl_process import _MATCH_FIELDS, _promote_match_fields  # noqa: E402
 
 W = {"trl": 20, "mecanismo": 15, "contrapartida": 10}
 
@@ -68,6 +69,22 @@ def test_stage1_mecanismo_discriminates_with_card_field_flatlines_without():
     assert _score_mecanismo({"mechanism": "subvencao"}, p, W) != \
         _score_mecanismo({"mechanism": "credito"}, p, W)
     assert _score_mecanismo({}, p, W) == W["mecanismo"] / 2  # ausente → flatline
+
+
+def test_build_carry_forward_promotes_from_wiki_store(monkeypatch):
+    """build_knowledge_graph carrega adiante os campos de match da wiki store ao
+    rebuildar → índice nunca degrada se a síntese ainda não rodou (desacopla o
+    índice da síntese flaky/rate-limited). Edital sem wiki fica cru (esperado)."""
+    from pipeline import build_knowledge_graph as bkg
+    store = {"finep:1": {"mechanism": "subvencao", "objective": "x",
+                         "trl_range": {"min": 1, "max": 9}, "key_requirements": ["r"]}}
+    monkeypatch.setattr("core.kg_store.load_wiki_page", lambda eid: store.get(eid))
+    index = {"editais": [{"id": "finep:1", "title": "a"}, {"id": "finep:2", "title": "b"}]}
+    bkg._carry_forward_match_fields(index)
+    assert index["editais"][0]["mechanism"] == "subvencao"
+    assert index["editais"][0]["objective"] == "x"
+    assert index["editais"][0]["key_requirements"] == ["r"]
+    assert "mechanism" not in index["editais"][1]  # sem wiki → cru, sem inventar
 
 
 def test_stage1_contrapartida_absence_gives_full_points_regression():
