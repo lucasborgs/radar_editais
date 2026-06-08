@@ -561,7 +561,28 @@ def build_indices(chamadas: list[dict], source: str = _DEFAULT_SOURCE) -> tuple[
 # PERSISTÊNCIA
 # =============================================================================
 
+def _carry_forward_match_fields(index: dict) -> None:
+    """Preserva os campos de match ao rebuildar: lê da wiki store DURÁVEL (Postgres
+    em prod, arquivo em dev) e carrega adiante para cada entry.
+
+    Desacopla o índice — o que o HybridMatch lê — da SÍNTESE flaky/rate-limited:
+    o rebuild produz entries cruas (vêm do scrape), e sem isto o índice ficaria sem
+    mechanism/trl/objective/etc. até a síntese re-promover — degradando o matching
+    em silêncio na janela (ou a noite toda, se a síntese travar). Aqui o índice já
+    nasce enriquecido com o que a síntese anterior produziu; a síntese só refina.
+    """
+    for entry in index.get("editais", []):
+        page = kg_store.load_wiki_page(entry["id"])
+        if page:
+            wiki_schema.promote_match_fields(entry, page)
+
+
 def save_indices(index_vigentes: dict, index_historico: dict) -> None:
+    # Carrega adiante os campos de match da wiki store ANTES de salvar — o índice
+    # nunca degrada se a síntese ainda não rodou/falhou (ver _carry_forward).
+    _carry_forward_match_fields(index_vigentes)
+    _carry_forward_match_fields(index_historico)
+
     # kg_store.save grava o arquivo local E, se o Supabase estiver configurado,
     # faz upsert na tabela kg_artifacts (publica o índice para a produção).
     kg_store.save("index", index_vigentes)
