@@ -204,6 +204,30 @@
 - **Ponto de entrada:** isolamento prod + qualidade/dedup dos itens `provisorio`.
 - **Status:** adiado conscientemente.
 
+### Grafo induzido (GraphRAG) — overlay de insight, NÃO base do match
+- **O quê:** uma **Camada B** induzida sobre o grafo curado — extração livre de
+  entidades/relações + detecção de comunidades + sumarização — como **overlay
+  batch** sobre corpus delimitado, alimentando uma **superfície de insight
+  separada** (não o match/escrita). **Alvo 1 (barato):** rede de fundos do Q3
+  (co-investimento, sobreposição de tese, quem segue quem; corpus ~30-50 →
+  trivial e não-óbvio). **Prêmio maior:** insight longitudinal cross-quadrante
+  ("memória da evolução das agências").
+- **Por que adiado:** indução é cara ∝ corpus e **hostil ao ETL incremental**
+  (doc novo desloca comunidades → re-sumariza). O loop central (descobrir→match→
+  escrever) é servido pela **Camada A CURADA** — indução é feature de
+  *profundidade*, não de *robustez*, logo **fora do MVP** ([[project_multi_quadrante]]).
+- **Binding obrigatório (a parte que não pode faltar):** a saída induzida só vale
+  se **ligar às wiki pages curadas**. Template = **contrato de reconciliação**:
+  emitir nós/arestas **tipados** (`node_type`/`link_types` existentes ou flag
+  candidato-novo) e **resolver cada ponta a id canônico** (`investidor:kptl`, não
+  nó solto). Reusa `themes_proposed` (quarentena) + `verificacao: provisorio`
+  (gate de graduação). Sem o contrato → segundo grafo desconectado, insight
+  flutua, custo desperdiçado.
+- **Onde está specado:** `docs/spec_multi_quadrante.md` §3.9 (e §3.8 sobre o
+  GraphRAG curado no Stage 2 de tese).
+- **Status:** adiado (pós-MVP). Alvo 1 (rede de fundos) destrava barato assim que
+  o `node_type investidor` existir (Fase C).
+
 ### Matching Stage 2a — scoring por embeddings em vez de geração-LLM
 - **O quê:** o Stage 2a (pontuação temática de TODOS os elegíveis) é hoje uma
   chamada generativa ao LLM que devolve `{id: score}`. Foi construído um caminho
@@ -389,6 +413,84 @@
 - **Ponto de entrada:** `pipeline/adapters/base.py::split_into_units`,
   `core/chunker.py::chunk_from_blocks` (regra de fronteira/merge), `core/eval/`
   suíte `rag`. **Status:** aberto.
+
+### Descoberta — dedup cross-fonte (mesma oportunidade, URLs diferentes)
+- **O quê:** o ledger da Descoberta dedupa por URL normalizada (`_norm_url` em
+  `core/opportunity_discovery.py`). Mas a MESMA oportunidade chega por fontes
+  diferentes com URLs diferentes — `pdfPage` do DOU (feeder Fase A) ≠ página HTML
+  da agência (achada pelo Tavily). Dedup por URL **não pega** esse duplicado →
+  dois `web:<url_hash>`, dois nós no grafo, duplicata no radar.
+- **Decisão de fonte (já specada):** quando há overlap, **DOU vence** (canônico,
+  estruturado); DOU-sourced pode nascer com `verificacao` > `provisorio`.
+  Ver `docs/spec_dou_feeder.md` §6.1.
+- **Mitigação imediata (barata):** encolher o escopo do Tavily pras zonas que o
+  DOU NÃO cobre (DOEs estaduais, Q3 VC, Q4 aceleradoras) — o overlap quase some,
+  e com ele o problema. O Tavily deixa de re-varrer o federal que o DOU entrega
+  limpo. **Isso destrava sozinho a maior parte do furo.**
+- **Solução durável:** dedup semântico (título+órgão+nº do edital, ou
+  similaridade) + prioridade de fonte no merge. Casa com o item de proveniência
+  abaixo e com `verificacao`.
+- **Por que adiado:** só morde quando DOU + Tavily rodam juntos no federal; a
+  mitigação imediata (encolher Tavily) já segura o MVP. **Ponto de entrada:**
+  `core/opportunity_discovery.py` (`_known_urls`/`_norm_url`/ledger), `wikis/_discovery.md`
+  (queries do Tavily). **Status:** aberto (destrava quando a flag `DISCOVERY_DOU_ENABLED` ligar).
+
+### DOU — sync de ciclo de vida (retificação/prorrogação/encerramento → temporal)
+- **O quê:** o DOU não anuncia só abertura — anuncia o ciclo inteiro (826 atos/dia
+  em DO1+DO3, 2026-06-09): Retificação (errata), Prorrogação (prazo estendido),
+  Alteração, Suspensão, Revogação, Republicação, Resultado/Homologação
+  (encerramento). É um **stream de ciclo de vida por oportunidade**, não só
+  descoberta. Capturar esses atos e atualizar a oportunidade no radar:
+  prorrogação→novo prazo; suspensão/revogação→status; resultado→ENCERRADA.
+- **Por que importa:** `core/temporal.py` hoje infere status de "prazo < hoje". O
+  DOU é a fonte **autoritativa** das transições reais (prorrogação muda o prazo;
+  suspensão muda o status independente do prazo). Radar com prazo errado é inútil
+  → manter editais VIVOS é multiplicador de robustez. Casa com a memória
+  longitudinal das agências.
+- **IDENTIDADE é o nó duro (Option B `nº+órgão` TESTADA E REPROVADA, dry-run
+  2026-06-09):** a hipótese de id estável `<órgão>-<nº>-<ano>` colide em massa — o
+  "Nº N/ANO" do DOU é escopado por unidade(UASG)+tipo de ato, não por ministério
+  (`ministerio-da-educacao-1-2026` fundiu 50+ atos distintos). E a ligação
+  retificação→original mora no TEXTO do corpo ("retifica-se a publicação de DD/MM,
+  pág. X"), não no título. Logo a identidade de ciclo de vida exige **(a)** org
+  unit-level (artCategory completo, não topo) **+ (b)** parse de cross-referência
+  no corpo do ato — é parte DESTE problema, não um pré-requisito barato.
+  Descoberta/dedup continua no `url_hash` (correto, único por aviso).
+- **Por que adiado:** identidade unit-level + parse de cross-ref no corpo é
+  trabalho real; e o rendimento de ciclo de vida de FOMENTO (vs licitação) é baixo
+  por dia. Não bloqueia o MVP de descoberta.
+- **Ponto de entrada:** `core/dou_feeder.py` (parse dos artType de ciclo),
+  `core/temporal.py` (aplicar transição), `core/edital_id.py` (id estável).
+  **Status:** aberto; decisão de id é P-agora, sync é pós-MVP.
+
+### DOU feeder — maturação de precisão (pós dry-run 2026-06-09)
+- **Contexto:** dry-run da cadeia DOU→triagem→extração: 63 candidatos → 9
+  aprovados. Threading do órgão (artCategory→SearchHit.agency) e aperto da
+  triagem (deep-tech/P&D) JÁ FEITOS. Restam 3 frentes adiadas:
+- **(a) `org_allowlist` de C&T é a alavanca PRIMÁRIA de precisão p/ DOU
+  (conclusão revertida pelo dry-run):** o dry-run provou que a triagem de TEMA
+  sobre o aviso fino é não-confiável (9→0→2 aprovados, inconsistente entre runs —
+  o tema não está no aviso, só no edital linkado). Já o ÓRGÃO (`artCategory`) é
+  sempre confiável no XML. Logo, para DOU, **filtrar por órgão é mais robusto que
+  por tema**: `org_allowlist` C&T (`ciência`, `finep`, `cnpq`, `embrapii`,
+  `desenvolvimento, indústria`, `defesa`, `comunicaç`, `energia`, `petróleo`,
+  `senai`, `amparo à pesquisa`) cortou 97→5 determinístico/barato. **Caveat:** FAPs
+  estaduais aparecem sob "Governo do Estado de X" (não topo C&T) → allowlist perde
+  essa cauda; mitigar adicionando padrões de FAP/governo estadual quando entrarem.
+  Resíduo nos 5 (alteração, portaria, UASG) → regra barata + triagem lenient. A
+  triagem (rebalanceada p/ reject-driven, "na dúvida aprova") vira 2ª passada, não
+  o filtro principal. `dou_candidates(org_allowlist=...)` já existe.
+- **(b) Extração profunda via edital linkado:** o aviso DOU é FINO (título+órgão+
+  prazo vêm bem; tema/detalhes vêm pobres) — confirma "DOU = descoberta, não
+  extração". O conteúdo rico está no PDF/edital apontado pelo aviso. Seguir o
+  link (`pdfPage`/URL do edital) p/ extração completa quando o aviso passar na
+  triagem. Hoje o aviso surge a oportunidade; a profundidade é follow.
+- **(c) Endurecer retry do login INLABS:** o handler `logar.php` dá 502
+  intermitente (visto ao vivo: ora furou na 1ª, ora sustentado >12s). O retry
+  atual (`_login`, 4×/3s) é fino p/ um cron diário → backoff maior + tolerância
+  a dia perdido (descoberta não pode quebrar por manutenção do INLABS).
+- **Ponto de entrada:** `core/dou_feeder.py`, `core/opportunity_discovery.py`
+  (`_triage`/`_extract`). **Status:** aberto (destrava com a Fase A em prod).
 
 ### Fontes — proveniência/confiança por campo (dissolver "estruturada vs. cega")
 - **O quê:** hoje há dois caminhos implícitos de metadado. FINEP/FAPESP trazem
