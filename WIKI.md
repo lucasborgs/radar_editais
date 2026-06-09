@@ -388,6 +388,14 @@ node_types:
     folder: editais
     tags: [finep, edital, "<status_tag>", "mecanismo/<mechanism>", "tema/<slug>", "subprograma/<slug>", "trl/<faixa>", "ano/<pub_year>"]
     emoji: "<status_emoji>"
+  desafio:            # Q2 — open innovation / obrigação regulatória (evento, mesmo pipeline do edital)
+    folder: desafios
+    tags: [desafio, "<status_tag>", "tema/<slug>", "setor/<slug>", "ancora/<slug>", "trl/<faixa>", "ano/<pub_year>"]
+    emoji: "🎯"
+  programa:           # Q4 — aceleração / incubação (evento, batch/cohort)
+    folder: programas
+    tags: [programa, "<status_tag>", "tema/<slug>", "setor/<slug>", "modelo/<equity|no-equity>", "ano/<pub_year>"]
+    emoji: "🚀"
   tema:
     folder: temas
     tags: [finep, tema]
