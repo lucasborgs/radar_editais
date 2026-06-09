@@ -304,7 +304,7 @@ setor_vocab:
   - espacial
   - ti-software
   - multissetorial
-estagio_vocab: [pre-seed, seed, serie-a]
+estagio_vocab: [pre-seed, seed, serie-a, growth]
 modelo_vocab: [equity, no-equity]
 ```
 
@@ -482,11 +482,14 @@ spec_multi_quadrante §8 #3), não descoberta automática. Valores PLANOS (o wra
 investidor_schema:
   artifact: "knowledge_graph/investidores.json"
   id_format: "investidor:<slug>"        # ex.: investidor:kptl
-  node_fields: [id, name, tese, tese_themes, setores, estagio_alvo, ticket_range, lead_follow, portfolio, co_investidores, site, contato]
+  node_fields: [id, name, tese, tese_themes, setores, estagio_alvo, ticket_range, lead_follow, portfolio, co_investidores, site, contato, generalista, fund_status, tese_keywords, anti_tese, verificado_em, source_urls]
   required_fields: [id, name, tese_themes, setores, estagio_alvo]
   notes:
     - "tese_themes: temas CANÔNICOS (§5.9, mesma representação de edital.themes) — é a ponte investidor↔edital. INVARIANTE: ⊆ tema_vocab (senão a ponte nunca casa)."
     - "estagio_alvo ⊆ estagio_vocab (§5.9.1); setores ⊆ setor_vocab; ticket_range: {min_brl, max_brl} | null."
+    - "generalista: true = fundo SEM tese setorial (investe em qualquer setor) → tese_themes DEVE ser [] e o match usa ESTÁGIO, não tema (senão casaria com tudo = ruído). Match-por-tese só vale p/ fundo com tese."
+    - "fund_status: ativo|captando|dormante — frescor da ENTIDADE (análogo do status do edital; fundo dormante = ruído). verificado_em + source_urls: proveniência do enriquecimento."
+    - "tese_keywords: texto livre FINO (análogo do areas_raw da ICT) p/ match além dos 7 temas grossos. anti_tese: o que o fundo NÃO faz (poder de REJEITAR no match)."
     - "co_investidores: semente da Camada B induzida (rede de fundos, BACKLOG) — inerte no MVP."
     - "investidores.json espelha icts.json: {investidores:[...], total_investidores, themes_index, last_updated}. NÃO entra no index.json (invariante de-risk ①)."
 ```
