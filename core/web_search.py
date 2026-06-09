@@ -30,11 +30,16 @@ class WebSearchError(Exception):
 
 @dataclass
 class SearchHit:
-    """Um resultado de busca. `content` já vem limpo (Tavily raw_content)."""
+    """Um resultado de busca. `content` já vem limpo (Tavily raw_content).
+
+    `agency`: órgão emissor quando a FONTE já o conhece de forma confiável (ex.:
+    feeder DOU lê do `artCategory` do XML). Vazio para fontes cegas (Tavily), que
+    deixam a triagem LLM adivinhar. Quem extrai prefere este campo ao palpite."""
     title: str
     url: str
     snippet: str
     content: str
+    agency: str = ""
 
 
 def web_search(query: str, k: int = 5) -> list[SearchHit]:
