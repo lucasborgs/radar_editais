@@ -127,6 +127,24 @@ function ScoreDimBar({ label, score, max }: { label: string; score: number; max:
   );
 }
 
+// Badge de tipo-evento (multi-quadrante). `edital` é o default e NÃO renderiza
+// badge (evita ruído no caso dominante); só desafio/programa se distinguem.
+const OPPORTUNITY_TYPE_BADGE: Record<string, { label: string; emoji: string }> = {
+  desafio: { label: "Desafio", emoji: "🎯" },
+  programa: { label: "Programa", emoji: "🚀" },
+};
+
+function OpportunityTypeBadge({ type }: { type?: string }) {
+  const meta = type ? OPPORTUNITY_TYPE_BADGE[type] : undefined;
+  if (!meta) return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-sans font-medium text-primary">
+      <span aria-hidden>{meta.emoji}</span>
+      {meta.label}
+    </span>
+  );
+}
+
 function MatchCard({ match }: { match: KGMatchResult }) {
   const router = useRouter();
   const color = scoreColor(match.score);
@@ -152,6 +170,7 @@ function MatchCard({ match }: { match: KGMatchResult }) {
       </div>
 
       <div className="flex items-center gap-2 flex-wrap mb-2">
+        <OpportunityTypeBadge type={match.opportunity_type} />
         <StatusBadge status={match.status} />
         {match.deadline && (
           <span className="font-data text-xs text-content-secondary">
