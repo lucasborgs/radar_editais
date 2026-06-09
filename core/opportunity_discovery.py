@@ -135,6 +135,9 @@ def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, mode
         "Extraia os campos de uma oportunidade de fomento a partir do texto. "
         "Responda só JSON com as chaves: titulo, prazo_envio (dd/mm/yyyy ou \"\"), "
         "publico_alvo, descricao (2-3 frases), status (ABERTA|ENCERRADA|\"\"), "
+        "opportunity_type (UM de: edital|desafio|programa — desafio=desafio "
+        "tecnológico/open innovation de empresa-âncora; programa=aceleração/"
+        "incubação/cohort; edital=chamada/edital de fomento público padrão), "
         "tema (lista; ESCOLHA só desta lista canônica, [] se nenhum servir: "
         f"{vocab}). Não invente dados que não estão no texto."
     )
@@ -164,6 +167,9 @@ def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, mode
         "descricao": data.get("descricao", ""),
         "status": data.get("status", "") or "ABERTA",
         "tema": "; ".join(t for t in tema if isinstance(t, str)),
+        # opportunity_type (Fase B): tipo-evento classificado pela LLM. Default
+        # edital (chamada pública padrão); build_knowledge_graph o carrega ao índice.
+        "opportunity_type": (data.get("opportunity_type") or "edital").strip().lower(),
         "agency": agency or "",
         "fonte": agency or "Web (descoberta)",
         "verificacao": "provisorio",
