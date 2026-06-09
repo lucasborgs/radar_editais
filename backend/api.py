@@ -200,6 +200,12 @@ class CompanyProfileSchema(BaseModel):
     equipe_resumo: str = ""
     trl: int | None = None
     tipos_financiamento_interesse: list[str] = []
+    # capital privado / desafios (Q3/Q4) — opcionais, alimentam o match de investidor
+    estagio: str = ""
+    mrr_arr: float | None = None
+    round_alvo_brl: float | None = None
+    cap_table_resumo: str = ""
+    tracao_resumo: str = ""
 
 
 class MatchRequest(BaseModel):
@@ -293,6 +299,11 @@ def _to_py_profile(schema: CompanyProfileSchema) -> PyCompanyProfile:
         equipe_resumo=schema.equipe_resumo,
         trl=schema.trl,
         tipos_financiamento_interesse=schema.tipos_financiamento_interesse,
+        estagio=schema.estagio,
+        mrr_arr=schema.mrr_arr,
+        round_alvo_brl=schema.round_alvo_brl,
+        cap_table_resumo=schema.cap_table_resumo,
+        tracao_resumo=schema.tracao_resumo,
     )
 
 
@@ -324,6 +335,7 @@ def _profile_from_workspace(db, workspace_id: str) -> PyCompanyProfile:
         "solution_summary", "descricao_atividades", "portfolio_projetos",
         "tamanho_empresa", "capital_social", "equipe_resumo", "trl",
         "tipos_financiamento_interesse",
+        "estagio", "mrr_arr", "round_alvo_brl", "cap_table_resumo", "tracao_resumo",
     }
     return PyCompanyProfile(**{k: v for k, v in raw.items() if k in allowed})
 
@@ -433,6 +445,20 @@ def match_editais(request: Request, req: MatchRequest, user_id: CurrentUserId, d
             profile=profile, top_k=req.top_k, workspace_id=workspace_id
         )
     }
+
+
+@app.post("/match/investidores", summary="Rankeamento de investidores (Q3) por tese/estágio")
+@limiter.limit("10/minute")
+def match_investidores_endpoint(
+    request: Request, req: MatchRequest, user_id: CurrentUserId, db: DbClient
+):
+    """Perfil da startup → fundos/investidores (Q3) rankeados por aderência:
+    especialistas casam por TESE/tema/setor; generalistas por ESTÁGIO. SEM gate —
+    entidade não elimina (spec_multi_quadrante §3.8). Caminho isolado: não toca o
+    matcher de edital."""
+    from core.investor_match import match_investidores
+    profile = _to_py_profile(req.profile)
+    return {"matches": match_investidores(profile, top_k=req.top_k)}
 
 
 # =============================================================================
