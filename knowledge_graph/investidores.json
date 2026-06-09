@@ -1,0 +1,58 @@
+{
+  "investidores": [
+    {
+      "id": "investidor:kptl",
+      "name": "KPTL",
+      "tese": "Venture capital de deep-tech early-stage (ex-Inseed); aposta em startups com risco tecnológico/científico real.",
+      "tese_themes": [
+        "tecnologias digitais e conectividade",
+        "materiais, química e manufatura avançada",
+        "saúde e ciências da vida"
+      ],
+      "setores": ["multissetorial"],
+      "estagio_alvo": ["seed", "serie-a"],
+      "ticket_range": null,
+      "lead_follow": "lead",
+      "portfolio": [],
+      "co_investidores": [],
+      "site": "https://kptl.com.br",
+      "contato": null
+    },
+    {
+      "id": "investidor:sp-ventures",
+      "name": "SP Ventures",
+      "tese": "Venture capital focado em agritech e foodtech early-stage.",
+      "tese_themes": ["agro - bioeconomia e alimentos"],
+      "setores": ["agro"],
+      "estagio_alvo": ["seed"],
+      "ticket_range": null,
+      "lead_follow": "lead",
+      "portfolio": [],
+      "co_investidores": [],
+      "site": "https://www.spventures.com.br",
+      "contato": null
+    },
+    {
+      "id": "investidor:antler-brasil",
+      "name": "Antler Brasil",
+      "tese": "Investimento day-zero / pré-seed, agnóstico de setor; co-funda times desde a formação.",
+      "tese_themes": [],
+      "setores": ["multissetorial"],
+      "estagio_alvo": ["pre-seed"],
+      "ticket_range": null,
+      "lead_follow": "lead",
+      "portfolio": [],
+      "co_investidores": [],
+      "site": "https://www.antler.co",
+      "contato": null
+    }
+  ],
+  "total_investidores": 3,
+  "themes_index": {
+    "tecnologias digitais e conectividade": ["investidor:kptl"],
+    "materiais, química e manufatura avançada": ["investidor:kptl"],
+    "saúde e ciências da vida": ["investidor:kptl"],
+    "agro - bioeconomia e alimentos": ["investidor:sp-ventures"]
+  },
+  "last_updated": "2026-06-09"
+}

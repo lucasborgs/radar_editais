@@ -23,6 +23,7 @@ from core import wiki_schema as ws
 WIKI_DIR   = ROOT / "knowledge_graph" / "wiki"
 INDEX_FILE = ROOT / "knowledge_graph" / "index.json"
 ICTS_FILE  = ROOT / "knowledge_graph" / "icts.json"
+INVESTIDORES_FILE = ROOT / "knowledge_graph" / "investidores.json"
 
 
 def _load_wiki_pages() -> list[dict]:
@@ -215,6 +216,51 @@ def test_edital_themes_subset_of_canonical_vocab():
     edital_themes = set(index.get("themes_index", {}).keys())
     drift = edital_themes - vocab
     assert not drift, f"Temas de edital fora do vocab canônico §5.9: {drift}"
+
+
+# -----------------------------------------------------------------------------
+# NÓ INVESTIDOR (WIKI.md §6.1.3 / investidor_schema)
+# -----------------------------------------------------------------------------
+
+def _load_investidores() -> dict:
+    return json.loads(INVESTIDORES_FILE.read_text(encoding="utf-8"))
+
+
+def test_investidor_nodes_have_required_fields():
+    """Todo investidor tem os campos declarados em investidor_schema."""
+    if not INVESTIDORES_FILE.exists():
+        return
+    sch = ws.investidor_schema()
+    node_fields = set(sch["node_fields"])
+    required = set(sch["required_fields"])
+    for n in _load_investidores().get("investidores", []):
+        assert required <= set(n.keys()), \
+            f"Investidor {n.get('id')} faltam obrigatórios: {required - set(n.keys())}"
+        unexpected = set(n.keys()) - node_fields
+        assert not unexpected, f"Investidor {n.get('id')} campos fora do schema: {unexpected}"
+
+
+def test_investidor_id_format():
+    """id segue 'investidor:<slug>' (§6.1.3 id_format)."""
+    if not INVESTIDORES_FILE.exists():
+        return
+    for n in _load_investidores().get("investidores", []):
+        assert n["id"].startswith("investidor:"), \
+            f"Investidor id sem prefixo de fonte: {n['id']!r}"
+
+
+def test_investidor_tese_themes_in_canonical_vocab():
+    """INVARIANTE DA PONTE: tese_themes ⊆ vocab canônico §5.9 (a mesma autoridade
+    que editais), senão edital.themes ∩ investidor.tese_themes nunca casa."""
+    if not INVESTIDORES_FILE.exists():
+        return
+    vocab = set(ws.tema_vocab())
+    if not vocab:
+        return
+    for n in _load_investidores().get("investidores", []):
+        drift = set(n.get("tese_themes", [])) - vocab
+        assert not drift, \
+            f"Investidor {n['id']}: tese_themes fora do vocab §5.9 (quebra a ponte): {drift}"
 
 
 # -----------------------------------------------------------------------------
