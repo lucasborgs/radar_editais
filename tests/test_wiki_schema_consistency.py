@@ -263,6 +263,18 @@ def test_investidor_tese_themes_in_canonical_vocab():
             f"Investidor {n['id']}: tese_themes fora do vocab §5.9 (quebra a ponte): {drift}"
 
 
+def test_investidor_generalista_has_no_themes():
+    """Regra do generalista (investidor_schema): generalista=true investe em
+    qualquer setor → tese_themes DEVE ser [] (o match usa estágio, não tema).
+    Tema num generalista casaria com tudo = ruído."""
+    if not INVESTIDORES_FILE.exists():
+        return
+    for n in _load_investidores().get("investidores", []):
+        if n.get("generalista"):
+            assert not n.get("tese_themes"), \
+                f"Investidor {n['id']}: generalista com tese_themes={n['tese_themes']} (deve ser [])"
+
+
 # -----------------------------------------------------------------------------
 # PROMPT
 # -----------------------------------------------------------------------------
