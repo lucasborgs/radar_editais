@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "./constants";
 import { createSupabaseClient } from "./supabase";
 import type { EditalEntry, EditalCard, KGMatchResult, DashboardStats } from "@/types/edital";
+import type { InvestorMatch } from "@/types/investidor";
 import type { CompanyProfile } from "@/types/profile";
 import type {
   WritingStartResponse,
@@ -188,6 +189,13 @@ export const kgExplore = (
 
 export const getMatches = (profile: CompanyProfile, topK: number = 10) =>
   apiFetch<{ matches: KGMatchResult[] }>("/match", {
+    method: "POST",
+    body: JSON.stringify({ profile, top_k: topK }),
+  });
+
+// Investidores (Q3) — entidade, sem gate, dois modos (tese vs estágio).
+export const getInvestorMatches = (profile: CompanyProfile, topK: number = 6) =>
+  apiFetch<{ matches: InvestorMatch[] }>("/match/investidores", {
     method: "POST",
     body: JSON.stringify({ profile, top_k: topK }),
   });
