@@ -39,6 +39,11 @@ const PROFILE_FIELD_LABELS: Record<keyof CompanyProfile, string> = {
   trl: "TRL",
   equipe_resumo: "Equipe",
   tipos_financiamento_interesse: "Financiamento de interesse",
+  estagio: "Estágio de investimento",
+  mrr_arr: "MRR/ARR",
+  round_alvo_brl: "Round alvo de captação",
+  cap_table_resumo: "Cap table",
+  tracao_resumo: "Tração",
 };
 
 // Renderiza um valor de campo do perfil em texto legível (lida com listas/null).
