@@ -178,7 +178,8 @@ def _to_hit(a: dict) -> SearchHit:
     snippet = a["ementa"] or a["texto"][:300]
     org = (a["artCategory"].split("/")[0] or "").strip()
     return SearchHit(title=a["identifica"] or "(sem título)", url=url,
-                     snippet=snippet, content=a["texto"], agency=org)
+                     snippet=snippet, content=a["texto"], agency=org,
+                     full_text=True)
 
 
 # =============================================================================
