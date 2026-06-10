@@ -83,3 +83,45 @@ def test_run_critic_injects_siblings_into_prompt(monkeypatch):
     assert "3 pesquisadores" in user_msg  # conteúdo da seção irmã entrou no prompt
     assert res.approved is False
     assert res.issues
+
+
+def test_run_critic_pitch_uses_fund_node_not_edital_chunks(monkeypatch):
+    """No mode=pitch, o critic cruza contra o nó do fundo (context-stuffing) e
+    NÃO chama retrieve_chunks (edital_chunks). Substrato e prompt mudam."""
+    captured = {}
+
+    def fake_create(**kw):
+        captured["messages"] = kw["messages"]
+        content = '{"approved": false, "issues": ["O pitch diz que o fundo investe em série B, mas o estágio alvo é seed"], "feedback": "contradiz o fundo"}'
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+        )
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+    )
+    monkeypatch.setattr("core.llm_client.make_client", lambda **kw: fake_client)
+
+    # Se o critic tentar retrieve_chunks no pitch, o teste falha (não deve tocar edital_chunks).
+    def _boom(*a, **k):
+        raise AssertionError("retrieve_chunks não deve ser chamado no mode=pitch")
+    monkeypatch.setattr("core.retriever.retrieve_chunks", _boom)
+
+    s = _StubSession(["1. Time", "2. Fit com a tese do fundo"], {})
+    s.mode = "pitch"
+    s._pitch_target_context = (
+        "FUNDO-ALVO: KPTL\nTese: deep-tech early-stage.\nEstágio alvo: seed"
+    )
+
+    res = run_critic(
+        "Seu fundo investe em série B, e é por isso que encaixamos.",
+        "2. Fit com a tese do fundo",
+        s,
+    )
+
+    system_msg = captured["messages"][0]["content"]
+    user_msg = captured["messages"][1]["content"]
+    assert "pitches de captação" in system_msg          # prompt de pitch, não de edital
+    assert "DADOS DO FUNDO-ALVO" in user_msg
+    assert "Estágio alvo: seed" in user_msg             # nó do fundo entrou no prompt
+    assert res.approved is False

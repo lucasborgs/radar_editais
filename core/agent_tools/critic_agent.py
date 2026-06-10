@@ -85,6 +85,57 @@ Responda com JSON:
 }}
 Se o rascunho não afirma nada falso nem contraditório: approved=true, issues=[]."""
 
+# ── Critic do gênero PITCH (mode=pitch, alvo = fundo investidor) ──
+# Mesma máquina (só-contradição, nunca-omissão), mas o substrato da checagem (a)
+# é o NÓ DO FUNDO-ALVO, não trechos de edital. Checagens (b)/(c) (coerência entre
+# seções + consistência interna) são idênticas — gênero-agnósticas.
+_PITCH_CRITIC_SYSTEM = """Você é um revisor de fatos de pitches de captação (venture capital) para startups deep-tech.
+Sua única função é IMPEDIR que um rascunho seja salvo quando ele AFIRMA algo FALSO —
+isto é, quando o texto CONTRADIZ os dados do fundo-alvo, CONTRADIZ outra seção já redigida
+do pitch, ou contém inconsistência factual interna.
+
+Você NÃO avalia completude, abrangência, persuasão, estilo ou se a seção cobre todos os
+tópicos desejáveis. A ausência de uma informação NUNCA é motivo para bloquear: só o que
+está ESCRITO e está ERRADO conta.
+
+Bloqueie (approved=false) SOMENTE quando o rascunho AFIRMAR:
+  (a) algo sobre o FUNDO-ALVO que contradiz seus dados (tese, temas, setores, estágio alvo,
+      ticket, lead/follow) — ex.: dizer que o fundo investe em série B quando o estágio é seed,
+  (b) um fato que contradiz OUTRA seção já redigida do pitch (ex.: TAM, tração, tamanho do
+      time, ask/round divergente do que já foi escrito), ou
+  (c) algo internamente inconsistente que torne o pitch incorreto.
+
+Você NÃO valida fatos externos (não sabe o MRR/tração real da startup) — só contradições
+contra o que está no contexto. Na dúvida, aprove.
+Sempre responda com JSON válido."""
+
+_PITCH_CRITIC_USER = """DADOS DO FUNDO-ALVO:
+{fundo_context}
+
+OUTRAS SEÇÕES JÁ REDIGIDAS DO PITCH:
+{proposal_context}
+
+SEÇÃO SENDO SALVA: {section_title}
+RASCUNHO:
+{draft}
+
+Confira se o RASCUNHO afirma algo FALSO, usando SOMENTE os dados do fundo e as outras seções acima:
+1. Alguma afirmação sobre o FUNDO-ALVO contradiz seus dados (tese, setores, estágio, ticket, lead/follow)?
+2. Alguma afirmação contradiz uma OUTRA seção já redigida acima (TAM, tração, time, ask divergentes)?
+3. Há inconsistência factual interna que torne o pitch incorreto?
+
+NÃO reporte omissões, falta de detalhe ou tópicos ausentes — apenas afirmações erradas
+ou contraditórias. NÃO bloqueie por não conseguir verificar tração/números externos.
+`issues` deve conter SOMENTE o que justifique NÃO salvar.
+
+Responda com JSON:
+{{
+  "approved": true ou false,
+  "issues": ["descrição objetiva de cada afirmação FALSA/contraditória (indique se o conflito é com o fundo ou com outra seção)"],
+  "feedback": "diagnóstico geral em 1 frase"
+}}
+Se o rascunho não afirma nada falso nem contraditório: approved=true, issues=[]."""
+
 # Orçamento de chars para o contexto das outras seções no prompt do critic.
 # read_full_proposal pode ser grande; truncamos para não estourar tokens.
 _PROPOSAL_CTX_BUDGET = 6000
@@ -131,7 +182,11 @@ class CriticResult:
 
 
 def run_critic(draft: str, section_title: str, session) -> CriticResult:
-    """Revisão 1-shot de um rascunho de seção contra o edital.
+    """Revisão 1-shot de um rascunho de seção contra o substrato do gênero.
+
+    `session.mode` decide o substrato da checagem de contradição: edital (chunks
+    de `edital_chunks`) no gênero proposta, ou o nó do fundo-alvo (`pitch`). A
+    coerência entre seções e a consistência interna valem nos dois.
 
     Args:
         draft: conteúdo markdown do rascunho a revisar
@@ -139,25 +194,67 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         session: instância de WritingSession (para acesso a db + scope_edital_ids)
     """
     from core.llm_client import make_client
-    from core.retriever import format_chunks_for_prompt, retrieve_chunks
 
-    # Recupera trechos do edital relevantes para o conteúdo do rascunho.
-    # Usa os primeiros 500 chars como query — suficiente para capturar tema.
-    try:
-        chunks = retrieve_chunks(
-            session._db,
-            session._scope_edital_ids,
-            query=draft[:500],
-            k=5,
+    # Coerência entre seções (checagens b/c) — idêntica nos dois gêneros.
+    proposal_context = _build_proposal_context(session, section_title)
+    mode = getattr(session, "mode", "proposal")
+
+    if mode == "pitch":
+        # Substrato da checagem (a) = NÓ DO FUNDO-ALVO (context-stuffing já carregado),
+        # não edital_chunks. Sem retrieve_chunks e sem bloco temporal (fundo não tem
+        # deadline). Spec §3.5.
+        fundo_context = getattr(session, "_pitch_target_context", "") or (
+            "Nenhum dado do fundo-alvo disponível para verificação."
         )
-        edital_context = (
-            format_chunks_for_prompt(chunks, edital_ids=session._scope_edital_ids)
-            if chunks
-            else "Nenhum trecho do edital disponível para verificação desta seção."
+        system_prompt = _PITCH_CRITIC_SYSTEM
+        user_msg = _PITCH_CRITIC_USER.format(
+            fundo_context=fundo_context,
+            proposal_context=proposal_context,
+            section_title=section_title,
+            draft=draft[:3000],
         )
-    except Exception as e:
-        logger.warning("critic [%s]: retrieve_chunks falhou: %s", session.session_id, e)
-        edital_context = "Nenhum trecho do edital disponível para verificação."
+    else:
+        from core.retriever import format_chunks_for_prompt, retrieve_chunks
+
+        # Recupera trechos do edital relevantes para o conteúdo do rascunho.
+        # Usa os primeiros 500 chars como query — suficiente para capturar tema.
+        try:
+            chunks = retrieve_chunks(
+                session._db,
+                session._scope_edital_ids,
+                query=draft[:500],
+                k=5,
+            )
+            edital_context = (
+                format_chunks_for_prompt(chunks, edital_ids=session._scope_edital_ids)
+                if chunks
+                else "Nenhum trecho do edital disponível para verificação desta seção."
+            )
+        except Exception as e:
+            logger.warning("critic [%s]: retrieve_chunks falhou: %s", session.session_id, e)
+            edital_context = "Nenhum trecho do edital disponível para verificação."
+
+        # Contexto temporal (Front 3): permite ao critic pegar prazos afirmados no
+        # rascunho que divergem do deadline real. Falha graciosa: bloco vazio.
+        try:
+            from core.temporal import render_temporal_block
+            primary_edital = (
+                getattr(session, "_scope_edital_ids", None) or [getattr(session, "edital_id", "")]
+            )[0]
+            temporal_block = render_temporal_block(primary_edital)
+            temporal_block = f"{temporal_block}\n\n" if temporal_block else ""
+        except Exception as e:
+            logger.debug("critic [%s]: temporal block indisponível: %s", session.session_id, e)
+            temporal_block = ""
+
+        system_prompt = _CRITIC_SYSTEM
+        user_msg = _CRITIC_USER.format(
+            temporal_block=temporal_block,
+            edital_context=edital_context,
+            proposal_context=proposal_context,
+            section_title=section_title,
+            draft=draft[:3000],
+        )
 
     client = make_client(api_key=os.environ["OPENAI_API_KEY"])
     # O critic é um fact-checker de precisão crítica: ele decide se um rascunho
@@ -171,34 +268,11 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         or "gpt-4o"
     )
 
-    proposal_context = _build_proposal_context(session, section_title)
-
-    # Contexto temporal (Front 3): permite ao critic pegar prazos afirmados no
-    # rascunho que divergem do deadline real. Falha graciosa: bloco vazio.
-    try:
-        from core.temporal import render_temporal_block
-        primary_edital = (
-            getattr(session, "_scope_edital_ids", None) or [getattr(session, "edital_id", "")]
-        )[0]
-        temporal_block = render_temporal_block(primary_edital)
-        temporal_block = f"{temporal_block}\n\n" if temporal_block else ""
-    except Exception as e:
-        logger.debug("critic [%s]: temporal block indisponível: %s", session.session_id, e)
-        temporal_block = ""
-
-    user_msg = _CRITIC_USER.format(
-        temporal_block=temporal_block,
-        edital_context=edital_context,
-        proposal_context=proposal_context,
-        section_title=section_title,
-        draft=draft[:3000],
-    )
-
     try:
         response = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": _CRITIC_SYSTEM},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_msg},
             ],
             temperature=0.1,
