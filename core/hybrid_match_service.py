@@ -750,11 +750,16 @@ class HybridMatchService:
                 continue
             card = self._load_wiki_page(entry["id"])
             if card:
-                # opportunity_type é inherited (vem do scrape/Descoberta → entry do
-                # índice); a wiki page sintetizada NÃO o carrega. Threadamos da entry
-                # via spread em dict NOVO — load_wiki_page devolve objeto de blob
-                # cacheado (modo postgres), mutar in-place corromperia o cache.
-                result.append({**card, "opportunity_type": entry.get("opportunity_type", "edital")})
+                # opportunity_type e verificacao são inherited (vêm do scrape/
+                # Descoberta → entry do índice); a wiki page sintetizada NÃO os
+                # carrega. Threadamos da entry via spread em dict NOVO —
+                # load_wiki_page devolve objeto de blob cacheado (modo postgres),
+                # mutar in-place corromperia o cache.
+                result.append({
+                    **card,
+                    "opportunity_type": entry.get("opportunity_type", "edital"),
+                    "verificacao": entry.get("verificacao", "verificado"),
+                })
             else:
                 result.append(entry)
         if skipped_expired:
@@ -851,6 +856,9 @@ class HybridMatchService:
                 "id": r.edital_id,
                 "title": r.card.get("title", ""),
                 "opportunity_type": r.card.get("opportunity_type", "edital"),
+                # provisorio = item da Descoberta ainda sem verificação humana —
+                # o frontend rotula (badge), não filtra (decisão Fase 1).
+                "verificacao": r.card.get("verificacao", "verificado"),
                 "status": r.card.get("status", ""),
                 "deadline": r.card.get("deadline", ""),
                 "score": min(score_final, 10.0),
