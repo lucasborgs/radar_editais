@@ -531,6 +531,44 @@
 - **Onde:** `pipeline/adapters/`, `build_knowledge_graph.py` (`_NORMALIZERS`),
   `pipeline/etl_process.py` (síntese). **Status:** aberto (design nomeado, não construído).
 
+### Multi-quadrante — follow-ups (pós-sessão 2026-06-10)
+
+Contexto: sessão fechou Fase B surfacing, `mode=pitch` (investidor), critic
+pitch-aware, suítes de eval (investor_match + opportunity_type + gate de extração)
+e o radar unificado L2. Spec em `docs/spec_multi_quadrante.md` (+ `_schema`).
+Memória: `project_multi_quadrante`. Os itens abaixo são o que ficou conscientemente
+de fora — nenhum bloqueia o que foi entregue.
+
+- **Frontend do radar unificado (L2).** Backend pronto (`POST /match/radar`,
+  `core/radar_service.py`), mas a página de matching ainda mostra 2 seções
+  separadas (MatchCard + InvestorCard). Falta a view de UM ranking com badge de
+  quadrante + sinal `why_now`. **Onde:** `frontend/src/app/matching/page.tsx`.
+- **Botão "escrever pitch" no card de investidor (Q3).** O endpoint
+  `/writing/start` já aceita id `investidor:` (mode=pitch), mas não há gancho de
+  UI a partir do InvestorCard. **Onde:** `frontend/src/app/matching/page.tsx`.
+- **Normalização de scores heterogêneos no radar (afinar L2).** Débito exposto no
+  smoke: o scorer LLM de investidor é mais generoso (~8-9.5) que o blended do
+  HybridMatch (~4-5) → investidores dominam o topo. O cap por quadrante evita
+  inundação, mas a ORDENAÇÃO ainda favorece entidades. Refinamento nº1 da fase
+  dedicada de match (spec §3.8 autoriza L2 ingênua agora). **Onde:**
+  `core/radar_service.merge_radar`.
+- **Match tipo-aware de desafio/programa — BLOQUEADO-POR-DADOS.** O HybridMatch
+  já não QUEBRA com desafio/programa (dims de edital ausentes degradam para
+  neutro, não eliminam), mas não usa sinais próprios (`empresa_ancora`,
+  `poc_scope`, dims/pesos por `kind_class`). E o eval de MATCH desse tipo não tem
+  casos: **não há desafio/programa no índice** porque a torneira web está inerte e
+  FINEP/FAPESP só emitem `edital`. **Destrava:** ligar a Descoberta web OU o feeder
+  DOU → dado entra no índice → curar golden (perfis→desafios esperados, provável
+  reuso da suíte `matching` filtrando por `opportunity_type`) + afinar scoring.
+- **Critic de pitch mais rico.** Hoje o critic pitch-aware cruza contra o nó do
+  fundo (contradição de tese/estágio) + coerência entre seções, mas não valida
+  fatos externos (não conhece tração real). Insumo futuro: perfil/biblioteca para
+  checar coerência de tração/números. **Onde:** `core/agent_tools/critic_agent.py`.
+- **Ligar a torneira web em prod (sair do "inerte").** Não é código — são 3 chaves
+  de ops: worker procrastinate ativo + `TAVILY_API_KEY` + chave LLM no Railway. O
+  cron diário (`discover_opportunities_task`, 04:00 UTC) liga sozinho. Pré-requisito
+  do fix de `titulo` vazio (item acima) antes de `write=True` em prod.
+
 ---
 
 ## Débitos conhecidos (menores)
