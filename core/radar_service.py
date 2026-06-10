@@ -25,8 +25,17 @@ logger = logging.getLogger(__name__)
 # k=60 é a convenção (amortece o peso desproporcional das 1ªs posições). É a
 # normalização "simples e assertiva" do MVP — robusta a outlier, sem calibração,
 # sem número mágico. Magnitude crua fica no payload p/ display. Refino futuro
-# (pesos por quadrante, floor de qualidade) no BACKLOG.
+# (pesos por quadrante) no BACKLOG.
 _RRF_K = 60
+
+# Floor de qualidade (tier "fraco"): RRF funde por rank, então o rank-1 de uma
+# lista fraca boiaria no topo. Rebaixamos (NÃO eliminamos — entidade nunca some,
+# spec §3.8) os matches fracos pra um segundo tier. Sinais por fonte:
+#   • evento: reusa o flag `eligible` do HybridMatch (Stage 1 já tem gate) — sem
+#     número novo. eligible=False = aproximado = fraco.
+#   • entidade: não tem gate → floor de score. O scorer LLM ancora alto (fits bons
+#     ~8-9.5); abaixo de _ENTITY_FLOOR = "morno". É o único knob — calibrar com dado.
+_ENTITY_FLOOR = 6.0
 
 
 def _why_now_event(edital_id: str) -> str:
@@ -100,25 +109,46 @@ def _rank_within_source(items: list[dict]) -> None:
         it["rrf"] = 1.0 / (_RRF_K + rank)
 
 
+def _is_weak(item: dict, entity_floor: float) -> bool:
+    """Match fraco (tier inferior): evento aproximado (eligible=False, gate do
+    HybridMatch) ou entidade abaixo do floor de score. Nunca remove — só rebaixa."""
+    if item["kind_class"] == "evento":
+        return item["payload"].get("eligible") is False
+    return item["score"] < entity_floor
+
+
 def merge_radar(
     events: list[dict],
     entities: list[dict],
     *,
     top_k: int = 10,
     per_type_cap: int | None = None,
+    entity_floor: float = _ENTITY_FLOOR,
 ) -> dict:
-    """Funde listas heterogêneas num ranking único via RRF. PURO (sem I/O além do
-    `why_now` de evento, que degrada gracioso). Rankeia cada fonte, ordena pelo
-    score RRF (desempate: score cru desc, p/ determinismo), aplica o cap por
-    quadrante e trunca em top_k."""
+    """Funde listas heterogêneas num ranking único via RRF + floor de qualidade.
+    PURO (sem I/O além do `why_now` de evento, que degrada gracioso).
+
+    Rankeia cada fonte (RRF), parte em dois tiers (forte/fraco — fracos rebaixados,
+    não removidos), ordena cada tier por RRF (desempate: score cru desc), concatena
+    fortes→fracos, aplica o cap por quadrante e trunca em top_k. Cada item ganha
+    `tier ∈ {forte, fraco}` para o display.
+    """
     evs = [_event_item(m) for m in (events or [])]
     ents = [_entity_item(m) for m in (entities or [])]
     _rank_within_source(evs)        # eventos rankeados entre si
     _rank_within_source(ents)       # entidades rankeadas entre si
 
-    items = evs + ents
-    items.sort(key=lambda x: (x["rrf"], x["score"]), reverse=True)
-    items = _apply_cap(items, per_type_cap)[:top_k]
+    strong: list[dict] = []
+    weak: list[dict] = []
+    for it in evs + ents:
+        weak_flag = _is_weak(it, entity_floor)
+        it["tier"] = "fraco" if weak_flag else "forte"
+        (weak if weak_flag else strong).append(it)
+
+    sort_key = lambda x: (x["rrf"], x["score"])  # noqa: E731
+    strong.sort(key=sort_key, reverse=True)
+    weak.sort(key=sort_key, reverse=True)
+    items = _apply_cap(strong + weak, per_type_cap)[:top_k]
 
     counts: dict[str, int] = {}
     for it in items:
@@ -131,6 +161,7 @@ def build_radar(
     *,
     top_k: int = 10,
     per_type_cap: int | None = None,
+    entity_floor: float = _ENTITY_FLOOR,
     workspace_id: str | None = None,
 ) -> dict:
     """Orquestra os 2 matchers reais e funde. Cada matcher degrada para [] em
@@ -150,7 +181,9 @@ def build_radar(
         logger.warning("radar: match de entidades falhou: %s", e)
         entities = []
 
-    return merge_radar(events, entities, top_k=top_k, per_type_cap=per_type_cap)
+    return merge_radar(
+        events, entities, top_k=top_k, per_type_cap=per_type_cap, entity_floor=entity_floor,
+    )
 
 
 __all__ = ["build_radar", "merge_radar"]
