@@ -11,8 +11,8 @@ from pydantic import BaseModel
 from backend.library_routes import MAX_UPLOAD_MB
 from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient
-from core.content_library import extract_document_text, get_item, get_workspace_id
 from core.profile_extractor import ExtractResult, ProfileExtractor
+from core.services.content_library import extract_document_text, get_item, get_workspace_id
 
 router = APIRouter(tags=["profile"])
 

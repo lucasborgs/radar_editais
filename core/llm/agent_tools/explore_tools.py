@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 from core.llm.agent_runtime import Tool, tool
 
 if TYPE_CHECKING:
-    from core.kg_match_service import KGMatchService
+    from core.services.kg_match_service import KGMatchService
 
 logger = logging.getLogger(__name__)
 

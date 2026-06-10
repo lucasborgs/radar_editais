@@ -31,7 +31,7 @@ from core.retrieval.retriever import (
 )
 
 if TYPE_CHECKING:
-    from core.writing_session import WritingSession
+    from core.services.writing_session import WritingSession
 
 logger = logging.getLogger(__name__)
 

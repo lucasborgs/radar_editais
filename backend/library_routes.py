@@ -6,7 +6,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from core.auth import CurrentUserId, DbClient
-from core.content_library import (
+from core.services.content_library import (
     CONTENT_TYPES,
     SUPPORTED_UPLOAD_EXTS,
     archive_item,

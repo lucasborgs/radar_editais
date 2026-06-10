@@ -47,7 +47,7 @@ _TEXTO_CRU_CAP = 60_000
 
 
 # =============================================================================
-# LLM client (triagem barata / extração capaz) — padrão de core.content_library
+# LLM client (triagem barata / extração capaz) — padrão de core.services.content_library
 # =============================================================================
 
 def _make_client(role: str):

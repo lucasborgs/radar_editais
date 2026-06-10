@@ -33,11 +33,11 @@ import os  # noqa: E402
 
 from procrastinate import App, PsycopgConnector  # noqa: E402
 
-from core.content_library import enrich_content  # noqa: E402
 from core.db import get_supabase_service  # noqa: E402
 from core.logging_config import setup_logging  # noqa: E402
 from core.retrieval.chunker import chunk_from_blocks  # noqa: E402
 from core.retrieval.embedder import embed_texts  # noqa: E402
+from core.services.content_library import enrich_content  # noqa: E402
 from core.structurer import build_or_load_structured_doc  # noqa: E402
 from pipeline.adapters.base import get_adapter  # noqa: E402
 

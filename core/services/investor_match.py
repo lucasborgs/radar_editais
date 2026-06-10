@@ -52,7 +52,7 @@ Retorne os {top_k} investidores mais aderentes no formato JSON especificado. sco
 
 def _make_client():
     """(client, model) conforme LLM_BACKEND. Levanta se sem credencial — o caller
-    captura e degrada. Mesmo padrão de core.kg_match_service."""
+    captura e degrada. Mesmo padrão de core.services.kg_match_service."""
     from core.llm.llm_client import make_client
     backend = os.getenv("LLM_BACKEND", "openai").lower()
     if backend == "gemini":

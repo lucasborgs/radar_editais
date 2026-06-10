@@ -174,7 +174,7 @@ def map_areas_to_themes(areas: list[str], canonical: list[str]) -> dict[str, str
 
 
 def _make_client():
-    """(client, model) seguindo o padrão de core.content_library. (None, None)
+    """(client, model) seguindo o padrão de core.services.content_library. (None, None)
     se não houver credencial — o build degrada para themes vazios."""
     from core.llm.llm_client import make_client
     backend = os.getenv("LLM_BACKEND", "openai").lower()

@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from core.content_library import get_item
-from core.hybrid_match_service import HybridMatchService
-from core.kg_match_service import KGMatchService
+from core.services.content_library import get_item
+from core.services.hybrid_match_service import HybridMatchService
+from core.services.kg_match_service import KGMatchService
 from domain.user_profile import CompanyProfile as PyCompanyProfile
 
 # =============================================================================

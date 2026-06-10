@@ -21,8 +21,8 @@ import logging
 import os
 import re
 
-from core.hybrid_match_service import get_weights, score_stage1
 from core.kg import kg_store
+from core.services.hybrid_match_service import get_weights, score_stage1
 from domain.user_profile import CompanyProfile
 from supabase import Client
 

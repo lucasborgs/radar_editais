@@ -18,13 +18,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from core.hybrid_match_service import (  # noqa: E402
+from core.kg.wiki_schema import MATCH_FIELDS as _MATCH_FIELDS  # noqa: E402
+from core.kg.wiki_schema import promote_match_fields as _promote_match_fields  # noqa: E402
+from core.services.hybrid_match_service import (  # noqa: E402
     _score_contrapartida,
     _score_mecanismo,
     _score_trl,
 )
-from core.kg.wiki_schema import MATCH_FIELDS as _MATCH_FIELDS  # noqa: E402
-from core.kg.wiki_schema import promote_match_fields as _promote_match_fields  # noqa: E402
 from domain.user_profile import CompanyProfile  # noqa: E402
 
 W = {"trl": 20, "mecanismo": 15, "contrapartida": 10}

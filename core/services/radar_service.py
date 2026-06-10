@@ -170,7 +170,7 @@ def build_radar(
     """Orquestra os 2 matchers reais e funde. Cada matcher degrada para [] em
     falha (sem LLM/índice/diretório) — o radar nunca levanta por isso."""
     try:
-        from core.hybrid_match_service import HybridMatchService
+        from core.services.hybrid_match_service import HybridMatchService
         events = HybridMatchService().match(
             profile=profile, top_k=top_k, workspace_id=workspace_id,
         ) or []
@@ -178,7 +178,7 @@ def build_radar(
         logger.warning("radar: match de eventos falhou: %s", e)
         events = []
     try:
-        from core.investor_match import match_investidores
+        from core.services.investor_match import match_investidores
         entities = match_investidores(profile, top_k=top_k) or []
     except Exception as e:
         logger.warning("radar: match de entidades falhou: %s", e)

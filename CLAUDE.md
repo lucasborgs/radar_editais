@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Schema autoritativo
 
-Regras de criação de wiki pages, nós/links do grafo, vocabulários, workflows de ingestão e manutenção vivem em [WIKI.md](WIKI.md) (global) e [wikis/](wikis/)`<fonte>.md` (por fonte). O código lê o schema via [core/wiki_schema.py](core/wiki_schema.py). **Mudanças em regras → edite os docs, não o código.** O validador [tests/test_wiki_schema_consistency.py](tests/test_wiki_schema_consistency.py) garante que doc e código não divergem.
+Regras de criação de wiki pages, nós/links do grafo, vocabulários, workflows de ingestão e manutenção vivem em [WIKI.md](WIKI.md) (global) e [wikis/](wikis/)`<fonte>.md` (por fonte). O código lê o schema via [core/kg/wiki_schema.py](core/kg/wiki_schema.py). **Mudanças em regras → edite os docs, não o código.** O validador [tests/test_wiki_schema_consistency.py](tests/test_wiki_schema_consistency.py) garante que doc e código não divergem.
 
 ## Project Overview
 
@@ -71,8 +71,8 @@ Bronze (raw FINEP JSON via Liferay API)
 
 Edital chunks (para RAG na WritingSession, ADR M9):
   → procrastinate task `chunk_edital` (core/tasks.py)
-  → core/chunker.py    chunking estrutural por Art./§
-  → core/embedder.py   OpenAI text-embedding-3-large
+  → core/retrieval/chunker.py    chunking estrutural por Art./§
+  → core/retrieval/embedder.py   OpenAI text-embedding-3-large
   → tabela edital_chunks (pgvector + tsvector)
 ```
 Paths em `config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR).
@@ -83,10 +83,12 @@ backend/       api.py (shell: app + middleware + wiring) + routers/ por domínio
                (catalog, graph, matching, applications, brief, writing, files,
                profile) + auth_routes/library_routes + common.py (singletons +
                schema de perfil) + rate_limit.py (limiter)
-core/          db (Supabase clients), auth (JWT/DbClient), writing_session,
-               hybrid_match_service, kg_match_service, content_library,
-               checklist_service, profile_extractor, wiki_schema,
-               chunker, embedder, retriever, tasks (procrastinate)
+core/          services/ (writing_session, hybrid/kg/investor/radar match,
+               checklist, content_library), kg/ (kg_store, wiki_schema,
+               edital_id, temporal), retrieval/ (chunker, embedder, retriever),
+               llm/ (llm_client, agent_runtime, agent_tools/), eval/ (harness);
+               flat: db, auth, tasks (procrastinate), profile_extractor,
+               opportunity_discovery, dou_feeder, web_search, demais serviços
 domain/        CompanyProfile dataclass (user_profile.py)
 pipeline/      ETL FINEP (extractors/, etl_process, build_knowledge_graph, health_check)
 scripts/       CLI: run_all, reindex_edital, dev, deploy
@@ -94,11 +96,11 @@ supabase/      migrations/*.sql + config.toml (local CLI)
 ```
 
 ### Core services
-- **HybridMatchService** (`core/hybrid_match_service.py`) — scoring determinístico Pandas-based + Stage 2 LLM. Lê pesos de `matching_weights` com cache TTL 60s (ADR A5).
-- **KGMatchService** (`core/kg_match_service.py`) — LLM raciocina sobre o knowledge graph (index.json + wiki pages). Sem embeddings.
-- **WritingSession** (`core/writing_session.py`) — DB-backed (writing_sessions + session_turns). RAG via `retrieve_chunks` substitui context stuffing. Resolve @ mentions de library_items.
-- **ChecklistService** (`core/checklist_service.py`) — 3 passes paralelos via asyncio.gather: compliance + qualidade + completude (ADR C4).
-- **ContentLibrary** (`core/content_library.py`) — CRUD de items + enrich_content via LLM (summary, key_facts, themes, importance_score 1-10). Soft-delete via archived_at.
+- **HybridMatchService** (`core/services/hybrid_match_service.py`) — scoring determinístico Pandas-based + Stage 2 LLM. Lê pesos de `matching_weights` com cache TTL 60s (ADR A5).
+- **KGMatchService** (`core/services/kg_match_service.py`) — LLM raciocina sobre o knowledge graph (index.json + wiki pages). Sem embeddings.
+- **WritingSession** (`core/services/writing_session.py`) — DB-backed (writing_sessions + session_turns). RAG via `retrieve_chunks` substitui context stuffing. Resolve @ mentions de library_items.
+- **ChecklistService** (`core/services/checklist_service.py`) — 3 passes paralelos via asyncio.gather: compliance + qualidade + completude (ADR C4).
+- **ContentLibrary** (`core/services/content_library.py`) — CRUD de items + enrich_content via LLM (summary, key_facts, themes, importance_score 1-10). Soft-delete via archived_at.
 
 ### Background jobs (procrastinate, ADR M8)
 - `enrich_content_task` — enriquecimento LLM async ao upload de item da library
@@ -121,11 +123,8 @@ Next.js 14 + TypeScript + TailwindCSS + Radix UI. API client at `frontend/src/li
 
 ## Key Gotchas
 
-### Parquet + list columns → ndarray
-Columns storing Python lists (e.g., `themes`, `keywords`) deserialize from Parquet as `numpy.ndarray`. Always use `_safe_list(val)` when reading them in `core/matching_engine.py` and `core/search_engine.py`.
-
 ### Imports
-The package is installed via `pip install -e .`. All imports are absolute (`from core.matching_engine import MatchingEngine`). Never add `sys.path` hacks.
+The package is installed via `pip install -e .`. All imports are absolute (`from core.services.hybrid_match_service import HybridMatchService`). Never add `sys.path` hacks.
 
 ### LLM enrichment cache
 `.enrichment_cache.json` at root prevents re-calling LLM on unchanged editais. Delete to force re-enrichment.

@@ -6,7 +6,7 @@ The model is hardcoded; callers do NOT choose. If the project ever migrates
 to a different embedding model, the dimension in migration 004 must be
 updated in lockstep.
 
-Pattern mirrors core.content_library._make_client() but uses the embeddings
+Pattern mirrors core.services.content_library._make_client() but uses the embeddings
 endpoint instead of chat. We intentionally replicate the client construction
 rather than import from content_library to avoid creating a coupling between
 two unrelated subsystems.
@@ -26,7 +26,7 @@ _BATCH_LIMIT = 2048  # OpenAI per-call input limit
 def _make_openai_client():
     """Return an OpenAI client authenticated for embeddings.
 
-    Replicates the pattern from core.content_library._make_client but does NOT
+    Replicates the pattern from core.services.content_library._make_client but does NOT
     consider LLM_BACKEND — embeddings are always OpenAI by policy (A1).
     """
     from core.llm.llm_client import make_client

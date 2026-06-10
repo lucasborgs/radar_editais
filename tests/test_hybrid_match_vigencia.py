@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from unittest.mock import patch
 
-from core.hybrid_match_service import HybridMatchService
+from core.services.hybrid_match_service import HybridMatchService
 
 
 def _svc_with_index(editais: list[dict]) -> HybridMatchService:

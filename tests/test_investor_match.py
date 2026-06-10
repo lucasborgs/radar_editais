@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 
-from core import investor_match
+from core.services import investor_match
 from domain.user_profile import CompanyProfile
 
 
