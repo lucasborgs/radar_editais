@@ -322,6 +322,11 @@ def _page_text(hit: websearch.SearchHit) -> str:
 
 
 if __name__ == "__main__":
+    # CLI do shadow-run (spec_dou_feeder §9): fora do backend/worker, ninguém
+    # carregou o .env ainda — sem isto as chaves não chegam e tudo degrada
+    # silenciosamente pra no-op.
+    from dotenv import load_dotenv
+    load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     out = discover_opportunities()
     print(f"\nDescoberta: {len(out)} oportunidades provisórias extraídas.")
