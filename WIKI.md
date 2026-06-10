@@ -284,6 +284,30 @@ Invariante (test_wiki_schema_consistency): todo tema usado por editais ou ICTs
 deve estar nesta lista. Tema novo no corpus sem entrada aqui = quebra o
 validador → decida (adicionar ao vocab ou corrigir o produtor).
 
+### 5.9.1 Vocabulários do multi-quadrante
+
+`setor` (vertical de indústria) é DISTINTO de `tema` (domínio tecnológico) — para
+deep-tech costumam coexistir (tema=`saúde e ciências da vida`, setor=`saude`).
+`estagio`/`modelo` servem o quadrante investidor/programa (spec_multi_quadrante).
+
+```yaml
+setor_vocab:
+  - oleo-gas
+  - energia
+  - saude
+  - agro
+  - defesa
+  - industria
+  - financeiro
+  - mobilidade
+  - meio-ambiente
+  - espacial
+  - ti-software
+  - multissetorial
+estagio_vocab: [pre-seed, seed, serie-a, growth]
+modelo_vocab: [equity, no-equity]
+```
+
 ### 5.10 Exigência de parceria com ICT (`requires_ict_partner`)
 
 Campo booleano **derivado** na entry do edital (`index.json`), indicando se o
@@ -364,6 +388,14 @@ node_types:
     folder: editais
     tags: [finep, edital, "<status_tag>", "mecanismo/<mechanism>", "tema/<slug>", "subprograma/<slug>", "trl/<faixa>", "ano/<pub_year>"]
     emoji: "<status_emoji>"
+  desafio:            # Q2 — open innovation / obrigação regulatória (evento, mesmo pipeline do edital)
+    folder: desafios
+    tags: [desafio, "<status_tag>", "tema/<slug>", "setor/<slug>", "ancora/<slug>", "trl/<faixa>", "ano/<pub_year>"]
+    emoji: "🎯"
+  programa:           # Q4 — aceleração / incubação (evento, batch/cohort)
+    folder: programas
+    tags: [programa, "<status_tag>", "tema/<slug>", "setor/<slug>", "modelo/<equity|no-equity>", "ano/<pub_year>"]
+    emoji: "🚀"
   tema:
     folder: temas
     tags: [finep, tema]
@@ -384,6 +416,10 @@ node_types:
     folder: icts
     tags: [ict, "kind/<kind>", "tema/<slug>"]
     emoji: "🔬"
+  investidor:
+    folder: investidores
+    tags: [investidor, "estagio/<slug>", "tese/<slug>", "setor/<slug>"]
+    emoji: "💸"
   home:
     folder: ""
     tags: [finep, home]
@@ -438,6 +474,32 @@ ict_schema:
     - "themes_proposed: áreas que não casaram com nenhum tema de edital — candidatas à expansão do vocabulário (não entram em themes nem na ponte)."
     - "contact: dict {responsavel, email, telefone, site, ...} (campos opcionais)."
     - "icts.json espelha index.json: {icts: [...], total_icts, themes_index, themes_proposed_index, last_updated}."
+```
+
+#### 6.1.3 Nó `investidor` (entidade, fora do ciclo de edital)
+
+Fundos/anjos/corporate venture (Q3). Como a `ict` (§6.1.2), é **entidade fora do
+ciclo de edital**: sem PDF/status/mechanism/vigência, NÃO flui pelo ETL de evento
+nem por `core/temporal.py`, tem artefato próprio (`investidores.json`) e se liga ao
+grafo de editais pela **ponte do nó `tema`** (`edital.themes ∩ investidor.tese_themes`,
+interseção por slug). Populado por **curadoria manual** (~30-50 fundos, decisão
+spec_multi_quadrante §8 #3), não descoberta automática. Valores PLANOS (o wrapper
+`Extracted` de `domain/investor_entity` é só do caminho de extração-LLM futuro).
+
+```yaml
+investidor_schema:
+  artifact: "knowledge_graph/investidores.json"
+  id_format: "investidor:<slug>"        # ex.: investidor:kptl
+  node_fields: [id, name, tese, tese_themes, setores, estagio_alvo, ticket_range, lead_follow, portfolio, co_investidores, site, contato, generalista, fund_status, tese_keywords, anti_tese, verificado_em, source_urls]
+  required_fields: [id, name, tese_themes, setores, estagio_alvo]
+  notes:
+    - "tese_themes: temas CANÔNICOS (§5.9, mesma representação de edital.themes) — é a ponte investidor↔edital. INVARIANTE: ⊆ tema_vocab (senão a ponte nunca casa)."
+    - "estagio_alvo ⊆ estagio_vocab (§5.9.1); setores ⊆ setor_vocab; ticket_range: {min_brl, max_brl} | null."
+    - "generalista: true = fundo SEM tese setorial (investe em qualquer setor) → tese_themes DEVE ser [] e o match usa ESTÁGIO, não tema (senão casaria com tudo = ruído). Match-por-tese só vale p/ fundo com tese."
+    - "fund_status: ativo|captando|dormante — frescor da ENTIDADE (análogo do status do edital; fundo dormante = ruído). verificado_em + source_urls: proveniência do enriquecimento."
+    - "tese_keywords: texto livre FINO (análogo do areas_raw da ICT) p/ match além dos 7 temas grossos. anti_tese: o que o fundo NÃO faz (poder de REJEITAR no match)."
+    - "co_investidores: semente da Camada B induzida (rede de fundos, BACKLOG) — inerte no MVP."
+    - "investidores.json espelha icts.json: {investidores:[...], total_investidores, themes_index, last_updated}. NÃO entra no index.json (invariante de-risk ①)."
 ```
 
 ### 6.2 Tipos de link

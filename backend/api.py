@@ -200,11 +200,25 @@ class CompanyProfileSchema(BaseModel):
     equipe_resumo: str = ""
     trl: int | None = None
     tipos_financiamento_interesse: list[str] = []
+    # capital privado / desafios (Q3/Q4) — opcionais, alimentam o match de investidor
+    estagio: str = ""
+    mrr_arr: float | None = None
+    round_alvo_brl: float | None = None
+    cap_table_resumo: str = ""
+    tracao_resumo: str = ""
 
 
 class MatchRequest(BaseModel):
     profile: CompanyProfileSchema
     top_k: int = 10
+
+
+class RadarRequest(BaseModel):
+    profile: CompanyProfileSchema
+    top_k: int = 10
+    # Cap por quadrante (anti-inundação): máx. de itens por opportunity_type no
+    # ranking. None = sem cap. Ver core.radar_service.
+    per_type_cap: int | None = None
 
 
 class WritingStartRequest(BaseModel):
@@ -293,6 +307,11 @@ def _to_py_profile(schema: CompanyProfileSchema) -> PyCompanyProfile:
         equipe_resumo=schema.equipe_resumo,
         trl=schema.trl,
         tipos_financiamento_interesse=schema.tipos_financiamento_interesse,
+        estagio=schema.estagio,
+        mrr_arr=schema.mrr_arr,
+        round_alvo_brl=schema.round_alvo_brl,
+        cap_table_resumo=schema.cap_table_resumo,
+        tracao_resumo=schema.tracao_resumo,
     )
 
 
@@ -324,6 +343,7 @@ def _profile_from_workspace(db, workspace_id: str) -> PyCompanyProfile:
         "solution_summary", "descricao_atividades", "portfolio_projetos",
         "tamanho_empresa", "capital_social", "equipe_resumo", "trl",
         "tipos_financiamento_interesse",
+        "estagio", "mrr_arr", "round_alvo_brl", "cap_table_resumo", "tracao_resumo",
     }
     return PyCompanyProfile(**{k: v for k, v in raw.items() if k in allowed})
 
@@ -433,6 +453,40 @@ def match_editais(request: Request, req: MatchRequest, user_id: CurrentUserId, d
             profile=profile, top_k=req.top_k, workspace_id=workspace_id
         )
     }
+
+
+@app.post("/match/investidores", summary="Rankeamento de investidores (Q3) por tese/estágio")
+@limiter.limit("10/minute")
+def match_investidores_endpoint(
+    request: Request, req: MatchRequest, user_id: CurrentUserId, db: DbClient
+):
+    """Perfil da startup → fundos/investidores (Q3) rankeados por aderência:
+    especialistas casam por TESE/tema/setor; generalistas por ESTÁGIO. SEM gate —
+    entidade não elimina (spec_multi_quadrante §3.8). Caminho isolado: não toca o
+    matcher de edital."""
+    from core.investor_match import match_investidores
+    profile = _to_py_profile(req.profile)
+    return {"matches": match_investidores(profile, top_k=req.top_k)}
+
+
+@app.post("/match/radar", summary="Radar unificado (L2): eventos + investidores num ranking só")
+@limiter.limit("10/minute")
+def match_radar(request: Request, req: RadarRequest, user_id: CurrentUserId, db: DbClient):
+    """Funde o match de eventos (edital/desafio/programa) e o de investidores num
+    ÚNICO ranking (Layer 2, spec §3.8): normaliza scores, anexa o sinal "por que
+    agora" e aplica cap por quadrante. Orquestra os 2 matchers sem tocá-los —
+    `/match` e `/match/investidores` seguem disponíveis."""
+    profile = _to_py_profile(req.profile)
+    if not profile.is_complete():
+        raise HTTPException(
+            status_code=422,
+            detail="Perfil incompleto. Preencha pelo menos nome e descricao_atividades.",
+        )
+    workspace_id = get_workspace_id(db, user_id)
+    from core.radar_service import build_radar
+    return build_radar(
+        profile, top_k=req.top_k, per_type_cap=req.per_type_cap, workspace_id=workspace_id,
+    )
 
 
 # =============================================================================
@@ -694,8 +748,14 @@ def writing_start(
     Cria uma sessão de escrita persistida em Postgres para o edital selecionado.
     Retorna session_id, títulos das seções e contexto da sessão.
     """
-    edital = wiki_matcher.get_edital_by_id(req.edital_id)
-    if edital is None:
+    # Alvo de escrita: evento (edital/desafio/programa, no índice) OU entidade
+    # (investidor:<slug>, em investidores.json → pitch outbound). Valida na fonte
+    # certa por namespace do id; a WritingSession deriva o mode do mesmo id.
+    if req.edital_id.startswith("investidor:"):
+        from core import kg_store
+        if req.edital_id not in {i["id"] for i in kg_store.load_investidores()}:
+            raise HTTPException(status_code=404, detail=f"Fundo '{req.edital_id}' não encontrado")
+    elif wiki_matcher.get_edital_by_id(req.edital_id) is None:
         raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
 
     workspace_id = get_workspace_id(db, user_id)

@@ -125,6 +125,33 @@ def eval_faithfulness(*, input, output, **_) -> Evaluation | None:
             "comment": f"{faithful}/{len(stated)} evidências verbatim"}
 
 
+# Baseline de não-regressão (Fase 2.4): presence_accuracy ≈ 0.95. As adições de
+# schema da Fase B multi-quadrante (opportunity_type + campos de desafio/programa)
+# NÃO são DECISION_FIELDS → não devem mover este número. O gate trava se mover.
+_PRESENCE_BASELINE = 0.95
+
+
+def run_presence_regression(item_results: list[dict]) -> Evaluation:
+    """Gate de não-regressão: média de presence_accuracy < baseline → regressão.
+
+    Vive no harness (run_evaluator), não em teste paralelo. Emite o booleano e a
+    média observada no comentário para diagnóstico.
+    """
+    vals = [
+        ev["value"]
+        for ir in item_results
+        for ev in ir.get("evaluations", [])
+        if ev.get("name") == "presence_accuracy" and isinstance(ev.get("value"), (int, float))
+    ]
+    if not vals:
+        return {"name": "presence_regression", "value": None, "comment": "sem casos"}
+    mean = sum(vals) / len(vals)
+    regressed = mean < _PRESENCE_BASELINE
+    return {"name": "presence_regression", "value": regressed,
+            "comment": f"mean={mean:.3f} baseline={_PRESENCE_BASELINE} "
+                       f"({'REGREDIU' if regressed else 'ok'})"}
+
+
 def _prereqs() -> str | None:
     if not os.getenv("OPENAI_API_KEY"):
         return "requer OPENAI_API_KEY (extrator)"
@@ -141,5 +168,6 @@ SUITE = Suite(
     load_data=load_data,
     task=task,
     evaluators=[eval_presence, eval_value, eval_faithfulness],
+    run_evaluators=[run_presence_regression],
     prereqs=_prereqs,
 )

@@ -48,6 +48,22 @@ def slugify(text: str) -> str:
 _edital_slug = id_to_slug
 
 
+def _event_folder(opportunity_type: str | None) -> str:
+    """Pasta do vault para um evento (multi-quadrante), derivada do schema (§6.1).
+
+    `opportunity_type` (edital|desafio|programa) coincide com a chave do node_type;
+    o folder vem de wiki_schema.node_types() — schema autoritativo, sem duplicação.
+    Default `editais` (FINEP/FAPESP e qualquer tipo desconhecido).
+    """
+    nt = wiki_schema.node_types().get(opportunity_type or "edital", {})
+    return nt.get("folder", "editais")
+
+
+def _event_folder_for(eid: str, edital_by_id: dict) -> str:
+    """Pasta do evento `eid` resolvida via edital_by_id (cross-links nas notas-ponte)."""
+    return _event_folder(edital_by_id.get(eid, {}).get("opportunity_type"))
+
+
 def _status_emoji(status: str) -> str:
     return wiki_schema.status_info(status)["emoji"]
 
@@ -253,7 +269,8 @@ def tema_note(tema_label: str, editais_ids: list[str], edital_by_id: dict, subfo
         title = edital.get("title", f"Edital {eid}")
         status = edital.get("status", "")
         emoji = _status_emoji(status)
-        lines.append(f"- {emoji} [[{subfolder}/editais/{_edital_slug(eid)}|{title}]]")
+        folder = _event_folder_for(eid, edital_by_id)
+        lines.append(f"- {emoji} [[{subfolder}/{folder}/{_edital_slug(eid)}|{title}]]")
 
     lines.append("")
     return "\n".join(lines)
@@ -279,7 +296,8 @@ def fonte_note(fonte_label: str, editais_ids: list[str], edital_by_id: dict, sub
         title = edital.get("title", f"Edital {eid}")
         status = edital.get("status", "")
         emoji = _status_emoji(status)
-        lines.append(f"- {emoji} [[{subfolder}/editais/{_edital_slug(eid)}|{title}]]")
+        folder = _event_folder_for(eid, edital_by_id)
+        lines.append(f"- {emoji} [[{subfolder}/{folder}/{_edital_slug(eid)}|{title}]]")
 
     lines.append("")
     return "\n".join(lines)
@@ -305,7 +323,8 @@ def publico_note(publico_label: str, editais_ids: list[str], edital_by_id: dict,
         title = edital.get("title", f"Edital {eid}")
         status = edital.get("status", "")
         emoji = _status_emoji(status)
-        lines.append(f"- {emoji} [[{subfolder}/editais/{_edital_slug(eid)}|{title}]]")
+        folder = _event_folder_for(eid, edital_by_id)
+        lines.append(f"- {emoji} [[{subfolder}/{folder}/{_edital_slug(eid)}|{title}]]")
 
     lines.append("")
     return "\n".join(lines)
@@ -330,7 +349,8 @@ def subprograma_note(sp_label: str, editais_ids: list[str], edital_by_id: dict, 
         title = edital.get("title", f"Edital {eid}")
         status = edital.get("status", "")
         emoji = _status_emoji(status)
-        lines.append(f"- {emoji} [[{subfolder}/editais/{_edital_slug(eid)}|{title}]]")
+        folder = _event_folder_for(eid, edital_by_id)
+        lines.append(f"- {emoji} [[{subfolder}/{folder}/{_edital_slug(eid)}|{title}]]")
     lines.append("")
     return "\n".join(lines)
 
@@ -368,6 +388,8 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
     lines.append("## Navegação")
     lines.append("")
     lines.append(f"- 📂 [[{subfolder}/editais/]] — todos os editais")
+    lines.append(f"- 🎯 [[{subfolder}/desafios/]] — desafios (open innovation)")
+    lines.append(f"- 🚀 [[{subfolder}/programas/]] — programas (aceleração)")
     lines.append(f"- 🏷️ [[{subfolder}/temas/]] — por tema")
     lines.append(f"- 💰 [[{subfolder}/fontes/]] — por fonte de recurso")
     lines.append(f"- 👥 [[{subfolder}/publicos/]] — por público-alvo")
@@ -381,7 +403,8 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
             eid = edital["id"]
             title = edital.get("title", "")
             deadline = edital.get("deadline", "")
-            lines.append(f"- 🟢 [[{subfolder}/editais/{_edital_slug(eid)}|{title}]] — prazo: {deadline}")
+            folder = _event_folder(edital.get("opportunity_type"))
+            lines.append(f"- 🟢 [[{subfolder}/{folder}/{_edital_slug(eid)}|{title}]] — prazo: {deadline}")
 
     lines.append("")
     return "\n".join(lines)
@@ -407,7 +430,9 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     # (§4.2). Derived: subprogramas, n_pdfs, n_facts vêm do índice.
     from core.edital_id import wiki_page_path
     inherited_keys = wiki_schema.wiki_page_fields()["inherited"]  # global, agnóstico à fonte
-    overridable_keys = list(inherited_keys) + ["subprogramas", "n_pdfs", "n_facts"]
+    # opportunity_type é inherited (vem da Descoberta → entry do índice; a wiki page
+    # sintetizada não o carrega) — índice é autoridade, então entra no override.
+    overridable_keys = list(inherited_keys) + ["subprogramas", "n_pdfs", "n_facts", "opportunity_type"]
     editais = []
     for eid, entry in index_entries.items():
         card_file = wiki_page_path(eid)
@@ -426,7 +451,7 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     # Base do vault — limpa notas antigas antes de re-exportar
     base = vault_path / subfolder
     # mechanism/ano/trl_faixa são tags, não nós (§6.1.1) — sem subpasta.
-    expected_subfolders = {"editais", "temas", "fontes", "publicos", "subprogramas"}
+    expected_subfolders = {"editais", "desafios", "programas", "temas", "fontes", "publicos", "subprogramas"}
 
     # Detecta aninhamento: se `base/<subfolder>` já existe, significa que um export
     # anterior rodou com `--vault` apontando para dentro de `base`, criando estrutura
@@ -460,16 +485,19 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     home_path.write_text(home_note(index, subfolder), encoding="utf-8")
     print(f"  HOME: {home_path}")
 
-    # Notas de editais
-    n_editais = 0
+    # Notas de eventos (edital/desafio/programa) — roteadas por opportunity_type.
+    by_folder: dict[str, int] = {}
     for edital in editais:
         eid = edital["id"]
+        folder = _event_folder(edital.get("opportunity_type"))
         content = edital_note(edital, facts_by_id, subfolder)
-        note_path = base / "editais" / f"{_edital_slug(eid)}.md"
+        note_path = base / folder / f"{_edital_slug(eid)}.md"
         note_path.write_text(content, encoding="utf-8")
-        n_editais += 1
+        by_folder[folder] = by_folder.get(folder, 0) + 1
 
-    print(f"  Editais: {n_editais} notas → {base}/editais/")
+    for folder, n in sorted(by_folder.items()):
+        print(f"  {folder}: {n} notas → {base}/{folder}/")
+    n_editais = sum(by_folder.values())
 
     # Notas de temas
     themes_index = index.get("themes_index", {})

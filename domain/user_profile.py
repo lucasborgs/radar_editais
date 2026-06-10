@@ -48,6 +48,15 @@ class CompanyProfile:
     # Valores: "subvencao_nao_reembolsavel" | "credito_reembolsavel"
     #          | "matching_embrapii" | "pesquisa_colaborativa"
 
+    # ── Perfil para capital privado / desafios (Q3/Q4) — opcionais ──────────
+    # Não quebram o match de edital; alimentam o match de investidor (tese) e a
+    # completude POR-QUADRANTE (perfil "completo p/ edital" ≠ "completo p/ fundo").
+    estagio: str = ""                    # pre-seed | seed | serie-a (≠ TRL)
+    mrr_arr: float | None = None         # tração financeira (receita recorrente)
+    round_alvo_brl: float | None = None  # quanto capta (casa c/ investidor.ticket_range)
+    cap_table_resumo: str = ""           # quem já investiu / equity disponível
+    tracao_resumo: str = ""              # clientes, pilotos, LOIs (≠ portfolio_projetos)
+
     def to_context(self) -> str:
         """Gera texto de contexto para uso em prompts LLM."""
         parts = []
@@ -82,6 +91,18 @@ class CompanyProfile:
             parts.append(f"\nEquipe:\n{self.equipe_resumo}")
         if self.tipos_financiamento_interesse:
             parts.append(f"\nTipos de financiamento desejados: {', '.join(self.tipos_financiamento_interesse)}")
+
+        # Capital privado / desafios (Q3/Q4) — só aparecem se preenchidos.
+        if self.estagio:
+            parts.append(f"Estágio: {self.estagio}")
+        if self.mrr_arr:
+            parts.append(f"MRR/ARR: R$ {self.mrr_arr:,.2f}")
+        if self.round_alvo_brl:
+            parts.append(f"Round alvo de captação: R$ {self.round_alvo_brl:,.2f}")
+        if self.tracao_resumo:
+            parts.append(f"\nTração:\n{self.tracao_resumo}")
+        if self.cap_table_resumo:
+            parts.append(f"\nCap table:\n{self.cap_table_resumo}")
 
         return "\n".join(parts) if parts else "Perfil da empresa nao preenchido."
 

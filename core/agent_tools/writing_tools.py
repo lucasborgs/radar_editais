@@ -46,15 +46,22 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
 
     @tool
     def search_edital(query: str, k: int = 5) -> str:
-        """Busca trechos relevantes do edital atual e dos editais análogos.
+        """Busca dados da oportunidade-alvo.
 
-        Use para perguntas sobre requisitos, prazos, mecanismo de financiamento,
-        TRL aceito, contrapartida, elegibilidade, valores. Aceita PT-BR; frases
-        curtas funcionam melhor que parágrafos.
+        Em proposta de edital: trechos relevantes do edital atual e dos análogos
+        (requisitos, prazos, mecanismo, TRL, contrapartida, elegibilidade, valores).
+        Em pitch de captação: os dados do FUNDO-ALVO (tese, temas, setores, estágio,
+        ticket, portfólio) — para ancorar o fit. Aceita PT-BR; frases curtas funcionam
+        melhor que parágrafos.
 
-        NÃO use para ler a proposta que o usuário está escrevendo (use
+        NÃO use para ler a proposta/pitch que o usuário está escrevendo (use
         read_section ou read_full_proposal para isso).
         """
+        # Pitch (entidade): o substrato é o nó do fundo, não chunks de edital.
+        if getattr(session, "mode", "proposal") == "pitch":
+            return session._pitch_target_context or (
+                "Nenhum dado do fundo-alvo disponível. Prossiga com o perfil da startup."
+            )
         try:
             chunks = retrieve_chunks(
                 session._db,

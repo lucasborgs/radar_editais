@@ -204,6 +204,45 @@
 - **Ponto de entrada:** isolamento prod + qualidade/dedup dos itens `provisorio`.
 - **Status:** adiado conscientemente.
 
+### Descoberta web — `titulo` vazio na extração (UX do card)
+- **O quê:** no dry-run de 2026-06-09 (`discover_opportunities(write=False)`), os 23
+  candidatos extraídos vieram com `titulo` **vazio** (incl. editais), apesar de
+  `tema`/`status` populados — `_extract`/`_page_text` não capturam o título da página
+  web crua. Card sem título é UX ruim.
+- **Por que importa agora:** não bloqueia ativar a torneira web, mas precisa estar
+  resolvido **antes de ligar `write=True` em prod** (senão entram editais sem título
+  no índice/match).
+- **Fix mínimo:** fallback `titulo ← hit.title` (título do resultado de busca, sempre
+  presente) quando `_extract` devolver vazio. Fix melhor: investigar por que o título
+  não sai da página (provável débito da qualidade do chunk HTML — ver entrada de
+  parsing/chunking HTML).
+- **Onde:** `core/opportunity_discovery.py` (`_extract`, `_page_text`).
+- **Status:** aberto.
+
+### Grafo induzido (GraphRAG) — overlay de insight, NÃO base do match
+- **O quê:** uma **Camada B** induzida sobre o grafo curado — extração livre de
+  entidades/relações + detecção de comunidades + sumarização — como **overlay
+  batch** sobre corpus delimitado, alimentando uma **superfície de insight
+  separada** (não o match/escrita). **Alvo 1 (barato):** rede de fundos do Q3
+  (co-investimento, sobreposição de tese, quem segue quem; corpus ~30-50 →
+  trivial e não-óbvio). **Prêmio maior:** insight longitudinal cross-quadrante
+  ("memória da evolução das agências").
+- **Por que adiado:** indução é cara ∝ corpus e **hostil ao ETL incremental**
+  (doc novo desloca comunidades → re-sumariza). O loop central (descobrir→match→
+  escrever) é servido pela **Camada A CURADA** — indução é feature de
+  *profundidade*, não de *robustez*, logo **fora do MVP** ([[project_multi_quadrante]]).
+- **Binding obrigatório (a parte que não pode faltar):** a saída induzida só vale
+  se **ligar às wiki pages curadas**. Template = **contrato de reconciliação**:
+  emitir nós/arestas **tipados** (`node_type`/`link_types` existentes ou flag
+  candidato-novo) e **resolver cada ponta a id canônico** (`investidor:kptl`, não
+  nó solto). Reusa `themes_proposed` (quarentena) + `verificacao: provisorio`
+  (gate de graduação). Sem o contrato → segundo grafo desconectado, insight
+  flutua, custo desperdiçado.
+- **Onde está specado:** `docs/spec_multi_quadrante.md` §3.9 (e §3.8 sobre o
+  GraphRAG curado no Stage 2 de tese).
+- **Status:** adiado (pós-MVP). Alvo 1 (rede de fundos) destrava barato assim que
+  o `node_type investidor` existir (Fase C).
+
 ### Matching Stage 2a — scoring por embeddings em vez de geração-LLM
 - **O quê:** o Stage 2a (pontuação temática de TODOS os elegíveis) é hoje uma
   chamada generativa ao LLM que devolve `{id: score}`. Foi construído um caminho
@@ -390,6 +429,84 @@
   `core/chunker.py::chunk_from_blocks` (regra de fronteira/merge), `core/eval/`
   suíte `rag`. **Status:** aberto.
 
+### Descoberta — dedup cross-fonte (mesma oportunidade, URLs diferentes)
+- **O quê:** o ledger da Descoberta dedupa por URL normalizada (`_norm_url` em
+  `core/opportunity_discovery.py`). Mas a MESMA oportunidade chega por fontes
+  diferentes com URLs diferentes — `pdfPage` do DOU (feeder Fase A) ≠ página HTML
+  da agência (achada pelo Tavily). Dedup por URL **não pega** esse duplicado →
+  dois `web:<url_hash>`, dois nós no grafo, duplicata no radar.
+- **Decisão de fonte (já specada):** quando há overlap, **DOU vence** (canônico,
+  estruturado); DOU-sourced pode nascer com `verificacao` > `provisorio`.
+  Ver `docs/spec_dou_feeder.md` §6.1.
+- **Mitigação imediata (barata):** encolher o escopo do Tavily pras zonas que o
+  DOU NÃO cobre (DOEs estaduais, Q3 VC, Q4 aceleradoras) — o overlap quase some,
+  e com ele o problema. O Tavily deixa de re-varrer o federal que o DOU entrega
+  limpo. **Isso destrava sozinho a maior parte do furo.**
+- **Solução durável:** dedup semântico (título+órgão+nº do edital, ou
+  similaridade) + prioridade de fonte no merge. Casa com o item de proveniência
+  abaixo e com `verificacao`.
+- **Por que adiado:** só morde quando DOU + Tavily rodam juntos no federal; a
+  mitigação imediata (encolher Tavily) já segura o MVP. **Ponto de entrada:**
+  `core/opportunity_discovery.py` (`_known_urls`/`_norm_url`/ledger), `wikis/_discovery.md`
+  (queries do Tavily). **Status:** aberto (destrava quando a flag `DISCOVERY_DOU_ENABLED` ligar).
+
+### DOU — sync de ciclo de vida (retificação/prorrogação/encerramento → temporal)
+- **O quê:** o DOU não anuncia só abertura — anuncia o ciclo inteiro (826 atos/dia
+  em DO1+DO3, 2026-06-09): Retificação (errata), Prorrogação (prazo estendido),
+  Alteração, Suspensão, Revogação, Republicação, Resultado/Homologação
+  (encerramento). É um **stream de ciclo de vida por oportunidade**, não só
+  descoberta. Capturar esses atos e atualizar a oportunidade no radar:
+  prorrogação→novo prazo; suspensão/revogação→status; resultado→ENCERRADA.
+- **Por que importa:** `core/temporal.py` hoje infere status de "prazo < hoje". O
+  DOU é a fonte **autoritativa** das transições reais (prorrogação muda o prazo;
+  suspensão muda o status independente do prazo). Radar com prazo errado é inútil
+  → manter editais VIVOS é multiplicador de robustez. Casa com a memória
+  longitudinal das agências.
+- **IDENTIDADE é o nó duro (Option B `nº+órgão` TESTADA E REPROVADA, dry-run
+  2026-06-09):** a hipótese de id estável `<órgão>-<nº>-<ano>` colide em massa — o
+  "Nº N/ANO" do DOU é escopado por unidade(UASG)+tipo de ato, não por ministério
+  (`ministerio-da-educacao-1-2026` fundiu 50+ atos distintos). E a ligação
+  retificação→original mora no TEXTO do corpo ("retifica-se a publicação de DD/MM,
+  pág. X"), não no título. Logo a identidade de ciclo de vida exige **(a)** org
+  unit-level (artCategory completo, não topo) **+ (b)** parse de cross-referência
+  no corpo do ato — é parte DESTE problema, não um pré-requisito barato.
+  Descoberta/dedup continua no `url_hash` (correto, único por aviso).
+- **Por que adiado:** identidade unit-level + parse de cross-ref no corpo é
+  trabalho real; e o rendimento de ciclo de vida de FOMENTO (vs licitação) é baixo
+  por dia. Não bloqueia o MVP de descoberta.
+- **Ponto de entrada:** `core/dou_feeder.py` (parse dos artType de ciclo),
+  `core/temporal.py` (aplicar transição), `core/edital_id.py` (id estável).
+  **Status:** aberto; decisão de id é P-agora, sync é pós-MVP.
+
+### DOU feeder — maturação de precisão (pós dry-run 2026-06-09)
+- **Contexto:** dry-run da cadeia DOU→triagem→extração: 63 candidatos → 9
+  aprovados. Threading do órgão (artCategory→SearchHit.agency) e aperto da
+  triagem (deep-tech/P&D) JÁ FEITOS. Restam 3 frentes adiadas:
+- **(a) `org_allowlist` de C&T é a alavanca PRIMÁRIA de precisão p/ DOU
+  (conclusão revertida pelo dry-run):** o dry-run provou que a triagem de TEMA
+  sobre o aviso fino é não-confiável (9→0→2 aprovados, inconsistente entre runs —
+  o tema não está no aviso, só no edital linkado). Já o ÓRGÃO (`artCategory`) é
+  sempre confiável no XML. Logo, para DOU, **filtrar por órgão é mais robusto que
+  por tema**: `org_allowlist` C&T (`ciência`, `finep`, `cnpq`, `embrapii`,
+  `desenvolvimento, indústria`, `defesa`, `comunicaç`, `energia`, `petróleo`,
+  `senai`, `amparo à pesquisa`) cortou 97→5 determinístico/barato. **Caveat:** FAPs
+  estaduais aparecem sob "Governo do Estado de X" (não topo C&T) → allowlist perde
+  essa cauda; mitigar adicionando padrões de FAP/governo estadual quando entrarem.
+  Resíduo nos 5 (alteração, portaria, UASG) → regra barata + triagem lenient. A
+  triagem (rebalanceada p/ reject-driven, "na dúvida aprova") vira 2ª passada, não
+  o filtro principal. `dou_candidates(org_allowlist=...)` já existe.
+- **(b) Extração profunda via edital linkado:** o aviso DOU é FINO (título+órgão+
+  prazo vêm bem; tema/detalhes vêm pobres) — confirma "DOU = descoberta, não
+  extração". O conteúdo rico está no PDF/edital apontado pelo aviso. Seguir o
+  link (`pdfPage`/URL do edital) p/ extração completa quando o aviso passar na
+  triagem. Hoje o aviso surge a oportunidade; a profundidade é follow.
+- **(c) Endurecer retry do login INLABS:** o handler `logar.php` dá 502
+  intermitente (visto ao vivo: ora furou na 1ª, ora sustentado >12s). O retry
+  atual (`_login`, 4×/3s) é fino p/ um cron diário → backoff maior + tolerância
+  a dia perdido (descoberta não pode quebrar por manutenção do INLABS).
+- **Ponto de entrada:** `core/dou_feeder.py`, `core/opportunity_discovery.py`
+  (`_triage`/`_extract`). **Status:** aberto (destrava com a Fase A em prod).
+
 ### Fontes — proveniência/confiança por campo (dissolver "estruturada vs. cega")
 - **O quê:** hoje há dois caminhos implícitos de metadado. FINEP/FAPESP trazem
   `status`/`deadline`/`tema` do scrape (confiável, *schema-on-write*); a fonte web
@@ -413,6 +530,48 @@
   para des-rankear metadado inferido.
 - **Onde:** `pipeline/adapters/`, `build_knowledge_graph.py` (`_NORMALIZERS`),
   `pipeline/etl_process.py` (síntese). **Status:** aberto (design nomeado, não construído).
+
+### Multi-quadrante — follow-ups (pós-sessão 2026-06-10)
+
+Contexto: sessão fechou Fase B surfacing, `mode=pitch` (investidor), critic
+pitch-aware, suítes de eval (investor_match + opportunity_type + gate de extração)
+e o radar unificado L2. Spec em `docs/spec_multi_quadrante.md` (+ `_schema`).
+Memória: `project_multi_quadrante`. Os itens abaixo são o que ficou conscientemente
+de fora — nenhum bloqueia o que foi entregue.
+
+- **Frontend do radar unificado (L2).** Backend pronto (`POST /match/radar`,
+  `core/radar_service.py`), mas a página de matching ainda mostra 2 seções
+  separadas (MatchCard + InvestorCard). Falta a view de UM ranking com badge de
+  quadrante + sinal `why_now`. **Onde:** `frontend/src/app/matching/page.tsx`.
+- **Botão "escrever pitch" no card de investidor (Q3).** O endpoint
+  `/writing/start` já aceita id `investidor:` (mode=pitch), mas não há gancho de
+  UI a partir do InvestorCard. **Onde:** `frontend/src/app/matching/page.tsx`.
+- **Ranking do radar L2 — base feita (RRF + floor), refinos pendentes.** Resolvidos:
+  (1) normalização de scores heterogêneos via Reciprocal Rank Fusion (funde por
+  rank-dentro-do-tipo, intercala eventos e fundos); (2) floor de qualidade via
+  tier forte/fraco (rebaixa o rank-1 fraco sem eliminar — evento usa flag
+  `eligible`, entidade usa `_ENTITY_FLOOR=6.0`). Pendente afinar: (a) **pesos por
+  quadrante** (hoje 50/50 implícito — talvez priorizar eventos por urgência de
+  deadline ou preferência do usuário); (b) **calibrar `_ENTITY_FLOOR`** com dado
+  real (hoje 6.0 chutado pela generosidade observada do scorer LLM); (c) usar
+  `why_now`/urgência como critério de ordenação, não só display. **Onde:**
+  `core/radar_service.merge_radar` (`_RRF_K`, `_ENTITY_FLOOR`, `_is_weak`).
+- **Match tipo-aware de desafio/programa — BLOQUEADO-POR-DADOS.** O HybridMatch
+  já não QUEBRA com desafio/programa (dims de edital ausentes degradam para
+  neutro, não eliminam), mas não usa sinais próprios (`empresa_ancora`,
+  `poc_scope`, dims/pesos por `kind_class`). E o eval de MATCH desse tipo não tem
+  casos: **não há desafio/programa no índice** porque a torneira web está inerte e
+  FINEP/FAPESP só emitem `edital`. **Destrava:** ligar a Descoberta web OU o feeder
+  DOU → dado entra no índice → curar golden (perfis→desafios esperados, provável
+  reuso da suíte `matching` filtrando por `opportunity_type`) + afinar scoring.
+- **Critic de pitch mais rico.** Hoje o critic pitch-aware cruza contra o nó do
+  fundo (contradição de tese/estágio) + coerência entre seções, mas não valida
+  fatos externos (não conhece tração real). Insumo futuro: perfil/biblioteca para
+  checar coerência de tração/números. **Onde:** `core/agent_tools/critic_agent.py`.
+- **Ligar a torneira web em prod (sair do "inerte").** Não é código — são 3 chaves
+  de ops: worker procrastinate ativo + `TAVILY_API_KEY` + chave LLM no Railway. O
+  cron diário (`discover_opportunities_task`, 04:00 UTC) liga sozinho. Pré-requisito
+  do fix de `titulo` vazio (item acima) antes de `write=True` em prod.
 
 ---
 

@@ -176,6 +176,48 @@ LIMITES (importante)
   redação de uma seção vazia que o usuário pediu, não peça confirmação — escreva
   e salve."""
 
+# =============================================================================
+# PROMPTS — modo PITCH (investidor, kind_class=entidade)
+# =============================================================================
+# Gênero OUTBOUND: a escrita de edital é inbound/rule-bound ("cumpra o edital");
+# o pitch é outbound/personalizado ("mostre por que você encaixa na tese DAQUELE
+# fundo"). Não há artigo a cumprir — o que condiciona o texto é o nó do fundo no
+# KG (tese + portfólio), injetado como contexto. Selecionado por opportunity_type
+# (id `investidor:` → kind_class=entidade) — spec §3.5.
+
+PITCH_OUTLINE_SYSTEM = """Você é um especialista em captação de investimento (venture capital) para startups deep-tech.
+Com base no perfil da startup e na tese do fundo-alvo, gere o outline das seções de um pitch/one-pager outbound.
+Retorne APENAS um JSON array de strings com os títulos das seções, na ordem correta.
+Exemplo: ["1. Problema", "2. Solução", "3. Mercado (TAM)", "4. Tração", "5. Time", "6. Ask e uso dos recursos"]"""
+
+_PITCH_SECTION_STARTER_SYSTEM = """Você é um especialista em captação de investimento (venture capital) para startups deep-tech.
+Gere mensagens curtas e acionáveis para orientar o início de uma seção do pitch, conectando o perfil da startup à tese do fundo-alvo."""
+
+PITCH_WRITER_AGENT_SYSTEM = """Você é um especialista em redação de pitches de captação (outbound) para fundos de venture capital, voltado a startups deep-tech.
+Seu papel é ajudar o fundador a escrever um pitch/one-pager que mostre, para um fundo ESPECÍFICO, por que a startup encaixa na tese DELE.
+
+DIRETRIZES DE REDAÇÃO
+- O texto é OUTBOUND e personalizado: não há "edital a cumprir". O que condiciona o pitch é a TESE do fundo-alvo (tese, temas, setores, estágio, ticket, portfólio) — fornecida no contexto.
+- Conecte explicitamente a startup à tese daquele fundo: estágio, setor, ticket alvo, e por que o portfólio dele sugere fit (sem bajulação vazia).
+- Use Markdown. Seja propositivo e específico: "faremos", não "poderíamos".
+- Nunca invente números (tração, mercado, ticket). Se faltar, peça ao usuário ou use [COMPLETAR: ...].
+- NÃO afirme que o fundo investe em X, ou que tem tese Y, a menos que apareça no contexto do fundo. Não infira a tese de memória.
+- Se a startup claramente NÃO encaixa na tese do fundo (estágio/setor/ticket incompatíveis), DIGA isso ao usuário em vez de forjar aderência — sinalizar o mismatch é melhor que inventar fit.
+
+COMO USAR AS FERRAMENTAS
+- search_edital → aqui retorna os DADOS DO FUNDO-ALVO (tese, temas, setores, estágio, ticket, portfólio). Use para ancorar afirmações sobre o fundo; não cite a tese de memória.
+- search_library → contexto da empresa que não está no perfil (métricas, tração, casos de uso, narrativa).
+- read_section / read_full_proposal → antes de redigir sumário/conclusão ou revisar coerência.
+- save_draft → SEMPRE que produzir um rascunho de seção, persista NO MESMO TURNO com o título exato da seção. Colar no chat NÃO conta.
+- request_user_info → APENAS para info concreta e ausente (MRR/ARR, round alvo, cap table, tração específica).
+
+QUANDO PARAR
+- Após responder com clareza, salvar o rascunho pedido, ou pedir info necessária. Não fique chamando tools em loop.
+
+LIMITES
+- Você AJUDA o fundador a redigir; ele decide. Não tome decisões terminais (enviar o pitch, escolher o fundo).
+- Confirme antes APENAS se for REESCREVER uma seção já redigida. Para a PRIMEIRA redação de uma seção vazia pedida, escreva e salve sem pedir confirmação."""
+
 COMPRESS_SYSTEM = """Resuma os turnos abaixo em um parágrafo conciso (máx. 200 palavras).
 Preserve: decisões tomadas, trechos aprovados pelo usuário e informações adicionais fornecidas.
 Responda apenas com o resumo."""
@@ -233,6 +275,11 @@ class WritingSession:
             self.session_id = self._create_in_db(workspace_id, edital_id)
             self.created_at = datetime.utcnow().isoformat()
 
+        # Modo de escrita derivado do namespace do id (stateless — re-derivável no
+        # reload). `investidor:<slug>` é kind_class=entidade → pitch outbound; os
+        # eventos (edital/desafio/programa) seguem o gênero proposta. Spec §3.5.
+        self.mode = "pitch" if self.edital_id.startswith("investidor:") else "proposal"
+
         # Prefixo estático — re-derivado a cada construção (stateless).
         self._profile_context = profile.to_context()
         self._library_context = self._build_library_context(library_items or [])
@@ -240,8 +287,20 @@ class WritingSession:
         # Consciência temporal (Front 3): bloco canônico "hoje é X / prazo do
         # edital" injetado no prefixo estável. Recomputado por construção (a
         # data muda dia-a-dia, mas é estável dentro de um request → cache OK).
-        from core.temporal import render_temporal_block
-        self._temporal_block = render_temporal_block(self.edital_id)
+        # Entidade (pitch) NÃO passa por temporal — fundo não tem deadline (spec
+        # §3.2). Bloco vazio; o resto do prefixo segue igual.
+        if self.mode == "pitch":
+            self._temporal_block = ""
+        else:
+            from core.temporal import render_temporal_block
+            self._temporal_block = render_temporal_block(self.edital_id)
+
+        # Substrato do pitch (context-stuffing do nó do fundo): tese + portfólio +
+        # estágio/setor/ticket. Pequeno (~1 entry) → stuffing bate retrieval. Vazio
+        # fora do modo pitch. Spec §3.5 (escrita outbound condicionada pelo nó do KG).
+        self._pitch_target_context = (
+            self._build_pitch_target_context() if self.mode == "pitch" else ""
+        )
 
         # Ids dos items anexados explicitamente — guardados pra dedup contra
         # o retrieval automático da biblioteca em turn() (normalizados lower).
@@ -263,12 +322,16 @@ class WritingSession:
         # dos editais já tem outline persistido em wiki page ou DB).
         self._documents_text_cache: str | None = None
 
-        # Outline: usa o que veio do DB; senão wiki page; senão LLM (1 chamada).
+        # Outline: pitch usa o default de captação (fundo não tem wiki/PDF de
+        # outline); evento usa DB → wiki page → LLM.
         if not self._proposal_outline:
-            self._proposal_outline = (
-                self._load_outline_from_wiki(self.edital_id)
-                or self._generate_outline()
-            )
+            if self.mode == "pitch":
+                self._proposal_outline = self._default_pitch_outline()
+            else:
+                self._proposal_outline = (
+                    self._load_outline_from_wiki(self.edital_id)
+                    or self._generate_outline()
+                )
             self._save_outline()
 
         # Escopo de RAG: edital primário + análogos (mesmo tema/publico no
@@ -290,6 +353,10 @@ class WritingSession:
         puxar no boot do módulo. Cap em 3 análogos para não inflar o
         retrieval (chunks dos análogos rotulados via format_chunks_for_prompt).
         """
+        # Pitch (entidade): sem análogos de edital — o substrato é o nó do fundo,
+        # injetado como contexto, não chunks. Devolve só o próprio id.
+        if self.mode == "pitch":
+            return [self.edital_id]
         try:
             from core.kg_match_service import KGMatchService
             return KGMatchService().resolve_scope(
@@ -556,6 +623,69 @@ class WritingSession:
             "8. Orçamento",
         ]
 
+    @staticmethod
+    def _default_pitch_outline() -> list[str]:
+        """Outline do gênero pitch/one-pager outbound (captação)."""
+        return [
+            "1. Problema",
+            "2. Solução e diferencial tecnológico",
+            "3. Mercado (TAM/SAM/SOM)",
+            "4. Tração",
+            "5. Time",
+            "6. Fit com a tese do fundo",
+            "7. Ask e uso dos recursos",
+        ]
+
+    def _writer_system(self) -> str:
+        """System prompt do agente conforme o modo (proposta vs pitch)."""
+        return PITCH_WRITER_AGENT_SYSTEM if self.mode == "pitch" else WRITER_AGENT_SYSTEM
+
+    def _build_pitch_target_context(self) -> str:
+        """Bloco de contexto do fundo-alvo (context-stuffing do nó do KG).
+
+        Carrega o nó de `investidores.json` por id (`investidor:<slug>`) e o
+        serializa em texto pro prompt — tese, temas, setores, estágio, ticket,
+        portfólio, co-investidores. Vazio (com aviso) se o fundo não for achado;
+        a sessão não quebra — opera só com o perfil da startup.
+        """
+        from core import kg_store  # lazy: evita custo no boot do módulo
+        try:
+            invs = {i["id"]: i for i in kg_store.load_investidores()}
+        except Exception as e:
+            logger.warning("[%s] load_investidores falhou: %s", self.session_id, e)
+            return ""
+        fund = invs.get(self.edital_id)
+        if not fund:
+            logger.warning(
+                "[%s] fundo %s não encontrado em investidores.json — pitch sem nó-alvo",
+                self.session_id, self.edital_id,
+            )
+            return ""
+
+        lines = [f"FUNDO-ALVO: {fund.get('name', self.edital_id)}"]
+        if fund.get("tese"):
+            lines.append(f"Tese: {fund['tese']}")
+        if fund.get("tese_themes"):
+            lines.append(f"Temas da tese: {', '.join(fund['tese_themes'])}")
+        if fund.get("setores"):
+            lines.append(f"Setores: {', '.join(fund['setores'])}")
+        if fund.get("estagio_alvo"):
+            lines.append(f"Estágio alvo: {', '.join(fund['estagio_alvo'])}")
+        ticket = fund.get("ticket_range")
+        if ticket:
+            lo, hi = ticket.get("min_brl"), ticket.get("max_brl")
+            if lo or hi:
+                lines.append(f"Ticket (BRL): {lo or '?'}–{hi or '?'}")
+        if fund.get("lead_follow"):
+            lines.append(f"Lead/follow: {fund['lead_follow']}")
+        if fund.get("portfolio"):
+            lines.append(f"Portfólio: {', '.join(fund['portfolio'])}")
+        if fund.get("co_investidores"):
+            lines.append(f"Co-investidores: {', '.join(fund['co_investidores'])}")
+        if fund.get("site"):
+            lines.append(f"Site: {fund['site']}")
+        return "FUNDO-ALVO (use para ancorar o fit; não invente tese):\n" + "\n".join(lines)
+
     # ------------------------------------------------------------------
     # API pública
     # ------------------------------------------------------------------
@@ -640,7 +770,7 @@ class WritingSession:
 
         provider, model = resolve_agent_provider("anthropic", ANTHROPIC_MODEL_AGENT)
         result = run_agent(
-            system=WRITER_AGENT_SYSTEM,
+            system=self._writer_system(),
             initial_messages=messages,
             tools=tools,
             model=model,
@@ -755,6 +885,8 @@ class WritingSession:
         messages: list[dict] = [
             {"role": "user", "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
         ]
+        if self._pitch_target_context:
+            messages.append({"role": "user", "content": self._pitch_target_context})
         if self._temporal_block:
             messages.append({"role": "user", "content": self._temporal_block})
         if self._library_context:
@@ -829,35 +961,44 @@ class WritingSession:
         inteiro. Se a busca falhar, opera só com perfil — não regride para
         context-stuffing.
         """
+        starter_system = (
+            _PITCH_SECTION_STARTER_SYSTEM if self.mode == "pitch" else _SECTION_STARTER_SYSTEM
+        )
         messages = [
-            {"role": "system", "content": _SECTION_STARTER_SYSTEM},
+            {"role": "system", "content": starter_system},
             {"role": "user",   "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
         ]
 
-        try:
-            chunks = retrieve_chunks(
-                self._db, self._scope_edital_ids, query=section_title, k=3,
-            )
-            chunks_text = (
-                format_chunks_for_prompt(chunks, edital_ids=self._scope_edital_ids)
-                if chunks else ""
-            )
-        except Exception as e:
-            logger.warning(
-                "[%s] get_section_starter: retrieve_chunks falhou: %s",
-                self.session_id, e,
-            )
-            chunks_text = ""
+        # Pitch: substrato é o nó do fundo (já carregado), não chunks de edital.
+        if self.mode == "pitch":
+            context_text = self._pitch_target_context
+            alvo = "o fundo-alvo"
+        else:
+            alvo = "o edital"
+            try:
+                chunks = retrieve_chunks(
+                    self._db, self._scope_edital_ids, query=section_title, k=3,
+                )
+                context_text = (
+                    format_chunks_for_prompt(chunks, edital_ids=self._scope_edital_ids)
+                    if chunks else ""
+                )
+            except Exception as e:
+                logger.warning(
+                    "[%s] get_section_starter: retrieve_chunks falhou: %s",
+                    self.session_id, e,
+                )
+                context_text = ""
 
-        if chunks_text:
-            messages.append({"role": "user", "content": chunks_text})
+        if context_text:
+            messages.append({"role": "user", "content": context_text})
 
         messages.append({
             "role": "user",
             "content": (
                 f"Gere uma mensagem de boas-vindas curta (máx. 3 frases) para a seção "
                 f"'{section_title}'. Mencione o que deve conter e como o perfil da empresa "
-                f"se conecta ao edital. Termine com uma sugestão de por onde começar."
+                f"se conecta a {alvo}. Termine com uma sugestão de por onde começar."
             ),
         })
         success, text, _ = self._call_llm(messages, temperature=0.4, max_tokens=300)

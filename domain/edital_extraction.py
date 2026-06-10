@@ -82,6 +82,10 @@ class EditalExtraction(BaseModel):
     # --- proveniência ---
     source: str
     native_id: str
+    # Discriminador do tipo de oportunidade-EVENTO (spec_multi_quadrante §2). Os 3
+    # tipos-evento compartilham este schema/pipeline; só os campos opcionais abaixo
+    # ramificam. ENTIDADE (investidor) NÃO usa este model — ver domain/investor_entity.
+    opportunity_type: str = "edital"   # "edital" | "desafio" | "programa"
 
     # --- DECISÃO (alimentam elegibilidade/ranking determinístico) ---
     eligible_entities: Extracted[list[str]] = Field(default_factory=absent)
@@ -102,6 +106,13 @@ class EditalExtraction(BaseModel):
     # Restrições organizacionais estruturadas (capturar agora, gate quando o
     # perfil tiver o lado oposto).
     eligibility_constraints: list[EligibilityConstraint] = Field(default_factory=list)
+
+    # --- CONTEXTO específico de DESAFIO (Q2 open innovation), opcional ---
+    empresa_ancora: str | None = None       # quem traz a dor (operador/corporate)
+    poc_scope: str | None = None            # escopo do piloto/PoC esperado
+    # --- CONTEXTO específico de PROGRAMA (Q4 aceleração/incubação), opcional ---
+    modelo_participacao: str | None = None  # "equity" | "no-equity"
+    beneficios: list[str] = Field(default_factory=list)  # capital, mentoria, espaço
 
     # status/deadline NÃO vivem aqui: o pipeline temporal (core/temporal.py) é o
     # dono (SSOT) — o PDF lido na extração fica stale com retificações.
@@ -133,6 +144,10 @@ CONTEXT_FIELDS: tuple[str, ...] = (
     "funding_amount",
     "project_duration_months",
     "eligibility_constraints",
+    "empresa_ancora",
+    "poc_scope",
+    "modelo_participacao",
+    "beneficios",
 )
 
 __all__ = [

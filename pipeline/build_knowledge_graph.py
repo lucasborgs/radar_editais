@@ -377,6 +377,9 @@ def _build_editais(chamadas: list[dict], source: str = _DEFAULT_SOURCE) -> list[
             **normalizer(ch),
             "n_pdfs": n_pdfs,
             "requires_ict_partner": _detect_ict_requirement(ch),
+            # opportunity_type (Fase B multi-quadrante): tipo-evento que distingue
+            # edital/desafio/programa. Aditivo — FINEP/FAPESP não trazem → "edital".
+            "opportunity_type": ch.get("opportunity_type", "edital"),
             # Confiança por-item (§5.11): fontes do SCRAPER_REGISTRY são
             # "verificado" por padrão; a EXCEÇÃO é web, cujo bronze mistura
             # seed manual (verificado) e Descoberta (provisorio) — cada item
