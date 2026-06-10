@@ -25,14 +25,11 @@ cd frontend && npm run dev                      # Next.js frontend (port 3000)
 
 ### Data pipeline
 ```bash
-python scripts/run_all.py               # scrapers + full ETL (incremental, hash-based)
+python pipeline/build_knowledge_graph.py   # bronze → índice + wiki pages (todas as fontes)
+python -m core.opportunity_discovery       # torneira web (DOU com DISCOVERY_DOU_ENABLED=1)
 ```
-
-### Fine-tuning pipeline
-```bash
-python pipeline/etl_generate_pairs.py --backend gemini   # generate training pairs
-python pipeline/etl_finetune_tsdae.py                    # TSDAE unsupervised pre-training
-```
+Em prod, scrapers e Descoberta rodam pelos crons do worker (`run_daily_etl`
+03:00 UTC, `discover_opportunities` 04:00 UTC — core/tasks.py).
 
 ### Avaliação (harness unificado)
 ```bash

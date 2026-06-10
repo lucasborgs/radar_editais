@@ -67,3 +67,4 @@ eval_matching_results.json
 # Supabase CLI internal state
 supabase/.branches/
 supabase/.temp/
+*.bak
