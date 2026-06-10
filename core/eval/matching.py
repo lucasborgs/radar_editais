@@ -20,7 +20,7 @@ FIXTURE = ROOT / "tests" / "fixtures" / "eval_matching.json"
 
 @lru_cache(maxsize=1)
 def _service():
-    from core.hybrid_match_service import HybridMatchService
+    from core.services.hybrid_match_service import HybridMatchService
     return HybridMatchService()
 
 

@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
-from core.writing_session import WritingSession  # noqa: E402
+from core.services.writing_session import WritingSession  # noqa: E402
 
 
 def _make_session() -> WritingSession:

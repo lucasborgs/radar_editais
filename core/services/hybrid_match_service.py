@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import time
+import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
@@ -30,8 +31,6 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # MAPEAMENTOS PARA STAGE 1
 # =============================================================================
-
-import unicodedata
 
 # tipo_entidade do perfil → labels aceitos em eligible_entities / publico_alvo do card
 _ENTITY_MAP: dict[str, set[str]] = {

@@ -41,13 +41,13 @@ from pathlib import Path
 import requests
 
 from config import FINEP_PDFS_DIR
-from core.content_library import get_item, mark_items_referenced
 from core.kg.edital_id import wiki_page_path
 from core.reflection_service import load_active_insights
 from core.retrieval.retriever import (
     format_chunks_for_prompt,
     retrieve_chunks,
 )
+from core.services.content_library import get_item, mark_items_referenced
 from domain.user_profile import CompanyProfile
 from supabase import Client
 
@@ -358,7 +358,7 @@ class WritingSession:
         if self.mode == "pitch":
             return [self.edital_id]
         try:
-            from core.kg_match_service import KGMatchService
+            from core.services.kg_match_service import KGMatchService
             return KGMatchService().resolve_scope(
                 edital_id=self.edital_id, max_analogues=3,
             )

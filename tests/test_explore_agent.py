@@ -19,9 +19,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.kg_match_service import KGMatchService  # noqa: E402
 from core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
 from core.llm.agent_tools import build_explore_tools  # noqa: E402
+from core.services.kg_match_service import KGMatchService  # noqa: E402
 
 # ============================================================================
 # _build_explore_hint

@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from config import OBSIDIAN_VAULT_DIR  # noqa: E402
 from core.kg.edital_id import slug_to_id  # noqa: E402
-from core.kg_match_service import KGMatchService  # noqa: E402
+from core.services.kg_match_service import KGMatchService  # noqa: E402
 
 _WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]")
 _TEMAS_DIR = OBSIDIAN_VAULT_DIR / "radar-editais" / "temas"

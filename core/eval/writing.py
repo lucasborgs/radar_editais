@@ -62,13 +62,13 @@ def task(*, item: Any, **_) -> dict:
     from core.kg.temporal import render_temporal_block
     from core.llm.agent_tools.critic_agent import _build_proposal_context
     from core.retrieval.retriever import format_chunks_for_prompt, retrieve_chunks
+    from core.services.writing_session import WritingSession
     from core.writing_eval import (
         extract_edital_claims,
         judge_factual_errors,
         judge_internal_coherence,
         score_grounding,
     )
-    from core.writing_session import WritingSession
 
     db = get_supabase_service()
     workspace_id = os.environ["EVAL_WORKSPACE_ID"]

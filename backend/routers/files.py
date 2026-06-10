@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from core.auth import CurrentUserId, DbClient
-from core.content_library import get_workspace_id
+from core.services.content_library import get_workspace_id
 
 router = APIRouter(tags=["files"])
 

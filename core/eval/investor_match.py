@@ -1,6 +1,6 @@
 """Suíte de avaliação do match-por-tese de INVESTIDOR (Q3, kind_class=entidade).
 
-Espelha `core/eval/matching.py`, mas roda `core.investor_match.match_investidores`
+Espelha `core/eval/matching.py`, mas roda `core.services.investor_match.match_investidores`
 (sem gate de elegibilidade nem vigência — entidade). Dois evaluators:
   • precision@K via rúbrica de tese (juiz LLM em `core.investor_eval`): cada fundo
     do top-K é julgado por fit de tese/estágio/setor.
@@ -74,7 +74,7 @@ def load_data() -> list[dict]:
 
 def task(*, item: Any, **_) -> dict:
     inp = get_input(item)
-    from core.investor_match import match_investidores
+    from core.services.investor_match import match_investidores
     profile = _build_profile(inp["profile"])
     matches = match_investidores(profile, top_k=inp.get("top_k", 5))
     return {
