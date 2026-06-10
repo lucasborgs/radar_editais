@@ -205,6 +205,37 @@ def test_discover_dou_feeder_behind_flag(monkeypatch):
     assert len(out) == 2
 
 
+def test_discover_dou_has_own_budget_does_not_starve_tavily(monkeypatch):
+    """Orçamentos separados (achado do 1º shadow-run: DOU ~63/dia zerava o
+    Tavily num cap compartilhado): DOU respeita max_dou_candidates; Tavily
+    conta max_candidates do zero, mesmo com o DOU cheio."""
+    import core.dou_feeder as df
+    dou_hits = [SearchHit(f"D{i}", f"http://in.gov.br/p{i}", "s", "c",
+                          full_text=True) for i in range(10)]
+    tavily_hits = [SearchHit(f"T{i}", f"http://x.org/t{i}", "s", "c")
+                   for i in range(5)]
+    monkeypatch.setenv("DISCOVERY_DOU_ENABLED", "1")
+    monkeypatch.setattr(df, "dou_candidates", lambda day=None, **kw: dou_hits)
+    monkeypatch.setattr(od.websearch, "web_search", lambda q, k=8: tavily_hits)
+    monkeypatch.setattr(od, "_known_urls", lambda: set())
+    monkeypatch.setattr(od, "_make_client", lambda role: (object(), "m"))
+    monkeypatch.setattr(od, "_triage",
+                        lambda h, c, m: {"is_opportunity": True, "agency": ""})
+    monkeypatch.setattr(od, "_page_text", lambda h: h.content or "")
+    monkeypatch.setattr(od, "_extract",
+                        lambda h, t, a, c, m: {"url": h.url,
+                                               "url_hash": web_url_hash(h.url),
+                                               "verificacao": "provisorio"})
+    monkeypatch.setattr(od.ws, "discovery_config",
+                        lambda: {"queries": ["q"], "max_results_per_query": 8,
+                                 "max_candidates": 3, "max_dou_candidates": 4})
+    out = od.discover_opportunities(write=False)
+    urls = [r["url"] for r in out]
+    # DOU capado em 4 (não 10); Tavily ganha os 3 do orçamento PRÓPRIO.
+    assert len([u for u in urls if "in.gov.br" in u]) == 4
+    assert len([u for u in urls if "x.org" in u]) == 3
+
+
 def test_discover_dou_disabled_by_default(monkeypatch):
     """Sem a flag, o feeder DOU nem é chamado (caminho Tavily intocado)."""
     import core.dou_feeder as df

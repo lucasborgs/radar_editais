@@ -38,7 +38,11 @@ discovery:
     # Programas de aceleração / incubação (Q4)
     - "programa de aceleração startups inscrições abertas edital"
     - "incubadora seleção de startups chamada aberta"
-  # Caps por execução (controle de custo do crawl diário).
+  # Caps por execução (controle de custo do crawl diário). Orçamentos SEPARADOS
+  # por gerador: no 1º shadow-run o DOU rendeu ~63 candidatos/dia e, num cap
+  # compartilhado, zerava o Tavily. max_candidates = busca cega (Tavily);
+  # max_dou_candidates = teto defensivo do DOU (o pré-filtro já corta).
   max_results_per_query: 8
   max_candidates: 40
+  max_dou_candidates: 80
 ```
