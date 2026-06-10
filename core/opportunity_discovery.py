@@ -23,7 +23,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from config import BRONZE_DIR
 from core import kg_store
@@ -229,6 +229,25 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     known = _known_urls()
     seen_now: set[str] = set()
     candidates: list[websearch.SearchHit] = []
+
+    # Gerador DOU (espinha de alta precisão, spec_dou_feeder.md §6) — ANTES do
+    # Tavily: os candidatos DOU contam pro max_cand, encolhendo a fatia da busca
+    # cega na mesma execução (§6.1: DOU é espinha, Tavily é gap-filler). Atrás de
+    # flag pra ligar/desligar em prod sem tocar o caminho Tavily (e desligar se o
+    # INLABS cair). Busca o DOU de ONTEM (UTC): o cron roda 04:00 UTC, antes da
+    # publicação da edição do dia (manhã BRT) — "hoje" seria sempre vazio; D-1 é
+    # determinístico e o ledger mantém a idempotência.
+    if os.getenv("DISCOVERY_DOU_ENABLED", "0") == "1":
+        from core.dou_feeder import dou_candidates  # noqa: PLC0415
+        day = datetime.now(timezone.utc).date() - timedelta(days=1)
+        for h in dou_candidates(day):
+            nu = _norm_url(h.url)
+            if nu and nu not in known and nu not in seen_now:
+                seen_now.add(nu)
+                candidates.append(h)
+        logger.info("descoberta: %d candidatos DOU (%s)", len(candidates),
+                    day.isoformat())
+
     for q in queries:
         if len(candidates) >= max_cand:
             break
@@ -286,7 +305,12 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
 def _page_text(hit: websearch.SearchHit) -> str:
     """Texto da página para extração + chunking. Tenta o fetch COMPLETO (corpo
     inteiro — o `raw_content` do Tavily vem capado em ~2k chars, raso demais pro
-    RAG); cai para o content capado e por fim o snippet. Nunca levanta."""
+    RAG); cai para o content capado e por fim o snippet. Nunca levanta.
+
+    Hits com `full_text` (DOU: `content` = Texto completo do XML) pulam o fetch —
+    economiza 1 request/candidato e a URL (visualizador JSP) não renderia melhor."""
+    if hit.full_text:
+        return hit.content or hit.snippet or ""
     try:
         from core.agent_tools.profile_tools import _fetch_and_parse
         full = (_fetch_and_parse(hit.url) or {}).get("text", "") or ""

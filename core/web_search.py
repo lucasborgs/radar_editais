@@ -34,12 +34,17 @@ class SearchHit:
 
     `agency`: órgão emissor quando a FONTE já o conhece de forma confiável (ex.:
     feeder DOU lê do `artCategory` do XML). Vazio para fontes cegas (Tavily), que
-    deixam a triagem LLM adivinhar. Quem extrai prefere este campo ao palpite."""
+    deixam a triagem LLM adivinhar. Quem extrai prefere este campo ao palpite.
+
+    `full_text`: True quando `content` JÁ é o corpo completo (ex.: `Texto` do XML
+    do DOU) — o full-fetch da URL não traria nada melhor (pdfPage é um visualizador
+    JSP raso) e pode ser pulado."""
     title: str
     url: str
     snippet: str
     content: str
     agency: str = ""
+    full_text: bool = False
 
 
 def web_search(query: str, k: int = 5) -> list[SearchHit]:
