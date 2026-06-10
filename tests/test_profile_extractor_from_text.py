@@ -6,7 +6,7 @@ antiga), com _call_llm MOCKADO (nenhuma chamada real a LLM/rede):
   - texto vazio/branco → erro controlado, sem exceção
   - _call_llm retorna None → required fields "missing" + erro
 
-Também testa o serializer _serialize_extract_result do backend/api.py.
+Também testa o serializer _serialize_extract_result de backend/routers/profile.py.
 """
 from __future__ import annotations
 
@@ -110,11 +110,11 @@ def test_extract_from_text_llm_none_marks_missing(monkeypatch):
 
 
 # ============================================================================
-# Serializer (_serialize_extract_result) — backend/api.py
+# Serializer (_serialize_extract_result) — backend/routers/profile.py
 # ============================================================================
 
 def test_serialize_extract_result_shape(monkeypatch):
-    from backend.api import _serialize_extract_result
+    from backend.routers.profile import _serialize_extract_result
 
     extractor = ProfileExtractor()
     monkeypatch.setattr(extractor, "_call_llm", lambda text: dict(_FULL_LLM))
