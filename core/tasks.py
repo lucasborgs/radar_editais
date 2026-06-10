@@ -225,7 +225,7 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
     (silver vazio) → retorna [] e o caller limpa as linhas antigas, conforme
     o contrato §11.4 ("falha LLM → B não indexa").
     """
-    from core.edital_id import native_id_of, source_of  # noqa: PLC0415
+    from core.kg.edital_id import native_id_of, source_of  # noqa: PLC0415
 
     source = source_of(edital_id)
     native = native_id_of(edital_id)
@@ -453,7 +453,7 @@ async def run_daily_etl_task(timestamp: int) -> None:
     logger.info("run_daily_etl_task: iniciando (timestamp=%s)", timestamp)
 
     # Import tardio para evitar custo no boot do worker
-    from core.edital_id import make_id  # noqa: PLC0415
+    from core.kg.edital_id import make_id  # noqa: PLC0415
     from pipeline.build_knowledge_graph import _ID_EXTRACTORS  # noqa: PLC0415
     from pipeline.extractors import SCRAPER_REGISTRY
 
@@ -597,7 +597,7 @@ async def discover_opportunities_task(timestamp: int) -> None:
 
     `timestamp` vem do procrastinate periodic (instante agendado, UNIX epoch).
     """
-    from core.edital_id import make_id  # noqa: PLC0415
+    from core.kg.edital_id import make_id  # noqa: PLC0415
     from core.opportunity_discovery import discover_opportunities  # noqa: PLC0415
 
     logger.info("discover_opportunities_task: iniciando (timestamp=%s)", timestamp)

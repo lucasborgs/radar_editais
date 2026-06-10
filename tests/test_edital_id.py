@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 import pytest  # noqa: E402
 
 from config import KG_WIKI_DIR  # noqa: E402
-from core.edital_id import (  # noqa: E402
+from core.kg.edital_id import (  # noqa: E402
     iter_wiki_pages,
     make_id,
     native_id_of,
@@ -102,7 +102,7 @@ def test_iter_wiki_pages_ignores_dotfiles(tmp_path: Path, monkeypatch):
     (fake_kg / "finep" / "601.json").write_text("{}", encoding="utf-8")
     (fake_kg / ".etl_process_cache.json").write_text("{}", encoding="utf-8")
 
-    monkeypatch.setattr("core.edital_id.KG_WIKI_DIR", fake_kg)
+    monkeypatch.setattr("core.kg.edital_id.KG_WIKI_DIR", fake_kg)
 
     paths = iter_wiki_pages()
     names = sorted(p.name for p in paths)
@@ -116,7 +116,7 @@ def test_iter_wiki_pages_filter_by_source(tmp_path: Path, monkeypatch):
     (fake_kg / "finep" / "782.json").write_text("{}", encoding="utf-8")
     (fake_kg / "fapesp" / "18064.json").write_text("{}", encoding="utf-8")
 
-    monkeypatch.setattr("core.edital_id.KG_WIKI_DIR", fake_kg)
+    monkeypatch.setattr("core.kg.edital_id.KG_WIKI_DIR", fake_kg)
 
     assert len(iter_wiki_pages()) == 2
     assert len(iter_wiki_pages("finep")) == 1
@@ -125,7 +125,7 @@ def test_iter_wiki_pages_filter_by_source(tmp_path: Path, monkeypatch):
 
 
 def test_iter_wiki_pages_returns_empty_when_dir_missing(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("core.edital_id.KG_WIKI_DIR", tmp_path / "does-not-exist")
+    monkeypatch.setattr("core.kg.edital_id.KG_WIKI_DIR", tmp_path / "does-not-exist")
     assert iter_wiki_pages() == []
 
 

@@ -31,8 +31,8 @@ import time
 from datetime import datetime
 
 from config import KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
-from core import kg_store, wiki_schema
-from core.edital_id import source_of, wiki_page_path
+from core.kg import kg_store, wiki_schema
+from core.kg.edital_id import source_of, wiki_page_path
 from core.structurer import build_or_load_structured_doc
 from pipeline.adapters.base import get_adapter
 
@@ -69,7 +69,7 @@ def _load_documents_via_silver(edital_id: str) -> tuple[list[tuple[str, str]], d
     Retorna `(documents, silver_meta)`. Vazio = sem conteúdo extraível;
     caller decide o fallback (`_save_minimal_wiki_page`).
     """
-    from core.edital_id import native_id_of, source_of  # noqa: PLC0415
+    from core.kg.edital_id import native_id_of, source_of  # noqa: PLC0415
 
     source = source_of(edital_id)
     native = native_id_of(edital_id)
@@ -201,7 +201,7 @@ def _call_llm(client, model: str, metadata: dict, pdfs: list[tuple[str, str]]) -
 
 # Promoção dos campos de match (wiki page → índice durável) — single source em
 # core/wiki_schema (compartilhado com build_knowledge_graph, que os carrega adiante).
-from core.wiki_schema import promote_match_fields as _promote_match_fields  # noqa: E402
+from core.kg.wiki_schema import promote_match_fields as _promote_match_fields  # noqa: E402
 
 
 def _save_wiki_page(entry: dict, synthesized: dict) -> dict:

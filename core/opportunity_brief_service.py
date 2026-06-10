@@ -21,8 +21,8 @@ import logging
 import os
 import re
 
-from core import kg_store
 from core.hybrid_match_service import get_weights, score_stage1
+from core.kg import kg_store
 from domain.user_profile import CompanyProfile
 from supabase import Client
 
@@ -153,7 +153,7 @@ def _llm_narrative(
     # Consciência temporal (Front 3): o brief de um edital com prazo curto deve
     # destacar a urgência; falha graciosa para bloco vazio.
     try:
-        from core.temporal import render_temporal_block
+        from core.kg.temporal import render_temporal_block
         tb = render_temporal_block(edital_id)
         temporal_block = f"{tb}\n\n" if tb else ""
     except Exception as e:

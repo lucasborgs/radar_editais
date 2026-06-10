@@ -63,7 +63,7 @@ def _discover_editais() -> list[str]:
     adapter resolve o PDF de volta via native_id. Prefixamos aqui (são todos
     FINEP por definição de FINEP_PDFS_DIR).
     """
-    from core.edital_id import make_id  # noqa: PLC0415
+    from core.kg.edital_id import make_id  # noqa: PLC0415
     if not FINEP_PDFS_DIR.exists():
         return []
     return sorted(make_id("finep", d.name) for d in FINEP_PDFS_DIR.iterdir() if d.is_dir())
@@ -106,7 +106,7 @@ async def _process_one(edital_id: str, queue: bool, force: bool) -> dict:
         return {"edital_id": edital_id, "status": "skipped (already indexed)"}
 
     # O dir é nomeado pelo native_id cru; o edital_id chega prefixado.
-    from core.edital_id import native_id_of  # noqa: PLC0415
+    from core.kg.edital_id import native_id_of  # noqa: PLC0415
     pdf_dir = FINEP_PDFS_DIR / native_id_of(edital_id)
     if not pdf_dir.exists():
         return {"edital_id": edital_id, "status": f"error: directory not found ({pdf_dir})"}

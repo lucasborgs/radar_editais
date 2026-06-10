@@ -16,8 +16,8 @@ import os
 import re
 
 from config import OBSIDIAN_VAULT_DIR
-from core import kg_store
-from core.edital_id import id_to_slug, slug_to_id
+from core.kg import kg_store
+from core.kg.edital_id import id_to_slug, slug_to_id
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -350,7 +350,7 @@ class KGMatchService:
         Derivado de wiki_schema.node_types() — schema autoritativo, sem
         duplicação. `home` (folder="") é tratado à parte.
         """
-        from core import wiki_schema
+        from core.kg import wiki_schema
         return {
             v["folder"]: k
             for k, v in wiki_schema.node_types().items()

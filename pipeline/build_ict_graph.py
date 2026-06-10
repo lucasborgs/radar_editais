@@ -29,7 +29,7 @@ import re
 from datetime import datetime, timezone
 
 from config import BRONZE_DIR, KNOWLEDGE_GRAPH_DIR
-from core import kg_store
+from core.kg import kg_store
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def canonical_themes() -> list[str]:
     """Vocabulário canônico de temas-macro (WIKI.md §5.9) — alvo do mapeamento
     fino→macro. Garante que ict.themes use a MESMA representação de edital.themes
     (a ponte). Fallback: temas emergentes do index.json se o vocab não existir."""
-    from core import wiki_schema as ws
+    from core.kg import wiki_schema as ws
     vocab = ws.tema_vocab()
     if vocab:
         return sorted(vocab)

@@ -1,7 +1,7 @@
 """Radar unificado (Layer 2) — merge/normalização/cap. Puro, sem rede.
 
 `merge_radar` funde listas de eventos (HybridMatch) e entidades (investor_match)
-num ranking só. `_why_now_event` lê core.temporal e degrada para "" com ids
+num ranking só. `_why_now_event` lê core.kg.temporal e degrada para "" com ids
 fake — então os testes focam em tagging de quadrante, ordenação e cap.
 """
 from __future__ import annotations

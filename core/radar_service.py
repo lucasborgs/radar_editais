@@ -39,9 +39,9 @@ _ENTITY_FLOOR = 6.0
 
 
 def _why_now_event(edital_id: str) -> str:
-    """Sinal de urgência de um evento via core.temporal (defensivo: '' em falha)."""
+    """Sinal de urgência de um evento via core.kg.temporal (defensivo: '' em falha)."""
     try:
-        from core.temporal import temporal_context
+        from core.kg.temporal import temporal_context
         ctx = temporal_context(edital_id)
     except Exception:
         return ""

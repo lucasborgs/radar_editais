@@ -27,7 +27,7 @@ import logging
 import os
 import re
 
-from core import kg_store
+from core.kg import kg_store
 
 logger = logging.getLogger(__name__)
 

@@ -60,8 +60,8 @@ def task(*, item: Any, **_) -> dict:
     inp = get_input(item)
     from core.agent_tools.critic_agent import _build_proposal_context
     from core.db import get_supabase_service
+    from core.kg.temporal import render_temporal_block
     from core.retriever import format_chunks_for_prompt, retrieve_chunks
-    from core.temporal import render_temporal_block
     from core.writing_eval import (
         extract_edital_claims,
         judge_factual_errors,

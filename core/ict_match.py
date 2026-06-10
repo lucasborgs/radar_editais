@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from core import kg_store
+from core.kg import kg_store
 
 logger = logging.getLogger(__name__)
 

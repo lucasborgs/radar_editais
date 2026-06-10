@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from core import kg_store  # noqa: E402
+from core.kg import kg_store  # noqa: E402
 
 
 def test_load_wiki_page_postgres_from_blob(monkeypatch):

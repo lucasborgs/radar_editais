@@ -114,7 +114,7 @@ def writing_start(
     # (investidor:<slug>, em investidores.json → pitch outbound). Valida na fonte
     # certa por namespace do id; a WritingSession deriva o mode do mesmo id.
     if req.edital_id.startswith("investidor:"):
-        from core import kg_store
+        from core.kg import kg_store
         if req.edital_id not in {i["id"] for i in kg_store.load_investidores()}:
             raise HTTPException(status_code=404, detail=f"Fundo '{req.edital_id}' não encontrado")
     elif wiki_matcher.get_edital_by_id(req.edital_id) is None:
