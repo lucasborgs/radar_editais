@@ -19,6 +19,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Reciprocal Rank Fusion: funde rankings de fontes com escalas de score
+# INCOMPARÁVEIS (evento ~4-6 penalizado vs entidade ~7-9 LLM-generoso) usando só
+# a POSIÇÃO dentro de cada lista, não a nota crua. score_rrf = Σ 1/(k + rank).
+# k=60 é a convenção (amortece o peso desproporcional das 1ªs posições). É a
+# normalização "simples e assertiva" do MVP — robusta a outlier, sem calibração,
+# sem número mágico. Magnitude crua fica no payload p/ display. Refino futuro
+# (pesos por quadrante, floor de qualidade) no BACKLOG.
+_RRF_K = 60
+
 
 def _why_now_event(edital_id: str) -> str:
     """Sinal de urgência de um evento via core.temporal (defensivo: '' em falha)."""
@@ -82,6 +91,15 @@ def _apply_cap(items: list[dict], per_type_cap: int | None) -> list[dict]:
     return kept
 
 
+def _rank_within_source(items: list[dict]) -> None:
+    """Atribui `rank` (1-based, por score desc) e `rrf` (1/(k+rank)) in-place.
+    Cada lista-fonte é rankeada SEPARADAMENTE — é o que torna escalas
+    incomparáveis comparáveis."""
+    for rank, it in enumerate(sorted(items, key=lambda x: x["score"], reverse=True), start=1):
+        it["rank"] = rank
+        it["rrf"] = 1.0 / (_RRF_K + rank)
+
+
 def merge_radar(
     events: list[dict],
     entities: list[dict],
@@ -89,12 +107,17 @@ def merge_radar(
     top_k: int = 10,
     per_type_cap: int | None = None,
 ) -> dict:
-    """Funde listas heterogêneas num ranking único. PURO (sem I/O além do
-    `why_now` de evento, que degrada gracioso). Ordena por score desc, aplica o
-    cap por quadrante e trunca em top_k."""
-    items = [_event_item(m) for m in (events or [])]
-    items += [_entity_item(m) for m in (entities or [])]
-    items.sort(key=lambda x: x["score"], reverse=True)
+    """Funde listas heterogêneas num ranking único via RRF. PURO (sem I/O além do
+    `why_now` de evento, que degrada gracioso). Rankeia cada fonte, ordena pelo
+    score RRF (desempate: score cru desc, p/ determinismo), aplica o cap por
+    quadrante e trunca em top_k."""
+    evs = [_event_item(m) for m in (events or [])]
+    ents = [_entity_item(m) for m in (entities or [])]
+    _rank_within_source(evs)        # eventos rankeados entre si
+    _rank_within_source(ents)       # entidades rankeadas entre si
+
+    items = evs + ents
+    items.sort(key=lambda x: (x["rrf"], x["score"]), reverse=True)
     items = _apply_cap(items, per_type_cap)[:top_k]
 
     counts: dict[str, int] = {}
