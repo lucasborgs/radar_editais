@@ -105,6 +105,10 @@ _TRIAGE_SYSTEM = (
     "processo seletivo/concurso de pessoal, compra/licitação; ou ALTERAÇÃO/"
     "PRORROGAÇÃO/RESULTADO de chamada antiga, notícia, página institucional, "
     "oportunidade encerrada. "
+    "REJEITE também quando a página NÃO é UMA chamada específica: página-lista/"
+    "portal/agregador de editais ('editais abertos', 'oportunidades'), homepage "
+    "de programa/agência, ou notícia que anuncia VÁRIOS editais de uma vez — "
+    "essas páginas não viram um registro útil (1 URL = 1 oportunidade). "
     "Responda só JSON: "
     '{"is_opportunity": true|false, "agency": "sigla/nome curto da agência ou \\"\\""}.'
 )
