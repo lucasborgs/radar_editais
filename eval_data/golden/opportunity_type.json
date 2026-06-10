@@ -1,0 +1,44 @@
+[
+  {
+    "case_id": "edital-finep-subvencao",
+    "expected_type": "edital",
+    "title": "Chamada Pública FINEP/FNDCT — Subvenção Econômica à Inovação 2026",
+    "url": "https://www.finep.gov.br/chamadas-publicas/subvencao-2026",
+    "text": "A FINEP torna pública a presente Chamada para seleção de propostas de empresas brasileiras visando à concessão de recursos de subvenção econômica à inovação. Poderão participar empresas de qualquer porte sediadas no Brasil. As propostas serão submetidas pelo portal da FINEP até a data limite. Os recursos são não-reembolsáveis e destinam-se a projetos de pesquisa, desenvolvimento e inovação em temas prioritários."
+  },
+  {
+    "case_id": "edital-fapesp-pipe",
+    "expected_type": "edital",
+    "title": "FAPESP PIPE — Pesquisa Inovativa em Pequenas Empresas",
+    "url": "https://fapesp.br/pipe/chamada",
+    "text": "A FAPESP convida pequenas empresas do Estado de São Paulo a submeterem propostas de pesquisa para o desenvolvimento de produtos e processos inovadores. O edital prevê apoio financeiro em fases, com cronograma de submissão e análise por pares. São elegíveis empresas com até 250 funcionários."
+  },
+  {
+    "case_id": "desafio-petrobras-conexoes",
+    "expected_type": "desafio",
+    "title": "Conexões para Inovação — Desafio Petrobras de Descarbonização",
+    "url": "https://petrobras.com.br/conexoes/desafio-descarbonizacao",
+    "text": "A Petrobras lança desafio tecnológico de open innovation buscando startups com soluções para captura e armazenamento de carbono (CCUS) e eficiência energética em refinarias. As startups selecionadas farão uma prova de conceito (PoC) em ambiente operacional da companhia, com possibilidade de contrato comercial. A empresa-âncora é a própria Petrobras, que traz o problema real a ser resolvido."
+  },
+  {
+    "case_id": "desafio-100-10-1",
+    "expected_type": "desafio",
+    "title": "Desafio de Inovação Aberta — Indústria 4.0",
+    "url": "https://example.com/desafio-industria-40",
+    "text": "Grande indústria de manufatura abre desafio de inovação aberta para encontrar startups que resolvam dores de manutenção preditiva e qualidade na linha de produção. As empresas selecionadas pilotam suas soluções em uma planta real e podem se tornar fornecedoras. O foco é solucionar um problema concreto trazido pela companhia."
+  },
+  {
+    "case_id": "programa-aceleracao-equity",
+    "expected_type": "programa",
+    "title": "Programa de Aceleração Deep-Tech — Cohort 2026",
+    "url": "https://example.com/aceleradora/cohort-2026",
+    "text": "Programa de aceleração de 6 meses para startups deep-tech em estágio inicial. A aceleradora oferece capital de R$ 250 mil em troca de participação societária (equity), mentoria semanal com especialistas, espaço de trabalho e acesso a uma rede de investidores. Ao final do cohort, as startups apresentam no Demo Day."
+  },
+  {
+    "case_id": "programa-incubacao-no-equity",
+    "expected_type": "programa",
+    "title": "Programa de Incubação ICT — Residência Tecnológica",
+    "url": "https://example.com/incubadora/residencia",
+    "text": "Programa de incubação que recebe novos cohorts de empreendedores para residência tecnológica de 12 meses. Oferece mentoria, laboratórios e capacitação, sem tomar participação societária (no-equity). O objetivo é apoiar a maturação de negócios de base tecnológica até a primeira tração."
+  }
+]
