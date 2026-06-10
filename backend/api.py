@@ -213,6 +213,14 @@ class MatchRequest(BaseModel):
     top_k: int = 10
 
 
+class RadarRequest(BaseModel):
+    profile: CompanyProfileSchema
+    top_k: int = 10
+    # Cap por quadrante (anti-inundação): máx. de itens por opportunity_type no
+    # ranking. None = sem cap. Ver core.radar_service.
+    per_type_cap: int | None = None
+
+
 class WritingStartRequest(BaseModel):
     edital_id: str
     profile: CompanyProfileSchema
@@ -459,6 +467,26 @@ def match_investidores_endpoint(
     from core.investor_match import match_investidores
     profile = _to_py_profile(req.profile)
     return {"matches": match_investidores(profile, top_k=req.top_k)}
+
+
+@app.post("/match/radar", summary="Radar unificado (L2): eventos + investidores num ranking só")
+@limiter.limit("10/minute")
+def match_radar(request: Request, req: RadarRequest, user_id: CurrentUserId, db: DbClient):
+    """Funde o match de eventos (edital/desafio/programa) e o de investidores num
+    ÚNICO ranking (Layer 2, spec §3.8): normaliza scores, anexa o sinal "por que
+    agora" e aplica cap por quadrante. Orquestra os 2 matchers sem tocá-los —
+    `/match` e `/match/investidores` seguem disponíveis."""
+    profile = _to_py_profile(req.profile)
+    if not profile.is_complete():
+        raise HTTPException(
+            status_code=422,
+            detail="Perfil incompleto. Preencha pelo menos nome e descricao_atividades.",
+        )
+    workspace_id = get_workspace_id(db, user_id)
+    from core.radar_service import build_radar
+    return build_radar(
+        profile, top_k=req.top_k, per_type_cap=req.per_type_cap, workspace_id=workspace_id,
+    )
 
 
 # =============================================================================
