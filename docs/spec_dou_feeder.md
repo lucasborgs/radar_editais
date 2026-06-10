@@ -2,7 +2,8 @@
 
 > **Status:** módulo IMPLEMENTADO e validado ao vivo (2026-06-09) —
 > [core/dou_feeder.py](../core/dou_feeder.py). Wiring no `discover_opportunities()`
-> **pendente** (aditivo; §6). Credenciais em `.env` (`INLABS_EMAIL`/`INLABS_PASSWORD`),
+> **FEITO** (2026-06-10, atrás de `DISCOVERY_DOU_ENABLED`; §6). Ativação em prod
+> via **shadow-run** (§9). Credenciais em `.env` (`INLABS_EMAIL`/`INLABS_PASSWORD`),
 > carregadas por `load_dotenv()` (já em `backend/api.py` e `core/tasks.py`).
 > Persona: deep-tech early-stage. Ref. arquitetural: [spec_multi_quadrante.md](spec_multi_quadrante.md) §3.3.
 
@@ -185,3 +186,48 @@ publicação de DD/MM, pág. X"), não no metadado do título.
 - Medir precisão pós-triagem (quantos candidatos DOU viram oportunidade real) p/
   calibrar o pré-filtro vs custo.
 - Avaliar varrer dias retroativos no primeiro run (backfill da janela vigente).
+
+## 9. Shadow-run e ativação em prod (Fase 1 do ROADMAP)
+
+Decisão 2026-06-10: a torneira liga em prod **depois** de um shadow-run local —
+rodar N dias gravando, inspecionar qualidade, só então expor. Política de UI
+decidida: itens `provisorio` são **rotulados** (badge "não verificado" no card),
+não filtrados.
+
+### Como o isolamento funciona hoje
+
+O cron `discover_opportunities` (04:00 UTC, `core/tasks.py`) já roda `write=True`
+incondicionalmente — o que segura a prod é **ambiental**: sem `TAVILY_API_KEY`/
+chave LLM o engine degrada pra no-op, e sem `DISCOVERY_DOU_ENABLED=1` +
+`INLABS_*` o feeder DOU fica inerte. Shadow-run = rodar com tudo ligado **no
+ambiente local** (bronze + índice locais); prod não vê nada até as chaves
+entrarem no Railway.
+
+### Runbook do shadow-run
+
+```bash
+# .env local: TAVILY_API_KEY, OPENAI_API_KEY (ou GEMINI), INLABS_EMAIL,
+# INLABS_PASSWORD, DISCOVERY_DOU_ENABLED=1
+
+# 1×/dia (manual ou worker local), de manhã (o wiring busca o DOU de D-1 UTC):
+python -m core.opportunity_discovery       # grava bronze_data/web_raw/web_discovery_*.json
+python pipeline/build_knowledge_graph.py   # ingere no índice local (badge aparece na UI local)
+```
+
+### O que inspecionar (por run e acumulado)
+
+- **Título**: % de registros com `title` não-vazio (revalida o item do BACKLOG —
+  o fallback `titulo ← hit.title` existe no código; o sintoma do dry-run de
+  2026-06-09 não foi reproduzido por leitura, precisa de dado real).
+- **Campos**: `prazo_envio`/`status`/`opportunity_type`/`tema` plausíveis.
+- **Precisão**: quantos aprovados pela triagem são fomento real (DOU vs Tavily
+  separadamente — mede o ganho da espinha).
+- **Duplicatas cross-fonte** (mesma oportunidade, URL DOU ≠ URL agência): o
+  reescopo do Tavily (§6.1) deve tê-las quase zerado; contar as que sobrarem.
+- **Custo**: candidatos/dia × triagem + aprovados × extração.
+
+### Critério de graduação (ligar em prod)
+
+Sem número mágico — julgamento sobre ~1 semana de runs: títulos ok, falso-positivo
+da triagem tolerável (o badge avisa o usuário), sem duplicata grosseira no radar.
+Ligar = setar as mesmas envs no Railway (worker), nada de código.
