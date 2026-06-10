@@ -720,8 +720,14 @@ def writing_start(
     Cria uma sessão de escrita persistida em Postgres para o edital selecionado.
     Retorna session_id, títulos das seções e contexto da sessão.
     """
-    edital = wiki_matcher.get_edital_by_id(req.edital_id)
-    if edital is None:
+    # Alvo de escrita: evento (edital/desafio/programa, no índice) OU entidade
+    # (investidor:<slug>, em investidores.json → pitch outbound). Valida na fonte
+    # certa por namespace do id; a WritingSession deriva o mode do mesmo id.
+    if req.edital_id.startswith("investidor:"):
+        from core import kg_store
+        if req.edital_id not in {i["id"] for i in kg_store.load_investidores()}:
+            raise HTTPException(status_code=404, detail=f"Fundo '{req.edital_id}' não encontrado")
+    elif wiki_matcher.get_edital_by_id(req.edital_id) is None:
         raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
 
     workspace_id = get_workspace_id(db, user_id)
