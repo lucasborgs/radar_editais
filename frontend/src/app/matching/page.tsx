@@ -145,6 +145,22 @@ function OpportunityTypeBadge({ type }: { type?: string }) {
   );
 }
 
+// Badge de verificação: item `provisorio` veio da Descoberta automática (web/DOU)
+// e ainda não passou por revisão humana — rotulamos, não filtramos (política
+// Fase 1). `verificado` é o caso dominante e NÃO renderiza badge.
+function VerificacaoBadge({ verificacao }: { verificacao?: string }) {
+  if (verificacao !== "provisorio") return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-sans font-medium text-amber-700"
+      title="Encontrado automaticamente na web — dados ainda não verificados. Confira na fonte antes de aplicar."
+    >
+      <span aria-hidden>⚠️</span>
+      Não verificado
+    </span>
+  );
+}
+
 function MatchCard({ match }: { match: KGMatchResult }) {
   const router = useRouter();
   const color = scoreColor(match.score);
@@ -171,6 +187,7 @@ function MatchCard({ match }: { match: KGMatchResult }) {
 
       <div className="flex items-center gap-2 flex-wrap mb-2">
         <OpportunityTypeBadge type={match.opportunity_type} />
+        <VerificacaoBadge verificacao={match.verificacao} />
         <StatusBadge status={match.status} />
         {match.deadline && (
           <span className="font-data text-xs text-content-secondary">

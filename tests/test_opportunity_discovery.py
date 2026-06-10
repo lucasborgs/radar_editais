@@ -171,6 +171,97 @@ def test_discover_skips_non_opportunity(monkeypatch):
     assert [r["url"] for r in out] == ["http://x.org/a"]
 
 
+def test_discover_dou_feeder_behind_flag(monkeypatch):
+    """Com DISCOVERY_DOU_ENABLED=1, candidatos DOU entram ANTES do Tavily e
+    passam pelo mesmo dedup (ledger + seen)."""
+    import core.dou_feeder as df
+    dou_hits = [
+        SearchHit("Chamada MCTI", "http://in.gov.br/p1", "ementa", "texto dou",
+                  agency="MCTI", full_text=True),
+        SearchHit("Known", "http://x.org/known", "s", "c", full_text=True),
+    ]
+    tavily_hits = [SearchHit("B", "http://x.org/b", "sb", "cb")]
+    monkeypatch.setenv("DISCOVERY_DOU_ENABLED", "1")
+    monkeypatch.setattr(df, "dou_candidates", lambda day=None, **kw: dou_hits)
+    monkeypatch.setattr(od.websearch, "web_search", lambda q, k=8: tavily_hits)
+    monkeypatch.setattr(od, "_known_urls", lambda: {"http://x.org/known"})
+    monkeypatch.setattr(od, "_make_client", lambda role: (object(), "m"))
+    monkeypatch.setattr(od, "_triage",
+                        lambda h, c, m: {"is_opportunity": True, "agency": ""})
+    monkeypatch.setattr(od, "_page_text", lambda h: h.content or "")
+    seen = []
+    def fake_extract(h, txt, agency, c, m):
+        seen.append((h.url, agency))
+        return {"url": h.url, "url_hash": web_url_hash(h.url),
+                "verificacao": "provisorio"}
+    monkeypatch.setattr(od, "_extract", fake_extract)
+    monkeypatch.setattr(od.ws, "discovery_config",
+                        lambda: {"queries": ["q"], "max_results_per_query": 8,
+                                 "max_candidates": 40})
+    out = od.discover_opportunities(write=False)
+    # DOU primeiro (espinha), known deduplicado, Tavily depois; agency da fonte
+    # DOU prevalece sobre o palpite (vazio) da triagem.
+    assert seen == [("http://in.gov.br/p1", "MCTI"), ("http://x.org/b", "")]
+    assert len(out) == 2
+
+
+def test_discover_dou_has_own_budget_does_not_starve_tavily(monkeypatch):
+    """Orçamentos separados (achado do 1º shadow-run: DOU ~63/dia zerava o
+    Tavily num cap compartilhado): DOU respeita max_dou_candidates; Tavily
+    conta max_candidates do zero, mesmo com o DOU cheio."""
+    import core.dou_feeder as df
+    dou_hits = [SearchHit(f"D{i}", f"http://in.gov.br/p{i}", "s", "c",
+                          full_text=True) for i in range(10)]
+    tavily_hits = [SearchHit(f"T{i}", f"http://x.org/t{i}", "s", "c")
+                   for i in range(5)]
+    monkeypatch.setenv("DISCOVERY_DOU_ENABLED", "1")
+    monkeypatch.setattr(df, "dou_candidates", lambda day=None, **kw: dou_hits)
+    monkeypatch.setattr(od.websearch, "web_search", lambda q, k=8: tavily_hits)
+    monkeypatch.setattr(od, "_known_urls", lambda: set())
+    monkeypatch.setattr(od, "_make_client", lambda role: (object(), "m"))
+    monkeypatch.setattr(od, "_triage",
+                        lambda h, c, m: {"is_opportunity": True, "agency": ""})
+    monkeypatch.setattr(od, "_page_text", lambda h: h.content or "")
+    monkeypatch.setattr(od, "_extract",
+                        lambda h, t, a, c, m: {"url": h.url,
+                                               "url_hash": web_url_hash(h.url),
+                                               "verificacao": "provisorio"})
+    monkeypatch.setattr(od.ws, "discovery_config",
+                        lambda: {"queries": ["q"], "max_results_per_query": 8,
+                                 "max_candidates": 3, "max_dou_candidates": 4})
+    out = od.discover_opportunities(write=False)
+    urls = [r["url"] for r in out]
+    # DOU capado em 4 (não 10); Tavily ganha os 3 do orçamento PRÓPRIO.
+    assert len([u for u in urls if "in.gov.br" in u]) == 4
+    assert len([u for u in urls if "x.org" in u]) == 3
+
+
+def test_discover_dou_disabled_by_default(monkeypatch):
+    """Sem a flag, o feeder DOU nem é chamado (caminho Tavily intocado)."""
+    import core.dou_feeder as df
+    monkeypatch.delenv("DISCOVERY_DOU_ENABLED", raising=False)
+    def boom(*a, **kw):
+        raise AssertionError("dou_candidates não deveria ser chamado")
+    monkeypatch.setattr(df, "dou_candidates", boom)
+    monkeypatch.setattr(od.websearch, "web_search", lambda q, k=8: [])
+    monkeypatch.setattr(od, "_known_urls", lambda: set())
+    monkeypatch.setattr(od.ws, "discovery_config",
+                        lambda: {"queries": ["q"], "max_results_per_query": 8,
+                                 "max_candidates": 40})
+    assert od.discover_opportunities(write=False) == []
+
+
+def test_page_text_skips_fetch_for_full_text_hits(monkeypatch):
+    """Hit com full_text (DOU) usa o content direto, sem full-fetch da URL."""
+    import core.agent_tools.profile_tools as pt
+    def boom(url):
+        raise AssertionError("full-fetch não deveria rodar para hit full_text")
+    monkeypatch.setattr(pt, "_fetch_and_parse", boom)
+    hit = SearchHit("T", "http://in.gov.br/p1", "snip", "texto completo do dou",
+                    full_text=True)
+    assert od._page_text(hit) == "texto completo do dou"
+
+
 def test_discover_no_credential_returns_empty(monkeypatch):
     monkeypatch.setattr(od.websearch, "web_search", lambda q, k=8:
                         [SearchHit("A", "http://x.org/a", "s", "c")])

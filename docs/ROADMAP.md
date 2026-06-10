@@ -30,8 +30,8 @@ Detalhe e seams em [spec_multi_quadrante.md](spec_multi_quadrante.md) + memória
 
 | Fase | O quê | Por que aqui | Pré-requisito / risco |
 |---|---|---|---|
-| **0 — Handoff** ✅ em curso | merge PR #8 + este ROADMAP + nota de arquitetura + memória | ponte pra próxima conversa/modelo | baixo |
-| **1 — Ligar a torneira** (iniciativa "dados") | Descoberta web em prod | fundacional e pequeno; enriquece o grafo → torna a #3-frontend demonstrável e destrava match de desafio/programa | **fix `titulo` vazio** antes de `write=True`; política de itens `provisorio` (rotular/filtrar na UI); custo Tavily+LLM |
+| **0 — Handoff** ✅ | merge PR #8 + este ROADMAP + nota de arquitetura + memória | ponte pra próxima conversa/modelo | baixo |
+| **1 — Ligar a torneira** (iniciativa "dados") 🔄 código pronto, shadow-run pendente | Descoberta web em prod | fundacional e pequeno; enriquece o grafo → torna a #3-frontend demonstrável e destrava match de desafio/programa | wiring DOU + reescopo Tavily + badge `provisorio` FEITOS (2026-06-10); falta rodar o **shadow-run** (~1 semana, runbook em [spec_dou_feeder.md](spec_dou_feeder.md) §9) e então setar envs no Railway; custo Tavily+LLM |
 | **2 — Reorg backend** (#3-backend) | arquitetura/boas práticas na base | base estável (multi-quadrante assentou) e limpa **antes** do rewrite | NÃO reorganizar o frontend aqui (vai ser reescrito); ver [refactor_backend.md](refactor_backend.md) |
 | **3 — Frontend** (iniciativa "frontend") | 1a front-door conversacional → 1b workspace tipo IDE | maior e mais design; merece base limpa + dados ricos | maior superfície de design; 1b (IDE) é ambicioso; **specar UX antes de codar** |
 
@@ -43,7 +43,10 @@ Detalhe e seams em [spec_multi_quadrante.md](spec_multi_quadrante.md) + memória
 
 ### Decisões em aberto (definir antes de cada fase)
 
-- **Fase 1:** política de itens `provisorio` no radar/UI (rotular vs filtrar); ligar via `write=True` direto ou shadow-run primeiro. Pré: corrigir `titulo` vazio (BACKLOG).
+- **Fase 1 — DECIDIDO (2026-06-10):** itens `provisorio` são **rotulados**
+  (badge "não verificado"), não filtrados; ativação via **shadow-run** local
+  primeiro (runbook: spec_dou_feeder §9). O "fix `titulo` vazio" caiu: o
+  fallback já existia no código; revalida-se com o dado do shadow-run (BACKLOG).
 - **Fase 3:** stack do frontend (manter Next.js 14?); spec de UX das duas interfaces (fluxos, janelas, o que cada uma consome do backend) — **alto julgamento, specar com modelo capaz**.
 
 ---
