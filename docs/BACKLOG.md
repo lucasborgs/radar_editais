@@ -546,12 +546,15 @@ de fora — nenhum bloqueia o que foi entregue.
 - **Botão "escrever pitch" no card de investidor (Q3).** O endpoint
   `/writing/start` já aceita id `investidor:` (mode=pitch), mas não há gancho de
   UI a partir do InvestorCard. **Onde:** `frontend/src/app/matching/page.tsx`.
-- **Normalização de scores heterogêneos no radar (afinar L2).** Débito exposto no
-  smoke: o scorer LLM de investidor é mais generoso (~8-9.5) que o blended do
-  HybridMatch (~4-5) → investidores dominam o topo. O cap por quadrante evita
-  inundação, mas a ORDENAÇÃO ainda favorece entidades. Refinamento nº1 da fase
-  dedicada de match (spec §3.8 autoriza L2 ingênua agora). **Onde:**
-  `core/radar_service.merge_radar`.
+- **Ranking do radar L2 — base feita (RRF), refinos pendentes.** A normalização
+  de scores heterogêneos foi resolvida com Reciprocal Rank Fusion (commit RRF):
+  funde por rank-dentro-do-tipo, intercala eventos e fundos. Pendente afinar:
+  (a) **pesos por quadrante** (hoje 50/50 implícito — talvez priorizar eventos por
+  urgência de deadline, ou ajustar por preferência do usuário); (b) **floor de
+  qualidade** (RRF põe o rank-1 de uma lista curta no topo mesmo com score cru
+  baixo — um fundo fraco pode subir; falta um piso/threshold antes da fusão);
+  (c) usar `why_now`/urgência como critério, não só display. **Onde:**
+  `core/radar_service.merge_radar` (`_RRF_K`, `_rank_within_source`).
 - **Match tipo-aware de desafio/programa — BLOQUEADO-POR-DADOS.** O HybridMatch
   já não QUEBRA com desafio/programa (dims de edital ausentes degradam para
   neutro, não eliminam), mas não usa sinais próprios (`empresa_ancora`,
