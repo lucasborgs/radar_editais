@@ -9,8 +9,9 @@ from __future__ import annotations
 from core.radar_service import _apply_cap, merge_radar
 
 
-def _ev(id_, score, otype="edital", title="E"):
-    return {"id": id_, "score": score, "opportunity_type": otype, "title": title}
+def _ev(id_, score, otype="edital", title="E", eligible=True):
+    return {"id": id_, "score": score, "opportunity_type": otype, "title": title,
+            "eligible": eligible}
 
 
 def _inv(id_, score, name="Fundo"):
@@ -85,6 +86,31 @@ def test_apply_cap_limits_per_type_keeping_order():
 def test_apply_cap_none_is_noop():
     items = [{"id": "e1", "opportunity_type": "edital", "score": 9}]
     assert _apply_cap(items, None) == items
+
+
+def test_floor_demotes_weak_entity_below_strong_event():
+    """Fundo abaixo do floor (6.0) afunda abaixo de um evento forte, mesmo com
+    score cru maior — senão o rank-1 fraco boiaria no topo."""
+    out = merge_radar([_ev("e1", 5.0)], [_inv("i1", 5.5)])  # i1 < floor → fraco
+    radar = out["radar"]
+    assert [it["id"] for it in radar] == ["e1", "i1"]   # sem floor seria [i1, e1]
+    tier = {it["id"]: it["tier"] for it in radar}
+    assert tier == {"e1": "forte", "i1": "fraco"}
+
+
+def test_floor_demotes_ineligible_event():
+    """Evento aproximado (eligible=False) vai pro tier fraco, abaixo de entidade forte."""
+    out = merge_radar([_ev("e1", 9.0, eligible=False)], [_inv("i1", 7.0)])
+    assert [it["id"] for it in out["radar"]] == ["i1", "e1"]  # sem floor seria [e1, i1]
+    tier = {it["id"]: it["tier"] for it in out["radar"]}
+    assert tier["e1"] == "fraco" and tier["i1"] == "forte"
+
+
+def test_floor_demotes_but_never_drops():
+    """Match fraco continua presente (spec §3.8: entidade nunca some) — só rebaixado."""
+    out = merge_radar([], [_inv("i1", 2.0)])  # único match, bem fraco
+    assert [it["id"] for it in out["radar"]] == ["i1"]
+    assert out["radar"][0]["tier"] == "fraco"
 
 
 def test_cap_applied_anti_flood_in_merge():
