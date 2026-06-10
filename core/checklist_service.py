@@ -344,7 +344,7 @@ async def auto_review_checklist(
         }
 
     try:
-        from core.llm_client import make_async_client
+        from core.llm.llm_client import make_async_client
     except ImportError as e:
         logger.error("AsyncOpenAI indisponível: %s", e)
         return {

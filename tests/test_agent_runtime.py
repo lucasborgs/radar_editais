@@ -1,4 +1,4 @@
-"""Testes unitários do core.agent_runtime.
+"""Testes unitários do core.llm.agent_runtime.
 
 Cobre:
   - @tool decorator: inferência de schema, required vs default, erros de
@@ -21,7 +21,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.agent_runtime import (  # noqa: E402
+from core.llm.agent_runtime import (  # noqa: E402
     ToolRegistry,
     TraceStep,
     _format_tool_results_anthropic,
@@ -291,7 +291,7 @@ def test_run_agent_no_tool_use_one_step(monkeypatch):
             usage={"input_tokens": 30, "output_tokens": 10},
         ),
     ])
-    monkeypatch.setattr("core.agent_runtime._call_anthropic", fake)
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
 
     @tool
     def search(q: str) -> str:
@@ -333,7 +333,7 @@ def test_run_agent_one_tool_call_then_response(monkeypatch):
             usage={"input_tokens": 150, "output_tokens": 15},
         ),
     ])
-    monkeypatch.setattr("core.agent_runtime._call_anthropic", fake)
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
 
     @tool
     def search(q: str) -> str:
@@ -378,7 +378,7 @@ def test_run_agent_unknown_tool_returns_error_string_to_model(monkeypatch):
             usage={"input_tokens": 60, "output_tokens": 8},
         ),
     ])
-    monkeypatch.setattr("core.agent_runtime._call_anthropic", fake)
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
 
     @tool
     def real_tool(x: str) -> str:
@@ -413,7 +413,7 @@ def test_run_agent_max_steps_cuts_infinite_loop(monkeypatch):
     )
     # Programa 3 steps; max_steps=3 deve cortar
     fake = _make_fake_call([infinite_tool_use, infinite_tool_use, infinite_tool_use])
-    monkeypatch.setattr("core.agent_runtime._call_anthropic", fake)
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
 
     @tool
     def spin() -> str:
@@ -440,7 +440,7 @@ def test_run_agent_llm_exception_yields_error_stop_reason(monkeypatch):
     def boom(*args, **kwargs):
         raise RuntimeError("API down")
 
-    monkeypatch.setattr("core.agent_runtime._call_anthropic", boom)
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", boom)
 
     @tool
     def noop(x: str) -> str:
@@ -486,7 +486,7 @@ def test_run_agent_on_step_callback_invoked(monkeypatch):
             usage={"input_tokens": 5, "output_tokens": 3},
         ),
     ])
-    monkeypatch.setattr("core.agent_runtime._call_anthropic", fake)
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
 
     @tool
     def t(x: str) -> str:

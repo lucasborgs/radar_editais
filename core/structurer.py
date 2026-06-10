@@ -38,7 +38,7 @@ _JSON_FENCE_RE = re.compile(r"```(?:json)?|```")
 
 def _make_client():
     backend = os.getenv("LLM_BACKEND", "openai").lower()
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
 
     if backend == "gemini":
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")

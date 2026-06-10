@@ -29,7 +29,7 @@ def _make_openai_client():
     Replicates the pattern from core.content_library._make_client but does NOT
     consider LLM_BACKEND — embeddings are always OpenAI by policy (A1).
     """
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError(

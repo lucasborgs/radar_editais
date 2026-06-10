@@ -83,7 +83,7 @@ _DIMENSION_MAX = {
 
 def _make_client(model_override: str | None = None):
     """Constrói client OpenAI. `model_override` aceita resolução de tier (Fase 4 #24)."""
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
     model = model_override or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     return make_client(api_key=os.environ["OPENAI_API_KEY"]), model
 

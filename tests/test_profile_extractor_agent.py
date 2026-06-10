@@ -17,8 +17,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.agent_runtime import AgentResult  # noqa: E402
-from core.agent_tools import ExtractionState, build_profile_tools  # noqa: E402
+from core.llm.agent_runtime import AgentResult  # noqa: E402
+from core.llm.agent_tools import ExtractionState, build_profile_tools  # noqa: E402
 from core.profile_extractor import ProfileExtractor  # noqa: E402
 
 # ============================================================================
@@ -55,7 +55,7 @@ def test_fetch_page_returns_text_and_caches(monkeypatch):
 
     html = "<html><head><title>ACME Bio</title></head><body><p>Empresa de bioeconomia.</p></body></html>"
     monkeypatch.setattr(
-        "core.agent_tools.profile_tools.requests.get",
+        "core.llm.agent_tools.profile_tools.requests.get",
         lambda *a, **kw: _mock_response(html=html),
     )
 
@@ -78,7 +78,7 @@ def test_fetch_page_serves_from_cache_on_second_call(monkeypatch):
         call_count["n"] += 1
         return _mock_response(html=html)
 
-    monkeypatch.setattr("core.agent_tools.profile_tools.requests.get", fake_get)
+    monkeypatch.setattr("core.llm.agent_tools.profile_tools.requests.get", fake_get)
 
     fetch.call({"url": "https://x.com"})
     out = fetch.call({"url": "https://x.com"})
@@ -92,7 +92,7 @@ def test_fetch_page_handles_http_error(monkeypatch):
     fetch = next(t for t in tools if t.name == "fetch_page")
 
     monkeypatch.setattr(
-        "core.agent_tools.profile_tools.requests.get",
+        "core.llm.agent_tools.profile_tools.requests.get",
         lambda *a, **kw: _mock_response(status_code=404, html=""),
     )
     out = fetch.call({"url": "https://nope.com"})
@@ -109,7 +109,7 @@ def test_fetch_page_handles_timeout(monkeypatch):
     def boom(*a, **kw):
         raise Timeout("slow")
 
-    monkeypatch.setattr("core.agent_tools.profile_tools.requests.get", boom)
+    monkeypatch.setattr("core.llm.agent_tools.profile_tools.requests.get", boom)
     out = fetch.call({"url": "https://slow.com"})
     assert "Timeout" in out
 
@@ -125,7 +125,7 @@ def test_fetch_page_respects_max_pages_limit(monkeypatch):
 
     # 11ª URL nova é bloqueada
     monkeypatch.setattr(
-        "core.agent_tools.profile_tools.requests.get",
+        "core.llm.agent_tools.profile_tools.requests.get",
         lambda *a, **kw: _mock_response(html="<html><title>nova</title></html>"),
     )
     out = fetch.call({"url": "https://nova.com"})
@@ -198,7 +198,7 @@ def test_list_links_matching_fetches_on_demand(monkeypatch):
     state = ExtractionState()
     html = '<html><body><a href="/about">About</a></body></html>'
     monkeypatch.setattr(
-        "core.agent_tools.profile_tools.requests.get",
+        "core.llm.agent_tools.profile_tools.requests.get",
         lambda *a, **kw: _mock_response(html=html),
     )
     tools = build_profile_tools(state)
@@ -228,7 +228,7 @@ def test_lookup_cnpj_accepts_masked_format(monkeypatch):
     lc = next(t for t in tools if t.name == "lookup_cnpj")
 
     monkeypatch.setattr(
-        "core.agent_tools.profile_tools.requests.get",
+        "core.llm.agent_tools.profile_tools.requests.get",
         lambda *a, **kw: _mock_response(
             json_data={
                 "razao_social": "ACME LTDA",
@@ -248,7 +248,7 @@ def test_lookup_cnpj_handles_404(monkeypatch):
     lc = next(t for t in tools if t.name == "lookup_cnpj")
 
     monkeypatch.setattr(
-        "core.agent_tools.profile_tools.requests.get",
+        "core.llm.agent_tools.profile_tools.requests.get",
         lambda *a, **kw: _mock_response(status_code=404, html=""),
     )
     out = lc.call({"cnpj": "11222333000144"})
@@ -262,7 +262,7 @@ def test_lookup_cnpj_handles_timeout(monkeypatch):
     lc = next(t for t in tools if t.name == "lookup_cnpj")
 
     monkeypatch.setattr(
-        "core.agent_tools.profile_tools.requests.get",
+        "core.llm.agent_tools.profile_tools.requests.get",
         MagicMock(side_effect=Timeout("slow")),
     )
     out = lc.call({"cnpj": "11222333000144"})
@@ -419,7 +419,7 @@ def test_extract_agent_threads_eligibility_into_profile(monkeypatch):
         })
         return fake_result
 
-    monkeypatch.setattr("core.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
     result = pe._extract_agent("https://acme.bio")
     assert result.profile.uf == "MG"
     assert result.profile.ano_fundacao == 2017
@@ -506,7 +506,7 @@ def test_extract_agent_happy_path(monkeypatch):
         })
         return fake_result
 
-    monkeypatch.setattr("core.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
 
     result = pe._extract_agent("https://acme.bio")
     assert result.error is None
@@ -527,7 +527,7 @@ def test_extract_agent_no_submit_returns_low_confidence(monkeypatch):
         stop_reason="end_turn",
         usage={"input_tokens": 50, "output_tokens": 10},
     )
-    monkeypatch.setattr("core.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
     result = pe._extract_agent("https://x.com")
     assert result.low_confidence is True
@@ -542,7 +542,7 @@ def test_extract_agent_handles_run_agent_exception(monkeypatch):
     def boom(**kw):
         raise RuntimeError("API down")
 
-    monkeypatch.setattr("core.agent_runtime.run_agent", boom)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", boom)
 
     result = pe._extract_agent("https://x.com")
     assert result.low_confidence is True
@@ -560,7 +560,7 @@ def test_extract_agent_max_steps_low_confidence(monkeypatch):
         stop_reason="max_steps",
         usage={"input_tokens": 200, "output_tokens": 30},
     )
-    monkeypatch.setattr("core.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
     result = pe._extract_agent("https://x.com")
     assert result.low_confidence is True

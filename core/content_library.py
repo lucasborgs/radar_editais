@@ -53,7 +53,7 @@ importance_score reflete o valor do documento para escrita de propostas de fomen
 # =============================================================================
 
 def _make_client():
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
     backend = os.getenv("LLM_BACKEND", "openai").lower()
     if backend == "gemini":
         return make_client(

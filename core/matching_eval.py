@@ -90,7 +90,7 @@ def judge_match_rubric(profile_context: str, edital_summary: str) -> tuple[int, 
     """Juiz LLM da rúbrica para um par (perfil, edital). Falha → (0, 0, "")."""
     user = f"EMPRESA:\n{profile_context}\n\nEDITAL:\n{edital_summary}"
     try:
-        from core.llm_client import make_client
+        from core.llm.llm_client import make_client
         client = make_client(api_key=os.environ["OPENAI_API_KEY"])
         resp = client.chat.completions.create(
             model=_eval_model(),

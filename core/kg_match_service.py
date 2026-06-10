@@ -71,7 +71,7 @@ PERGUNTA DO VISITANTE:
 # Sistema prompt do modo agente (Sprint 3 do Cenário B). Substitui o
 # EXPLORE_SYSTEM_PROMPT quando agent_enabled=True. As ferramentas
 # (list_editais, get_edital, find_analogues, get_graph_neighbors) são
-# registradas via core.agent_tools.build_explore_tools.
+# registradas via core.llm.agent_tools.build_explore_tools.
 EXPLORE_AGENT_SYSTEM = """Você é o assistente do Radar de Editais, uma plataforma que conecta empresas
 a oportunidades de fomento público no Brasil (FINEP, FNDCT, CT&I).
 
@@ -159,7 +159,7 @@ def _make_client():
     backend = os.getenv("LLM_BACKEND", "openai").lower()
 
     if backend == "gemini":
-        from core.llm_client import make_client
+        from core.llm.llm_client import make_client
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY não definida")
@@ -169,7 +169,7 @@ def _make_client():
         ), "gemini-2.5-flash"
 
     elif backend == "openai":
-        from core.llm_client import make_client
+        from core.llm.llm_client import make_client
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY não definida")
@@ -177,7 +177,7 @@ def _make_client():
         return make_client(api_key=api_key), model
 
     elif backend == "ollama":
-        from core.llm_client import make_client
+        from core.llm.llm_client import make_client
         model = os.getenv("OLLAMA_MODEL", "llama3.2")
         return make_client(
             api_key="ollama",
@@ -672,8 +672,8 @@ class KGMatchService:
           • Sem pré-resolução de focus_ids — agente decide via tools
           • Dica de clique no grafo vira message extra (não substitui análise)
         """
-        from core.agent_runtime import resolve_agent_provider, run_agent
-        from core.agent_tools import build_explore_tools
+        from core.llm.agent_runtime import resolve_agent_provider, run_agent
+        from core.llm.agent_tools import build_explore_tools
 
         self._load_index()  # garante índice carregado (não usa self._client)
 

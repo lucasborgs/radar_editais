@@ -108,7 +108,7 @@ Gere mensagens curtas e acionáveis para orientar o início de uma seção da pr
 
 # Sistema prompt do agente de escrita — único path de escrita. As ferramentas
 # (search_edital, search_library, read_section, read_full_proposal, save_draft,
-# request_user_info) são registradas via core.agent_tools.build_writing_tools.
+# request_user_info) são registradas via core.llm.agent_tools.build_writing_tools.
 WRITER_AGENT_SYSTEM = """Você é um especialista em redação de propostas para editais de fomento no Brasil.
 Seu papel é ajudar o usuário a escrever uma proposta técnica de alta qualidade.
 
@@ -759,8 +759,8 @@ class WritingSession:
             info concreta do usuário
           • mentions resolvem antes (intenção explícita do usuário)
         """
-        from core.agent_runtime import resolve_agent_provider, run_agent
-        from core.agent_tools import build_writing_tools
+        from core.llm.agent_runtime import resolve_agent_provider, run_agent
+        from core.llm.agent_tools import build_writing_tools
 
         mentions_context = self._resolve_mentions(user_message)
         messages = self._build_agent_initial_messages(
@@ -1208,7 +1208,7 @@ class WritingSession:
         if not OPENAI_API_KEY:
             return False, "OPENAI_API_KEY não configurada", "CONFIG_ERROR"
         try:
-            from core.llm_client import make_client
+            from core.llm.llm_client import make_client
             client = make_client(api_key=OPENAI_API_KEY)
             response = client.chat.completions.create(
                 model=self.model,

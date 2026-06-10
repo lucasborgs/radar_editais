@@ -64,7 +64,7 @@ def get_adapter(source: str) -> SourceAdapter:
 
 # Tamanho-alvo por unidade do Documento Canônico para fontes sem paginação
 # nativa (HTML servido como corpo único). O structurer reproduz texto VERBATIM
-# por unidade e o cliente LLM tem timeout de 60s (core.llm_client): uma unit
+# por unidade e o cliente LLM tem timeout de 60s (core.llm.llm_client): uma unit
 # que force perto de max_tokens=4000 de saída (~40-80s a 50-80 tok/s) estoura o
 # timeout. ~3500 chars (~900 tokens → saída verbatim ~1000-1200 tokens) fica
 # bem abaixo. O contrato §12.3 prevê "HTML → 1 unit (ou split por âncora)".
