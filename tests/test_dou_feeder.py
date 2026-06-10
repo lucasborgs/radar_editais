@@ -17,12 +17,13 @@ sys.path.insert(0, str(ROOT))
 from core import dou_feeder as dou
 
 
-def _art(artType="Aviso de Chamamento Público",
-         artCategory="Ministério da Ciência, Tecnologia e Inovação/FINEP",
+def _art(art_type="Aviso de Chamamento Público",
+         art_category="Ministério da Ciência, Tecnologia e Inovação/FINEP",
          identifica="CHAMADA PÚBLICA MCTI/FINEP Nº 5/2026",
          ementa="Seleção pública de propostas de inovação.",
          texto="Texto completo da chamada de subvenção econômica."):
-    return {"artType": artType, "artCategory": artCategory, "pubDate": "09/06/2026",
+    # As CHAVES ficam no schema real do XML do INLABS (camelCase).
+    return {"artType": art_type, "artCategory": art_category, "pubDate": "09/06/2026",
             "pdfPage": "https://pesquisa.in.gov.br/imprensa/jsp/visualiza/index.jsp?jornal=530&pagina=7",
             "idMateria": "12345", "identifica": identifica, "ementa": ementa,
             "texto": texto}
@@ -37,29 +38,29 @@ def test_keeps_chamada_publica():
 
 
 def test_drops_licitacao_arttype():
-    assert dou._is_candidate(_art(artType="Aviso de Licitação"), None) is False
-    assert dou._is_candidate(_art(artType="Extrato de Contrato"), None) is False
-    assert dou._is_candidate(_art(artType="Resultado de Julgamento"), None) is False
+    assert dou._is_candidate(_art(art_type="Aviso de Licitação"), None) is False
+    assert dou._is_candidate(_art(art_type="Extrato de Contrato"), None) is False
+    assert dou._is_candidate(_art(art_type="Resultado de Julgamento"), None) is False
 
 
 def test_drops_resultado_por_titulo():
     """artType genérico ('Extrato') não pega — o drop por Identifica pega."""
     assert dou._is_candidate(
-        _art(artType="Extrato", identifica="EXTRATO DE TERMO DE FOMENTO Nº 1/2026"),
+        _art(art_type="Extrato", identifica="EXTRATO DE TERMO DE FOMENTO Nº 1/2026"),
         None) is False
 
 
 def test_preserva_extrato_de_edital():
     """'Extrato de edital' é anúncio de chamada aberta — não cai no drop."""
     assert dou._is_candidate(
-        _art(artType="Extrato", identifica="EXTRATO DE EDITAL Nº 3/2026 - CHAMADA"),
+        _art(art_type="Extrato", identifica="EXTRATO DE EDITAL Nº 3/2026 - CHAMADA"),
         None) is True
 
 
 def test_exige_sinal_de_fomento():
     assert dou._is_candidate(
         _art(identifica="PORTARIA Nº 9", ementa="Altera o regimento interno.",
-             texto="", artType="Portaria"),
+             texto="", art_type="Portaria"),
         None) is False
 
 
