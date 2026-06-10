@@ -189,6 +189,22 @@ def _norm_url(url: str) -> str:
     return (url or "").split("#")[0].rstrip("/").lower()
 
 
+# Domínios sociais: post de rede social ANUNCIA a oportunidade mas nunca É a
+# página dela — conteúdo raso pro chunking e link errado no card. Dry-run de
+# triagem 2026-06-10: 3 dos 28 aprovados eram Instagram. Drop determinístico
+# ANTES da triagem (economiza a chamada). Página da agência continua entrando
+# normalmente pelas queries.
+_SOCIAL_DOMAINS = (
+    "instagram.com", "facebook.com", "linkedin.com", "x.com", "twitter.com",
+    "youtube.com", "tiktok.com",
+)
+
+
+def _is_social(url: str) -> bool:
+    host = _norm_url(url).split("//")[-1].split("/")[0]
+    return any(host == d or host.endswith("." + d) for d in _SOCIAL_DOMAINS)
+
+
 def _load_ledger() -> set[str]:
     if _LEDGER.exists():
         try:
@@ -269,7 +285,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
             continue
         for h in hits:
             nu = _norm_url(h.url)
-            if not nu or nu in known or nu in seen_now:
+            if not nu or nu in known or nu in seen_now or _is_social(h.url):
                 continue
             seen_now.add(nu)
             candidates.append(h)
