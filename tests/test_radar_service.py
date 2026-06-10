@@ -28,9 +28,27 @@ def test_merge_tags_kind_class_and_type():
     assert by_id["investidor:kptl"]["why_now"] == "Match de tese (sempre aberto)"
 
 
-def test_merge_sorts_by_score_desc_across_types():
+def test_rrf_interleaves_instead_of_blocking_by_raw_score():
+    """RRF funde por POSIÇÃO, não nota crua: o melhor evento sobe junto do melhor
+    fundo em vez de todos os fundos (score mais alto) virem em bloco."""
+    events = [_ev("e1", 6.0), _ev("e2", 5.5), _ev("e3", 5.0)]
+    entities = [_inv("i1", 9.0), _inv("i2", 8.0)]
+    out = merge_radar(events, entities)
+    # sem RRF (score cru) seria: i1, i2, e1, e2, e3 — entidades em bloco.
+    # com RRF: rank1-vs-rank1 empata e intercala (desempate por score cru).
+    assert [it["id"] for it in out["radar"]] == ["i1", "e1", "i2", "e2", "e3"]
+
+
+def test_rrf_tiebreak_by_raw_score():
+    """Mesmo rank nas duas fontes → empata no RRF → desempata pelo score cru."""
     out = merge_radar([_ev("e1", 5.0)], [_inv("i1", 9.0)])
     assert [it["id"] for it in out["radar"]] == ["i1", "e1"]
+
+
+def test_single_source_rrf_preserves_score_order():
+    """Fonte única: RRF = ordem de score (rank segue o score)."""
+    out = merge_radar([_ev("a", 3.0), _ev("b", 9.0), _ev("c", 6.0)], [])
+    assert [it["id"] for it in out["radar"]] == ["b", "c", "a"]
 
 
 def test_merge_truncates_to_top_k():
