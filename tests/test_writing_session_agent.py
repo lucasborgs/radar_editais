@@ -46,6 +46,8 @@ def _make_session() -> WritingSession:
     s._library_context = ""
     s._reflection_insights_context = ""
     s._temporal_block = ""
+    s.mode = "proposal"
+    s._pitch_target_context = ""
     s._pending_user_input = None
     s.backend = "anthropic"
     s.model = "claude-sonnet-4-6"
@@ -305,3 +307,58 @@ def test_turn_agent_pending_user_input_propagates(monkeypatch):
     s._turn_count = 1
     result = s._turn_agent("preciso preencher o CNPJ", section_hint=None, user_turn_index=1)
     assert result["pending_user_input"] == {"field": "cnpj", "prompt": "Qual o CNPJ?"}
+
+
+# ============================================================================
+# Modo PITCH (investidor, kind_class=entidade) — Fatia 2 multi-quadrante
+# ============================================================================
+
+def _make_pitch_session() -> WritingSession:
+    """Sessão de pitch (alvo = fundo investidor). Mesmo padrão __new__ do fixture
+    de proposta, com o nó do fundo injetado como contexto (context-stuffing)."""
+    s = _make_session()
+    s.edital_id = "investidor:kptl"
+    s.mode = "pitch"
+    s._pitch_target_context = (
+        "FUNDO-ALVO (use para ancorar o fit; não invente tese):\n"
+        "FUNDO-ALVO: KPTL\nTese: deep-tech early-stage.\nEstágio alvo: seed"
+    )
+    return s
+
+
+def test_pitch_writer_system_is_outbound():
+    """mode=pitch seleciona o prompt de captação, não o de proposta de edital."""
+    s = _make_pitch_session()
+    assert "captação" in s._writer_system().lower()
+    # proposta segue no prompt de edital
+    assert "edital" in _make_session()._writer_system().lower()
+
+
+def test_pitch_scope_has_no_edital_analogues():
+    """Entidade não resolve análogos de edital — escopo é só o próprio id."""
+    s = _make_pitch_session()
+    assert s._resolve_edital_scope() == ["investidor:kptl"]
+
+
+def test_pitch_outline_is_capture_genre():
+    s = _make_pitch_session()
+    outline = s._default_pitch_outline()
+    assert any("Ask" in sec for sec in outline)
+    assert any("Tração" in sec for sec in outline)
+
+
+def test_search_edital_returns_fund_node_in_pitch():
+    """No pitch, search_edital devolve o nó do fundo, não chunks de edital_chunks."""
+    from core.agent_tools import build_writing_tools
+
+    s = _make_pitch_session()
+    tools = {t.name: t for t in build_writing_tools(s)}
+    out = tools["search_edital"].func(query="qual a tese do fundo?")
+    assert "FUNDO-ALVO" in out
+    assert "KPTL" in out
+
+
+def test_pitch_context_injected_in_initial_messages():
+    s = _make_pitch_session()
+    msgs = s._build_agent_initial_messages("escreva o problema", None, "")
+    assert any("FUNDO-ALVO" in m["content"] for m in msgs)
