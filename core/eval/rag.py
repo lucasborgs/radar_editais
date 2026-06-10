@@ -23,7 +23,7 @@ def load_data() -> list[dict]:
     path = GOLDEN_DIR / f"{SOURCE}.json"
     if not path.exists():
         return []
-    from core.retriever import (
+    from core.retrieval.retriever import (
         DEFAULT_FTS_WEIGHT,
         DEFAULT_MAX_PER_SOURCE,
         DEFAULT_TOP_K,
@@ -48,7 +48,7 @@ def load_data() -> list[dict]:
 
 def task(*, item: Any, **_) -> dict:
     inp = get_input(item)
-    from core.retriever import retrieve_chunks
+    from core.retrieval.retriever import retrieve_chunks
     t0 = time.perf_counter()
     # edital_ids é uma lista; o primeiro é o edital "primário" do retrieval.
     retrieved = retrieve_chunks(

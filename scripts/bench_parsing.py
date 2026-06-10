@@ -29,8 +29,8 @@ load_dotenv()
 import psycopg  # noqa: E402
 
 from config import FINEP_PDFS_DIR  # noqa: E402
-from core.chunker import chunk_from_blocks  # noqa: E402
-from core.embedder import embed_query, embed_texts  # noqa: E402
+from core.retrieval.chunker import chunk_from_blocks  # noqa: E402
+from core.retrieval.embedder import embed_query, embed_texts  # noqa: E402
 from core.rag_eval import gold_best_chunk_recall_at_k, gold_recall_at_k  # noqa: E402
 from pipeline.adapters.finep import _SKIP_KEYWORDS, _filter_to_latest_versions  # noqa: E402
 

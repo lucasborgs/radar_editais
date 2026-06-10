@@ -31,7 +31,7 @@ import os
 import re
 from typing import Any
 
-from core.embedder import embed_query
+from core.retrieval.embedder import embed_query
 from supabase import Client
 
 logger = logging.getLogger(__name__)

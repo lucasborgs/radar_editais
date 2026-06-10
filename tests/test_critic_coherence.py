@@ -66,7 +66,7 @@ def test_run_critic_injects_siblings_into_prompt(monkeypatch):
         chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
     )
     monkeypatch.setattr("core.llm_client.make_client", lambda **kw: fake_client)
-    monkeypatch.setattr("core.retriever.retrieve_chunks", lambda *a, **k: [])
+    monkeypatch.setattr("core.retrieval.retriever.retrieve_chunks", lambda *a, **k: [])
 
     s = _StubSession(
         ["1. Equipe", "2. Conclusão"],
@@ -105,7 +105,7 @@ def test_run_critic_pitch_uses_fund_node_not_edital_chunks(monkeypatch):
     # Se o critic tentar retrieve_chunks no pitch, o teste falha (não deve tocar edital_chunks).
     def _boom(*a, **k):
         raise AssertionError("retrieve_chunks não deve ser chamado no mode=pitch")
-    monkeypatch.setattr("core.retriever.retrieve_chunks", _boom)
+    monkeypatch.setattr("core.retrieval.retriever.retrieve_chunks", _boom)
 
     s = _StubSession(["1. Time", "2. Fit com a tese do fundo"], {})
     s.mode = "pitch"

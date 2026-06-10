@@ -214,7 +214,7 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
             draft=draft[:3000],
         )
     else:
-        from core.retriever import format_chunks_for_prompt, retrieve_chunks
+        from core.retrieval.retriever import format_chunks_for_prompt, retrieve_chunks
 
         # Recupera trechos do edital relevantes para o conteúdo do rascunho.
         # Usa os primeiros 500 chars como query — suficiente para capturar tema.
