@@ -17,7 +17,7 @@ só-no-site) e **programas de aceleração/incubação** (Q4). Q3 (VC) fica FORA
 Descoberta: investidor é diretório curado, não cabe no schema de oportunidade.
 
 **Unificação (Opção A, WIKI.md §12.4):** a Descoberta é a *torneira automática*
-da fonte `web` — não tem bronze/índice próprios. Grava em `bronze_data/web_raw/`
+da fonte `web` — não tem bronze/índice próprios. Grava em `data/bronze/web_raw/`
 (prefixo `web_discovery_`) no schema web (`url`/`url_hash`/`texto_cru`/
 `verificacao=provisorio`), e daí entra como qualquer página web: chunkada pro RAG
 pelo adapter `pipeline.adapters.web` e indexada por `_build_editais("web")`. A

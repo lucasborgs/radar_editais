@@ -210,7 +210,7 @@ entrarem no Railway.
 # INLABS_PASSWORD, DISCOVERY_DOU_ENABLED=1
 
 # 1×/dia (manual ou worker local), de manhã (o wiring busca o DOU de D-1 UTC):
-python -m core.opportunity_discovery       # grava bronze_data/web_raw/web_discovery_*.json
+python -m core.opportunity_discovery       # grava data/bronze/web_raw/web_discovery_*.json
 python pipeline/build_knowledge_graph.py   # ingere no índice local (badge aparece na UI local)
 ```
 

@@ -1,5 +1,5 @@
 """
-Build do grafo de ICTs — consolida o bronze de ICTs em knowledge_graph/icts.json.
+Build do grafo de ICTs — consolida o bronze de ICTs em data/knowledge_graph/icts.json.
 
 ICTs (WIKI.md §6.1.2) são parceiras que editais exigem; não são editais. Este
 build é paralelo ao build_knowledge_graph (editais) e produz um artefato próprio,
@@ -46,7 +46,7 @@ _SUMMARY_MAX = 280
 # =============================================================================
 
 def load_bronze() -> list[dict]:
-    """Lê o bronze de ICTs mais recente de cada fonte em bronze_data/ict_raw/."""
+    """Lê o bronze de ICTs mais recente de cada fonte em data/bronze/ict_raw/."""
     if not ICT_BRONZE_DIR.exists():
         return []
     records: list[dict] = []
@@ -297,7 +297,7 @@ def save(index: dict) -> None:
 def main(use_llm: bool = True) -> None:
     bronze = load_bronze()
     if not bronze:
-        print("Sem bronze de ICTs (bronze_data/ict_raw/). Rode o extractor primeiro.")
+        print("Sem bronze de ICTs (data/bronze/ict_raw/). Rode o extractor primeiro.")
         return
 
     canonical = canonical_themes()
@@ -323,7 +323,7 @@ def main(use_llm: bool = True) -> None:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    parser = argparse.ArgumentParser(description="Constrói knowledge_graph/icts.json")
+    parser = argparse.ArgumentParser(description="Constrói data/knowledge_graph/icts.json")
     parser.add_argument("--no-llm", action="store_true",
                         help="não mapeia temas (estrutura só) — útil em CI/teste")
     args = parser.parse_args()

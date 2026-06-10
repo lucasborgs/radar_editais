@@ -9,7 +9,7 @@ e não são copiados no Dockerfile). Trocar a origem dos dados agora é mudar
 AQUI, não em cada call-site.
 
 Backends de LEITURA (env `KG_STORE_BACKEND`):
-  • "file" (default)  — lê `knowledge_graph/*.json`. Dev + ETL local.
+  • "file" (default)  — lê `data/knowledge_graph/*.json`. Dev + ETL local.
   • "postgres"        — lê a tabela `kg_artifacts` (JSONB) no Supabase.
                         Caminho de produção: o request-path deixa de depender
                         de arquivos locais.

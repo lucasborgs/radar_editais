@@ -435,7 +435,7 @@ async def run_daily_etl_task(timestamp: int) -> None:
     """Cron diário (3am UTC): roda scrapers ativos e dispara chunking.
 
     Para cada fonte em pipeline.extractors.SCRAPER_REGISTRY:
-      1. Roda o scraper (captura novos editais em bronze_data/)
+      1. Roda o scraper (captura novos editais em data/bronze/)
       2. Falhas tipadas (TimeoutError, ParseError, etc.) viram rows em
          pipeline_errors via log_pipeline_error
       3. Para cada edital novo detectado, enfileira chunk_edital_task

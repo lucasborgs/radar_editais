@@ -16,22 +16,22 @@ build/
 !.env.example
 
 # Data (raw sources — não versionar)
-bronze_data/
-silver_data/
+data/bronze/
+data/silver/
 profiles/
 artigos/
 benchmark/
 audit_finep_structure/
 
 # Knowledge Graph — dados gerados
-knowledge_graph/wiki/
-knowledge_graph/index.json
-knowledge_graph/index_historico.json
-knowledge_graph/health_check_log.jsonl
-knowledge_graph/.filter_rejections.jsonl
-knowledge_graph/**/.etl_process_cache.json
-knowledge_graph/icts.json
-knowledge_graph/.ict_theme_map_cache.json
+data/knowledge_graph/wiki/
+data/knowledge_graph/index.json
+data/knowledge_graph/index_historico.json
+data/knowledge_graph/health_check_log.jsonl
+data/knowledge_graph/.filter_rejections.jsonl
+data/knowledge_graph/**/.etl_process_cache.json
+data/knowledge_graph/icts.json
+data/knowledge_graph/.ict_theme_map_cache.json
 
 # Caches LLM file-based na raiz (regeneráveis; não versionar)
 .enrichment_cache.json
