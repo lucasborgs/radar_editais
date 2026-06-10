@@ -204,6 +204,21 @@
 - **Ponto de entrada:** isolamento prod + qualidade/dedup dos itens `provisorio`.
 - **Status:** adiado conscientemente.
 
+### Descoberta web — `titulo` vazio na extração (UX do card)
+- **O quê:** no dry-run de 2026-06-09 (`discover_opportunities(write=False)`), os 23
+  candidatos extraídos vieram com `titulo` **vazio** (incl. editais), apesar de
+  `tema`/`status` populados — `_extract`/`_page_text` não capturam o título da página
+  web crua. Card sem título é UX ruim.
+- **Por que importa agora:** não bloqueia ativar a torneira web, mas precisa estar
+  resolvido **antes de ligar `write=True` em prod** (senão entram editais sem título
+  no índice/match).
+- **Fix mínimo:** fallback `titulo ← hit.title` (título do resultado de busca, sempre
+  presente) quando `_extract` devolver vazio. Fix melhor: investigar por que o título
+  não sai da página (provável débito da qualidade do chunk HTML — ver entrada de
+  parsing/chunking HTML).
+- **Onde:** `core/opportunity_discovery.py` (`_extract`, `_page_text`).
+- **Status:** aberto.
+
 ### Grafo induzido (GraphRAG) — overlay de insight, NÃO base do match
 - **O quê:** uma **Camada B** induzida sobre o grafo curado — extração livre de
   entidades/relações + detecção de comunidades + sumarização — como **overlay
