@@ -24,7 +24,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from core.agent_runtime import Tool, tool
-from core.retriever import (
+from core.retrieval.retriever import (
     format_chunks_for_prompt,
     retrieve_chunks,
     retrieve_library_items,

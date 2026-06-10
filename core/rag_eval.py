@@ -7,7 +7,7 @@ devolvem números — sem DB, sem rede.
 
 Modelo de dados
 ---------------
-Um "chunk recuperado" é o dict emitido por `core.retriever.retrieve_chunks`:
+Um "chunk recuperado" é o dict emitido por `core.retrieval.retriever.retrieve_chunks`:
     {id, chunk_index, text, section, source_file, page_range, score}
 
 Um "chunk esperado" no golden é só `{source_file, section}` — comparação

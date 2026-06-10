@@ -44,7 +44,7 @@ from config import FINEP_PDFS_DIR
 from core.content_library import get_item, mark_items_referenced
 from core.kg.edital_id import wiki_page_path
 from core.reflection_service import load_active_insights
-from core.retriever import (
+from core.retrieval.retriever import (
     format_chunks_for_prompt,
     retrieve_chunks,
 )

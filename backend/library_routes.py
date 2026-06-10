@@ -94,7 +94,7 @@ def library_recommend(
     excluídos — retorna lista possivelmente menor que k até backfill completar.
     """
     workspace_id = get_workspace_id(db, user_id)
-    from core.retriever import retrieve_library_items
+    from core.retrieval.retriever import retrieve_library_items
     return retrieve_library_items(workspace_id, query=q, k=k)
 
 

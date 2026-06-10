@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import core.reranker as reranker  # noqa: E402
-from core.retriever import _apply_rerank  # noqa: E402
+from core.retrieval.retriever import _apply_rerank  # noqa: E402
 
 # =============================================================================
 # rerank_scores — contrato de degradação graciosa

@@ -39,7 +39,7 @@ load_dotenv()
 
 import psycopg  # noqa: E402
 
-from core.embedder import embed_texts  # noqa: E402
+from core.retrieval.embedder import embed_texts  # noqa: E402
 from core.llm_client import make_client  # noqa: E402
 from core.rag_eval import gold_best_chunk_recall_at_k, gold_recall_at_k  # noqa: E402
 from scripts.bench_parsing import _retrieve  # noqa: E402  (cosine top-k dense-only)
