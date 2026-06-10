@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from backend.common import wiki_matcher
 from core.auth import CurrentUserId, DbClient
-from core.wiki_schema import parse_deadline
+from core.kg.wiki_schema import parse_deadline
 
 logger = logging.getLogger(__name__)
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from core import temporal
+from core.kg import temporal
 
 
 def _patch_index(monkeypatch, editais: list[dict], reference_date: str = "2026-05-31"):

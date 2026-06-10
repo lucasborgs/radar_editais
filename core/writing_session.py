@@ -42,7 +42,7 @@ import requests
 
 from config import FINEP_PDFS_DIR
 from core.content_library import get_item, mark_items_referenced
-from core.edital_id import wiki_page_path
+from core.kg.edital_id import wiki_page_path
 from core.reflection_service import load_active_insights
 from core.retriever import (
     format_chunks_for_prompt,
@@ -292,7 +292,7 @@ class WritingSession:
         if self.mode == "pitch":
             self._temporal_block = ""
         else:
-            from core.temporal import render_temporal_block
+            from core.kg.temporal import render_temporal_block
             self._temporal_block = render_temporal_block(self.edital_id)
 
         # Substrato do pitch (context-stuffing do nó do fundo): tese + portfólio +

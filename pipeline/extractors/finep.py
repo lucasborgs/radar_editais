@@ -30,7 +30,7 @@ import time
 from pathlib import Path
 
 from config import FINEP_PDFS_DIR
-from core.wiki_schema import iso_to_br_date
+from core.kg.wiki_schema import iso_to_br_date
 
 from .base import BaseScraper
 from .finep_api import FinepAPI, FinepAPIError, chamada_url_publica

@@ -18,7 +18,11 @@ from pathlib import Path
 
 import yaml
 
-_ROOT = Path(__file__).resolve().parent.parent
+# Raiz do repo via config (canônico) — não derivar de __file__: o módulo já
+# mudou de profundidade uma vez (core/ → core/kg/) e o path relativo quebraria
+# silenciosamente de novo a cada move.
+from config import ROOT as _ROOT
+
 _WIKI_MD = _ROOT / "WIKI.md"
 _WIKIS_DIR = _ROOT / "wikis"
 _PME_FILTER_MD = _WIKIS_DIR / "_pme_filter.md"

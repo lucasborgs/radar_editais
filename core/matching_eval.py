@@ -4,7 +4,7 @@ core/matching_eval.py — Rúbrica e métricas do eval de matching (Front 2).
 Nunca validamos se o `/match` rankeia bem — é o topo do funil. Este módulo
 julga o top-K de um match contra a rúbrica única da spec (por edital):
   • fit temático 0-2, elegibilidade 0-2 (juiz LLM), vigência sim/não
-    (determinístico, via core.temporal).
+    (determinístico, via core.kg.temporal).
 
 A partir do veredicto por edital, computa precisão@K e se um edital esperado
 (ex.: finep:612 para iFlorestal) aparece no topo.

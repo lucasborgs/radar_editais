@@ -24,8 +24,8 @@ import json
 from pathlib import Path
 
 from config import FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, OBSIDIAN_VAULT_DIR
-from core import wiki_schema
-from core.edital_id import id_to_slug, source_of
+from core.kg import wiki_schema
+from core.kg.edital_id import id_to_slug, source_of
 
 # Multi-fonte (§12 WIKI.md): o export consome o índice unificado (todas as fontes)
 # e deriva a fonte de cada edital do próprio id prefixado. Sem hardcode de fonte.
@@ -39,12 +39,12 @@ FACTS_DIR = FINEP_PDFS_DIR
 # =============================================================================
 
 def slugify(text: str) -> str:
-    """Wrapper para core.wiki_schema.slugify (§6.3 WIKI.md)."""
+    """Wrapper para core.kg.wiki_schema.slugify (§6.3 WIKI.md)."""
     return wiki_schema.slugify(text)
 
 
 # Slug colon-free para nome de nota/wikilink (Obsidian proíbe `:`). Centralizado
-# em core.edital_id (id_to_slug/slug_to_id) — get_graph faz o caminho inverso.
+# em core.kg.edital_id (id_to_slug/slug_to_id) — get_graph faz o caminho inverso.
 _edital_slug = id_to_slug
 
 
@@ -428,7 +428,7 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     # Índice é autoridade sobre inherited fields (§4.1 WIKI.md) — sobrescreve
     # o que está congelado no card. Card é autoridade sobre synthesized fields
     # (§4.2). Derived: subprogramas, n_pdfs, n_facts vêm do índice.
-    from core.edital_id import wiki_page_path
+    from core.kg.edital_id import wiki_page_path
     inherited_keys = wiki_schema.wiki_page_fields()["inherited"]  # global, agnóstico à fonte
     # opportunity_type é inherited (vem da Descoberta → entry do índice; a wiki page
     # sintetizada não o carrega) — índice é autoridade, então entra no override.

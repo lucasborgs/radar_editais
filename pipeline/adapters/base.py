@@ -18,7 +18,7 @@ import re
 from abc import ABC, abstractmethod
 from typing import TypedDict
 
-from core import wiki_schema
+from core.kg import wiki_schema
 
 logger = logging.getLogger(__name__)
 

@@ -237,7 +237,7 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         # Contexto temporal (Front 3): permite ao critic pegar prazos afirmados no
         # rascunho que divergem do deadline real. Falha graciosa: bloco vazio.
         try:
-            from core.temporal import render_temporal_block
+            from core.kg.temporal import render_temporal_block
             primary_edital = (
                 getattr(session, "_scope_edital_ids", None) or [getattr(session, "edital_id", "")]
             )[0]

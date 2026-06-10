@@ -20,7 +20,7 @@ import logging
 import os
 import re
 
-from core import kg_store
+from core.kg import kg_store
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)

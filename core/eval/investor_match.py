@@ -23,7 +23,7 @@ FIXTURE = ROOT / "tests" / "fixtures" / "eval_investor_match.json"
 
 @lru_cache(maxsize=1)
 def _funds_by_id() -> dict[str, dict]:
-    from core import kg_store
+    from core.kg import kg_store
     return {i["id"]: i for i in kg_store.load_investidores()}
 
 
