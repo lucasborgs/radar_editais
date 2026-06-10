@@ -231,3 +231,21 @@ python pipeline/build_knowledge_graph.py   # ingere no índice local (badge apar
 Sem número mágico — julgamento sobre ~1 semana de runs: títulos ok, falso-positivo
 da triagem tolerável (o badge avisa o usuário), sem duplicata grosseira no radar.
 Ligar = setar as mesmas envs no Railway (worker), nada de código.
+
+### Log do shadow-run
+
+**Dia 1 (2026-06-10, DOU de 2026-06-09):**
+- DOU: 63 candidatos pré-filtrados (58 DO3 + 5 DO1) → triagem aprovou **2**
+  (~3%): 1 real (MDIC, matchmaking tecnológico) + 1 falso positivo (portaria
+  da Defesa delegando assinatura de convênio). Títulos 100% populados
+  (`Identifica`) — pendência "titulo vazio" do BACKLOG morta.
+- Tavily (reescopado): 40 candidatos → **30 aprovados**; títulos 100%. Ruído
+  dominante: notícias VELHAS (prazos 2022-2024) e páginas-hub/landing
+  ("editais abertos", raiz de agência, agregador). O filtro de vigência do
+  build segurou os datados (foram pro histórico); 9 itens entraram vigentes,
+  todos `provisorio` (badge validado end-to-end na UI local).
+- **Bugs achados e corrigidos no dia:** CLI não carregava `.env` (no-op
+  silencioso); cap compartilhado fazia o DOU (63/dia) zerar o Tavily →
+  orçamentos separados (`max_dou_candidates`).
+- **Ajuste pro dia 2:** triagem agora rejeita explicitamente página-lista/
+  agregador/homepage (1 URL = 1 oportunidade); medir o efeito.
