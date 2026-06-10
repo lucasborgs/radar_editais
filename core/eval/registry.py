@@ -5,7 +5,14 @@ wired end-to-end reaproveitando core/{matching,rag,writing}_eval.py.
 """
 from __future__ import annotations
 
-from core.eval import extraction, matching, rag, writing
+from core.eval import (
+    extraction,
+    investor_match,
+    matching,
+    opportunity_type,
+    rag,
+    writing,
+)
 from core.eval.harness import Suite
 
 SUITES: dict[str, Suite] = {
@@ -13,6 +20,8 @@ SUITES: dict[str, Suite] = {
     rag.SUITE.name: rag.SUITE,
     writing.SUITE.name: writing.SUITE,
     extraction.SUITE.name: extraction.SUITE,
+    investor_match.SUITE.name: investor_match.SUITE,
+    opportunity_type.SUITE.name: opportunity_type.SUITE,
 }
 
 

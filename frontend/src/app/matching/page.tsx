@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatusBadge } from "@/components/ui";
-import { getMatches } from "@/lib/api";
+import { getMatches, getInvestorMatches } from "@/lib/api";
 import { PORTE_LABELS, scoreColor } from "@/lib/constants";
 import type { TipoFinanciamento } from "@/types/profile";
 
@@ -53,6 +53,7 @@ function CheckPills<T extends string>({
 import { cn } from "@/lib/utils";
 import type { CompanyProfile } from "@/types/profile";
 import type { KGMatchResult } from "@/types/edital";
+import type { InvestorMatch } from "@/types/investidor";
 import { EMPTY_PROFILE, PROFILE_STORAGE_KEY, saveProfileToStorage } from "@/types/profile";
 
 
@@ -126,6 +127,24 @@ function ScoreDimBar({ label, score, max }: { label: string; score: number; max:
   );
 }
 
+// Badge de tipo-evento (multi-quadrante). `edital` é o default e NÃO renderiza
+// badge (evita ruído no caso dominante); só desafio/programa se distinguem.
+const OPPORTUNITY_TYPE_BADGE: Record<string, { label: string; emoji: string }> = {
+  desafio: { label: "Desafio", emoji: "🎯" },
+  programa: { label: "Programa", emoji: "🚀" },
+};
+
+function OpportunityTypeBadge({ type }: { type?: string }) {
+  const meta = type ? OPPORTUNITY_TYPE_BADGE[type] : undefined;
+  if (!meta) return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-sans font-medium text-primary">
+      <span aria-hidden>{meta.emoji}</span>
+      {meta.label}
+    </span>
+  );
+}
+
 function MatchCard({ match }: { match: KGMatchResult }) {
   const router = useRouter();
   const color = scoreColor(match.score);
@@ -151,6 +170,7 @@ function MatchCard({ match }: { match: KGMatchResult }) {
       </div>
 
       <div className="flex items-center gap-2 flex-wrap mb-2">
+        <OpportunityTypeBadge type={match.opportunity_type} />
         <StatusBadge status={match.status} />
         {match.deadline && (
           <span className="font-data text-xs text-content-secondary">
@@ -219,6 +239,78 @@ function MatchCard({ match }: { match: KGMatchResult }) {
   );
 }
 
+function DimLine({ label, text }: { label: string; text: string }) {
+  return (
+    <div className="flex items-start gap-1.5 text-[11px] font-sans">
+      <span className="text-content-secondary shrink-0 w-12">{label}</span>
+      <span className="text-content-primary">{text}</span>
+    </div>
+  );
+}
+
+function InvestorCard({ inv }: { inv: InvestorMatch }) {
+  const color = scoreColor(inv.score);
+  const dims = inv.match_dimensions ?? {};
+  return (
+    <div className="rounded-xl border border-border bg-white p-4 transition-colors hover:bg-gray-50">
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-content-primary font-sans leading-snug">
+            {inv.name}
+          </p>
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium font-sans",
+                inv.generalista ? "bg-gray-100 text-content-secondary" : "bg-primary/10 text-primary"
+              )}
+            >
+              {inv.generalista ? "Generalista · estágio" : "Tese"}
+            </span>
+            {inv.lead_follow && (
+              <span className="text-[10px] font-sans text-content-secondary">{inv.lead_follow}</span>
+            )}
+            {inv.estagio_alvo && inv.estagio_alvo.length > 0 && (
+              <span className="font-data text-[10px] text-content-secondary">
+                {inv.estagio_alvo.join(", ")}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <span className="text-lg font-bold font-data leading-none" style={{ color }}>
+            {inv.score.toFixed(1)}
+          </span>
+          <span className="text-[10px] font-sans text-content-secondary">/10</span>
+        </div>
+      </div>
+
+      <p className="text-xs text-content-secondary font-sans mb-2 line-clamp-2">
+        {inv.justificativa}
+      </p>
+
+      <div className="space-y-0.5 mb-3">
+        {dims.tese && <DimLine label="Tese" text={dims.tese} />}
+        {dims.estagio && <DimLine label="Estágio" text={dims.estagio} />}
+        {dims.setor && <DimLine label="Setor" text={dims.setor} />}
+      </div>
+
+      {inv.site && (
+        <div className="flex items-center gap-2 pt-2 border-t border-border">
+          <a
+            href={inv.site}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-sans text-content-secondary hover:text-content-primary transition-colors"
+          >
+            Ver fundo →
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProfileCompletionBar({ profile }: { profile: CompanyProfile }) {
   const checks = [
     !!profile.nome,
@@ -263,6 +355,7 @@ export default function MatchingPage() {
   });
 
   const [results, setResults] = useState<KGMatchResult[] | null>(null);
+  const [investors, setInvestors] = useState<InvestorMatch[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -293,6 +386,13 @@ export default function MatchingPage() {
     try {
       const res = await getMatches(profile);
       setResults(res.matches);
+      // Investidores (Q3) — secundário: falha aqui não quebra os editais.
+      try {
+        const inv = await getInvestorMatches(profile);
+        setInvestors(inv.matches);
+      } catch {
+        setInvestors([]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao conectar ao servidor.");
     } finally {
@@ -460,6 +560,42 @@ export default function MatchingPage() {
               </Field>
             </FormSection>
 
+            <FormSection title="Capital privado (opcional)">
+              <Field label="Estágio de investimento">
+                <select
+                  className={INPUT_CLS}
+                  value={profile.estagio}
+                  onChange={(e) => set("estagio", e.target.value as CompanyProfile["estagio"])}
+                >
+                  <option value="">Não informado</option>
+                  <option value="pre-seed">Pre-seed</option>
+                  <option value="seed">Seed</option>
+                  <option value="serie-a">Série A</option>
+                  <option value="growth">Growth</option>
+                </select>
+              </Field>
+              <Field label="Round alvo de captação (R$)">
+                <input
+                  type="number"
+                  className={INPUT_CLS}
+                  value={profile.round_alvo_brl ?? ""}
+                  onChange={(e) =>
+                    set("round_alvo_brl", e.target.value ? Number(e.target.value) : null)
+                  }
+                  placeholder="Ex: 2000000"
+                />
+              </Field>
+              <Field label="Tração (clientes, pilotos, receita)">
+                <textarea
+                  rows={2}
+                  className={cn(INPUT_CLS, "resize-none")}
+                  value={profile.tracao_resumo}
+                  onChange={(e) => set("tracao_resumo", e.target.value)}
+                  placeholder="Ex: 3 pilotos com cooperativas, R$ 40k MRR"
+                />
+              </Field>
+            </FormSection>
+
             {/* Search button */}
             {error && (
               <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-sans">
@@ -560,6 +696,24 @@ export default function MatchingPage() {
                     </div>
                   </details>
                 )}
+              </div>
+            </div>
+          )}
+
+          {investors && investors.length > 0 && !loading && (
+            <div className="mt-8">
+              <div className="flex items-center gap-2 mb-4">
+                <h3 className="font-heading text-base font-bold text-content-primary">
+                  Investidores
+                </h3>
+                <span className="text-xs font-sans text-content-secondary">
+                  capital privado · {investors.length} fundos
+                </span>
+              </div>
+              <div className="space-y-3">
+                {investors.map((inv) => (
+                  <InvestorCard key={inv.id} inv={inv} />
+                ))}
               </div>
             </div>
           )}

@@ -257,6 +257,11 @@ def ict_schema() -> dict:
     return load().get("ict_schema", {})
 
 
+def investidor_schema() -> dict:
+    """Schema do nó `investidor` e do artefato investidores.json (WIKI.md §6.1.3)."""
+    return load().get("investidor_schema", {})
+
+
 def tema_vocab() -> list[str]:
     """Vocabulário canônico de temas-macro (WIKI.md §5.9) — alvo único de
     editais e ICTs. Lista vazia se não declarado (consumidores degradam)."""

@@ -114,7 +114,10 @@ def test_langfuse_path_quando_keys_setadas(tmp_path, monkeypatch):
 
 def test_suites_registered():
     from core.eval.registry import SUITES
-    assert set(SUITES) == {"matching", "rag", "writing", "extraction"}
+    assert set(SUITES) == {
+        "matching", "rag", "writing", "extraction",
+        "investor_match", "opportunity_type",
+    }
 
 
 def test_rag_skips_without_supabase(tmp_path, monkeypatch):

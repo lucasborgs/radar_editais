@@ -749,7 +749,14 @@ class HybridMatchService:
                 skipped_expired += 1
                 continue
             card = self._load_wiki_page(entry["id"])
-            result.append(card if card else entry)
+            if card:
+                # opportunity_type é inherited (vem do scrape/Descoberta → entry do
+                # índice); a wiki page sintetizada NÃO o carrega. Threadamos da entry
+                # via spread em dict NOVO — load_wiki_page devolve objeto de blob
+                # cacheado (modo postgres), mutar in-place corromperia o cache.
+                result.append({**card, "opportunity_type": entry.get("opportunity_type", "edital")})
+            else:
+                result.append(entry)
         if skipped_expired:
             logger.warning(
                 "%d edital(is) com prazo vencido ignorado(s) em runtime — "
@@ -843,6 +850,7 @@ class HybridMatchService:
             item = {
                 "id": r.edital_id,
                 "title": r.card.get("title", ""),
+                "opportunity_type": r.card.get("opportunity_type", "edital"),
                 "status": r.card.get("status", ""),
                 "deadline": r.card.get("deadline", ""),
                 "score": min(score_final, 10.0),

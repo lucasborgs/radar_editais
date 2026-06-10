@@ -44,6 +44,7 @@ _FILES: dict[str, str] = {
     "index": "index.json",
     "index_historico": "index_historico.json",
     "icts": "icts.json",
+    "investidores": "investidores.json",
 }
 
 _TABLE = "kg_artifacts"
@@ -139,6 +140,12 @@ def load_index(*, historico: bool = False) -> dict:
 def load_icts() -> list[dict]:
     """Lista de ICTs do `icts.json` (a chave `icts` do blob)."""
     return load("icts", default={}).get("icts", [])
+
+
+def load_investidores() -> list[dict]:
+    """Lista de investidores (Q3) do `investidores.json` — diretório CURADO à mão
+    (espelha load_icts). Entidade fora do ciclo de edital, fora do index.json."""
+    return load("investidores", default={}).get("investidores", [])
 
 
 # ---------------------------------------------------------------------------

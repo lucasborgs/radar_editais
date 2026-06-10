@@ -92,10 +92,20 @@ def _json_from_llm(client, model, system: str, user: str, max_tokens: int = 1200
 # =============================================================================
 
 _TRIAGE_SYSTEM = (
-    "Você tria resultados de busca para saber se são OPORTUNIDADES DE FOMENTO À "
-    "INOVAÇÃO vigentes no Brasil (edital, chamada pública, subvenção, desafio com "
-    "inscrição aberta). NÃO conta: notícia, blog, artigo, página institucional "
-    "genérica, oportunidade encerrada. Responda só JSON: "
+    "Você tria resultados para um radar de fomento voltado a STARTUPS DEEP-TECH. "
+    "O texto costuma ser um AVISO curto, sem todos os detalhes — na DÚVIDA sobre o "
+    "tema, APROVE; a análise profunda vem depois (a IA mostra, o humano decide). "
+    "APROVE (is_opportunity=true) oportunidades ABERTAS de fomento, pesquisa, "
+    "inovação ou desenvolvimento tecnológico (subvenção, chamada/edital de "
+    "inovação, P&D, desafio tecnológico) — inovação em QUALQUER setor conta "
+    "(biotec, agritech, healthtech, energia, defesa...). "
+    "REJEITE (is_opportunity=false) SÓ quando for CLARAMENTE irrelevante a deep-"
+    "tech: assistência social, cultura, esporte, saúde assistencial, agricultura "
+    "familiar/merenda (PNAE/PAA), povos indígenas, credenciamento de prestadores, "
+    "processo seletivo/concurso de pessoal, compra/licitação; ou ALTERAÇÃO/"
+    "PRORROGAÇÃO/RESULTADO de chamada antiga, notícia, página institucional, "
+    "oportunidade encerrada. "
+    "Responda só JSON: "
     '{"is_opportunity": true|false, "agency": "sigla/nome curto da agência ou \\"\\""}.'
 )
 
@@ -125,6 +135,9 @@ def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, mode
         "Extraia os campos de uma oportunidade de fomento a partir do texto. "
         "Responda só JSON com as chaves: titulo, prazo_envio (dd/mm/yyyy ou \"\"), "
         "publico_alvo, descricao (2-3 frases), status (ABERTA|ENCERRADA|\"\"), "
+        "opportunity_type (UM de: edital|desafio|programa — desafio=desafio "
+        "tecnológico/open innovation de empresa-âncora; programa=aceleração/"
+        "incubação/cohort; edital=chamada/edital de fomento público padrão), "
         "tema (lista; ESCOLHA só desta lista canônica, [] se nenhum servir: "
         f"{vocab}). Não invente dados que não estão no texto."
     )
@@ -154,6 +167,9 @@ def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, mode
         "descricao": data.get("descricao", ""),
         "status": data.get("status", "") or "ABERTA",
         "tema": "; ".join(t for t in tema if isinstance(t, str)),
+        # opportunity_type (Fase B): tipo-evento classificado pela LLM. Default
+        # edital (chamada pública padrão); build_knowledge_graph o carrega ao índice.
+        "opportunity_type": (data.get("opportunity_type") or "edital").strip().lower(),
         "agency": agency or "",
         "fonte": agency or "Web (descoberta)",
         "verificacao": "provisorio",
@@ -246,7 +262,10 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         if not verdict["is_opportunity"]:
             continue
         page_text = _page_text(h)
-        rec = _extract(h, page_text, verdict["agency"], ext_client, ext_model)
+        # Prefere o órgão que a FONTE já conhece (ex.: DOU lê do artCategory) ao
+        # palpite da triagem — só cai no palpite quando a fonte é cega (Tavily).
+        agency = getattr(h, "agency", "") or verdict["agency"]
+        rec = _extract(h, page_text, agency, ext_client, ext_model)
         if rec:
             records.append(rec)
 

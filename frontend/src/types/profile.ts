@@ -29,7 +29,15 @@ export interface CompanyProfile {
   equipe_resumo: string;
   // Intenção de financiamento
   tipos_financiamento_interesse: TipoFinanciamento[];
+  // Capital privado / desafios (Q3/Q4) — opcionais, alimentam o match de investidor
+  estagio: EstagioInvestimento | "";
+  mrr_arr: number | null;
+  round_alvo_brl: number | null;
+  cap_table_resumo: string;
+  tracao_resumo: string;
 }
+
+export type EstagioInvestimento = "pre-seed" | "seed" | "serie-a" | "growth";
 
 export const EMPTY_PROFILE: CompanyProfile = {
   nome: "",
@@ -48,6 +56,11 @@ export const EMPTY_PROFILE: CompanyProfile = {
   trl: null,
   equipe_resumo: "",
   tipos_financiamento_interesse: [],
+  estagio: "",
+  mrr_arr: null,
+  round_alvo_brl: null,
+  cap_table_resumo: "",
+  tracao_resumo: "",
 };
 
 export const PROFILE_STORAGE_KEY = "radar_company_profile";
