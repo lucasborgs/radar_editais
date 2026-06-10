@@ -79,7 +79,10 @@ Paths em `config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GR
 
 ### Package layout
 ```
-backend/       FastAPI app (api.py) + auth_routes + library_routes
+backend/       api.py (shell: app + middleware + wiring) + routers/ por domínio
+               (catalog, graph, matching, applications, brief, writing, files,
+               profile) + auth_routes/library_routes + common.py (singletons +
+               schema de perfil) + rate_limit.py (limiter)
 core/          db (Supabase clients), auth (JWT/DbClient), writing_session,
                hybrid_match_service, kg_match_service, content_library,
                checklist_service, profile_extractor, wiki_schema,
@@ -102,7 +105,7 @@ supabase/      migrations/*.sql + config.toml (local CLI)
 - `chunk_edital_task` — chunking + embedding de um edital para RAG
 - Worker: `python -m procrastinate --app=core.tasks.app worker`
 
-### API surface (backend/api.py)
+### API surface (backend/routers/ — wiring em backend/api.py)
 ```
 GET  /stats, /editais, /editais/{id}, /editais/{id}/sections
 POST /match, /chat, /analyze, /draft
