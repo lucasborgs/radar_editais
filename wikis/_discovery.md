@@ -8,6 +8,14 @@ Princípio: queries amplas o bastante para recall, específicas o bastante para 
 afogar em ruído. Resultados passam por triagem agêntica + entram no KG como
 `provisorio` (§5.11). Ver `docs/spec_descoberta_oportunidades.md`.
 
+**Divisão de trabalho com o feeder DOU (spec_dou_feeder.md §6.1):** com
+`DISCOVERY_DOU_ENABLED=1`, o DOU é a *espinha de alta precisão* do fomento
+federal publicado — as queries Tavily NÃO devem re-varrer essa zona (desperdício
++ overlap que o dedup por URL não pega). O Tavily mira o que o DOU não vê:
+**FAPs/DOEs estaduais**, **desafios corporativos/open innovation** (anúncio
+só-no-site) e **programas de aceleração/incubação** (Q4). Q3 (VC) fica FORA da
+Descoberta: investidor é diretório curado, não cabe no schema de oportunidade.
+
 **Unificação (Opção A, WIKI.md §12.4):** a Descoberta é a *torneira automática*
 da fonte `web` — não tem bronze/índice próprios. Grava em `bronze_data/web_raw/`
 (prefixo `web_discovery_`) no schema web (`url`/`url_hash`/`texto_cru`/
@@ -17,15 +25,24 @@ outra torneira do mesmo bronze é a seed list manual (`web_sources`).
 
 ```yaml
 discovery:
-  # Queries de busca (Tavily). Tunáveis conforme a taxa de aprovação observada.
+  # Queries de busca (Tavily), escopadas pras zonas NÃO-DOU (ver divisão acima).
+  # Tunáveis conforme a taxa de aprovação observada.
   queries:
-    - "edital aberto inovação tecnológica empresas 2026 Brasil"
-    - "chamada pública fomento à inovação PME"
-    - "edital subvenção econômica pesquisa desenvolvimento"
-    - "desafio de inovação aberto empresas inscrições"
+    # FAPs / fomento estadual (DOEs não entram no feeder DOU federal)
     - "FAP estadual edital inovação chamada aberta"
-    - "programa apoio pesquisa desenvolvimento inovação edital vigente"
-  # Caps por execução (controle de custo do crawl diário).
+    - "fundação de amparo à pesquisa edital empresas inovação inscrições abertas"
+    - "edital fomento inovação empresas governo estadual aberto"
+    # Desafios corporativos / open innovation (anúncio só-no-site)
+    - "desafio de inovação aberto empresas inscrições"
+    - "open innovation desafio tecnológico startups inscrições abertas"
+    # Programas de aceleração / incubação (Q4)
+    - "programa de aceleração startups inscrições abertas edital"
+    - "incubadora seleção de startups chamada aberta"
+  # Caps por execução (controle de custo do crawl diário). Orçamentos SEPARADOS
+  # por gerador: no 1º shadow-run o DOU rendeu ~63 candidatos/dia e, num cap
+  # compartilhado, zerava o Tavily. max_candidates = busca cega (Tavily);
+  # max_dou_candidates = teto defensivo do DOU (o pré-filtro já corta).
   max_results_per_query: 8
   max_candidates: 40
+  max_dou_candidates: 80
 ```

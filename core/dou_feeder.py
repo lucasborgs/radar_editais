@@ -178,7 +178,8 @@ def _to_hit(a: dict) -> SearchHit:
     snippet = a["ementa"] or a["texto"][:300]
     org = (a["artCategory"].split("/")[0] or "").strip()
     return SearchHit(title=a["identifica"] or "(sem título)", url=url,
-                     snippet=snippet, content=a["texto"], agency=org)
+                     snippet=snippet, content=a["texto"], agency=org,
+                     full_text=True)
 
 
 # =============================================================================
@@ -236,6 +237,8 @@ def dou_candidates(
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()  # INLABS_* vêm do .env quando rodado avulso (fora do worker)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     import sys
 

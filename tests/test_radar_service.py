@@ -29,6 +29,17 @@ def test_merge_tags_kind_class_and_type():
     assert by_id["investidor:kptl"]["why_now"] == "Match de tese (sempre aberto)"
 
 
+def test_merge_threads_verificacao():
+    """`verificacao` flui do match de evento (badge provisorio na UI); entidade
+    é diretório curado → sempre verificado; evento sem o campo → verificado."""
+    ev_prov = {**_ev("web:abc", 8.0), "verificacao": "provisorio"}
+    out = merge_radar([ev_prov, _ev("finep:1", 7.0)], [_inv("investidor:kptl", 7.0)])
+    by_id = {it["id"]: it for it in out["radar"]}
+    assert by_id["web:abc"]["verificacao"] == "provisorio"
+    assert by_id["finep:1"]["verificacao"] == "verificado"
+    assert by_id["investidor:kptl"]["verificacao"] == "verificado"
+
+
 def test_rrf_interleaves_instead_of_blocking_by_raw_score():
     """RRF funde por POSIÇÃO, não nota crua: o melhor evento sobe junto do melhor
     fundo em vez de todos os fundos (score mais alto) virem em bloco."""

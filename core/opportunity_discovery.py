@@ -23,7 +23,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from config import BRONZE_DIR
 from core import kg_store
@@ -105,6 +105,10 @@ _TRIAGE_SYSTEM = (
     "processo seletivo/concurso de pessoal, compra/licitação; ou ALTERAÇÃO/"
     "PRORROGAÇÃO/RESULTADO de chamada antiga, notícia, página institucional, "
     "oportunidade encerrada. "
+    "REJEITE também quando a página NÃO é UMA chamada específica: página-lista/"
+    "portal/agregador de editais ('editais abertos', 'oportunidades'), homepage "
+    "de programa/agência, ou notícia que anuncia VÁRIOS editais de uma vez — "
+    "essas páginas não viram um registro útil (1 URL = 1 oportunidade). "
     "Responda só JSON: "
     '{"is_opportunity": true|false, "agency": "sigla/nome curto da agência ou \\"\\""}.'
 )
@@ -222,6 +226,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     queries = cfg.get("queries", [])
     k = int(cfg.get("max_results_per_query", 8))
     max_cand = int(cfg.get("max_candidates", 40))
+    max_dou = int(cfg.get("max_dou_candidates", 80))
     if not queries:
         logger.warning("descoberta: sem queries em wikis/_discovery.md")
         return []
@@ -229,8 +234,33 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     known = _known_urls()
     seen_now: set[str] = set()
     candidates: list[websearch.SearchHit] = []
+
+    # Gerador DOU (espinha de alta precisão, spec_dou_feeder.md §6) — ANTES do
+    # Tavily e com ORÇAMENTO PRÓPRIO (max_dou_candidates): no 1º shadow-run
+    # (2026-06-10) o DOU rendeu 63 candidatos/dia e, contando pro max_cand
+    # compartilhado, ZEROU o Tavily — as zonas gap-filler (FAPs, desafios,
+    # aceleradoras; §6.1) ficariam permanentemente sem cobertura. Atrás de flag
+    # pra ligar/desligar em prod sem tocar o caminho Tavily (e desligar se o
+    # INLABS cair). Busca o DOU de ONTEM (UTC): o cron roda 04:00 UTC, antes da
+    # publicação da edição do dia (manhã BRT) — "hoje" seria sempre vazio; D-1 é
+    # determinístico e o ledger mantém a idempotência.
+    if os.getenv("DISCOVERY_DOU_ENABLED", "0") == "1":
+        from core.dou_feeder import dou_candidates  # noqa: PLC0415
+        day = datetime.now(timezone.utc).date() - timedelta(days=1)
+        for h in dou_candidates(day):
+            if len(candidates) >= max_dou:
+                break
+            nu = _norm_url(h.url)
+            if nu and nu not in known and nu not in seen_now:
+                seen_now.add(nu)
+                candidates.append(h)
+        logger.info("descoberta: %d candidatos DOU (%s)", len(candidates),
+                    day.isoformat())
+
+    # Tavily conta o próprio orçamento (max_candidates) — separado do DOU.
+    n_dou = len(candidates)
     for q in queries:
-        if len(candidates) >= max_cand:
+        if len(candidates) - n_dou >= max_cand:
             break
         try:
             hits = websearch.web_search(q, k=k)
@@ -243,7 +273,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
                 continue
             seen_now.add(nu)
             candidates.append(h)
-            if len(candidates) >= max_cand:
+            if len(candidates) - n_dou >= max_cand:
                 break
 
     if not candidates:
@@ -286,7 +316,12 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
 def _page_text(hit: websearch.SearchHit) -> str:
     """Texto da página para extração + chunking. Tenta o fetch COMPLETO (corpo
     inteiro — o `raw_content` do Tavily vem capado em ~2k chars, raso demais pro
-    RAG); cai para o content capado e por fim o snippet. Nunca levanta."""
+    RAG); cai para o content capado e por fim o snippet. Nunca levanta.
+
+    Hits com `full_text` (DOU: `content` = Texto completo do XML) pulam o fetch —
+    economiza 1 request/candidato e a URL (visualizador JSP) não renderia melhor."""
+    if hit.full_text:
+        return hit.content or hit.snippet or ""
     try:
         from core.agent_tools.profile_tools import _fetch_and_parse
         full = (_fetch_and_parse(hit.url) or {}).get("text", "") or ""
@@ -298,6 +333,11 @@ def _page_text(hit: websearch.SearchHit) -> str:
 
 
 if __name__ == "__main__":
+    # CLI do shadow-run (spec_dou_feeder §9): fora do backend/worker, ninguém
+    # carregou o .env ainda — sem isto as chaves não chegam e tudo degrada
+    # silenciosamente pra no-op.
+    from dotenv import load_dotenv
+    load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     out = discover_opportunities()
     print(f"\nDescoberta: {len(out)} oportunidades provisórias extraídas.")
