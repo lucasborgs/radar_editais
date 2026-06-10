@@ -64,6 +64,7 @@ def _event_item(m: dict) -> dict:
         "id": eid,
         "kind_class": "evento",
         "opportunity_type": m.get("opportunity_type", "edital"),
+        "verificacao": m.get("verificacao", "verificado"),
         "title": m.get("title", ""),
         "score": float(m.get("score") or 0.0),
         "why_now": _why_now_event(eid),
@@ -77,6 +78,8 @@ def _entity_item(m: dict) -> dict:
         "id": m.get("id", ""),
         "kind_class": "entidade",
         "opportunity_type": "investidor",
+        # diretório de investidores é curado à mão — sempre verificado
+        "verificacao": "verificado",
         "title": m.get("name", ""),
         "score": float(m.get("score") or 0.0),
         "why_now": "Match de tese (sempre aberto)",

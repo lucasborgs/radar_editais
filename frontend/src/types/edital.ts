@@ -61,6 +61,7 @@ export interface KGMatchResult {
   id: string;
   title: string;
   opportunity_type?: string;   // edital | desafio | programa (default edital)
+  verificacao?: string;        // verificado | provisorio (Descoberta sem revisão humana)
   score: number;
   score_deterministic: number;
   score_tematico: number;
