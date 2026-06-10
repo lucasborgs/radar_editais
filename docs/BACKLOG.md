@@ -546,15 +546,16 @@ de fora — nenhum bloqueia o que foi entregue.
 - **Botão "escrever pitch" no card de investidor (Q3).** O endpoint
   `/writing/start` já aceita id `investidor:` (mode=pitch), mas não há gancho de
   UI a partir do InvestorCard. **Onde:** `frontend/src/app/matching/page.tsx`.
-- **Ranking do radar L2 — base feita (RRF), refinos pendentes.** A normalização
-  de scores heterogêneos foi resolvida com Reciprocal Rank Fusion (commit RRF):
-  funde por rank-dentro-do-tipo, intercala eventos e fundos. Pendente afinar:
-  (a) **pesos por quadrante** (hoje 50/50 implícito — talvez priorizar eventos por
-  urgência de deadline, ou ajustar por preferência do usuário); (b) **floor de
-  qualidade** (RRF põe o rank-1 de uma lista curta no topo mesmo com score cru
-  baixo — um fundo fraco pode subir; falta um piso/threshold antes da fusão);
-  (c) usar `why_now`/urgência como critério, não só display. **Onde:**
-  `core/radar_service.merge_radar` (`_RRF_K`, `_rank_within_source`).
+- **Ranking do radar L2 — base feita (RRF + floor), refinos pendentes.** Resolvidos:
+  (1) normalização de scores heterogêneos via Reciprocal Rank Fusion (funde por
+  rank-dentro-do-tipo, intercala eventos e fundos); (2) floor de qualidade via
+  tier forte/fraco (rebaixa o rank-1 fraco sem eliminar — evento usa flag
+  `eligible`, entidade usa `_ENTITY_FLOOR=6.0`). Pendente afinar: (a) **pesos por
+  quadrante** (hoje 50/50 implícito — talvez priorizar eventos por urgência de
+  deadline ou preferência do usuário); (b) **calibrar `_ENTITY_FLOOR`** com dado
+  real (hoje 6.0 chutado pela generosidade observada do scorer LLM); (c) usar
+  `why_now`/urgência como critério de ordenação, não só display. **Onde:**
+  `core/radar_service.merge_radar` (`_RRF_K`, `_ENTITY_FLOOR`, `_is_weak`).
 - **Match tipo-aware de desafio/programa — BLOQUEADO-POR-DADOS.** O HybridMatch
   já não QUEBRA com desafio/programa (dims de edital ausentes degradam para
   neutro, não eliminam), mas não usa sinais próprios (`empresa_ancora`,
