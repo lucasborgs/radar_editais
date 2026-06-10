@@ -197,12 +197,13 @@
 
 ### Ingestão web → matching (Descoberta Fase B)
 - **O quê:** produtizar a ingestão de editais da web (discovery) no matching de prod.
-- **Por que adiado:** FINEP+FAPESP já cobrem volume considerável; discovery foi
-  validado (provou a cegueira do Stage 1, ao vivo) mas productionizar é fluxo à parte,
-  e há outros fluxos a validar antes. Web já roda (`discover_opportunities`), entra no
-  índice local via `build_knowledge_graph`, mas fica fora do índice de prod.
-- **Ponto de entrada:** isolamento prod + qualidade/dedup dos itens `provisorio`.
-- **Status:** adiado conscientemente.
+- **Feito (Fase 1 ROADMAP, 2026-06-10):** wiring do feeder DOU atrás de
+  `DISCOVERY_DOU_ENABLED` (busca D-1 UTC; spec_dou_feeder §6), reescopo do Tavily
+  pras zonas não-DOU (§6.1), badge "não verificado" pro `provisorio`
+  (índice→match→radar→card; política: rotular, não filtrar).
+- **Em curso:** **shadow-run** local antes de ligar em prod — runbook e critério
+  de graduação em `spec_dou_feeder.md` §9. Ligar = setar envs no Railway.
+- **Status:** shadow-run pendente de rodar (~1 semana de runs).
 
 ### Descoberta web — `titulo` vazio na extração (UX do card)
 - **O quê:** no dry-run de 2026-06-09 (`discover_opportunities(write=False)`), os 23
@@ -217,7 +218,13 @@
   não sai da página (provável débito da qualidade do chunk HTML — ver entrada de
   parsing/chunking HTML).
 - **Onde:** `core/opportunity_discovery.py` (`_extract`, `_page_text`).
-- **Status:** aberto.
+- **Revisão (2026-06-10):** o fallback `or hit.title` EXISTE desde a origem do
+  engine (`_extract`, linha do `"title"`), e o parsing do Tavily preenche
+  `hit.title` — por leitura, o sintoma não se explica. Hipótese: o dry-run
+  inspecionou a chave `titulo` (o registro usa `title`). Hits DOU trazem
+  `Identifica` como título (robusto).
+- **Status:** sem ação de código; **revalidar no shadow-run** (spec_dou_feeder §9
+  inclui "% de title não-vazio" na inspeção). Reabrir só se o dado real reproduzir.
 
 ### Grafo induzido (GraphRAG) — overlay de insight, NÃO base do match
 - **O quê:** uma **Camada B** induzida sobre o grafo curado — extração livre de
@@ -438,10 +445,10 @@
 - **Decisão de fonte (já specada):** quando há overlap, **DOU vence** (canônico,
   estruturado); DOU-sourced pode nascer com `verificacao` > `provisorio`.
   Ver `docs/spec_dou_feeder.md` §6.1.
-- **Mitigação imediata (barata):** encolher o escopo do Tavily pras zonas que o
-  DOU NÃO cobre (DOEs estaduais, Q3 VC, Q4 aceleradoras) — o overlap quase some,
-  e com ele o problema. O Tavily deixa de re-varrer o federal que o DOU entrega
-  limpo. **Isso destrava sozinho a maior parte do furo.**
+- **Mitigação imediata (barata): FEITA (2026-06-10)** — queries do Tavily
+  reescopadas em `wikis/_discovery.md` pras zonas que o DOU NÃO cobre
+  (FAPs/estaduais, desafios open-innovation, Q4 aceleradoras; Q3 VC ficou fora —
+  investidor é diretório curado). O Tavily deixou de re-varrer o federal.
 - **Solução durável:** dedup semântico (título+órgão+nº do edital, ou
   similaridade) + prioridade de fonte no merge. Casa com o item de proveniência
   abaixo e com `verificacao`.
