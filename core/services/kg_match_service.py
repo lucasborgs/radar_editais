@@ -1,10 +1,10 @@
 """
 KGMatchService — Matching Karpathy-style.
 
-A LLM lê o índice completo de editais FINEP (knowledge_graph/index.json)
+A LLM lê o índice completo de editais FINEP (data/knowledge_graph/index.json)
 junto com o perfil da empresa e retorna os editais mais relevantes com
 justificativa por dimensão. Para o top-3, enriquece com dados do card
-(knowledge_graph/cards/{id}.json) quando disponível.
+(data/knowledge_graph/cards/{id}.json) quando disponível.
 
 Sem embeddings, sem ChromaDB — apenas raciocínio LLM sobre índice estruturado.
 """
