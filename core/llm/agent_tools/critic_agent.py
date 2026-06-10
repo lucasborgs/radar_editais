@@ -193,7 +193,7 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         section_title: título da seção (para contexto no prompt)
         session: instância de WritingSession (para acesso a db + scope_edital_ids)
     """
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
 
     # Coerência entre seções (checagens b/c) — idêntica nos dois gêneros.
     proposal_context = _build_proposal_context(session, section_title)

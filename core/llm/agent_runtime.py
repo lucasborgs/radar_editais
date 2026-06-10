@@ -5,7 +5,7 @@ viram agentes com tools, mantendo os demais serviços LLM-using em 1-shot.
 
 Padrão de uso:
 
-    from core.agent_runtime import tool, run_agent
+    from core.llm.agent_runtime import tool, run_agent
 
     @tool
     def search_edital(query: str, k: int = 5) -> str:
@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 Provider = Literal["openai", "anthropic"]
 StopReason = Literal["end_turn", "max_steps", "max_tokens", "error", "other"]
 
-# Defaults compartilhados com core.llm_client (vide LLM_TIMEOUT_SECONDS / MAX_RETRIES).
+# Defaults compartilhados com core.llm.llm_client (vide LLM_TIMEOUT_SECONDS / MAX_RETRIES).
 _TIMEOUT = float(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
 _MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
 
@@ -299,7 +299,7 @@ def _call_openai(
     System message é injetado como primeira message (formato OpenAI). Messages
     de input já vêm sem system — o caller (`run_agent`) garante isso.
     """
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
 
     client = make_client(api_key=os.environ["OPENAI_API_KEY"])
     full_messages = [{"role": "system", "content": system}] + messages

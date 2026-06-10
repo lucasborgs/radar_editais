@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from core.agent_runtime import Tool, tool
+from core.llm.agent_runtime import Tool, tool
 from core.retrieval.retriever import (
     format_chunks_for_prompt,
     retrieve_chunks,
@@ -185,7 +185,7 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
         """
         import os
 
-        from core.llm_client import make_client
+        from core.llm.llm_client import make_client
 
         outline = session._proposal_outline
         if not outline:
@@ -282,7 +282,7 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
 
         # Critic review — só pula se force=True (decisão explícita do usuário).
         if not force:
-            from core.agent_tools.critic_agent import run_critic
+            from core.llm.agent_tools.critic_agent import run_critic
             critic = run_critic(content, target_title, session)
             if not critic.approved:
                 issues_str = "\n".join(f"• {issue}" for issue in critic.issues)
@@ -351,7 +351,7 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
 
     # DeepResearch (Fase A): tool stateless de busca web. Subagente-como-tool —
     # devolve fato COM fonte; NÃO persiste (gate humano → library é a Fase B).
-    from core.agent_tools.research_tools import build_research_tools
+    from core.llm.agent_tools.research_tools import build_research_tools
 
     return [
         plan_writing_session,

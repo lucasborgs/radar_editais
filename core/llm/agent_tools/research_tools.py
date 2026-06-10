@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import logging
 
-from core.agent_runtime import Tool, tool
 from core.deep_research import run_deep_research
+from core.llm.agent_runtime import Tool, tool
 
 logger = logging.getLogger(__name__)
 

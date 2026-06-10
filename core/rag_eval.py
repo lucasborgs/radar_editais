@@ -269,7 +269,7 @@ def judge_faithfulness(query: str, retrieved_chunks: list[dict]) -> float:
         # for desativado.
         import os
 
-        from core.llm_client import make_client
+        from core.llm.llm_client import make_client
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             logger.warning("judge_faithfulness: OPENAI_API_KEY ausente — retornando 0.0")

@@ -29,7 +29,7 @@ def test_ligado_prepende_contexto(monkeypatch):
     fake.chat.completions.create.return_value = MagicMock(
         choices=[MagicMock(message=MagicMock(content="Seção 1, edital X."))]
     )
-    with patch("core.llm_client.make_client", return_value=fake):
+    with patch("core.llm.llm_client.make_client", return_value=fake):
         out = cr.contextualize_chunks([{"text": "elegibilidade: empresas"}])
     assert out == ["Seção 1, edital X.\n\nelegibilidade: empresas"]
 
@@ -39,6 +39,6 @@ def test_falha_por_chunk_cai_para_cru(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     fake = MagicMock()
     fake.chat.completions.create.side_effect = RuntimeError("boom")
-    with patch("core.llm_client.make_client", return_value=fake):
+    with patch("core.llm.llm_client.make_client", return_value=fake):
         out = cr.contextualize_chunks([{"text": "corpo"}])
     assert out == ["corpo"]  # nunca quebra

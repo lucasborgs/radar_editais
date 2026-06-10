@@ -90,7 +90,7 @@ def judge_thesis_fit(profile_context: str, fund_summary: str) -> tuple[int, int,
     """Juiz LLM da rúbrica para um par (perfil, fundo). Falha → (0,0,0,"")."""
     user = f"STARTUP:\n{profile_context}\n\nFUNDO:\n{fund_summary}"
     try:
-        from core.llm_client import make_client
+        from core.llm.llm_client import make_client
         client = make_client(api_key=os.environ["OPENAI_API_KEY"])
         resp = client.chat.completions.create(
             model=_eval_model(),

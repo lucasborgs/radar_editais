@@ -36,7 +36,7 @@ os.environ.setdefault("RERANK_BACKEND", "llm")
 
 import json  # noqa: E402
 
-from core.llm_client import make_client  # noqa: E402
+from core.llm.llm_client import make_client  # noqa: E402
 from core.rag_eval import gold_best_chunk_recall_at_k, gold_recall_at_k  # noqa: E402
 from core.retrieval.retriever import retrieve_chunks  # noqa: E402
 from scripts.bench_query_expansion import _MODEL, _QR_PROMPT, GOLDENS  # noqa: E402

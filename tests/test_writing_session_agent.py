@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.agent_runtime import AgentResult, TraceStep  # noqa: E402
+from core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
 from core.writing_session import WritingSession  # noqa: E402
 
 
@@ -198,7 +198,7 @@ def test_turn_agent_happy_path_no_tools(monkeypatch):
     def fake_run_agent(**kwargs):
         return fake_result
 
-    monkeypatch.setattr("core.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
 
     s._turn_count = 1
     result = s._turn_agent("oi", section_hint=None, user_turn_index=1)
@@ -234,7 +234,7 @@ def test_turn_agent_with_tools_persists_trace(monkeypatch):
         stop_reason="end_turn",
         usage={"input_tokens": 250, "output_tokens": 18},
     )
-    monkeypatch.setattr("core.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
     s._turn_count = 1
     result = s._turn_agent("qual o prazo?", section_hint=None, user_turn_index=1)
@@ -262,7 +262,7 @@ def test_turn_agent_error_returns_error_dict(monkeypatch):
         stop_reason="error",
         usage={"input_tokens": 0, "output_tokens": 0},
     )
-    monkeypatch.setattr("core.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
     s._turn_count = 1
     result = s._turn_agent("oi", section_hint=None, user_turn_index=1)
@@ -302,7 +302,7 @@ def test_turn_agent_pending_user_input_propagates(monkeypatch):
         s._pending_user_input = {"field": "cnpj", "prompt": "Qual o CNPJ?"}
         return fake_result
 
-    monkeypatch.setattr("core.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
 
     s._turn_count = 1
     result = s._turn_agent("preciso preencher o CNPJ", section_hint=None, user_turn_index=1)
@@ -349,7 +349,7 @@ def test_pitch_outline_is_capture_genre():
 
 def test_search_edital_returns_fund_node_in_pitch():
     """No pitch, search_edital devolve o nó do fundo, não chunks de edital_chunks."""
-    from core.agent_tools import build_writing_tools
+    from core.llm.agent_tools import build_writing_tools
 
     s = _make_pitch_session()
     tools = {t.name: t for t in build_writing_tools(s)}

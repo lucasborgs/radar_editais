@@ -567,7 +567,7 @@ dimensões em 1 frase cada:
 
 
 def _make_client():
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
     backend = os.getenv("LLM_BACKEND", "openai").lower()
 
     if backend == "gemini":
