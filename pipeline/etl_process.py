@@ -50,7 +50,6 @@ logging.basicConfig(
 
 INDEX_FILE           = KNOWLEDGE_GRAPH_DIR / "index.json"
 INDEX_HISTORICO_FILE = KNOWLEDGE_GRAPH_DIR / "index_historico.json"
-CACHE_FILE           = KG_WIKI_DIR / ".etl_process_cache.json"
 
 
 # =============================================================================
@@ -137,17 +136,20 @@ def _content_hash(metadata: dict, silver_meta: dict) -> str:
 
 
 def _load_cache() -> dict:
-    if CACHE_FILE.exists():
-        try:
-            return json.loads(CACHE_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
+    """Cache de síntese {edital_id: content_hash} via kg_store: durável em
+    Postgres quando configurado (o FS do worker de prod é efêmero — sem isto,
+    cada redeploy re-sintetizava TODA a wiki e esbarrava no rate limit).
+    Modo file escreve no mesmo path de antes (wiki/.etl_process_cache.json)."""
+    from core.kg import kg_store
+    try:
+        return kg_store.load("etl_process_cache", default={})
+    except Exception:
+        return {}
 
 
 def _save_cache(cache: dict) -> None:
-    KG_WIKI_DIR.mkdir(parents=True, exist_ok=True)
-    CACHE_FILE.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
+    from core.kg import kg_store
+    kg_store.save("etl_process_cache", cache)
 
 
 # =============================================================================

@@ -35,11 +35,11 @@ logger = logging.getLogger(__name__)
 
 # Bronze de saída: o MESMO da fonte web (a Descoberta é uma torneira dela).
 _WEB_BRONZE_DIR = BRONZE_DIR / "web_raw"
-# Estado da Descoberta (ledger de dedup cross-execução) — fica num dir próprio,
-# não em web_raw, para não se confundir com os arquivos bronze. O dotfile já
-# seria ignorado pelo glob("*.json"), mas mantê-lo à parte é mais claro.
-_DISCOVERY_STATE_DIR = BRONZE_DIR / "discovery_raw"
-_LEDGER = _DISCOVERY_STATE_DIR / ".ledger.json"
+# Ledger LEGADO (file-based, pré-kg_store): mantido só como fonte de migração —
+# o ledger vive no kg_store (`discovery_ledger`), durável em Postgres quando
+# configurado (o FS do worker de prod é efêmero; sem isto, cada redeploy
+# re-triava URLs já vistas).
+_LEGACY_LEDGER = BRONZE_DIR / "discovery_raw" / ".ledger.json"
 
 # Cap defensivo do texto guardado por página (o chunker re-fatia depois). Páginas
 # de fomento ficam bem abaixo; evita um caso patológico inflar o bronze.
@@ -206,18 +206,23 @@ def _is_social(url: str) -> bool:
 
 
 def _load_ledger() -> set[str]:
-    if _LEDGER.exists():
+    """Ledger via kg_store (blob `discovery_ledger`, {"urls": [...]}) ∪ ledger
+    file-based legado, se existir — migração por união: o legado é absorvido no
+    próximo _save_ledger e pode ser deletado depois."""
+    try:
+        urls = set(kg_store.load("discovery_ledger", default={}).get("urls", []))
+    except Exception:
+        urls = set()
+    if _LEGACY_LEDGER.exists():
         try:
-            return set(json.loads(_LEDGER.read_text(encoding="utf-8")))
+            urls |= set(json.loads(_LEGACY_LEDGER.read_text(encoding="utf-8")))
         except Exception:
-            return set()
-    return set()
+            pass
+    return urls
 
 
 def _save_ledger(urls: set[str]) -> None:
-    _DISCOVERY_STATE_DIR.mkdir(parents=True, exist_ok=True)
-    _LEDGER.write_text(json.dumps(sorted(urls), ensure_ascii=False, indent=2),
-                       encoding="utf-8")
+    kg_store.save("discovery_ledger", {"urls": sorted(urls)})
 
 
 def _known_urls() -> set[str]:
