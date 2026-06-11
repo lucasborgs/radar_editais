@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from backend.common import CompanyProfileSchema, to_py_profile, wiki_matcher
 from backend.rate_limit import limiter
-from core.auth import CurrentUserId, DbClient
+from core.auth import CurrentUserId, DbClient, OptionalDbClient, OptionalUserId
 from core.services.content_library import get_workspace_id
 
 router = APIRouter(tags=["matching"])
@@ -66,18 +66,25 @@ def match_investidores_endpoint(
 
 @router.post("/match/radar", summary="Radar unificado (L2): eventos + investidores num ranking só")
 @limiter.limit("10/minute")
-def match_radar(request: Request, req: RadarRequest, user_id: CurrentUserId, db: DbClient):
+def match_radar(
+    request: Request, req: RadarRequest, user_id: OptionalUserId, db: OptionalDbClient,
+):
     """Funde o match de eventos (edital/desafio/programa) e o de investidores num
     ÚNICO ranking (Layer 2, spec §3.8): normaliza scores, anexa o sinal "por que
     agora" e aplica cap por quadrante. Orquestra os 2 matchers sem tocá-los —
-    `/match` e `/match/investidores` seguem disponíveis."""
+    `/match` e `/match/investidores` seguem disponíveis.
+
+    Auth OPCIONAL (delta B2, porta pública do front-door): sem JWT → workspace_id
+    None e `build_radar` usa pesos globais default. Com JWT → comportamento atual
+    idêntico (pesos por workspace). O perfil já vem no body em ambos os casos."""
     profile = to_py_profile(req.profile)
     if not profile.is_complete():
         raise HTTPException(
             status_code=422,
             detail="Perfil incompleto. Preencha pelo menos nome e descricao_atividades.",
         )
-    workspace_id = get_workspace_id(db, user_id)
+    # Só resolve workspace no caminho autenticado (sem JWT não há cliente per-request).
+    workspace_id = get_workspace_id(db, user_id) if (user_id and db is not None) else None
     from core.services.radar_service import build_radar
     return build_radar(
         profile, top_k=req.top_k, per_type_cap=req.per_type_cap, workspace_id=workspace_id,
