@@ -15,9 +15,9 @@ function loadCollapsed(): boolean {
 /**
  * Explorer retrátil do workspace.
  *
- * Expandido: árvore "Proposta" (seções do outline, ✓ quando tem conteúdo) +
- * grupo "Anexos" (library_items — clicar insere @mention no chat) + rodapé com
- * Revisar/Exportar (DESABILITADOS em N1/N2; tooltip "em breve").
+ * Expandido: árvore "Proposta" (seções do outline, ✓ quando tem conteúdo,
+ * ⚠︎n quando o auto-review encontrou findings) + grupo "Anexos" (library_items
+ * — clicar insere @mention no chat) + rodapé com Revisar/Exportar.
  *
  * Colapsado: barra fina de ícones (§ seções · 📎 anexos · ▶ revisar · ⬇ exportar).
  * Estado persistido em localStorage.
@@ -25,17 +25,28 @@ function loadCollapsed(): boolean {
 export function Explorer({
   sections,
   attachments,
+  findingCounts,
+  reviewing,
   onSelectSection,
   onSelectAttachment,
+  onReview,
+  onExport,
 }: {
   sections: WorkspaceSection[];
   attachments: ContentItemSummary[];
+  // Mapa título-da-seção → nº de findings (inclui chave "Geral").
+  findingCounts: Map<string, number>;
+  reviewing: boolean;
   onSelectSection: (title: string) => void;
   onSelectAttachment: (item: ContentItemSummary) => void;
+  onReview: () => void;
+  onExport: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   // Evita flash: lê localStorage só no client após o mount.
   useEffect(() => setCollapsed(loadCollapsed()), []);
+
+  const totalFindings = Array.from(findingCounts.values()).reduce((a, b) => a + b, 0);
 
   function toggle() {
     setCollapsed((c) => {
@@ -66,18 +77,25 @@ export function Explorer({
           <span className="w-8 h-8 flex items-center justify-center" title="Anexos">
             📎
           </span>
-          <span
-            className="w-8 h-8 flex items-center justify-center opacity-40"
-            title="Revisar (em breve)"
+          <button
+            onClick={onReview}
+            disabled={reviewing}
+            title="Revisar"
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40"
           >
-            ▶
-          </span>
-          <span
-            className="w-8 h-8 flex items-center justify-center opacity-40"
-            title="Exportar (em breve)"
+            {reviewing ? (
+              <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            ) : (
+              "▶"
+            )}
+          </button>
+          <button
+            onClick={onExport}
+            title="Exportar"
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-50 transition-colors"
           >
             ⬇
-          </span>
+          </button>
         </div>
       </div>
     );
@@ -106,6 +124,7 @@ export function Explorer({
         </p>
         {sections.map((s) => {
           const hasContent = s.content.trim().length > 0;
+          const findings = findingCounts.get(s.title) ?? 0;
           return (
             <button
               key={s.title}
@@ -121,7 +140,15 @@ export function Explorer({
               >
                 {hasContent ? "✓" : "·"}
               </span>
-              <span className="truncate">{s.title}</span>
+              <span className="truncate flex-1">{s.title}</span>
+              {findings > 0 && (
+                <span
+                  title={`${findings} ${findings === 1 ? "observação" : "observações"} da revisão`}
+                  className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-100 text-amber-800 px-1.5 text-[10px] font-medium"
+                >
+                  ⚠︎{findings}
+                </span>
+              )}
             </button>
           );
         })}
@@ -152,19 +179,32 @@ export function Explorer({
         )}
       </div>
 
-      {/* rodapé: Revisar / Exportar — desabilitados em N1/N2 (N3/N4) */}
+      {/* rodapé: Revisar / Exportar */}
       <div className="shrink-0 border-t border-border p-2 space-y-1">
         <button
-          disabled
-          title="em breve"
-          className="w-full text-xs font-sans text-content-secondary/50 border border-border rounded-lg py-1.5 cursor-not-allowed"
+          onClick={onReview}
+          disabled={reviewing}
+          className="w-full text-xs font-sans text-content-primary border border-border rounded-lg py-1.5 hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
         >
-          ▶ Revisar
+          {reviewing ? (
+            <>
+              <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              Revisando…
+            </>
+          ) : (
+            <>
+              ▶ Revisar
+              {totalFindings > 0 && (
+                <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-1.5 text-[10px] font-medium">
+                  {totalFindings}
+                </span>
+              )}
+            </>
+          )}
         </button>
         <button
-          disabled
-          title="em breve"
-          className="w-full text-xs font-sans text-content-secondary/50 border border-border rounded-lg py-1.5 cursor-not-allowed"
+          onClick={onExport}
+          className="w-full text-xs font-sans text-content-primary border border-border rounded-lg py-1.5 hover:bg-gray-50 transition-colors"
         >
           ⬇ Exportar
         </button>

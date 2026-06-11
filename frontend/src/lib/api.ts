@@ -472,6 +472,57 @@ export const saveDocumentSection = (
 export const exportDocument = (sessionId: string) =>
   apiFetch<{ markdown: string; session_id: string }>(`/writing/${sessionId}/export`);
 
+// ── Auto-review (checklist 3-passes, ancorado por seção) ───
+// Shape REAL do core/services/checklist_service.py + enriquecimento `section`
+// feito no router (backend/routers/writing.py:_attach_issue_sections).
+export interface ComplianceIssue {
+  requirement: string;
+  status: "ok" | "missing" | "partial";
+  evidence: string;
+  suggestion: string;
+  section: string; // anexado pelo backend (W6)
+}
+
+export interface QualityIssue {
+  category: "clarity" | "coherence" | "persuasion" | "tone";
+  severity: "low" | "medium" | "high";
+  excerpt: string;
+  suggestion: string;
+  section: string;
+}
+
+export interface CompletenessSection {
+  title: string;
+  status: "empty" | "shallow" | "adequate" | "thorough";
+  suggestion: string;
+  section: string;
+}
+
+export interface AutoReview {
+  compliance: { issues: ComplianceIssue[]; score: number };
+  quality: { issues: QualityIssue[]; overall_score: number };
+  completeness: {
+    sections: CompletenessSection[];
+    missing_sections: string[];
+    overall_score: number;
+  };
+  error: Array<{ pass: string; message: string }> | null;
+}
+
+export const autoReviewChecklist = (sessionId: string, token: string) =>
+  apiFetch<{ session_id: string; review: AutoReview }>(
+    `/writing/${sessionId}/checklist/auto-review`,
+    { method: "POST" },
+    token,
+  );
+
+export const saveSessionToStorage = (sessionId: string, token: string) =>
+  apiFetch<{ path: string; signed_url: string; session_id: string }>(
+    `/writing/${sessionId}/save-to-storage`,
+    { method: "POST" },
+    token,
+  );
+
 // ── Writing Sessions list (resumable) ──────────────────────
 
 export interface WritingSessionSummary {
