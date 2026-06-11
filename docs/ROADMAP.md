@@ -5,7 +5,7 @@
 > próxima frente, sem reconstruir o raciocínio. Pendências granulares vivem em
 > [BACKLOG.md](BACKLOG.md); o "porquê" arquitetural, nas specs `spec_*.md`.
 
-## Estado atual (2026-06-10)
+## Estado atual (2026-06-11)
 
 Arquitetura **multi-quadrante** entregue (Fases B+C) e mergeada na `main` via PR #8:
 - **Q3 investidor** end-to-end (diretório curado, match-por-tese, `/match/investidores`, card).
@@ -31,9 +31,9 @@ Detalhe e seams em [spec_multi_quadrante.md](spec_multi_quadrante.md) + memória
 | Fase | O quê | Por que aqui | Pré-requisito / risco |
 |---|---|---|---|
 | **0 — Handoff** ✅ | merge PR #8 + este ROADMAP + nota de arquitetura + memória | ponte pra próxima conversa/modelo | baixo |
-| **1 — Ligar a torneira** (iniciativa "dados") 🔄 código pronto, shadow-run pendente | Descoberta web em prod | fundacional e pequeno; enriquece o grafo → torna a #3-frontend demonstrável e destrava match de desafio/programa | wiring DOU + reescopo Tavily + badge `provisorio` FEITOS (2026-06-10); falta rodar o **shadow-run** (~1 semana, runbook em [spec_dou_feeder.md](spec_dou_feeder.md) §9) e então setar envs no Railway; custo Tavily+LLM |
-| **2 — Reorg backend** (#3-backend) | arquitetura/boas práticas na base | base estável (multi-quadrante assentou) e limpa **antes** do rewrite | NÃO reorganizar o frontend aqui (vai ser reescrito); ver [refactor_backend.md](refactor_backend.md) |
-| **3 — Frontend** (iniciativa "frontend") | 1a front-door conversacional → 1b workspace tipo IDE | maior e mais design; merece base limpa + dados ricos | maior superfície de design; 1b (IDE) é ambicioso; **specar UX antes de codar** |
+| **1 — Ligar a torneira** ✅ código (PR #9) · 🔄 operação | Descoberta web em prod | fundacional e pequeno | falta só: **shadow-run** diário ~1 semana (runbook spec_dou_feeder §9; dia 1 rodado e logado), revisar 13 labels do golden de triagem (BACKLOG) e setar 4 envs no Railway. Suíte `triage` eval-gated criada (baseline 0.8525/0.9836) |
+| **2 — Reorg backend** ✅ (2026-06-11, PRs #10-#13) | api.py→routers; core/ em subpacotes (kg/retrieval/llm/services); README+diagrama; data/ unificado; cache de síntese e ledger duráveis (cloud b+d) | — | frontend intocado (Fase 3); bronze→Storage fica como item solto |
+| **3 — Frontend** ⬅️ PRÓXIMA | 1a front-door conversacional → 1b workspace tipo IDE | base limpa ✅ (Fase 2); dados enriquecem com o shadow-run | **specar UX antes de codar** (fluxos, janelas, stack — decisões do Lucas); 1b é ambicioso |
 
 ### Notas que mudam o cálculo
 
