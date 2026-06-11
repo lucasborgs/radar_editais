@@ -249,3 +249,20 @@ Ligar = setar as mesmas envs no Railway (worker), nada de código.
   orçamentos separados (`max_dou_candidates`).
 - **Ajuste pro dia 2:** triagem agora rejeita explicitamente página-lista/
   agregador/homepage (1 URL = 1 oportunidade); medir o efeito.
+
+**Dia 2 (2026-06-11, DOU de 2026-06-10):**
+- DOU: 74 candidatos (72 DO3 + 2 DO1) → **0 aprovados** — dia sem fomento real
+  no DOU; consistente com a expectativa de que a espinha DOU é esparsa.
+- Tavily: **11 aprovados** (vs 30 no dia 1) — o fix anti-agregador cortou
+  volume, mas ainda passam hubs ("Desafios - 100 Open Startups", "Open
+  Innovation Challenge Service") e títulos genéricos — candidatos a refinar a
+  triagem (eval-gated, suíte `triage`).
+- Índice local pós-build: 34 vigentes = 17 finep + 2 fapesp + **15 web
+  provisorio** (badge na UI). Primeira vez que o front-door (PR #14) mostra a
+  base multi-fonte.
+- **Incidente operacional (gotcha pra prod):** primeira run pós-PR #13 quebrou
+  no `_save_ledger` — a tabela `kg_artifacts` existia no Postgres local, mas o
+  PostgREST estava com schema cache velho (PGRST205). Fix: `NOTIFY pgrst,
+  'reload schema'`. Bronze não se perdeu; ledger reconstruído do bronze. Ao
+  aplicar a migração 016 em ambiente novo, validar que o REST enxerga a tabela
+  antes do primeiro run.
