@@ -237,6 +237,12 @@
   que mudança de input só move erros de lugar; sem golden estável, nenhuma
   melhoria de triagem é decidível.
 - **Status:** aguardando revisão do fundador.
+- **Caso concreto novo (2026-06-11, teste em prod):** a notícia agregadora
+  "FINEP lança série de editais com R$ 3,3 bilhões" (web:ba26ff22d7b4,
+  `provisorio`) passou na triagem apesar do fix anti-página-lista do dia 2 —
+  é notícia sobre VÁRIOS editais que já temos individualmente via API (duplica
+  e polui o tema agro). Adicionar ao golden como `expected: reject` quando o
+  golden for revisado; reforça a regra "1 URL = 1 oportunidade".
 
 ### Descoberta web — `titulo` vazio na extração (UX do card)
 - **O quê:** no dry-run de 2026-06-09 (`discover_opportunities(write=False)`), os 23

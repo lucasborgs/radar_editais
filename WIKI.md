@@ -284,6 +284,14 @@ Invariante (test_wiki_schema_consistency): todo tema usado por editais ou ICTs
 deve estar nesta lista. Tema novo no corpus sem entrada aqui = quebra o
 validador → decida (adicionar ao vocab ou corrigir o produtor).
 
+Variações conhecidas mapeadas em `domain/vocabulary._SYNONYMS` (2026-06-11):
+a taxonomia Liferay da FINEP usa "Indústria e Materiais Avançados" para o
+tema de materiais. As demais categorias da taxonomia fora do vocab são
+mecanismos/programas ("Subvenção Econômica", "Seleção de Gestores…") ou temas
+sem cobertura ("Meio Ambiente - Água e Clima", "Cidades…", "Educação…") — o
+filtro de vocabulário do build os descarta por design; entram no vocab apenas
+com evidência de cobertura (regra acima).
+
 ### 5.9.1 Vocabulários do multi-quadrante
 
 `setor` (vertical de indústria) é DISTINTO de `tema` (domínio tecnológico) — para

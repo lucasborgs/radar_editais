@@ -10,12 +10,11 @@ Chamada por `pipeline.build_knowledge_graph._build_editais` no campo `themes`.
 """
 from __future__ import annotations
 
-# Mapa de sinônimos → canônico. Vazio por enquanto; preencher conforme
-# encontramos variações no corpus (ex: "IA" → "inteligência artificial").
+# Mapa de sinônimos → canônico (variações do corpus → tema_vocab, WIKI.md §5.9).
 _SYNONYMS: dict[str, str] = {
-    # "ia": "inteligência artificial",
-    # "machine learning": "inteligência artificial",
-    # "energia renovável": "energia limpa",
+    # Taxonomia Liferay da FINEP nomeia assim o tema-macro de materiais
+    # (auditoria 2026-06-11 das api_taxonomy_categories do bronze).
+    "indústria e materiais avançados": "materiais, química e manufatura avançada",
 }
 
 
