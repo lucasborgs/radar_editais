@@ -33,7 +33,7 @@ Detalhe e seams em [spec_multi_quadrante.md](spec_multi_quadrante.md) + memória
 | **0 — Handoff** ✅ | merge PR #8 + este ROADMAP + nota de arquitetura + memória | ponte pra próxima conversa/modelo | baixo |
 | **1 — Ligar a torneira** ✅ código (PR #9) · 🔄 operação | Descoberta web em prod | fundacional e pequeno | falta só: **shadow-run** diário ~1 semana (runbook spec_dou_feeder §9; dia 1 rodado e logado), revisar 13 labels do golden de triagem (BACKLOG) e setar 4 envs no Railway. Suíte `triage` eval-gated criada (baseline 0.8525/0.9836) |
 | **2 — Reorg backend** ✅ (2026-06-11, PRs #10-#13) | api.py→routers; core/ em subpacotes (kg/retrieval/llm/services); README+diagrama; data/ unificado; cache de síntese e ledger duráveis (cloud b+d) | — | frontend intocado (Fase 3); bronze→Storage fica como item solto |
-| **3 — Frontend** ⬅️ PRÓXIMA | 1a front-door conversacional → 1b workspace tipo IDE | base limpa ✅ (Fase 2); dados enriquecem com o shadow-run | **specar UX antes de codar** (fluxos, janelas, stack — decisões do Lucas); 1b é ambicioso |
+| **3 — Frontend** ⬅️ EM ANDAMENTO | 1a front-door conversacional → 1b workspace tipo IDE | base limpa ✅ (Fase 2); dados enriquecem com o shadow-run | spec UX da 1a ✅ (2026-06-11, [spec_frontdoor_ux.md](spec_frontdoor_ux.md) — decisões D1–D7 + marcos M1–M5); 1b ainda sem spec, é ambicioso |
 
 ### Notas que mudam o cálculo
 
@@ -47,13 +47,17 @@ Detalhe e seams em [spec_multi_quadrante.md](spec_multi_quadrante.md) + memória
   (badge "não verificado"), não filtrados; ativação via **shadow-run** local
   primeiro (runbook: spec_dou_feeder §9). O "fix `titulo` vazio" caiu: o
   fallback já existia no código; revalida-se com o dado do shadow-run (BACKLOG).
-- **Fase 3:** stack do frontend (manter Next.js 14?); spec de UX das duas interfaces (fluxos, janelas, o que cada uma consome do backend) — **alto julgamento, specar com modelo capaz**.
+- **Fase 3 — 1a DECIDIDO (2026-06-11):** stack mantém Next.js 14 in-place; chat
+  puro com resultados inline; porta pública (gates: anexo/persistir/escrever);
+  motor híbrido (agente propõe diff de perfil, usuário confirma, front dispara
+  `/match/radar`). Detalhe em [spec_frontdoor_ux.md](spec_frontdoor_ux.md).
+  **Falta:** spec de UX da **1b** (workspace) — specar quando a 1a estiver de pé.
 
 ---
 
 ## Detalhe da iniciativa de frontend (#1) — esboço
 
-Capturado para não se perder; o **spec de UX fica a cargo do Lucas** (a fazer).
+Spec de UX da 1a: ✅ [spec_frontdoor_ux.md](spec_frontdoor_ux.md) (2026-06-11). 1b: a specar.
 
 - **1a — Front-door conversacional.** Interface de chat onde qualquer usuário interage com a base de conhecimento. Elimina onboarding + tela de match: guia o preenchimento do perfil da empresa (aceitando **anexos** → `profile_extractor`/`content_library`) e já devolve as fontes (editais/investidores/programas) em **ranking do match** (`/match/radar`).
 - **1b — Workspace tipo IDE (estilo Claude Code).** Após selecionar um item: menu principal numa aba à direita → janela de expansão (explorer de arquivos) → janela de elaboração/edição da proposta → chat com a LLM. Reaproveita `WritingSession`/`/writing/*`.
