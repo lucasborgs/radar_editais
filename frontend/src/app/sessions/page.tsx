@@ -198,7 +198,19 @@ export default function SessionsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-primary font-sans">
+                      {/* Abrir no novo workspace (1b). Mantemos "Continuar"
+                          (chat antigo) até a chegada/redirect ser feita em N4. */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          router.push(`/workspace/${s.session_id}`);
+                        }}
+                        className="text-xs font-sans text-white bg-primary hover:bg-primary-hover rounded-lg px-2.5 py-1 transition-colors"
+                      >
+                        Abrir no workspace
+                      </button>
+                      <span className="text-xs text-content-secondary font-sans">
                         Continuar →
                       </span>
                       <button
