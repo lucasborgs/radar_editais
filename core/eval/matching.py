@@ -20,7 +20,7 @@ FIXTURE = ROOT / "tests" / "fixtures" / "eval_matching.json"
 
 @lru_cache(maxsize=1)
 def _service():
-    from core.hybrid_match_service import HybridMatchService
+    from core.services.hybrid_match_service import HybridMatchService
     return HybridMatchService()
 
 
@@ -73,7 +73,7 @@ def task(*, item: Any, **_) -> dict:
     profile = _build_profile(inp["profile"])
     matches = svc.match(profile, top_k=inp.get("top_k", 5))
 
-    from core.temporal import temporal_context
+    from core.kg.temporal import temporal_context
     enriched = []
     for m in matches:
         eid = m["id"]
@@ -136,7 +136,7 @@ def eval_expected_hit(*, output, expected_output, **_) -> Evaluation | None:
 def _prereqs() -> str | None:
     if not os.getenv("OPENAI_API_KEY"):
         return "requer OPENAI_API_KEY (juiz da rúbrica + Stage 2)"
-    from core import kg_store
+    from core.kg import kg_store
     if not kg_store.load_index().get("editais"):
         return "índice do KG vazio — rode pipeline/build_knowledge_graph"
     return None

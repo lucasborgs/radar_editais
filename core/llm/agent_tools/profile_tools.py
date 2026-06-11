@@ -27,7 +27,7 @@ from typing import Any
 import requests
 from bs4 import BeautifulSoup
 
-from core.agent_runtime import Tool, tool
+from core.llm.agent_runtime import Tool, tool
 
 logger = logging.getLogger(__name__)
 

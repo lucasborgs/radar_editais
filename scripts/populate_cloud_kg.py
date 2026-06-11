@@ -59,7 +59,7 @@ bkg.main()  # rebuilda do bronze, salva local + upsert kg_artifacts no cloud
 # Verificação: lê de volta do cloud o que acabou de subir.
 print("\n--- verificação no cloud ---")
 os.environ["KG_STORE_BACKEND"] = "postgres"
-import core.kg_store as kg_store  # noqa: E402
+import core.kg.kg_store as kg_store  # noqa: E402
 
 kg_store._pg_cache.clear()
 idx = kg_store.load_index()

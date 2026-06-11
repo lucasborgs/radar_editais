@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from core.hybrid_match_service import HybridMatchService
+from core.services.hybrid_match_service import HybridMatchService
 from domain.user_profile import CompanyProfile
 
 
@@ -46,7 +46,7 @@ def test_no_eligible_marks_results_ineligible():
     svc = _svc([_HOSTILE_CARD])
     with patch.object(svc, "_load_wiki_page", lambda eid: None), \
          patch.object(svc, "_load_index", lambda: None), \
-         patch("core.hybrid_match_service._call_stage2_scores", lambda eligible, profile: {}):
+         patch("core.services.hybrid_match_service._call_stage2_scores", lambda eligible, profile: {}):
         results = svc.match(_ineligible_profile(), top_k=5)
 
     assert results, "fallback deve devolver os aproximados (utilidade), não lista vazia"
@@ -68,9 +68,9 @@ def test_eligible_results_marked_true():
     svc = _svc([friendly])
     with patch.object(svc, "_load_wiki_page", lambda eid: None), \
          patch.object(svc, "_load_index", lambda: None), \
-         patch("core.hybrid_match_service._call_stage2_scores",
+         patch("core.services.hybrid_match_service._call_stage2_scores",
                lambda eligible, profile: {"finep:OK": 8.0}), \
-         patch("core.hybrid_match_service._call_stage2_explain",
+         patch("core.services.hybrid_match_service._call_stage2_explain",
                lambda top_results, profile: {}):
         results = svc.match(_ineligible_profile(), top_k=5)
 

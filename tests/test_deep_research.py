@@ -9,8 +9,8 @@ sys.path.insert(0, str(ROOT))
 
 from core import deep_research as dr
 from core import web_search as ws
-from core.agent_runtime import AgentResult
-from core.agent_tools.research_tools import build_research_tools
+from core.llm.agent_runtime import AgentResult
+from core.llm.agent_tools.research_tools import build_research_tools
 
 
 def _fake_hits():
@@ -82,7 +82,7 @@ def test_deep_research_tool_formats_with_sources(monkeypatch):
         sources=[dr.Source("Fonte A", "http://a"), dr.Source("", "http://b")],
         stop_reason="end_turn",
     )
-    monkeypatch.setattr("core.agent_tools.research_tools.run_deep_research",
+    monkeypatch.setattr("core.llm.agent_tools.research_tools.run_deep_research",
                         lambda q: result)
     tool = build_research_tools()[0]
     assert tool.name == "deep_research"
@@ -94,7 +94,7 @@ def test_deep_research_tool_formats_with_sources(monkeypatch):
 
 def test_deep_research_tool_graceful_when_empty(monkeypatch):
     monkeypatch.setattr(
-        "core.agent_tools.research_tools.run_deep_research",
+        "core.llm.agent_tools.research_tools.run_deep_research",
         lambda q: dr.DeepResearchResult(answer="", sources=[], stop_reason="error"),
     )
     tool = build_research_tools()[0]
@@ -106,6 +106,6 @@ def test_redator_inclui_deep_research():
     """Guard-rail inverso da Fase C: aqui a tool DEVE estar no Redator."""
     import inspect
 
-    from core.agent_tools import writing_tools
+    from core.llm.agent_tools import writing_tools
     src = inspect.getsource(writing_tools.build_writing_tools)
     assert "build_research_tools" in src

@@ -26,9 +26,9 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from config import BRONZE_DIR
-from core import kg_store
 from core import web_search as websearch
-from core import wiki_schema as ws
+from core.kg import kg_store
+from core.kg import wiki_schema as ws
 from core.web_identity import normalize_web_url, web_url_hash
 
 logger = logging.getLogger(__name__)
@@ -47,13 +47,13 @@ _TEXTO_CRU_CAP = 60_000
 
 
 # =============================================================================
-# LLM client (triagem barata / extração capaz) — padrão de core.content_library
+# LLM client (triagem barata / extração capaz) — padrão de core.services.content_library
 # =============================================================================
 
 def _make_client(role: str):
     """(client, model) para 'triage' (barato) ou 'extract' (capaz). None se sem
     credencial — o caller degrada."""
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
     backend = os.getenv("LLM_BACKEND", "openai").lower()
     try:
         if backend == "gemini":
@@ -323,7 +323,7 @@ def _page_text(hit: websearch.SearchHit) -> str:
     if hit.full_text:
         return hit.content or hit.snippet or ""
     try:
-        from core.agent_tools.profile_tools import _fetch_and_parse
+        from core.llm.agent_tools.profile_tools import _fetch_and_parse
         full = (_fetch_and_parse(hit.url) or {}).get("text", "") or ""
         if len(full) > len(hit.content or ""):
             return full

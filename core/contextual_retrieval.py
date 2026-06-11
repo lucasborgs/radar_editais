@@ -50,7 +50,7 @@ def contextualize_chunks(chunks: list[dict]) -> list[str]:
         return texts
 
     try:
-        from core.llm_client import make_client
+        from core.llm.llm_client import make_client
         client = make_client(api_key=os.environ["OPENAI_API_KEY"])
     except Exception as e:  # noqa: BLE001
         logger.warning("contextual_retrieval: cliente LLM indisponível (%s) — embed cru", e)

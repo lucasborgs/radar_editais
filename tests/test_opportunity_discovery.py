@@ -253,7 +253,7 @@ def test_discover_dou_disabled_by_default(monkeypatch):
 
 def test_page_text_skips_fetch_for_full_text_hits(monkeypatch):
     """Hit com full_text (DOU) usa o content direto, sem full-fetch da URL."""
-    import core.agent_tools.profile_tools as pt
+    import core.llm.agent_tools.profile_tools as pt
     def boom(url):
         raise AssertionError("full-fetch não deveria rodar para hit full_text")
     monkeypatch.setattr(pt, "_fetch_and_parse", boom)

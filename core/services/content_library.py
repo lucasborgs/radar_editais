@@ -53,7 +53,7 @@ importance_score reflete o valor do documento para escrita de propostas de fomen
 # =============================================================================
 
 def _make_client():
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
     backend = os.getenv("LLM_BACKEND", "openai").lower()
     if backend == "gemini":
         return make_client(
@@ -245,7 +245,7 @@ async def create_item(
     item = result.data[0]
 
     if enrich:
-        # Import local para evitar ciclo: core.tasks importa core.content_library.
+        # Import local para evitar ciclo: core.tasks importa core.services.content_library.
         from core.tasks import app as tasks_app
 
         async with tasks_app.open_async():
@@ -305,7 +305,7 @@ async def update_item(
         return None
 
     if content_changed:
-        # Import local para evitar ciclo: core.tasks importa core.content_library.
+        # Import local para evitar ciclo: core.tasks importa core.services.content_library.
         from core.tasks import app as tasks_app
 
         async with tasks_app.open_async():

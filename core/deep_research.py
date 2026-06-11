@@ -4,7 +4,7 @@ DeepResearch Fase A (ver docs/spec_deepresearch.md). Padrão subagente-como-tool
 `run_deep_research` roda um `run_agent` interno com duas tools (web_search via
 core.web_search; fetch_url para leitura profunda). Devolve `DeepResearchResult`
 estruturado (answer + sources) — a função pura que tanto a tool do Redator
-(core.agent_tools.research_tools) quanto, no futuro, a UI/gate (Fase B) consomem.
+(core.llm.agent_tools.research_tools) quanto, no futuro, a UI/gate (Fase B) consomem.
 
 Princípio inegociável (anti-fabricação, [[project_robustez_spec]]): o subagente
 sintetiza SÓ o que as fontes trazem, cita URL, e diz "não encontrei" quando for o
@@ -17,7 +17,7 @@ import os
 from dataclasses import dataclass, field
 
 from core import web_search as ws
-from core.agent_runtime import resolve_agent_provider, run_agent, tool
+from core.llm.agent_runtime import resolve_agent_provider, run_agent, tool
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ def run_deep_research(
     def fetch_url(url: str) -> str:
         """Lê o conteúdo de uma URL específica (texto limpo). Use quando o trecho
         da busca não basta e a página parece ter a resposta."""
-        from core.agent_tools.profile_tools import _fetch_and_parse
+        from core.llm.agent_tools.profile_tools import _fetch_and_parse
         try:
             d = _fetch_and_parse(url)
         except Exception as e:

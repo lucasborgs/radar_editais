@@ -41,13 +41,13 @@ from pathlib import Path
 import requests
 
 from config import FINEP_PDFS_DIR
-from core.content_library import get_item, mark_items_referenced
-from core.edital_id import wiki_page_path
+from core.kg.edital_id import wiki_page_path
 from core.reflection_service import load_active_insights
-from core.retriever import (
+from core.retrieval.retriever import (
     format_chunks_for_prompt,
     retrieve_chunks,
 )
+from core.services.content_library import get_item, mark_items_referenced
 from domain.user_profile import CompanyProfile
 from supabase import Client
 
@@ -108,7 +108,7 @@ Gere mensagens curtas e acionáveis para orientar o início de uma seção da pr
 
 # Sistema prompt do agente de escrita — único path de escrita. As ferramentas
 # (search_edital, search_library, read_section, read_full_proposal, save_draft,
-# request_user_info) são registradas via core.agent_tools.build_writing_tools.
+# request_user_info) são registradas via core.llm.agent_tools.build_writing_tools.
 WRITER_AGENT_SYSTEM = """Você é um especialista em redação de propostas para editais de fomento no Brasil.
 Seu papel é ajudar o usuário a escrever uma proposta técnica de alta qualidade.
 
@@ -292,7 +292,7 @@ class WritingSession:
         if self.mode == "pitch":
             self._temporal_block = ""
         else:
-            from core.temporal import render_temporal_block
+            from core.kg.temporal import render_temporal_block
             self._temporal_block = render_temporal_block(self.edital_id)
 
         # Substrato do pitch (context-stuffing do nó do fundo): tese + portfólio +
@@ -358,7 +358,7 @@ class WritingSession:
         if self.mode == "pitch":
             return [self.edital_id]
         try:
-            from core.kg_match_service import KGMatchService
+            from core.services.kg_match_service import KGMatchService
             return KGMatchService().resolve_scope(
                 edital_id=self.edital_id, max_analogues=3,
             )
@@ -759,8 +759,8 @@ class WritingSession:
             info concreta do usuário
           • mentions resolvem antes (intenção explícita do usuário)
         """
-        from core.agent_runtime import resolve_agent_provider, run_agent
-        from core.agent_tools import build_writing_tools
+        from core.llm.agent_runtime import resolve_agent_provider, run_agent
+        from core.llm.agent_tools import build_writing_tools
 
         mentions_context = self._resolve_mentions(user_message)
         messages = self._build_agent_initial_messages(
@@ -1208,7 +1208,7 @@ class WritingSession:
         if not OPENAI_API_KEY:
             return False, "OPENAI_API_KEY não configurada", "CONFIG_ERROR"
         try:
-            from core.llm_client import make_client
+            from core.llm.llm_client import make_client
             client = make_client(api_key=OPENAI_API_KEY)
             response = client.chat.completions.create(
                 model=self.model,

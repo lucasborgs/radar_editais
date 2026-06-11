@@ -45,7 +45,7 @@ Texto do site:
 # Sistema prompt do modo agente (Sprint 4 do Cenário B). Substitui o
 # _EXTRACT_SYSTEM/_EXTRACT_USER quando agent_enabled=True. As ferramentas
 # (fetch_page, list_links_matching, lookup_cnpj, submit_profile) são
-# registradas via core.agent_tools.build_profile_tools.
+# registradas via core.llm.agent_tools.build_profile_tools.
 EXTRACTOR_AGENT_SYSTEM = """Você é um analista que constrói o perfil técnico-comercial de empresas
 brasileiras para uma plataforma de matching com editais de fomento.
 
@@ -209,8 +209,8 @@ class ProfileExtractor:
           • Output via tool submit_profile (state.submitted_profile) em vez
             de JSON parseado do texto final.
         """
-        from core.agent_runtime import resolve_agent_provider, run_agent
-        from core.agent_tools import ExtractionState, build_profile_tools
+        from core.llm.agent_runtime import resolve_agent_provider, run_agent
+        from core.llm.agent_tools import ExtractionState, build_profile_tools
 
         state = ExtractionState()
         tools = build_profile_tools(state)
@@ -273,7 +273,7 @@ class ProfileExtractor:
     def _call_llm(self, text: str) -> dict | None:
         backend = os.getenv("LLM_BACKEND", "openai").lower()
         try:
-            from core.llm_client import make_client
+            from core.llm.llm_client import make_client
             if backend == "gemini":
                 api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
                 if not api_key:

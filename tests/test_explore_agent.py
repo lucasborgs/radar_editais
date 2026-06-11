@@ -19,9 +19,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.agent_runtime import AgentResult, TraceStep  # noqa: E402
-from core.agent_tools import build_explore_tools  # noqa: E402
-from core.kg_match_service import KGMatchService  # noqa: E402
+from core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
+from core.llm.agent_tools import build_explore_tools  # noqa: E402
+from core.services.kg_match_service import KGMatchService  # noqa: E402
 
 # ============================================================================
 # _build_explore_hint
@@ -121,7 +121,7 @@ def test_explore_agent_happy_path(monkeypatch):
         stop_reason="end_turn",
         usage={"input_tokens": 50, "output_tokens": 10},
     )
-    monkeypatch.setattr("core.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
     out = svc._explore_agent("oi", None, None, None, None)
     assert out == "Resposta do agente."
@@ -141,7 +141,7 @@ def test_explore_agent_with_hint_passes_to_messages(monkeypatch):
         captured["initial_messages"] = kw["initial_messages"]
         return fake_result
 
-    monkeypatch.setattr("core.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
     svc._explore_agent(
         "qual o prazo?", history=None,
         edital_ids=None,
@@ -170,7 +170,7 @@ def test_explore_agent_passes_history_window(monkeypatch):
         captured["msgs"] = kw["initial_messages"]
         return fake_result
 
-    monkeypatch.setattr("core.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
 
     # 12 turnos no histórico
     history = [
@@ -194,7 +194,7 @@ def test_explore_agent_error_returns_friendly_message(monkeypatch):
         final_text="", steps=[], stop_reason="error",
         usage={"input_tokens": 0, "output_tokens": 0},
     )
-    monkeypatch.setattr("core.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
     out = svc._explore_agent("oi", None, None, None, None)
     assert "não consegui processar" in out.lower()
@@ -206,7 +206,7 @@ def test_explore_agent_empty_final_text_falls_back(monkeypatch):
         final_text="", steps=[], stop_reason="end_turn",
         usage={"input_tokens": 0, "output_tokens": 0},
     )
-    monkeypatch.setattr("core.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
     out = svc._explore_agent("oi", None, None, None, None)
     assert "não consegui" in out.lower() or out  # algo útil, não vazio

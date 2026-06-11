@@ -20,7 +20,7 @@ import logging
 from datetime import datetime
 
 from config import FINEP_PDFS_DIR, KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
-from core.edital_id import native_id_of, wiki_page_path
+from core.kg.edital_id import native_id_of, wiki_page_path
 
 logger = logging.getLogger(__name__)
 

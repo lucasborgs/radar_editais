@@ -6,7 +6,7 @@ estruturados (texto verbatim + section_path + kind). Artefato neutro e burro,
 consumido pela Knowledge gold (síntese wiki) e pela Retrieval gold
 (chunkeamento RAG), com caches independentes (§11.4).
 
-Schema, prompt e parâmetros vêm de WIKI.md §11 via core.wiki_schema —
+Schema, prompt e parâmetros vêm de WIKI.md §11 via core.kg.wiki_schema —
 mudança de regra é no doc, não aqui.
 
 Agnóstico à fonte (§12): consome Documento Canônico (§12.3). Não abre
@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from config import SILVER_DIR
-from core import wiki_schema
+from core.kg import wiki_schema
 from pipeline.adapters.base import CanonicalDoc
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ _JSON_FENCE_RE = re.compile(r"```(?:json)?|```")
 
 def _make_client():
     backend = os.getenv("LLM_BACKEND", "openai").lower()
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
 
     if backend == "gemini":
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")

@@ -17,12 +17,13 @@ import logging
 import os
 import re
 import time
+import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
-from core import kg_store
-from core.edital_id import iter_wiki_pages
-from core.wiki_schema import parse_deadline
+from core.kg import kg_store
+from core.kg.edital_id import iter_wiki_pages
+from core.kg.wiki_schema import parse_deadline
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -30,8 +31,6 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # MAPEAMENTOS PARA STAGE 1
 # =============================================================================
-
-import unicodedata
 
 # tipo_entidade do perfil → labels aceitos em eligible_entities / publico_alvo do card
 _ENTITY_MAP: dict[str, set[str]] = {
@@ -567,7 +566,7 @@ dimensões em 1 frase cada:
 
 
 def _make_client():
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
     backend = os.getenv("LLM_BACKEND", "openai").lower()
 
     if backend == "gemini":
@@ -604,7 +603,7 @@ def _editais_summary(results: list[Stage1Result]) -> list[dict]:
 def _temporal_block() -> str:
     """Bloco "hoje é X" para consciência temporal do Stage 2. Vazio se indisponível."""
     try:
-        from core.temporal import render_match_temporal_block
+        from core.kg.temporal import render_match_temporal_block
         return render_match_temporal_block()
     except Exception as e:
         logger.debug("match Stage 2: temporal block indisponível: %s", e)
