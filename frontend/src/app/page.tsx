@@ -58,10 +58,14 @@ const SUGGESTIONS = [
 // Flag p/ não re-disparar o merge de perfil (F5) em toda visita logada.
 const MERGED_FLAG = "frontdoor_merged";
 
+// Transcript vive em sessionStorage (decisão 2026-06-11): nova visita/aba =
+// conversa limpa; F5 na mesma aba preserva. O PERFIL continua em localStorage
+// (é o ativo durável). Limpa resíduo da era localStorage do transcript.
 function loadHistory(): TranscriptEntry[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(HISTORY_KEY);
+    window.localStorage.removeItem(HISTORY_KEY);
+    const raw = window.sessionStorage.getItem(HISTORY_KEY);
     return raw ? migrateHistory(JSON.parse(raw)) : [];
   } catch {
     return [];
@@ -111,7 +115,7 @@ export default function FrontDoorPage() {
   useEffect(() => {
     if (!hydrated) return;
     try {
-      window.localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
+      window.sessionStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
     } catch {
       // quota/modo privado — segue em memória.
     }
@@ -367,7 +371,7 @@ export default function FrontDoorPage() {
 
   const handleReset = useCallback(() => {
     try {
-      window.localStorage.removeItem(HISTORY_KEY);
+      window.sessionStorage.removeItem(HISTORY_KEY);
     } catch {
       /* noop */
     }

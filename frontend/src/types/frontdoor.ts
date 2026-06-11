@@ -1,7 +1,7 @@
 // Transcript tipado do front-door (M2+). O transcript deixou de ser uma lista
 // de {role, content} (M1) e passa a ser uma lista de ENTRADAS heterogêneas:
 // mensagens, cards de diff de perfil, cards de radar e gates de login. Persiste
-// em localStorage `frontdoor_history` v2 — `migrateHistory` converte o formato
+// em sessionStorage `frontdoor_history` v2 (conversa por visita/aba) — `migrateHistory` converte o formato
 // antigo (array de {role,content}) em entradas `msg`, sem descartar nada.
 
 import type { CompanyProfile } from "./profile";
@@ -45,7 +45,7 @@ export interface GateEntry {
 
 export type TranscriptEntry = MsgEntry | DiffEntry | RadarEntry | GateEntry;
 
-// ── Persistência (localStorage v2) ──────────────────────────────────────────
+// ── Persistência (sessionStorage v2) ──────────────────────────────────────────
 export const HISTORY_KEY = "frontdoor_history";
 
 // Migra/valida o conteúdo cru do localStorage para entradas tipadas. Aceita:
