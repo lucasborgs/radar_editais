@@ -26,6 +26,21 @@
 - **Ponto de entrada:** backend/routers/frontdoor.py · frontend/src/app/page.tsx.
 - **Status:** aberto (2026-06-11).
 
+### Síntese de wiki — campos estruturais não invalidam o cache
+
+- **O quê:** a wiki page copia campos estruturais do entry do índice (`themes`,
+  `status`, `deadline`…) na hora da síntese, mas o cache hit do
+  `pipeline/etl_process.py` reusa a página antiga inteira — mudança de
+  normalização no build (ex.: fix de temas 2026-06-11) atualiza o índice mas
+  deixa as wiki pages (o "card completo" do `GET /editais/{id}`) velhas até
+  alguém rodar `--skip-cache`.
+- **Fix candidato:** no cache hit, re-aplicar os campos estruturais do entry
+  atual sobre a página lida (espelho do `_carry_forward_match_fields`, na
+  direção oposta) antes de persistir no blob durável.
+- **Workaround usado:** `etl_process.py --edital <ids> --skip-cache` + push
+  manual das páginas pro cloud.
+- **Status:** aberto (2026-06-11).
+
 ### Feedback do tester — botão no frontend (P1 launch / build-in-public)
 - **O quê:** o backend já tem o canal (`POST /feedback` em `backend/auth_routes.py`
   + tabela `user_feedback`, migration 019, RLS por user_id — commit `b46b134b9`).
