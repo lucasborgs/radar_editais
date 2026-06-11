@@ -205,6 +205,24 @@
   de graduação em `spec_dou_feeder.md` §9. Ligar = setar envs no Railway.
 - **Status:** shadow-run pendente de rodar (~1 semana de runs).
 
+### Triagem da Descoberta — 13 labels do golden aguardam decisão de persona
+- **O quê:** o golden da suíte `triage` (`eval_data/golden/triage.json`, 122
+  candidatos reais de 2026-06-10) tem **13 casos `review: true`** — rotulagem
+  inicial por auditoria, mas a palavra final é decisão de PRODUTO, não de código.
+- **As 2 decisões principais:** (a) **hub de desafio corporativo perene**
+  (Tupy, beOn Claro) conta como oportunidade Q2 ou só desafio com chamada
+  datada? (b) **credenciamento de incubadoras** (FAPESP 2026) — chamada p/
+  incubadoras, não startups: oportunidade indireta conta pra persona deep-tech?
+  Os outros 11: notícia recente de edital específico × política anti-notícia;
+  vigência incerta. Cada caso tem `note` explicando o dilema.
+- **Como resolver:** editar `expected` no JSON e re-rodar
+  `python -m core.eval triage` (baseline atual: accuracy 0.8525, fn_guard
+  0.9836 — os 2 FNs são exatamente casos em review).
+- **Por que importa:** o A/B de 2026-06-10 (snippet × reason × content) provou
+  que mudança de input só move erros de lugar; sem golden estável, nenhuma
+  melhoria de triagem é decidível.
+- **Status:** aguardando revisão do fundador.
+
 ### Descoberta web — `titulo` vazio na extração (UX do card)
 - **O quê:** no dry-run de 2026-06-09 (`discover_opportunities(write=False)`), os 23
   candidatos extraídos vieram com `titulo` **vazio** (incl. editais), apesar de
