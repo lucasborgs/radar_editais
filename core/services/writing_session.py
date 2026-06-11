@@ -246,6 +246,7 @@ class WritingSession:
         llm_backend: str | None = None,
         model: str | None = None,
         library_items: list[dict] | None = None,
+        mode: str | None = None,
     ):
         self._db = db
         self.workspace_id = workspace_id
@@ -278,7 +279,10 @@ class WritingSession:
         # Modo de escrita derivado do namespace do id (stateless — re-derivável no
         # reload). `investidor:<slug>` é kind_class=entidade → pitch outbound; os
         # eventos (edital/desafio/programa) seguem o gênero proposta. Spec §3.5.
-        self.mode = "pitch" if self.edital_id.startswith("investidor:") else "proposal"
+        # W-D3: `mode` explícito (do request) tem precedência se for um valor
+        # válido; ausente/inválido cai na derivação por id (comportamento atual).
+        derived_mode = "pitch" if self.edital_id.startswith("investidor:") else "proposal"
+        self.mode = mode if mode in ("proposal", "pitch") else derived_mode
 
         # Prefixo estático — re-derivado a cada construção (stateless).
         self._profile_context = profile.to_context()
@@ -699,6 +703,9 @@ class WritingSession:
         return {
             "session_id":         self.session_id,
             "edital_id":          self.edital_id,
+            # W-D3: modo derivado do id (proposal | pitch) — o front usa para o
+            # badge do header e o outline default sem inspecionar o namespace.
+            "mode":               self.mode,
             "section_titles":     self._proposal_outline,
             "has_documents":      has_documents,
             "turn_count":         self._turn_count,
@@ -848,13 +855,40 @@ class WritingSession:
                         break
                 if matched_id:
                     use_inputs.pop(matched_id, None)
-                trace.append({
+                entry: dict = {
                     "id": matched_id or "",
                     "name": s.name,
                     "input": s.input,
                     "output": s.output,
-                })
+                }
+                # W-D1: para o workspace (co-edição), expõe o título da seção
+                # EFETIVAMENTE salva por save_draft. O input.section_title é o que
+                # o agente pediu (pode estar não-normalizado); a fonte de verdade
+                # é o título normalizado do outline que a tool ecoa no output
+                # ("Rascunho salvo em '<título>' ..."). Só presente em saves
+                # bem-sucedidos — critic bloqueado / erro / título inválido não
+                # geram seção tocada e ficam sem o campo.
+                if s.name == "save_draft":
+                    saved = WritingSession._parse_saved_section(s.output)
+                    if saved:
+                        entry["saved_section"] = saved
+                trace.append(entry)
         return trace
+
+    # Output de save_draft em sucesso: "Rascunho salvo em '<título>' (<n> chars)...".
+    # Extrai o título normalizado entre aspas simples logo após "salvo em".
+    _SAVED_SECTION_RE = re.compile(r"Rascunho salvo em '([^']+)'")
+
+    @staticmethod
+    def _parse_saved_section(output: str) -> str | None:
+        """Título da seção persistida, extraído do retorno de save_draft.
+
+        Devolve None quando o output não indica um save bem-sucedido (critic
+        bloqueou, content vazio, título fora do outline, exceção)."""
+        if not output:
+            return None
+        m = WritingSession._SAVED_SECTION_RE.search(output)
+        return m.group(1) if m else None
 
     def _save_pending_user_input(self, value: dict | None) -> None:
         """Persiste writing_sessions.pending_user_input (best-effort)."""

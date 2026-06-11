@@ -35,6 +35,13 @@ class WritingStartRequest(BaseModel):
     edital_id: str
     profile: CompanyProfileSchema
     library_item_ids: list[str] = []
+    # W-D3: modo de escrita explícito ('proposal' | 'pitch'). Opcional — quando
+    # ausente (default), a WritingSession deriva o modo do namespace do id
+    # (`investidor:<slug>` → pitch; demais → proposal). Hoje todo pitch entra por
+    # um id `investidor:`, então o override raramente é necessário; expomos o
+    # campo para o front poder sinalizar a intenção (badge/header) sem depender
+    # de inspecionar o id. Não altera a lógica do pitch em si.
+    mode: str | None = None
 
 
 class WritingTurnRequest(BaseModel):
@@ -60,6 +67,9 @@ class ToolTraceEntry(BaseModel):
     name: str
     input: dict
     output: str
+    # W-D1: presente só em entradas save_draft bem-sucedidas — título normalizado
+    # da seção persistida (usado pela co-edição do workspace p/ highlight + undo).
+    saved_section: str | None = None
 
 
 class WritingTurnResponse(BaseModel):
@@ -130,6 +140,7 @@ def writing_start(
         profile=profile,
         edital_id=req.edital_id,
         library_items=library_items,
+        mode=req.mode,  # W-D3: opcional; None → modo derivado do id
     )
     return session.get_info()
 
@@ -197,8 +208,52 @@ def writing_list_sessions(
     db: DbClient,
     status: str | None = Query(None, description="active | completed | abandoned"),
 ):
+    """Lista sessões do workspace, cada uma já com `edital_id` + um título
+    utilizável (`edital_title`).
+
+    W-D2: a listagem resolve o título do alvo no servidor — evita o front ter
+    que disparar N getEditalById (e cobre alvos `investidor:` que não vivem no
+    índice de editais). Resolução best-effort: alvo não encontrado fica sem
+    título e o front cai no id.
+    """
     workspace_id = get_workspace_id(db, user_id)
-    return {"sessions": list_sessions(db, workspace_id, status=status)}
+    sessions = list_sessions(db, workspace_id, status=status)
+    _attach_target_titles(sessions)
+    return {"sessions": sessions}
+
+
+def _attach_target_titles(sessions: list[dict]) -> None:
+    """Preenche `edital_title` em cada sessão a partir do alvo (edital ou fundo).
+
+    Resolve eventos (editais/desafios/programas) via wiki_matcher e entidades
+    (`investidor:<slug>`) via kg_store.load_investidores. Falha graciosa: erro
+    de carga deixa as sessões sem título (o front mostra o id)."""
+    if not sessions:
+        return
+
+    ids = {s["edital_id"] for s in sessions if s.get("edital_id")}
+    titles: dict[str, str] = {}
+
+    investor_ids = {i for i in ids if i.startswith("investidor:")}
+    if investor_ids:
+        try:
+            from core.kg import kg_store
+            for inv in kg_store.load_investidores():
+                if inv["id"] in investor_ids and inv.get("name"):
+                    titles[inv["id"]] = inv["name"]
+        except Exception:
+            pass  # sem títulos de fundo — front cai no id
+
+    for eid in ids - investor_ids:
+        try:
+            card = wiki_matcher.get_edital_by_id(eid)
+            if card and card.get("title"):
+                titles[eid] = card["title"]
+        except Exception:
+            pass
+
+    for s in sessions:
+        s["edital_title"] = titles.get(s.get("edital_id"))
 
 
 @router.delete("/writing/sessions/{session_id}", summary="Apaga sessão de escrita")
