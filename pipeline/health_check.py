@@ -19,7 +19,7 @@ import json
 import logging
 from datetime import datetime
 
-from config import FINEP_PDFS_DIR, KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
+from config import FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR
 from core.kg.edital_id import native_id_of, wiki_page_path
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,6 @@ logging.basicConfig(
 )
 
 INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
-CACHE_FILE = KG_WIKI_DIR / ".etl_process_cache.json"
 LOG_FILE   = KNOWLEDGE_GRAPH_DIR / "health_check_log.jsonl"
 
 STALENESS_DAYS = 30
@@ -113,13 +112,13 @@ def check_new_pdfs(edital_id: str) -> dict:
 
     pdfs_on_disk = sorted(p.name for p in pdf_dir.glob("*.pdf"))
 
-    if not CACHE_FILE.exists():
-        return {"check": "new_pdfs", "status": "NO_CACHE", "pdfs_on_disk": pdfs_on_disk}
-
     try:
-        cache = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+        from core.kg import kg_store
+        cache = kg_store.load("etl_process_cache", default={})
     except Exception:
         return {"check": "new_pdfs", "status": "CACHE_ERROR"}
+    if not cache:
+        return {"check": "new_pdfs", "status": "NO_CACHE", "pdfs_on_disk": pdfs_on_disk}
 
     if edital_id not in cache:
         return {"check": "new_pdfs", "status": "NOT_PROCESSED", "pdfs_on_disk": pdfs_on_disk}
