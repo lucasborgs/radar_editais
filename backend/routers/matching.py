@@ -78,7 +78,9 @@ def match_radar(
     None e `build_radar` usa pesos globais default. Com JWT → comportamento atual
     idêntico (pesos por workspace). O perfil já vem no body em ambos os casos."""
     profile = to_py_profile(req.profile)
-    if not profile.is_complete():
+    # Gate mínimo (≠ is_complete, que exige 8 campos): o front-door roda o radar
+    # cedo com perfil parcial e melhora conforme a conversa preenche o resto.
+    if not (profile.nome and profile.descricao_atividades):
         raise HTTPException(
             status_code=422,
             detail="Perfil incompleto. Preencha pelo menos nome e descricao_atividades.",
