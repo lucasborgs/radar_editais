@@ -11,6 +11,21 @@
 
 ## Aberto
 
+### Front-door 1a — restos do M5 (pós-PR #14)
+
+- **O quê:** (a) streaming SSE no `/frontdoor/turn` (delta B4 da spec — hoje há
+  só TypingIndicator); (b) telemetria de conversão (quantos anônimos → conta,
+  em qual gate); (c) mensagem F6 "desde sua última visita entraram N fontes"
+  (precisa de ranking persistido/contagem de novidades no backend);
+  (d) labels PT-BR nos diffs de origem merge/documento (hoje caem no nome do
+  campo; só os diffs do turno trazem label do LLM).
+- **Por que adiado:** Lucas pediu a 1a inteira testável de uma vez; estes itens
+  não bloqueiam o fluxo e dependem de dado de uso (telemetria) ou de backend
+  novo (novidades).
+- **Onde está specado:** docs/spec_frontdoor_ux.md §5 (B4), §8 (M5), §9.
+- **Ponto de entrada:** backend/routers/frontdoor.py · frontend/src/app/page.tsx.
+- **Status:** aberto (2026-06-11).
+
 ### Feedback do tester — botão no frontend (P1 launch / build-in-public)
 - **O quê:** o backend já tem o canal (`POST /feedback` em `backend/auth_routes.py`
   + tabela `user_feedback`, migration 019, RLS por user_id — commit `b46b134b9`).

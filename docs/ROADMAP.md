@@ -7,7 +7,14 @@
 
 ## Estado atual (2026-06-11)
 
-Arquitetura **multi-quadrante** entregue (Fases B+C) e mergeada na `main` via PR #8:
+**Front-door conversacional (Fase 3 · 1a) entregue** via PR #14: `/` é a home
+única (chat puro, porta pública) — turno via `POST /frontdoor/turn` (resposta +
+diff de perfil proposto), aceite do diff dispara `/match/radar` (agora com auth
+opcional), radar inline com expansão/brief/gates de login. Onboarding, matching,
+dashboard e /chat-sem-param aposentados por redirect. Detalhe em
+[spec_frontdoor_ux.md](spec_frontdoor_ux.md); restos do M5 no BACKLOG.
+
+Antes disso, arquitetura **multi-quadrante** entregue (Fases B+C) e mergeada na `main` via PR #8:
 - **Q3 investidor** end-to-end (diretório curado, match-por-tese, `/match/investidores`, card).
 - **Fase B surfacing**: `opportunity_type` (edital/desafio/programa) flui scrape→índice→match→badge→pasta do grafo.
 - **Escrita `mode=pitch`** (investidor, outbound) + **critic pitch-aware**.
@@ -33,7 +40,7 @@ Detalhe e seams em [spec_multi_quadrante.md](spec_multi_quadrante.md) + memória
 | **0 — Handoff** ✅ | merge PR #8 + este ROADMAP + nota de arquitetura + memória | ponte pra próxima conversa/modelo | baixo |
 | **1 — Ligar a torneira** ✅ código (PR #9) · 🔄 operação | Descoberta web em prod | fundacional e pequeno | falta só: **shadow-run** diário ~1 semana (runbook spec_dou_feeder §9; dia 1 rodado e logado), revisar 13 labels do golden de triagem (BACKLOG) e setar 4 envs no Railway. Suíte `triage` eval-gated criada (baseline 0.8525/0.9836) |
 | **2 — Reorg backend** ✅ (2026-06-11, PRs #10-#13) | api.py→routers; core/ em subpacotes (kg/retrieval/llm/services); README+diagrama; data/ unificado; cache de síntese e ledger duráveis (cloud b+d) | — | frontend intocado (Fase 3); bronze→Storage fica como item solto |
-| **3 — Frontend** ⬅️ EM ANDAMENTO | 1a front-door conversacional → 1b workspace tipo IDE | base limpa ✅ (Fase 2); dados enriquecem com o shadow-run | spec UX da 1a ✅ (2026-06-11, [spec_frontdoor_ux.md](spec_frontdoor_ux.md) — decisões D1–D7 + marcos M1–M5); 1b ainda sem spec, é ambicioso |
+| **3 — Frontend** | **1a ✅ ENTREGUE** (2026-06-11, PR #14: spec + M1–M4 + deltas B1–B3/B5) → **1b workspace tipo IDE** ⬅️ PRÓXIMA | base limpa ✅ (Fase 2); dados enriquecem com o shadow-run | 1b precisa de spec UX (não existe); restos do M5 no BACKLOG ("Front-door 1a — restos do M5"); `/chat?edital=` segue vivo (fluxo de escrita) |
 
 ### Notas que mudam o cálculo
 
