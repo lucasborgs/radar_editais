@@ -131,7 +131,13 @@ function EventExpansion({
   );
 }
 
-function EntityExpansion({ item }: { item: RadarItem }) {
+function EntityExpansion({
+  item,
+  onPitch,
+}: {
+  item: RadarItem;
+  onPitch: (investidorId: string) => void;
+}) {
   const p = item.payload as InvestorMatch;
   return (
     <div className="mt-2 space-y-1 border-t border-border pt-2 text-xs font-sans text-content-secondary">
@@ -151,16 +157,25 @@ function EntityExpansion({ item }: { item: RadarItem }) {
         <p>Estágios-alvo: {p.estagio_alvo.join(", ")}</p>
       )}
       {p.justificativa && <p>{p.justificativa}</p>}
-      {p.site && (
-        <a
-          href={p.site}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-block text-primary hover:opacity-80"
+      <div className="flex flex-wrap items-center gap-2 pt-1">
+        {p.site && (
+          <a
+            href={p.site}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-medium text-content-primary transition-colors hover:bg-app-bg"
+          >
+            Site do investidor ↗
+          </a>
+        )}
+        <button
+          type="button"
+          onClick={() => onPitch(item.id)}
+          className="rounded-lg bg-primary px-2.5 py-1 text-[11px] font-medium text-white transition-opacity hover:opacity-90"
         >
-          Site do investidor ↗
-        </a>
-      )}
+          Escrever pitch
+        </button>
+      </div>
     </div>
   );
 }
@@ -173,6 +188,7 @@ function RadarRow({
   brief,
   onBrief,
   onProposta,
+  onPitch,
 }: {
   item: RadarItem;
   expanded: boolean;
@@ -180,6 +196,7 @@ function RadarRow({
   brief: import("@/lib/api").OpportunityBrief | null;
   onBrief: (editalId: string) => Promise<void>;
   onProposta: (editalId: string) => void;
+  onPitch: (investidorId: string) => void;
 }) {
   const type = item.opportunity_type;
   const reason = itemReason(item);
@@ -239,7 +256,7 @@ function RadarRow({
         (item.kind_class === "evento" ? (
           <EventExpansion item={item} onBrief={onBrief} onProposta={onProposta} />
         ) : (
-          <EntityExpansion item={item} />
+          <EntityExpansion item={item} onPitch={onPitch} />
         ))}
 
       {expanded && brief && (
@@ -256,6 +273,7 @@ export function RadarCard({
   data,
   onBrief,
   onProposta,
+  onPitch,
   briefs,
 }: {
   data: RadarResponse;
@@ -263,6 +281,8 @@ export function RadarCard({
   // Retorna null se a ação virou gate (anônimo) — a linha não mostra brief então.
   onBrief: (editalId: string) => Promise<void>;
   onProposta: (editalId: string) => void;
+  // Escrever pitch (item investidor): cria sessão mode=pitch e abre o workspace.
+  onPitch: (investidorId: string) => void;
   // Briefs já gerados, chaveados por edital_id (estado mantido pela página).
   briefs: Record<string, import("@/lib/api").OpportunityBrief>;
 }) {
@@ -302,6 +322,7 @@ export function RadarCard({
             brief={briefs[item.id] ?? null}
             onBrief={onBrief}
             onProposta={onProposta}
+            onPitch={onPitch}
           />
         ))}
       </ul>

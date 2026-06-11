@@ -24,6 +24,7 @@ import {
   type OpportunityBrief,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { resolveWorkspaceSession } from "@/lib/workspace";
 import { useRouter } from "next/navigation";
 import {
   CompanyProfile,
@@ -351,18 +352,40 @@ export default function FrontDoorPage() {
     [isAuthed, profile],
   );
 
-  // ── Começar proposta: logado → fluxo de escrita atual; anônimo → gate ───────
-  const handleProposta = useCallback(
-    (editalId: string) => {
+  // ── Começar proposta / Escrever pitch: logado → cria sessão e abre o
+  // workspace; anônimo → gate. O pitch usa mode='pitch' (id `investidor:`).
+  const openWorkspace = useCallback(
+    async (editalId: string, mode?: "proposal" | "pitch") => {
       if (!isAuthed) {
         setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
         return;
       }
-      // O fluxo de escrita vive em /chat?edital={id} (WritingPageInner) e lê o
-      // perfil do mesmo localStorage que mantemos aqui.
-      router.push(`/chat?edital=${encodeURIComponent(editalId)}`);
+      const t = toast.loading(mode === "pitch" ? "Abrindo pitch…" : "Abrindo proposta…");
+      try {
+        const token = await getToken();
+        if (!token) {
+          setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
+          return;
+        }
+        const sessionId = await resolveWorkspaceSession(editalId, profile, token, mode);
+        router.push(`/workspace/${sessionId}`);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Não foi possível abrir o workspace.");
+      } finally {
+        toast.dismiss(t);
+      }
     },
-    [isAuthed, router],
+    [isAuthed, getToken, profile, router],
+  );
+
+  const handleProposta = useCallback(
+    (editalId: string) => void openWorkspace(editalId, "proposal"),
+    [openWorkspace],
+  );
+
+  const handlePitch = useCallback(
+    (investidorId: string) => void openWorkspace(investidorId, "pitch"),
+    [openWorkspace],
   );
 
   const handleReset = useCallback(() => {
@@ -433,6 +456,7 @@ export default function FrontDoorPage() {
                     briefs={briefs}
                     onBrief={handleBrief}
                     onProposta={handleProposta}
+                    onPitch={handlePitch}
                   />
                 </div>
               );
