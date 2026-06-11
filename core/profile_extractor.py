@@ -112,6 +112,59 @@ EXTRACTOR_AGENT_MAX_STEPS = int(os.getenv("EXTRACTOR_AGENT_MAX_STEPS", "12"))
 
 _REQUIRED_FIELDS = {"nome", "tipo_entidade", "one_liner", "descricao_atividades"}
 
+# --- Extração de diff a partir de uma mensagem de conversa (front-door B1) ----
+# Campos do CompanyProfile que a conversa pode preencher, com rótulo humano PT-BR
+# para o card de diff do front-end. Subconjunto pragmático: os campos que um
+# usuário tipicamente descreve em texto livre (não pedimos cap_table etc. aqui).
+_DIFF_FIELD_LABELS: dict[str, str] = {
+    "nome": "Nome da empresa",
+    "tipo_entidade": "Tipo de entidade",
+    "one_liner": "Proposta de valor",
+    "solution_summary": "Solução / tecnologia",
+    "descricao_atividades": "Descrição das atividades",
+    "tamanho_empresa": "Porte",
+    "trl": "TRL",
+    "uf": "UF",
+    "ano_fundacao": "Ano de fundação",
+    "faturamento_anual": "Faturamento anual",
+    "tipos_financiamento_interesse": "Tipos de financiamento de interesse",
+    "estagio": "Estágio",
+    "mrr_arr": "MRR/ARR",
+    "round_alvo_brl": "Round alvo de captação",
+}
+
+_DIFF_SYSTEM = """Você extrai atualizações de perfil de empresa a partir de UMA mensagem
+de conversa. Retorne APENAS JSON válido, sem explicações."""
+
+_DIFF_USER = """Dado o PERFIL ATUAL (JSON) e a ÚLTIMA MENSAGEM do usuário, identifique
+SOMENTE os campos que a mensagem PREENCHE ou ALTERA. Não repita campos que a
+mensagem não menciona ou cujo valor não muda. Se a mensagem for só uma pergunta
+sem informação factual sobre a empresa, retorne {{}}.
+
+Campos possíveis (use exatamente estas chaves; null não é permitido como valor):
+- nome (string)
+- tipo_entidade ("empresa" | "startup" | "universidade" | "ICT")
+- one_liner (string, 1 frase)
+- solution_summary (string)
+- descricao_atividades (string)
+- tamanho_empresa ("MEI" | "ME" | "EPP" | "MEDIO" | "GRANDE")
+- trl (int 1-9)
+- uf (sigla de 2 letras, ex.: "SP")
+- ano_fundacao (int)
+- faturamento_anual (number, R$)
+- tipos_financiamento_interesse (array de strings)
+- estagio ("pre-seed" | "seed" | "serie-a")
+- mrr_arr (number, R$)
+- round_alvo_brl (number, R$)
+
+PERFIL ATUAL:
+{profile_json}
+
+ÚLTIMA MENSAGEM:
+{message}
+
+Responda com um objeto JSON contendo apenas os campos alterados."""
+
 
 @dataclass
 class ExtractResult:
@@ -269,6 +322,110 @@ class ProfileExtractor:
         )
 
     # ------------------------------------------------------------------
+
+    # Comprimento mínimo da mensagem para valer a pena chamar o LLM de diff.
+    # Atalho determinístico trivial (decisão B1): mensagens muito curtas
+    # (ex.: "ok", "qual o prazo?") raramente trazem fato novo de perfil.
+    DIFF_MIN_MESSAGE_LEN = 15
+
+    def extract_diff_from_message(
+        self, message: str, current_profile: dict | None = None,
+    ) -> list[dict]:
+        """Extrai um `profile_diff` a partir de UMA mensagem de conversa (front-door B1).
+
+        Chamada LLM SEPARADA do explore e FOCADA: dado o perfil atual + a última
+        mensagem do usuário, retorna apenas os campos do CompanyProfile que a
+        mensagem preenche/altera, no formato de card de diff do front:
+            [{"field", "label", "old", "new"}]
+        `old` = valor atual (None se vazio), `new` = proposto, `label` = nome
+        humano PT-BR. Campos sem informação nova ficam de fora; nada extraído → [].
+
+        Usa o tier BARATO (endpoint público — controle de custo, decisão B5):
+        `_call_diff_llm` resolve o modelo via `core.llm_router` no tier "fast".
+        """
+        current_profile = current_profile or {}
+        if not message or len(message.strip()) < self.DIFF_MIN_MESSAGE_LEN:
+            # Atalho determinístico: mensagem curta demais para conter fato novo.
+            return []
+
+        raw = self._call_diff_llm(message.strip(), current_profile)
+        if not raw:
+            return []
+        return self._build_diff(raw, current_profile)
+
+    @staticmethod
+    def _build_diff(raw: dict, current_profile: dict) -> list[dict]:
+        """Monta as linhas do diff (old/new/label) a partir do dict do LLM.
+
+        Determinístico e testável sem LLM: filtra campos desconhecidos, ignora
+        valores vazios/None e os que não mudam em relação ao perfil atual.
+        """
+        diff: list[dict] = []
+        for field, new in raw.items():
+            if field not in _DIFF_FIELD_LABELS:
+                continue
+            if new in (None, "", []):
+                continue
+            old = current_profile.get(field)
+            old_norm = old if old not in ("", []) else None
+            if old_norm == new:
+                continue
+            diff.append({
+                "field": field,
+                "label": _DIFF_FIELD_LABELS[field],
+                "old": old_norm,
+                "new": new,
+            })
+        return diff
+
+    def _call_diff_llm(self, message: str, current_profile: dict) -> dict | None:
+        """LLM focado de extração de diff, no tier BARATO (B5).
+
+        Endpoint público nunca usa tier caro: o modelo vem de
+        `core.llm_router.resolve_model("fast")` (gpt-4o-mini por default).
+        Reaproveita o mesmo client OpenAI/Gemini do `_call_llm`.
+        """
+        backend = os.getenv("LLM_BACKEND", "openai").lower()
+        try:
+            from core.llm.llm_client import make_client
+            from core.llm_router import resolve_model
+            if backend == "gemini":
+                api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+                if not api_key:
+                    return None
+                client = make_client(
+                    api_key=api_key,
+                    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+                )
+                model = "gemini-2.5-flash"
+            else:
+                api_key = os.getenv("OPENAI_API_KEY")
+                if not api_key:
+                    return None
+                client = make_client(api_key=api_key)
+                # Tier barato explícito: porta pública não usa "pro".
+                model = resolve_model("fast")
+
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": _DIFF_SYSTEM},
+                    {"role": "user", "content": _DIFF_USER.format(
+                        profile_json=json.dumps(current_profile, ensure_ascii=False),
+                        message=message,
+                    )},
+                ],
+                temperature=0.0,
+                max_tokens=500,
+            )
+            raw = response.choices[0].message.content.strip()
+            if "```" in raw:
+                raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("`")
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else None
+        except Exception as e:
+            logger.error("LLM diff extraction falhou: %s", e)
+            return None
 
     def _call_llm(self, text: str) -> dict | None:
         backend = os.getenv("LLM_BACKEND", "openai").lower()

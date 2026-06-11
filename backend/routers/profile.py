@@ -83,13 +83,16 @@ def extract_profile(request: Request, req: ProfileExtractRequest):
     summary="Extrai perfil a partir de uma proposta antiga (PDF/DOCX/TXT/MD) — onboarding",
 )
 @limiter.limit("3/minute")
-async def extract_profile_from_document(request: Request, file: UploadFile = File(...)):
+async def extract_profile_from_document(
+    request: Request, user_id: CurrentUserId, file: UploadFile = File(...),
+):
     """Extrai CompanyProfile sugerido a partir de uma proposta antiga.
 
-    Público (sem auth), igual a /profile/extract — usado no onboarding antes de
-    existir workspace. Extrai o texto do documento (multi-formato, mesmo pipeline
-    da library) e roda o LLM. "AI drafts, human reviews": só RETORNA a sugestão +
-    confiança, nunca salva. Texto ilegível/vazio retorna erro controlado (não 500).
+    Autenticado (delta B3, gate de anexos da decisão D3): diferente de
+    /profile/extract (URL, público), o upload de documento exige login. Extrai o
+    texto do documento (multi-formato, mesmo pipeline da library) e roda o LLM.
+    "AI drafts, human reviews": só RETORNA a sugestão + confiança, nunca salva.
+    Texto ilegível/vazio retorna erro controlado (não 500).
     """
     content = await file.read()
     if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
