@@ -162,6 +162,35 @@ def get_user_id(payload: Annotated[dict, Depends(get_current_user)]) -> str:
 CurrentUserId = Annotated[str, Depends(get_user_id)]
 
 
+# Bearer opcional: nunca levanta por header ausente/malformado (auto_error=False),
+# para as rotas com auth OPCIONAL (ex.: /match/radar — delta B2). Anônimo segue
+# com pesos globais default; logado mantém o comportamento atual.
+_optional_security = HTTPBearer(auto_error=False)
+
+
+def get_optional_user_id(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_optional_security)],
+) -> str | None:
+    """FastAPI dependency — user_id quando há JWT válido, senão None.
+
+    Diferente de `get_user_id`: SEM Authorization ou com token inválido/expirado
+    retorna None em vez de 401. Usado só onde a auth é opcional (porta pública).
+    Em DEMO_MODE devolve a identidade demo (consistente com get_current_user).
+    """
+    if DEMO_MODE:
+        return _demo_identity()["user_id"]
+    if credentials is None:
+        return None
+    try:
+        return _decode_token(credentials.credentials)["sub"]
+    except HTTPException:
+        # Token inválido/expirado numa rota pública → trata como anônimo.
+        return None
+
+
+OptionalUserId = Annotated[str | None, Depends(get_optional_user_id)]
+
+
 def get_db(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_security)],
 ) -> Client:
@@ -191,3 +220,23 @@ def get_db(
 
 
 DbClient = Annotated[Client, Depends(get_db)]
+
+
+def get_optional_db(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_optional_security)],
+) -> Client | None:
+    """FastAPI dependency — cliente Supabase autenticado quando há JWT, senão None.
+
+    Par de `get_optional_user_id` para rotas com auth opcional (B2): sem header
+    (anônimo) não há cliente per-request, então devolve None — o handler resolve
+    workspace só no caminho autenticado. Em DEMO_MODE usa o service-role.
+    """
+    if DEMO_MODE:
+        from core.db import get_supabase_service
+        return get_supabase_service()
+    if credentials is None:
+        return None
+    return get_supabase_user(credentials.credentials)
+
+
+OptionalDbClient = Annotated[Client | None, Depends(get_optional_db)]

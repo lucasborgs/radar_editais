@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   {
-    href: "/dashboard",
-    label: "Dashboard",
+    href: "/",
+    label: "Início",
     icon: (
       <svg
         className="w-4 h-4"
@@ -44,25 +44,6 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: "/matching",
-    label: "Matching",
-    icon: (
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={1.75}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M13 10V3L4 14h7v7l9-11h-7z"
-        />
-      </svg>
-    ),
-  },
-  {
     href: "/pipeline",
     label: "Pipeline",
     icon: (
@@ -87,25 +68,6 @@ const NAV_ITEMS = [
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
-      </svg>
-    ),
-  },
-  {
-    href: "/chat",
-    label: "Chat IA",
-    icon: (
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={1.75}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-        />
       </svg>
     ),
   },
@@ -178,7 +140,9 @@ export function AppSidebar() {
         </p>
         {NAV_ITEMS.map(({ href, label, icon }) => {
           const active =
-            pathname === href || pathname.startsWith(`${href}/`);
+            href === "/"
+              ? pathname === "/"
+              : pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
               key={href}

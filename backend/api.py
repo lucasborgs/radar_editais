@@ -34,6 +34,7 @@ from backend.routers.applications import router as applications_router
 from backend.routers.brief import router as brief_router
 from backend.routers.catalog import router as catalog_router
 from backend.routers.files import router as files_router
+from backend.routers.frontdoor import router as frontdoor_router
 from backend.routers.graph import router as graph_router
 from backend.routers.matching import router as matching_router
 from backend.routers.profile import router as profile_router
@@ -150,6 +151,7 @@ app.include_router(auth_router)
 app.include_router(library_router)
 app.include_router(catalog_router)
 app.include_router(graph_router)
+app.include_router(frontdoor_router)
 app.include_router(matching_router)
 app.include_router(applications_router)
 app.include_router(brief_router)

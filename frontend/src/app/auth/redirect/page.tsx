@@ -3,34 +3,18 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { getMe } from "@/lib/api";
 
 export default function AuthRedirectPage() {
   const router = useRouter();
-  const { loading, user, getToken } = useAuth();
+  const { loading, user } = useAuth();
 
   useEffect(() => {
     if (loading) return;
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
-
-    getToken().then(async (token) => {
-      if (!token) {
-        router.replace("/login");
-        return;
-      }
-      try {
-        const me = await getMe(token);
-        const profile = me.profile as Record<string, unknown>;
-        const hasProfile = profile && profile.nome && profile.descricao_atividades;
-        router.replace(hasProfile ? "/dashboard" : "/onboarding");
-      } catch {
-        router.replace("/onboarding");
-      }
-    });
-  }, [loading, user]);
+    // Pós-login sempre cai na porta única "/" (D7): lá o front-door hidrata o
+    // perfil da conta e faz o merge com a conversa anônima (F5/F6). Sem usuário,
+    // volta ao login.
+    router.replace(user ? "/" : "/login");
+  }, [loading, user, router]);
 
   return (
     <div className="min-h-screen bg-app-bg flex items-center justify-center">
