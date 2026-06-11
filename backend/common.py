@@ -38,6 +38,11 @@ class CompanyProfileSchema(BaseModel):
     portfolio_projetos: str = ""
     tamanho_empresa: str = ""
     capital_social: float | None = None
+    # elegibilidade organizacional (espelha domain.CompanyProfile; o diff do
+    # front-door propõe estes campos e eles precisam round-trippar pela API)
+    uf: str = ""
+    faturamento_anual: float | None = None
+    ano_fundacao: int | None = None
     equipe_resumo: str = ""
     trl: int | None = None
     tipos_financiamento_interesse: list[str] = []
@@ -61,6 +66,9 @@ def to_py_profile(schema: CompanyProfileSchema) -> PyCompanyProfile:
         portfolio_projetos=schema.portfolio_projetos,
         tamanho_empresa=schema.tamanho_empresa,
         capital_social=schema.capital_social,
+        uf=schema.uf,
+        faturamento_anual=schema.faturamento_anual,
+        ano_fundacao=schema.ano_fundacao,
         equipe_resumo=schema.equipe_resumo,
         trl=schema.trl,
         tipos_financiamento_interesse=schema.tipos_financiamento_interesse,

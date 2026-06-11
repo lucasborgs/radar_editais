@@ -116,10 +116,10 @@ export default function PipelinePage() {
               Faça um match e gere um brief para começar.
             </p>
             <Link
-              href="/matching"
+              href="/"
               className="inline-block mt-2 px-4 py-2 rounded-xl text-sm font-semibold font-sans text-white bg-primary hover:bg-primary-hover transition-colors"
             >
-              Ir para o Matching
+              Ir para o radar
             </Link>
           </div>
         ) : (

@@ -193,6 +193,106 @@ export const getMatches = (profile: CompanyProfile, topK: number = 10) =>
     body: JSON.stringify({ profile, top_k: topK }),
   });
 
+// ── Radar unificado (L2) ───────────────────────────────────
+// Shape espelha core/services/radar_service.py::merge_radar: cada item carrega
+// os campos comuns + `payload` cru do matcher de origem (KGMatchResult p/ evento,
+// InvestorMatch p/ entidade). O front lê os campos comuns p/ o card e desce ao
+// payload só na expansão (justificativa, dimensões, etc.). Rota PÚBLICA (B2):
+// sem JWT usa pesos globais; com JWT usa pesos do workspace.
+
+export type RadarKindClass = "evento" | "entidade";
+export type RadarOpportunityType = "edital" | "desafio" | "programa" | "investidor";
+export type RadarTier = "forte" | "fraco";
+
+export interface RadarItem {
+  id: string;
+  kind_class: RadarKindClass;
+  opportunity_type: RadarOpportunityType;
+  verificacao: string;        // "verificado" | "provisorio"
+  title: string;
+  score: number;
+  why_now: string;            // sinal "por que agora" (countdown / tese)
+  tier: RadarTier;            // "fraco" = rebaixado (aproximado/abaixo do floor)
+  rank: number;
+  rrf: number;
+  // payload cru do matcher de origem — tipado por kind_class no consumo.
+  payload: KGMatchResult | InvestorMatch;
+}
+
+export interface RadarResponse {
+  radar: RadarItem[];
+  counts: Record<string, number>;
+}
+
+export const getRadar = (
+  profile: CompanyProfile,
+  topK: number = 10,
+  perTypeCap?: number | null,
+) =>
+  apiFetch<RadarResponse>("/match/radar", {
+    method: "POST",
+    body: JSON.stringify({ profile, top_k: topK, per_type_cap: perTypeCap ?? null }),
+  });
+
+// ── Front-door (turno conversacional, público) ─────────────
+// POST /frontdoor/turn (backend/routers/frontdoor.py): resposta sobre a base +
+// proposta de diff de perfil. O front aplica o diff só após aceite (D4).
+
+export interface ProfileDiffItem {
+  field: keyof CompanyProfile;
+  label: string;              // já em PT-BR (vem do backend)
+  old: unknown;
+  new: unknown;
+}
+
+export const frontdoorTurn = (
+  message: string,
+  history: KGChatMessage[],
+  profile: Partial<CompanyProfile> | null,
+) =>
+  apiFetch<{ answer: string; profile_diff: ProfileDiffItem[] | null }>(
+    "/frontdoor/turn",
+    {
+      method: "POST",
+      body: JSON.stringify({ message, history, profile }),
+    },
+  );
+
+// ── Opportunity Brief (GO/NO-GO, logado) ───────────────────
+// Shape espelha core/opportunity_brief_service.py::generate_brief.
+
+export type BriefRecommendation = "GO" | "GO_COM_RESSALVAS" | "NO_GO";
+
+export interface BriefDecisionRow {
+  dimension: string;
+  score: number;
+  max: number;
+}
+
+export interface OpportunityBrief {
+  application_id: string;
+  edital_id: string;
+  recommendation: BriefRecommendation;
+  total_score: number;        // 0-100
+  decision_matrix: BriefDecisionRow[];
+  narrative: { strengths: string[]; risks: string[]; next_steps: string[] };
+  error?: string;
+}
+
+export const getOpportunityBrief = (
+  editalId: string,
+  profile: CompanyProfile | null,
+  modelTier?: ModelTier,
+) =>
+  apiFetch<OpportunityBrief>("/opportunity/brief", {
+    method: "POST",
+    body: JSON.stringify({
+      edital_id: editalId,
+      profile: profile ?? null,
+      model_tier: modelTier ?? null,
+    }),
+  });
+
 // Investidores (Q3) — entidade, sem gate, dois modos (tese vs estágio).
 export const getInvestorMatches = (profile: CompanyProfile, topK: number = 6) =>
   apiFetch<{ matches: InvestorMatch[] }>("/match/investidores", {
