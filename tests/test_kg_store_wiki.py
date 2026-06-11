@@ -63,3 +63,14 @@ def test_save_wiki_pages_noop_without_supabase(monkeypatch):
     monkeypatch.setattr(kg_store, "_load_wiki_blob_pg",
                         lambda: (_ for _ in ()).throw(AssertionError("não deveria ler")))
     kg_store.save_wiki_pages({"finep:1": {"id": "finep:1"}})  # não levanta
+
+
+def test_etl_process_cache_via_kg_store(tmp_path, monkeypatch):
+    """Cache de síntese {eid: hash} roundtrip pelo seam — modo file usa o
+    MESMO path legado (wiki/.etl_process_cache.json), zero invalidação local."""
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+    monkeypatch.setattr(kg_store, "KNOWLEDGE_GRAPH_DIR", tmp_path)
+    kg_store.save("etl_process_cache", {"finep:1": "abc"})
+    assert (tmp_path / "wiki" / ".etl_process_cache.json").exists()
+    assert kg_store.load("etl_process_cache", default={}) == {"finep:1": "abc"}
