@@ -10,6 +10,7 @@ import {
   saveDocumentSection,
   getLibraryItems,
   getEditalById,
+  autoReviewChecklist,
 } from "@/lib/api";
 import type {
   ContentItemSummary,
@@ -20,13 +21,17 @@ import { cn } from "@/lib/utils";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { Explorer } from "@/components/workspace/Explorer";
 import { DocumentEditor } from "@/components/workspace/DocumentEditor";
+import { ExportModal } from "@/components/workspace/ExportModal";
 import {
   WorkspaceChat,
   type WorkspaceChatHandle,
 } from "@/components/workspace/WorkspaceChat";
 import {
   filledCount,
+  flattenReview,
+  groupBySection,
   modeFromEditalId,
+  type Finding,
   type WorkspaceMessage,
   type WorkspaceSection,
 } from "@/components/workspace/types";
@@ -58,6 +63,14 @@ export default function WorkspacePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [docLoading, setDocLoading] = useState(true);
   const [mobileTab, setMobileTab] = useState<"doc" | "chat">("doc");
+  const [mobileDrawer, setMobileDrawer] = useState(false);
+
+  // N3 — auto-review: findings da sessão de UI (não persiste; re-revisar substitui).
+  const [findings, setFindings] = useState<Finding[]>([]);
+  const [reviewing, setReviewing] = useState(false);
+
+  // N4 — export modal.
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Co-edição: seções tocadas pelo agente (highlight) + pilha de undo por seção.
   const [highlighted, setHighlighted] = useState<Set<string>>(new Set());
@@ -223,7 +236,7 @@ export default function WorkspacePage() {
 
   // ── Turno (o coração — F2) ────────────────────────────────────────────────
   const runTurn = useCallback(
-    async (text: string) => {
+    async (text: string, sectionHint?: string) => {
       const content = text.trim();
       if (!content || !sessionId || working) return;
       // O turno usa o perfil do workspace no backend (fallback) — igual ao
@@ -235,7 +248,7 @@ export default function WorkspacePage() {
       setWorking(true);
 
       try {
-        const res = await sendWritingTurn(sessionId, content, undefined);
+        const res = await sendWritingTurn(sessionId, content, sectionHint);
 
         // Seções persistidas neste turno (W-D1: saved_section no tool_trace).
         const editedSections = Array.from(
@@ -297,6 +310,47 @@ export default function WorkspacePage() {
     scrollToSectionRef.current = fn;
   }, []);
 
+  // ── N3 — Revisar (auto-review ancorado) ───────────────────────────────────
+  const handleReview = useCallback(async () => {
+    if (!sessionId || !token || reviewing) return;
+    setReviewing(true);
+    try {
+      const { review } = await autoReviewChecklist(sessionId, token);
+      // Re-revisar substitui os findings anteriores (spec §F4).
+      const flat = flattenReview(review);
+      setFindings(flat);
+      if (flat.length === 0) {
+        toast.success("Revisão concluída — nenhuma observação.");
+      }
+      if (review.error && review.error.length > 0) {
+        toast.warning("A revisão rodou com falhas parciais em algum dos passes.");
+      }
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Não foi possível revisar o documento.",
+      );
+    } finally {
+      setReviewing(false);
+    }
+  }, [sessionId, token, reviewing]);
+
+  // "Corrigir com IA": monta um prompt pré-preenchido com o finding e dispara
+  // um turno com section_hint da seção (null = finding "Geral").
+  const handleFixWithAI = useCallback(
+    (sectionHint: string | null, finding: Finding) => {
+      const where = sectionHint ? `na seção "${sectionHint}"` : "na proposta";
+      const suggestion = finding.suggestion
+        ? `\nSugestão da revisão: ${finding.suggestion}`
+        : "";
+      const prompt =
+        `A revisão apontou ${where}: ${finding.text}.${suggestion}\n` +
+        `Corrija isso no documento.`;
+      setMobileTab("chat");
+      void runTurn(prompt, sectionHint ?? undefined);
+    },
+    [runTurn],
+  );
+
   // ── Render ────────────────────────────────────────────────────────────────
   if (authChecked && !token) {
     return (
@@ -323,6 +377,17 @@ export default function WorkspacePage() {
 
   const filled = filledCount(sections);
 
+  // Findings agrupados por seção; "Geral" vira bloco no topo do editor.
+  const grouped = groupBySection(findings);
+  const generalFindings = grouped.get("Geral") ?? [];
+  const findingsBySection = new Map(
+    Array.from(grouped.entries()).filter(([k]) => k !== "Geral"),
+  );
+  // Contadores p/ o explorer (inclui "Geral" no total via Revisar badge).
+  const findingCounts = new Map(
+    Array.from(grouped.entries()).map(([k, v]) => [k, v.length]),
+  );
+
   return (
     <div className="h-screen flex flex-col bg-app-bg overflow-hidden">
       <WorkspaceHeader
@@ -332,8 +397,15 @@ export default function WorkspacePage() {
         total={sections.length}
       />
 
-      {/* Mobile: abas Documento | Chat */}
-      <div className="md:hidden flex border-b border-border bg-white">
+      {/* Mobile: abas Documento | Chat + botão do drawer do explorer */}
+      <div className="md:hidden flex items-center border-b border-border bg-white">
+        <button
+          onClick={() => setMobileDrawer(true)}
+          title="Abrir explorer"
+          className="px-3 py-2 text-content-secondary hover:text-content-primary transition-colors"
+        >
+          ☰
+        </button>
         {(["doc", "chat"] as const).map((tab) => (
           <button
             key={tab}
@@ -351,15 +423,54 @@ export default function WorkspacePage() {
       </div>
 
       <div className="flex-1 flex min-h-0">
-        {/* Explorer — drawer no mobile (escondido por simplicidade em viewport estreita) */}
+        {/* Explorer — sidebar no desktop */}
         <div className="hidden md:flex">
           <Explorer
             sections={sections}
             attachments={attachments}
+            findingCounts={findingCounts}
+            reviewing={reviewing}
             onSelectSection={handleSelectSection}
             onSelectAttachment={handleSelectAttachment}
+            onReview={() => void handleReview()}
+            onExport={() => setExportOpen(true)}
           />
         </div>
+
+        {/* Explorer — drawer overlay no mobile */}
+        {mobileDrawer && (
+          <div className="md:hidden fixed inset-0 z-40 flex">
+            <button
+              aria-label="Fechar explorer"
+              onClick={() => setMobileDrawer(false)}
+              className="absolute inset-0 bg-black/40"
+            />
+            <div className="relative z-10 h-full shadow-xl animate-in slide-in-from-left">
+              <Explorer
+                sections={sections}
+                attachments={attachments}
+                findingCounts={findingCounts}
+                reviewing={reviewing}
+                onSelectSection={(t) => {
+                  handleSelectSection(t);
+                  setMobileDrawer(false);
+                }}
+                onSelectAttachment={(item) => {
+                  handleSelectAttachment(item);
+                  setMobileDrawer(false);
+                }}
+                onReview={() => {
+                  void handleReview();
+                  setMobileDrawer(false);
+                }}
+                onExport={() => {
+                  setExportOpen(true);
+                  setMobileDrawer(false);
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Editor */}
         <div
@@ -377,8 +488,11 @@ export default function WorkspacePage() {
               sections={sections}
               highlightedSections={highlighted}
               savingSection={savingSection}
+              findingsBySection={findingsBySection}
+              generalFindings={generalFindings}
               onSaveSection={handleSaveSection}
               onSectionInteract={handleSectionInteract}
+              onFixWithAI={handleFixWithAI}
               registerScrollTo={registerScrollTo}
             />
           )}
@@ -400,6 +514,17 @@ export default function WorkspacePage() {
           />
         </div>
       </div>
+
+      {exportOpen && (
+        <ExportModal
+          sessionId={sessionId!}
+          sections={sections}
+          targetTitle={targetTitle || editalId}
+          mode={mode}
+          token={token}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
     </div>
   );
 }

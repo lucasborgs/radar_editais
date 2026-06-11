@@ -337,7 +337,10 @@ async def writing_checklist_auto_review(
       - quality:      clareza, coerência, persuasão, tom
       - completeness: seções presentes e com profundidade adequada
     """
-    from core.services.checklist_service import auto_review_checklist, build_checklist
+    from core.services.checklist_service import (
+        auto_review_checklist,
+        build_checklist,
+    )
     workspace_id = get_workspace_id(db, user_id)
     doc = get_session_document(db, session_id, workspace_id)
     if doc is None:
@@ -354,7 +357,40 @@ async def writing_checklist_auto_review(
         edital_requirements=build_checklist(doc["edital_id"]),
         outline=outline,
     )
+    _attach_issue_sections(review, outline)
     return {"session_id": session_id, "review": review}
+
+
+def _attach_issue_sections(review: dict, outline: list[str]) -> None:
+    """Anexa um campo `section` a cada issue do auto-review, ancorando os
+    findings no editor do workspace (spec §F4/W6 — reusa `_infer_section`).
+
+    - completeness: a própria seção do outline (campo `title`).
+    - compliance:   inferida do texto do requisito.
+    - quality:      inferida do trecho (excerpt); cai em "Geral" se nada casar.
+
+    A seção inferida só vira âncora se bater com um título do outline; caso
+    contrário o front a trata como "Geral" (bloco no topo do documento)."""
+    from core.services.checklist_service import _infer_section
+
+    outline_set = set(outline)
+
+    def anchor(raw: str) -> str:
+        sec = _infer_section(raw or "")
+        return sec if sec in outline_set else "Geral"
+
+    for issue in review.get("compliance", {}).get("issues", []) or []:
+        if isinstance(issue, dict):
+            issue["section"] = anchor(issue.get("requirement", ""))
+
+    for issue in review.get("quality", {}).get("issues", []) or []:
+        if isinstance(issue, dict):
+            issue["section"] = anchor(issue.get("excerpt", ""))
+
+    for sec in review.get("completeness", {}).get("sections", []) or []:
+        if isinstance(sec, dict):
+            title = sec.get("title", "")
+            sec["section"] = title if title in outline_set else "Geral"
 
 
 @router.get("/writing/{session_id}/document", summary="Retorna estado atual do documento")

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
-import { sectionAnchorId, type WorkspaceSection } from "./types";
+import { sectionAnchorId, type Finding, type WorkspaceSection } from "./types";
 
 /**
  * Editor central do workspace: documento contínuo, uma âncora por seção.
@@ -15,20 +15,33 @@ import { sectionAnchorId, type WorkspaceSection } from "./types";
  * Co-edição (N2): seções tocadas pelo agente no último turno entram em
  * `highlightedSections` (fundo suave). O highlight esmaece quando o usuário
  * entra/clica na seção — sinalizado via `onSectionInteract`.
+ *
+ * Revisar (N3): seções com findings do auto-review ganham um indicador ⚠︎n no
+ * título; clicar abre um painel inline com os findings e o botão "Corrigir com
+ * IA". Findings "Geral" aparecem num bloco no topo do documento.
  */
 export function DocumentEditor({
   sections,
   highlightedSections,
   savingSection,
+  findingsBySection,
+  generalFindings,
   onSaveSection,
   onSectionInteract,
+  onFixWithAI,
   registerScrollTo,
 }: {
   sections: WorkspaceSection[];
   highlightedSections: Set<string>;
   savingSection: string | null;
+  // Findings por seção (do auto-review). Vazio = sem revisão / sem achados.
+  findingsBySection: Map<string, Finding[]>;
+  // Findings sem seção inferível ("Geral") — bloco no topo.
+  generalFindings: Finding[];
   onSaveSection: (title: string, content: string) => void;
   onSectionInteract: (title: string) => void;
+  // "Corrigir com IA": dispara um turno pré-preenchido com section_hint.
+  onFixWithAI: (sectionHint: string | null, finding: Finding) => void;
   // O pai registra um callback p/ rolar até uma seção (clique no explorer).
   registerScrollTo: (fn: (title: string) => void) => void;
 }) {
@@ -44,14 +57,19 @@ export function DocumentEditor({
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto bg-white">
       <div className="max-w-3xl mx-auto px-8 py-8 space-y-8">
+        {generalFindings.length > 0 && (
+          <GeneralFindingsBlock findings={generalFindings} onFixWithAI={onFixWithAI} />
+        )}
         {sections.map((s) => (
           <SectionBlock
             key={s.title}
             section={s}
             highlighted={highlightedSections.has(s.title)}
             saving={savingSection === s.title}
+            findings={findingsBySection.get(s.title) ?? []}
             onSave={(content) => onSaveSection(s.title, content)}
             onInteract={() => onSectionInteract(s.title)}
+            onFixWithAI={onFixWithAI}
           />
         ))}
         {sections.length === 0 && (
@@ -64,21 +82,81 @@ export function DocumentEditor({
   );
 }
 
+// ── Bloco de findings "Geral" (sem seção) no topo do documento ──────────────
+function GeneralFindingsBlock({
+  findings,
+  onFixWithAI,
+}: {
+  findings: Finding[];
+  onFixWithAI: (sectionHint: string | null, finding: Finding) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3">
+      <p className="text-xs font-semibold text-amber-900 font-sans mb-2">
+        ⚠︎ Observações gerais da revisão ({findings.length})
+      </p>
+      <ul className="space-y-2">
+        {findings.map((f, i) => (
+          <FindingRow key={i} finding={f} onFix={() => onFixWithAI(null, f)} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ── Uma linha de finding (texto + badge + corrigir com IA) ──────────────────
+const KIND_LABEL: Record<Finding["kind"], string> = {
+  compliance: "Compliance",
+  quality: "Qualidade",
+  completeness: "Completude",
+};
+
+function FindingRow({ finding, onFix }: { finding: Finding; onFix: () => void }) {
+  return (
+    <li className="text-xs font-sans text-content-primary">
+      <div className="flex items-start gap-2">
+        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-white border border-amber-200 px-1.5 py-0.5 text-[10px] text-amber-800">
+          {KIND_LABEL[finding.kind]}
+          {finding.badge && <span className="opacity-70">· {finding.badge}</span>}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-content-primary">{finding.text}</p>
+          {finding.suggestion && (
+            <p className="text-content-secondary mt-0.5">{finding.suggestion}</p>
+          )}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onFix}
+        className="mt-1 ml-[4.5rem] text-[11px] font-medium text-primary hover:underline"
+      >
+        ✨ Corrigir com IA
+      </button>
+    </li>
+  );
+}
+
 function SectionBlock({
   section,
   highlighted,
   saving,
+  findings,
   onSave,
   onInteract,
+  onFixWithAI,
 }: {
   section: WorkspaceSection;
   highlighted: boolean;
   saving: boolean;
+  findings: Finding[];
   onSave: (content: string) => void;
   onInteract: () => void;
+  onFixWithAI: (sectionHint: string | null, finding: Finding) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(section.content);
+  const [showFindings, setShowFindings] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Sincroniza o draft quando o conteúdo muda no backend (turno/undo) e não
@@ -128,13 +206,41 @@ function SectionBlock({
       )}
     >
       <div className="flex items-center justify-between mb-2">
-        <h2 className="font-heading text-base font-bold text-content-primary">
-          {section.title}
-        </h2>
+        <div className="flex items-center gap-2 min-w-0">
+          <h2 className="font-heading text-base font-bold text-content-primary truncate">
+            {section.title}
+          </h2>
+          {findings.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowFindings((v) => !v)}
+              title={`${findings.length} ${findings.length === 1 ? "observação" : "observações"} da revisão`}
+              className={cn(
+                "shrink-0 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium transition-colors",
+                showFindings
+                  ? "bg-amber-200 text-amber-900"
+                  : "bg-amber-100 text-amber-800 hover:bg-amber-200",
+              )}
+            >
+              ⚠︎{findings.length}
+            </button>
+          )}
+        </div>
         {saving && (
           <span className="text-[10px] text-content-secondary font-sans">salvando…</span>
         )}
       </div>
+
+      {/* Painel inline de findings da seção */}
+      {findings.length > 0 && showFindings && (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2">
+          <ul className="space-y-2">
+            {findings.map((f, i) => (
+              <FindingRow key={i} finding={f} onFix={() => onFixWithAI(section.title, f)} />
+            ))}
+          </ul>
+        </div>
+      )}
 
       {editing ? (
         <textarea
