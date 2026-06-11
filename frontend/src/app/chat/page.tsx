@@ -351,10 +351,14 @@ function WritingPageInner() {
 
   const profile = loadProfileFromStorage() ?? EMPTY_PROFILE;
 
-  // Guard: sem perfil → onboarding
+  // Aposentadoria parcial (spec_frontdoor_ux D7/§6): a entrada exploratória de
+  // /chat foi absorvida pelo front-door "/". Mas /chat?edital={id} AINDA é o
+  // fluxo de escrita de proposta (alvo do "começar proposta") e /sessions
+  // deep-linka aqui — então só redirecionamos quando NÃO há edital. Sem perfil,
+  // o front-door é onde se constrói o perfil; mandamos para lá também.
   useEffect(() => {
-    if (!loadProfileFromStorage()) {
-      router.replace(`/onboarding${editalId ? `?next=/chat?edital=${editalId}` : ""}`);
+    if (!editalId || !loadProfileFromStorage()) {
+      router.replace("/");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

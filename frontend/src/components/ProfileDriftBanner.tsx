@@ -71,7 +71,7 @@ export function ProfileDriftBanner() {
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <Link
-          href="/onboarding"
+          href="/"
           className="rounded-md bg-amber-900 text-white px-3 py-1.5 text-xs font-medium font-sans hover:opacity-90"
         >
           Revisar perfil
