@@ -1,29 +1,53 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { ChatBubble } from "@/components/chat/ChatBubble";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { FrontDoorHeader } from "@/components/frontdoor/FrontDoorHeader";
+import { StatusBar } from "@/components/frontdoor/StatusBar";
 import { SuggestionChips } from "@/components/frontdoor/SuggestionChips";
 import { Composer } from "@/components/frontdoor/Composer";
-import { kgExplore } from "@/lib/api";
-import type { KGChatMessage } from "@/lib/api";
+import { DiffCard } from "@/components/frontdoor/DiffCard";
+import { RadarCard } from "@/components/frontdoor/RadarCard";
+import { GateCard } from "@/components/frontdoor/GateCard";
+import {
+  frontdoorTurn,
+  getRadar,
+  getMe,
+  saveProfile,
+  getOpportunityBrief,
+  extractProfileFromDocument,
+  type ProfileDiffItem,
+  type OpportunityBrief,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-
-// ── Estado persistido ──────────────────────────────────────────────────────────
-// O transcript do front-door vive no navegador (M1: motor provisório kg-explore,
-// stateless no backend). M2 adiciona perfil/diff; aqui só o histórico de turnos.
-const HISTORY_KEY = "frontdoor_history";
+import { useRouter } from "next/navigation";
+import {
+  CompanyProfile,
+  EMPTY_PROFILE,
+  loadProfileFromStorage,
+  saveProfileToStorage,
+} from "@/types/profile";
+import {
+  HISTORY_KEY,
+  migrateHistory,
+  toApiHistory,
+  applyDiff,
+  diffFromProfile,
+  profileCompleteness,
+  isRadarReady,
+  missingForRadar,
+  type TranscriptEntry,
+} from "@/types/frontdoor";
 
 // Boas-vindas do assistente (estado vazio). Não faz parte do `history` enviado
 // ao backend — é só a abertura da conversa.
 const WELCOME =
   "Oi! Me conte o que sua empresa faz — ou explore o que existe de fomento por aí.";
 
-// Chips de partida do first-run. Clicar envia a mensagem.
 const SUGGESTIONS = [
   "O que existe de fomento para IA em saúde?",
   "Quais editais estão com prazo aberto?",
@@ -31,126 +55,351 @@ const SUGGESTIONS = [
   "Que apoio há para hardware/deep tech?",
 ];
 
-function loadHistory(): KGChatMessage[] {
+// Flag p/ não re-disparar o merge de perfil (F5) em toda visita logada.
+const MERGED_FLAG = "frontdoor_merged";
+
+function loadHistory(): TranscriptEntry[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(HISTORY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    // Sanidade: só aceita array de turnos {role, content}.
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (m): m is KGChatMessage =>
-        m &&
-        (m.role === "user" || m.role === "assistant") &&
-        typeof m.content === "string"
-    );
+    return raw ? migrateHistory(JSON.parse(raw)) : [];
   } catch {
     return [];
   }
 }
 
-// ── Bolha ───────────────────────────────────────────────────────────────────────
-// Usuário em texto puro; assistente em markdown (mesmo padrão do chat do dashboard).
-function Bubble({ msg }: { msg: KGChatMessage }) {
-  const isUser = msg.role === "user";
+// ── Bolha ─────────────────────────────────────────────────────────────────────
+function Bubble({ role, content }: { role: "user" | "assistant"; content: string }) {
+  const isUser = role === "user";
   return (
-    <ChatBubble role={msg.role}>
+    <ChatBubble role={role}>
       {isUser ? (
-        <span className="whitespace-pre-wrap">{msg.content}</span>
+        <span className="whitespace-pre-wrap">{content}</span>
       ) : (
         <div className="prose prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 prose-headings:font-semibold prose-headings:text-content-primary">
-          <ReactMarkdown>{msg.content}</ReactMarkdown>
+          <ReactMarkdown>{content}</ReactMarkdown>
         </div>
       )}
     </ChatBubble>
   );
 }
 
-// ── Página ────────────────────────────────────────────────────────────────────
+// ── Página ──────────────────────────────────────────────────────────────────
 export default function FrontDoorPage() {
-  const { session } = useAuth();
+  const { session, getToken, signOut } = useAuth();
   const isAuthed = !!session;
+  const router = useRouter();
 
-  const [messages, setMessages] = useState<KGChatMessage[]>([]);
+  const [profile, setProfile] = useState<CompanyProfile>(EMPTY_PROFILE);
+  const [entries, setEntries] = useState<TranscriptEntry[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  // Evita flash do estado vazio antes de hidratar o localStorage no cliente.
   const [hydrated, setHydrated] = useState(false);
+  // Briefs gerados, chaveados por edital_id (para render inline no RadarCard).
+  const [briefs, setBriefs] = useState<Record<string, OpportunityBrief>>({});
 
-  // Carrega o transcript ao montar.
+  const lastRadarRef = useRef<HTMLDivElement>(null);
+
+  // Hidrata transcript + perfil local ao montar.
   useEffect(() => {
-    setMessages(loadHistory());
+    setEntries(loadHistory());
+    setProfile(loadProfileFromStorage() ?? EMPTY_PROFILE);
     setHydrated(true);
   }, []);
 
-  // Persiste a cada turno (depois de hidratar, para não sobrescrever com []).
+  // Persiste transcript a cada mudança (depois de hidratar).
   useEffect(() => {
     if (!hydrated) return;
     try {
-      window.localStorage.setItem(HISTORY_KEY, JSON.stringify(messages));
+      window.localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
     } catch {
-      // quota cheia / modo privado — ignora; a conversa segue só em memória.
+      // quota/modo privado — segue em memória.
     }
-  }, [messages, hydrated]);
+  }, [entries, hydrated]);
 
+  // ── Perfil persistido (anônimo: localStorage; logado: PUT /me/profile) ──────
+  const persistProfile = useCallback(
+    async (next: CompanyProfile) => {
+      setProfile(next);
+      saveProfileToStorage(next); // sempre mantém o espelho local
+      if (isAuthed) {
+        try {
+          const token = await getToken();
+          if (token) await saveProfile(next, token);
+        } catch {
+          toast.error("Não consegui salvar o perfil na sua conta.");
+        }
+      }
+    },
+    [isAuthed, getToken],
+  );
+
+  // ── F5/F6: hidratação do perfil logado + merge da conversa ──────────────────
+  useEffect(() => {
+    if (!hydrated || !isAuthed) return;
+    let alive = true;
+    (async () => {
+      const token = await getToken();
+      if (!token || !alive) return;
+      try {
+        const me = await getMe(token);
+        const account = { ...EMPTY_PROFILE, ...(me.profile ?? {}) } as CompanyProfile;
+        const local = loadProfileFromStorage();
+        const alreadyMerged =
+          window.localStorage.getItem(MERGED_FLAG) === me.workspace_id;
+
+        // Sem perfil local relevante OU já mergeado nesta conta → só hidrata.
+        if (!local || !local.nome || alreadyMerged) {
+          if (alive) setProfile(account);
+          saveProfileToStorage(account);
+          return;
+        }
+
+        // Merge F5: campos vazios na conta ← valores locais; conflitos → diff.
+        const filled: CompanyProfile = { ...account };
+        const conflicts: ProfileDiffItem[] = [];
+        let importedSilently = false;
+        (Object.keys(EMPTY_PROFILE) as (keyof CompanyProfile)[]).forEach((f) => {
+          const a = account[f];
+          const l = local[f];
+          const aEmpty = a === "" || a === null || (Array.isArray(a) && a.length === 0);
+          const lEmpty = l === "" || l === null || (Array.isArray(l) && l.length === 0);
+          if (lEmpty) return;
+          if (aEmpty) {
+            (filled as unknown as Record<string, unknown>)[f] = l;
+            importedSilently = true;
+          } else if (JSON.stringify(a) !== JSON.stringify(l)) {
+            conflicts.push({ field: f, label: f, old: a, new: l });
+          }
+        });
+
+        if (!alive) return;
+        setProfile(filled);
+        saveProfileToStorage(filled);
+        if (importedSilently && token) {
+          try {
+            await saveProfile(filled, token);
+            toast.success("Perfil da conversa importado.");
+          } catch {
+            /* silencioso — espelho local mantém o estado */
+          }
+        }
+        if (conflicts.length > 0) {
+          setEntries((prev) => [
+            ...prev,
+            { kind: "diff", items: conflicts, status: "pending", origin: "merge" },
+          ]);
+        }
+        window.localStorage.setItem(MERGED_FLAG, me.workspace_id);
+      } catch {
+        // sem perfil de conta acessível — segue com o local.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [hydrated, isAuthed, getToken]);
+
+  // ── Disparo do radar (após perfil completo) ─────────────────────────────────
+  const runRadar = useCallback(async (p: CompanyProfile) => {
+    try {
+      const data = await getRadar(p, 10);
+      setEntries((prev) => [...prev, { kind: "radar", data, ts: Date.now() }]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não consegui rodar o radar.");
+    }
+  }, []);
+
+  // ── Turno de conversa ───────────────────────────────────────────────────────
   const send = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || sending) return;
 
-      const userMsg: KGChatMessage = { role: "user", content: trimmed };
-      // history = todos os turnos já trocados + a mensagem atual.
-      const history = [...messages, userMsg];
-      setMessages(history);
+      const userEntry: TranscriptEntry = { kind: "msg", role: "user", content: trimmed };
+      const withUser = [...entries, userEntry];
+      setEntries(withUser);
       setInput("");
       setSending(true);
 
       try {
-        const { answer } = await kgExplore(trimmed, history);
-        setMessages((prev) => [...prev, { role: "assistant", content: answer }]);
+        const { answer, profile_diff } = await frontdoorTurn(
+          trimmed,
+          toApiHistory(withUser),
+          profile.nome ? profile : null,
+        );
+        setEntries((prev) => {
+          const next: TranscriptEntry[] = [
+            ...prev,
+            { kind: "msg", role: "assistant", content: answer },
+          ];
+          if (profile_diff && profile_diff.length > 0) {
+            next.push({ kind: "diff", items: profile_diff, status: "pending", origin: "turn" });
+          }
+          return next;
+        });
       } catch (e) {
-        // Erro: remove o turno do usuário do transcript e o devolve ao input
-        // para reenvio (a spec pede que a mensagem permaneça no composer).
-        setMessages((prev) => prev.filter((m) => m !== userMsg));
+        setEntries((prev) => prev.filter((m) => m !== userEntry));
         setInput(trimmed);
         toast.error(
-          e instanceof Error
-            ? e.message
-            : "Não consegui falar com o servidor. Tente novamente."
+          e instanceof Error ? e.message : "Não consegui falar com o servidor. Tente novamente.",
         );
       } finally {
         setSending(false);
       }
     },
-    [messages, sending]
+    [entries, sending, profile],
+  );
+
+  // ── Aceite/descarte de um diff (por índice no transcript) ───────────────────
+  const decideDiff = useCallback(
+    async (index: number, accepted: boolean, finalItems?: ProfileDiffItem[]) => {
+      const entry = entries[index];
+      if (!entry || entry.kind !== "diff") return;
+
+      setEntries((prev) =>
+        prev.map((e, i) =>
+          i === index && e.kind === "diff"
+            ? { ...e, status: accepted ? "accepted" : "dismissed", items: finalItems ?? e.items }
+            : e,
+        ),
+      );
+      if (!accepted) return;
+
+      const next = applyDiff(profile, finalItems ?? entry.items);
+      await persistProfile(next);
+
+      // Aceite é o trigger do radar (D4) — se o perfil ficou rodável.
+      if (isRadarReady(next)) {
+        await runRadar(next);
+      } else {
+        const msg = missingForRadar(next);
+        if (msg) {
+          setEntries((prev) => [...prev, { kind: "msg", role: "assistant", content: msg }]);
+        }
+      }
+    },
+    [entries, profile, persistProfile, runRadar],
+  );
+
+  // ── Barra de status: editar perfil (diff manual com todos os campos) ────────
+  const handleEditProfile = useCallback(() => {
+    setEntries((prev) => [
+      ...prev,
+      { kind: "diff", items: diffFromProfile(profile), status: "pending", origin: "manual" },
+    ]);
+  }, [profile]);
+
+  const handleSeeRadar = useCallback(() => {
+    lastRadarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  // ── Anexo (📎) ──────────────────────────────────────────────────────────────
+  const handleAttachClick = useCallback((): boolean | void => {
+    if (!isAuthed) {
+      setEntries((prev) => [...prev, { kind: "gate", action: "anexo" }]);
+      return true; // já tratado (gate) — não abre o seletor
+    }
+    return false; // logado → deixa o Composer abrir o file picker
+  }, [isAuthed]);
+
+  const handlePickFile = useCallback(
+    async (file: File) => {
+      const t = toast.loading("Lendo o documento…");
+      try {
+        const res = await extractProfileFromDocument(file);
+        // Monta um diff (old = perfil atual) só com os campos que vieram preenchidos.
+        const items: ProfileDiffItem[] = (
+          Object.keys(EMPTY_PROFILE) as (keyof CompanyProfile)[]
+        )
+          .filter((f) => {
+            const v = res.profile[f];
+            return Array.isArray(v) ? v.length > 0 : v !== "" && v !== null;
+          })
+          .map((f) => ({ field: f, label: f, old: profile[f], new: res.profile[f] }));
+        toast.dismiss(t);
+        if (items.length === 0) {
+          toast.message("Não encontrei dados de perfil no documento.");
+          return;
+        }
+        setEntries((prev) => [
+          ...prev,
+          { kind: "diff", items, status: "pending", origin: "document" },
+        ]);
+      } catch (e) {
+        toast.dismiss(t);
+        toast.error(e instanceof Error ? e.message : "Falha ao ler o documento.");
+      }
+    },
+    [profile],
+  );
+
+  // ── Brief GO/NO-GO (logado) / gate (anônimo) ────────────────────────────────
+  const handleBrief = useCallback(
+    async (editalId: string) => {
+      if (!isAuthed) {
+        setEntries((prev) => [...prev, { kind: "gate", action: "brief" }]);
+        return;
+      }
+      try {
+        const brief = await getOpportunityBrief(editalId, profile.nome ? profile : null);
+        setBriefs((prev) => ({ ...prev, [editalId]: brief }));
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Não consegui gerar o brief.");
+      }
+    },
+    [isAuthed, profile],
+  );
+
+  // ── Começar proposta: logado → fluxo de escrita atual; anônimo → gate ───────
+  const handleProposta = useCallback(
+    (editalId: string) => {
+      if (!isAuthed) {
+        setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
+        return;
+      }
+      // O fluxo de escrita vive em /chat?edital={id} (WritingPageInner) e lê o
+      // perfil do mesmo localStorage que mantemos aqui.
+      router.push(`/chat?edital=${encodeURIComponent(editalId)}`);
+    },
+    [isAuthed, router],
   );
 
   const handleReset = useCallback(() => {
     try {
       window.localStorage.removeItem(HISTORY_KEY);
     } catch {
-      // ignora — o estado em memória é limpo de qualquer forma.
+      /* noop */
     }
-    setMessages([]);
+    setEntries([]);
     setInput("");
+    setBriefs({});
     toast.success("Conversa reiniciada.");
   }, []);
 
-  const isEmpty = hydrated && messages.length === 0;
+  const isEmpty = hydrated && entries.length === 0;
+  const completeness = profileCompleteness(profile);
+  const hasRadar = entries.some((e) => e.kind === "radar");
+
+  // Índice do último card de radar (para ancorar o ref de "ver radar atual").
+  let lastRadarIndex = -1;
+  entries.forEach((e, i) => {
+    if (e.kind === "radar") lastRadarIndex = i;
+  });
 
   return (
     <div className="flex h-[100dvh] flex-col bg-app-bg">
-      <FrontDoorHeader isAuthed={isAuthed} onReset={handleReset} />
+      <FrontDoorHeader isAuthed={isAuthed} onReset={handleReset} onSignOut={signOut} />
+      <StatusBar
+        completeness={completeness}
+        hasRadar={hasRadar}
+        onSeeRadar={handleSeeRadar}
+        onEditProfile={handleEditProfile}
+      />
 
-      <ChatMessageList
-        className="mx-auto w-full max-w-2xl"
-        deps={[sending, hydrated]}
-      >
-        {/* Boas-vindas sempre no topo da conversa. */}
-        <Bubble msg={{ role: "assistant", content: WELCOME }} />
+      <ChatMessageList className="mx-auto w-full max-w-2xl" deps={[sending, hydrated, briefs]}>
+        <Bubble role="assistant" content={WELCOME} />
 
-        {/* Estado vazio: chips de sugestão logo após o convite. */}
         {isEmpty && (
           <div className="pt-1">
             <SuggestionChips
@@ -161,9 +410,38 @@ export default function FrontDoorPage() {
           </div>
         )}
 
-        {messages.map((msg, i) => (
-          <Bubble key={i} msg={msg} />
-        ))}
+        {entries.map((entry, i) => {
+          switch (entry.kind) {
+            case "msg":
+              return <Bubble key={i} role={entry.role} content={entry.content} />;
+            case "diff":
+              return (
+                <DiffCard
+                  key={i}
+                  items={entry.items}
+                  status={entry.status}
+                  origin={entry.origin}
+                  onAccept={(finalItems) => void decideDiff(i, true, finalItems)}
+                  onDismiss={() => void decideDiff(i, false)}
+                />
+              );
+            case "radar":
+              return (
+                <div key={i} ref={i === lastRadarIndex ? lastRadarRef : undefined}>
+                  <RadarCard
+                    data={entry.data}
+                    briefs={briefs}
+                    onBrief={handleBrief}
+                    onProposta={handleProposta}
+                  />
+                </div>
+              );
+            case "gate":
+              return <GateCard key={i} action={entry.action} />;
+            default:
+              return null;
+          }
+        })}
 
         {sending && (
           <div className="flex items-start">
@@ -176,6 +454,8 @@ export default function FrontDoorPage() {
         value={input}
         onChange={setInput}
         onSend={() => void send(input)}
+        onAttach={handleAttachClick}
+        onPickFile={handlePickFile}
         disabled={sending}
         placeholder="Conte o que sua empresa faz, ou pergunte sobre fomento…"
       />

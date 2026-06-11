@@ -7,17 +7,28 @@ import { cn } from "@/lib/utils";
 /**
  * Header fino do front-door: nome do produto + ação de conta + menu "⋮".
  *
- * - `isAuthed` decide entre "Entrar" (→ /login) e "Minha conta" (→ /dashboard),
- *   seguindo o padrão de sessão já usado no app (useAuth().session).
- * - O menu "⋮" expõe "Começar de novo" (limpa o transcript local). A barra de
- *   status de perfil é M2 — não entra aqui ainda.
+ * - Anônimo: "Entrar" (→ /login) e o menu só tem "Começar de novo".
+ * - Logado: "Minha conta" some; o menu "⋮" vira o hub de navegação secundária
+ *   (Biblioteca/Sessões/Pipeline/Editais/Configurações) + Sair, já que a sidebar
+ *   antiga sai do fluxo do front-door (D7/§6). "Começar de novo" limpa o
+ *   transcript local em ambos os casos.
  */
+const AUTHED_LINKS = [
+  { href: "/library", label: "Biblioteca" },
+  { href: "/sessions", label: "Sessões" },
+  { href: "/pipeline", label: "Pipeline" },
+  { href: "/editais", label: "Editais" },
+  { href: "/settings", label: "Configurações" },
+];
+
 export function FrontDoorHeader({
   isAuthed,
   onReset,
+  onSignOut,
 }: {
   isAuthed: boolean;
   onReset: () => void;
+  onSignOut?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -34,6 +45,9 @@ export function FrontDoorHeader({
     return () => document.removeEventListener("mousedown", onClick);
   }, [menuOpen]);
 
+  const itemCls =
+    "block w-full px-3 py-2 text-left text-sm font-sans text-content-primary hover:bg-app-bg";
+
   return (
     <header className="shrink-0 border-b border-border bg-white">
       <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
@@ -42,12 +56,14 @@ export function FrontDoorHeader({
         </span>
 
         <div className="flex items-center gap-1">
-          <Link
-            href={isAuthed ? "/dashboard" : "/login"}
-            className="rounded-lg px-3 py-1.5 text-sm font-sans text-content-primary hover:bg-app-bg transition-colors"
-          >
-            {isAuthed ? "Minha conta" : "Entrar"}
-          </Link>
+          {!isAuthed && (
+            <Link
+              href="/login"
+              className="rounded-lg px-3 py-1.5 text-sm font-sans text-content-primary hover:bg-app-bg transition-colors"
+            >
+              Entrar
+            </Link>
+          )}
 
           <div className="relative" ref={menuRef}>
             <button
@@ -58,11 +74,13 @@ export function FrontDoorHeader({
               onClick={() => setMenuOpen((v) => !v)}
               className={cn(
                 "rounded-lg px-2 py-1.5 text-content-secondary hover:bg-app-bg transition-colors",
-                menuOpen && "bg-app-bg"
+                menuOpen && "bg-app-bg",
               )}
             >
               {/* glifo de "três pontos verticais" */}
-              <span aria-hidden className="text-lg leading-none">⋮</span>
+              <span aria-hidden className="text-lg leading-none">
+                ⋮
+              </span>
             </button>
 
             {menuOpen && (
@@ -70,6 +88,19 @@ export function FrontDoorHeader({
                 role="menu"
                 className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-border bg-white py-1 shadow-lg"
               >
+                {isAuthed &&
+                  AUTHED_LINKS.map((l) => (
+                    <Link
+                      key={l.href}
+                      href={l.href}
+                      role="menuitem"
+                      onClick={() => setMenuOpen(false)}
+                      className={itemCls}
+                    >
+                      {l.label}
+                    </Link>
+                  ))}
+                {isAuthed && <div className="my-1 border-t border-border" />}
                 <button
                   type="button"
                   role="menuitem"
@@ -77,10 +108,23 @@ export function FrontDoorHeader({
                     setMenuOpen(false);
                     onReset();
                   }}
-                  className="block w-full px-3 py-2 text-left text-sm font-sans text-content-primary hover:bg-app-bg"
+                  className={itemCls}
                 >
                   Começar de novo
                 </button>
+                {isAuthed && onSignOut && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onSignOut();
+                    }}
+                    className={itemCls}
+                  >
+                    Sair
+                  </button>
+                )}
               </div>
             )}
           </div>
