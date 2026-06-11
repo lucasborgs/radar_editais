@@ -12,17 +12,16 @@ SUPABASE_ANON_KEY    = os.getenv("SUPABASE_ANON_KEY", "")
 
 ROOT = Path(__file__).parent
 
-# Dados Bronze (raw sources — imutáveis)
-BRONZE_DIR = ROOT / "bronze_data"
-
-# Dados Silver
-SILVER_DIR = ROOT / "silver_data"
+# Dados locais (medallion): data/bronze (raw imutável) e data/silver (derivado,
+# reconstruível do bronze). Camadas separadas como subpastas de um único dir.
+BRONZE_DIR = ROOT / "data" / "bronze"
+SILVER_DIR = ROOT / "data" / "silver"
 
 # FINEP PDFs organizados por chamada_id
 FINEP_PDFS_DIR = BRONZE_DIR / "finep_pdfs"
 
 # Knowledge Graph (wiki)
-KNOWLEDGE_GRAPH_DIR = ROOT / "knowledge_graph"
+KNOWLEDGE_GRAPH_DIR = ROOT / "data" / "knowledge_graph"
 
 # Wiki pages por edital (Karpathy-style)
 KG_WIKI_DIR = KNOWLEDGE_GRAPH_DIR / "wiki"

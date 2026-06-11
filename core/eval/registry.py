@@ -11,6 +11,7 @@ from core.eval import (
     matching,
     opportunity_type,
     rag,
+    triage,
     writing,
 )
 from core.eval.harness import Suite
@@ -22,6 +23,7 @@ SUITES: dict[str, Suite] = {
     extraction.SUITE.name: extraction.SUITE,
     investor_match.SUITE.name: investor_match.SUITE,
     opportunity_type.SUITE.name: opportunity_type.SUITE,
+    triage.SUITE.name: triage.SUITE,
 }
 
 

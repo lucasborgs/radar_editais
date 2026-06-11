@@ -96,10 +96,11 @@ def _pgvector_tables():
 
 def _editais_data_gap():
     """Demonstra o gap: kg_artifacts (editais) vazio no cloud vs local."""
+    from config import KNOWLEDGE_GRAPH_DIR
     from core.db import get_supabase_service
     resp = get_supabase_service().table("kg_artifacts").select("key").execute()
     cloud_keys = [r["key"] for r in (resp.data or [])]
-    local_idx = ROOT / "knowledge_graph" / "index.json"
+    local_idx = KNOWLEDGE_GRAPH_DIR / "index.json"
     local_n = 0
     if local_idx.exists():
         import json
