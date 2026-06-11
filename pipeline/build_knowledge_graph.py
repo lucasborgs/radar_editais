@@ -224,7 +224,17 @@ def _normalize_finep(ch: dict) -> dict:
     link, tema, publico_alvo, fonte_recurso."""
     deadline_str = ch.get("prazo_envio", "")
     raw_status = ch.get("status", "Desconhecido")
+    # Temas: a API cross-taga chamadas com múltiplas categorias (taxonomyCategory-
+    # Briefs) e o campo `tema` simples às vezes traz a SECUNDÁRIA (ex.: rodada
+    # "Transição Energética" com tema=Agro). União tema ∪ categorias-no-vocabulário
+    # — a taxonomia mistura temas com mecanismos ("Subvenção Econômica"), que o
+    # filtro de vocabulário descarta. `tema` permanece primeiro (primário).
     themes_raw = _split_multi(ch.get("tema"))
+    vocab = set(wiki_schema.tema_vocab())
+    for cat in ch.get("api_taxonomy_categories") or []:
+        canon = canonicalize_themes([cat])
+        if canon and (not vocab or canon[0] in vocab) and cat not in themes_raw:
+            themes_raw.append(cat)
     pub_date = ch.get("data_publicacao", "")
     fontes, subprogramas = _split_fontes(ch.get("fonte_recurso"))
     return {
