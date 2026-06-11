@@ -6,6 +6,7 @@ import type { CompanyProfile } from "@/types/profile";
 import type {
   WritingStartResponse,
   WritingTurnResponse,
+  WritingMode,
   SectionStartResponse,
   ExtractProfileResponse,
   ContentItemSummary,
@@ -304,11 +305,12 @@ export const getInvestorMatches = (profile: CompanyProfile, topK: number = 6) =>
 
 export const startWritingSession = (
   editalId: string,
-  profile: CompanyProfile
+  profile: CompanyProfile,
+  mode?: WritingMode,  // W-D3: opcional; omitido → modo derivado do id no backend
 ) =>
   apiFetch<WritingStartResponse>("/writing/start", {
     method: "POST",
-    body: JSON.stringify({ edital_id: editalId, profile }),
+    body: JSON.stringify({ edital_id: editalId, profile, mode }),
   });
 
 export type ModelTier = "fast" | "auto" | "pro";
@@ -445,8 +447,17 @@ export const deleteLibraryItem = (id: string, token: string) =>
 
 export interface DocumentSection { title: string; content: string }
 
+// GET /writing/{id}/document → outline (em ordem) + conteúdo por seção + o
+// edital/alvo da sessão. É a fonte de verdade do documento que o workspace
+// recarrega após cada turno (spec §9).
+export interface WritingDocument {
+  session_id: string;
+  edital_id: string;
+  sections: DocumentSection[];
+}
+
 export const getWritingDocument = (sessionId: string) =>
-  apiFetch<{ session_id: string; sections: DocumentSection[] }>(`/writing/${sessionId}/document`);
+  apiFetch<WritingDocument>(`/writing/${sessionId}/document`);
 
 export const saveDocumentSection = (
   sessionId: string,

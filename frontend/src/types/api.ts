@@ -7,12 +7,19 @@ export interface WritingMessage {
   draftSaved?: boolean;
 }
 
+export type WritingMode = "proposal" | "pitch";
+
 export interface WritingStartResponse {
   session_id: string;
   edital_id: string;
+  // W-D3: modo derivado do id (ou override) — front usa p/ o badge do header.
+  mode?: WritingMode;
   section_titles: string[];
   content_source: "section_index" | "live_fetch";
   success: boolean;
+  // get_info também devolve isto ao retomar uma sessão.
+  pending_user_input?: PendingUserInput | null;
+  turn_count?: number;
 }
 
 // Sprint 2 do Cenário B: agente pode pedir info ao usuário via tool dedicada.
@@ -29,6 +36,9 @@ export interface ToolTraceEntry {
   name: string;
   input: Record<string, unknown>;
   output: string;
+  // W-D1: título normalizado da seção persistida — presente só em entradas
+  // save_draft bem-sucedidas. A co-edição do workspace usa p/ highlight + undo.
+  saved_section?: string;
 }
 
 export interface WritingTurnResponse {
