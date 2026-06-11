@@ -5,7 +5,7 @@ A partir da Fase 1 multi-fonte (WIKI.md §12), o sistema deixa de assumir
 FINEP-only. IDs nativos das fontes (FAPESP usa `18064`, FINEP usa `782`,
 BNDES usa slugs) podem colidir entre si; o prefixo elimina ambiguidade.
 
-Layout filesystem correspondente: `knowledge_graph/wiki/{source}/{id}.json`
+Layout filesystem correspondente: `data/knowledge_graph/wiki/{source}/{id}.json`
 (subfolder por fonte). `:` em filename é problema em Windows e em alguns
 tooling — usamos subfolder, não literal.
 

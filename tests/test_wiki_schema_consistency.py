@@ -18,12 +18,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from config import KG_WIKI_DIR, KNOWLEDGE_GRAPH_DIR
 from core.kg import wiki_schema as ws
 
-WIKI_DIR   = ROOT / "knowledge_graph" / "wiki"
-INDEX_FILE = ROOT / "knowledge_graph" / "index.json"
-ICTS_FILE  = ROOT / "knowledge_graph" / "icts.json"
-INVESTIDORES_FILE = ROOT / "knowledge_graph" / "investidores.json"
+WIKI_DIR   = KG_WIKI_DIR
+INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
+ICTS_FILE  = KNOWLEDGE_GRAPH_DIR / "icts.json"
+INVESTIDORES_FILE = KNOWLEDGE_GRAPH_DIR / "investidores.json"
 
 
 def _load_wiki_pages() -> list[dict]:

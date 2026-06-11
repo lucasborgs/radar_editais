@@ -13,7 +13,7 @@ injetado no prompt a cada turn:
 
 Princípios:
   • Stateless — explore é chat público, sem session/RLS/workspace.
-  • Leitura-only sobre knowledge_graph/ e vault Obsidian no disco.
+  • Leitura-only sobre data/knowledge_graph/ e vault Obsidian no disco.
   • Tools wrappeiam métodos existentes de KGMatchService — sem
     duplicação de lógica.
   • Erro-como-string (mesmo padrão de writing_tools).

@@ -236,6 +236,32 @@ def test_discover_dou_has_own_budget_does_not_starve_tavily(monkeypatch):
     assert len([u for u in urls if "x.org" in u]) == 3
 
 
+def test_social_domains_dropped_before_triage(monkeypatch):
+    """Post de rede social nunca é a página da oportunidade — cai antes da
+    triagem (sem gastar LLM). Subdomínio conta; agência própria não."""
+    assert od._is_social("https://www.instagram.com/p/abc123") is True
+    assert od._is_social("https://m.facebook.com/x") is True
+    assert od._is_social("https://fapesc.sc.gov.br/edital") is False
+    # 'instagram.com.golpe.br' não casa (sufixo exige fronteira de domínio)
+    assert od._is_social("https://instagram.com.golpe.br/x") is False
+
+    hits = [SearchHit("Post", "https://instagram.com/p/1", "s", "c"),
+            SearchHit("Edital", "http://fapesc.sc.gov.br/e/1", "s", "c")]
+    monkeypatch.setattr(od.websearch, "web_search", lambda q, k=8: hits)
+    monkeypatch.setattr(od, "_known_urls", lambda: set())
+    monkeypatch.setattr(od, "_make_client", lambda role: (object(), "m"))
+    triaged = []
+    def fake_triage(h, c, m):
+        triaged.append(h.url)
+        return {"is_opportunity": False, "agency": ""}
+    monkeypatch.setattr(od, "_triage", fake_triage)
+    monkeypatch.setattr(od.ws, "discovery_config",
+                        lambda: {"queries": ["q"], "max_results_per_query": 8,
+                                 "max_candidates": 40})
+    od.discover_opportunities(write=False)
+    assert triaged == ["http://fapesc.sc.gov.br/e/1"]
+
+
 def test_discover_dou_disabled_by_default(monkeypatch):
     """Sem a flag, o feeder DOU nem é chamado (caminho Tavily intocado)."""
     import core.dou_feeder as df
