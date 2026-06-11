@@ -43,17 +43,21 @@ for name in ("index.json", "index_historico.json"):
         shutil.copy2(src, bak)
         print(f"backup: {src.name} → {bak.name}")
 
-# Exclui a fonte `web` do build (isolamento de prod) sem mover arquivo. Pós
-# unificação Opção A, a Descoberta entra como fonte `web` (provisorio) — zerar
-# o bronze de web no build mantém só FINEP+FAPESP no cloud.
+# Por default exclui a fonte `web` do build (isolamento de prod). Com
+# `--include-web` (decisão 2026-06-11: torneira aberta em prod) o bronze de
+# web entra no push — os itens vão rotulados `provisorio` (badge na UI).
 import pipeline.build_knowledge_graph as bkg  # noqa: E402
 
-_orig_load_bronze = bkg.load_bronze
-bkg.load_bronze = (  # noqa: E731 — override pontual do driver
-    lambda source=bkg._DEFAULT_SOURCE: [] if source == "web" else _orig_load_bronze(source)
-)
+include_web = "--include-web" in sys.argv
 
-print(f"\nRebuild FINEP+FAPESP (sem web) → upsert cloud ({os.getenv('SUPABASE_URL')})\n")
+if not include_web:
+    _orig_load_bronze = bkg.load_bronze
+    bkg.load_bronze = (  # noqa: E731 — override pontual do driver
+        lambda source=bkg._DEFAULT_SOURCE: [] if source == "web" else _orig_load_bronze(source)
+    )
+
+scope = "FINEP+FAPESP+web" if include_web else "FINEP+FAPESP (sem web)"
+print(f"\nRebuild {scope} → upsert cloud ({os.getenv('SUPABASE_URL')})\n")
 bkg.main()  # rebuilda do bronze, salva local + upsert kg_artifacts no cloud
 
 # Verificação: lê de volta do cloud o que acabou de subir.
@@ -69,5 +73,6 @@ fontes: dict[str, int] = {}
 for e in editais:
     fontes[e.get("source", "?")] = fontes.get(e.get("source", "?"), 0) + 1
 print(f"por fonte: {fontes}")
-if any(f not in ("finep", "fapesp") for f in fontes):
-    print("⚠ ATENÇÃO: fonte inesperada no índice (web não deveria estar aqui)")
+esperadas = ("finep", "fapesp", "web") if include_web else ("finep", "fapesp")
+if any(f not in esperadas for f in fontes):
+    print(f"⚠ ATENÇÃO: fonte inesperada no índice (esperadas: {esperadas})")
