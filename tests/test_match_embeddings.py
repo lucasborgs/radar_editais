@@ -124,7 +124,7 @@ def test_score_stage2a_embeddings_degrades_on_error(monkeypatch):
 # --- roteamento da flag --------------------------------------------------
 
 def test_call_stage2_scores_routes_to_embeddings(monkeypatch):
-    import core.hybrid_match_service as hms
+    import core.services.hybrid_match_service as hms
     monkeypatch.setenv("MATCH_STAGE2A_BACKEND", "embeddings")
     monkeypatch.setattr(
         "core.match_embeddings.score_stage2a_embeddings",
@@ -135,7 +135,7 @@ def test_call_stage2_scores_routes_to_embeddings(monkeypatch):
 
 
 def test_call_stage2_scores_default_is_llm(monkeypatch):
-    import core.hybrid_match_service as hms
+    import core.services.hybrid_match_service as hms
     monkeypatch.delenv("MATCH_STAGE2A_BACKEND", raising=False)
     called = {"embeddings": False}
     monkeypatch.setattr(

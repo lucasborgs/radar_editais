@@ -27,7 +27,7 @@ load_dotenv()
 
 import psycopg  # noqa: E402
 
-from core.llm_client import make_client  # noqa: E402
+from core.llm.llm_client import make_client  # noqa: E402
 from scripts.bench_parsing import _eval_arm  # noqa: E402
 
 EDITAIS = ["768", "762", "743"]

@@ -21,7 +21,7 @@ import math
 import threading
 
 from config import ROOT
-from core.embedder import EMBEDDING_MODEL, embed_texts
+from core.retrieval.embedder import EMBEDDING_MODEL, embed_texts
 
 logger = logging.getLogger(__name__)
 

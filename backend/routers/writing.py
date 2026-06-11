@@ -15,8 +15,8 @@ from backend.common import (
 )
 from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient
-from core.content_library import get_workspace_id
-from core.writing_session import (
+from core.services.content_library import get_workspace_id
+from core.services.writing_session import (
     WritingSession,
     delete_session,
     get_session_document,
@@ -114,7 +114,7 @@ def writing_start(
     # (investidor:<slug>, em investidores.json → pitch outbound). Valida na fonte
     # certa por namespace do id; a WritingSession deriva o mode do mesmo id.
     if req.edital_id.startswith("investidor:"):
-        from core import kg_store
+        from core.kg import kg_store
         if req.edital_id not in {i["id"] for i in kg_store.load_investidores()}:
             raise HTTPException(status_code=404, detail=f"Fundo '{req.edital_id}' não encontrado")
     elif wiki_matcher.get_edital_by_id(req.edital_id) is None:
@@ -234,7 +234,7 @@ def writing_checklist(session_id: str, user_id: CurrentUserId, db: DbClient):
     """Reconstrói o checklist a partir do edital. Estado de marcação não é
     persistido nesta wave — o frontend deve re-aplicar as marcações localmente.
     """
-    from core.checklist_service import build_checklist
+    from core.services.checklist_service import build_checklist
     workspace_id = get_workspace_id(db, user_id)
     doc = get_session_document(db, session_id, workspace_id)
     if doc is None:
@@ -253,7 +253,7 @@ def writing_checklist_update(
     """Stateless — devolve o item atualizado. Persistência do checklist será
     adicionada em uma wave posterior (não existe coluna dedicada hoje).
     """
-    from core.checklist_service import build_checklist
+    from core.services.checklist_service import build_checklist
     workspace_id = get_workspace_id(db, user_id)
     doc = get_session_document(db, session_id, workspace_id)
     if doc is None:
@@ -282,7 +282,7 @@ async def writing_checklist_auto_review(
       - quality:      clareza, coerência, persuasão, tom
       - completeness: seções presentes e com profundidade adequada
     """
-    from core.checklist_service import auto_review_checklist, build_checklist
+    from core.services.checklist_service import auto_review_checklist, build_checklist
     workspace_id = get_workspace_id(db, user_id)
     doc = get_session_document(db, session_id, workspace_id)
     if doc is None:

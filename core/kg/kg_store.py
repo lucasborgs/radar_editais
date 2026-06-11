@@ -189,7 +189,7 @@ def load_wiki_page(edital_id: str) -> dict | None:
     no blob, cai pro arquivo (cobre transição/dev). Single source para todos os
     consumidores de wiki page no request-path.
     """
-    from core.edital_id import wiki_page_path  # lazy: evita ciclo de import
+    from core.kg.edital_id import wiki_page_path  # lazy: evita ciclo de import
     if os.getenv("KG_STORE_BACKEND", "file").lower() == "postgres":
         page = _load_wiki_blob_pg().get(edital_id)
         if page is not None:

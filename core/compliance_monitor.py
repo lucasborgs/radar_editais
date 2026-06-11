@@ -27,7 +27,7 @@ import logging
 import os
 import re
 
-from core import kg_store
+from core.kg import kg_store
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ def _load_edital_requirements(edital_id: str) -> tuple[list[str], str]:
 
 
 def _make_client():
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
     return make_client(api_key=os.environ["OPENAI_API_KEY"]), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 

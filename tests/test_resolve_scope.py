@@ -20,8 +20,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from config import OBSIDIAN_VAULT_DIR  # noqa: E402
-from core.edital_id import slug_to_id  # noqa: E402
-from core.kg_match_service import KGMatchService  # noqa: E402
+from core.kg.edital_id import slug_to_id  # noqa: E402
+from core.services.kg_match_service import KGMatchService  # noqa: E402
 
 _WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]")
 _TEMAS_DIR = OBSIDIAN_VAULT_DIR / "radar-editais" / "temas"
@@ -110,7 +110,7 @@ def test_resolve_scope_edital_sem_vault_page():
 
 def test_resolve_scope_free_trigger():
     """Sem trigger algum → todos os editais do índice (strings)."""
-    from core import kg_store
+    from core.kg import kg_store
     if not kg_store.load_index().get("editais"):
         import pytest
         pytest.skip("requer knowledge_graph/index.json gerado (ausente em CI limpo)")

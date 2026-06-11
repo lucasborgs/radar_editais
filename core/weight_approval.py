@@ -228,7 +228,7 @@ def approve_suggestions(
         normalized.append((dim, delta))
 
     # Lê estado atual em 2 queries pra computar o peso final por dimensão.
-    from core.hybrid_match_service import get_weights
+    from core.services.hybrid_match_service import get_weights
     current_weights = get_weights(workspace_id)
 
     upserted: list[dict] = []
@@ -292,7 +292,7 @@ def _invalidate_weights_cache(workspace_id: str) -> None:
     próximo match.
     """
     try:
-        from core.hybrid_match_service import _weights_cache
+        from core.services.hybrid_match_service import _weights_cache
         _weights_cache.pop(workspace_id, None)
         _weights_cache.pop("__global__", None)
     except Exception as e:

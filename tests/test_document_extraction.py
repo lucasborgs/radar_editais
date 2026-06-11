@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest  # noqa: E402
 
-from core.content_library import extract_document_text  # noqa: E402
+from core.services.content_library import extract_document_text  # noqa: E402
 
 
 def _make_docx(paragraphs, table=None) -> bytes:

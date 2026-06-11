@@ -58,7 +58,7 @@ def test_k_limits_results():
 def test_find_partners_smoke_real_artifacts():
     """Se icts.json e index.json existem, find_partners não deve quebrar e deve
     devolver só ICTs com tema compartilhado."""
-    from core import kg_store
+    from core.kg import kg_store
 
     index = kg_store.load_index()
     editais = index.get("editais", [])

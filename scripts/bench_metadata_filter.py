@@ -3,7 +3,7 @@
 Bake-off Metadata Filtering (#9) — BASE vs BOOST vs FILTER (FINEP+FAPESP).
 
 As flags de tipo de conteúdo (contem_data/valor/elegibilidade/criterios) já são
-computadas (core.chunker._detect_metadata) e indexadas (edital_chunks.metadata,
+computadas (core.retrieval.chunker._detect_metadata) e indexadas (edital_chunks.metadata,
 GIN) mas NÃO usadas no retrieval. Aqui medimos se usá-las ajuda.
 
 Isolamento dense-only (como Estágio A do #8): mesmos chunks/embeddings nos 3
@@ -38,8 +38,8 @@ load_dotenv()
 
 import psycopg  # noqa: E402
 
-from core.embedder import embed_query, embed_texts  # noqa: E402
 from core.rag_eval import gold_best_chunk_recall_at_k, gold_recall_at_k  # noqa: E402
+from core.retrieval.embedder import embed_query, embed_texts  # noqa: E402
 from scripts.bench_parsing import _cos  # noqa: E402
 
 GOLDENS = {

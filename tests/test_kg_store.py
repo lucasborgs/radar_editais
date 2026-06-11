@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from core import kg_store
+from core.kg import kg_store
 
 
 @pytest.fixture(autouse=True)

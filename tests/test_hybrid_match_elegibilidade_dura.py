@@ -7,7 +7,7 @@ nunca seta eligible=False sozinha.
 """
 from __future__ import annotations
 
-from core.hybrid_match_service import (
+from core.services.hybrid_match_service import (
     _WEIGHTS,
     _score_elegibilidade_dura,
     score_stage1,

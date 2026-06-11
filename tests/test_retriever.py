@@ -1,5 +1,5 @@
 """
-Unit tests pra helpers de `core.retriever`:
+Unit tests pra helpers de `core.retrieval.retriever`:
   • `_build_or_tsquery`  — query rewrite para OR-tsquery (Fix A)
   • `_dedup_by_source`   — diversidade no top-K (Fix B)
 
@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.retriever import (  # noqa: E402
+from core.retrieval.retriever import (  # noqa: E402
     _build_or_tsquery,
     _dedup_by_source,
     format_chunks_for_prompt,

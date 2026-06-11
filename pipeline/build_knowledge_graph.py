@@ -23,11 +23,11 @@ from collections import defaultdict
 from datetime import date, datetime
 
 from config import BRONZE_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR
-from core import kg_store, wiki_schema
+from core.kg import kg_store, wiki_schema
 from core.pme_filter import relevance_with_reason
 from domain.vocabulary import canonicalize_themes
 
-# Schema autoritativo em WIKI.md (ver core.wiki_schema).
+# Schema autoritativo em WIKI.md (ver core.kg.wiki_schema).
 # Pós-Épico C: source aceito como parâmetro pelas funções públicas. Default
 # preserva FINEP-only (multifonte real entra no Épico D, com loop sobre o
 # SCRAPER_REGISTRY).

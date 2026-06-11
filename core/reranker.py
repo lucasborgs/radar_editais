@@ -86,7 +86,7 @@ def _rerank_llm(query: str, texts: list[str]) -> list[float]:
     import json
     import re
 
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
 
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:

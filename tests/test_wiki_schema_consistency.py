@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core import wiki_schema as ws
+from core.kg import wiki_schema as ws
 
 WIKI_DIR   = ROOT / "knowledge_graph" / "wiki"
 INDEX_FILE = ROOT / "knowledge_graph" / "index.json"

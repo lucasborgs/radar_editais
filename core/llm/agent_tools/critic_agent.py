@@ -193,7 +193,7 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         section_title: título da seção (para contexto no prompt)
         session: instância de WritingSession (para acesso a db + scope_edital_ids)
     """
-    from core.llm_client import make_client
+    from core.llm.llm_client import make_client
 
     # Coerência entre seções (checagens b/c) — idêntica nos dois gêneros.
     proposal_context = _build_proposal_context(session, section_title)
@@ -214,7 +214,7 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
             draft=draft[:3000],
         )
     else:
-        from core.retriever import format_chunks_for_prompt, retrieve_chunks
+        from core.retrieval.retriever import format_chunks_for_prompt, retrieve_chunks
 
         # Recupera trechos do edital relevantes para o conteúdo do rascunho.
         # Usa os primeiros 500 chars como query — suficiente para capturar tema.
@@ -237,7 +237,7 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         # Contexto temporal (Front 3): permite ao critic pegar prazos afirmados no
         # rascunho que divergem do deadline real. Falha graciosa: bloco vazio.
         try:
-            from core.temporal import render_temporal_block
+            from core.kg.temporal import render_temporal_block
             primary_edital = (
                 getattr(session, "_scope_edital_ids", None) or [getattr(session, "edital_id", "")]
             )[0]

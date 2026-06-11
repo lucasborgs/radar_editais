@@ -1,0 +1,962 @@
+{
+  "total_editais": 34,
+  "label": "vigentes",
+  "last_updated": "2026-06-04 11:58:44",
+  "reference_date": "2026-06-04",
+  "summary": {
+    "by_status": {
+      "ABERTA": 34
+    },
+    "by_year": {
+      "2025": 4,
+      "2024": 2,
+      "2017": 2,
+      "2026": 10,
+      "desconhecido": 16
+    },
+    "n_themes": 7,
+    "n_publico_alvo": 4,
+    "n_fontes": 1,
+    "n_subprogramas": 0,
+    "n_anos": 5
+  },
+  "editais": [
+    {
+      "id": "finep:769",
+      "source": "finep",
+      "title": "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT - Subvenção Econômica à Inovação - DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+      "status": "ABERTA",
+      "deadline": null,
+      "pub_date": "23/12/2025",
+      "pub_year": 2025,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/754098",
+      "themes": [
+        "agro - bioeconomia e alimentos"
+      ],
+      "themes_raw": [
+        "Agro - Bioeconomia e Alimentos"
+      ],
+      "publico_alvo": [
+        "Cooperativas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 14,
+      "requires_ict_partner": false,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:734",
+      "source": "finep",
+      "title": "Chamada pública conjunta Finep e Rede Eureka 2024",
+      "status": "ABERTA",
+      "deadline": null,
+      "pub_date": "31/01/2024",
+      "pub_year": 2024,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/747009",
+      "themes": [],
+      "themes_raw": [],
+      "publico_alvo": [],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 13,
+      "requires_ict_partner": false,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:743",
+      "source": "finep",
+      "title": "Edital FIP Nordeste Capital Semente",
+      "status": "ABERTA",
+      "deadline": null,
+      "pub_date": "10/07/2024",
+      "pub_year": 2024,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/749273",
+      "themes": [],
+      "themes_raw": [],
+      "publico_alvo": [],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 8,
+      "requires_ict_partner": false,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:760",
+      "source": "finep",
+      "title": "FIP Transição Energética e Descarbonização",
+      "status": "ABERTA",
+      "deadline": null,
+      "pub_date": "04/06/2025",
+      "pub_year": 2025,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/752871",
+      "themes": [],
+      "themes_raw": [],
+      "publico_alvo": [],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 1,
+      "requires_ict_partner": false,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:762",
+      "source": "finep",
+      "title": "FIP Bioeconomia e Sustentabilidade",
+      "status": "ABERTA",
+      "deadline": null,
+      "pub_date": "11/11/2025",
+      "pub_year": 2025,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/752980",
+      "themes": [],
+      "themes_raw": [],
+      "publico_alvo": [],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 14,
+      "requires_ict_partner": false,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:757",
+      "source": "finep",
+      "title": "Seleção de Gestor para o FIP Complexo da Saúde",
+      "status": "ABERTA",
+      "deadline": null,
+      "pub_date": "07/04/2025",
+      "pub_year": 2025,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/752474",
+      "themes": [],
+      "themes_raw": [],
+      "publico_alvo": [],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 3,
+      "requires_ict_partner": false,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:613",
+      "source": "finep",
+      "title": "Programa de Investimento em Startups Inovadoras 2ª Rodada",
+      "status": "ABERTA",
+      "deadline": null,
+      "pub_date": "21/11/2017",
+      "pub_year": 2017,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/721708",
+      "themes": [
+        "agro - bioeconomia e alimentos"
+      ],
+      "themes_raw": [
+        "Agro - Bioeconomia e Alimentos"
+      ],
+      "publico_alvo": [],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:612",
+      "source": "finep",
+      "title": "Programa de Investimento em Startups Inovadoras 2ª Rodada",
+      "status": "ABERTA",
+      "deadline": null,
+      "pub_date": "21/11/2017",
+      "pub_year": 2017,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/721681",
+      "themes": [
+        "agro - bioeconomia e alimentos"
+      ],
+      "themes_raw": [
+        "Agro - Bioeconomia e Alimentos"
+      ],
+      "publico_alvo": [],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 1,
+      "requires_ict_partner": false,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:782",
+      "source": "finep",
+      "title": "Ecossistema Tecnológico de Biorrefino",
+      "status": "ABERTA",
+      "deadline": "08/06/2026",
+      "pub_date": "25/03/2026",
+      "pub_year": 2026,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/755795",
+      "themes": [
+        "agro - bioeconomia e alimentos"
+      ],
+      "themes_raw": [
+        "Agro - Bioeconomia e Alimentos"
+      ],
+      "publico_alvo": [
+        "Startups",
+        "ICTs"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 10,
+      "requires_ict_partner": true,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:775",
+      "source": "finep",
+      "title": "Finep Mais Inovação Brasil – Rodada 2 - Base Industrial de Defesa",
+      "status": "ABERTA",
+      "deadline": "30/09/2026",
+      "pub_date": "06/02/2026",
+      "pub_year": 2026,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/754961",
+      "themes": [
+        "espaço - defesa e segurança"
+      ],
+      "themes_raw": [
+        "Espaço - Defesa e Segurança"
+      ],
+      "publico_alvo": [
+        "Startups",
+        "Cooperativas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 10,
+      "requires_ict_partner": true,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:780",
+      "source": "finep",
+      "title": "Finep Mais Inovação Brasil – Rodada 2 – Semicondutores",
+      "status": "ABERTA",
+      "deadline": "30/09/2026",
+      "pub_date": "12/03/2026",
+      "pub_year": 2026,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/755605",
+      "themes": [],
+      "themes_raw": [],
+      "publico_alvo": [
+        "Startups",
+        "Cooperativas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 9,
+      "requires_ict_partner": true,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:779",
+      "source": "finep",
+      "title": "Finep Mais Inovação Brasil - Rodada 2 – Tecnologias Digitais",
+      "status": "ABERTA",
+      "deadline": "30/09/2026",
+      "pub_date": "12/03/2026",
+      "pub_year": 2026,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/755485",
+      "themes": [
+        "tecnologias digitais e conectividade"
+      ],
+      "themes_raw": [
+        "Tecnologias Digitais e Conectividade"
+      ],
+      "publico_alvo": [
+        "Startups",
+        "Cooperativas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 9,
+      "requires_ict_partner": true,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:774",
+      "source": "finep",
+      "title": "Finep Mais Inovação Brasil – Rodada 2 – Cadeias Agroindustriais Sustentáveis",
+      "status": "ABERTA",
+      "deadline": "30/09/2026",
+      "pub_date": "06/02/2026",
+      "pub_year": 2026,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/754839",
+      "themes": [
+        "agro - bioeconomia e alimentos"
+      ],
+      "themes_raw": [
+        "Agro - Bioeconomia e Alimentos"
+      ],
+      "publico_alvo": [
+        "Startups",
+        "Cooperativas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 10,
+      "requires_ict_partner": true,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:778",
+      "source": "finep",
+      "title": "Finep Mais Inovação Brasil – Rodada 2 – Mobilidade Sustentável",
+      "status": "ABERTA",
+      "deadline": "31/08/2026",
+      "pub_date": "06/03/2026",
+      "pub_year": 2026,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/755376",
+      "themes": [
+        "mobilidade e logística"
+      ],
+      "themes_raw": [
+        "Mobilidade e Logística"
+      ],
+      "publico_alvo": [
+        "Startups",
+        "Cooperativas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 8,
+      "requires_ict_partner": true,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:772",
+      "source": "finep",
+      "title": "Finep Mais Inovação Brasil – Rodada 2 – Transição Energética",
+      "status": "ABERTA",
+      "deadline": "31/08/2026",
+      "pub_date": "06/02/2026",
+      "pub_year": 2026,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/754567",
+      "themes": [
+        "agro - bioeconomia e alimentos"
+      ],
+      "themes_raw": [
+        "Agro - Bioeconomia e Alimentos"
+      ],
+      "publico_alvo": [
+        "Startups",
+        "Cooperativas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 11,
+      "requires_ict_partner": true,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:773",
+      "source": "finep",
+      "title": "Finep Mais Inovação Brasil - Rodada 2 - Saúde / Empresas ",
+      "status": "ABERTA",
+      "deadline": "31/08/2026",
+      "pub_date": "06/02/2026",
+      "pub_year": 2026,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/754704",
+      "themes": [
+        "saúde e ciências da vida"
+      ],
+      "themes_raw": [
+        "Saúde e Ciências da Vida"
+      ],
+      "publico_alvo": [
+        "Startups",
+        "Cooperativas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 10,
+      "requires_ict_partner": true,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:777",
+      "source": "finep",
+      "title": "Finep Mais Inovação Brasil – Rodada 2 – Economia Circular e Cidades Sustentáveis",
+      "status": "ABERTA",
+      "deadline": "31/08/2026",
+      "pub_date": "13/02/2026",
+      "pub_year": 2026,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/755213",
+      "themes": [
+        "agro - bioeconomia e alimentos"
+      ],
+      "themes_raw": [
+        "Agro - Bioeconomia e Alimentos"
+      ],
+      "publico_alvo": [
+        "Startups",
+        "Cooperativas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 11,
+      "requires_ict_partner": true,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "finep:771",
+      "source": "finep",
+      "title": "Finep Mais Inovação Brasil – Rodada 2 – Transformação Mineral",
+      "status": "ABERTA",
+      "deadline": "31/08/2026",
+      "pub_date": "06/02/2026",
+      "pub_year": 2026,
+      "link": "https://www.finep.gov.br/e/chamada-publica/222684/754473",
+      "themes": [
+        "energia e transição sustentável"
+      ],
+      "themes_raw": [
+        "Energia e Transição Sustentável"
+      ],
+      "publico_alvo": [
+        "Startups",
+        "Cooperativas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 10,
+      "requires_ict_partner": true,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "fapesp:18067",
+      "source": "fapesp",
+      "title": "Chamada de Propostas - Auxílio à Inovação Regular",
+      "status": "ABERTA",
+      "deadline": "15/06/2026",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://fapesp.br/18067",
+      "themes": [],
+      "themes_raw": [],
+      "publico_alvo": [],
+      "fonte_recurso": [
+        "FAPESP"
+      ],
+      "subprogramas": [],
+      "modalidade": "Auxílio à Inovação Regular (AIR)",
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "fapesp:18203",
+      "source": "fapesp",
+      "title": "Chamada de Propostas para o Programa PIPE Jornada Tecnológica Soberania Digital – Fase 1",
+      "status": "ABERTA",
+      "deadline": "24/06/2026",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://fapesp.br/18203",
+      "themes": [],
+      "themes_raw": [],
+      "publico_alvo": [],
+      "fonte_recurso": [
+        "FAPESP"
+      ],
+      "subprogramas": [],
+      "modalidade": "PIPE - Fase 1",
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "verificado"
+    },
+    {
+      "id": "mcti:httpswwwgovbrobrasgovpt-brnoticias2026mais-inovacao-brasil-abre-novo-edital-para",
+      "source": "mcti",
+      "title": "Mais Inovação Brasil abre novo edital para impulsionar tecnologias voltadas à Economia Circular e Cidades Sustentáveis",
+      "status": "ABERTA",
+      "deadline": "31/08/2026",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://www.gov.br/obrasgov/pt-br/noticias/2026/mais-inovacao-brasil-abre-novo-edital-para-impulsionar-tecnologias-voltadas-a-economia-circular-e-cidades-sustentaveis",
+      "themes": [
+        "materiais, química e manufatura avançada",
+        "tecnologias digitais e conectividade"
+      ],
+      "themes_raw": [
+        "materiais, química e manufatura avançada",
+        "tecnologias digitais e conectividade"
+      ],
+      "publico_alvo": [
+        "Empresas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "fortec:httpsfortecorgbrwp-contentuploads202603edital-premio-fortec-2026pdf",
+      "source": "fortec",
+      "title": "Prêmio FORTEC de Inovação 2026",
+      "status": "ABERTA",
+      "deadline": "",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://fortec.org.br/wp-content/uploads/2026/03/Edital-Premio-FORTEC-2026.pdf",
+      "themes": [],
+      "themes_raw": [],
+      "publico_alvo": [
+        "Empresas",
+        "ICTs"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "mcti:httpswwwgovbrmctipt-bracompanhe-o-mctinoticias202604edital-de-r-300-milhoes-apoi",
+      "source": "mcti",
+      "title": "Edital de R$ 300 milhões apoia empresas no desenvolvimento de tecnologias digitais avançadas — Ministério da Ciência, Tecnologia e Inovação",
+      "status": "ABERTA",
+      "deadline": "",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://www.gov.br/mcti/pt-br/acompanhe-o-mcti/noticias/2026/04/edital-de-r-300-milhoes-apoia-empresas-no-desenvolvimento-de-tecnologias-digitais-avancadas",
+      "themes": [
+        "tecnologias digitais e conectividade"
+      ],
+      "themes_raw": [
+        "tecnologias digitais e conectividade"
+      ],
+      "publico_alvo": [
+        "Empresas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "finep:httpscreditoempreendedorcombreditais-de-inovacao20-editais-que-financiam-ideias-",
+      "source": "finep",
+      "title": "Finep Mais Inovação – Cadeias Agroindustriais Sustentáveis",
+      "status": "ABERTA",
+      "deadline": "30/09/2026",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://creditoempreendedor.com.br/editais-de-inovacao/20-editais-que-financiam-ideias-inovadoras-no-brasil-em-2026",
+      "themes": [
+        "agro - bioeconomia e alimentos"
+      ],
+      "themes_raw": [
+        "agro - bioeconomia e alimentos"
+      ],
+      "publico_alvo": [
+        "Empresas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "bndes:httpswwwbndesgovbrwpsvanityurlchamadadeinovacao",
+      "source": "bndes",
+      "title": "Chamadas públicas para contratação de inovação",
+      "status": "ABERTA",
+      "deadline": "",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://www.bndes.gov.br/wps/vanityurl/chamadadeinovacao",
+      "themes": [
+        "tecnologias digitais e conectividade"
+      ],
+      "themes_raw": [
+        "tecnologias digitais e conectividade"
+      ],
+      "publico_alvo": [
+        "Startups"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "prefeitura-do-rio:httpsinovagovenapgovbrquemsomosiniciativas52",
+      "source": "prefeitura-do-rio",
+      "title": "Sandbox.Rio",
+      "status": "ABERTA",
+      "deadline": "",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://inovagov.enap.gov.br/quemsomos/iniciativas/52",
+      "themes": [
+        "tecnologias digitais e conectividade",
+        "mobilidade e logística"
+      ],
+      "themes_raw": [
+        "tecnologias digitais e conectividade",
+        "mobilidade e logística"
+      ],
+      "publico_alvo": [
+        "Empresas",
+        "Startups"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "fapesc:httpssigmaparktecbrescritorio-de-projetos",
+      "source": "fapesc",
+      "title": "Escritório de Projetos e Captação de Recursos - Sigma Park",
+      "status": "ABERTA",
+      "deadline": "",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://sigmapark.tec.br/escritorio-de-projetos",
+      "themes": [],
+      "themes_raw": [],
+      "publico_alvo": [
+        "Empresas"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "finep:httpsabgi-brasilcomfinep-mais-inovacao-lanca-dez-editais-de-subvencao-economica-",
+      "source": "finep",
+      "title": "FINEP Lança 10 Editais de Subvenção Econômica para Inovação",
+      "status": "ABERTA",
+      "deadline": "",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://abgi-brasil.com/finep-mais-inovacao-lanca-dez-editais-de-subvencao-economica-para-empresas-e-icts",
+      "themes": [
+        "tecnologias digitais e conectividade",
+        "agro - bioeconomia e alimentos",
+        "espaço - defesa e segurança",
+        "mobilidade e logística",
+        "saúde e ciências da vida",
+        "energia e transição sustentável"
+      ],
+      "themes_raw": [
+        "tecnologias digitais e conectividade",
+        "agro - bioeconomia e alimentos",
+        "espaço - defesa e segurança",
+        "mobilidade e logística",
+        "saúde e ciências da vida",
+        "energia e transição sustentável"
+      ],
+      "publico_alvo": [
+        "Empresas",
+        "ICTs"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "finep:httpswwwyoutubecomwatchvtz4z6w1kxnk",
+      "source": "finep",
+      "title": "Edital de Subvenção Regional",
+      "status": "ABERTA",
+      "deadline": "",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://www.youtube.com/watch?v=tZ4z6W1kXnk",
+      "themes": [],
+      "themes_raw": [],
+      "publico_alvo": [],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "finep:httpswwwgovbrmdicpt-brassuntosnoticias2026fevereirofinep-abre-inscricoes-para-in",
+      "source": "finep",
+      "title": "Finep abre inscrições para investimento de R$ 150 milhões em economia circular e projetos sustentáveis",
+      "status": "ABERTA",
+      "deadline": "",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://www.gov.br/mdic/pt-br/assuntos/noticias/2026/fevereiro/finep-abre-inscricoes-para-investimento-de-r-150-milhoes-em-economia-circular-e-projetos-sustentaveis",
+      "themes": [
+        "energia e transição sustentável"
+      ],
+      "themes_raw": [
+        "energia e transição sustentável"
+      ],
+      "publico_alvo": [
+        "Empresas",
+        "ICTs"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "claro:httpsbeonclarocombrdesafios",
+      "source": "claro",
+      "title": "Desafios de Inovação Aberta para Startups - beOn Claro",
+      "status": "ABERTA",
+      "deadline": "",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://beon.claro.com.br/desafios",
+      "themes": [
+        "tecnologias digitais e conectividade",
+        "saúde e ciências da vida"
+      ],
+      "themes_raw": [
+        "tecnologias digitais e conectividade",
+        "saúde e ciências da vida"
+      ],
+      "publico_alvo": [
+        "Empresas",
+        "Startups"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "ifood:httpsobservatoriosebraestartupscombroportunidades",
+      "source": "ifood",
+      "title": "FINEP MAIS INOVAÇÃO BRASIL - 2ª RODADA - Transição Energética",
+      "status": "ABERTA",
+      "deadline": "",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://observatorio.sebraestartups.com.br/oportunidades",
+      "themes": [
+        "energia e transição sustentável"
+      ],
+      "themes_raw": [
+        "energia e transição sustentável"
+      ],
+      "publico_alvo": [
+        "Empresas",
+        "ICTs"
+      ],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "fappr:httpswwwfapprprgovbrprogramas-abertos",
+      "source": "fappr",
+      "title": "Centelha III",
+      "status": "ABERTA",
+      "deadline": "",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://www.fappr.pr.gov.br/Programas-Abertos",
+      "themes": [
+        "tecnologias digitais e conectividade"
+      ],
+      "themes_raw": [
+        "tecnologias digitais e conectividade"
+      ],
+      "publico_alvo": [],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    },
+    {
+      "id": "fiocruz:httpsinovafiocruzbr",
+      "source": "fiocruz",
+      "title": "Edital Inova Saúde Digital",
+      "status": "ABERTA",
+      "deadline": "",
+      "pub_date": "",
+      "pub_year": "desconhecido",
+      "link": "https://inova.fiocruz.br",
+      "themes": [
+        "saúde e ciências da vida",
+        "tecnologias digitais e conectividade"
+      ],
+      "themes_raw": [
+        "saúde e ciências da vida",
+        "tecnologias digitais e conectividade"
+      ],
+      "publico_alvo": [],
+      "fonte_recurso": [],
+      "subprogramas": [],
+      "n_pdfs": 0,
+      "requires_ict_partner": false,
+      "verificacao": "provisorio"
+    }
+  ],
+  "themes_index": {
+    "agro - bioeconomia e alimentos": [
+      "finep:769",
+      "finep:613",
+      "finep:612",
+      "finep:782",
+      "finep:774",
+      "finep:772",
+      "finep:777",
+      "finep:httpscreditoempreendedorcombreditais-de-inovacao20-editais-que-financiam-ideias-",
+      "finep:httpsabgi-brasilcomfinep-mais-inovacao-lanca-dez-editais-de-subvencao-economica-"
+    ],
+    "espaço - defesa e segurança": [
+      "finep:775",
+      "finep:httpsabgi-brasilcomfinep-mais-inovacao-lanca-dez-editais-de-subvencao-economica-"
+    ],
+    "tecnologias digitais e conectividade": [
+      "finep:779",
+      "mcti:httpswwwgovbrobrasgovpt-brnoticias2026mais-inovacao-brasil-abre-novo-edital-para",
+      "mcti:httpswwwgovbrmctipt-bracompanhe-o-mctinoticias202604edital-de-r-300-milhoes-apoi",
+      "bndes:httpswwwbndesgovbrwpsvanityurlchamadadeinovacao",
+      "prefeitura-do-rio:httpsinovagovenapgovbrquemsomosiniciativas52",
+      "finep:httpsabgi-brasilcomfinep-mais-inovacao-lanca-dez-editais-de-subvencao-economica-",
+      "claro:httpsbeonclarocombrdesafios",
+      "fappr:httpswwwfapprprgovbrprogramas-abertos",
+      "fiocruz:httpsinovafiocruzbr"
+    ],
+    "mobilidade e logística": [
+      "finep:778",
+      "prefeitura-do-rio:httpsinovagovenapgovbrquemsomosiniciativas52",
+      "finep:httpsabgi-brasilcomfinep-mais-inovacao-lanca-dez-editais-de-subvencao-economica-"
+    ],
+    "saúde e ciências da vida": [
+      "finep:773",
+      "finep:httpsabgi-brasilcomfinep-mais-inovacao-lanca-dez-editais-de-subvencao-economica-",
+      "claro:httpsbeonclarocombrdesafios",
+      "fiocruz:httpsinovafiocruzbr"
+    ],
+    "energia e transição sustentável": [
+      "finep:771",
+      "finep:httpsabgi-brasilcomfinep-mais-inovacao-lanca-dez-editais-de-subvencao-economica-",
+      "finep:httpswwwgovbrmdicpt-brassuntosnoticias2026fevereirofinep-abre-inscricoes-para-in",
+      "ifood:httpsobservatoriosebraestartupscombroportunidades"
+    ],
+    "materiais, química e manufatura avançada": [
+      "mcti:httpswwwgovbrobrasgovpt-brnoticias2026mais-inovacao-brasil-abre-novo-edital-para"
+    ]
+  },
+  "publico_index": {
+    "Cooperativas": [
+      "finep:769",
+      "finep:775",
+      "finep:780",
+      "finep:779",
+      "finep:774",
+      "finep:778",
+      "finep:772",
+      "finep:773",
+      "finep:777",
+      "finep:771"
+    ],
+    "Startups": [
+      "finep:782",
+      "finep:775",
+      "finep:780",
+      "finep:779",
+      "finep:774",
+      "finep:778",
+      "finep:772",
+      "finep:773",
+      "finep:777",
+      "finep:771",
+      "bndes:httpswwwbndesgovbrwpsvanityurlchamadadeinovacao",
+      "prefeitura-do-rio:httpsinovagovenapgovbrquemsomosiniciativas52",
+      "claro:httpsbeonclarocombrdesafios"
+    ],
+    "ICTs": [
+      "finep:782",
+      "fortec:httpsfortecorgbrwp-contentuploads202603edital-premio-fortec-2026pdf",
+      "finep:httpsabgi-brasilcomfinep-mais-inovacao-lanca-dez-editais-de-subvencao-economica-",
+      "finep:httpswwwgovbrmdicpt-brassuntosnoticias2026fevereirofinep-abre-inscricoes-para-in",
+      "ifood:httpsobservatoriosebraestartupscombroportunidades"
+    ],
+    "Empresas": [
+      "mcti:httpswwwgovbrobrasgovpt-brnoticias2026mais-inovacao-brasil-abre-novo-edital-para",
+      "fortec:httpsfortecorgbrwp-contentuploads202603edital-premio-fortec-2026pdf",
+      "mcti:httpswwwgovbrmctipt-bracompanhe-o-mctinoticias202604edital-de-r-300-milhoes-apoi",
+      "finep:httpscreditoempreendedorcombreditais-de-inovacao20-editais-que-financiam-ideias-",
+      "prefeitura-do-rio:httpsinovagovenapgovbrquemsomosiniciativas52",
+      "fapesc:httpssigmaparktecbrescritorio-de-projetos",
+      "finep:httpsabgi-brasilcomfinep-mais-inovacao-lanca-dez-editais-de-subvencao-economica-",
+      "finep:httpswwwgovbrmdicpt-brassuntosnoticias2026fevereirofinep-abre-inscricoes-para-in",
+      "claro:httpsbeonclarocombrdesafios",
+      "ifood:httpsobservatoriosebraestartupscombroportunidades"
+    ]
+  },
+  "fonte_index": {
+    "FAPESP": [
+      "fapesp:18067",
+      "fapesp:18203"
+    ]
+  },
+  "subprograma_index": {},
+  "ano_index": {
+    "2025": [
+      "finep:769",
+      "finep:760",
+      "finep:762",
+      "finep:757"
+    ],
+    "2024": [
+      "finep:734",
+      "finep:743"
+    ],
+    "2017": [
+      "finep:613",
+      "finep:612"
+    ],
+    "2026": [
+      "finep:782",
+      "finep:775",
+      "finep:780",
+      "finep:779",
+      "finep:774",
+      "finep:778",
+      "finep:772",
+      "finep:773",
+      "finep:777",
+      "finep:771"
+    ],
+    "desconhecido": [
+      "fapesp:18067",
+      "fapesp:18203",
+      "mcti:httpswwwgovbrobrasgovpt-brnoticias2026mais-inovacao-brasil-abre-novo-edital-para",
+      "fortec:httpsfortecorgbrwp-contentuploads202603edital-premio-fortec-2026pdf",
+      "mcti:httpswwwgovbrmctipt-bracompanhe-o-mctinoticias202604edital-de-r-300-milhoes-apoi",
+      "finep:httpscreditoempreendedorcombreditais-de-inovacao20-editais-que-financiam-ideias-",
+      "bndes:httpswwwbndesgovbrwpsvanityurlchamadadeinovacao",
+      "prefeitura-do-rio:httpsinovagovenapgovbrquemsomosiniciativas52",
+      "fapesc:httpssigmaparktecbrescritorio-de-projetos",
+      "finep:httpsabgi-brasilcomfinep-mais-inovacao-lanca-dez-editais-de-subvencao-economica-",
+      "finep:httpswwwyoutubecomwatchvtz4z6w1kxnk",
+      "finep:httpswwwgovbrmdicpt-brassuntosnoticias2026fevereirofinep-abre-inscricoes-para-in",
+      "claro:httpsbeonclarocombrdesafios",
+      "ifood:httpsobservatoriosebraestartupscombroportunidades",
+      "fappr:httpswwwfapprprgovbrprogramas-abertos",
+      "fiocruz:httpsinovafiocruzbr"
+    ]
+  }
+}

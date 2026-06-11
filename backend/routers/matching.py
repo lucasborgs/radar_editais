@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from backend.common import CompanyProfileSchema, to_py_profile, wiki_matcher
 from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient
-from core.content_library import get_workspace_id
+from core.services.content_library import get_workspace_id
 
 router = APIRouter(tags=["matching"])
 
@@ -22,7 +22,7 @@ class RadarRequest(BaseModel):
     profile: CompanyProfileSchema
     top_k: int = 10
     # Cap por quadrante (anti-inundação): máx. de itens por opportunity_type no
-    # ranking. None = sem cap. Ver core.radar_service.
+    # ranking. None = sem cap. Ver core.services.radar_service.
     per_type_cap: int | None = None
 
 
@@ -59,7 +59,7 @@ def match_investidores_endpoint(
     especialistas casam por TESE/tema/setor; generalistas por ESTÁGIO. SEM gate —
     entidade não elimina (spec_multi_quadrante §3.8). Caminho isolado: não toca o
     matcher de edital."""
-    from core.investor_match import match_investidores
+    from core.services.investor_match import match_investidores
     profile = to_py_profile(req.profile)
     return {"matches": match_investidores(profile, top_k=req.top_k)}
 
@@ -78,7 +78,7 @@ def match_radar(request: Request, req: RadarRequest, user_id: CurrentUserId, db:
             detail="Perfil incompleto. Preencha pelo menos nome e descricao_atividades.",
         )
     workspace_id = get_workspace_id(db, user_id)
-    from core.radar_service import build_radar
+    from core.services.radar_service import build_radar
     return build_radar(
         profile, top_k=req.top_k, per_type_cap=req.per_type_cap, workspace_id=workspace_id,
     )

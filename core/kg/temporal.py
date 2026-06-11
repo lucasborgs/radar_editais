@@ -24,9 +24,9 @@ import logging
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from core import kg_store
-from core.edital_id import wiki_page_path
-from core.wiki_schema import parse_deadline
+from core.kg import kg_store
+from core.kg.edital_id import wiki_page_path
+from core.kg.wiki_schema import parse_deadline
 
 logger = logging.getLogger(__name__)
 
