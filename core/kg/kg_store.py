@@ -45,6 +45,11 @@ _FILES: dict[str, str] = {
     "index_historico": "index_historico.json",
     "icts": "icts.json",
     "investidores": "investidores.json",
+    # Estado operacional do pipeline (não-artefato do grafo, mas mesmo seam):
+    # em prod o FS do worker é EFÊMERO — sem durabilidade aqui, cada redeploy
+    # re-sintetiza toda wiki (rate limit) e a Descoberta re-tria URLs já vistas.
+    "etl_process_cache": "wiki/.etl_process_cache.json",
+    "discovery_ledger": ".discovery_ledger.json",
 }
 
 _TABLE = "kg_artifacts"

@@ -288,6 +288,35 @@ def test_page_text_skips_fetch_for_full_text_hits(monkeypatch):
     assert od._page_text(hit) == "texto completo do dou"
 
 
+def test_ledger_via_kg_store_roundtrip(tmp_path, monkeypatch):
+    """Ledger vive no kg_store (durável em PG no worker de prod, cujo FS é
+    efêmero); modo file persiste em data/knowledge_graph/.discovery_ledger.json."""
+    from core.kg import kg_store
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+    monkeypatch.setattr(kg_store, "KNOWLEDGE_GRAPH_DIR", tmp_path)
+    monkeypatch.setattr(od, "_LEGACY_LEDGER", tmp_path / "nao-existe.json")
+    od._save_ledger({"http://x.org/a", "http://x.org/b"})
+    assert od._load_ledger() == {"http://x.org/a", "http://x.org/b"}
+    assert (tmp_path / ".discovery_ledger.json").exists()
+
+
+def test_ledger_merges_legacy_file(tmp_path, monkeypatch):
+    """Migração: ledger file-based legado (bronze/discovery_raw) entra por
+    UNIÃO no load — absorvido no próximo save."""
+    import json as _json
+
+    from core.kg import kg_store
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+    monkeypatch.setattr(kg_store, "KNOWLEDGE_GRAPH_DIR", tmp_path)
+    legacy = tmp_path / ".ledger.json"
+    legacy.write_text(_json.dumps(["http://velho.org/1"]), encoding="utf-8")
+    monkeypatch.setattr(od, "_LEGACY_LEDGER", legacy)
+    od._save_ledger({"http://novo.org/2"})
+    assert od._load_ledger() == {"http://velho.org/1", "http://novo.org/2"}
+
+
 def test_discover_no_credential_returns_empty(monkeypatch):
     monkeypatch.setattr(od.websearch, "web_search", lambda q, k=8:
                         [SearchHit("A", "http://x.org/a", "s", "c")])

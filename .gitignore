@@ -68,3 +68,4 @@ eval_matching_results.json
 supabase/.branches/
 supabase/.temp/
 *.bak
+data/knowledge_graph/.discovery_ledger.json
