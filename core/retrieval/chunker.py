@@ -8,8 +8,12 @@ por chunk, 150-token overlap, 80 min, 1500 max.
 Função pura: recebe blocos, retorna lista de dicts. Sem I/O, sem PDF, sem
 conhecimento de fonte. A discoverya/extração vive em `pipeline/adapters/<source>.py`.
 
-Token counting é aproximação (palavras × 1.3) — suficiente pro budget de
-tamanho; não é feedado ao provider LLM.
+Token counting: tiktoken (cl100k_base — o tokenizer do text-embedding-3-large,
+cujo budget de 8192 é o que o chunk não pode estourar). A heurística antiga
+(palavras × 1.3) subestimava brutalmente tabelas Markdown (muitos pipes/traços,
+poucas "palavras") — um chunk de tabela podia passar 2-3× do budget real,
+diluindo a representação. Fallback para a heurística se o tiktoken estiver
+ausente ou sem rede pra baixar o BPE (primeiro uso) — nunca quebra o ingest.
 """
 from __future__ import annotations
 
@@ -69,8 +73,27 @@ def _detect_metadata(text: str) -> dict:
         "contem_criterios": bool(_META_CRIT_RE.search(text)),
     }
 
-# Word-to-token ratio for Portuguese (approximate).
+# Word-to-token ratio for Portuguese (approximate) — caminho de FALLBACK
+# quando o tiktoken está indisponível.
 _WORD_TO_TOKEN = 1.3
+
+# Encoder tiktoken cacheado por processo. None + _ENCODER_FAILED=True significa
+# "tentamos e falhou" (dep ausente, sem rede pro download do BPE) — não retenta
+# a cada chamada.
+_ENCODER = None
+_ENCODER_FAILED = False
+
+
+def _get_encoder():
+    global _ENCODER, _ENCODER_FAILED
+    if _ENCODER is not None or _ENCODER_FAILED:
+        return _ENCODER
+    try:
+        import tiktoken
+        _ENCODER = tiktoken.get_encoding("cl100k_base")
+    except Exception:  # noqa: BLE001 — ImportError ou falha de rede no fetch do BPE
+        _ENCODER_FAILED = True
+    return _ENCODER
 
 
 # =============================================================================
@@ -78,9 +101,12 @@ _WORD_TO_TOKEN = 1.3
 # =============================================================================
 
 def _approx_tokens(text: str) -> int:
-    """Approximate token count via whitespace word split * 1.3."""
+    """Token count exato (tiktoken cl100k_base) com fallback heurístico."""
     if not text:
         return 0
+    enc = _get_encoder()
+    if enc is not None:
+        return len(enc.encode(text))
     return int(len(text.split()) * _WORD_TO_TOKEN)
 
 
@@ -121,7 +147,10 @@ def _split_oversize(text: str, max_tokens: int = MAX_TOKENS) -> list[str]:
 def _tail_overlap(text: str, n_tokens: int = OVERLAP_TOKENS) -> str:
     """Return the trailing ~n_tokens of `text` to use as prefix overlap.
 
-    Token-counted, but split on word boundaries — never mid-word.
+    Token-counted, but split on word boundaries — never mid-word. A estimativa
+    inicial é a heurística inversa (palavras); quando o tiktoken está
+    disponível, encolhe a cauda se a contagem exata estourar o budget (caso
+    típico: cauda de tabela, onde 1 "palavra" ≫ 1.3 tokens).
     """
     if n_tokens <= 0 or not text:
         return ""
@@ -130,7 +159,13 @@ def _tail_overlap(text: str, n_tokens: int = OVERLAP_TOKENS) -> str:
         return ""
     # Convert n_tokens back to a word count using the inverse heuristic.
     n_words = max(1, int(n_tokens / _WORD_TO_TOKEN))
-    return " ".join(words[-n_words:])
+    tail = " ".join(words[-n_words:])
+    enc = _get_encoder()
+    if enc is not None:
+        while n_words > 1 and len(enc.encode(tail)) > n_tokens:
+            n_words = max(1, n_words // 2)
+            tail = " ".join(words[-n_words:])
+    return tail
 
 
 # =============================================================================
