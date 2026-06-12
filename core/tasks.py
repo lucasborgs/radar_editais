@@ -253,13 +253,22 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
     return chunks
 
 
-def _existing_content_hash(db, edital_id: str) -> str | None:
-    """Lê o content_hash gravado no chunk_index=0 da última indexação.
+def _index_is_current(db, edital_id: str, content_hash: str, n_chunks: int) -> bool:
+    """Gate de re-indexação: True se o índice existente está COMPLETO e com o
+    mesmo conteúdo (pula o re-embed — corta custo OpenAI, requisito 3).
 
-    Serve de gate: se o hash do conteúdo recém-gerado bate com este, o edital
-    não mudou desde a última run e pulamos o re-embed (corta custo OpenAI —
-    requisito 3 / decisão 'gate por hash do doc canônico'). None = nunca
-    indexado (ou linha sem o campo, ex.: indexação anterior à introdução do gate).
+    Duas condições, ambas necessárias:
+      1. O `content_hash` do marcador (metadata do chunk_index=0, gravado SÓ
+         após o último batch — ver chunk_edital_task) bate com o hash do
+         conteúdo recém-gerado.
+      2. `count(*)` das rows do edital == `n_chunks` esperado. Como o hash é
+         md5 dos próprios textos, hash igual ⇒ mesma lista de chunks ⇒ o count
+         atual serve de expectativa. Pega indexação parcial (run antiga que
+         morreu no meio dos batches, deleção manual) — inclusive as legadas,
+         anteriores ao marcador-no-fim.
+
+    False = reindexar (nunca indexado, conteúdo mudou, ou índice incompleto).
+    Qualquer erro de lookup também retorna False — na dúvida, reindexa.
     """
     try:
         res = (
@@ -271,11 +280,20 @@ def _existing_content_hash(db, edital_id: str) -> str | None:
             .execute()
         )
         row = res.data if res else None
-        if row and isinstance(row.get("metadata"), dict):
-            return row["metadata"].get("content_hash")
+        if not (row and isinstance(row.get("metadata"), dict)):
+            return False
+        if row["metadata"].get("content_hash") != content_hash:
+            return False
+        cnt = (
+            db.table("edital_chunks")
+            .select("id", count="exact")
+            .eq("edital_id", edital_id)
+            .execute()
+        )
+        return (getattr(cnt, "count", None) or 0) == n_chunks
     except Exception as e:
-        logger.debug("chunk_edital_task: lookup de content_hash falhou p/ %s: %s", edital_id, e)
-    return None
+        logger.debug("chunk_edital_task: lookup do gate falhou p/ %s: %s", edital_id, e)
+        return False
 
 
 @app.task(name="chunk_edital", queue="default")
@@ -285,9 +303,12 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
     Idempotent: deletes any existing rows for this edital_id before inserting
     the fresh batch. Re-runnable without manual cleanup.
 
-    Gate de conteúdo (requisito 3): grava um `content_hash` (md5 dos textos dos
-    chunks) no metadata do chunk_index=0. Em re-runs, se o hash bater com o
-    indexado, pula o re-embed — só editais cujo conteúdo mudou pagam OpenAI.
+    Gate de conteúdo (requisito 3): após o ÚLTIMO batch inserido, grava um
+    marcador `{content_hash, n_chunks}` no metadata do chunk_index=0. Em
+    re-runs, se o hash bater E o count(*) estiver íntegro, pula o re-embed —
+    só editais cujo conteúdo mudou pagam OpenAI. O marcador vem por último de
+    propósito: uma run que morre no meio dos inserts deixa o índice SEM
+    marcador → a próxima run reindexa em vez de aceitar o parcial como pronto.
     `force=True` ignora o gate (caminho manual `reindex_edital.py --force`).
 
     Error handling:
@@ -312,13 +333,15 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
 
     texts = [c["text"] for c in chunks]
 
-    # Gate: se o conteúdo não mudou desde a última indexação, não re-embeda.
+    # Gate: se o conteúdo não mudou E o índice está completo, não re-embeda.
     content_hash = hashlib.md5("\x00".join(texts).encode("utf-8", "ignore")).hexdigest()
     if not force:
-        existing = await asyncio.to_thread(_existing_content_hash, db, edital_id)
-        if existing == content_hash:
+        current = await asyncio.to_thread(
+            _index_is_current, db, edital_id, content_hash, len(chunks)
+        )
+        if current:
             logger.info(
-                "chunk_edital_task: edital=%s inalterado (hash=%s) — skip re-embed",
+                "chunk_edital_task: edital=%s inalterado e íntegro (hash=%s) — skip re-embed",
                 edital_id, content_hash[:8],
             )
             return
@@ -349,8 +372,9 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
             "source_file": c.get("source_file"),
             "page_range": c.get("page_range"),
             "embedding": emb,
-            # content_hash em todos os chunks (lido do index 0 pelo gate).
-            "metadata": {**(c.get("metadata") or {}), "content_hash": content_hash},
+            # SEM content_hash aqui — o marcador de conclusão é gravado no
+            # chunk 0 só depois do último batch (ver abaixo).
+            "metadata": c.get("metadata") or {},
         }
         for c, emb in zip(chunks, embeddings, strict=True)
     ]
@@ -380,6 +404,22 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
                 "tentando psycopg direto.", e,
             )
             await asyncio.to_thread(_insert_chunks_psycopg, page)
+
+    # 3. Marcador de conclusão — POR ÚLTIMO. Só existe se todos os batches
+    #    entraram; uma run que morreu no meio deixa o índice sem marcador e a
+    #    próxima run reindexa (gate `_index_is_current` retorna False).
+    marker_meta = {
+        **(chunks[0].get("metadata") or {}),
+        "content_hash": content_hash,
+        "n_chunks": len(rows),
+    }
+    await asyncio.to_thread(
+        lambda: db.table("edital_chunks")
+        .update({"metadata": marker_meta})
+        .eq("edital_id", edital_id)
+        .eq("chunk_index", 0)
+        .execute()
+    )
 
     logger.info(
         "chunk_edital_task: edital=%s indexado com %d chunks (text-embedding-3-large)",
