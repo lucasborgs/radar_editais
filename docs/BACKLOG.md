@@ -11,6 +11,22 @@
 
 ## Aberto
 
+### Re-tagger LLM de temas por item (fonte-agnóstico)
+
+- **O quê:** hoje o tema FINEP vem da taxonomia da própria fonte (que erra —
+  fix de 2026-06-11) e o da web vem da extração da Descoberta; um passo de
+  síntese que LÊ o texto do edital e ESCOLHE do `tema_vocab` (como a web já
+  faz) uniformizaria o tagging para todas as fontes, inclusive futuras.
+- **Por que adiado:** o fix da união tema∪taxonomia resolveu o caso conhecido;
+  re-tagger é melhoria estrutural sem dor ativa. Complementa o vocab lint
+  (`core/vocab_lint.py`): lint evolui o vocabulário, re-tagger aplica-o
+  uniformemente.
+- **Gate:** eval `matching` + `opportunity_type` (mexe na dimensão temática do
+  HybridMatch).
+- **Ponto de entrada:** pipeline/etl_process.py (síntese já lê o texto; é onde
+  o re-tag custaria zero chamada extra) ou pipeline/build_knowledge_graph.py.
+- **Status:** aberto (2026-06-12).
+
 ### Front-door 1a — restos do M5 (pós-PR #14)
 
 - **O quê:** (a) streaming SSE no `/frontdoor/turn` (delta B4 da spec — hoje há
