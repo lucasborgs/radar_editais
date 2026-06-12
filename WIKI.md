@@ -292,6 +292,16 @@ sem cobertura ("Meio Ambiente - Água e Clima", "Cidades…", "Educação…") �
 filtro de vocabulário do build os descarta por design; entram no vocab apenas
 com evidência de cobertura (regra acima).
 
+**Evolução do vocabulário (vocab lint):** `python -m core.vocab_lint` coleta o
+sinal de demanda (variações fora do vocab no índice + `tema_livre` da Descoberta
+web + oportunidades sem-tema), pede UMA proposta à LLM (tier barato) e grava um
+relatório em `data/vocab_lint/` com diff pronto-pra-colar. O lint NUNCA aplica
+nada — ele PROPÕE; o humano aplica AQUI (o doc é o dono) e em `_SYNONYMS` se for
+o caso ("AI drafts, humans decide"). Barra conservadora: tema novo só com **≥3
+evidências independentes**; sinônimo só com equivalência semântica clara a um
+tema existente. Aplicação fica gated por `test_wiki_schema_consistency` + evals
+de não-regressão (`core.eval matching`, `opportunity_type`).
+
 ### 5.9.1 Vocabulários do multi-quadrante
 
 `setor` (vertical de indústria) é DISTINTO de `tema` (domínio tecnológico) — para
