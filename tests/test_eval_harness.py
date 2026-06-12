@@ -117,6 +117,7 @@ def test_suites_registered():
     assert set(SUITES) == {
         "matching", "rag", "writing", "extraction",
         "investor_match", "opportunity_type", "triage",
+        "profile_extractor", "reranker", "structurer", "compliance_monitor",
     }
 
 
