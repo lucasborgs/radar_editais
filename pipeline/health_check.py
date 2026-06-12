@@ -6,6 +6,10 @@ Health Check — Knowledge Base FINEP.
   2. staleness         — wiki page gerada há mais de 30 dias (pode estar desatualizada)
   3. new_pdfs          — PDFs em disco não refletidos no cache (retificação pendente)
 
+1 check por fonte (roda também no cron run_daily_etl — fonte quebrada não
+fica acumulando silêncio):
+  4. sources_freshness — bronze mais recente da fonte mais velho que N dias
+
 Uso:
     python pipeline/health_check.py
     python pipeline/health_check.py --edital 782
@@ -34,6 +38,11 @@ INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
 LOG_FILE   = KNOWLEDGE_GRAPH_DIR / "health_check_log.jsonl"
 
 STALENESS_DAYS = 30
+
+# Fonte parada: o cron de ETL roda diário, então bronze sem arquivo novo há
+# mais que isto indica scraper quebrado/cron morto. 3 dias tolera um incidente
+# de fim de semana sem alertar à toa.
+SOURCE_FRESHNESS_MAX_DAYS = 3
 
 REQUIRED_WIKI_PAGE_FIELDS = ["objective", "mechanism", "eligible_entities", "eligible_sectors"]
 
@@ -139,6 +148,52 @@ def check_new_pdfs(edital_id: str) -> dict:
 
 
 # =============================================================================
+# CHECK POR FONTE
+# =============================================================================
+
+def check_sources_freshness(
+    max_age_days: float = SOURCE_FRESHNESS_MAX_DAYS,
+    registry: dict | None = None,
+) -> list[dict]:
+    """Fonte parada: arquivo mais recente do bronze da fonte com idade > N dias.
+
+    Sinal = mtime do arquivo mais novo em BRONZE_DIR/<bronze_dir> de cada fonte
+    do SCRAPER_REGISTRY. Bronze é gitignored, então mtime reflete escrita real
+    do scraper (não checkout/deploy). Statuses:
+      • OK        — bronze fresco
+      • STALE     — fonte produzia e parou (scraper quebrado / cron morto) → alertar
+      • NO_BRONZE — fonte nunca produziu nesta máquina (ex.: web inerte) — estado
+                    de configuração, não regressão; NÃO alerta.
+
+    Puro leitura de filesystem — sem rede, sem DB. `registry` injetável p/ teste.
+    """
+    import time as _time
+
+    from config import BRONZE_DIR
+    if registry is None:
+        from pipeline.extractors import SCRAPER_REGISTRY
+        registry = SCRAPER_REGISTRY
+
+    now = _time.time()
+    results: list[dict] = []
+    for source_key, cfg in registry.items():
+        bronze = BRONZE_DIR / cfg["bronze_dir"]
+        files = [p for p in bronze.glob("*") if p.is_file()] if bronze.exists() else []
+        if not files:
+            results.append({"check": "sources_freshness", "source": source_key,
+                            "status": "NO_BRONZE", "age_days": None})
+            continue
+        age_days = (now - max(p.stat().st_mtime for p in files)) / 86400.0
+        results.append({
+            "check": "sources_freshness",
+            "source": source_key,
+            "status": "OK" if age_days <= max_age_days else "STALE",
+            "age_days": round(age_days, 1),
+        })
+    return results
+
+
+# =============================================================================
 # ORQUESTRADOR
 # =============================================================================
 
@@ -150,6 +205,14 @@ def run_health_check(
     print("=" * 60)
     print("HEALTH CHECK — Knowledge Base FINEP")
     print("=" * 60)
+
+    # Check por fonte (barato, sempre roda): fonte parada aparece antes do
+    # detalhe por edital.
+    print("\nFONTES:")
+    for r in check_sources_freshness():
+        age = f"{r['age_days']}d" if r["age_days"] is not None else "—"
+        print(f"  [{r['source']}] {r['status']} (bronze mais recente: {age})")
+    print()
 
     checks = checks or ALL_CHECKS
 

@@ -612,6 +612,21 @@ async def run_daily_etl_task(timestamp: int) -> None:
     except Exception as e:
         logger.error("run_daily_etl_task: falha ao regenerar grafo Obsidian: %s", e)
 
+    # 4) Alerta de fonte parada: bronze de alguma fonte registrada sem arquivo
+    #    novo há mais que o threshold (scraper quebrado retornando vazio, cron
+    #    capenga). O try/except por fonte acima captura exceções, mas um scraper
+    #    que "funciona" e não grava nada escaparia — este check pega pelo efeito.
+    try:
+        from pipeline.health_check import check_sources_freshness  # noqa: PLC0415
+        for r in await asyncio.to_thread(check_sources_freshness):
+            if r["status"] == "STALE":
+                logger.error(
+                    "run_daily_etl_task: fonte %s estagnada — bronze mais "
+                    "recente tem %.1f dias", r["source"], r["age_days"],
+                )
+    except Exception as e:
+        logger.warning("run_daily_etl_task: check de frescor das fontes falhou: %s", e)
+
     logger.info("run_daily_etl_task: concluído (total=%d novos)", total_new)
 
 
