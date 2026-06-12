@@ -11,6 +11,60 @@
 
 ## Aberto
 
+### Golden RAG expandido — 24 → ~80 queries (item 3 da auditoria 2026-06-12)
+
+- **O quê:** o golden de retrieval (`eval_data/golden/finep.json`, 24 queries
+  sintéticas, 3 editais FINEP) tem piso de ruído de ~1 query — flips por
+  não-determinismo de embedding (caso q14, 2026-06-12) e ±4pp de erro em
+  hit@5. Expandir para ~80, estratificado por intent (prazo/valor/
+  elegibilidade/critérios/objetivo) e por fonte (FINEP+FAPESP+web), com
+  queries reais mineradas dos spans de `search_edital` no Langfuse (todo
+  turno de escrita real deposita queries autênticas — a matéria-prima
+  acumula sozinha enquanto este item espera).
+- **Por que adiado:** golden grande sem decisão pendente é capacidade
+  esperando pergunta — reranker fechou, bake-off de embeddings foi
+  desaconselhado, metadata boost era de baixo risco. Fundação do aparato de
+  decisão, não do produto.
+- **Gatilho para retomar:** próxima decisão de retrieval com stakes reais
+  (trocar modelo de embedding, mexer em chunking, tunar fts_weight/boosts)
+  OU eval bloqueando um merge por inconclusivo.
+- **Decisões de spec (esboço):** (a) mix real-minerado + sintético
+  estratificado; (b) anti-contaminação: sintéticas NÃO geradas a partir do
+  chunk-alvo (superestimam recall); (c) rotulagem: LLM propõe gold_text,
+  humano valida (padrão vocab lint); (d) guard de drift: prereq da suíte
+  avisa se edital do golden não tem chunks no DB (caso finep:768,
+  2026-06-12, que contaminou um baseline com 8/24 nulls).
+- **Ponto de entrada:** scripts/generate_golden.py + core/eval/rag.py
+  (`_prereqs`); queries reais via Langfuse (spans tool_call de search_edital).
+- **Status:** aberto (2026-06-12).
+
+### Validação determinística de citações pós-draft (item 5 da auditoria 2026-06-12)
+
+- **O quê:** o anti-alucinação da escrita é todo prompt-side
+  (WRITER_AGENT_SYSTEM: "não cite anexo/artigo que você não viu no trecho").
+  Check determinístico barato: regex extrai referências estruturais do draft
+  ("Anexo N", "item X.Y", "Art. N") e valida contra os chunks do edital;
+  referência sem lastro vira sinalização ao usuário — nunca auto-correção
+  nem bloqueio (filosofia "AI drafts, humans decide").
+- **Por que adiado:** o risco atual está coberto por 3 camadas (prompt forte
+  + ChecklistService on-demand + revisão humana de todo draft). No beta, o
+  check pegaria fabricações que ninguém está produzindo em escala — valor
+  escala com volume de uso.
+- **Gatilho para retomar:** primeiro caso real de citação fabricada
+  reportado por usuário, OU volume de drafts a ponto de a revisão humana
+  virar gargalo.
+- **Decisões de spec (esboço):** (a) onde roda: 4º pass determinístico do
+  ChecklistService (on-demand) é o caminho de menor atrito; validar a cada
+  save_draft é a versão cara; (b) escopo inicial: só referências
+  estruturais — valores R$ e datas têm falso-positivo alto, ficam para v2;
+  (c) validar contra TODOS os chunks do edital no DB (o agente pode ter
+  visto o trecho em turno anterior), não só os do turno corrente; (d) UX:
+  badge/aviso por trecho suspeito, decisão fica com o humano.
+- **Ponto de entrada:** core/services/checklist_service.py (3 passes
+  paralelos via asyncio.gather — o 4º é determinístico e entra de graça);
+  chunks via edital_chunks (query direta, sem embedding).
+- **Status:** aberto (2026-06-12).
+
 ### Rerank cross-encoder em prod (estágio 2 do item 6 da auditoria)
 
 - **O quê:** ligar o reranker cross-encoder (mMiniLM) no Railway. Hoje prod
