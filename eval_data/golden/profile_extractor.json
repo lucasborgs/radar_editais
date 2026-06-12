@@ -1,0 +1,201 @@
+[
+  {
+    "case_id": "profile-001",
+    "input": {
+      "text": "A AgroSense é uma startup de agtech fundada em 2021, sediada em Ribeirão Preto (SP). Desenvolvemos sensores IoT de baixo custo para monitoramento de solo e microclima em lavouras de cana-de-açúcar e soja. Nosso produto é um protótipo funcional com dois pilotos ativos em fazendas parceiras no interior paulista. Buscamos subvenção não-reembolsável para avançar o desenvolvimento do hardware e validar em escala comercial."
+    },
+    "expected_output": {
+      "tipo_entidade": "startup",
+      "trl": 5,
+      "uf": "SP",
+      "ano_fundacao": 2021,
+      "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel"]
+    }
+  },
+  {
+    "case_id": "profile-002",
+    "input": {
+      "text": "NeuralMed é uma startup de healthtech em estágio seed, com sede em Belo Horizonte (MG), fundada em 2019. Desenvolvemos um sistema de auxílio diagnóstico por imagem baseado em deep learning para detecção precoce de nódulos pulmonares em tomografias. O produto passou por validação clínica em três hospitais e já tem CE Mark em processo. Temos interesse em crédito reembolsável para ampliar o time de vendas e em pesquisa colaborativa com universidades."
+    },
+    "expected_output": {
+      "tipo_entidade": "startup",
+      "estagio": "seed",
+      "trl": 7,
+      "uf": "MG",
+      "ano_fundacao": 2019,
+      "tipos_financiamento_interesse": ["credito_reembolsavel", "pesquisa_colaborativa"]
+    }
+  },
+  {
+    "case_id": "profile-003",
+    "input": {
+      "text": "A FinFlow é uma startup fintech em estágio série-A, fundada em 2017 no Rio de Janeiro (RJ). Oferecemos uma plataforma SaaS de gestão de fluxo de caixa e antecipação de recebíveis para pequenas e médias empresas brasileiras. Contamos com mais de 3.000 clientes ativos e faturamento anual de R$ 8 milhões. Buscamos parceiros de pesquisa colaborativa para desenvolver modelos preditivos de risco de crédito."
+    },
+    "expected_output": {
+      "tipo_entidade": "startup",
+      "estagio": "serie-a",
+      "uf": "RJ",
+      "ano_fundacao": 2017,
+      "faturamento_anual": 8000000,
+      "tipos_financiamento_interesse": ["pesquisa_colaborativa"]
+    }
+  },
+  {
+    "case_id": "profile-004",
+    "input": {
+      "text": "A BioSynth Pesquisa e Desenvolvimento Ltda. é uma startup de biotech em estágio pre-seed, criada em 2023 e localizada em Campinas (SP). Estamos desenvolvendo bioinseticidas à base de fungos entomopatogênicos para o controle biológico de pragas agrícolas. O projeto encontra-se na fase de pesquisa laboratorial e caracterização de cepas, com TRL 2. Nosso objetivo é captar subvenção não-reembolsável para custear ensaios em casa de vegetação."
+    },
+    "expected_output": {
+      "tipo_entidade": "startup",
+      "estagio": "pre-seed",
+      "trl": 2,
+      "uf": "SP",
+      "ano_fundacao": 2023,
+      "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel"]
+    }
+  },
+  {
+    "case_id": "profile-005",
+    "input": {
+      "text": "A CargaTech é uma startup de logística e software B2B em estágio seed, sediada em Curitiba (PR), fundada em 2020. Desenvolvemos um marketplace de fretes com algoritmo de roteirização e precificação dinâmica, integrado a ERPs de embarcadores. Hoje temos TRL 8 — produto em produção com mais de 200 transportadoras cadastradas. Temos interesse exclusivo em crédito reembolsável para financiar a expansão para o Centro-Oeste."
+    },
+    "expected_output": {
+      "tipo_entidade": "startup",
+      "estagio": "seed",
+      "trl": 8,
+      "uf": "PR",
+      "ano_fundacao": 2020,
+      "tipos_financiamento_interesse": ["credito_reembolsavel"]
+    }
+  },
+  {
+    "case_id": "profile-006",
+    "input": {
+      "text": "A Metalúrgica Brafer S.A. é uma empresa de médio porte do setor de manufatura, fundada em 1985 e sediada em Caxias do Sul (RS). Produzimos componentes forjados de alta precisão para os setores automotivo e agrícola, com capacidade instalada de 18.000 toneladas/ano. Contamos com certificações ISO 9001 e IATF 16949. Buscamos matching EMBRAPII para um projeto de automação por robótica colaborativa na linha de acabamento."
+    },
+    "expected_output": {
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "MEDIO",
+      "uf": "RS",
+      "ano_fundacao": 1985,
+      "tipos_financiamento_interesse": ["matching_embrapii"]
+    }
+  },
+  {
+    "case_id": "profile-007",
+    "input": {
+      "text": "A EduSoft Tecnologia Educacional Ltda. é uma empresa de pequeno porte especializada em software B2B para gestão de escolas de educação básica, fundada em 2010 em Florianópolis (SC). Nossa plataforma integra matrículas, frequência, comunicação e financeiro em um único ambiente na nuvem. Atendemos mais de 400 instituições de ensino privadas no Sul e Sudeste do Brasil. Temos interesse em crédito reembolsável para expansão da infraestrutura de dados e em subvenção para pesquisa em IA aplicada à personalização do aprendizado."
+    },
+    "expected_output": {
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "EPP",
+      "uf": "SC",
+      "ano_fundacao": 2010,
+      "tipos_financiamento_interesse": ["credito_reembolsavel", "subvencao_nao_reembolsavel"]
+    }
+  },
+  {
+    "case_id": "profile-008",
+    "input": {
+      "text": "A Solares Energia Ltda. é uma empresa de médio porte de energia renovável, fundada em 2008 e sediada em Fortaleza (CE). Projetamos, instalamos e operamos usinas fotovoltaicas de grande porte para clientes industriais e do agronegócio em todo o Nordeste. Temos capacidade instalada sob gestão superior a 90 MWp e equipe de 230 colaboradores. Buscamos crédito reembolsável para financiar o pipeline de projetos dos próximos 24 meses."
+    },
+    "expected_output": {
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "MEDIO",
+      "uf": "CE",
+      "ano_fundacao": 2008,
+      "tipos_financiamento_interesse": ["credito_reembolsavel"]
+    }
+  },
+  {
+    "case_id": "profile-009",
+    "input": {
+      "text": "A DataBridge Consultoria e Sistemas S.A. é uma empresa de grande porte de tecnologia, fundada em 1998 em São Paulo (SP). Oferecemos serviços de integração de dados, data warehouse e analytics para instituições financeiras e seguradoras de médio e grande porte. Empregamos diretamente mais de 1.200 profissionais e nosso faturamento anual supera R$ 300 milhões. Participamos de projetos de pesquisa colaborativa com universidades públicas para desenvolvimento de modelos de detecção de fraude."
+    },
+    "expected_output": {
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "GRANDE",
+      "uf": "SP",
+      "ano_fundacao": 1998,
+      "faturamento_anual": 300000000,
+      "tipos_financiamento_interesse": ["pesquisa_colaborativa"]
+    }
+  },
+  {
+    "case_id": "profile-010",
+    "input": {
+      "text": "A Petrochem Brasil S.A. é uma grande empresa do setor de química fina e especialidades para a indústria de petróleo e gás, fundada em 1976 no Rio de Janeiro (RJ). Fabricamos aditivos, inibidores de corrosão e soluções de tratamento de água para operações offshore e onshore. Nosso faturamento anual ultrapassa R$ 1,2 bilhão e operamos três plantas industriais no país. Temos interesse em matching EMBRAPII e pesquisa colaborativa com ICTs para desenvolver novos materiais de baixo impacto ambiental."
+    },
+    "expected_output": {
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "GRANDE",
+      "uf": "RJ",
+      "ano_fundacao": 1976,
+      "faturamento_anual": 1200000000,
+      "tipos_financiamento_interesse": ["matching_embrapii", "pesquisa_colaborativa"]
+    }
+  },
+  {
+    "case_id": "profile-011",
+    "input": {
+      "text": "O Instituto de Pesquisas em Materiais Avançados (IPMA) é uma ICT sem fins lucrativos vinculada ao Ministério da Ciência, Tecnologia e Inovações, sediada em Brasília (DF). Conduzimos pesquisa fundamental e aplicada em cerâmicas técnicas, polímeros de alto desempenho e compósitos para as indústrias aeroespacial e de defesa. Mantemos laboratórios de TRL 3 a 5 e buscamos parcerias de pesquisa colaborativa com empresas privadas para validação e escalonamento de processos."
+    },
+    "expected_output": {
+      "tipo_entidade": "ICT",
+      "trl": 4,
+      "uf": "DF",
+      "tipos_financiamento_interesse": ["pesquisa_colaborativa"]
+    }
+  },
+  {
+    "case_id": "profile-012",
+    "input": {
+      "text": "A Universidade Regional de Tecnologia e Inovação do Sul (URTIS) é uma instituição pública de ensino superior localizada em Porto Alegre (RS), fundada em 1962. Nosso Núcleo de Inovação Tecnológica coordena projetos de P&D em parceria com o setor produtivo nas áreas de automação industrial, computação embarcada e manufatura aditiva. Atualmente, três projetos do NIT encontram-se em TRL 4, com protótipos laboratoriais validados. Temos interesse em editais de subvenção não-reembolsável e pesquisa colaborativa."
+    },
+    "expected_output": {
+      "tipo_entidade": "universidade",
+      "trl": 4,
+      "uf": "RS",
+      "ano_fundacao": 1962,
+      "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "pesquisa_colaborativa"]
+    }
+  },
+  {
+    "case_id": "profile-013",
+    "input": {
+      "text": "Sou designer gráfico autônomo e atuo como MEI desde 2018, baseado em Recife (PE). Ofereço serviços de identidade visual, design de embalagens e criação de materiais para marketing digital para pequenos negócios e startups. Trabalho de forma 100% remota e meu faturamento anual fica em torno de R$ 80 mil."
+    },
+    "expected_output": {
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "MEI",
+      "uf": "PE",
+      "ano_fundacao": 2018,
+      "faturamento_anual": 80000
+    }
+  },
+  {
+    "case_id": "profile-014",
+    "input": {
+      "text": "Sou nutricionista e atuo como MEI em Goiânia (GO) desde 2020, oferecendo consultas de nutrição esportiva e clínica de forma presencial e online. Tenho um consultório próprio e atendo em torno de 80 pacientes por mês. Meu faturamento mensal é de aproximadamente R$ 9 mil."
+    },
+    "expected_output": {
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "MEI",
+      "uf": "GO",
+      "ano_fundacao": 2020
+    }
+  },
+  {
+    "case_id": "profile-015",
+    "input": {
+      "text": "A GreenHydro Energia S.A. é uma empresa de tecnologia em energia limpa, fundada em 2015 em Natal (RN). Desenvolvemos eletrolisadores de baixo custo para produção de hidrogênio verde a partir de energia solar excedente. Nosso produto está em TRL 6 — demonstrador em escala piloto operando em campo com um cliente industrial. Buscamos subvenção não-reembolsável e crédito reembolsável para escalar a fabricação e reduzir o custo unitário do equipamento."
+    },
+    "expected_output": {
+      "tipo_entidade": "empresa",
+      "trl": 6,
+      "uf": "RN",
+      "ano_fundacao": 2015,
+      "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "credito_reembolsavel"]
+    }
+  }
+]

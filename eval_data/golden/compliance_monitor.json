@@ -1,0 +1,446 @@
+[
+  {
+    "case_id": "compliance-001",
+    "input": {
+      "user_message": "Vou descrever aqui a metodologia do projeto. Vamos usar sensoriamento remoto e processamento de imagens de satélite para mapear áreas de desmatamento em tempo real. A equipe conta com engenheiros florestais e cientistas de dados, todos com experiência comprovada em projetos anteriores de monitoramento ambiental na Amazônia.",
+      "requirements": [
+        "A empresa proponente deve ser constituída sob as leis brasileiras e ter sede no território nacional",
+        "O projeto deve contar com pelo menos uma ICT (Instituição Científica e Tecnológica) parceira formalizada",
+        "A empresa deve ser classificada como ME (Microempresa) ou EPP (Empresa de Pequeno Porte) conforme Lei Complementar 123/2006"
+      ]
+    },
+    "expected_output": {
+      "flags": []
+    }
+  },
+  {
+    "case_id": "compliance-002",
+    "input": {
+      "user_message": "Na justificativa vou mostrar que o problema de rastreabilidade de castanhas-do-brasil impacta diretamente a renda de cooperativas extrativistas no Acre e no Pará. Atualmente, a falta de certificação digital impede o acesso a mercados premium que pagam até 40% a mais pelo produto certificado como livre de desmatamento.",
+      "requirements": [
+        "O projeto deve ser executado integralmente no estado de São Paulo",
+        "A empresa deve ter faturamento bruto anual inferior a R$ 4,8 milhões no exercício anterior",
+        "O prazo máximo de vigência do projeto é de 24 meses"
+      ]
+    },
+    "expected_output": {
+      "flags": []
+    }
+  },
+  {
+    "case_id": "compliance-003",
+    "input": {
+      "user_message": "Para os objetivos, quero listar: (1) desenvolver algoritmo de visão computacional para classificação automática de espécies florestais por imagem de satélite; (2) integrar dados de sensores IoT de campo com a plataforma de geointeligência; (3) validar o sistema em pelo menos 3 cooperativas extrativistas até o mês 18 do projeto.",
+      "requirements": [
+        "O nível de maturidade tecnológica (TRL) do projeto deve estar entre 4 e 7 no início da execução",
+        "O projeto deve prever pelo menos um produto ou processo inovador como resultado final",
+        "A empresa deve ter CNPJ ativo e regularidade fiscal comprovada"
+      ]
+    },
+    "expected_output": {
+      "flags": []
+    }
+  },
+  {
+    "case_id": "compliance-004",
+    "input": {
+      "user_message": "Preciso detalhar o orçamento. Vou incluir: pessoal da equipe (R$ 180 mil para 24 meses), licenças de software de processamento de imagens (R$ 36 mil), servidores em nuvem para processamento dos dados de satélite (R$ 48 mil) e visitas técnicas às cooperativas parceiras no Acre e Pará (R$ 24 mil). Total: R$ 288 mil.",
+      "requirements": [
+        "O orçamento deve ser detalhado por rubrica conforme o Manual do Beneficiário FINEP vigente",
+        "É vedada a aquisição de imóveis com recursos do projeto",
+        "Bolsas de pesquisa para sócios ou proprietários da empresa são expressamente proibidas"
+      ]
+    },
+    "expected_output": {
+      "flags": []
+    }
+  },
+  {
+    "case_id": "compliance-005",
+    "input": {
+      "user_message": "Nossa empresa está há 5 anos no mercado de tecnologia ambiental. Somos uma startup de base tecnológica registrada em São Paulo, com 8 funcionários CLT. Já executamos dois projetos financiados com subvenção pública, sendo um pela FAPESP PIPE e outro pelo Sebrae. Todos os relatórios foram entregues e as prestações de contas aprovadas.",
+      "requirements": [
+        "A empresa proponente deve comprovar capacidade técnica com histórico de projetos anteriores",
+        "A empresa deve estar em situação regular junto ao FGTS e não ter débitos trabalhistas",
+        "O projeto deve ter cronograma físico-financeiro detalhado com responsável identificado para cada atividade"
+      ]
+    },
+    "expected_output": {
+      "flags": []
+    }
+  },
+  {
+    "case_id": "compliance-006",
+    "input": {
+      "user_message": "Para a descrição da equipe, vou mencionar que o coordenador do projeto é o Dr. João Silva, doutor em Engenharia Florestal pela USP, com 12 anos de experiência em sensoriamento remoto. A equipe técnica conta com 2 engenheiros plenos e 1 bolsista de doutorado da Universidade Federal do Pará, que é nossa ICT parceira formalizada por acordo de cooperação técnica.",
+      "requirements": [
+        "O projeto deve contar com pelo menos uma ICT parceira com acordo formalizado",
+        "A empresa deve ser de capital majoritariamente nacional",
+        "O TRL mínimo exigido é 3 no início do projeto"
+      ]
+    },
+    "expected_output": {
+      "flags": []
+    }
+  },
+  {
+    "case_id": "compliance-007",
+    "input": {
+      "user_message": "Estou pensando em mencionar que nossa empresa tem sede em Lisboa, mas que operamos no Brasil através de uma filial em São Paulo. Seria melhor descrever só a operação brasileira ou incluir a matriz portuguesa também?",
+      "requirements": [
+        "A empresa proponente deve ser constituída sob as leis brasileiras e ter sede social no território nacional",
+        "Apenas empresas com CNPJ ativo como empresa principal (não filial) podem ser proponentes",
+        "O capital social da empresa deve ser majoritariamente controlado por cidadãos brasileiros"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "A empresa proponente deve ser constituída sob as leis brasileiras e ter sede social no território nacional",
+          "status": "at_risk",
+          "suggestion": "Deixe claro que a entidade proponente é a empresa constituída no Brasil (CNPJ), não a matriz estrangeira; descreva apenas a operação jurídica nacional."
+        },
+        {
+          "requirement": "Apenas empresas com CNPJ ativo como empresa principal (não filial) podem ser proponentes",
+          "status": "at_risk",
+          "suggestion": "Verifique se a filial brasileira possui CNPJ próprio como empresa independente ou se é uma filial subordinada à matriz portuguesa; apenas entidades independentes podem ser proponentes."
+        },
+        {
+          "requirement": "O capital social da empresa deve ser majoritariamente controlado por cidadãos brasileiros",
+          "status": "at_risk",
+          "suggestion": "Esclareça a composição societária: se a matriz portuguesa controla mais de 50% do capital, a empresa pode não ser elegível; consulte o edital sobre a regra de controle nacional."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-008",
+    "input": {
+      "user_message": "Para justificar o orçamento de pessoal, vou incluir meu próprio salário como sócio-fundador, já que vou dedicar 80% do meu tempo ao projeto. Isso representa R$ 12 mil por mês. Faz sentido incluir isso na rubrica de bolsas ou de pessoal CLT?",
+      "requirements": [
+        "É vedado o pagamento de bolsas de pesquisa a sócios, proprietários ou dirigentes da empresa com recursos do projeto",
+        "Despesas de pessoal devem estar vinculadas a contratos CLT ou bolsas para pesquisadores não pertencentes ao quadro societário",
+        "O orçamento deve ser detalhado por rubrica com justificativa individual de cada item"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "É vedado o pagamento de bolsas de pesquisa a sócios, proprietários ou dirigentes da empresa com recursos do projeto",
+          "status": "violation",
+          "suggestion": "Retire o salário do sócio-fundador do orçamento; a dedicação de sócios pode ser computada como contrapartida não-financeira da empresa, não como despesa do projeto."
+        },
+        {
+          "requirement": "Despesas de pessoal devem estar vinculadas a contratos CLT ou bolsas para pesquisadores não pertencentes ao quadro societário",
+          "status": "violation",
+          "suggestion": "Inclua apenas pessoal contratado via CLT ou pesquisadores bolsistas sem vínculo societário com a empresa; documente os contratos correspondentes."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-009",
+    "input": {
+      "user_message": "No cronograma, não vou colocar datas específicas porque o projeto ainda pode começar em meses diferentes dependendo da aprovação. Prefiro deixar as atividades sem prazo definido por enquanto e ajustar depois.",
+      "requirements": [
+        "O plano de trabalho deve conter cronograma físico-financeiro detalhado com prazos em meses (M1, M2...)",
+        "Cada atividade do plano de trabalho deve ter um responsável técnico identificado",
+        "O prazo máximo de vigência do projeto é de 36 meses"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "O plano de trabalho deve conter cronograma físico-financeiro detalhado com prazos em meses (M1, M2...)",
+          "status": "violation",
+          "suggestion": "O cronograma deve estar em meses relativos ao início do projeto (M1, M2...), não em datas absolutas; preencha todos os marcos e entregas mesmo que a data de início ainda não esteja confirmada."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-010",
+    "input": {
+      "user_message": "O projeto vai usar nossa tecnologia que já está no mercado há 2 anos — já temos 15 clientes pagantes e o produto está em versão 3.0. Agora queremos financiamento para escalar a operação comercial e contratar mais vendedores.",
+      "requirements": [
+        "O projeto deve ter caráter de pesquisa, desenvolvimento e inovação (P,D&I) com TRL máximo de 7 no início",
+        "Os recursos devem ser aplicados em atividades de desenvolvimento tecnológico, não em escalonamento comercial ou marketing",
+        "É vedado o uso de recursos do projeto para despesas com publicidade comercial ou expansão de força de vendas"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "O projeto deve ter caráter de pesquisa, desenvolvimento e inovação (P,D&I) com TRL máximo de 7 no início",
+          "status": "violation",
+          "suggestion": "Um produto em versão 3.0 com 15 clientes pagantes provavelmente já está em TRL 8 ou 9; este perfil se enquadra em linhas de crédito (reembolsável), não subvenção econômica para P&D."
+        },
+        {
+          "requirement": "Os recursos devem ser aplicados em atividades de desenvolvimento tecnológico, não em escalonamento comercial ou marketing",
+          "status": "violation",
+          "suggestion": "Reformule o escopo do projeto para focar em inovação tecnológica incremental (nova funcionalidade, novo mercado vertical) em vez de escalonamento comercial da solução atual."
+        },
+        {
+          "requirement": "É vedado o uso de recursos do projeto para despesas com publicidade comercial ou expansão de força de vendas",
+          "status": "violation",
+          "suggestion": "Remova a menção a contratação de vendedores; esse tipo de despesa é explicitamente vedado e invalida a proposta."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-011",
+    "input": {
+      "user_message": "Somos uma empresa de médio porte com faturamento de R$ 12 milhões no último ano. Estamos aplicando neste edital destinado exclusivamente a microempresas e empresas de pequeno porte. Nossa ideia é nos enquadrar como ME para efeitos do edital.",
+      "requirements": [
+        "A empresa deve ser classificada como ME (Microempresa, faturamento ≤ R$ 360 mil/ano) ou EPP (Empresa de Pequeno Porte, faturamento entre R$ 360 mil e R$ 4,8 milhões/ano) conforme Lei Complementar 123/2006",
+        "O porte da empresa será verificado pelo faturamento bruto do último exercício fiscal",
+        "Empresas que não se enquadrem nos critérios de porte exigidos serão desclassificadas"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "A empresa deve ser classificada como ME (Microempresa, faturamento ≤ R$ 360 mil/ano) ou EPP (Empresa de Pequeno Porte, faturamento entre R$ 360 mil e R$ 4,8 milhões/ano) conforme Lei Complementar 123/2006",
+          "status": "violation",
+          "suggestion": "Com faturamento de R$ 12 milhões, a empresa é de médio porte e não atende ao critério de ME/EPP; não é possível 'se enquadrar' retroativamente — a empresa não é elegível para este edital."
+        },
+        {
+          "requirement": "Empresas que não se enquadrem nos critérios de porte exigidos serão desclassificadas",
+          "status": "violation",
+          "suggestion": "Não prossiga com esta submissão; busque editais FINEP destinados a empresas de médio porte, como o PAPPE Subvenção para médias ou o Inova Empresa."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-012",
+    "input": {
+      "user_message": "Ainda não temos a ICT parceira definida. Estávamos pensando em conversar com alguma universidade depois que o projeto for aprovado. Podemos colocar uma ICT genérica na proposta e fechar o acordo depois?",
+      "requirements": [
+        "O projeto deve contar com pelo menos uma ICT parceira com Acordo de Parceria formalizado e assinado antes da submissão",
+        "O documento comprobatório da parceria ICT deve ser anexado à proposta no ato da inscrição",
+        "A ICT parceira deve estar cadastrada no MCTI e ter grupo de pesquisa com produção nos últimos 3 anos na área do projeto"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "O projeto deve contar com pelo menos uma ICT parceira com Acordo de Parceria formalizado e assinado antes da submissão",
+          "status": "violation",
+          "suggestion": "O acordo de parceria deve ser assinado antes da submissão, não após aprovação; inicie imediatamente a negociação com universidades ou institutos de pesquisa na área do projeto."
+        },
+        {
+          "requirement": "O documento comprobatório da parceria ICT deve ser anexado à proposta no ato da inscrição",
+          "status": "violation",
+          "suggestion": "Sem o documento assinado em mãos, a proposta será rejeitada na fase documental; não submeta sem este anexo."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-013",
+    "input": {
+      "user_message": "Nosso projeto vai ser desenvolvido principalmente em Belo Horizonte, mas parte da equipe está em Recife e pretendemos fazer testes de campo em Manaus também. Será que precisamos detalhar isso no plano de trabalho?",
+      "requirements": [
+        "O projeto deve ser executado integralmente no estado de Minas Gerais",
+        "Atividades em outros estados devem ser justificadas como acesso a infraestrutura única não disponível em MG",
+        "A sede operacional do projeto deve estar em Minas Gerais durante toda a vigência"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "O projeto deve ser executado integralmente no estado de Minas Gerais",
+          "status": "at_risk",
+          "suggestion": "Atividades em Recife e Manaus podem caracterizar execução fora de MG; justifique explicitamente no plano de trabalho por que cada atividade fora do estado é indispensável e não pode ser realizada em MG."
+        },
+        {
+          "requirement": "Atividades em outros estados devem ser justificadas como acesso a infraestrutura única não disponível em MG",
+          "status": "at_risk",
+          "suggestion": "Documente qual infraestrutura específica em Recife e Manaus justifica as atividades nesses locais; sem essa justificativa, a proposta pode ser desclassificada ou ter atividades vetadas."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-014",
+    "input": {
+      "user_message": "O projeto está previsto para durar 3 anos, sendo 36 meses no total. Mas dependendo do ritmo de desenvolvimento, pode ser que a gente precise de mais tempo — talvez uns 48 meses. Posso mencionar essa possibilidade no texto?",
+      "requirements": [
+        "O prazo máximo de vigência do projeto é de 36 meses, não sendo admitidas prorrogações além deste limite",
+        "O cronograma deve ser realista e compatível com o escopo proposto, sem margens de incerteza excessivas",
+        "Qualquer solicitação de alteração de prazo deve ser formalmente justificada e aprovada pela FINEP"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "O prazo máximo de vigência do projeto é de 36 meses, não sendo admitidas prorrogações além deste limite",
+          "status": "at_risk",
+          "suggestion": "Não mencione 48 meses na proposta; o prazo máximo é 36 meses e mencionar a possibilidade de extensão além disso pode levantar dúvidas sobre a viabilidade do cronograma."
+        },
+        {
+          "requirement": "O cronograma deve ser realista e compatível com o escopo proposto, sem margens de incerteza excessivas",
+          "status": "at_risk",
+          "suggestion": "Se o escopo real exige 48 meses, reduza o escopo para caber em 36 meses; um cronograma que o próprio proponente considera insuficiente compromete a credibilidade da proposta."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-015",
+    "input": {
+      "user_message": "Nossa plataforma está em TRL 2 ainda — temos a hipótese validada em laboratório mas ainda não fizemos protótipo funcional. A ideia do projeto é justamente sair do TRL 2 e chegar ao TRL 5 ao final dos 24 meses.",
+      "requirements": [
+        "O TRL mínimo exigido no início do projeto é 4 (validação tecnológica em ambiente laboratorial)",
+        "O projeto deve demonstrar viabilidade técnica comprovada da abordagem proposta antes da submissão",
+        "Projetos em TRL 1-3 devem ser submetidos a editais específicos de pesquisa básica (não este edital)"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "O TRL mínimo exigido no início do projeto é 4 (validação tecnológica em ambiente laboratorial)",
+          "status": "violation",
+          "suggestion": "TRL 2 está abaixo do mínimo exigido (TRL 4); o projeto não é elegível para este edital no estágio atual de maturidade tecnológica."
+        },
+        {
+          "requirement": "Projetos em TRL 1-3 devem ser submetidos a editais específicos de pesquisa básica (não este edital)",
+          "status": "violation",
+          "suggestion": "Redirecione a submissão para editais de pesquisa básica/aplicada (ex: FAPESP Pesquisa Inovativa, CNPq Universal) que apoiam projetos em TRL 1-3; volte a este edital quando atingir TRL 4."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-016",
+    "input": {
+      "user_message": "Para a contrapartida, pensamos em oferecer 15% do valor do projeto em recursos próprios. Nossa empresa fatura em torno de R$ 800 mil por ano, mas nos últimos dois meses estamos com fluxo de caixa bem apertado. Não sei se conseguiríamos realmente honrar esse valor.",
+      "requirements": [
+        "A empresa proponente deve comprovar capacidade financeira para aportar a contrapartida declarada",
+        "Para EPPs, a contrapartida mínima obrigatória é de 10% do valor total do projeto",
+        "A contrapartida prometida deve ser compatível com o porte financeiro e a capacidade de desembolso da empresa"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "A empresa proponente deve comprovar capacidade financeira para aportar a contrapartida declarada",
+          "status": "at_risk",
+          "suggestion": "Não declare uma contrapartida que a empresa não tem capacidade real de honrar; a FINEP pode solicitar comprovação financeira e a inadimplência na contrapartida pode resultar em suspensão do projeto."
+        },
+        {
+          "requirement": "A contrapartida prometida deve ser compatível com o porte financeiro e a capacidade de desembolso da empresa",
+          "status": "at_risk",
+          "suggestion": "Se o fluxo de caixa está apertado, considere declarar apenas os 10% mínimos obrigatórios e comprovar com extratos bancários e balanço patrimonial que este valor é factível."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-017",
+    "input": {
+      "user_message": "Acho que posso incluir no orçamento os equipamentos que já compramos no ano passado para montar o laboratório. Foi um investimento de R$ 80 mil que está diretamente relacionado ao projeto.",
+      "requirements": [
+        "São vedadas despesas pré-projeto, ou seja, custos incorridos antes da assinatura do contrato de financiamento",
+        "O orçamento deve contemplar apenas despesas a serem realizadas durante a vigência do projeto",
+        "Equipamentos adquiridos anteriormente podem ser declarados como contrapartida em bens, nunca como despesa elegível"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "São vedadas despesas pré-projeto, ou seja, custos incorridos antes da assinatura do contrato de financiamento",
+          "status": "violation",
+          "suggestion": "Equipamentos comprados no ano passado são despesas pré-projeto e não podem constar no orçamento como despesas elegíveis; removê-los do orçamento é obrigatório."
+        },
+        {
+          "requirement": "Equipamentos adquiridos anteriormente podem ser declarados como contrapartida em bens, nunca como despesa elegível",
+          "status": "at_risk",
+          "suggestion": "Se desejar, declare os R$ 80 mil em equipamentos como contrapartida em bens e infraestrutura no campo de contrapartida da proposta, com valoração a preço de mercado."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-018",
+    "input": {
+      "user_message": "Pensamos em escrever a proposta de forma mais aberta, usando expressões como 'tentaremos desenvolver', 'esperamos que seja possível atingir' e 'o projeto poderá eventualmente resultar em'. Isso nos dá mais flexibilidade caso não consigamos cumprir tudo.",
+      "requirements": [
+        "A proposta deve conter indicadores quantitativos e metas verificáveis para cada objetivo do projeto",
+        "A linguagem deve ser propositiva e assertiva, com compromissos claros assumidos pelo proponente",
+        "Metas vagas ou condicionais são motivo de desclassificação na análise de mérito técnico"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "A proposta deve conter indicadores quantitativos e metas verificáveis para cada objetivo do projeto",
+          "status": "violation",
+          "suggestion": "Substitua expressões vagas por metas mensuráveis: ex. 'Desenvolveremos protótipo funcional com precisão ≥ 85% até M12' em vez de 'tentaremos desenvolver'."
+        },
+        {
+          "requirement": "A linguagem deve ser propositiva e assertiva, com compromissos claros assumidos pelo proponente",
+          "status": "violation",
+          "suggestion": "Use linguagem assertiva: 'O projeto entregará X até M18' e não 'poderá eventualmente resultar em'; avaliadores interpretam linguagem condicional como falta de confiança técnica."
+        },
+        {
+          "requirement": "Metas vagas ou condicionais são motivo de desclassificação na análise de mérito técnico",
+          "status": "violation",
+          "suggestion": "Revise toda a proposta e substitua cada meta condicional por um compromisso verificável com prazo e critério de aceite definidos."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-019",
+    "input": {
+      "user_message": "No item de resultados esperados, vou colocar que o projeto irá 'contribuir para a sociedade' e 'gerar impacto positivo no meio ambiente'. Acho que esses objetivos amplos ficam bem na justificativa.",
+      "requirements": [
+        "Os resultados esperados devem ser descritos com indicadores quantitativos mensuráveis (ex: número de produtos desenvolvidos, artigos publicados, patentes depositadas)",
+        "Cada resultado deve estar vinculado a uma atividade específica do plano de trabalho",
+        "Impactos socioambientais devem ser quantificados sempre que possível"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "Os resultados esperados devem ser descritos com indicadores quantitativos mensuráveis (ex: número de produtos desenvolvidos, artigos publicados, patentes depositadas)",
+          "status": "at_risk",
+          "suggestion": "Substitua 'contribuir para a sociedade' por resultados concretos: ex. '1 software registrado no INPI, 2 artigos publicados em periódico Qualis A, 3 cooperativas atendidas pela plataforma até M24'."
+        },
+        {
+          "requirement": "Impactos socioambientais devem ser quantificados sempre que possível",
+          "status": "at_risk",
+          "suggestion": "Quantifique o impacto ambiental: ex. 'redução de X toneladas de CO2 rastreadas, Y hectares monitorados, Z alertas de desmatamento gerados por mês'; evite linguagem genérica sem métricas."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "compliance-020",
+    "input": {
+      "user_message": "Para a seção de equipe, estou pensando em incluir colaboradores estrangeiros que vão participar remotamente de fora do Brasil — dois pesquisadores da Alemanha e um do Canadá. Eles teriam dedicação de 20% cada.",
+      "requirements": [
+        "A equipe executora do projeto deve ser composta majoritariamente por profissionais com vínculo empregatício ou acadêmico no Brasil",
+        "Pesquisadores estrangeiros podem participar apenas como colaboradores eventuais, sem dedicação superior a 10% da carga horária do projeto",
+        "Despesas com pesquisadores no exterior só são elegíveis se vinculadas a missões de trabalho específicas previstas no plano de trabalho"
+      ]
+    },
+    "expected_output": {
+      "flags": [
+        {
+          "requirement": "Pesquisadores estrangeiros podem participar apenas como colaboradores eventuais, sem dedicação superior a 10% da carga horária do projeto",
+          "status": "at_risk",
+          "suggestion": "20% de dedicação por pesquisador estrangeiro excede o limite de 10% permitido; reduza a participação de cada um para no máximo 10% ou justifique a necessidade de expertise exclusiva não disponível no Brasil."
+        },
+        {
+          "requirement": "Despesas com pesquisadores no exterior só são elegíveis se vinculadas a missões de trabalho específicas previstas no plano de trabalho",
+          "status": "at_risk",
+          "suggestion": "Detalhe no plano de trabalho as missões específicas que justificam a participação dos pesquisadores estrangeiros; colaboração remota genérica sem missão definida pode não ser elegível como despesa."
+        }
+      ]
+    }
+  }
+]

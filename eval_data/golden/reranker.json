@@ -1,0 +1,302 @@
+[
+  {
+    "case_id": "rerank-001",
+    "input": {
+      "query": "Quem pode participar deste edital? A empresa precisa ser de qual porte?",
+      "chunks": [
+        "O presente edital destina-se exclusivamente a Microempresas (ME) e Empresas de Pequeno Porte (EPP), conforme definição da Lei Complementar nº 123/2006. Empresas de médio e grande porte não são elegíveis como proponentes principais.",
+        "O valor máximo de subvenção por projeto é de R$ 500.000,00, sendo que a contrapartida mínima do proponente é de 10% sobre o valor total do projeto aprovado.",
+        "Os projetos devem ser executados em território nacional e os resultados devem ser aplicados prioritariamente no mercado brasileiro, podendo contemplar exportações como mercado secundário.",
+        "A data limite para submissão das propostas é 30 de setembro de 2025, improrrogável, conforme estabelecido no Artigo 4º do presente instrumento."
+      ]
+    },
+    "expected_output": {
+      "ranking": [0, 2, 1, 3]
+    }
+  },
+  {
+    "case_id": "rerank-002",
+    "input": {
+      "query": "Qual o valor máximo de financiamento disponível por projeto?",
+      "chunks": [
+        "Empresas individualizadas por CNPJ próprio, com quadro societário constituído majoritariamente por pesquisadores ou tecnólogos, são elegíveis desde que comprovem vínculo com instituição de pesquisa credenciada.",
+        "Cada proposta aprovada poderá receber recursos não reembolsáveis de até R$ 1.200.000,00, sendo vedada a apresentação de mais de uma proposta por CNPJ nesta chamada.",
+        "O prazo de execução dos projetos financiados será de até 24 meses, contados da data de assinatura do Termo de Outorga entre a FAPESP e a empresa beneficiária.",
+        "A documentação de habilitação deve incluir certidão negativa de débitos federais, estaduais e municipais emitidas nos últimos 90 dias anteriores à data de submissão."
+      ]
+    },
+    "expected_output": {
+      "ranking": [1, 2, 0, 3]
+    }
+  },
+  {
+    "case_id": "rerank-003",
+    "input": {
+      "query": "Qual é o prazo final para submissão das propostas?",
+      "chunks": [
+        "O financiamento contempla recursos para custeio e capital, incluindo aquisição de equipamentos, contratação de pessoal técnico especializado e serviços de terceiros, desde que diretamente vinculados ao objeto do projeto.",
+        "São elegíveis empresas com faturamento anual de até R$ 16 milhões, conforme Resolução BNDES vigente, independentemente do setor de atividade econômica declarado.",
+        "As propostas deverão ser submetidas exclusivamente pelo sistema SIGFAP até as 23h59 do dia 15 de agosto de 2025, horário de Brasília. Propostas recebidas após esta data serão automaticamente descartadas.",
+        "A área temática prioritária desta chamada é biotecnologia aplicada à agricultura, com foco em bioinsumos para redução de agroquímicos em culturas de grãos e horticultura."
+      ]
+    },
+    "expected_output": {
+      "ranking": [2, 0, 1, 3]
+    }
+  },
+  {
+    "case_id": "rerank-004",
+    "input": {
+      "query": "É obrigatório ter parceria com universidade ou ICT para concorrer?",
+      "chunks": [
+        "O valor total desta chamada é de R$ 50 milhões, distribuídos entre as modalidades subvenção econômica (80%) e equalização de encargos financeiros (20%), conforme aprovado pelo Conselho de Administração da FINEP.",
+        "A proposta deverá ser submetida em parceria obrigatória com ao menos uma Instituição Científica, Tecnológica e de Inovação (ICT) credenciada no MCTI, que atuará como executora de atividades de P&D definidas no plano de trabalho.",
+        "O cronograma de desembolso dos recursos aprovados obedecerá ao plano financeiro apresentado na proposta, sujeito à disponibilidade orçamentária do Fundo Nacional de Desenvolvimento Científico e Tecnológico — FNDCT.",
+        "Microempresas e empresas de pequeno porte localizadas em municípios com IDH abaixo de 0,65 terão bonificação de 5 pontos percentuais na nota técnica final de avaliação."
+      ]
+    },
+    "expected_output": {
+      "ranking": [1, 3, 2, 0]
+    }
+  },
+  {
+    "case_id": "rerank-005",
+    "input": {
+      "query": "Quais documentos são exigidos para habilitação jurídica da empresa?",
+      "chunks": [
+        "As pesquisas financiadas por esta chamada devem apresentar nível de maturidade tecnológica (TRL) entre 4 e 7, comprovado por relatório técnico de avaliação subscrito pelo responsável técnico do projeto.",
+        "Para fins de habilitação jurídica, a empresa deverá apresentar: contrato social ou estatuto consolidado com última alteração registrada, CNPJ ativo, certidão de regularidade junto ao INSS, FGTS e Receita Federal.",
+        "O prazo máximo de execução dos projetos é de 36 meses, admitida uma prorrogação de até 6 meses mediante justificativa técnica devidamente aprovada pela FINEP.",
+        "A taxa de overhead institucional para ICTs executoras é limitada a 15% do valor total repassado à instituição parceira, devendo ser explicitada no plano de trabalho."
+      ]
+    },
+    "expected_output": {
+      "ranking": [1, 3, 0, 2]
+    }
+  },
+  {
+    "case_id": "rerank-006",
+    "input": {
+      "query": "Quais áreas temáticas ou setores são financiados por esta chamada?",
+      "chunks": [
+        "A empresa proponente deverá demonstrar capacidade de execução mediante apresentação de currículo do responsável técnico com no mínimo três anos de experiência comprovada na área do projeto.",
+        "Esta chamada apoiará projetos nas seguintes áreas prioritárias: inteligência artificial e computação em nuvem; biotecnologia e saúde de precisão; energias renováveis e armazenamento; economia circular e bioeconomia da floresta.",
+        "O desembolso dos recursos será realizado em três parcelas: 40% na assinatura do contrato, 30% após aprovação do primeiro relatório técnico parcial e 30% na conclusão do projeto.",
+        "Projetos submetidos por empresas sediadas nas regiões Norte, Nordeste e Centro-Oeste receberão bônus de regionalidade de 10 pontos na avaliação técnica."
+      ]
+    },
+    "expected_output": {
+      "ranking": [1, 3, 2, 0]
+    }
+  },
+  {
+    "case_id": "rerank-007",
+    "input": {
+      "query": "O financiamento é reembolsável ou não reembolsável?",
+      "chunks": [
+        "Os recursos desta chamada são concedidos exclusivamente na modalidade subvenção econômica não reembolsável, ou seja, a empresa beneficiária não está obrigada a devolver os valores recebidos, desde que cumpra integralmente as metas e obrigações contratuais.",
+        "O TRL mínimo exigido para projetos desta chamada é TRL 3, devendo o proponente apresentar prova de conceito em laboratório. Projetos em TRL 1 ou 2 (pesquisa básica) não são elegíveis.",
+        "Empresas com capital social inferior a R$ 100.000,00 na data de submissão deverão apresentar garantias adicionais, como fiança bancária ou seguro-garantia, para assegurar a execução do projeto.",
+        "A submissão deve ser realizada exclusivamente de forma eletrônica pelo portal FINEP Connect, não sendo aceitas propostas em papel, e-mail ou outros meios alternativos."
+      ]
+    },
+    "expected_output": {
+      "ranking": [0, 2, 3, 1]
+    }
+  },
+  {
+    "case_id": "rerank-008",
+    "input": {
+      "query": "Qual o nível TRL mínimo e máximo aceito para os projetos?",
+      "chunks": [
+        "As empresas beneficiárias devem manter escrituração contábil regular e apresentar balanço patrimonial auditado referente ao último exercício fiscal encerrado antes da submissão da proposta.",
+        "Esta chamada aceita projetos com TRL entre 4 e 8. Projetos abaixo de TRL 4 devem ser submetidos ao edital de pesquisa básica aplicada. Projetos acima de TRL 8 são considerados inovação incremental e têm edital específico de expansão de mercado.",
+        "O prazo de execução é de até 18 meses para projetos de até R$ 300.000,00 e de até 30 meses para projetos com valor superior, devendo o cronograma ser detalhado mês a mês no plano de trabalho.",
+        "São elegíveis empresas de todos os setores, exceto setor financeiro (CNAE 64xx), setor imobiliário (CNAE 68xx) e empresas com menos de 12 meses de constituição na data de submissão."
+      ]
+    },
+    "expected_output": {
+      "ranking": [1, 3, 2, 0]
+    }
+  },
+  {
+    "case_id": "rerank-009",
+    "input": {
+      "query": "Empresas de grande porte podem submeter propostas?",
+      "chunks": [
+        "O cronograma prevê: abertura da chamada em 1º de julho de 2025; encerramento das inscrições em 30 de setembro de 2025; divulgação dos resultados em 15 de dezembro de 2025; assinatura dos contratos em fevereiro de 2026.",
+        "Nesta chamada, apenas Microempresas (ME), Empresas de Pequeno Porte (EPP) e Empresas de Médio Porte (EMP), com faturamento bruto anual de até R$ 300 milhões, são elegíveis. Grandes empresas com faturamento superior a este limite estão expressamente vedadas de participar como proponentes.",
+        "A contrapartida financeira mínima exigida é de 20% do valor total do projeto para empresas sediadas no Sudeste e Sul, e de 10% para empresas das demais regiões.",
+        "Os recursos financiados poderão ser aplicados em despesas de custeio, aquisição de equipamentos nacionais ou importados, e contratação de consultorias especializadas de duração inferior a 12 meses."
+      ]
+    },
+    "expected_output": {
+      "ranking": [1, 2, 3, 0]
+    }
+  },
+  {
+    "case_id": "rerank-010",
+    "input": {
+      "query": "Qual o cronograma de execução e duração máxima dos projetos aprovados?",
+      "chunks": [
+        "A habilitação econômico-financeira exige apresentação de balanço patrimonial dos dois últimos exercícios, demonstrando índice de liquidez corrente igual ou superior a 1,0.",
+        "Esta chamada destina recursos para os setores de saúde digital, agtech, cleantech e manufatura avançada, excluindo explicitamente projetos de cunho social sem componente tecnológico mensurável.",
+        "Os projetos aprovados terão duração máxima de 24 meses, contados da data de publicação da ordem de início no Diário Oficial da União. Não há possibilidade de prorrogação para projetos com prazo inferior a 12 meses já na submissão.",
+        "A empresa proponente deve comprovar que o produto ou serviço a ser desenvolvido representa inovação de produto ou processo novo ou significativamente melhorado para o mercado nacional."
+      ]
+    },
+    "expected_output": {
+      "ranking": [2, 3, 1, 0]
+    }
+  },
+  {
+    "case_id": "rerank-011",
+    "input": {
+      "query": "Qual a contrapartida financeira mínima que a empresa deve aportar?",
+      "chunks": [
+        "Para empresas com faturamento de até R$ 4,8 milhões (MEI e ME), a contrapartida mínima é de 5% do valor total do projeto. Para EPPs com faturamento entre R$ 4,8 milhões e R$ 16 milhões, a contrapartida sobe para 15%.",
+        "A avaliação das propostas será realizada por comitê técnico externo, composto por especialistas das áreas temáticas da chamada, seguindo critérios publicados no Anexo II deste edital.",
+        "Resultados de P&D financiados por esta chamada são de propriedade compartilhada entre a empresa e a ICT parceira, salvo acordo específico de confidencialidade aprovado previamente pela FINEP.",
+        "O cronograma de implantação inclui: fase de qualificação (30 dias), fase de execução (até 20 meses) e fase de prestação de contas final (90 dias após o encerramento do projeto)."
+      ]
+    },
+    "expected_output": {
+      "ranking": [0, 3, 2, 1]
+    }
+  },
+  {
+    "case_id": "rerank-012",
+    "input": {
+      "query": "Como funciona a propriedade intelectual dos resultados gerados no projeto?",
+      "chunks": [
+        "As propostas serão avaliadas em duas fases: na primeira fase, análise de conformidade documental; na segunda fase, análise do mérito técnico-científico e econômico por comitê especializado.",
+        "O prazo para submissão de projetos é de 60 dias a partir da publicação desta chamada no Diário Oficial. Após este prazo, o sistema não aceitará novas submissões.",
+        "A titularidade dos direitos de propriedade intelectual, incluindo patentes, modelos de utilidade e segredos industriais gerados com recursos desta chamada, será negociada entre a empresa e a ICT parceira no ato da formalização do acordo de parceria, devendo constar expressamente no plano de trabalho.",
+        "As despesas elegíveis incluem pessoal técnico, bolsas de pesquisa, material de consumo, serviços de terceiros e viagens nacionais e internacionais diretamente relacionadas ao projeto."
+      ]
+    },
+    "expected_output": {
+      "ranking": [2, 3, 0, 1]
+    }
+  },
+  {
+    "case_id": "rerank-013",
+    "input": {
+      "query": "Startups recém-constituídas com menos de 2 anos são elegíveis?",
+      "chunks": [
+        "O valor máximo de bolsa de pesquisa para pesquisador sênior vinculado à ICT parceira é de R$ 8.000,00 mensais. Para pesquisador júnior ou pós-doutorando, o teto é de R$ 4.500,00 mensais.",
+        "Esta chamada é aberta a empresas constituídas há pelo menos 12 meses na data de encerramento das inscrições. Startups com menos de 12 meses de CNPJ ativo não são elegíveis. Empresas entre 12 e 24 meses deverão comprovar receita operacional no período ou apresentar cartas de intenção de clientes.",
+        "A chamada está alinhada às prioridades da Estratégia Nacional de Ciência, Tecnologia e Inovação 2023–2030, com foco nos eixos de transição energética, saúde e bioeconomia.",
+        "Projetos que envolvam tratamento de dados pessoais deverão incluir, no plano de trabalho, cláusula de conformidade com a Lei Geral de Proteção de Dados (LGPD) e designação de encarregado de dados."
+      ]
+    },
+    "expected_output": {
+      "ranking": [1, 3, 2, 0]
+    }
+  },
+  {
+    "case_id": "rerank-014",
+    "input": {
+      "query": "Qual a diferença entre subvenção econômica e crédito reembolsável neste edital?",
+      "chunks": [
+        "Para projetos de TRL 4 a 6, a modalidade disponível é subvenção econômica não reembolsável, cujos recursos não precisam ser devolvidos. Para projetos de TRL 7 a 9, a modalidade é crédito reembolsável com taxa de juros de TJLP + 2% ao ano, com prazo de amortização de até 60 meses após o período de carência.",
+        "A empresa deverá indicar um gerente de projeto responsável pelo acompanhamento técnico e financeiro, com carga horária mínima de 20 horas semanais dedicadas ao projeto.",
+        "O envio de documentação complementar após a submissão é permitido apenas durante o prazo de diligência, que será comunicado individualmente a cada proponente por e-mail cadastrado no sistema.",
+        "Projetos com componente de internacionalização (exportação de produto ou serviço inovador) recebem pontuação adicional de até 10 pontos na avaliação técnica de impacto econômico."
+      ]
+    },
+    "expected_output": {
+      "ranking": [0, 3, 1, 2]
+    }
+  },
+  {
+    "case_id": "rerank-015",
+    "input": {
+      "query": "Quais despesas são elegíveis — é permitido comprar equipamentos com os recursos?",
+      "chunks": [
+        "As propostas serão classificadas em ordem de pontuação técnica e os recursos serão alocados até o limite do orçamento disponível por região, respeitando a ordem de classificação.",
+        "São consideradas despesas elegíveis: contratação de recursos humanos especializados; aquisição de máquinas, equipamentos e instrumentos de laboratório; material de consumo; serviços técnicos especializados de terceiros; e viagens. Despesas administrativas e de infraestrutura predial não são elegíveis.",
+        "Toda a execução financeira deverá ser comprovada mediante notas fiscais eletrônicas (NF-e) ou recibos com valor de face equivalente ao lançamento no relatório financeiro parcial.",
+        "Empresas que receberam financiamento FINEP nos últimos 5 anos deverão comprovar a regularidade na prestação de contas dos contratos anteriores antes de submeter nova proposta."
+      ]
+    },
+    "expected_output": {
+      "ranking": [1, 2, 3, 0]
+    }
+  },
+  {
+    "case_id": "rerank-016",
+    "input": {
+      "query": "Existe algum critério relacionado ao impacto ambiental ou sustentabilidade dos projetos?",
+      "chunks": [
+        "O prazo de análise das propostas pela FINEP é de até 90 dias corridos após o encerramento do prazo de submissão. Projetos com valor acima de R$ 1 milhão passam por análise adicional do Comitê de Investimentos.",
+        "A empresa deverá manter todos os documentos técnicos e financeiros do projeto pelo prazo mínimo de 10 anos após o encerramento do contrato, para fins de auditoria e prestação de contas.",
+        "A pontuação técnica considera: mérito científico (30 pontos); viabilidade técnica e econômica (25 pontos); impacto socioambiental positivo, incluindo redução de emissões, uso de biomassa ou tecnologias limpas (25 pontos); e capacidade da equipe (20 pontos). Projetos com impacto ambiental negativo não avaliado são desclassificados.",
+        "A contrapartida financeira pode ser em espécie (recursos financeiros aportados diretamente ao projeto) ou em bens e serviços (equipamentos próprios, horas de pesquisadores da empresa), desde que devidamente valorados e aprovados."
+      ]
+    },
+    "expected_output": {
+      "ranking": [2, 3, 0, 1]
+    }
+  },
+  {
+    "case_id": "rerank-017",
+    "input": {
+      "query": "Há exigência de faturamento mínimo ou máximo para a empresa proponente?",
+      "chunks": [
+        "O projeto deverá apresentar cronograma detalhado de execução, com marcos trimestrais mensuráveis e indicadores de desempenho técnico que permitam aferir o avanço em relação às metas propostas.",
+        "São elegíveis empresas com receita operacional bruta anual entre R$ 360.000,00 e R$ 300.000.000,00 (entre microempresa e empresa de médio porte). Empresas sem faturamento nos últimos 12 meses são inelegíveis, salvo se apresentarem contratos firmados que atestem atividade econômica real.",
+        "As áreas de foco desta chamada incluem: saúde digital e telemedicina; biotecnologia para diagnósticos; dispositivos médicos de classe II e III; e plataformas de gestão de dados clínicos com IA.",
+        "A submissão de proposta implica a aceitação plena das condições estabelecidas neste edital e seus anexos, sem possibilidade de negociação posterior dos termos contratuais padrão da FINEP."
+      ]
+    },
+    "expected_output": {
+      "ranking": [1, 3, 2, 0]
+    }
+  },
+  {
+    "case_id": "rerank-018",
+    "input": {
+      "query": "O edital exige comprovação de experiência anterior em P&D da equipe?",
+      "chunks": [
+        "Os recursos desta chamada são oriundos do FNDCT e do Fundo Setorial de Saúde (CT-Saúde), sendo vedada sua aplicação em atividades que não configurem pesquisa, desenvolvimento ou inovação tecnológica nos termos da Lei 10.973/2004.",
+        "A equipe técnica responsável pela execução do projeto deverá incluir ao menos um pesquisador com título de doutor ou mestre em área correlata ao tema do projeto, com currículo comprovado em plataforma Lattes atualizado nos últimos 24 meses e com ao menos duas publicações ou depósitos de patente nos últimos 5 anos.",
+        "O valor de cada projeto pode ser ajustado em até 15% durante a execução, mediante justificativa técnica apresentada à FINEP, sem necessidade de formalização de aditivo contratual para ajustes dentro deste limite.",
+        "Empresas em processo de recuperação judicial ou falência, ou com sócios condenados por crimes contra a Administração Pública, estão expressamente impedidas de participar desta chamada."
+      ]
+    },
+    "expected_output": {
+      "ranking": [1, 3, 2, 0]
+    }
+  },
+  {
+    "case_id": "rerank-019",
+    "input": {
+      "query": "Quando serão divulgados os resultados da seleção?",
+      "chunks": [
+        "Os projetos aprovados estarão sujeitos a monitoramento semestral pela FINEP, com apresentação de relatório técnico e financeiro contendo metas alcançadas, desvios justificados e previsão para o período seguinte.",
+        "Empresas sediadas nos estados do Nordeste e Norte recebem prioridade de análise e bônus de 5 pontos na pontuação final, como mecanismo de redução de desigualdades regionais em inovação.",
+        "O resultado preliminar desta chamada será publicado no site da FINEP e no Diário Oficial da União em até 120 dias após o encerramento das inscrições. Após publicação, os proponentes terão 10 dias úteis para interpor recurso fundamentado contra a decisão.",
+        "A propriedade dos equipamentos adquiridos com recursos desta chamada permanece com a empresa beneficiária durante a execução do projeto e por até 5 anos após o encerramento, devendo ser mantidos para uso exclusivo em atividades de P&D."
+      ]
+    },
+    "expected_output": {
+      "ranking": [2, 0, 1, 3]
+    }
+  },
+  {
+    "case_id": "rerank-020",
+    "input": {
+      "query": "Projetos de software e plataformas digitais são elegíveis nesta chamada?",
+      "chunks": [
+        "A análise da conformidade documental será realizada em até 30 dias corridos após o encerramento do prazo de submissão. Propostas com documentação incompleta serão eliminadas nesta fase, sem possibilidade de complementação.",
+        "O limite máximo de financiamento por empresa é de R$ 2 milhões por chamada, vedada a submissão simultânea de mais de uma proposta pelo mesmo CNPJ ou por CNPJs com sócios em comum acima de 30% do capital.",
+        "Esta chamada contempla projetos de desenvolvimento de software inovador, plataformas digitais, aplicativos e sistemas de inteligência artificial, desde que o produto final seja novo ou significativamente aperfeiçoado em relação ao estado da arte do mercado brasileiro e haja plano de comercialização com metas de receita.",
+        "A empresa beneficiária deverá abrir conta bancária específica para movimentação dos recursos da chamada, vedada a mistura com recursos próprios ou de outros financiamentos, sob pena de rescisão contratual."
+      ]
+    },
+    "expected_output": {
+      "ranking": [2, 1, 3, 0]
+    }
+  }
+]
