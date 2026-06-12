@@ -286,6 +286,7 @@ class _LLMStep:
     tool_uses: list[dict[str, Any]]            # [{id, name, input}]
     assistant_message: Any                      # para appendar ao messages[]
     usage: dict[str, int]
+    raw_response: Any = None                    # resposta crua do SDK (p/ telemetria de custo)
 
 
 def _call_openai(
@@ -363,6 +364,7 @@ def _call_openai(
         tool_uses=tool_uses,
         assistant_message=assistant_msg,
         usage=usage,
+        raw_response=response,
     )
 
 
@@ -431,6 +433,7 @@ def _call_anthropic(
         tool_uses=tool_uses,
         assistant_message=assistant_msg,
         usage=usage,
+        raw_response=response,
     )
 
 
@@ -610,8 +613,11 @@ def run_agent(
                             "text": llm_step.text,
                             "tool_uses": llm_step.tool_uses,
                         },
-                        usage_details=llm_step.usage,
                     )
+                    # usage_details com keys canônicas (input/output + cache/
+                    # reasoning) extraídas da resposta crua — viabiliza custo
+                    # por turno/sessão no Langfuse (item 8 da auditoria).
+                    telemetry.record_usage(gen_span, llm_step.raw_response)
 
             total_in += llm_step.usage.get("input_tokens", 0)
             total_out += llm_step.usage.get("output_tokens", 0)
