@@ -1,0 +1,517 @@
+[
+  {
+    "case_id": "struct-001",
+    "input": {
+      "page_text": "CAPÍTULO I — DAS DISPOSIÇÕES GERAIS\n\nArt. 1º O presente Edital tem por objetivo apoiar projetos de pesquisa, desenvolvimento e inovação (PD&I) em empresas brasileiras, visando ao aumento da competitividade nacional por meio do desenvolvimento tecnológico.\n\nArt. 2º Os recursos destinados a este Edital são provenientes do Fundo Nacional de Desenvolvimento Científico e Tecnológico — FNDCT, administrado pela FINEP — Financiadora de Estudos e Projetos.\n\nArt. 3º Para os fins deste Edital, considera-se:\n\nI — Empresa: pessoa jurídica de direito privado, constituída e em operação no Brasil;\n\nII — Proponente: empresa que submete proposta de projeto no âmbito deste Edital;\n\nIII — Instituição de Ciência e Tecnologia (ICT): organização de direito público ou privado que tenha por missão institucional, dentre outras, executar atividades de pesquisa básica ou aplicada de caráter científico ou tecnológico;\n\nIV — Coexecutora: instituição parceira que participa da execução do projeto em regime de cooperação.\n\nArt. 4º O prazo para submissão de propostas é de 45 (quarenta e cinco) dias corridos, contados a partir da data de publicação deste Edital no Diário Oficial da União."
+    },
+    "expected_output": {
+      "blocks": [
+        {
+          "section_path": ["Capítulo I — Das Disposições Gerais"],
+          "kind": "heading",
+          "text": "CAPÍTULO I — DAS DISPOSIÇÕES GERAIS"
+        },
+        {
+          "section_path": ["Capítulo I — Das Disposições Gerais", "Art. 1º"],
+          "kind": "paragraph",
+          "text": "Art. 1º O presente Edital tem por objetivo apoiar projetos de pesquisa, desenvolvimento e inovação (PD&I) em empresas brasileiras, visando ao aumento da competitividade nacional por meio do desenvolvimento tecnológico."
+        },
+        {
+          "section_path": ["Capítulo I — Das Disposições Gerais", "Art. 2º"],
+          "kind": "paragraph",
+          "text": "Art. 2º Os recursos destinados a este Edital são provenientes do Fundo Nacional de Desenvolvimento Científico e Tecnológico — FNDCT, administrado pela FINEP — Financiadora de Estudos e Projetos."
+        },
+        {
+          "section_path": ["Capítulo I — Das Disposições Gerais", "Art. 3º"],
+          "kind": "paragraph",
+          "text": "Art. 3º Para os fins deste Edital, considera-se:"
+        },
+        {
+          "section_path": ["Capítulo I — Das Disposições Gerais", "Art. 3º"],
+          "kind": "list",
+          "text": "I — Empresa: pessoa jurídica de direito privado, constituída e em operação no Brasil;\n\nII — Proponente: empresa que submete proposta de projeto no âmbito deste Edital;\n\nIII — Instituição de Ciência e Tecnologia (ICT): organização de direito público ou privado que tenha por missão institucional, dentre outras, executar atividades de pesquisa básica ou aplicada de caráter científico ou tecnológico;\n\nIV — Coexecutora: instituição parceira que participa da execução do projeto em regime de cooperação."
+        },
+        {
+          "section_path": ["Capítulo I — Das Disposições Gerais", "Art. 4º"],
+          "kind": "paragraph",
+          "text": "Art. 4º O prazo para submissão de propostas é de 45 (quarenta e cinco) dias corridos, contados a partir da data de publicação deste Edital no Diário Oficial da União."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "struct-002",
+    "input": {
+      "page_text": "CAPÍTULO II — DAS CONDIÇÕES DE PARTICIPAÇÃO\n\nArt. 5º Poderão submeter propostas empresas que atendam cumulativamente aos seguintes requisitos:\n\n§ 1º Estar regularmente constituída e em atividade no Brasil, com CNPJ ativo;\n\n§ 2º Ser classificada como Microempresa (ME), Empresa de Pequeno Porte (EPP) ou Empresa de Médio Porte (EMP) nos termos da legislação vigente;\n\n§ 3º Ter capacidade técnica e operacional compatível com a natureza e complexidade do projeto proposto;\n\n§ 4º Não ter pendências junto à Receita Federal, ao INSS, ao FGTS ou quaisquer outros órgãos federais;\n\n§ 5º Não constar em cadastro de inadimplentes do Governo Federal, incluindo o CADIN e o SIAFI.\n\nArt. 6º É vedada a participação de empresas:\n\nI — Que tenham contrato ou convênio em vigor com a FINEP em situação de inadimplência;\n\nII — Cujo controle societário seja exercido direta ou indiretamente por pessoa jurídica de direito público;\n\nIII — Que estejam em processo de falência, concordata, recuperação judicial ou extrajudicial.\n\nArt. 7º Cada empresa poderá submeter até 2 (duas) propostas no âmbito deste Edital, sendo no máximo 1 (uma) como proponente principal em cada linha temática."
+    },
+    "expected_output": {
+      "blocks": [
+        {
+          "section_path": ["Capítulo II — Das Condições de Participação"],
+          "kind": "heading",
+          "text": "CAPÍTULO II — DAS CONDIÇÕES DE PARTICIPAÇÃO"
+        },
+        {
+          "section_path": ["Capítulo II — Das Condições de Participação", "Art. 5º"],
+          "kind": "paragraph",
+          "text": "Art. 5º Poderão submeter propostas empresas que atendam cumulativamente aos seguintes requisitos:"
+        },
+        {
+          "section_path": ["Capítulo II — Das Condições de Participação", "Art. 5º"],
+          "kind": "list",
+          "text": "§ 1º Estar regularmente constituída e em atividade no Brasil, com CNPJ ativo;\n\n§ 2º Ser classificada como Microempresa (ME), Empresa de Pequeno Porte (EPP) ou Empresa de Médio Porte (EMP) nos termos da legislação vigente;\n\n§ 3º Ter capacidade técnica e operacional compatível com a natureza e complexidade do projeto proposto;\n\n§ 4º Não ter pendências junto à Receita Federal, ao INSS, ao FGTS ou quaisquer outros órgãos federais;\n\n§ 5º Não constar em cadastro de inadimplentes do Governo Federal, incluindo o CADIN e o SIAFI."
+        },
+        {
+          "section_path": ["Capítulo II — Das Condições de Participação", "Art. 6º"],
+          "kind": "paragraph",
+          "text": "Art. 6º É vedada a participação de empresas:"
+        },
+        {
+          "section_path": ["Capítulo II — Das Condições de Participação", "Art. 6º"],
+          "kind": "list",
+          "text": "I — Que tenham contrato ou convênio em vigor com a FINEP em situação de inadimplência;\n\nII — Cujo controle societário seja exercido direta ou indiretamente por pessoa jurídica de direito público;\n\nIII — Que estejam em processo de falência, concordata, recuperação judicial ou extrajudicial."
+        },
+        {
+          "section_path": ["Capítulo II — Das Condições de Participação", "Art. 7º"],
+          "kind": "paragraph",
+          "text": "Art. 7º Cada empresa poderá submeter até 2 (duas) propostas no âmbito deste Edital, sendo no máximo 1 (uma) como proponente principal em cada linha temática."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "struct-003",
+    "input": {
+      "page_text": "CAPÍTULO IV — DO APOIO FINANCEIRO\n\nArt. 12. O valor total disponível neste Edital é de R$ 150.000.000,00 (cento e cinquenta milhões de reais), distribuídos entre as linhas temáticas conforme o Anexo I.\n\nArt. 13. O valor máximo por projeto é de R$ 5.000.000,00 (cinco milhões de reais) e o valor mínimo é de R$ 500.000,00 (quinhentos mil reais).\n\n§ 1º Projetos com participação de ICT pública como coexecutora poderão solicitar até R$ 7.000.000,00 (sete milhões de reais).\n\n§ 2º A contrapartida mínima do proponente é de 10% (dez por cento) do valor total do projeto para ME e EPP, e de 20% (vinte por cento) para Empresas de Médio Porte.\n\n§ 3º A contrapartida poderá ser financeira ou econômica, nos termos do Manual de Operações da FINEP.\n\nArt. 14. Os recursos serão liberados em parcelas, de acordo com o cronograma de desembolso aprovado pela FINEP, condicionadas ao cumprimento das metas físicas e financeiras estabelecidas no Plano de Trabalho.\n\nArt. 15. É vedada a utilização dos recursos para pagamento de pessoal permanente da empresa proponente, salvo para remuneração de pesquisadores em dedicação exclusiva ao projeto, conforme regulamentação específica.\n\nArt. 16. O prazo máximo de execução dos projetos é de 36 (trinta e seis) meses, podendo ser prorrogado mediante justificativa técnica e aprovação da FINEP."
+    },
+    "expected_output": {
+      "blocks": [
+        {
+          "section_path": ["Capítulo IV — Do Apoio Financeiro"],
+          "kind": "heading",
+          "text": "CAPÍTULO IV — DO APOIO FINANCEIRO"
+        },
+        {
+          "section_path": ["Capítulo IV — Do Apoio Financeiro", "Art. 12"],
+          "kind": "paragraph",
+          "text": "Art. 12. O valor total disponível neste Edital é de R$ 150.000.000,00 (cento e cinquenta milhões de reais), distribuídos entre as linhas temáticas conforme o Anexo I."
+        },
+        {
+          "section_path": ["Capítulo IV — Do Apoio Financeiro", "Art. 13"],
+          "kind": "paragraph",
+          "text": "Art. 13. O valor máximo por projeto é de R$ 5.000.000,00 (cinco milhões de reais) e o valor mínimo é de R$ 500.000,00 (quinhentos mil reais)."
+        },
+        {
+          "section_path": ["Capítulo IV — Do Apoio Financeiro", "Art. 13"],
+          "kind": "list",
+          "text": "§ 1º Projetos com participação de ICT pública como coexecutora poderão solicitar até R$ 7.000.000,00 (sete milhões de reais).\n\n§ 2º A contrapartida mínima do proponente é de 10% (dez por cento) do valor total do projeto para ME e EPP, e de 20% (vinte por cento) para Empresas de Médio Porte.\n\n§ 3º A contrapartida poderá ser financeira ou econômica, nos termos do Manual de Operações da FINEP."
+        },
+        {
+          "section_path": ["Capítulo IV — Do Apoio Financeiro", "Art. 14"],
+          "kind": "paragraph",
+          "text": "Art. 14. Os recursos serão liberados em parcelas, de acordo com o cronograma de desembolso aprovado pela FINEP, condicionadas ao cumprimento das metas físicas e financeiras estabelecidas no Plano de Trabalho."
+        },
+        {
+          "section_path": ["Capítulo IV — Do Apoio Financeiro", "Art. 15"],
+          "kind": "paragraph",
+          "text": "Art. 15. É vedada a utilização dos recursos para pagamento de pessoal permanente da empresa proponente, salvo para remuneração de pesquisadores em dedicação exclusiva ao projeto, conforme regulamentação específica."
+        },
+        {
+          "section_path": ["Capítulo IV — Do Apoio Financeiro", "Art. 16"],
+          "kind": "paragraph",
+          "text": "Art. 16. O prazo máximo de execução dos projetos é de 36 (trinta e seis) meses, podendo ser prorrogado mediante justificativa técnica e aprovação da FINEP."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "struct-004",
+    "input": {
+      "page_text": "5. DOCUMENTAÇÃO OBRIGATÓRIA PARA SUBMISSÃO\n\n5.1 A proposta deverá ser submetida exclusivamente por meio da plataforma digital da FINEP (https://plataforma.finep.gov.br), acompanhada dos seguintes documentos obrigatórios:\n\na) Formulário de Proposta preenchido integralmente na plataforma;\nb) Plano de Trabalho detalhado, incluindo cronograma físico-financeiro;\nc) Currículo Lattes atualizado do coordenador do projeto (CNPq);\nd) Ato constitutivo da empresa (Contrato Social ou Estatuto) e suas últimas alterações;\ne) Comprovante de inscrição e situação cadastral no CNPJ;\nf) Certidão Negativa de Débitos Relativos a Créditos Tributários Federais e à Dívida Ativa da União;\ng) Certificado de Regularidade do FGTS;\nh) Certidão Negativa de Débitos Trabalhistas (CNDT);\ni) Balanço patrimonial e demonstrações financeiras do último exercício fiscal, assinados por contador habilitado;\nj) Declaração de enquadramento como ME, EPP ou EMP, conforme o caso;\nk) Declaração de inexistência de impedimentos legais para participação no Edital;\nl) Comprovante de recolhimento do ISSQN dos últimos 12 meses, quando aplicável.\n\n5.2 No caso de projetos com coexecutora ICT, deverá ser apresentado também:\n\na) Carta de Anuência da ICT, assinada pelo dirigente máximo;\nb) Portaria de credenciamento ou estatuto da ICT que comprove sua natureza jurídica."
+    },
+    "expected_output": {
+      "blocks": [
+        {
+          "section_path": ["5. Documentação Obrigatória para Submissão"],
+          "kind": "heading",
+          "text": "5. DOCUMENTAÇÃO OBRIGATÓRIA PARA SUBMISSÃO"
+        },
+        {
+          "section_path": ["5. Documentação Obrigatória para Submissão", "5.1"],
+          "kind": "paragraph",
+          "text": "5.1 A proposta deverá ser submetida exclusivamente por meio da plataforma digital da FINEP (https://plataforma.finep.gov.br), acompanhada dos seguintes documentos obrigatórios:"
+        },
+        {
+          "section_path": ["5. Documentação Obrigatória para Submissão", "5.1"],
+          "kind": "list",
+          "text": "a) Formulário de Proposta preenchido integralmente na plataforma;\nb) Plano de Trabalho detalhado, incluindo cronograma físico-financeiro;\nc) Currículo Lattes atualizado do coordenador do projeto (CNPq);\nd) Ato constitutivo da empresa (Contrato Social ou Estatuto) e suas últimas alterações;\ne) Comprovante de inscrição e situação cadastral no CNPJ;\nf) Certidão Negativa de Débitos Relativos a Créditos Tributários Federais e à Dívida Ativa da União;\ng) Certificado de Regularidade do FGTS;\nh) Certidão Negativa de Débitos Trabalhistas (CNDT);\ni) Balanço patrimonial e demonstrações financeiras do último exercício fiscal, assinados por contador habilitado;\nj) Declaração de enquadramento como ME, EPP ou EMP, conforme o caso;\nk) Declaração de inexistência de impedimentos legais para participação no Edital;\nl) Comprovante de recolhimento do ISSQN dos últimos 12 meses, quando aplicável."
+        },
+        {
+          "section_path": ["5. Documentação Obrigatória para Submissão", "5.2"],
+          "kind": "paragraph",
+          "text": "5.2 No caso de projetos com coexecutora ICT, deverá ser apresentado também:"
+        },
+        {
+          "section_path": ["5. Documentação Obrigatória para Submissão", "5.2"],
+          "kind": "list",
+          "text": "a) Carta de Anuência da ICT, assinada pelo dirigente máximo;\nb) Portaria de credenciamento ou estatuto da ICT que comprove sua natureza jurídica."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "struct-005",
+    "input": {
+      "page_text": "ANEXO III — LISTA DE DOCUMENTOS OBRIGATÓRIOS PARA CONTRATAÇÃO\n\nApós a aprovação da proposta, o proponente deverá apresentar à FINEP, no prazo de 30 (trinta) dias, os documentos listados abaixo para formalização do contrato de subvenção econômica:\n\n1. Documentos da Empresa:\n— Cópia autenticada do CNPJ;\n— Cópia autenticada do Contrato Social consolidado;\n— Certidão de regularidade fiscal federal, estadual e municipal;\n— Certidão Negativa de Débitos Previdenciários;\n— Prova de regularidade junto ao FGTS;\n— Comprovante de abertura de conta bancária específica para o projeto;\n— Relação de bens e equipamentos da empresa (inventário atualizado).\n\n2. Documentos dos Responsáveis Técnicos:\n— Cópia do documento de identidade e CPF do coordenador;\n— Currículo documentado do coordenador e dos pesquisadores principais;\n— Declaração de dedicação mínima ao projeto (carga horária semanal);\n— Comprovante de vínculo empregatício com a empresa.\n\n3. Documentos do Projeto:\n— Plano de Trabalho revisado, incorporando eventuais exigências da análise técnica;\n— Cronograma físico-financeiro detalhado por trimestre;\n— Orçamento analítico com cotações de fornecedores para itens acima de R$ 10.000,00;\n— Memória de cálculo das despesas previstas.\n\nDocumentos entregues fora do prazo ou em desconformidade resultarão no cancelamento da aprovação."
+    },
+    "expected_output": {
+      "blocks": [
+        {
+          "section_path": ["Anexo III — Lista de Documentos Obrigatórios para Contratação"],
+          "kind": "heading",
+          "text": "ANEXO III — LISTA DE DOCUMENTOS OBRIGATÓRIOS PARA CONTRATAÇÃO"
+        },
+        {
+          "section_path": ["Anexo III — Lista de Documentos Obrigatórios para Contratação"],
+          "kind": "paragraph",
+          "text": "Após a aprovação da proposta, o proponente deverá apresentar à FINEP, no prazo de 30 (trinta) dias, os documentos listados abaixo para formalização do contrato de subvenção econômica:"
+        },
+        {
+          "section_path": ["Anexo III — Lista de Documentos Obrigatórios para Contratação", "1. Documentos da Empresa"],
+          "kind": "heading",
+          "text": "1. Documentos da Empresa:"
+        },
+        {
+          "section_path": ["Anexo III — Lista de Documentos Obrigatórios para Contratação", "1. Documentos da Empresa"],
+          "kind": "list",
+          "text": "— Cópia autenticada do CNPJ;\n— Cópia autenticada do Contrato Social consolidado;\n— Certidão de regularidade fiscal federal, estadual e municipal;\n— Certidão Negativa de Débitos Previdenciários;\n— Prova de regularidade junto ao FGTS;\n— Comprovante de abertura de conta bancária específica para o projeto;\n— Relação de bens e equipamentos da empresa (inventário atualizado)."
+        },
+        {
+          "section_path": ["Anexo III — Lista de Documentos Obrigatórios para Contratação", "2. Documentos dos Responsáveis Técnicos"],
+          "kind": "heading",
+          "text": "2. Documentos dos Responsáveis Técnicos:"
+        },
+        {
+          "section_path": ["Anexo III — Lista de Documentos Obrigatórios para Contratação", "2. Documentos dos Responsáveis Técnicos"],
+          "kind": "list",
+          "text": "— Cópia do documento de identidade e CPF do coordenador;\n— Currículo documentado do coordenador e dos pesquisadores principais;\n— Declaração de dedicação mínima ao projeto (carga horária semanal);\n— Comprovante de vínculo empregatício com a empresa."
+        },
+        {
+          "section_path": ["Anexo III — Lista de Documentos Obrigatórios para Contratação", "3. Documentos do Projeto"],
+          "kind": "heading",
+          "text": "3. Documentos do Projeto:"
+        },
+        {
+          "section_path": ["Anexo III — Lista de Documentos Obrigatórios para Contratação", "3. Documentos do Projeto"],
+          "kind": "list",
+          "text": "— Plano de Trabalho revisado, incorporando eventuais exigências da análise técnica;\n— Cronograma físico-financeiro detalhado por trimestre;\n— Orçamento analítico com cotações de fornecedores para itens acima de R$ 10.000,00;\n— Memória de cálculo das despesas previstas."
+        },
+        {
+          "section_path": ["Anexo III — Lista de Documentos Obrigatórios para Contratação"],
+          "kind": "paragraph",
+          "text": "Documentos entregues fora do prazo ou em desconformidade resultarão no cancelamento da aprovação."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "struct-006",
+    "input": {
+      "page_text": "ANEXO II — CRONOGRAMA DO PROCESSO SELETIVO\n\nO processo seletivo deste Edital obedecerá às seguintes etapas e prazos:\n\n| Etapa | Descrição | Data de Início | Data de Encerramento |\n|---|---|---|---|\n| 1 | Publicação do Edital | 15/03/2026 | — |\n| 2 | Período de submissão de propostas | 15/03/2026 | 30/04/2026 |\n| 3 | Análise de admissibilidade e enquadramento | 01/05/2026 | 31/05/2026 |\n| 4 | Análise técnica e econômico-financeira | 01/06/2026 | 31/07/2026 |\n| 5 | Divulgação do resultado preliminar | 15/08/2026 | — |\n| 6 | Prazo para recurso | 16/08/2026 | 30/08/2026 |\n| 7 | Análise dos recursos | 01/09/2026 | 15/09/2026 |\n| 8 | Divulgação do resultado final | 30/09/2026 | — |\n| 9 | Contratação | 01/10/2026 | 30/11/2026 |\n\nObs.: As datas poderão ser alteradas mediante publicação de errata no Diário Oficial da União e no sítio eletrônico da FINEP (www.finep.gov.br).\n\nO não cumprimento dos prazos por parte do proponente implicará a desclassificação automática da proposta, sem possibilidade de recurso."
+    },
+    "expected_output": {
+      "blocks": [
+        {
+          "section_path": ["Anexo II — Cronograma do Processo Seletivo"],
+          "kind": "heading",
+          "text": "ANEXO II — CRONOGRAMA DO PROCESSO SELETIVO"
+        },
+        {
+          "section_path": ["Anexo II — Cronograma do Processo Seletivo"],
+          "kind": "paragraph",
+          "text": "O processo seletivo deste Edital obedecerá às seguintes etapas e prazos:"
+        },
+        {
+          "section_path": ["Anexo II — Cronograma do Processo Seletivo"],
+          "kind": "table",
+          "text": "| Etapa | Descrição | Data de Início | Data de Encerramento |\n|---|---|---|---|\n| 1 | Publicação do Edital | 15/03/2026 | — |\n| 2 | Período de submissão de propostas | 15/03/2026 | 30/04/2026 |\n| 3 | Análise de admissibilidade e enquadramento | 01/05/2026 | 31/05/2026 |\n| 4 | Análise técnica e econômico-financeira | 01/06/2026 | 31/07/2026 |\n| 5 | Divulgação do resultado preliminar | 15/08/2026 | — |\n| 6 | Prazo para recurso | 16/08/2026 | 30/08/2026 |\n| 7 | Análise dos recursos | 01/09/2026 | 15/09/2026 |\n| 8 | Divulgação do resultado final | 30/09/2026 | — |\n| 9 | Contratação | 01/10/2026 | 30/11/2026 |"
+        },
+        {
+          "section_path": ["Anexo II — Cronograma do Processo Seletivo"],
+          "kind": "paragraph",
+          "text": "Obs.: As datas poderão ser alteradas mediante publicação de errata no Diário Oficial da União e no sítio eletrônico da FINEP (www.finep.gov.br)."
+        },
+        {
+          "section_path": ["Anexo II — Cronograma do Processo Seletivo"],
+          "kind": "paragraph",
+          "text": "O não cumprimento dos prazos por parte do proponente implicará a desclassificação automática da proposta, sem possibilidade de recurso."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "struct-007",
+    "input": {
+      "page_text": "TABELA 3 — CRITÉRIOS E PESOS DE AVALIAÇÃO TÉCNICA\n\nAs propostas aprovadas na fase de admissibilidade serão avaliadas por comissão técnica especializada, segundo os critérios, pesos e pontuação mínima definidos na tabela abaixo:\n\n| Critério | Peso (%) | Pontuação Mínima | Descrição |\n|---|---|---|---|\n| Mérito técnico-científico | 30 | 6,0 | Originalidade, consistência metodológica e estado da arte |\n| Potencial de impacto econômico | 25 | 6,0 | Estimativa de mercado, geração de empregos e receitas |\n| Adequação ao tema prioritário | 20 | 7,0 | Aderência às linhas temáticas do Edital |\n| Capacidade técnica da equipe | 15 | 5,0 | Qualificação e experiência comprovada dos pesquisadores |\n| Viabilidade econômico-financeira | 10 | 5,0 | Coerência do orçamento, contrapartida e cronograma |\n| TOTAL | 100 | — | Nota mínima global: 6,0 |\n\nAs propostas que não atingirem a pontuação mínima em qualquer critério serão desclassificadas, ainda que a nota global seja igual ou superior a 6,0.\n\nEm caso de empate na pontuação total, serão utilizados os seguintes critérios de desempate, nessa ordem: (1) maior pontuação no critério de mérito técnico-científico; (2) maior pontuação no critério de impacto econômico; (3) maior porte tecnológico da empresa (TRL mais elevado)."
+    },
+    "expected_output": {
+      "blocks": [
+        {
+          "section_path": ["Tabela 3 — Critérios e Pesos de Avaliação Técnica"],
+          "kind": "heading",
+          "text": "TABELA 3 — CRITÉRIOS E PESOS DE AVALIAÇÃO TÉCNICA"
+        },
+        {
+          "section_path": ["Tabela 3 — Critérios e Pesos de Avaliação Técnica"],
+          "kind": "paragraph",
+          "text": "As propostas aprovadas na fase de admissibilidade serão avaliadas por comissão técnica especializada, segundo os critérios, pesos e pontuação mínima definidos na tabela abaixo:"
+        },
+        {
+          "section_path": ["Tabela 3 — Critérios e Pesos de Avaliação Técnica"],
+          "kind": "table",
+          "text": "| Critério | Peso (%) | Pontuação Mínima | Descrição |\n|---|---|---|---|\n| Mérito técnico-científico | 30 | 6,0 | Originalidade, consistência metodológica e estado da arte |\n| Potencial de impacto econômico | 25 | 6,0 | Estimativa de mercado, geração de empregos e receitas |\n| Adequação ao tema prioritário | 20 | 7,0 | Aderência às linhas temáticas do Edital |\n| Capacidade técnica da equipe | 15 | 5,0 | Qualificação e experiência comprovada dos pesquisadores |\n| Viabilidade econômico-financeira | 10 | 5,0 | Coerência do orçamento, contrapartida e cronograma |\n| TOTAL | 100 | — | Nota mínima global: 6,0 |"
+        },
+        {
+          "section_path": ["Tabela 3 — Critérios e Pesos de Avaliação Técnica"],
+          "kind": "paragraph",
+          "text": "As propostas que não atingirem a pontuação mínima em qualquer critério serão desclassificadas, ainda que a nota global seja igual ou superior a 6,0."
+        },
+        {
+          "section_path": ["Tabela 3 — Critérios e Pesos de Avaliação Técnica"],
+          "kind": "paragraph",
+          "text": "Em caso de empate na pontuação total, serão utilizados os seguintes critérios de desempate, nessa ordem: (1) maior pontuação no critério de mérito técnico-científico; (2) maior pontuação no critério de impacto econômico; (3) maior porte tecnológico da empresa (TRL mais elevado)."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "struct-008",
+    "input": {
+      "page_text": "São Paulo, 10 de março de 2026.\n\nFUNDAÇÃO DE AMPARO À PESQUISA DO ESTADO DE SÃO PAULO — FAPESP\n\n_______________________________________\nProf. Dr. Marco Antônio Zago\nPresidente\nFAPESP\n\n_______________________________________\nProfa. Dra. Helena Nader\nDiretora Científica\nFAPESP\n\n_______________________________________\nDr. Carlos Henrique de Brito Cruz\nDiretor Executivo\nFAPESP\n\nEste Edital foi aprovado pelo Conselho Superior da FAPESP em reunião ordinária realizada em 05 de março de 2026, conforme Deliberação CS nº 847/2026, e publicado no Diário Oficial do Estado de São Paulo em 10 de março de 2026 (DOE-SP, Caderno Executivo I, Seção I, p. 32).\n\nA FAPESP é uma fundação pública com autonomia administrativa e financeira, criada pela Constituição do Estado de São Paulo de 1989. Sede: Rua Pio XI, 1500 — Alto da Lapa, São Paulo, SP, CEP 05468-901. Telefone: (11) 3838-4000. Sítio eletrônico: www.fapesp.br."
+    },
+    "expected_output": {
+      "blocks": [
+        {
+          "section_path": [],
+          "kind": "boilerplate",
+          "text": "São Paulo, 10 de março de 2026."
+        },
+        {
+          "section_path": [],
+          "kind": "boilerplate",
+          "text": "FUNDAÇÃO DE AMPARO À PESQUISA DO ESTADO DE SÃO PAULO — FAPESP"
+        },
+        {
+          "section_path": [],
+          "kind": "signature",
+          "text": "Prof. Dr. Marco Antônio Zago\nPresidente\nFAPESP"
+        },
+        {
+          "section_path": [],
+          "kind": "signature",
+          "text": "Profa. Dra. Helena Nader\nDiretora Científica\nFAPESP"
+        },
+        {
+          "section_path": [],
+          "kind": "signature",
+          "text": "Dr. Carlos Henrique de Brito Cruz\nDiretor Executivo\nFAPESP"
+        },
+        {
+          "section_path": [],
+          "kind": "boilerplate",
+          "text": "Este Edital foi aprovado pelo Conselho Superior da FAPESP em reunião ordinária realizada em 05 de março de 2026, conforme Deliberação CS nº 847/2026, e publicado no Diário Oficial do Estado de São Paulo em 10 de março de 2026 (DOE-SP, Caderno Executivo I, Seção I, p. 32)."
+        },
+        {
+          "section_path": [],
+          "kind": "boilerplate",
+          "text": "A FAPESP é uma fundação pública com autonomia administrativa e financeira, criada pela Constituição do Estado de São Paulo de 1989. Sede: Rua Pio XI, 1500 — Alto da Lapa, São Paulo, SP, CEP 05468-901. Telefone: (11) 3838-4000. Sítio eletrônico: www.fapesp.br."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "struct-009",
+    "input": {
+      "page_text": "Brasília, 20 de fevereiro de 2026.\n\nFINEP — FINANCIADORA DE ESTUDOS E PROJETOS\n\nEste documento é assinado eletronicamente nos termos do Decreto nº 10.543, de 13 de novembro de 2020.\n\n_______________________________________\nMárcio de Melo Tavares\nPresidente\nFINEP\n\n_______________________________________\nDra. Fernanda Lima Corrêa\nDiretora de Programas e Projetos\nFINEP\n\n_______________________________________\nDr. Roberto Aparecido Silveira\nDiretor de Operações\nFINEP\n\nAuthenticity code: FINEP-2026-EDL-0047-ASSINADO\n\nPara verificar a autenticidade deste documento acesse: https://assinatura.finep.gov.br e informe o código acima.\n\nFINEP — Financiadora de Estudos e Projetos. CNPJ: 33.749.086/0001-09. Endereço: Praia do Flamengo, 200 — Flamengo, Rio de Janeiro, RJ, CEP 22210-030. Este edital é uma publicação oficial do Governo Federal do Brasil."
+    },
+    "expected_output": {
+      "blocks": [
+        {
+          "section_path": [],
+          "kind": "boilerplate",
+          "text": "Brasília, 20 de fevereiro de 2026."
+        },
+        {
+          "section_path": [],
+          "kind": "boilerplate",
+          "text": "FINEP — FINANCIADORA DE ESTUDOS E PROJETOS"
+        },
+        {
+          "section_path": [],
+          "kind": "boilerplate",
+          "text": "Este documento é assinado eletronicamente nos termos do Decreto nº 10.543, de 13 de novembro de 2020."
+        },
+        {
+          "section_path": [],
+          "kind": "signature",
+          "text": "Márcio de Melo Tavares\nPresidente\nFINEP"
+        },
+        {
+          "section_path": [],
+          "kind": "signature",
+          "text": "Dra. Fernanda Lima Corrêa\nDiretora de Programas e Projetos\nFINEP"
+        },
+        {
+          "section_path": [],
+          "kind": "signature",
+          "text": "Dr. Roberto Aparecido Silveira\nDiretor de Operações\nFINEP"
+        },
+        {
+          "section_path": [],
+          "kind": "boilerplate",
+          "text": "Authenticity code: FINEP-2026-EDL-0047-ASSINADO"
+        },
+        {
+          "section_path": [],
+          "kind": "boilerplate",
+          "text": "Para verificar a autenticidade deste documento acesse: https://assinatura.finep.gov.br e informe o código acima."
+        },
+        {
+          "section_path": [],
+          "kind": "boilerplate",
+          "text": "FINEP — Financiadora de Estudos e Projetos. CNPJ: 33.749.086/0001-09. Endereço: Praia do Flamengo, 200 — Flamengo, Rio de Janeiro, RJ, CEP 22210-030. Este edital é uma publicação oficial do Governo Federal do Brasil."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "struct-010",
+    "input": {
+      "page_text": "1. OBJETIVOS\n\n1.1 Objetivo Geral\n\nApoiar financeiramente projetos de pesquisa aplicada e desenvolvimento experimental voltados para a criação, aprimoramento ou validação de soluções tecnológicas inovadoras nas áreas de bioeconomia, transição energética e economia circular, contribuindo para o desenvolvimento sustentável e a competitividade da indústria nacional.\n\n1.2 Objetivos Específicos\n\na) Estimular a cooperação entre empresas e Instituições de Ciência e Tecnologia (ICTs) para a realização de atividades conjuntas de PD&I;\n\nb) Promover o desenvolvimento de tecnologias com potencial de mercado e de geração de empregos qualificados;\n\nc) Apoiar a consolidação de empresas inovadoras de base tecnológica, especialmente micro, pequenas e médias empresas;\n\nd) Fomentar projetos alinhados às Missões de Inovação definidas pela Estratégia Nacional de Ciência, Tecnologia e Inovação (ENCTI 2023–2030);\n\ne) Contribuir para a redução das emissões de gases de efeito estufa e para a descarbonização da economia brasileira.\n\n1.3 Alinhamento Estratégico\n\nEste Edital integra o Programa Mais Inovação Brasil e está alinhado com os Objetivos de Desenvolvimento Sustentável (ODS) da Agenda 2030 da ONU, em especial os ODS 7 (Energia Limpa e Acessível), 9 (Indústria, Inovação e Infraestrutura) e 13 (Ação Contra a Mudança Global do Clima)."
+    },
+    "expected_output": {
+      "blocks": [
+        {
+          "section_path": ["1. Objetivos"],
+          "kind": "heading",
+          "text": "1. OBJETIVOS"
+        },
+        {
+          "section_path": ["1. Objetivos", "1.1 Objetivo Geral"],
+          "kind": "heading",
+          "text": "1.1 Objetivo Geral"
+        },
+        {
+          "section_path": ["1. Objetivos", "1.1 Objetivo Geral"],
+          "kind": "paragraph",
+          "text": "Apoiar financeiramente projetos de pesquisa aplicada e desenvolvimento experimental voltados para a criação, aprimoramento ou validação de soluções tecnológicas inovadoras nas áreas de bioeconomia, transição energética e economia circular, contribuindo para o desenvolvimento sustentável e a competitividade da indústria nacional."
+        },
+        {
+          "section_path": ["1. Objetivos", "1.2 Objetivos Específicos"],
+          "kind": "heading",
+          "text": "1.2 Objetivos Específicos"
+        },
+        {
+          "section_path": ["1. Objetivos", "1.2 Objetivos Específicos"],
+          "kind": "list",
+          "text": "a) Estimular a cooperação entre empresas e Instituições de Ciência e Tecnologia (ICTs) para a realização de atividades conjuntas de PD&I;\n\nb) Promover o desenvolvimento de tecnologias com potencial de mercado e de geração de empregos qualificados;\n\nc) Apoiar a consolidação de empresas inovadoras de base tecnológica, especialmente micro, pequenas e médias empresas;\n\nd) Fomentar projetos alinhados às Missões de Inovação definidas pela Estratégia Nacional de Ciência, Tecnologia e Inovação (ENCTI 2023–2030);\n\ne) Contribuir para a redução das emissões de gases de efeito estufa e para a descarbonização da economia brasileira."
+        },
+        {
+          "section_path": ["1. Objetivos", "1.3 Alinhamento Estratégico"],
+          "kind": "heading",
+          "text": "1.3 Alinhamento Estratégico"
+        },
+        {
+          "section_path": ["1. Objetivos", "1.3 Alinhamento Estratégico"],
+          "kind": "paragraph",
+          "text": "Este Edital integra o Programa Mais Inovação Brasil e está alinhado com os Objetivos de Desenvolvimento Sustentável (ODS) da Agenda 2030 da ONU, em especial os ODS 7 (Energia Limpa e Acessível), 9 (Indústria, Inovação e Infraestrutura) e 13 (Ação Contra a Mudança Global do Clima)."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "struct-011",
+    "input": {
+      "page_text": "3. ELEGIBILIDADE E ÁREAS TEMÁTICAS PRIORITÁRIAS\n\n3.1 Poderão submeter propostas neste Edital empresas com sede e operação no Estado de São Paulo, constituídas há pelo menos 2 (dois) anos, que atuem nos seguintes setores prioritários:\n\n— Agrotecnologia e biotecnologia aplicada ao agronegócio;\n— Tecnologias para saúde e ciências da vida (healthtech e medtech);\n— Soluções de tecnologia da informação e comunicação (TIC) com aplicação industrial;\n— Energia renovável, armazenamento e eficiência energética;\n— Tecnologias ambientais e gestão de resíduos.\n\n3.2 Serão aceitas propostas de empresas classificadas como:\n\nI — Empresa Nascente de Base Tecnológica (ENBT): empresa com até 7 (sete) anos de existência, com faturamento bruto anual inferior a R$ 16.000.000,00, cujas atividades principais envolvam o desenvolvimento ou a aplicação de tecnologias inovadoras;\n\nII — Empresa de Base Tecnológica Consolidada (EBTC): empresa com mais de 7 (sete) anos de existência, com faturamento bruto anual de até R$ 300.000.000,00, comprovadamente atuante em atividades de PD&I;\n\nIII — Spinoff Acadêmica: empresa originada de pesquisa realizada em universidade ou instituto de pesquisa público sediado no Estado de São Paulo, independentemente do tempo de constituição.\n\n3.3 Empresas com projetos em andamento financiados pela FAPESP poderão participar, desde que o novo projeto seja complementar e não haja sobreposição de objetos ou equipe."
+    },
+    "expected_output": {
+      "blocks": [
+        {
+          "section_path": ["3. Elegibilidade e Áreas Temáticas Prioritárias"],
+          "kind": "heading",
+          "text": "3. ELEGIBILIDADE E ÁREAS TEMÁTICAS PRIORITÁRIAS"
+        },
+        {
+          "section_path": ["3. Elegibilidade e Áreas Temáticas Prioritárias", "3.1"],
+          "kind": "paragraph",
+          "text": "3.1 Poderão submeter propostas neste Edital empresas com sede e operação no Estado de São Paulo, constituídas há pelo menos 2 (dois) anos, que atuem nos seguintes setores prioritários:"
+        },
+        {
+          "section_path": ["3. Elegibilidade e Áreas Temáticas Prioritárias", "3.1"],
+          "kind": "list",
+          "text": "— Agrotecnologia e biotecnologia aplicada ao agronegócio;\n— Tecnologias para saúde e ciências da vida (healthtech e medtech);\n— Soluções de tecnologia da informação e comunicação (TIC) com aplicação industrial;\n— Energia renovável, armazenamento e eficiência energética;\n— Tecnologias ambientais e gestão de resíduos."
+        },
+        {
+          "section_path": ["3. Elegibilidade e Áreas Temáticas Prioritárias", "3.2"],
+          "kind": "paragraph",
+          "text": "3.2 Serão aceitas propostas de empresas classificadas como:"
+        },
+        {
+          "section_path": ["3. Elegibilidade e Áreas Temáticas Prioritárias", "3.2"],
+          "kind": "list",
+          "text": "I — Empresa Nascente de Base Tecnológica (ENBT): empresa com até 7 (sete) anos de existência, com faturamento bruto anual inferior a R$ 16.000.000,00, cujas atividades principais envolvam o desenvolvimento ou a aplicação de tecnologias inovadoras;\n\nII — Empresa de Base Tecnológica Consolidada (EBTC): empresa com mais de 7 (sete) anos de existência, com faturamento bruto anual de até R$ 300.000.000,00, comprovadamente atuante em atividades de PD&I;\n\nIII — Spinoff Acadêmica: empresa originada de pesquisa realizada em universidade ou instituto de pesquisa público sediado no Estado de São Paulo, independentemente do tempo de constituição."
+        },
+        {
+          "section_path": ["3. Elegibilidade e Áreas Temáticas Prioritárias", "3.3"],
+          "kind": "paragraph",
+          "text": "3.3 Empresas com projetos em andamento financiados pela FAPESP poderão participar, desde que o novo projeto seja complementar e não haja sobreposição de objetos ou equipe."
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "struct-012",
+    "input": {
+      "page_text": "2. OBJETO E DESCRIÇÃO DO PROGRAMA\n\n2.1 Este Edital tem por objeto a concessão de subvenção econômica a empresas inovadoras para execução de projetos de Pesquisa, Desenvolvimento e Inovação (PD&I) nas áreas temáticas de Bioeconomia e Uso Sustentável da Biodiversidade.\n\n2.2 Entende-se por Bioeconomia, para os fins deste Edital, o conjunto de atividades econômicas que utilizam conhecimentos derivados das ciências biológicas, associados a tecnologias de ponta, para produzir bens, processos e serviços de forma sustentável, preservando os recursos naturais e promovendo a inclusão social.\n\n2.3 São áreas temáticas elegíveis dentro do escopo da Bioeconomia:\n\na) Bioprospecção e desenvolvimento de bioprodutos (biofármacos, bioinsumos, bioativos);\nb) Biotecnologia industrial e processos de biorrefinaria;\nc) Uso e conservação de recursos genéticos da biodiversidade brasileira;\nd) Sistemas agroflorestais e manejo florestal sustentável;\ne) Biotecnologia azul (recursos marinhos e aquáticos).\n\n2.4 Projetos que envolvam coleta ou uso de material biológico deverão estar regularizados perante o Sistema Nacional de Gestão do Patrimônio Genético e do Conhecimento Tradicional Associado (SisGen), nos termos da Lei nº 13.123/2015 e do Decreto nº 8.772/2016.\n\n2.5 Não serão apoiados projetos cujo objeto principal seja a substituição de tecnologias já existentes por soluções equivalentes sem incremento técnico significativo, projetos voltados exclusivamente à comercialização ou projetos de natureza consultiva ou de prestação de serviços de rotina."
+    },
+    "expected_output": {
+      "blocks": [
+        {
+          "section_path": ["2. Objeto e Descrição do Programa"],
+          "kind": "heading",
+          "text": "2. OBJETO E DESCRIÇÃO DO PROGRAMA"
+        },
+        {
+          "section_path": ["2. Objeto e Descrição do Programa", "2.1"],
+          "kind": "paragraph",
+          "text": "2.1 Este Edital tem por objeto a concessão de subvenção econômica a empresas inovadoras para execução de projetos de Pesquisa, Desenvolvimento e Inovação (PD&I) nas áreas temáticas de Bioeconomia e Uso Sustentável da Biodiversidade."
+        },
+        {
+          "section_path": ["2. Objeto e Descrição do Programa", "2.2"],
+          "kind": "paragraph",
+          "text": "2.2 Entende-se por Bioeconomia, para os fins deste Edital, o conjunto de atividades econômicas que utilizam conhecimentos derivados das ciências biológicas, associados a tecnologias de ponta, para produzir bens, processos e serviços de forma sustentável, preservando os recursos naturais e promovendo a inclusão social."
+        },
+        {
+          "section_path": ["2. Objeto e Descrição do Programa", "2.3"],
+          "kind": "paragraph",
+          "text": "2.3 São áreas temáticas elegíveis dentro do escopo da Bioeconomia:"
+        },
+        {
+          "section_path": ["2. Objeto e Descrição do Programa", "2.3"],
+          "kind": "list",
+          "text": "a) Bioprospecção e desenvolvimento de bioprodutos (biofármacos, bioinsumos, bioativos);\nb) Biotecnologia industrial e processos de biorrefinaria;\nc) Uso e conservação de recursos genéticos da biodiversidade brasileira;\nd) Sistemas agroflorestais e manejo florestal sustentável;\ne) Biotecnologia azul (recursos marinhos e aquáticos)."
+        },
+        {
+          "section_path": ["2. Objeto e Descrição do Programa", "2.4"],
+          "kind": "paragraph",
+          "text": "2.4 Projetos que envolvam coleta ou uso de material biológico deverão estar regularizados perante o Sistema Nacional de Gestão do Patrimônio Genético e do Conhecimento Tradicional Associado (SisGen), nos termos da Lei nº 13.123/2015 e do Decreto nº 8.772/2016."
+        },
+        {
+          "section_path": ["2. Objeto e Descrição do Programa", "2.5"],
+          "kind": "paragraph",
+          "text": "2.5 Não serão apoiados projetos cujo objeto principal seja a substituição de tecnologias já existentes por soluções equivalentes sem incremento técnico significativo, projetos voltados exclusivamente à comercialização ou projetos de natureza consultiva ou de prestação de serviços de rotina."
+        }
+      ]
+    }
+  }
+]

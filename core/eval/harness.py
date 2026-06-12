@@ -131,17 +131,58 @@ def _aggregate(item_results: list[dict]) -> dict[str, float]:
 # Caminho Langfuse
 # ---------------------------------------------------------------------------
 
+def _to_lf_evals(raw: Any, LFEval: type) -> Any:
+    """Converte Evaluation dict(s) → instâncias Langfuse Evaluation (tem .name)."""
+    if raw is None:
+        return None
+    evals = raw if isinstance(raw, list) else [raw]
+    result = [
+        LFEval(name=e["name"], value=e.get("value"), comment=e.get("comment"))
+        for e in evals if e and e.get("name")
+    ]
+    return result if len(result) > 1 else (result[0] if result else None)
+
+
 def _run_langfuse(suite: Suite, items: list[Item], run_name: str) -> Any:
-    from langfuse import Langfuse
+    from langfuse import Evaluation as LFEval, Langfuse
     lf = Langfuse()
+
+    def _wrap_ev(ev_fn: EvaluatorFn):
+        def wrapper(*, input, output, expected_output, metadata, **kwargs):
+            return _to_lf_evals(
+                ev_fn(input=input, output=output,
+                      expected_output=expected_output, metadata=metadata),
+                LFEval,
+            )
+        return wrapper
+
+    def _wrap_run_ev(run_ev_fn: RunEvaluatorFn):
+        def wrapper(*, item_results, **kwargs):
+            # Normaliza ExperimentItemResult → dict local para nossos run_evaluators.
+            local_results = [
+                {
+                    "output": getattr(ir, "output", None),
+                    "metadata": getattr(ir, "metadata", None) or {},
+                    "evaluations": [
+                        {"name": getattr(e, "name", None),
+                         "value": getattr(e, "value", None),
+                         "comment": getattr(e, "comment", None)}
+                        for e in (getattr(ir, "evaluations", []) or [])
+                    ],
+                }
+                for ir in (item_results or [])
+            ]
+            return _to_lf_evals(run_ev_fn(local_results), LFEval)
+        return wrapper
+
     result = lf.run_experiment(
         name=suite.name,
         run_name=run_name,
         description=suite.description,
         data=items,
         task=suite.task,
-        evaluators=list(suite.evaluators),
-        run_evaluators=list(suite.run_evaluators),
+        evaluators=[_wrap_ev(ev) for ev in suite.evaluators],
+        run_evaluators=[_wrap_run_ev(rev) for rev in suite.run_evaluators],
     )
     lf.flush()
     return result
