@@ -40,6 +40,7 @@ DEFAULT_TOP_K = 5
 DEFAULT_FTS_WEIGHT = 0.3    # ver "Tuning do default" no docstring de `retrieve_chunks`
 DEFAULT_MAX_PER_SOURCE = 2  # diversidade: nº máx de chunks do mesmo PDF no top-K
 DEFAULT_RERANK_CANDIDATES = 20  # tamanho do pool reordenado pelo reranker (Front 4)
+DEFAULT_METADATA_BOOST = 1.2    # boost de chunks cujas flags de metadata casam com a query
 _CANDIDATE_LIMIT = 20       # how many we pull from each retriever before fusion
 _RRF_CONSTANT = 60          # classic RRF k
 
@@ -89,6 +90,66 @@ def _build_or_tsquery(query: str, max_terms: int = 8, min_len: int = 3) -> str:
         if len(keepers) >= max_terms:
             break
     return " | ".join(keepers)
+
+
+# Detecção de intenção da query → flags de metadata do chunker.
+# Espelha as flags gravadas em `edital_chunks.metadata` (core/retrieval/chunker.py
+# `_detect_metadata`), mas com vocabulário de PERGUNTA, não de conteúdo: quem
+# pergunta "qual o prazo?" não escreve uma data — o chunk que responde tem uma.
+# `contem_tabela` fica de fora deliberadamente: não há query-pattern natural
+# ("tem tabela?" não é pergunta de usuário).
+_QUERY_FLAG_PATTERNS: dict[str, re.Pattern] = {
+    "contem_data": re.compile(
+        r"\bprazo|\bdata\b|\bquando\b|\bcronograma|\bvigên|\bvigenc|\bencerr|\bdeadline",
+        re.IGNORECASE,
+    ),
+    "contem_valor_financeiro": re.compile(
+        r"\bvalor|\bquanto\b|\brecursos?\b|\borçament|\borcament|\bfinanc"
+        r"|\bmilhõ|\bmilho[e]?s|\bbilhõ|\bcontrapartida|\bverba|\bcusto",
+        re.IGNORECASE,
+    ),
+    "contem_elegibilidade": re.compile(
+        r"\belegív|\belegiv|\bproponente|\bexecutora|\bcoexecutora|\bhabilita"
+        r"|\bquem\s+pode\b|\bICT\b|\bCNPJ\b",
+        re.IGNORECASE,
+    ),
+    "contem_criterios": re.compile(
+        r"\bcrit[ée]rio|\bpontua|\bpeso\b|\bnota\b|\bavalia|\bclassifica|\bjulgament",
+        re.IGNORECASE,
+    ),
+}
+
+
+def _detect_query_flags(query: str) -> frozenset[str]:
+    """Flags de metadata cuja intenção aparece na query. Vazio = sem sinal."""
+    if not query:
+        return frozenset()
+    return frozenset(
+        flag for flag, pat in _QUERY_FLAG_PATTERNS.items() if pat.search(query)
+    )
+
+
+def _apply_metadata_boost(
+    scores: dict[str, float],
+    by_id: dict[str, dict],
+    query_flags: frozenset[str],
+    boost: float,
+) -> dict[str, float]:
+    """Multiplica o score de chunks cuja metadata casa com a intenção da query.
+
+    Boost suave (não filtro): a detecção de intent é regex e erra — um WHERE
+    duro mataria recall nesses erros; multiplicar só reordena. Aplica uma vez
+    por chunk (any-match), não cumulativo por flag. Chunks sem metadata (rows
+    indexadas antes das flags) ficam neutros — nunca penaliza.
+    """
+    if boost == 1.0 or not query_flags:
+        return scores
+    out: dict[str, float] = {}
+    for _id, score in scores.items():
+        meta = by_id[_id].get("metadata") or {}
+        matched = any(meta.get(f) is True for f in query_flags)
+        out[_id] = score * boost if matched else score
+    return out
 
 
 def _dedup_by_source(
@@ -178,11 +239,13 @@ def retrieve_chunks(
     primary_boost: float = 1.5,
     rerank: bool = True,
     k_candidates: int = DEFAULT_RERANK_CANDIDATES,
+    metadata_boost: float = DEFAULT_METADATA_BOOST,
 ) -> list[dict]:
     """Hybrid retrieval over edital_chunks para um ou mais editais.
 
     Returns top-k dicts with keys:
-        id, edital_id, chunk_index, text, section, source_file, page_range, score
+        id, edital_id, chunk_index, text, section, source_file, page_range,
+        metadata, score
 
     Args:
         edital_ids: lista de IDs de editais. O PRIMEIRO é tratado como o
@@ -214,6 +277,16 @@ def retrieve_chunks(
             ausente, mantém a ordenação RRF pura.
         k_candidates: tamanho do pool levado ao reranker (over-fetch). Só tem
             efeito quando `rerank=True`.
+        metadata_boost: multiplicador aplicado ao score RRF de chunks cujas
+            flags de metadata (contem_data, contem_valor_financeiro, etc. —
+            gravadas pelo chunker) casam com a intenção detectada na query
+            ("qual o prazo?" → contem_data). Boost suave, não filtro: a
+            detecção é regex e erra; multiplicar só reordena, nunca exclui.
+            Aplicado SÓ no estágio RRF (molda o pool que vai ao reranker e a
+            ordenação de fallback) — não é reaplicado pós-rerank como o
+            primary_boost, porque o cross-encoder já vê o texto do chunk e
+            julgar relevância à query é exatamente o trabalho dele; reaplicar
+            contaria o sinal duas vezes. Use 1.0 pra desativar.
 
     Tuning do default
     -----------------
@@ -264,7 +337,7 @@ def retrieve_chunks(
             if dense_weight > 0.0:
                 cur.execute(
                     """
-                    SELECT id::text, edital_id, chunk_index, text, section, source_file, page_range
+                    SELECT id::text, edital_id, chunk_index, text, section, source_file, page_range, metadata
                       FROM public.edital_chunks
                      WHERE edital_id = ANY(%s)
                        AND embedding IS NOT NULL
@@ -284,7 +357,7 @@ def retrieve_chunks(
             if fts_weight > 0.0 and ts_or_query:
                 cur.execute(
                     """
-                    SELECT id::text, edital_id, chunk_index, text, section, source_file, page_range
+                    SELECT id::text, edital_id, chunk_index, text, section, source_file, page_range, metadata
                       FROM public.edital_chunks
                      WHERE edital_id = ANY(%s)
                        AND text_search @@ to_tsquery('portuguese', %s)
@@ -302,7 +375,7 @@ def retrieve_chunks(
     #    in both lists; we keep one canonical row payload.
     by_id: dict[str, dict] = {}
     for row in dense_rows + sparse_rows:
-        _id, edital_id_val, chunk_index, text, section, source_file, page_range = row
+        _id, edital_id_val, chunk_index, text, section, source_file, page_range, metadata = row
         if _id not in by_id:
             by_id[_id] = {
                 "id": _id,
@@ -312,6 +385,7 @@ def retrieve_chunks(
                 "section": section,
                 "source_file": source_file,
                 "page_range": page_range,
+                "metadata": metadata,
             }
 
     dense_ids = [r[0] for r in dense_rows]
@@ -332,6 +406,13 @@ def retrieve_chunks(
             _id: (score * primary_boost if by_id[_id].get("edital_id") == primary_id else score)
             for _id, score in scores.items()
         }
+
+    # 3b. Boost por flags de metadata: query pedindo prazo/valor/elegibilidade/
+    #     critérios sobe chunks que comprovadamente contêm esse tipo de conteúdo
+    #     (flags do chunker). Ver docstring de `metadata_boost`.
+    scores = _apply_metadata_boost(
+        scores, by_id, _detect_query_flags(query), metadata_boost
+    )
 
     # 4. Ordenação por RRF score (com primary_boost já aplicado).
     ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
