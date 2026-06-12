@@ -84,6 +84,70 @@ def agent_run(
         yield None
 
 
+def record_usage(span: Any, response: Any) -> None:
+    """Registra usage_details num span de generation a partir da resposta LLM.
+
+    Por que existe: sem usage_details consistente nos spans, o Langfuse não
+    consegue calcular custo por turno/sessão (ele precisa de input/output tokens
+    + model pra precificar). Antes cada call site lembrava — ou esquecia — de
+    montar o dict manualmente, com keys divergentes. Este helper centraliza a
+    extração e garante o contrato esperado pelo Langfuse: usage_details com keys
+    canônicas 'input' e 'output' (e, quando disponíveis, 'cache_read'/'reasoning').
+
+    Detecta o shape pela presença dos atributos (defensivo, sem isinstance):
+      • OpenAI Chat Completions: response.usage.prompt_tokens / completion_tokens
+        (+ prompt_tokens_details.cached_tokens, completion_tokens_details.reasoning_tokens)
+      • Anthropic Messages:       response.usage.input_tokens / output_tokens
+        (+ cache_read_input_tokens / cache_creation_input_tokens)
+
+    Nunca levanta exceção: no-op se span é None, se response não tem usage, ou
+    se qualquer acesso/atualização falhar. Telemetria jamais derruba a request.
+    """
+    if span is None:
+        return
+    try:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return
+
+        details: dict[str, int] = {}
+
+        # Shape OpenAI: prompt_tokens / completion_tokens
+        prompt = getattr(usage, "prompt_tokens", None)
+        completion = getattr(usage, "completion_tokens", None)
+        # Shape Anthropic: input_tokens / output_tokens
+        in_tok = getattr(usage, "input_tokens", None)
+        out_tok = getattr(usage, "output_tokens", None)
+
+        if prompt is not None or completion is not None:
+            details["input"] = prompt or 0
+            details["output"] = completion or 0
+            prompt_details = getattr(usage, "prompt_tokens_details", None)
+            cached = getattr(prompt_details, "cached_tokens", None)
+            if cached:
+                details["cache_read"] = cached
+            completion_details = getattr(usage, "completion_tokens_details", None)
+            reasoning = getattr(completion_details, "reasoning_tokens", None)
+            if reasoning:
+                details["reasoning"] = reasoning
+        elif in_tok is not None or out_tok is not None:
+            details["input"] = in_tok or 0
+            details["output"] = out_tok or 0
+            cache_read = getattr(usage, "cache_read_input_tokens", None)
+            if cache_read:
+                details["cache_read"] = cache_read
+            cache_creation = getattr(usage, "cache_creation_input_tokens", None)
+            if cache_creation:
+                details["cache_write"] = cache_creation
+        else:
+            # Sem nenhum dos shapes conhecidos — nada a registrar.
+            return
+
+        span.update(usage_details=details)
+    except Exception as e:  # pragma: no cover - guard defensivo
+        logger.debug("record_usage falhou (ignorado): %s", e)
+
+
 @contextmanager
 def llm_generation(
     name: str,
@@ -94,8 +158,10 @@ def llm_generation(
 ):
     """Span de uma chamada LLM dentro do loop do agente (as_type=generation).
 
-    Captura input (messages), model e usage_details (atualizar via span.update
-    com usage_details={'input': N, 'output': M} após a chamada).
+    Captura input (messages), model e usage_details. Para registrar o usage
+    após a chamada, use `record_usage(span, response)` com a resposta crua do
+    SDK (OpenAI ou Anthropic) — ele extrai input/output (+ cache/reasoning) no
+    formato que o Langfuse usa pra precificar.
     """
     if not is_enabled():
         yield None
