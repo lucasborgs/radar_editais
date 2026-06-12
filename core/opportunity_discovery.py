@@ -143,7 +143,11 @@ def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, mode
         "tecnológico/open innovation de empresa-âncora; programa=aceleração/"
         "incubação/cohort; edital=chamada/edital de fomento público padrão), "
         "tema (lista; ESCOLHA só desta lista canônica, [] se nenhum servir: "
-        f"{vocab}). Não invente dados que não estão no texto."
+        f"{vocab}), "
+        "tema_livre (lista; 1-2 temas em 2-4 palavras descrevendo a área da "
+        "oportunidade APENAS quando NENHUM item de `tema` acima servir; [] caso "
+        "contrário. NÃO invente além do texto — é o sinal de demanda por evolução "
+        "do vocabulário). Não invente dados que não estão no texto."
     )
     try:
         data = _json_from_llm(
@@ -157,6 +161,13 @@ def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, mode
     tema = data.get("tema") or []
     if isinstance(tema, str):
         tema = [tema]
+    # tema_livre: sinal de DEMANDA por evolução do vocab (§5.9). Quando nada da
+    # lista canônica serve, o LLM devolve aqui o tema-candidato em linguagem livre
+    # — `core.vocab_lint` agrega esse sinal e PROPÕE evolução pro humano decidir
+    # (a triagem e o campo `tema` não mudam; isto é só sinal adicional).
+    tema_livre = data.get("tema_livre") or []
+    if isinstance(tema_livre, str):
+        tema_livre = [tema_livre]
     # Registro no SCHEMA DA FONTE WEB (não mais um schema de discovery próprio):
     # url/url_hash dão a identidade `web:<url_hash>` (mesma de páginas manuais);
     # texto_cru é o corpo pro chunking; verificacao=provisorio marca a origem
@@ -171,6 +182,8 @@ def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, mode
         "descricao": data.get("descricao", ""),
         "status": data.get("status", "") or "ABERTA",
         "tema": "; ".join(t for t in tema if isinstance(t, str)),
+        # tema_livre: sinal de demanda fora do vocab (consumido por core.vocab_lint).
+        "tema_livre": "; ".join(t for t in tema_livre if isinstance(t, str)),
         # opportunity_type (Fase B): tipo-evento classificado pela LLM. Default
         # edital (chamada pública padrão); build_knowledge_graph o carrega ao índice.
         "opportunity_type": (data.get("opportunity_type") or "edital").strip().lower(),

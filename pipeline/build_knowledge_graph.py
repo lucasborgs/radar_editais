@@ -294,7 +294,11 @@ def _normalize_web(ch: dict) -> dict:
     """
     deadline_str = ch.get("prazo_envio", "") or ch.get("deadline", "")
     raw_status = ch.get("status") or "Desconhecido"
-    themes_raw = _split_multi(ch.get("tema"))
+    # tema (escolhido do vocab na extração) ∪ tema_livre (o que o LLM teria
+    # escolhido quando NADA do vocab servia). O filtro abaixo promove o
+    # tema_livre automaticamente quando o vocab evolui (vocab lint → WIKI.md):
+    # rebuild re-deriva do bronze, sem re-extração e sem custo de LLM.
+    themes_raw = _split_multi(ch.get("tema")) + _split_multi(ch.get("tema_livre"))
     vocab = set(wiki_schema.tema_vocab())
     themes = [t for t in canonicalize_themes(themes_raw) if not vocab or t in vocab]
     return {

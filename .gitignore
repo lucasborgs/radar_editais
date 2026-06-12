@@ -18,6 +18,7 @@ build/
 # Data (raw sources — não versionar)
 data/bronze/
 data/silver/
+data/vocab_lint/
 profiles/
 artigos/
 benchmark/
