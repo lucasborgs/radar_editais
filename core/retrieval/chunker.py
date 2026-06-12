@@ -24,10 +24,12 @@ OVERLAP_TOKENS = 150
 MIN_TOKENS = 80
 MAX_TOKENS = 1500
 
-# Metadata detection — content-type flags úteis pra filtro no retrieval.
-# Lista deliberadamente curta: cada flag tem que (a) ser barata de detectar e
-# (b) ter caso de uso concreto numa query do writer. Adicionar flag sem
-# query-pattern correspondente é dívida.
+# Metadata detection — content-type flags consumidas no retrieval: o retriever
+# detecta a intenção da query (core/retrieval/retriever.py _QUERY_FLAG_PATTERNS)
+# e dá boost RRF aos chunks cuja flag casa. Lista deliberadamente curta: cada
+# flag tem que (a) ser barata de detectar e (b) ter query-pattern correspondente
+# no retriever — flag sem consumo é dívida (contem_tabela é a exceção tolerada:
+# não há pergunta natural de usuário que peça "tabela").
 _META_DATE_RE = re.compile(r"\b\d{2}/\d{2}/\d{4}\b")
 _META_MONEY_RE = re.compile(r"R\$\s*[\d.,]+|\bmilhões\b|\bbilhões\b", re.IGNORECASE)
 _META_ELIG_RE = re.compile(

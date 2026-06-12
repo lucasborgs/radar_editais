@@ -15,8 +15,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from core.retrieval.retriever import (  # noqa: E402
+    _apply_metadata_boost,
     _build_or_tsquery,
     _dedup_by_source,
+    _detect_query_flags,
     format_chunks_for_prompt,
 )
 
@@ -201,6 +203,92 @@ def test_dedup_source_none_e_tratado_como_chave_propria():
     out = _dedup_by_source(ranked, by_id, k=3, max_per_source=1)
     # c1 entra (source=None), c2 NÃO (mesmo bucket None), c3 entra (Edital)
     assert [r["id"] for r in out] == ["c1", "c3"]
+
+
+# =============================================================================
+# Metadata flags — detecção de intent na query + boost RRF
+# =============================================================================
+
+def test_detect_flags_prazo_vira_contem_data():
+    assert "contem_data" in _detect_query_flags("Qual o prazo de submissão?")
+    assert "contem_data" in _detect_query_flags("Até quando vai a vigência?")
+    assert "contem_data" in _detect_query_flags("Quando encerra a chamada?")
+
+
+def test_detect_flags_valor_vira_contem_valor_financeiro():
+    assert "contem_valor_financeiro" in _detect_query_flags("Qual o valor máximo?")
+    assert "contem_valor_financeiro" in _detect_query_flags("Quanto de contrapartida é exigido?")
+    assert "contem_valor_financeiro" in _detect_query_flags("Há recursos para bolsas?")
+
+
+def test_detect_flags_elegibilidade():
+    assert "contem_elegibilidade" in _detect_query_flags("Quem pode participar?")
+    assert "contem_elegibilidade" in _detect_query_flags("Empresas sem ICT são elegíveis?")
+    assert "contem_elegibilidade" in _detect_query_flags("O proponente precisa de CNPJ ativo?")
+
+
+def test_detect_flags_criterios():
+    assert "contem_criterios" in _detect_query_flags("Quais os critérios de avaliação?")
+    assert "contem_criterios" in _detect_query_flags("Como funciona a pontuação?")
+    assert "contem_criterios" in _detect_query_flags("Qual o peso de cada item no julgamento?")
+
+
+def test_detect_flags_query_neutra_sem_flags():
+    """Query sem intent detectável → conjunto vazio (boost vira no-op)."""
+    assert _detect_query_flags("Resuma o objetivo do edital") == frozenset()
+    assert _detect_query_flags("") == frozenset()
+
+
+def test_detect_flags_multiplas_intencoes():
+    flags = _detect_query_flags("Qual o valor e o prazo do edital?")
+    assert "contem_data" in flags
+    assert "contem_valor_financeiro" in flags
+
+
+def _by_id_meta(*items: tuple[str, dict | None]) -> dict[str, dict]:
+    return {cid: {"id": cid, "edital_id": "601", "metadata": meta}
+            for cid, meta in items}
+
+
+def test_metadata_boost_sobe_chunk_com_flag():
+    """Chunk com a flag pedida pela query ultrapassa um sem a flag que tinha
+    score RRF levemente maior."""
+    by_id = _by_id_meta(
+        ("c1", {"contem_data": False}),
+        ("c2", {"contem_data": True}),
+    )
+    scores = {"c1": 0.50, "c2": 0.45}
+    out = _apply_metadata_boost(scores, by_id, frozenset({"contem_data"}), boost=1.2)
+    assert out["c2"] > out["c1"]
+    assert out["c1"] == 0.50  # não-match fica intacto
+
+
+def test_metadata_boost_any_match_nao_cumulativo():
+    """Chunk casando 2 flags recebe o boost UMA vez, não boost²."""
+    by_id = _by_id_meta(
+        ("c1", {"contem_data": True, "contem_valor_financeiro": True}),
+    )
+    out = _apply_metadata_boost(
+        {"c1": 1.0}, by_id,
+        frozenset({"contem_data", "contem_valor_financeiro"}), boost=1.2,
+    )
+    assert out["c1"] == 1.2
+
+
+def test_metadata_boost_neutro_sem_metadata():
+    """Rows indexadas antes das flags (metadata None ou sem as chaves) ficam
+    neutras — nunca penalizadas."""
+    by_id = _by_id_meta(("c1", None), ("c2", {}), ("c3", {"content_hash": "abc"}))
+    scores = {"c1": 0.5, "c2": 0.4, "c3": 0.3}
+    out = _apply_metadata_boost(scores, by_id, frozenset({"contem_data"}), boost=1.2)
+    assert out == scores
+
+
+def test_metadata_boost_noop_sem_flags_ou_boost_1():
+    by_id = _by_id_meta(("c1", {"contem_data": True}))
+    scores = {"c1": 0.5}
+    assert _apply_metadata_boost(scores, by_id, frozenset(), boost=1.2) == scores
+    assert _apply_metadata_boost(scores, by_id, frozenset({"contem_data"}), boost=1.0) == scores
 
 
 # =============================================================================
