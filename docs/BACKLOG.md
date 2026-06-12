@@ -11,6 +11,28 @@
 
 ## Aberto
 
+### Rerank cross-encoder em prod (estágio 2 do item 6 da auditoria)
+
+- **O quê:** ligar o reranker cross-encoder (mMiniLM) no Railway. Hoje prod
+  roda `RERANK_BACKEND=off`; o estágio 1 (flip pra `llm` no painel, sem
+  deploy) entrega +7pp de gold_recall@3 vs off. O estágio 2 troca llm→CE:
+  build com `pip install .[rerank]` (+~1GB de imagem, torch CPU), warmup no
+  startup do FastAPI (load lazy leva ~25s — sem warmup o 1º turno pós-deploy
+  paga), conferir RAM da instância web (+0.7-1GB residente; ~US$7-10/mês),
+  pesos baixados no build ou no warmup (disco efêmero re-baixa por restart).
+- **Por que adiado:** na escala beta o ganho sobre o estágio 1 é marginal
+  (ndcg 0.931 vs 0.870; latência empata na vCPU; API do llm custa centavos).
+  Vale quando o volume crescer ou pra tirar a OpenAI do caminho crítico do
+  rerank.
+- **Números/gate:** benchmark 2026-06-12 no docstring de core/reranker.py e
+  commit 8ebe6b7bf; suíte `reranker` + A/B na suíte `rag` (off 0.823 vs CE
+  0.895 de gold_recall@3). bge-reranker-v2-m3 REPROVADO por footprint —
+  não reavaliar sem GPU.
+- **Ponto de entrada:** scripts/deploy.sh (bloco ENV, linha ~81, atualizar
+  comentário do beta) + Dockerfile/build do serviço web + warmup em
+  backend/api.py.
+- **Status:** aberto (2026-06-12).
+
 ### Re-tagger LLM de temas por item (fonte-agnóstico)
 
 - **O quê:** hoje o tema FINEP vem da taxonomia da própria fonte (que erra —
