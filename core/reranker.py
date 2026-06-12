@@ -23,6 +23,20 @@ Decisão do modelo cross-encoder (questão aberta #3 da spec): default
 `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` — MiniLM multilíngue treinado no
 mMARCO (inclui português), ~118M params, leve o suficiente para rodar em CPU
 por turno. Sobrescrevível via `RERANK_MODEL`.
+
+Benchmark 2026-06-12 (golden reranker, 20 casos; scripts/bench_reranker.py):
+  • mMiniLM (este default): ndcg@3 0.931, top1 1.00, ~1.1s/chamada CPU
+    (20 passagens ~800 tok), custo zero.
+  • backend llm (gpt-4o-mini): ndcg@3 0.870, top1 1.00, ~2.6s/chamada +
+    custo de API. O cross-encoder DOMINA o llm em qualidade, latência e
+    custo — prefira RERANK_BACKEND=cross-encoder onde a dep couber.
+  • BAAI/bge-reranker-v2-m3 (candidato a upgrade): REPROVADO no gate por
+    footprint — 568M params (~4.5GB em fp32 no load) nem carrega em dev
+    com 8GB de RAM; latência CPU projetada ≥5s/chamada. Reavaliar só se o
+    rerank migrar para GPU/serviço dedicado.
+Em prod o backend segue `off` (decisão de beta: peso de torch na imagem +
+latência; ver scripts/deploy.sh). Quando houver folga, o caminho é
+cross-encoder, não llm.
 """
 from __future__ import annotations
 
