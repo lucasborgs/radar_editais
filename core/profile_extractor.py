@@ -63,6 +63,13 @@ DIRETRIZES DE INVESTIGAÇÃO
   enriquecer com dados oficiais (razão social, porte, atividade).
 - Nunca invente dados. Se não conseguir achar, use string vazia ou None.
 
+ORGANIZE A INVESTIGAÇÃO
+- Em crawls de várias páginas, registre o plano com write_todos e atualize os
+  status conforme avança (in_progress ao abrir uma página, completed depois).
+- Use write_note para anotar os fatos de cada página assim que os ler — o texto
+  da página some do contexto quando ele enche. Releia com read_note antes de
+  chamar submit_profile, para consolidar o que coletou.
+
 CAMPOS DO PERFIL (submit_profile)
 - nome: razão social ou nome fantasia (obrigatório)
 - tipo_entidade: 'empresa', 'startup', 'universidade' ou 'ict' (obrigatório)
@@ -263,10 +270,24 @@ class ProfileExtractor:
             de JSON parseado do texto final.
         """
         from core.llm.agent_runtime import resolve_agent_provider, run_agent
-        from core.llm.agent_tools import ExtractionState, build_profile_tools
+        from core.llm.agent_tools import (
+            ExtractionState,
+            PlanState,
+            Scratchpad,
+            build_planning_tools,
+            build_profile_tools,
+            build_scratchpad_tools,
+        )
 
         state = ExtractionState()
-        tools = build_profile_tools(state)
+        # write_todos ancora o plano de crawl; scratchpad retém fatos de cada
+        # página antes do submit_profile (texto da página é truncado e some do
+        # contexto quando ele enche). PlanState/Scratchpad por extração.
+        tools = (
+            build_profile_tools(state)
+            + build_planning_tools(PlanState())
+            + build_scratchpad_tools(Scratchpad())
+        )
 
         initial = [
             {

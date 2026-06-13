@@ -157,6 +157,10 @@ COMO USAR AS FERRAMENTAS
   quando contexto estratégico de aplicações passadas for relevante para a seção.
 - plan_writing_session → no início de uma sessão ou quando o usuário pedir
   orientação sobre por onde começar ou em que focar.
+- write_todos → em tarefas com múltiplas etapas, registre seu plano e atualize
+  os status conforme avança (in_progress ao começar, completed ao terminar). Se
+  usar plan_writing_session, transcreva a estratégia para write_todos antes de
+  executar. Em pedido trivial de uma etapa só, não precisa.
 
 QUANDO PARAR DE USAR FERRAMENTAS
 - Após responder à pergunta do usuário com clareza.

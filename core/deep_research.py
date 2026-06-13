@@ -17,7 +17,7 @@ import os
 from dataclasses import dataclass, field
 
 from core import web_search as ws
-from core.llm.agent_runtime import resolve_agent_provider, run_agent, tool
+from core.llm.agent_runtime import run_subagent, tool
 
 logger = logging.getLogger(__name__)
 
@@ -100,23 +100,18 @@ def run_deep_research(
             return f"Erro ao ler {url}: {e}."
         return f"{d.get('title', url)}\n{d.get('text', '')[:_FETCH_CHAR_LIMIT]}"
 
-    prov, mdl = resolve_agent_provider(
-        provider,  # type: ignore[arg-type]
-        model or os.getenv("ANTHROPIC_MODEL_AGENT", "claude-sonnet-4-6"),
+    # Subagente-como-tool: run_subagent resolve provider e degrada graciosamente
+    # (exceção → stop_reason="error"). A dedup de sources e o formato do
+    # resultado ficam aqui, no domínio.
+    result = run_subagent(
+        name="deep_research",
+        system=_SYSTEM,
+        user_message=question,
+        tools=[web_search, fetch_url],
+        provider=provider,  # type: ignore[arg-type]
+        model=model,
+        max_steps=max_steps,
     )
-
-    try:
-        result = run_agent(
-            system=_SYSTEM,
-            initial_messages=[{"role": "user", "content": question}],
-            tools=[web_search, fetch_url],
-            model=mdl,
-            provider=prov,
-            max_steps=max_steps,
-        )
-    except Exception as e:
-        logger.error("run_deep_research falhou: %s", e)
-        return DeepResearchResult(answer="", sources=[], stop_reason="error")
 
     # Fontes = hits consultados, deduplicados por URL (preservando ordem).
     seen: set[str] = set()
