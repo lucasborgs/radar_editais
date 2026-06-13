@@ -381,6 +381,19 @@ export default function FrontDoorPage() {
     toast.success("Conversa reiniciada.");
   }, []);
 
+  // "Nova conversa" da ConversationSidebar: quando já estamos em "/", a página
+  // não remonta, então a sidebar dispara `frontdoor:new` (já tendo limpado o
+  // sessionStorage) e nós zeramos o estado em memória aqui.
+  useEffect(() => {
+    function onNew() {
+      setEntries([]);
+      setInput("");
+      setBriefs({});
+    }
+    window.addEventListener("frontdoor:new", onNew);
+    return () => window.removeEventListener("frontdoor:new", onNew);
+  }, []);
+
   const isEmpty = hydrated && entries.length === 0;
   const completeness = profileCompleteness(profile);
   const hasRadar = entries.some((e) => e.kind === "radar");
