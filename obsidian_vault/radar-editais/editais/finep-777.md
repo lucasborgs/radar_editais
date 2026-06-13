@@ -16,6 +16,7 @@ tags:
   - aberta
   - mecanismo/subvencao
   - tema/agro-bioeconomia-e-alimentos
+  - tema/materiais-quimica-e-manufatura-avancada
   - trl/trl_pesquisa
   - trl/trl_prototipo
   - trl/trl_industrial
@@ -24,10 +25,11 @@ tags:
 
 # 🟢 Finep Mais Inovação Brasil – Rodada 2 – Economia Circular e Cidades Sustentáveis
 
-> Este edital financia o desenvolvimento de produtos ou processos inovadores nas áreas de economia circular e cidades sustentáveis, direcionado a startups e cooperativas. O objetivo é promover soluções sustentáveis que atendam às necessidades sociais e ambientais.
+> Este edital financia o desenvolvimento de produtos ou processos inovadores nas áreas de economia circular e cidades sustentáveis, direcionado a startups e cooperativas. O objetivo é promover soluções tecnológicas que contribuam para a sustentabilidade e a eficiência dos recursos.
 
 ## Temas
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
+- [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 
 ## Fonte
 - [[radar-editais/fontes/finep|FINEP]]
@@ -47,23 +49,23 @@ tags:
 | Valor do projeto | R$ 5,000,000 a R$ 30,000,000 |
 | TRL aceito | 3 a 8 |
 | Contrapartida | Obrigatória |
-| Entidades elegíveis | empresas, startups, ICTs |
+| Entidades elegíveis | startups, cooperativas, empresas |
 | PDFs disponíveis | 11 |
 | Fatos extraídos | 0 |
 | Link | [https://www.finep.gov.br/e/chamada-publica/222684/755213](https://www.finep.gov.br/e/chamada-publica/222684/755213) |
 
 ## Requisitos Principais
 
-- Participação obrigatória de pelo menos uma ICT no projeto.
-- Propostas devem ser apresentadas por empresas brasileiras.
+- Participação obrigatória de pelo menos uma ICT.
+- Propostas devem ser apresentadas em arranjos simples ou em rede.
 - Valor solicitado deve estar entre R$ 5 milhões e R$ 30 milhões, dependendo do arranjo.
-- Contrapartida financeira obrigatória, com percentuais mínimos definidos por porte da empresa.
 - Prazo de execução do projeto de até 36 meses.
+- Pontuação mínima de 14 pontos para aprovação.
 
 ## Fatos-chave
 
 - Recursos não reembolsáveis de até R$ 150 milhões disponíveis.
-- Apoio a projetos que promovam a economia circular e a sustentabilidade urbana.
+- Apoio a projetos nas regiões Norte, Nordeste e Centro-Oeste com reserva de R$ 45 milhões.
+- Possibilidade de execução de atividades em parceria com ICTs.
 - Propostas podem ser submetidas até 31/08/2026.
-- Avaliação baseada em critérios de inovação, relevância e parcerias sociais.
-- Reservas orçamentárias para projetos nas regiões Norte, Nordeste e Centro-Oeste.
+- Avaliação contínua das propostas conforme ordem de chegada.

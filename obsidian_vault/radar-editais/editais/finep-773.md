@@ -7,7 +7,7 @@ pub_date: 06/02/2026
 mechanism: subvencao
 trl_min: 3
 trl_max: 7
-n_pdfs: 10
+n_pdfs: 11
 n_facts: 0
 link: https://www.finep.gov.br/e/chamada-publica/222684/754704
 tags:
@@ -49,7 +49,7 @@ tags:
 | Contrapartida | Obrigatória |
 | Entidades elegíveis | empresas, startups, ICTs |
 | Certificações exigidas | Autorização de Funcionamento de Empresa (AFE) junto à ANVISA (apenas para dispositivos médicos) |
-| PDFs disponíveis | 10 |
+| PDFs disponíveis | 11 |
 | Fatos extraídos | 0 |
 | Link | [https://www.finep.gov.br/e/chamada-publica/222684/754704](https://www.finep.gov.br/e/chamada-publica/222684/754704) |
 
