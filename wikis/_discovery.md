@@ -45,4 +45,9 @@ discovery:
   max_results_per_query: 8
   max_candidates: 40
   max_dou_candidates: 80
+  # Crawl de hub (1 nível, gated por DISCOVERY_HUB_CRAWL_ENABLED): quando a
+  # triagem marca is_hub (portal de inovação aberta com vários desafios), até
+  # este nº de desafios-filho por hub vira candidato. Custo = triagem+extração
+  # por filho; o teto de hubs/execução é _MAX_HUBS_PER_RUN no código.
+  max_hub_children: 8
 ```
