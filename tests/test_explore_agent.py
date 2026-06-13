@@ -239,6 +239,32 @@ def test_oportunidades_por_tema_is_cross_dimensional():
     assert "Editais" in out and "ICTs" in out and "Investidores" in out
 
 
+# ---------------------------------------------------------------------------
+# _theme_match — casamento de tema tolerante a linguagem natural
+# ---------------------------------------------------------------------------
+
+def test_theme_match_natural_language_phrase():
+    """Frase natural casa o tema canônico por TOKEN (o bug que devolvia vazio no
+    chat cross-dim): 'IA em saúde' → 'saúde e ciências da vida'."""
+    from core.llm.agent_tools.explore_tools import _theme_match
+    assert _theme_match("IA em saúde", ["saúde e ciências da vida"]) is True
+    # agro ⊂ agronegócio (token bidirecional)
+    assert _theme_match("IA no agronegócio", ["agro, bioeconomia e alimentos"]) is True
+
+
+def test_theme_match_empty_matches_all():
+    from core.llm.agent_tools.explore_tools import _theme_match
+    assert _theme_match("", ["qualquer tema"]) is True
+
+
+def test_theme_match_rejects_unrelated():
+    """Não casa tema sem token em comum — recall-first, mas não casa tudo."""
+    from core.llm.agent_tools.explore_tools import _theme_match
+    assert _theme_match("turismo", ["saúde e ciências da vida"]) is False
+    # stopword/conectivo sozinho não casa (cai no corte de tamanho/stopword)
+    assert _theme_match("em de para", ["saúde e ciências da vida"]) is False
+
+
 def test_list_editais_tool_returns_string_with_results():
     svc = KGMatchService()
     tools = build_explore_tools(svc)
