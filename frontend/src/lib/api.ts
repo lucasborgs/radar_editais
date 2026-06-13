@@ -85,6 +85,9 @@ async function apiFetch<T>(
     ...options,
   });
   if (!res.ok) throw await buildApiError(res);
+  // 204 No Content (delete/archive/unarchive da library): corpo vazio —
+  // res.json() estouraria SyntaxError mesmo com sucesso.
+  if (res.status === 204) return undefined as T;
   return res.json();
 }
 
@@ -245,18 +248,37 @@ export interface ProfileDiffItem {
   new: unknown;
 }
 
+// Ids das entradas persistidas num turno logado (backend/routers/frontdoor.py:
+// persist_frontdoor_turn). `diff` é o que o front usa (PATCH no aceite/descarte).
+export interface FrontdoorEntryIds {
+  user: number | null;
+  assistant: number | null;
+  diff?: number | null;
+}
+
 export const frontdoorTurn = (
   message: string,
   history: KGChatMessage[],
   profile: Partial<CompanyProfile> | null,
+  sessionId?: string | null,
 ) =>
-  apiFetch<{ answer: string; profile_diff: ProfileDiffItem[] | null }>(
-    "/frontdoor/turn",
-    {
-      method: "POST",
-      body: JSON.stringify({ message, history, profile }),
-    },
-  );
+  // O JWT vai automático pelo apiFetch quando há sessão Supabase — o endpoint
+  // tem auth opcional: anônimo segue público, logado persiste e devolve
+  // session_id/entry_ids (spec chat-first, fase 2).
+  apiFetch<{
+    answer: string;
+    profile_diff: ProfileDiffItem[] | null;
+    session_id?: string;
+    entry_ids?: FrontdoorEntryIds;
+  }>("/frontdoor/turn", {
+    method: "POST",
+    body: JSON.stringify({
+      message,
+      history,
+      profile,
+      session_id: sessionId ?? null,
+    }),
+  });
 
 // ── Opportunity Brief (GO/NO-GO, logado) ───────────────────
 // Shape espelha core/opportunity_brief_service.py::generate_brief.
@@ -400,6 +422,12 @@ export const getLibraryItems = (
 export const archiveLibraryItem = (id: string, token: string) =>
   apiFetch<{ success: boolean }>(`/library/${id}/archive`, { method: "POST" }, token);
 
+// Desarquiva (restaura) item soft-deleted. Wrapper do endpoint já existente no
+// backend (POST /library/{id}/unarchive); usado pelo gerenciador "Arquivos"
+// para que arquivar não vire ação irrecuperável pela UI.
+export const unarchiveLibraryItem = (id: string, token: string) =>
+  apiFetch<void>(`/library/${id}/unarchive`, { method: "POST" }, token);
+
 export const getLibraryItem = (id: string, token: string) =>
   apiFetch<ContentItemFull>(`/library/${id}`, undefined, token);
 
@@ -478,6 +506,70 @@ export const listWritingSessions = (token: string) =>
 
 export const deleteWritingSession = (sessionId: string, token: string) =>
   apiFetch<{ ok: boolean }>(`/writing/sessions/${sessionId}`, { method: "DELETE" }, token);
+
+// ── Conversations (lista unificada, spec chat-first fase 2) ─
+// backend/routers/conversations.py — writing + frontdoor sobre as mesmas
+// tabelas; o sidebar consome a lista e a home retoma frontdoor pelo detail.
+
+export interface ConversationSummary {
+  session_id: string;
+  kind: "frontdoor" | "writing";
+  title: string | null; // frontdoor; writing deriva do edital no front
+  edital_id: string | null;
+  status: "active" | "completed" | "abandoned";
+  turn_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationEntry {
+  id: number; // session_turns.id
+  turn_index: number;
+  entry_kind: "msg" | "diff" | "radar";
+  role: "user" | "assistant";
+  content: string; // entry_kind=msg
+  payload: Record<string, unknown> | null; // entry_kind=diff|radar
+}
+
+export interface ConversationDetail {
+  session_id: string;
+  kind: "frontdoor" | "writing";
+  title: string | null;
+  edital_id: string | null;
+  status: "active" | "completed" | "abandoned";
+  created_at: string;
+  updated_at: string;
+  entries: ConversationEntry[];
+}
+
+export const listConversations = (token: string) =>
+  apiFetch<{ conversations: ConversationSummary[] }>("/conversations", undefined, token);
+
+export const getConversation = (sessionId: string, token: string) =>
+  apiFetch<ConversationDetail>(`/conversations/${sessionId}`, undefined, token);
+
+export const appendConversationEntry = (
+  sessionId: string,
+  body: { entry_kind: "radar" | "diff"; payload: Record<string, unknown> },
+  token: string,
+) =>
+  apiFetch<ConversationEntry>(
+    `/conversations/${sessionId}/entries`,
+    { method: "POST", body: JSON.stringify(body) },
+    token,
+  );
+
+export const updateConversationEntry = (
+  sessionId: string,
+  entryId: number,
+  payload: Record<string, unknown>,
+  token: string,
+) =>
+  apiFetch<ConversationEntry>(
+    `/conversations/${sessionId}/entries/${entryId}`,
+    { method: "PATCH", body: JSON.stringify({ payload }) },
+    token,
+  );
 
 // ── Applications (Pipeline) ────────────────────────────────
 
