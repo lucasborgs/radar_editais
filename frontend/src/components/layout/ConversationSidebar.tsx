@@ -24,25 +24,21 @@ import {
   type ConversationSummary,
 } from "@/lib/api";
 
-// ── Agrupamento por data ──────────────────────────────────────────────────────
-// Buckets no estilo ChatGPT. A ordem do array define a ordem de render.
-type Bucket = "Hoje" | "Ontem" | "Últimos 7 dias" | "Antigas";
-const BUCKET_ORDER: Bucket[] = ["Hoje", "Ontem", "Últimos 7 dias", "Antigas"];
-
-function bucketFor(iso: string): Bucket {
-  const then = new Date(iso);
-  if (isNaN(then.getTime())) return "Antigas";
-  // Compara por dia-calendário (não por janela de 24h), como o ChatGPT.
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const diffDays = Math.floor(
-    (startOfToday.getTime() - new Date(then).setHours(0, 0, 0, 0)) / 86_400_000,
-  );
-  if (diffDays <= 0) return "Hoje";
-  if (diffDays === 1) return "Ontem";
-  if (diffDays < 7) return "Últimos 7 dias";
-  return "Antigas";
-}
+// ── Dois destinos (spec chat-first, decisão 2026-06-13) ───────────────────────
+// O sidebar separa as duas superfícies de primeira classe: "Descobrir"
+// (conversas de discovery/match — kind=frontdoor) e "Escrever" (propostas —
+// kind=writing). Dentro de cada seção, mais recentes primeiro (a API já ordena
+// por updated_at desc). Substitui o agrupamento por data.
+type Section = "Descobrir" | "Escrever";
+const SECTION_ORDER: Section[] = ["Descobrir", "Escrever"];
+const SECTION_KIND: Record<Section, ConversationSummary["kind"]> = {
+  Descobrir: "frontdoor",
+  Escrever: "writing",
+};
+const SECTION_EMPTY: Record<Section, string> = {
+  Descobrir: "Nenhuma conversa de descoberta ainda.",
+  Escrever: "Nenhuma proposta em andamento.",
+};
 
 // ── Ícones (stroke 1.75, alinhados ao restante do app) ─────────────────────────
 function Icon({ d, className }: { d: string; className?: string }) {
@@ -69,12 +65,14 @@ const ICON_PATHS = {
   files:
     "M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z",
   chat: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z",
+  profile: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
   settings:
     "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z",
   dots: "M5 12h.01M12 12h.01M19 12h.01",
 } as const;
 
 const UTILITY_ITEMS: { href: string; label: string; d: string }[] = [
+  { href: "/perfil", label: "Perfil", d: ICON_PATHS.profile },
   { href: "/pipeline", label: "Pipeline", d: ICON_PATHS.pipeline },
   { href: "/editais", label: "Editais", d: ICON_PATHS.editais },
   { href: "/library", label: "Arquivos", d: ICON_PATHS.files },
@@ -179,22 +177,18 @@ export function ConversationSidebar() {
     [titles],
   );
 
-  // Filtro client-side por título + agrupamento por data.
-  const grouped = useMemo(() => {
+  // Filtro client-side por título + partição em Descobrir/Escrever (por kind).
+  // Sempre renderiza as duas seções (mesmo vazias) para os destinos serem
+  // estáveis — exceto quando há busca, aí só mostra seções com resultado.
+  const sections = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = q
       ? sessions.filter((s) => titleFor(s).toLowerCase().includes(q))
       : sessions;
-    const map = new Map<Bucket, ConversationSummary[]>();
-    for (const s of filtered) {
-      const b = bucketFor(s.updated_at);
-      const list = map.get(b);
-      if (list) list.push(s);
-      else map.set(b, [s]);
-    }
-    return BUCKET_ORDER.flatMap((b) => {
-      const items = map.get(b);
-      return items ? [{ bucket: b, items }] : [];
+    return SECTION_ORDER.flatMap((section) => {
+      const items = filtered.filter((s) => s.kind === SECTION_KIND[section]);
+      if (q && items.length === 0) return [];
+      return [{ section, items }];
     });
   }, [sessions, query, titleFor]);
 
@@ -322,21 +316,24 @@ export function ConversationSidebar() {
               <div key={i} className="h-8 rounded-lg bg-gray-100 animate-pulse" />
             ))}
           </div>
-        ) : grouped.length === 0 ? (
-          // Vazio (ou sem resultado de busca).
+        ) : sections.length === 0 ? (
+          // Busca sem resultado (sem busca, as duas seções sempre aparecem).
           <div className="px-2 py-6 text-center">
             <p className="text-xs text-content-secondary font-sans">
-              {query.trim()
-                ? "Nenhuma conversa encontrada."
-                : "Nenhuma conversa ainda."}
+              Nenhuma conversa encontrada.
             </p>
           </div>
         ) : (
-          grouped.map(({ bucket, items }) => (
-            <div key={bucket} className="mb-3">
+          sections.map(({ section, items }) => (
+            <div key={section} className="mb-3">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-content-secondary px-2 mb-1 font-sans">
-                {bucket}
+                {section}
               </p>
+              {items.length === 0 ? (
+                <p className="text-xs text-content-secondary/70 font-sans px-2 py-1">
+                  {SECTION_EMPTY[section]}
+                </p>
+              ) : (
               <div className="space-y-0.5">
                 {items.map((s) => {
                   // Retomada por kind: escrita resolve a sessão pelo edital
@@ -403,6 +400,7 @@ export function ConversationSidebar() {
                   );
                 })}
               </div>
+              )}
             </div>
           ))
         )}
