@@ -6,7 +6,7 @@
 
 import type { CompanyProfile } from "./profile";
 import { EMPTY_PROFILE } from "./profile";
-import type { ProfileDiffItem, RadarResponse } from "@/lib/api";
+import type { ConversationEntry, ProfileDiffItem, RadarResponse } from "@/lib/api";
 
 export type ChatRole = "user" | "assistant";
 
@@ -30,12 +30,17 @@ export interface DiffEntry {
   // anexo), "merge" (conflito conta vs. conversa no login), "manual" (editar
   // perfil pela barra de status). Só muda a copy/título do card.
   origin?: "turn" | "document" | "merge" | "manual";
+  // Id da row em session_turns quando a conversa é persistida (logado, spec
+  // chat-first fase 2) — alvo do PATCH no aceite/descarte.
+  entryId?: number;
 }
 
 export interface RadarEntry {
   kind: "radar";
   data: RadarResponse;
   ts: number;
+  // Id da row em session_turns quando persistida (logado).
+  entryId?: number;
 }
 
 export interface GateEntry {
@@ -47,6 +52,9 @@ export type TranscriptEntry = MsgEntry | DiffEntry | RadarEntry | GateEntry;
 
 // ── Persistência (sessionStorage v2) ──────────────────────────────────────────
 export const HISTORY_KEY = "frontdoor_history";
+// Binding com a conversa persistida no servidor (logado, spec chat-first fase
+// 2): F5 na mesma aba retoma a MESMA conversa do banco em vez de criar outra.
+export const SESSION_ID_KEY = "frontdoor_session_id";
 
 // Migra/valida o conteúdo cru do localStorage para entradas tipadas. Aceita:
 //   • v2: array de TranscriptEntry (passa por sanidade leve);
@@ -81,6 +89,7 @@ export function migrateHistory(raw: unknown): TranscriptEntry[] {
             items: e.items as DiffEntry["items"],
             status: (e.status as DiffStatus) ?? "pending",
             origin: e.origin as DiffEntry["origin"],
+            entryId: typeof e.entryId === "number" ? e.entryId : undefined,
           });
         }
         break;
@@ -90,6 +99,7 @@ export function migrateHistory(raw: unknown): TranscriptEntry[] {
             kind: "radar",
             data: e.data as RadarResponse,
             ts: typeof e.ts === "number" ? e.ts : Date.now(),
+            entryId: typeof e.entryId === "number" ? e.entryId : undefined,
           });
         }
         break;
@@ -98,6 +108,52 @@ export function migrateHistory(raw: unknown): TranscriptEntry[] {
           out.push({ kind: "gate", action: e.action });
         }
         break;
+      default:
+        break;
+    }
+  }
+  return out;
+}
+
+// Reconstrói o transcript a partir do GET /conversations/{id} (retomada de
+// conversa frontdoor, spec chat-first fase 2). Mesma postura defensiva do
+// migrateHistory: entradas malformadas/kinds desconhecidos são ignorados.
+// O payload de diff/radar é a própria entrada serializada (persist_frontdoor_turn
+// e o POST /entries gravam {items,status,origin} / {data,ts}).
+export function entriesFromServer(entries: ConversationEntry[]): TranscriptEntry[] {
+  const out: TranscriptEntry[] = [];
+  for (const e of entries) {
+    switch (e.entry_kind) {
+      case "msg":
+        if ((e.role === "user" || e.role === "assistant") && e.content) {
+          out.push({ kind: "msg", role: e.role, content: e.content });
+        }
+        break;
+      case "diff": {
+        const p = (e.payload ?? {}) as Record<string, unknown>;
+        if (Array.isArray(p.items)) {
+          out.push({
+            kind: "diff",
+            items: p.items as DiffEntry["items"],
+            status: (p.status as DiffStatus) ?? "pending",
+            origin: p.origin as DiffEntry["origin"],
+            entryId: e.id,
+          });
+        }
+        break;
+      }
+      case "radar": {
+        const p = (e.payload ?? {}) as Record<string, unknown>;
+        if (p.data && typeof p.data === "object") {
+          out.push({
+            kind: "radar",
+            data: p.data as RadarResponse,
+            ts: typeof p.ts === "number" ? p.ts : Date.now(),
+            entryId: e.id,
+          });
+        }
+        break;
+      }
       default:
         break;
     }

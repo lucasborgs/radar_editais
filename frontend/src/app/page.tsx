@@ -7,6 +7,7 @@ import { ChatBubble } from "@/components/chat/ChatBubble";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { FrontDoorHeader } from "@/components/frontdoor/FrontDoorHeader";
+import { ConversationSidebar } from "@/components/layout/ConversationSidebar";
 import { StatusBar } from "@/components/frontdoor/StatusBar";
 import { SuggestionChips } from "@/components/frontdoor/SuggestionChips";
 import { Composer } from "@/components/frontdoor/Composer";
@@ -20,6 +21,9 @@ import {
   saveProfile,
   getOpportunityBrief,
   extractProfileFromDocument,
+  getConversation,
+  appendConversationEntry,
+  updateConversationEntry,
   type ProfileDiffItem,
   type OpportunityBrief,
 } from "@/lib/api";
@@ -33,10 +37,12 @@ import {
 } from "@/types/profile";
 import {
   HISTORY_KEY,
+  SESSION_ID_KEY,
   migrateHistory,
   toApiHistory,
   applyDiff,
   diffFromProfile,
+  entriesFromServer,
   profileCompleteness,
   isRadarReady,
   missingForRadar,
@@ -101,15 +107,71 @@ export default function FrontDoorPage() {
   const [hydrated, setHydrated] = useState(false);
   // Briefs gerados, chaveados por edital_id (para render inline no RadarCard).
   const [briefs, setBriefs] = useState<Record<string, OpportunityBrief>>({});
+  // Conversa persistida no servidor (logado, spec chat-first fase 2). null =
+  // ainda sem binding (anônimo, ou logado antes do 1º turno).
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  // Retomada via sidebar: /?c=<session_id>. Lido uma vez na montagem.
+  const [resumeId, setResumeId] = useState<string | null>(null);
 
   const lastRadarRef = useRef<HTMLDivElement>(null);
 
-  // Hidrata transcript + perfil local ao montar.
+  // Liga o estado local à conversa do servidor (e sobrevive a F5 na mesma aba).
+  // Binding novo (1º turno) avisa o sidebar para recarregar a lista.
+  const bindSession = useCallback(
+    (id: string) => {
+      if (id !== sessionId) {
+        window.dispatchEvent(new Event("conversations:refresh"));
+      }
+      setSessionId(id);
+      try {
+        window.sessionStorage.setItem(SESSION_ID_KEY, id);
+      } catch {
+        /* quota/modo privado — segue só em memória */
+      }
+    },
+    [sessionId],
+  );
+
+  // Hidrata transcript + perfil local ao montar. Com ?c= na URL, o transcript
+  // local NÃO é carregado — a conversa vem do servidor (efeito de retomada).
   useEffect(() => {
-    setEntries(loadHistory());
+    const c = new URLSearchParams(window.location.search).get("c");
+    if (c) {
+      setResumeId(c);
+    } else {
+      setEntries(loadHistory());
+      try {
+        setSessionId(window.sessionStorage.getItem(SESSION_ID_KEY));
+      } catch {
+        /* noop */
+      }
+    }
     setProfile(loadProfileFromStorage() ?? EMPTY_PROFILE);
     setHydrated(true);
   }, []);
+
+  // Retomada de conversa frontdoor (logado): carrega o transcript do servidor.
+  // Espera o auth resolver — se o usuário for mesmo anônimo, o efeito nunca
+  // dispara e a home fica como conversa nova.
+  useEffect(() => {
+    if (!hydrated || !isAuthed || !resumeId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const token = await getToken();
+        if (!token || !alive) return;
+        const detail = await getConversation(resumeId, token);
+        if (!alive) return;
+        setEntries(entriesFromServer(detail.entries));
+        bindSession(detail.session_id);
+      } catch {
+        if (alive) toast.error("Não consegui retomar esta conversa.");
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [hydrated, isAuthed, resumeId, getToken, bindSession]);
 
   // Persiste transcript a cada mudança (depois de hidratar).
   useEffect(() => {
@@ -205,14 +267,38 @@ export default function FrontDoorPage() {
   }, [hydrated, isAuthed, getToken]);
 
   // ── Disparo do radar (após perfil completo) ─────────────────────────────────
-  const runRadar = useCallback(async (p: CompanyProfile) => {
-    try {
-      const data = await getRadar(p, 10);
-      setEntries((prev) => [...prev, { kind: "radar", data, ts: Date.now() }]);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não consegui rodar o radar.");
-    }
-  }, []);
+  const runRadar = useCallback(
+    async (p: CompanyProfile) => {
+      try {
+        const data = await getRadar(p, 10);
+        const entry: TranscriptEntry = { kind: "radar", data, ts: Date.now() };
+        setEntries((prev) => [...prev, entry]);
+        // Logado com conversa persistida: espelha o card no servidor (POST
+        // /conversations/{id}/entries). Falha não bloqueia a UX — a conversa
+        // vale mais que o histórico (spec fase 2).
+        if (isAuthed && sessionId) {
+          try {
+            const token = await getToken();
+            if (token) {
+              const saved = await appendConversationEntry(
+                sessionId,
+                { entry_kind: "radar", payload: { data, ts: entry.ts } },
+                token,
+              );
+              setEntries((prev) =>
+                prev.map((e) => (e === entry ? { ...e, entryId: saved.id } : e)),
+              );
+            }
+          } catch (err) {
+            console.warn("Falha ao persistir card de radar:", err);
+          }
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Não consegui rodar o radar.");
+      }
+    },
+    [isAuthed, sessionId, getToken],
+  );
 
   // ── Turno de conversa ───────────────────────────────────────────────────────
   const send = useCallback(
@@ -227,18 +313,29 @@ export default function FrontDoorPage() {
       setSending(true);
 
       try {
-        const { answer, profile_diff } = await frontdoorTurn(
+        const { answer, profile_diff, session_id, entry_ids } = await frontdoorTurn(
           trimmed,
           toApiHistory(withUser),
           profile.nome ? profile : null,
+          sessionId,
         );
+        // Logado: o backend persistiu o turno e devolveu o binding da conversa
+        // (1º turno cria; seguintes reusam). Anônimo: session_id ausente.
+        if (session_id) bindSession(session_id);
         setEntries((prev) => {
           const next: TranscriptEntry[] = [
             ...prev,
             { kind: "msg", role: "assistant", content: answer },
           ];
           if (profile_diff && profile_diff.length > 0) {
-            next.push({ kind: "diff", items: profile_diff, status: "pending", origin: "turn" });
+            next.push({
+              kind: "diff",
+              items: profile_diff,
+              status: "pending",
+              origin: "turn",
+              // Alvo do PATCH no aceite/descarte (persistido junto ao turno).
+              entryId: entry_ids?.diff ?? undefined,
+            });
           }
           return next;
         });
@@ -252,7 +349,7 @@ export default function FrontDoorPage() {
         setSending(false);
       }
     },
-    [entries, sending, profile],
+    [entries, sending, profile, sessionId, bindSession],
   );
 
   // ── Aceite/descarte de um diff (por índice no transcript) ───────────────────
@@ -268,6 +365,32 @@ export default function FrontDoorPage() {
             : e,
         ),
       );
+
+      // Espelha a decisão no servidor quando a entrada está persistida (PATCH
+      // payload — status pending→accepted/dismissed). Fire-and-forget: falha
+      // não bloqueia o aceite local.
+      if (isAuthed && sessionId && entry.entryId) {
+        void (async () => {
+          try {
+            const token = await getToken();
+            if (token) {
+              await updateConversationEntry(
+                sessionId,
+                entry.entryId!,
+                {
+                  items: finalItems ?? entry.items,
+                  status: accepted ? "accepted" : "dismissed",
+                  origin: entry.origin ?? "turn",
+                },
+                token,
+              );
+            }
+          } catch (err) {
+            console.warn("Falha ao persistir decisão do diff:", err);
+          }
+        })();
+      }
+
       if (!accepted) return;
 
       const next = applyDiff(profile, finalItems ?? entry.items);
@@ -283,7 +406,7 @@ export default function FrontDoorPage() {
         }
       }
     },
-    [entries, profile, persistProfile, runRadar],
+    [entries, profile, persistProfile, runRadar, isAuthed, sessionId, getToken],
   );
 
   // ── Barra de status: editar perfil (diff manual com todos os campos) ────────
@@ -369,17 +492,52 @@ export default function FrontDoorPage() {
     [isAuthed, router],
   );
 
-  const handleReset = useCallback(() => {
+  // Zera transcript local + binding com o servidor. A conversa persistida NÃO
+  // é apagada (continua no histórico do sidebar) — só desligamos dela.
+  const resetConversation = useCallback(() => {
     try {
       window.sessionStorage.removeItem(HISTORY_KEY);
+      window.sessionStorage.removeItem(SESSION_ID_KEY);
     } catch {
       /* noop */
     }
     setEntries([]);
     setInput("");
     setBriefs({});
-    toast.success("Conversa reiniciada.");
+    setSessionId(null);
+    setResumeId(null);
+    // Derruba um eventual ?c= da URL sem remontar a página.
+    if (window.location.search) {
+      window.history.replaceState(null, "", "/");
+    }
   }, []);
+
+  const handleReset = useCallback(() => {
+    resetConversation();
+    toast.success("Conversa reiniciada.");
+  }, [resetConversation]);
+
+  // "Nova conversa" da ConversationSidebar: quando já estamos em "/", a página
+  // não remonta, então a sidebar dispara `frontdoor:new` (já tendo limpado o
+  // sessionStorage) e nós zeramos o estado em memória aqui.
+  useEffect(() => {
+    window.addEventListener("frontdoor:new", resetConversation);
+    return () => window.removeEventListener("frontdoor:new", resetConversation);
+  }, [resetConversation]);
+
+  // Retomada disparada pelo sidebar quando JÁ estamos em "/" (clicar num Link
+  // /?c=... não remonta a página, então o ?c= lido na montagem não muda).
+  useEffect(() => {
+    function onResume(ev: Event) {
+      const id = (ev as CustomEvent<string>).detail;
+      if (!id) return;
+      resetConversation();
+      setResumeId(id);
+      window.history.replaceState(null, "", `/?c=${encodeURIComponent(id)}`);
+    }
+    window.addEventListener("frontdoor:resume", onResume);
+    return () => window.removeEventListener("frontdoor:resume", onResume);
+  }, [resetConversation]);
 
   const isEmpty = hydrated && entries.length === 0;
   const completeness = profileCompleteness(profile);
@@ -392,8 +550,15 @@ export default function FrontDoorPage() {
   });
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-app-bg">
-      <FrontDoorHeader isAuthed={isAuthed} onReset={handleReset} onSignOut={signOut} />
+    // A home é a tela principal do chat — o sidebar de conversas vive aqui
+    // também (não só nas páginas com DashboardLayout). Oculto em telas pequenas,
+    // como nos apps de chat de referência.
+    <div className="flex h-[100dvh] bg-app-bg">
+      <div className="hidden md:flex">
+        <ConversationSidebar />
+      </div>
+      <div className="flex flex-1 flex-col min-w-0">
+        <FrontDoorHeader isAuthed={isAuthed} onReset={handleReset} onSignOut={signOut} />
       <StatusBar
         completeness={completeness}
         hasRadar={hasRadar}
@@ -454,15 +619,16 @@ export default function FrontDoorPage() {
         )}
       </ChatMessageList>
 
-      <Composer
-        value={input}
-        onChange={setInput}
-        onSend={() => void send(input)}
-        onAttach={handleAttachClick}
-        onPickFile={handlePickFile}
-        disabled={sending}
-        placeholder="Conte o que sua empresa faz, ou pergunte sobre fomento…"
-      />
+        <Composer
+          value={input}
+          onChange={setInput}
+          onSend={() => void send(input)}
+          onAttach={handleAttachClick}
+          onPickFile={handlePickFile}
+          disabled={sending}
+          placeholder="Conte o que sua empresa faz, ou pergunte sobre fomento…"
+        />
+      </div>
     </div>
   );
 }

@@ -1252,13 +1252,17 @@ def list_sessions(
 ) -> list[dict]:
     """Lista sessões do workspace, ordenadas por updated_at desc.
 
-    Retorna registros leves: id, edital_id, status, created_at, updated_at,
-    turn_count. O turn_count é derivado de um SELECT count agregado em
-    session_turns por sessão.
+    Retorna registros leves: id, edital_id, kind, title, status, created_at,
+    updated_at, turn_count. O turn_count é derivado de um SELECT count agregado
+    em session_turns por sessão.
+
+    `kind`/`title` foram adicionados na migration 020 (lista unificada de
+    conversas, fase 2). Consumidores antigos (GET /writing/sessions) ignoram os
+    campos extras — não há quebra.
     """
     query = (
         db.table("writing_sessions")
-        .select("id, edital_id, status, created_at, updated_at")
+        .select("id, edital_id, kind, title, status, created_at, updated_at")
         .eq("workspace_id", workspace_id)
         .order("updated_at", desc=True)
     )
@@ -1346,3 +1350,266 @@ def get_session_document(
             for t in outline
         ],
     }
+
+
+# =============================================================================
+# Conversations (spec frontend chat-first, fase 2)
+# =============================================================================
+# As "conversations" são as mesmas tabelas writing_sessions/session_turns; o
+# `kind` distingue o sabor. Os helpers abaixo servem o router /conversations
+# e a persistência do front door autenticado — entradas heterogêneas (msg, diff,
+# radar) num único transcript ordenado por turn_index.
+
+
+def get_conversation(db: Client, session_id: str, workspace_id: str) -> dict | None:
+    """Header de uma conversa (qualquer kind) + entradas ordenadas por turn_index.
+
+    Retorna None se a sessão não existir OU não pertencer ao workspace (RLS já
+    protege; validamos explicitamente também — defesa em profundidade).
+
+    O shape de cada entrada espelha o `Entry` da spec: id, turn_index,
+    entry_kind, role, content, payload. As entradas vêm direto de session_turns
+    (a remap de turn_index user=2N-1/assistant=2N feita pela WritingSession é
+    transparente aqui — ordenamos pelo índice físico, que mantém a ordem).
+    """
+    result = (
+        db.table("writing_sessions")
+        .select("id, workspace_id, edital_id, kind, title, status, created_at, updated_at")
+        .eq("id", session_id)
+        .maybe_single()
+        .execute()
+    )
+    row = result.data if result else None
+    if not row or row["workspace_id"] != workspace_id:
+        return None
+
+    turns = (
+        db.table("session_turns")
+        .select("id, turn_index, entry_kind, role, content, payload")
+        .eq("session_id", session_id)
+        .order("turn_index", desc=False)
+        .order("id", desc=False)
+        .execute()
+    )
+    entries = [
+        {
+            "id": t["id"],
+            "turn_index": t["turn_index"],
+            "entry_kind": t.get("entry_kind") or "msg",
+            "role": t["role"],
+            "content": t.get("content") or "",
+            "payload": t.get("payload"),
+        }
+        for t in (turns.data or [])
+    ]
+    return {
+        "session_id": row["id"],
+        "kind": row.get("kind") or "writing",
+        "title": row.get("title"),
+        "edital_id": row.get("edital_id"),
+        "status": row["status"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "entries": entries,
+    }
+
+
+def _next_turn_index(db: Client, session_id: str) -> int:
+    """Próximo turn_index livre da conversa (max + 1, ou 1 se vazia).
+
+    Para o transcript do front door tratamos turn_index como um índice físico
+    monotônico de entrada (sem o pareamento user=2N-1/assistant=2N da escrita) —
+    cada entrada appendada ganha o próximo inteiro, preservando a ordem cronológica.
+    """
+    res = (
+        db.table("session_turns")
+        .select("turn_index")
+        .eq("session_id", session_id)
+        .order("turn_index", desc=True)
+        .limit(1)
+        .execute()
+    )
+    rows = res.data or []
+    return (rows[0]["turn_index"] + 1) if rows else 1
+
+
+def append_entry(
+    db: Client,
+    session_id: str,
+    workspace_id: str,
+    entry_kind: str,
+    payload: dict,
+) -> dict | None:
+    """Appenda uma entrada não-msg (radar/diff) ao transcript. Retorna a entrada
+    criada (shape Entry) ou None se a sessão não pertencer ao workspace.
+
+    role='assistant' e content='' por convenção (a entrada vive no payload —
+    spec, "modelo de dados"). turn_index é o próximo índice físico livre.
+    """
+    owner = (
+        db.table("writing_sessions")
+        .select("id, workspace_id")
+        .eq("id", session_id)
+        .maybe_single()
+        .execute()
+    )
+    row = owner.data if owner else None
+    if not row or row["workspace_id"] != workspace_id:
+        return None
+
+    turn_index = _next_turn_index(db, session_id)
+    inserted = (
+        db.table("session_turns")
+        .insert({
+            "session_id": session_id,
+            "turn_index": turn_index,
+            "role": "assistant",
+            "content": "",
+            "entry_kind": entry_kind,
+            "payload": payload,
+        })
+        .execute()
+    )
+    new_row = inserted.data[0] if inserted.data else None
+    if not new_row:
+        return None
+    return {
+        "id": new_row["id"],
+        "turn_index": new_row["turn_index"],
+        "entry_kind": new_row.get("entry_kind") or entry_kind,
+        "role": new_row["role"],
+        "content": new_row.get("content") or "",
+        "payload": new_row.get("payload"),
+    }
+
+
+def update_entry_payload(
+    db: Client,
+    session_id: str,
+    entry_id: int,
+    workspace_id: str,
+    payload: dict,
+) -> dict | None:
+    """Substitui o payload de uma entrada (caso de uso: status do diff
+    pending→accepted/dismissed). Retorna a entrada atualizada ou None se a
+    entrada não existir / não pertencer à sessão / sessão de outro workspace.
+    """
+    owner = (
+        db.table("writing_sessions")
+        .select("id, workspace_id")
+        .eq("id", session_id)
+        .maybe_single()
+        .execute()
+    )
+    row = owner.data if owner else None
+    if not row or row["workspace_id"] != workspace_id:
+        return None
+
+    updated = (
+        db.table("session_turns")
+        .update({"payload": payload})
+        .eq("id", entry_id)
+        .eq("session_id", session_id)
+        .execute()
+    )
+    new_row = updated.data[0] if updated.data else None
+    if not new_row:
+        return None  # entry_id inexistente ou de outra sessão
+    return {
+        "id": new_row["id"],
+        "turn_index": new_row["turn_index"],
+        "entry_kind": new_row.get("entry_kind") or "msg",
+        "role": new_row["role"],
+        "content": new_row.get("content") or "",
+        "payload": new_row.get("payload"),
+    }
+
+
+def persist_frontdoor_turn(
+    db: Client,
+    workspace_id: str,
+    user_message: str,
+    assistant_message: str,
+    profile_diff: list[dict] | None,
+    session_id: str | None = None,
+) -> dict:
+    """Persiste um turno do front door (usuário logado) e devolve session_id +
+    ids das entradas criadas.
+
+    Cria a conversa (kind='frontdoor') no primeiro turno; reusa a existente nos
+    seguintes. Grava: turno do usuário (msg) + resposta do assistente (msg) +,
+    se houver diff, a proposta como entrada `diff` (payload={items, status,
+    origin}). O id do diff volta para o front fazer o PATCH no aceite/descarte.
+
+    Levanta em falha de DB — o caller (router) decide engolir o erro (a conversa
+    vale mais que o histórico). NÃO é best-effort por dentro de propósito: assim
+    o caller consegue logar com contexto e devolver a resposta mesmo assim.
+    """
+    if not session_id:
+        title = user_message.strip()[:60]
+        created = (
+            db.table("writing_sessions")
+            .insert({
+                "workspace_id": workspace_id,
+                "edital_id": None,
+                "kind": "frontdoor",
+                "title": title,
+                "status": "active",
+                "proposal_outline": [],
+                "section_drafts": {},
+            })
+            .execute()
+        )
+        if not created.data:
+            raise RuntimeError("Falha ao criar conversa frontdoor")
+        session_id = created.data[0]["id"]
+
+    base_index = _next_turn_index(db, session_id)
+    entry_ids: dict[str, int | None] = {}
+
+    user_row = (
+        db.table("session_turns")
+        .insert({
+            "session_id": session_id,
+            "turn_index": base_index,
+            "role": "user",
+            "content": user_message,
+            "entry_kind": "msg",
+        })
+        .execute()
+    )
+    entry_ids["user"] = user_row.data[0]["id"] if user_row.data else None
+
+    assistant_row = (
+        db.table("session_turns")
+        .insert({
+            "session_id": session_id,
+            "turn_index": base_index + 1,
+            "role": "assistant",
+            "content": assistant_message,
+            "entry_kind": "msg",
+        })
+        .execute()
+    )
+    entry_ids["assistant"] = assistant_row.data[0]["id"] if assistant_row.data else None
+
+    if profile_diff:
+        diff_row = (
+            db.table("session_turns")
+            .insert({
+                "session_id": session_id,
+                "turn_index": base_index + 2,
+                "role": "assistant",
+                "content": "",
+                "entry_kind": "diff",
+                "payload": {
+                    "items": profile_diff,
+                    "status": "pending",
+                    "origin": "turn",
+                },
+            })
+            .execute()
+        )
+        entry_ids["diff"] = diff_row.data[0]["id"] if diff_row.data else None
+
+    return {"session_id": session_id, "entry_ids": entry_ids}
