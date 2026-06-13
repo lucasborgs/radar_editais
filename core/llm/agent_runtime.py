@@ -35,6 +35,7 @@ Princípios:
 """
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 import os
@@ -52,6 +53,31 @@ StopReason = Literal["end_turn", "max_steps", "max_tokens", "error", "other"]
 # Defaults compartilhados com core.llm.llm_client (vide LLM_TIMEOUT_SECONDS / MAX_RETRIES).
 _TIMEOUT = float(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
 _MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+
+# Orçamento de contexto (spec 02): tool-results são appendadas ao histórico sem
+# truncamento → em sessões longas o contexto cresce sem teto. Cap central por
+# chars, aplicado pós-`t.call` no loop. Default folgado (calibrar com o log de
+# disparo antes de apertar). Caps por-tool (writing_tools) são complementares.
+TOOL_RESULT_CHAR_CAP = int(os.getenv("TOOL_RESULT_CHAR_CAP", "8000"))
+
+
+def _cap(text: str, limit: int, *, tool_name: str | None = None) -> str:
+    """Trunca `text` a `limit` chars, anexando marcador de truncamento.
+
+    Cap simples por chars (a spec recomenda medir antes de ir token-aware).
+    Quando dispara, loga qual tool e quanto cortou — observabilidade leve para
+    calibrar o limite. Retorna o texto intacto se já couber.
+    """
+    if text is None:
+        return text
+    if limit <= 0 or len(text) <= limit:
+        return text
+    omitted = len(text) - limit
+    logger.info(
+        "tool-result cap disparou (tool=%s): %d chars → %d (cortou %d)",
+        tool_name or "?", len(text), limit, omitted,
+    )
+    return text[:limit] + f"\n…[truncado: {omitted} chars omitidos]"
 
 
 # =============================================================================
@@ -73,19 +99,44 @@ class Tool:
     func: Callable[..., Any]
 
     def call(self, args: dict[str, Any]) -> str:
-        """Executa a tool com args validados pelo schema. Captura toda
-        exceção e converte em string — loop nunca quebra por tool ruim."""
+        """Executa a tool (sync) com args validados pelo schema. Captura toda
+        exceção e converte em string — loop nunca quebra por tool ruim.
+
+        Caminho sync: tools `async def` não podem ser aguardadas aqui (não há
+        event loop) → recusadas com erro-string. O loop do agente usa
+        `call_async` (via run_agent_async); este método permanece para chamadas
+        sync diretas e compatibilidade."""
         try:
             result = self.func(**args)
-            # Suporte preguiçoso a tools async sem ainda usar asyncio.run aqui:
-            # o run_agent atual é sync. Se a função for coroutine, exigimos que
-            # a refatoração pra async aconteça antes — para já, recusamos.
             if inspect.iscoroutine(result):
                 result.close()
                 return (
-                    f"Erro: tool '{self.name}' é async, runtime atual é sync. "
-                    "Use uma versão sync ou aguarde suporte async."
+                    f"Erro: tool '{self.name}' é async — use call_async "
+                    "(o loop do agente já o faz)."
                 )
+            if not isinstance(result, str):
+                return str(result)
+            return result
+        except Exception as e:
+            logger.warning("Tool '%s' falhou: %s", self.name, e)
+            return f"Erro ao executar '{self.name}': {e}"
+
+    async def call_async(self, args: dict[str, Any]) -> str:
+        """Versão async de `call` (spec 01). Captura exceção → string.
+
+        - Tool `async def` é aguardada nativamente.
+        - Tool sync roda em `asyncio.to_thread`, liberando o event loop para que
+          várias tools de I/O do mesmo turno rodem concorrentes (latência do
+          turno = máx, não soma).
+        """
+        try:
+            if inspect.iscoroutinefunction(self.func):
+                result = await self.func(**args)
+            else:
+                result = await asyncio.to_thread(self.func, **args)
+                # Função sync que devolve coroutine (raro) — aguarda também.
+                if inspect.iscoroutine(result):
+                    result = await result
             if not isinstance(result, str):
                 return str(result)
             return result
@@ -468,6 +519,12 @@ _REFLECT_PROMPT = (
     "O que ainda precisa para responder bem ao pedido do usuário?"
 )
 
+# Reflexão dinâmica (spec 08): sinais leves (sem LLM) que antecipam a reflexão
+# antes do teto reflect_every. `reflect_every` vira piso de frequência; entre
+# tetos, só rodadas com sinal disparam — rodadas triviais não geram reflexão à toa.
+_REFLECT_CHAR_THRESHOLD = int(os.getenv("REFLECT_CHAR_THRESHOLD", "12000"))
+_PLAN_TOOL_NAMES = {"write_todos"}  # mudança de plano → vale sintetizar
+
 
 def resolve_agent_provider(
     preferred: Provider,
@@ -529,7 +586,7 @@ def resolve_agent_provider(
     )
 
 
-def run_agent(
+async def run_agent_async(
     *,
     system: str,
     initial_messages: list[dict[str, Any]],
@@ -543,6 +600,10 @@ def run_agent(
 ) -> AgentResult:
     """Executa o loop do agente até `end_turn`, `max_steps` ou erro.
 
+    Versão async (spec 01): as tools de um mesmo turno rodam concorrentes via
+    `asyncio.gather`. A chamada LLM por turno continua síncrona (uma só, nada a
+    paralelizar). Use o shim sync `run_agent` para call sites síncronos.
+
     Args:
         system: instrução de sistema (top-level no Anthropic, primeira message no OpenAI)
         initial_messages: histórico inicial (user/assistant), sem system
@@ -551,9 +612,11 @@ def run_agent(
         provider: "openai" ou "anthropic"
         max_steps: limite de iterações LLM (evita loops infinitos)
         on_step: callback opcional, recebe cada TraceStep recém-criado
-        reflect_every: se não-None, injeta um prompt de reflexão após cada N
-            rodadas de tool-execution completas. Útil para sessões longas onde
-            o agente precisa sintetizar achados antes de continuar.
+        reflect_every: se não-None, habilita a reflexão e define o TETO de
+            cadência (reflete no máximo a cada N rodadas de tools). A reflexão é
+            dinâmica (spec 08): entre tetos, antecipa quando há sinal leve de que
+            vale (erro de tool, mudança de plano via write_todos, muito output
+            acumulado) e não dispara em rodadas triviais. None/0 desliga.
         span_name: nome do span raiz na telemetria. Default mantém
             `f"agent.{provider}.{model}"`. `run_subagent` passa
             `f"subagent.{name}"` para distinguir subagente de agente top-level
@@ -580,7 +643,9 @@ def run_agent(
     total_out = 0
     last_text = ""
     stop_reason: StopReason = "max_steps"
-    tool_rounds = 0  # rodadas completas de tool-execution (para reflect_every)
+    tool_rounds = 0  # rodadas completas de tool-execution (teto de reflexão)
+    rounds_since_reflect = 0  # rodadas desde a última reflexão (cadência dinâmica)
+    chars_since_reflect = 0   # tool-output acumulado desde a última reflexão
 
     # Import lazy pra evitar custo de telemetria em testes que monkeypatcham
     # adapters — o telemetry helper é leve mas o import puxa langfuse stack.
@@ -647,9 +712,14 @@ def run_agent(
                 stop_reason = llm_step.stop_reason
                 break
 
-            # Executa cada tool, coleta resultados, appenda ao histórico
-            tool_results: list[dict[str, Any]] = []
-            for use in llm_step.tool_uses:
+            # Executa as tools do turno CONCORRENTEMENTE (spec 01): tools de I/O
+            # não bloqueiam umas às outras → latência do turno = máx, não soma.
+            # asyncio.gather cria uma Task por tool: cada uma copia o contexto
+            # atual (contextvars), então o span telemetry.tool_call de cada tool
+            # parenta corretamente sob o span do turno, sem cruzar com os irmãos.
+            # gather preserva a ordem por índice → casamento de tool_result por
+            # id (Anthropic) e a sequência do trace ficam determinísticos.
+            async def _exec_tool(use: dict[str, Any]) -> tuple[dict[str, Any], TraceStep]:
                 with telemetry.tool_call(
                     name=f"tool.{use['name']}",
                     input=use["input"],
@@ -662,19 +732,35 @@ def run_agent(
                             f"Tools disponíveis: {', '.join(registry.names())}."
                         )
                     else:
-                        output = t.call(use["input"])
+                        output = await t.call_async(use["input"])
+
+                    # Cap central de contexto (spec 02): qualquer tool-result
+                    # acima do orçamento é truncada com marcador antes de ir ao
+                    # histórico. Caps por-tool (writing_tools) já podem ter agido
+                    # antes; este é o teto de segurança final.
+                    output = _cap(
+                        output, TOOL_RESULT_CHAR_CAP, tool_name=use["name"],
+                    )
 
                     if tool_span is not None:
                         tool_span.update(output=output)
 
-                tool_results.append({"id": use["id"], "output": output})
-
-                tool_trace = TraceStep(
+                trace = TraceStep(
                     kind="tool",
                     name=use["name"],
                     input=use["input"],
                     output=output,
                 )
+                return {"id": use["id"], "output": output}, trace
+
+            pairs = await asyncio.gather(
+                *(_exec_tool(use) for use in llm_step.tool_uses)
+            )
+            # Appenda em ordem (determinístico) após o gather; on_step/steps não
+            # são tocados dentro das tasks concorrentes para evitar interleave.
+            tool_results: list[dict[str, Any]] = []
+            for result, tool_trace in pairs:
+                tool_results.append(result)
                 steps.append(tool_trace)
                 if on_step:
                     on_step(tool_trace)
@@ -685,9 +771,27 @@ def run_agent(
             # O modelo responde como assistant antes de continuar — consolida
             # achados intermediários e ajuda a evitar desvio de objetivo em loops
             # longos.
+            # Reflexão dinâmica (spec 08): em vez de cadência fixa, reflete quando
+            # um sinal leve indica que vale (erro de tool, mudança de plano, muito
+            # output acumulado) OU ao atingir o teto reflect_every (piso de
+            # frequência). Heurística sem LLM; rodadas triviais entre tetos não
+            # disparam. reflect_every None/0 → reflexão desligada (compat).
             tool_rounds += 1
-            if reflect_every and tool_rounds % reflect_every == 0:
-                messages.append({"role": "user", "content": _REFLECT_PROMPT})
+            if reflect_every:
+                rounds_since_reflect += 1
+                chars_since_reflect += sum(len(r["output"]) for r in tool_results)
+                round_tools = {u["name"] for u in llm_step.tool_uses}
+                had_error = any(
+                    r["output"].startswith(("Erro:", "Erro ao executar"))
+                    for r in tool_results
+                )
+                plan_changed = bool(round_tools & _PLAN_TOOL_NAMES)
+                big_output = chars_since_reflect >= _REFLECT_CHAR_THRESHOLD
+                hit_ceiling = rounds_since_reflect >= reflect_every
+                if hit_ceiling or had_error or plan_changed or big_output:
+                    messages.append({"role": "user", "content": _REFLECT_PROMPT})
+                    rounds_since_reflect = 0
+                    chars_since_reflect = 0
         else:
             # Esgotou max_steps sem o break interno
             stop_reason = "max_steps"
@@ -709,6 +813,59 @@ def run_agent(
         stop_reason=stop_reason,
         usage={"input_tokens": total_in, "output_tokens": total_out},
     )
+
+
+# =============================================================================
+# Shim sync — call sites síncronos continuam chamando run_agent (spec 01)
+# =============================================================================
+
+def run_agent(
+    *,
+    system: str,
+    initial_messages: list[dict[str, Any]],
+    tools: list[Tool],
+    model: str,
+    provider: Provider = "anthropic",
+    max_steps: int = 8,
+    on_step: Callable[[TraceStep], None] | None = None,
+    reflect_every: int | None = None,
+    span_name: str | None = None,
+) -> AgentResult:
+    """Shim síncrono sobre `run_agent_async` (spec 01).
+
+    A lógica do loop vive em `run_agent_async`; aqui só decidimos como rodá-la:
+    - Sem event loop ativo na thread (caso comum: handler FastAPI sync em
+      threadpool, task procrastinate, tool sync rodando em `asyncio.to_thread`)
+      → `asyncio.run` direto.
+    - Com loop ativo na thread (sync chamado de dentro de corrotina) → roda num
+      worker thread com loop próprio, evitando o erro "asyncio.run() cannot be
+      called from a running event loop".
+
+    Mantém assinatura e retorno do run_agent original — call sites não mudam.
+    """
+    def _make_coro():
+        return run_agent_async(
+            system=system,
+            initial_messages=initial_messages,
+            tools=tools,
+            model=model,
+            provider=provider,
+            max_steps=max_steps,
+            on_step=on_step,
+            reflect_every=reflect_every,
+            span_name=span_name,
+        )
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(_make_coro())
+
+    # Loop ativo nesta thread → isola a execução num worker dedicado.
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+        return ex.submit(lambda: asyncio.run(_make_coro())).result()
 
 
 # =============================================================================

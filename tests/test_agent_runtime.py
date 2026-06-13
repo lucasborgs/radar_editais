@@ -27,6 +27,7 @@ from core.llm.agent_runtime import (  # noqa: E402
     _format_tool_results_anthropic,
     _format_tool_results_openai,
     _LLMStep,
+    _REFLECT_PROMPT,
     resolve_agent_provider,
     run_agent,
     tool,
@@ -140,7 +141,7 @@ def test_tool_call_async_rejected():
 
     result = real_async.call({"x": 1})
     assert "é async" in result
-    assert "runtime atual é sync" in result
+    assert "call_async" in result
 
 
 # ============================================================================
@@ -505,3 +506,283 @@ def test_run_agent_on_step_callback_invoked(monkeypatch):
     assert len(captured) == 1
     assert captured[0].kind == "llm"
     assert captured[0].text == "tudo bem"
+
+
+# ============================================================================
+# Execução paralela de tools + suporte async (spec 01)
+# ============================================================================
+
+def test_tool_call_async_runs_async_tool():
+    """call_async aguarda uma tool `async def` e devolve a string (spec 01)."""
+    import asyncio
+
+    @tool
+    async def afetch(x: int) -> str:
+        """Tool async."""
+        return f"got {x}"
+
+    out = asyncio.run(afetch.call_async({"x": 7}))
+    assert out == "got 7"
+
+
+def test_run_agent_parallel_tools_wallclock(monkeypatch):
+    """2 tools de I/O sync no mesmo turno rodam concorrentes (spec 01):
+    wallclock ≈ máx (~0.3s), não a soma (~0.6s)."""
+    import time
+
+    fake = _make_fake_call([
+        _LLMStep(
+            stop_reason="end_turn",
+            text="",
+            tool_uses=[
+                {"id": "tu_1", "name": "slow_a", "input": {}},
+                {"id": "tu_2", "name": "slow_b", "input": {}},
+            ],
+            assistant_message={"role": "assistant", "content": "..."},
+            usage={"input_tokens": 10, "output_tokens": 5},
+        ),
+        _LLMStep(
+            stop_reason="end_turn", text="pronto", tool_uses=[],
+            assistant_message={"role": "assistant", "content": "pronto"},
+            usage={"input_tokens": 10, "output_tokens": 5},
+        ),
+    ])
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
+
+    @tool
+    def slow_a() -> str:
+        """Lenta A."""
+        time.sleep(0.3)
+        return "a"
+
+    @tool
+    def slow_b() -> str:
+        """Lenta B."""
+        time.sleep(0.3)
+        return "b"
+
+    t0 = time.monotonic()
+    result = run_agent(
+        system="sys",
+        initial_messages=[{"role": "user", "content": "vai"}],
+        tools=[slow_a, slow_b],
+        model="claude-sonnet-4-6",
+        provider="anthropic",
+    )
+    elapsed = time.monotonic() - t0
+
+    assert result.stop_reason == "end_turn"
+    # sequencial seria ~0.6s; concorrente ~0.3s. Folga p/ ruído de agendamento.
+    assert elapsed < 0.5, f"esperado <0.5s (concorrente), levou {elapsed:.2f}s"
+    # ambas executaram e a ordem do trace casa com a ordem dos tool_uses
+    tool_steps = [s for s in result.steps if s.kind == "tool"]
+    assert [s.name for s in tool_steps] == ["slow_a", "slow_b"]
+    assert [s.output for s in tool_steps] == ["a", "b"]
+
+
+def test_run_agent_executes_async_tool(monkeypatch):
+    """Uma tool `async def` é executada pelo loop (via call_async) e seu
+    resultado retorna ao modelo (spec 01)."""
+    fake = _make_fake_call([
+        _LLMStep(
+            stop_reason="end_turn", text="",
+            tool_uses=[{"id": "tu_1", "name": "afetch", "input": {"q": "x"}}],
+            assistant_message={"role": "assistant", "content": "..."},
+            usage={"input_tokens": 1, "output_tokens": 1},
+        ),
+        _LLMStep(
+            stop_reason="end_turn", text="feito", tool_uses=[],
+            assistant_message={"role": "assistant", "content": "feito"},
+            usage={"input_tokens": 1, "output_tokens": 1},
+        ),
+    ])
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
+
+    @tool
+    async def afetch(q: str) -> str:
+        """Tool async."""
+        return f"async:{q}"
+
+    result = run_agent(
+        system="sys",
+        initial_messages=[{"role": "user", "content": "vai"}],
+        tools=[afetch],
+        model="claude-sonnet-4-6",
+        provider="anthropic",
+    )
+
+    tool_steps = [s for s in result.steps if s.kind == "tool"]
+    assert tool_steps[0].output == "async:x"
+    assert result.final_text == "feito"
+
+
+def test_run_agent_works_within_running_event_loop(monkeypatch):
+    """Shim sync (spec 01): run_agent chamado de dentro de um event loop ativo
+    roda num worker thread em vez de estourar 'asyncio.run() cannot be called
+    from a running event loop'. Cobre o caso de um método sync invocado de uma
+    corrotina."""
+    import asyncio
+
+    fake = _make_fake_call([
+        _LLMStep(
+            stop_reason="end_turn", text="ok", tool_uses=[],
+            assistant_message={"role": "assistant", "content": "ok"},
+            usage={"input_tokens": 1, "output_tokens": 1},
+        ),
+    ])
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
+
+    @tool
+    def noop() -> str:
+        """noop."""
+        return ""
+
+    async def _caller():
+        # run_agent é sync, mas aqui há um loop ativo.
+        return run_agent(
+            system="sys",
+            initial_messages=[{"role": "user", "content": "oi"}],
+            tools=[noop],
+            model="claude-sonnet-4-6",
+            provider="anthropic",
+        )
+
+    result = asyncio.run(_caller())
+    assert result.final_text == "ok"
+    assert result.stop_reason == "end_turn"
+
+
+# ============================================================================
+# Reflexão dinâmica (spec 08)
+# ============================================================================
+
+def _make_recording_call(sequence: list[_LLMStep]):
+    """Como _make_fake_call, mas grava as `messages` recebidas em cada chamada,
+    para inspecionar se o prompt de reflexão foi injetado no histórico."""
+    state = {"i": 0, "seen": []}
+
+    def call(system, messages, tools_schema, model):
+        state["seen"].append(list(messages))
+        step = sequence[state["i"]]
+        state["i"] += 1
+        return step
+
+    return call, state
+
+
+def _reflected(state) -> bool:
+    """True se o _REFLECT_PROMPT apareceu nas messages da 2ª chamada LLM (i.e.,
+    foi injetado após a 1ª rodada de tools)."""
+    if len(state["seen"]) < 2:
+        return False
+    return any(
+        isinstance(m, dict) and m.get("content") == _REFLECT_PROMPT
+        for m in state["seen"][1]
+    )
+
+
+def _one_tool_then_end(tool_name: str, tool_input: dict | None = None):
+    """Sequência de 2 steps: chama `tool_name`, depois encerra."""
+    return [
+        _LLMStep(
+            stop_reason="end_turn", text="",
+            tool_uses=[{"id": "tu_1", "name": tool_name, "input": tool_input or {}}],
+            assistant_message={"role": "assistant", "content": "..."},
+            usage={"input_tokens": 1, "output_tokens": 1},
+        ),
+        _LLMStep(
+            stop_reason="end_turn", text="fim", tool_uses=[],
+            assistant_message={"role": "assistant", "content": "fim"},
+            usage={"input_tokens": 1, "output_tokens": 1},
+        ),
+    ]
+
+
+def test_reflection_anticipated_on_plan_change(monkeypatch):
+    """Mudança de plano (write_todos) antecipa a reflexão antes do teto."""
+    fake, state = _make_recording_call(_one_tool_then_end("write_todos"))
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
+
+    @tool
+    def write_todos(items: str) -> str:
+        """Plano."""
+        return "plano atualizado"
+
+    run_agent(
+        system="sys", initial_messages=[{"role": "user", "content": "vai"}],
+        tools=[write_todos], model="claude-sonnet-4-6", provider="anthropic",
+        reflect_every=5,  # teto alto: só o sinal de plano pode disparar
+    )
+    assert _reflected(state)
+
+
+def test_reflection_anticipated_on_tool_error(monkeypatch):
+    """Erro de tool (tool inexistente → string de erro) antecipa a reflexão."""
+    fake, state = _make_recording_call(_one_tool_then_end("nao_existe"))
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
+
+    @tool
+    def real(x: str) -> str:
+        """Real."""
+        return x
+
+    run_agent(
+        system="sys", initial_messages=[{"role": "user", "content": "vai"}],
+        tools=[real], model="claude-sonnet-4-6", provider="anthropic",
+        reflect_every=5,
+    )
+    assert _reflected(state)
+
+
+def test_no_reflection_on_trivial_round_before_ceiling(monkeypatch):
+    """Rodada trivial (sem erro, sem plano, output pequeno) NÃO dispara reflexão
+    enquanto o teto não é atingido."""
+    fake, state = _make_recording_call(_one_tool_then_end("search", {"q": "x"}))
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
+
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return "ok"
+
+    run_agent(
+        system="sys", initial_messages=[{"role": "user", "content": "vai"}],
+        tools=[search], model="claude-sonnet-4-6", provider="anthropic",
+        reflect_every=5,
+    )
+    assert not _reflected(state)
+
+
+def test_reflection_fires_at_ceiling(monkeypatch):
+    """Teto reflect_every=1 garante reflexão mesmo numa rodada trivial."""
+    fake, state = _make_recording_call(_one_tool_then_end("search", {"q": "x"}))
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
+
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return "ok"
+
+    run_agent(
+        system="sys", initial_messages=[{"role": "user", "content": "vai"}],
+        tools=[search], model="claude-sonnet-4-6", provider="anthropic",
+        reflect_every=1,
+    )
+    assert _reflected(state)
+
+
+def test_no_reflection_when_disabled(monkeypatch):
+    """reflect_every=None (default) → reflexão desligada (compat)."""
+    fake, state = _make_recording_call(_one_tool_then_end("write_todos"))
+    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", fake)
+
+    @tool
+    def write_todos(items: str) -> str:
+        """Plano."""
+        return "plano"
+
+    run_agent(
+        system="sys", initial_messages=[{"role": "user", "content": "vai"}],
+        tools=[write_todos], model="claude-sonnet-4-6", provider="anthropic",
+    )
+    assert not _reflected(state)
