@@ -6,7 +6,7 @@ tags:
 
 # 🏷️ Tema: tecnologias digitais e conectividade
 
-**8 editais** e **33 ICTs** relacionados a este tema.
+**8 editais**, **33 ICTs** e **2 investidores** relacionados a este tema.
 
 ## Editais
 
@@ -54,3 +54,8 @@ tags:
 - 🔬 [[radar-editais/icts/embrapii-sistemas-inteligentes-certi|CERTI]]
 - 🔬 [[radar-editais/icts/embrapii-inteligencia-artificial-ceia-ufg|CEIA-UFG]]
 - 🔬 [[radar-editais/icts/embrapii-software-e-automaco-ceei|CEEI]]
+
+## Investidores
+
+- 💸 [[radar-editais/investidores/investidor-indicator-capital|Indicator Capital]]
+- 💸 [[radar-editais/investidores/investidor-kptl|KPTL]]
