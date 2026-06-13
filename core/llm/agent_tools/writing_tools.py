@@ -351,12 +351,11 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
 
     # DeepResearch (Fase A): tool stateless de busca web. Subagente-como-tool —
     # devolve fato COM fonte; NÃO persiste (gate humano → library é a Fase B).
-    from core.llm.agent_tools.research_tools import build_research_tools
-
     # write_todos: PlanState interno por chamada (= por turno). Tracking de
     # execução anti-drift; complementa plan_writing_session (que é 1-shot).
     # Persistência cross-turn dos todos fica fora de escopo (ver spec).
     from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
+    from core.llm.agent_tools.research_tools import build_research_tools
 
     return [
         plan_writing_session,
