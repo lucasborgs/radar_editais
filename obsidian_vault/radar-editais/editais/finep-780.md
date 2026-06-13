@@ -19,6 +19,8 @@ tags:
   - trl/trl_prototipo
   - trl/trl_industrial
   - ano/2026
+  - publico-alvo/startups
+  - publico-alvo/cooperativas
 ---
 
 # 🟢 Finep Mais Inovação Brasil – Rodada 2 – Semicondutores
@@ -27,10 +29,6 @@ tags:
 
 ## Fonte
 - [[radar-editais/fontes/finep|FINEP]]
-
-## Público-Alvo
-- [[radar-editais/publicos/startups|Startups]]
-- [[radar-editais/publicos/cooperativas|Cooperativas]]
 
 ## Informações
 

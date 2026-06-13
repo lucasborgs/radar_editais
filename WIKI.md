@@ -396,15 +396,17 @@ Cada tipo de nó vira uma subpasta no vault Obsidian e um grupo no `graph.json`.
 
 **Critério nó vs tag:** um tipo é **nó** só se for hub de navegação (pivota-se por ele
 para *descobrir* editais) **e** tiver identidade própria. Enums de baixa cardinalidade
-(2-3 valores) que apenas *filtram* — `mechanism`, `ano`, `trl_faixa` — são **tags** no
+que apenas *filtram* — `mechanism`, `ano`, `trl_faixa`, `publico-alvo` — são **tags** no
 frontmatter do edital (§6.1.1), não nós, para não poluir o grafo com mega-hubs sem
-semântica. Política vale para todas as fontes.
+semântica. `publico-alvo` (startup/empresa/ICT/universidade) é categórico de baixa
+cardinalidade: segue como sinal de match (`publico_alvo` no card, §5.5) mas NÃO é nó.
+Política vale para todas as fontes.
 
 ```yaml
 node_types:
   edital:
     folder: editais
-    tags: [finep, edital, "<status_tag>", "mecanismo/<mechanism>", "tema/<slug>", "subprograma/<slug>", "trl/<faixa>", "ano/<pub_year>"]
+    tags: [finep, edital, "<status_tag>", "mecanismo/<mechanism>", "tema/<slug>", "subprograma/<slug>", "trl/<faixa>", "ano/<pub_year>", "publico-alvo/<slug>"]
     emoji: "<status_emoji>"
   desafio:            # Q2 — open innovation / obrigação regulatória (evento, mesmo pipeline do edital)
     folder: desafios
@@ -418,10 +420,6 @@ node_types:
     folder: temas
     tags: [finep, tema]
     emoji: "🏷️"
-  publico:
-    folder: publicos
-    tags: [finep, publico-alvo]
-    emoji: "👥"
   subprograma:
     folder: subprogramas
     tags: [finep, subprograma]
@@ -530,10 +528,6 @@ link_types:
     from: edital
     to: tema
     section: "## Temas"
-  edital_has_target_audience:
-    from: edital
-    to: publico
-    section: "## Público-Alvo"
   edital_has_subprograma:
     from: edital
     to: subprograma
@@ -543,7 +537,7 @@ link_types:
     to: fonte
     section: "## Fonte"
   aggregator_lists_edital:
-    from: [tema, publico, subprograma, fonte, home]
+    from: [tema, subprograma, fonte, home]
     to: edital
     section: "## Editais"
   ict_has_expertise:
