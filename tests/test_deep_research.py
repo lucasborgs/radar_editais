@@ -22,18 +22,16 @@ def _fake_hits():
 
 
 def test_run_deep_research_collects_and_dedups_sources(monkeypatch):
-    # web_search devolve hits fixos; run_agent finge que o subagente buscou.
+    # web_search devolve hits fixos; run_subagent finge que o subagente buscou.
     monkeypatch.setattr(ws, "web_search", lambda q, k=5: _fake_hits())
-    monkeypatch.setattr(dr, "resolve_agent_provider",
-                        lambda p, m, **kw: ("anthropic", "fake-model"))
 
-    def fake_run_agent(**kw):
+    def fake_run_subagent(**kw):
         tools = {t.name: t for t in kw["tools"]}
         tools["web_search"].call({"query": "tamanho mercado X", "k": 3})
         return AgentResult(final_text="O mercado X cresce 10% [http://a].",
                            steps=[], stop_reason="end_turn", usage={})
 
-    monkeypatch.setattr(dr, "run_agent", fake_run_agent)
+    monkeypatch.setattr(dr, "run_subagent", fake_run_subagent)
 
     res = dr.run_deep_research("qual o tamanho do mercado X?")
     assert res.answer.startswith("O mercado X cresce")
@@ -43,23 +41,19 @@ def test_run_deep_research_collects_and_dedups_sources(monkeypatch):
 
 
 def test_run_deep_research_agent_error_degrades(monkeypatch):
-    monkeypatch.setattr(dr, "resolve_agent_provider",
-                        lambda p, m, **kw: ("anthropic", "fake-model"))
+    # run_subagent já absorve a exceção interna e devolve stop_reason="error";
+    # run_deep_research só propaga esse resultado degradado.
+    def degraded(**kw):
+        return AgentResult(final_text="", steps=[], stop_reason="error", usage={})
 
-    def boom(**kw):
-        raise RuntimeError("LLM caiu")
-
-    monkeypatch.setattr(dr, "run_agent", boom)
+    monkeypatch.setattr(dr, "run_subagent", degraded)
     res = dr.run_deep_research("x")
     assert res.answer == "" and res.sources == [] and res.stop_reason == "error"
 
 
 def test_web_search_tool_handles_no_key(monkeypatch):
     """A tool interna web_search converte WebSearchError em string (não quebra)."""
-    monkeypatch.setattr(dr, "resolve_agent_provider",
-                        lambda p, m, **kw: ("anthropic", "fake-model"))
-
-    def fake_run_agent(**kw):
+    def fake_run_subagent(**kw):
         tools = {t.name: t for t in kw["tools"]}
         out = tools["web_search"].call({"query": "q"})
         assert "indispon" in out.lower()  # mensagem amigável, não exceção
@@ -70,7 +64,7 @@ def test_web_search_tool_handles_no_key(monkeypatch):
         raise ws.WebSearchError("TAVILY_API_KEY não configurada")
 
     monkeypatch.setattr(ws, "web_search", raise_no_key)
-    monkeypatch.setattr(dr, "run_agent", fake_run_agent)
+    monkeypatch.setattr(dr, "run_subagent", fake_run_subagent)
     res = dr.run_deep_research("q")
     assert res.answer == "não encontrei"
     assert res.sources == []  # nada coletado

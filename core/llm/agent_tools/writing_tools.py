@@ -353,6 +353,11 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
     # devolve fato COM fonte; NÃO persiste (gate humano → library é a Fase B).
     from core.llm.agent_tools.research_tools import build_research_tools
 
+    # write_todos: PlanState interno por chamada (= por turno). Tracking de
+    # execução anti-drift; complementa plan_writing_session (que é 1-shot).
+    # Persistência cross-turn dos todos fica fora de escopo (ver spec).
+    from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
+
     return [
         plan_writing_session,
         search_edital,
@@ -363,4 +368,5 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
         request_user_info,
         recall_company_learnings,
         *build_research_tools(),
+        *build_planning_tools(PlanState()),
     ]

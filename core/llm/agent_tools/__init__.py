@@ -7,14 +7,23 @@ tools prontas para `core.llm.agent_runtime.run_agent`.
 Por que closures e não classes globais: tools precisam de RLS/workspace
 isolation. Closure por sessão garante que duas WritingSessions concorrentes
 nunca compartilham handle de DB ou escopo de busca por engano.
+
+Padrões transversais (write_todos, scratchpad) ficam em planning_tools /
+scratchpad_tools e são appendados por quem precisa.
 """
 from core.llm.agent_tools.explore_tools import build_explore_tools
+from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
 from core.llm.agent_tools.profile_tools import ExtractionState, build_profile_tools
+from core.llm.agent_tools.scratchpad_tools import Scratchpad, build_scratchpad_tools
 from core.llm.agent_tools.writing_tools import build_writing_tools
 
 __all__ = [
     "ExtractionState",
+    "PlanState",
+    "Scratchpad",
     "build_explore_tools",
+    "build_planning_tools",
     "build_profile_tools",
+    "build_scratchpad_tools",
     "build_writing_tools",
 ]

@@ -539,6 +539,7 @@ def run_agent(
     max_steps: int = 8,
     on_step: Callable[[TraceStep], None] | None = None,
     reflect_every: int | None = None,
+    span_name: str | None = None,
 ) -> AgentResult:
     """Executa o loop do agente até `end_turn`, `max_steps` ou erro.
 
@@ -553,6 +554,10 @@ def run_agent(
         reflect_every: se não-None, injeta um prompt de reflexão após cada N
             rodadas de tool-execution completas. Útil para sessões longas onde
             o agente precisa sintetizar achados antes de continuar.
+        span_name: nome do span raiz na telemetria. Default mantém
+            `f"agent.{provider}.{model}"`. `run_subagent` passa
+            `f"subagent.{name}"` para distinguir subagente de agente top-level
+            no trace — não muda comportamento, só o rótulo.
 
     Returns:
         AgentResult com texto final, trace completo, stop_reason e usage total.
@@ -582,7 +587,7 @@ def run_agent(
     from core import telemetry
 
     with telemetry.agent_run(
-        name=f"agent.{provider}.{model}",
+        name=span_name or f"agent.{provider}.{model}",
         input={"system": system, "initial_messages": initial_messages},
         metadata={
             "provider": provider,
@@ -704,3 +709,61 @@ def run_agent(
         stop_reason=stop_reason,
         usage={"input_tokens": total_in, "output_tokens": total_out},
     )
+
+
+# =============================================================================
+# Subagente-como-tool — wrapper de degradação graciosa em volta de run_agent
+# =============================================================================
+
+def run_subagent(
+    *,
+    name: str,
+    system: str,
+    user_message: str,
+    tools: list[Tool],
+    provider: Provider = "anthropic",
+    model: str | None = None,
+    max_steps: int = 5,
+) -> AgentResult:
+    """Roda um subagente-como-tool: resolve provider, executa `run_agent` e
+    degrada graciosamente em caso de erro.
+
+    Formaliza o padrão hoje hand-rolled em call sites (ex.: deep_research):
+    resolver o provider via API key disponível, encapsular o `run_agent` em
+    try/except, e — se algo explodir — devolver um `AgentResult` vazio com
+    `stop_reason="error"` em vez de propagar a exceção. O chamador (que é uma
+    tool no agente pai) nunca quebra o loop por causa de um subagente.
+
+    Args:
+        name: identificador do subagente (ex.: "deep_research") — vira
+            `span_name=f"subagent.{name}"` na telemetria e rótulo de log.
+        system: system prompt do subagente.
+        user_message: a pergunta/tarefa única que dispara o subagente.
+        tools: tools internas do subagente.
+        provider: provider preferido (resolve_agent_provider faz fallback por key).
+        model: modelo desejado; None → default do provider via resolve.
+        max_steps: limite de iterações do loop interno (subagentes são curtos).
+
+    Returns:
+        AgentResult do loop interno; ou, em falha de resolução/execução,
+        AgentResult(final_text="", steps=[], stop_reason="error", usage={}).
+    """
+    try:
+        prov, mdl = resolve_agent_provider(
+            provider,
+            model or os.getenv("ANTHROPIC_MODEL_AGENT", "claude-sonnet-4-6"),
+        )
+        return run_agent(
+            system=system,
+            initial_messages=[{"role": "user", "content": user_message}],
+            tools=tools,
+            model=mdl,
+            provider=prov,
+            max_steps=max_steps,
+            span_name=f"subagent.{name}",
+        )
+    except Exception as e:
+        logger.error("run_subagent '%s' falhou: %s", name, e)
+        return AgentResult(
+            final_text="", steps=[], stop_reason="error", usage={},
+        )
