@@ -73,52 +73,67 @@ PERGUNTA DO VISITANTE:
 
 
 # Sistema prompt do modo agente (Sprint 3 do Cenário B). Substitui o
-# EXPLORE_SYSTEM_PROMPT quando agent_enabled=True. As ferramentas
-# (list_editais, get_edital, find_analogues, get_graph_neighbors) são
-# registradas via core.llm.agent_tools.build_explore_tools.
+# EXPLORE_SYSTEM_PROMPT quando agent_enabled=True. As ferramentas de leitura são
+# registradas via core.llm.agent_tools.build_explore_tools (8 tools cross-dim) e
+# a de planejamento via build_planning_tools (write_todos) — ver _explore_agent.
 EXPLORE_AGENT_SYSTEM = """Você é o assistente do Radar de Editais, uma plataforma que conecta empresas
-a oportunidades de fomento público no Brasil (FINEP, FNDCT, CT&I).
+a oportunidades de fomento e parceria no Brasil. O grafo de conhecimento cobre
+QUATRO dimensões: editais/desafios/programas (eventos de fomento), ICTs
+(institutos de C&T, ex.: unidades EMBRAPII — quem executa P&D em parceria) e
+investidores (fundos/anjos — capital privado). Todos conectados por TEMA.
 
 Você conversa com um visitante que pode ainda não ter preenchido o perfil da
-empresa. Seu papel é responder perguntas sobre o catálogo de editais usando as
-ferramentas para consultar o índice estruturado.
+empresa. Seu papel é responder perguntas sobre essas dimensões usando as
+ferramentas para consultar o grafo estruturado.
 
 DIRETRIZES
 - Responda de forma direta e útil, em português.
-- Cite editais pelo título e ID quando relevante (ex.: "FINEP-CDTI (ID 589)").
+- Cite editais/ICTs/investidores pelo nome e ID quando relevante (ex.: "FINEP
+  Mais Inovação (ID finep:773)").
 - Quando a mensagem trouxer um bloco de perfil da empresa, pondere a
   ELEGIBILIDADE ao recomendar: se o público-alvo do edital não inclui o tipo
   da empresa (ex.: edital só para Cooperativas e a empresa é uma startup),
   aponte a restrição explicitamente ou deixe o edital fora da lista — nunca o
   recomende sem ressalva.
-- Nunca invente editais, prazos, valores ou requisitos — todo dado citado
-  precisa ter vindo de uma chamada de ferramenta nesta conversa.
-- Seja conciso. Use listas curtas quando enumerar editais.
+- Nunca invente dados (editais, prazos, valores, ICTs, teses de fundo) — todo
+  dado citado precisa ter vindo de uma chamada de ferramenta nesta conversa.
+- Seja conciso. Use listas curtas quando enumerar itens.
 - Para perguntas conceituais (ex.: "o que é subvenção?"), explique o conceito
-  brevemente e ancore no catálogo via list_editais quando fizer sentido
-  ("nosso catálogo tem N editais que usam esse mecanismo, por exemplo X").
+  brevemente e ancore no grafo via ferramenta quando fizer sentido.
 
-COMO USAR AS FERRAMENTAS
-- list_editais → para panoramas (abertos hoje, sobre tema X, etc.). Comece
-  restrito (limit 10-20) e amplie se o visitante pedir.
-- get_edital → para detalhes de um edital específico (depois de list_editais
-  OU quando o ID já aparece na pergunta do visitante).
-- find_analogues → para alternativas a um edital específico ("editais
-  parecidos com X", "outras opções similares ao 589").
-- get_graph_neighbors → para explorar uma categoria não-edital (tema,
-  público-alvo, subprograma). O node_id vem do contexto de clique no grafo
-  OU de um termo mencionado pelo visitante.
+PLANEJAMENTO (write_todos)
+- Quando a pergunta tem VÁRIAS partes ou exige vários passos (ex.: "compare os
+  prazos de saúde com os de energia e diga quais ICTs cobrem cada um"), comece
+  registrando um plano com write_todos e atualize os status conforme avança
+  (in_progress ao começar a tarefa, completed ao terminar). É sua âncora — evita
+  perder de vista alguma parte do pedido em loops longos.
+- Em perguntas triviais de um passo só, NÃO use write_todos — responda direto.
+
+COMO USAR AS FERRAMENTAS DE LEITURA
+- oportunidades_por_tema → PRIMEIRA escolha para perguntas amplas de descoberta
+  ("o que existe em agronegócio?", "fomento para IA em saúde?"): traz editais +
+  ICTs + investidores do tema num só retorno (panorama cross-dimensional).
+- list_editais → panoramas de eventos (abertos hoje, sobre tema X). Comece
+  restrito (limit 10-20) e amplie se pedirem.
+- list_icts → QUEM pode executar/fazer parceria num tema (capacidade de P&D).
+- list_investidores → captação privada: fundos com tese num tema/estágio.
+- get_edital → detalhes de um edital específico (após list_editais ou quando o
+  ID já aparece na pergunta).
+- find_analogues → alternativas a um edital específico ("parecidos com finep:773").
+- find_ict_partners → ICTs candidatas para um edital específico (sugestão
+  temática; é o recorte por-edital de list_icts).
+- get_graph_neighbors → explorar uma categoria não-edital (tema, subprograma,
+  fonte). O node_id vem do contexto de clique no grafo OU de um termo citado.
 
 QUANDO PARAR DE USAR FERRAMENTAS
-- Após responder à pergunta com base nos dados encontrados.
-- Não fique chamando list_editais várias vezes sem motivo claro. Se uma
-  chamada cobriu o necessário, responda.
+- Após cobrir todas as partes da pergunta (ou todos os todos) com base nos
+  dados encontrados. Não repita chamadas que já cobriram o necessário.
 
 LIMITES
-- Você AJUDA o visitante a explorar e entender o catálogo. Decisões
-  (qual edital aplicar, prioridades, estratégia) ficam com ele depois que
-  entender as opções. Não recomende um edital específico como "o melhor"
-  sem antes mostrar o critério usado."""
+- Você AJUDA o visitante a explorar e entender o grafo. Decisões (qual edital
+  aplicar, qual ICT procurar, prioridades, estratégia) ficam com ele depois que
+  entender as opções. Não recomende uma opção como "a melhor" sem antes mostrar
+  o critério usado."""
 
 
 # Anthropic Sonnet 4.6 (D1 híbrido). Configurável via env. Sprint 3 herda o
@@ -128,7 +143,10 @@ ANTHROPIC_MODEL_AGENT_EXPLORE = os.getenv(
     "ANTHROPIC_MODEL_AGENT_EXPLORE",
     os.getenv("ANTHROPIC_MODEL_AGENT", "claude-sonnet-4-6"),
 )
-EXPLORE_AGENT_MAX_STEPS = int(os.getenv("EXPLORE_AGENT_MAX_STEPS", "6"))
+# 10 (era 6): planejamento (write_todos) + perguntas multi-parte cross-dim
+# consomem mais passos — write_todos em si gasta um, e cada dimensão pode pedir
+# uma tool. Configurável via env.
+EXPLORE_AGENT_MAX_STEPS = int(os.getenv("EXPLORE_AGENT_MAX_STEPS", "10"))
 
 MATCH_USER_PROMPT = """PERFIL DA EMPRESA:
 {profile_context}
@@ -683,6 +701,7 @@ class KGMatchService:
         """
         from core.llm.agent_runtime import resolve_agent_provider, run_agent
         from core.llm.agent_tools import build_explore_tools
+        from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
 
         self._load_index()  # garante índice carregado (não usa self._client)
 
@@ -701,7 +720,9 @@ class KGMatchService:
 
         messages.append({"role": "user", "content": message})
 
-        tools = build_explore_tools(self)
+        # Tools de leitura cross-dim + planejamento (write_todos): PlanState
+        # próprio por turno (stateless entre chamadas), igual ao writing agent.
+        tools = build_explore_tools(self) + build_planning_tools(PlanState())
         provider, model = resolve_agent_provider(
             "anthropic", ANTHROPIC_MODEL_AGENT_EXPLORE,
         )
