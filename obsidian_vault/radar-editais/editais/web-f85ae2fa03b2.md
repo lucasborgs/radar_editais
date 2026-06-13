@@ -10,17 +10,15 @@ tags:
   - edital
   - aberta
   - ano/desconhecido
+  - publico-alvo/empresas
+  - publico-alvo/startups
+  - publico-alvo/cooperativas
 ---
 
 # 🟢 Com apoio do Governo de MS, Finep apresenta oportunidades em editais com R$ 3,3 bilhões para inovação – SEMADESC
 
 ## Fonte
 - [[radar-editais/fontes/web|WEB]]
-
-## Público-Alvo
-- [[radar-editais/publicos/empresas|Empresas]]
-- [[radar-editais/publicos/startups|Startups]]
-- [[radar-editais/publicos/cooperativas|Cooperativas]]
 
 ## Informações
 

@@ -12,6 +12,9 @@ tags:
 
 > O CQMED foi credenciado como Unidade EMBRAPII de Inovação em Fármacos em 2017 e realiza projetos com a indústria farmacêutica na área de desenvolvimento de fármacos e tecnologias relacionadas a química medicinal. Os projetos conjuntos fazem parte da etapa pré-competitiva do…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 

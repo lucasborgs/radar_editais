@@ -12,6 +12,9 @@ tags:
 
 > Localizada em Campina Grande, na Paraíba, a Unidade Embrapii Nutes (Núcleo de Tecnologias Estratégicas em Saúde) atua no desenvolvimento de dispositivos médicos e tecnologias voltadas para a área da saúde. Dentre as atividades destacam-se o desenvolvimento de dispositivos…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 

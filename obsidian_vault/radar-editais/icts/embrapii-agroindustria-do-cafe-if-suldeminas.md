@@ -12,6 +12,9 @@ tags:
 
 > A Unidade Embrapii IFSULDEMINAS – Agroindústria do Café é um centro de inovação tecnológica credenciado pela Empresa Brasileira de Pesquisa e Inovação Industrial (Embrapii), sediado no Instituto Federal do Sul de Minas Gerais – Campus Machado, região reconhecida como um dos…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

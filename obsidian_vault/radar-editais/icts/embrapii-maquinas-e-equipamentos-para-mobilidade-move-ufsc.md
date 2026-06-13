@@ -13,6 +13,9 @@ tags:
 
 > MOVE é uma Unidade Embrapii que atua na área de Máquinas e Equipamentos para Mobilidade, com foco em: 1. Veículos e equipamentos para movimentação de cargas e pessoas. 2. Dispositivos e equipamentos para conversão de energia e propulsão. 3. Processos de fabricação, sistemas de…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]

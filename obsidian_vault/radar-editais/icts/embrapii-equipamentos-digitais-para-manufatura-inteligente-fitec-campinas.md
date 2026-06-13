@@ -12,6 +12,9 @@ tags:
 
 > FITec Campinas: Inovação e Tecnologia de Ponta para Impulsionar seu Negócio! Somos um centro de excelência em P&D, especialista em transformar ideias em realidade! Nosso time de 90+ especialistas em: Transformação Digital Inteligência Artificial Ciência de Dados IoT Gestão…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

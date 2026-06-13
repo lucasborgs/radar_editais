@@ -12,6 +12,9 @@ tags:
 
 > Quem somos A UCSGRAPHENE se consolidou como um centro de excelência no desenvolvimento de soluções tecnológicas, focando na utilização de materiais avançados para aprimorar produtos e processos industriais. Ela não apenas cria novos produtos, mas também transforma processos…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 

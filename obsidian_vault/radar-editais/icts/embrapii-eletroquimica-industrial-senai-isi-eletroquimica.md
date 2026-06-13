@@ -14,6 +14,9 @@ tags:
 
 > O Instituto Senai de Inovação em Eletroquímica é credenciado pela Embrapii para atendimento nas áreas de Baterias, Revestimentos Inteligentes e Sensores Eletroquímicos com foco principal em Eletroquímica Industrial. O Instituto atua de maneira multidisciplinar englobando análise…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]

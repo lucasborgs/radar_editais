@@ -12,6 +12,9 @@ tags:
 
 > Apresente sua demanda para o nosso assistente de inteligência artificial: bit.ly/matchias O Centro de Excelência em Inteligência Artificial – CEIA é uma instituição de referência no tema de Inteligência Artificial e Ciência de Dados, com atuação como Unidade Embrapii nas…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

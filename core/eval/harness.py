@@ -131,7 +131,7 @@ def _aggregate(item_results: list[dict]) -> dict[str, float]:
 # Caminho Langfuse
 # ---------------------------------------------------------------------------
 
-def _to_lf_evals(raw: Any, LFEval: type) -> Any:
+def _to_lf_evals(raw: Any, LFEval: type) -> Any:  # noqa: N803 — alias da classe Langfuse Evaluation
     """Converte Evaluation dict(s) → instâncias Langfuse Evaluation (tem .name)."""
     if raw is None:
         return None
@@ -144,7 +144,8 @@ def _to_lf_evals(raw: Any, LFEval: type) -> Any:
 
 
 def _run_langfuse(suite: Suite, items: list[Item], run_name: str) -> Any:
-    from langfuse import Evaluation as LFEval, Langfuse
+    from langfuse import Evaluation as LFEval
+    from langfuse import Langfuse
     lf = Langfuse()
 
     def _wrap_ev(ev_fn: EvaluatorFn):

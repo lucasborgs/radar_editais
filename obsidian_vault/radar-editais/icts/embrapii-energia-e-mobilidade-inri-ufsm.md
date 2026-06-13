@@ -13,6 +13,9 @@ tags:
 
 > O Instituto de Redes Inteligentes (INRI) vinculado à Universidade Federal de Santa Maria (UFSM) é credenciado pela EMBRAPII para desenvolver projetos de P,D&I nas áreas de Energia e Mobilidade, tendo como sublinhas: Recursos Energéticos: Geração, Armazenamento, Integração,…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]

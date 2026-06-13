@@ -6,7 +6,7 @@ tags:
 
 # 🏷️ Tema: mobilidade e logística
 
-**3 editais** e **10 ICTs** relacionados a este tema.
+**3 editais** e **13 ICTs** relacionados a este tema.
 
 ## Editais
 
@@ -20,9 +20,12 @@ tags:
 - 🔬 [[radar-editais/icts/embrapii-mobilidade-incluindo-eletro-mobilidade-simob-ufrgs|SIMOB-UFRGS]]
 - 🔬 [[radar-editais/icts/embrapii-energia-e-mobilidade-inri-ufsm|INRI-UFSM]]
 - 🔬 [[radar-editais/icts/embrapii-iot-e-manufatura-40-vbl-iot-e-industria-40-von-braun|VBL IoT E INDÚSTRIA 4.0 – Von Braun]]
+- 🔬 [[radar-editais/icts/embrapii-biofotonica-e-instrumentaco-usp-ifsc|USP-IFSC]]
 - 🔬 [[radar-editais/icts/embrapii-soluces-computacionais-em-engenharia-tecgraf|TECGRAF]]
 - 🔬 [[radar-editais/icts/embrapii-tecnologias-aplicadas-a-powertrains-powertrain-usp|Powertrain-USP]]
 - 🔬 [[radar-editais/icts/embrapii-maquinas-e-equipamentos-para-mobilidade-move-ufsc|MOVE-UFSC]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-inteligentes-de-energia-if-sc-fln|IF-SC – FLN]]
 - 🔬 [[radar-editais/icts/embrapii-mobilidade-e-sistemas-inteligentes-if-mg|IF-MG]]
+- 🔬 [[radar-editais/icts/embrapii-computaco-industrial-edge-ufal|EDGE-UFAL]]
 - 🔬 [[radar-editais/icts/embrapii-tecnologia-e-sistemas-veiculares-cin-ufpe|CIn-UFPE]]
+- 🔬 [[radar-editais/icts/embrapii-transmisso-de-potencia-ccm-ita|CCM-ITA]]

@@ -12,6 +12,9 @@ tags:
 
 > Inicialmente, o Polo de Inovação IFMG foi credenciado como Unidade EMBRAPII para executar projetos de Pesquisa, Desenvolvimento e Inovação (PD&I) na área de competência Sistemas Automotivos Inteligentes. No final de 2018, o Polo IFMG propôs ampliar sua área de atuação para…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]
 

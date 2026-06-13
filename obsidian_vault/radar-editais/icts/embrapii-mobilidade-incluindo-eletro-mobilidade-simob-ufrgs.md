@@ -12,6 +12,9 @@ tags:
 
 > A Unidade Embrapii da Escola de Engenharia da UFRGS, SIMOB – Sistemas Inteligentes de Mobilidade, conta com capacidades específicas no desenvolvimento de materiais e processos de fabricação como Conformação Mecânica, Fundição e Soldagem, Instrumentação e Automação, bem como de…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]
 

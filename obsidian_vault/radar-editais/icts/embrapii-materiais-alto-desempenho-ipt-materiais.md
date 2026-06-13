@@ -13,6 +13,9 @@ tags:
 
 > O Instituto de Pesquisas Tecnológicas é um instituto criado em 1899 e, desde do início de suas atividades, tem atuado com desenvolvimento de tecnologias de materiais. Ao longo de sua história, o IPT realizou contribuições importantes em diferentes fases da instalação e do…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]

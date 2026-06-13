@@ -23,7 +23,17 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from core.kg import kg_store
 from core.llm.agent_runtime import Tool, tool
+
+
+def _theme_match(needle: str, themes: list[str]) -> bool:
+    """Match case-insensitive por substring do tema/setor (needle) nos temas de
+    um nó. Vazio = casa tudo (sem filtro)."""
+    n = (needle or "").strip().lower()
+    if not n:
+        return True
+    return any(n in (t or "").lower() for t in themes)
 
 if TYPE_CHECKING:
     from core.services.kg_match_service import KGMatchService
@@ -258,5 +268,111 @@ def build_explore_tools(service: KGMatchService) -> list[Tool]:
             )
         return "\n".join(lines)
 
+    @tool
+    def list_icts(tema: str = "", limit: int = 20) -> str:
+        """Lista ICTs (institutos de C&T, ex.: unidades EMBRAPII) por tema/setor.
+
+        Use quando o usuário pergunta QUEM pode executar/fazer parceria num
+        tema, ou quer um panorama da capacidade instalada de pesquisa. ICTs não
+        lançam editais — viabilizam projetos (parceria). Para ICTs de um edital
+        específico, prefira find_ict_partners.
+
+        Args:
+            tema: substring case-insensitive nos temas da ICT; "" = todas
+            limit: máximo a listar (default 20, max 50)
+        """
+        limit = max(1, min(int(limit), 50))
+        try:
+            icts = [i for i in kg_store.load_icts() if _theme_match(tema, i.get("themes", []))]
+        except Exception as e:
+            return f"Erro ao listar ICTs: {e}."
+        if not icts:
+            return f"Nenhuma ICT encontrada{f' para tema={tema!r}' if tema else ''}."
+        lines = [f"Encontradas {len(icts)} ICTs (mostrando até {limit}):"]
+        for i in icts[:limit]:
+            contact = (i.get("contact") or {}).get("email") or i.get("url", "")
+            themes = ", ".join(i.get("themes", [])[:3])[:60]
+            lines.append(f"  {i.get('name', i['id'])[:55]} | temas:{themes} | {contact}")
+        return "\n".join(lines)
+
+    @tool
+    def list_investidores(tema: str = "", limit: int = 20) -> str:
+        """Lista investidores (fundos/anjos) cuja tese cobre um tema/setor.
+
+        Use quando o usuário pergunta sobre captação privada, quem investe num
+        setor, ou opções de financiamento equity num tema. Devolve nome, tese
+        (resumo), estágio-alvo e site.
+
+        Args:
+            tema: substring case-insensitive nos temas/setores da tese; "" = todos
+            limit: máximo a listar (default 20, max 50)
+        """
+        limit = max(1, min(int(limit), 50))
+        try:
+            invs = [
+                v for v in kg_store.load_investidores()
+                if _theme_match(tema, v.get("tese_themes", []) + v.get("setores", []))
+            ]
+        except Exception as e:
+            return f"Erro ao listar investidores: {e}."
+        if not invs:
+            return f"Nenhum investidor encontrado{f' para tema={tema!r}' if tema else ''}."
+        lines = [f"Encontrados {len(invs)} investidores (mostrando até {limit}):"]
+        for v in invs[:limit]:
+            estagio = ", ".join(v.get("estagio_alvo", [])[:3])
+            lines.append(
+                f"  {v.get('name', v['id'])[:45]} | tese:{(v.get('tese') or '')[:70]} "
+                f"| estágio:{estagio} | {v.get('site', '')}"
+            )
+        return "\n".join(lines)
+
+    @tool
+    def oportunidades_por_tema(tema: str) -> str:
+        """Panorama CROSS-DIMENSIONAL de um tema/setor: junta editais/desafios
+        abertos, ICTs parceiras e investidores com tese no tema — as quatro
+        dimensões do grafo num só lugar.
+
+        Use para perguntas amplas de descoberta, ex.: "quais oportunidades em
+        agronegócio?", "o que existe para deep tech em saúde?". Depois, aprofunde
+        com get_edital, list_icts ou list_investidores conforme o interesse.
+
+        Args:
+            tema: substring case-insensitive do tema/setor (ex.: "agro", "saúde")
+        """
+        out: list[str] = [f"Panorama de oportunidades em '{tema}':"]
+        # Eventos (editais/desafios/programas vêm do índice via list_editais)
+        try:
+            editais = service.list_editais(status="ABERTA", tema=tema or None, limit=10)
+        except Exception:
+            editais = []
+        out.append(f"\n📋 Editais/desafios abertos ({len(editais)}):")
+        for e in editais[:10]:
+            out.append(f"  ID:{e['id']} | {e['title'][:60]} | prazo:{e.get('deadline', '?')}")
+        if not editais:
+            out.append("  (nenhum aberto com esse tema)")
+        # Entidades
+        try:
+            icts = [i for i in kg_store.load_icts() if _theme_match(tema, i.get("themes", []))]
+        except Exception:
+            icts = []
+        out.append(f"\n🔬 ICTs parceiras ({len(icts)}):")
+        for i in icts[:8]:
+            out.append(f"  {i.get('name', i['id'])[:55]}")
+        if not icts:
+            out.append("  (nenhuma no tema)")
+        try:
+            invs = [
+                v for v in kg_store.load_investidores()
+                if _theme_match(tema, v.get("tese_themes", []) + v.get("setores", []))
+            ]
+        except Exception:
+            invs = []
+        out.append(f"\n💸 Investidores com tese no tema ({len(invs)}):")
+        for v in invs[:8]:
+            out.append(f"  {v.get('name', v['id'])[:45]} | estágio:{', '.join(v.get('estagio_alvo', [])[:2])}")
+        if not invs:
+            out.append("  (nenhum no tema)")
+        return "\n".join(out)
+
     return [list_editais, get_edital, find_analogues, get_graph_neighbors,
-            find_ict_partners]
+            find_ict_partners, list_icts, list_investidores, oportunidades_por_tema]

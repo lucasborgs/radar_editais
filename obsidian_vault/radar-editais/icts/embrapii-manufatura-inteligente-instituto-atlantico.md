@@ -12,6 +12,9 @@ tags:
 
 > A Unidade Embrapii Instituto Atlântico está habilitada a apoiar as indústrias na sua transformação digital, coinvestindo no desenvolvimento de soluções que impactam diretamente o aumento da produtividade e redução de custos das empresas. A linha de atuação denominada “Manufatura…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

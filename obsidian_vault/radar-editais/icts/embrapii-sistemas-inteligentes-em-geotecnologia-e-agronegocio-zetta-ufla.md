@@ -5,11 +5,20 @@ link: https://embrapii.org.br/unidades/sistemas-inteligentes-em-geotecnologia-e-
 tags:
   - embrapii
   - ict
+  - tema/tecnologias-digitais-e-conectividade
+  - tema/agro-bioeconomia-e-alimentos
 ---
 
 # 🔬 ICT: ZETTA-UFLA
 
 > A Zetta/UFLA é credenciada na área de Agricultura Digital, com ênfase nas competências de inovação tecnológica, geotecnologias, ciência de dados e implementação de sistemas inteligentes. Como Unidade Embrapii, poderá executar projetos de Pesquisa, Desenvolvimento e Inovação…
+
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
+## Temas de atuação
+- [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
+- [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 
 ## Áreas de expertise
 - Inteligência computacional em geotecnologia e processamento de dados

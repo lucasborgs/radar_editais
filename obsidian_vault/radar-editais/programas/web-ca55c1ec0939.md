@@ -10,15 +10,13 @@ tags:
   - edital
   - aberta
   - ano/desconhecido
+  - publico-alvo/startups
 ---
 
 # 🟢 5º EDITAL | Edital de Aceleração de Novas Ideias | 2024 - StartLaw
 
 ## Fonte
 - [[radar-editais/fontes/web|WEB]]
-
-## Público-Alvo
-- [[radar-editais/publicos/startups|Startups]]
 
 ## Informações
 

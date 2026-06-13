@@ -12,6 +12,9 @@ tags:
 
 > Unidade EMBRAPII Inatel – Sistemas Digitais e Radiofrequência Desde abril de 2016, o Instituto Nacional de Telecomunicações (Inatel) é credenciado como Unidade EMBRAPII, na área de competência de “Sistemas Digitais e Radiofrequência”. As sublinhas de atuação contemplam:…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

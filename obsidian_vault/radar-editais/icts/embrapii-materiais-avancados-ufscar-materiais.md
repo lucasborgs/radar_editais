@@ -13,6 +13,9 @@ tags:
 
 > A Unidade EMBRAPII UFSCar Materiais foi credenciada para atuar no desenvolvimento de novos materiais para diferentes aplicações industriais. Área de competência: Materiais Avançados Sublinhas: Materiais funcionais; Materiais para a indústria sustentável; Síntese e Processamento…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]

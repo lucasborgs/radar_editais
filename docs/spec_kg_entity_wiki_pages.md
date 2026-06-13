@@ -1,84 +1,98 @@
-# Mini-spec: wiki pages para entidades (ICT / investidor) no KG
+# Spec: KG cross-dimensional + qualidade da torneira
 
-**Status:** rascunho para decisão (escopado 2026-06-13). Não implementado.
+**Status:** ativa (2026-06-13). Reescreve a mini-spec de "wiki pages de entidade"
+para o alvo real, definido pelo feedback do grafo Obsidian: **o grafo vira uma
+base de conhecimento que o chat de Descoberta consulta através de TODAS as
+dimensões** (editais, desafios, ICTs, investidores). Ciclo combinado Track 1+2
+(decisão de Lucas, 2026-06-13).
 
-## Problema
+## Norte (ponto 4)
 
-Editais têm wiki page individual por nó (`data/knowledge_graph/wiki/<fonte>/<id>.json`),
-lida pelo `kg_store.load_wiki_page` e raciocinada pelo `KGMatchService`/explore.
-**Entidades não.** Hoje:
+O chat de Descoberta (explore, ANTES do match) deve responder, por tema/setor,
+através das quatro dimensões. Ex.: "quais oportunidades em agronegócio?" →
+editais + desafios abertos + ICTs parceiras + investidores com tese no setor.
 
-| | Representação | Wiki page? | Match | Explore | Radar |
-|---|---|---|---|---|---|
-| ICT (EMBRAPII) | `icts.json` consolidado (build_ict_graph) | não | `ict_match` | sim (explore_tools) | **não** |
-| Investidor | `investidores.json` curado à mão | não | `investor_match` | — | sim |
+Hoje o explore tem 4 tools (`list_editais`, `get_edital`, `find_analogues`,
+`find_ict_partners`): alcança **editais** e "ICTs parceiras *de um edital*", mas
+não consulta ICTs por tema de forma autônoma e **não conhece investidores**.
 
-O schema **já declara** os node types (WIKI.md §6.1.2 `ict`, §6.1.3 `investidor`;
-`wiki_schema.node_types()` com folders/tags). Falta a **materialização como nó**:
-emissão de wiki page + carregamento + consumo uniforme. A ponte entidade↔evento
-é por **tema** (§6.1.2: "não há aresta direta edital↔ICT" — casa via
-`edital.themes ∩ ict.themes`), mesma lógica já aplicada no export Obsidian.
+## Estado atual (verificado)
 
-## Objetivo
+| Dimensão | Representação | Wiki page? | Match | Explore |
+|---|---|---|---|---|
+| Edital/desafio/programa | `wiki/<fonte>/<id>.json` + index.json | sim | radar+hybrid | sim |
+| ICT (EMBRAPII) | `icts.json` consolidado | não | `ict_match` | só "parceiras de edital" |
+| Investidor | `investidores.json` curado | não | `investor_match` no radar | **ausente** |
 
-Entidades viram nós de primeira classe, em paridade com editais: página de
-detalhe abrível, raciocínio nó-a-nó no KG agent, e ICT entrando no radar.
+Ponte = nó `tema` (§6.1.2: sem aresta direta edital↔ICT). Mas o normalizador
+fino→macro do `build_ict_graph` deixou **140 áreas sem tema-macro** (→ ICTs
+órfãos no grafo, ex.: as unidades de mineração). A ponte é lossy.
 
-## Escopo
+---
 
-1. **Emissão de wiki page por entidade.**
-   - ICT: `build_ict_graph` passa a emitir `wiki/ict/<slug>.json` por unidade
-     (além do `icts.json` consolidado, que segue como índice). Campos do §6.1.2:
-     `id, name, kind, themes, areas_raw, about/summary, contact, url, address`.
-   - Investidor: novo passo de build (ex.: `pipeline/build_investidor_graph.py`)
-     sincroniza `investidores.json` (curado) → `wiki/investidor/<slug>.json`.
-     Campos do §6.1.3: `id, name, tese, tese_themes, tese_keywords, setores,
-     estagio_alvo, ticket_range, lead_follow, fund_status, site`.
-   - Seguir o padrão `wiki/<folder>/<slug>.json` derivado de `node_types()[*].folder`
-     (sem hardcode de pasta — schema é autoritativo).
+## Track 1 — Base cross-dimensional pro chat
 
-2. **`kg_store`: carregamento.** Generalizar `load_wiki_page(id)` para resolver
-   ids de entidade (`embrapii:…`, `investidor:…`) ao path da wiki page por
-   node_type. Manter `load_icts`/`load_investidores` como índices.
+### Fase 0 — Limpeza de grafo (sem eval gate)
+- **público-alvo: nó → tag.** É enum de baixa cardinalidade — vira tag
+  (`publico/<slug>`) como mechanism/ano/trl (§6.1.1). Remove o folder `publicos/`
+  do export, o `publico_index` como nós, e o nó no KG. WIKI.md é autoritativo →
+  editar lá primeiro; `test_wiki_schema_consistency` guarda.
+- **Nó-pai de fonte para entidades.** Editais têm nó de fonte (FINEP/FAPESP/WEB
+  via `source_of`); ICTs e investidores ganham o seu (EMBRAPII, INVESTIDORES) —
+  no export e como agrupador no KG.
+- **Cobertura do normalizador de tema.** Reduzir as 140 áreas órfãs: melhorar o
+  prompt fino→macro (ex.: mineração → "materiais, química e manufatura avançada")
+  e/ou revisar se o vocab de 7 temas-macro é granular o bastante (gatilho de
+  evolução de `tema_vocab`, ver PR #16). Meta: nenhum ICT órfão por tema mapeável.
 
-3. **Consumo uniforme.** `KGMatchService`/explore conseguem "abrir" um nó de
-   entidade (detalhe) como abrem um edital. Hoje o explore chega em ICT via
-   `explore_tools→ict_match`; passa a ler a wiki page.
+### Fase 1 — Entidades como nós de primeira classe
+- `build_ict_graph` emite `wiki/ict/<slug>.json` por unidade (campos §6.1.2);
+  `icts.json` segue como índice.
+- Novo sync `investidores.json` → `wiki/investidor/<slug>.json` (campos §6.1.3).
+- `kg_store`: `load_wiki_page` resolve ids de entidade por node_type; índice de
+  tema unificado spanning editais+desafios+ICTs+investidores.
+- Export passa a ler as wiki pages de entidade (hoje lê `icts.json`).
 
-4. **ICT no radar.** `radar_service` normaliza `ict_match` ao item comum do radar
-   (hoje só `investor_match` cobre o quadrante entidade). RRF + floor de score
-   como o investidor (entidade não tem gate — §scorer LLM ancora alto). É a
-   provável lacuna de produto: ICT só aparece no explore, não no ranking.
+### Fase 2 — Tools cross-dimensionais do explore (o norte)
+- `oportunidades_por_tema(tema|setor)` → agrega as 4 dimensões num resultado.
+- `list_icts(tema)` e `list_investidores(tema|tese)` standalone (hoje só
+  "parceiras de um edital" / nada).
+- Wiring no `KGMatchService`/explore: o chat de Descoberta responde cross-dim.
+- Sem eval gate de match (é explore/leitura), mas validar com perguntas-golden.
 
-5. **Guard de schema.** `tests/test_wiki_schema_consistency.py` valida doc↔código;
-   qualquer campo novo da wiki page de entidade tem que estar no WIKI.md.
+### Fase 3 — ICT no radar (EVAL-GATED)
+- `radar_service` normaliza `ict_match` ao item comum (hoje só `investor_match`
+  cobre entidade). RRF + floor como investidor.
+- **GATE: `python -m core.eval matching` antes de mergear** — muda a mistura
+  evento-vs-entidade do ranking.
 
-## Fora de escopo / não-objetivos
+---
 
-- **Chunk+embed de entidades** — confirmado desnecessário (entidades não entram
-  na escrita; o `mode="pitch"` para `investidor:` é latente, não fluxo ativo).
-- Enriquecimento LLM tipo card de edital — entidades já são estruturadas na fonte.
+## Track 2 — Qualidade da torneira
+
+### Fase 4 — Dedup e triagem
+- **Excluir FINEP/FAPESP da descoberta web**: pular domínios finep.gov.br /
+  fapesp.br (e outros com extrator dedicado) no `opportunity_discovery` — eles já
+  entram pelo ETL próprio; na web viram ruído/duplicata (ex.: notícia dos R$3,3bi).
+- **Triagem notícia-vs-oportunidade**: apertar o filtro pra rejeitar páginas que
+  são anúncio/notícia sem chamada acionável (sem prazo/elegibilidade/inscrição).
+
+### Fase 5 — Profundidade em hubs
+- Páginas-hub de inovação aberta (ex.: tupy.com.br/inovacao-aberta) listam
+  desafios reais em links-filhos não explorados → o nó-hub fica pobre. Crawl de
+  **1 nível** pra extrair cada desafio como nó próprio (node_type `desafio`).
+  Reusa o agente de research (research_tools) com orçamento limitado.
+
+---
 
 ## Riscos / interações
+- Não quebrar radar (investidor), hybrid, explore atuais — tudo aditivo.
+- **Data plane:** wiki pages lidas do disco; a migração JSONB `kg_artifacts`
+  (pendente, [[project-data-plane-prod]]) muda o seam em prod — emissão de wiki
+  page de entidade respeita o mesmo `kg_store`.
+- Fase 3 muda ranking → eval gate obrigatório.
+- Chunk/embed de entidades **fora de escopo** (não entram na escrita).
 
-- Não pode quebrar radar (investidor), hybrid match nem explore atuais — aditivo.
-- **Data plane:** wiki pages são lidas do disco localmente; a migração JSONB
-  `kg_artifacts` (pendente, ver [[project-data-plane-prod]]) muda o seam de
-  leitura em prod — a emissão de wiki page de entidade tem que respeitar o mesmo
-  `kg_store` para não criar um segundo caminho de leitura.
-
-## Perguntas em aberto
-
-1. ICT no radar muda a mistura evento-vs-entidade — precisa de re-eval do radar
-   (suíte matching) antes de mergear? (provável que sim — gate.)
-2. Slug de entidade: reusar `id_to_slug` (`embrapii:x`→`embrapii-x`) ou folder
-   por node_type? (o export Obsidian já usa `id_to_slug`.)
-3. Investidor é curado à mão — o build sincroniza one-way (json→wiki) ou a wiki
-   page vira a fonte de verdade editável?
-
-## Fases sugeridas
-
-1. ICT: emissão de wiki page + `kg_store` load + ICT no radar (+ eval gate).
-2. Investidor: build de sync + wiki page + paridade no explore.
-3. Export Obsidian já consome entidades (feito); revisar se passa a ler as wiki
-   pages em vez do `icts.json` consolidado.
+## Sequência sugerida
+Fase 0 (limpeza, baixo risco, melhora o grafo já) → 1 (nós) → 2 (chat cross-dim,
+o valor pro usuário) → 4+5 (torneira, paralelizável) → 3 (ICT no radar, eval-gated, por último).

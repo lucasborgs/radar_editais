@@ -12,6 +12,9 @@ tags:
 
 > O CESAR é credenciado desde 2016 como Unidade EMBRAPII para Produtos Conectados no Brasil. Dessa forma, o centro de inovação tem recursos para co-investir com empresas industriais no desenvolvimento de projetos de inovação em IoT e tecnologias afins. Destaque para alguns…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

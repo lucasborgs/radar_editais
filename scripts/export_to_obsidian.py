@@ -10,7 +10,6 @@ Estrutura de pastas gerada no vault:
   ├── icts/          → uma nota por ICT (unidade EMBRAPII; quadrante entidade)
   ├── temas/         → uma nota por tema (nó compartilhado evento↔entidade)
   ├── fontes/        → uma nota por fonte de recurso
-  ├── publicos/      → uma nota por público-alvo
   ├── anos/          → uma nota por ano de publicação (dimensão longitudinal)
   ├── mecanismos/    → uma nota por mecanismo financeiro (§5.1 WIKI.md)
   ├── subprogramas/  → uma nota por subprograma / fundo setorial (§5.6 WIKI.md)
@@ -147,6 +146,10 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
     for fk in trl_faixa_keys:
         lines.append(f"  - trl/{fk}")
     lines.append(f"  - ano/{pub_year}")
+    # público-alvo é tag (§6.1.1), não mais nó/folder — categórico de baixa
+    # cardinalidade que só filtra (segue como sinal de match no card).
+    for p in publicos:
+        lines.append(f"  - publico-alvo/{slugify(p)}")
     lines.append("---")
     lines.append("")
 
@@ -173,12 +176,6 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
     lines.append("## Fonte")
     lines.append(f"- [[{subfolder}/fontes/{src}|{src.upper()}]]")
     lines.append("")
-
-    if publicos:
-        lines.append("## Público-Alvo")
-        for p in publicos:
-            lines.append(f"- [[{subfolder}/publicos/{slugify(p)}|{p}]]")
-        lines.append("")
 
     if subprogramas:
         lines.append("## Subprograma")
@@ -292,6 +289,13 @@ def ict_note(ict: dict, subfolder: str = "radar-editais") -> str:
         lines.append(f"> {snippet}")
         lines.append("")
 
+    # Fonte = agência da entidade (EMBRAPII), análogo ao nó-fonte dos editais —
+    # dá um nó-pai que agrupa todas as unidades (ponto 3 do feedback de grafo).
+    src = source_of(iid)
+    lines.append("## Fonte")
+    lines.append(f"- [[{subfolder}/fontes/{src}|{src.upper()}]]")
+    lines.append("")
+
     # Temas → nós compartilhados com os editais (a ponte evento↔entidade)
     if themes:
         lines.append("## Temas de atuação")
@@ -328,6 +332,28 @@ def ict_note(ict: dict, subfolder: str = "radar-editais") -> str:
             lines.append(f"| {label} | {val} |")
         lines.append("")
 
+    return "\n".join(lines)
+
+
+def fonte_entidade_note(label: str, icts: list[dict], subfolder: str = "radar-editais") -> str:
+    """Nó-fonte de uma agência de entidades (ex.: EMBRAPII) — agrupa as unidades
+    sob um nó-pai, análogo aos nós-fonte dos editais (ponto 3 do feedback de grafo)."""
+    lines = ["---"]
+    lines.append(f'title: "{safe_yaml_str(label)}"')
+    lines.append("tags:")
+    lines.append("  - fonte-recurso")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# 💰 Fonte: {label}")
+    lines.append("")
+    lines.append(f"**{len(icts)} ICTs** credenciadas por esta agência.")
+    lines.append("")
+    lines.append("## ICTs")
+    lines.append("")
+    for ict in icts:
+        name = ict.get("name", ict["id"])
+        lines.append(f"- 🔬 [[{subfolder}/icts/{_edital_slug(ict['id'])}|{name}]]")
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -389,33 +415,6 @@ def fonte_note(fonte_label: str, editais_ids: list[str], edital_by_id: dict, sub
     lines.append(f"# 💰 Fonte: {fonte_label}")
     lines.append("")
     lines.append(f"**{len(editais_ids)} editais** financiados por esta fonte.")
-    lines.append("")
-    lines.append("## Editais")
-    lines.append("")
-
-    for eid in dict.fromkeys(editais_ids):
-        edital = edital_by_id.get(eid, {})
-        title = edital.get("title", f"Edital {eid}")
-        status = edital.get("status", "")
-        emoji = _status_emoji(status)
-        folder = _event_folder_for(eid, edital_by_id)
-        lines.append(f"- {emoji} [[{subfolder}/{folder}/{_edital_slug(eid)}|{title}]]")
-
-    lines.append("")
-    return "\n".join(lines)
-
-
-def publico_note(publico_label: str, editais_ids: list[str], edital_by_id: dict, subfolder: str = "radar-editais") -> str:
-    """Gera nota Markdown para um público-alvo."""
-    lines = ["---"]
-    lines.append(f'title: "{safe_yaml_str(publico_label)}"')
-    lines.append("tags:")
-    lines.append("  - publico-alvo")
-    lines.append("---")
-    lines.append("")
-    lines.append(f"# 👥 Público: {publico_label}")
-    lines.append("")
-    lines.append(f"**{len(editais_ids)} editais** aceitam este perfil de proponente.")
     lines.append("")
     lines.append("## Editais")
     lines.append("")
@@ -495,7 +494,6 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
     lines.append(f"- 🔬 [[{subfolder}/icts/]] — ICTs parceiras (unidades EMBRAPII)")
     lines.append(f"- 🏷️ [[{subfolder}/temas/]] — por tema (ponte editais↔ICTs)")
     lines.append(f"- 💰 [[{subfolder}/fontes/]] — por fonte de recurso")
-    lines.append(f"- 👥 [[{subfolder}/publicos/]] — por público-alvo")
     lines.append(f"- 🏛️ [[{subfolder}/subprogramas/]] — por subprograma / fundo setorial")
     lines.append("")
     lines.append("## Editais Abertos")
@@ -567,7 +565,7 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     # Base do vault — limpa notas antigas antes de re-exportar
     base = vault_path / subfolder
     # mechanism/ano/trl_faixa são tags, não nós (§6.1.1) — sem subpasta.
-    expected_subfolders = {"editais", "desafios", "programas", "icts", "temas", "fontes", "publicos", "subprogramas"}
+    expected_subfolders = {"editais", "desafios", "programas", "icts", "temas", "fontes", "subprogramas"}
 
     # Detecta aninhamento: se `base/<subfolder>` já existe, significa que um export
     # anterior rodou com `--vault` apontando para dentro de `base`, criando estrutura
@@ -656,19 +654,21 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
         note_path.write_text(content, encoding="utf-8")
         n_fontes += 1
 
+    # Nós-fonte das entidades (agrupa ICTs sob o nó-pai da agência, ex.: EMBRAPII).
+    icts_by_source: dict[str, list[dict]] = {}
+    for ict in icts:
+        icts_by_source.setdefault(source_of(ict["id"]), []).append(ict)
+    for src, src_icts in icts_by_source.items():
+        content = fonte_entidade_note(src.upper(), src_icts, subfolder)
+        note_path = base / "fontes" / f"{src}.md"
+        note_path.write_text(content, encoding="utf-8")
+        n_fontes += 1
+
     print(f"  Fontes (agências): {n_fontes} notas → {base}/fontes/")
 
     # Notas de público-alvo
-    publico_index = index.get("publico_index", {})
-    n_publicos = 0
-    for pub_label, editais_ids in publico_index.items():
-        content = publico_note(pub_label, editais_ids, edital_by_id, subfolder)
-        slug = slugify(pub_label)
-        note_path = base / "publicos" / f"{slug}.md"
-        note_path.write_text(content, encoding="utf-8")
-        n_publicos += 1
-
-    print(f"  Públicos: {n_publicos} notas → {base}/publicos/")
+    # público-alvo deixou de ser nó (§6.1.1): agora é tag no frontmatter do
+    # edital. Sem folder publicos/ nem publico_note.
 
     # Notas de subprograma (vem do índice, populado pelo build_knowledge_graph)
     subprograma_index = index.get("subprograma_index", {})
@@ -682,7 +682,7 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
 
     print(f"  Subprogramas: {n_sub} notas → {base}/subprogramas/")
 
-    total = n_editais + n_icts + n_temas + n_fontes + n_publicos + n_sub + 1
+    total = n_editais + n_icts + n_temas + n_fontes + n_sub + 1
     print(f"\n✓ {total} notas exportadas para: {base}")
     print("\nPróximos passos no Obsidian:")
     print(f"  1. Abra o vault em: {vault_path}")

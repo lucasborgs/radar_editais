@@ -13,6 +13,9 @@ tags:
 
 > No cenário atual, que aponta grandes mudanças na Engenharia Automotiva mundial e, por decorrência no Brasil, a Escola Politécnica da USP apresenta a Unidade Embrapii Poli/USP Powertrain, que visa lidar com a parte mais sensível dessas mudanças, o Trem de Forças Veicular. A…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]
