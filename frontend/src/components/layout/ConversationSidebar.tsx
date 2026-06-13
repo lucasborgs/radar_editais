@@ -6,9 +6,9 @@
 // histórico de conversas agrupado por data, e um rodapé discreto com as páginas
 // utilitárias (Pipeline/Editais/Arquivos/Configurações) + identidade do usuário.
 //
-// Fase 1 é frontend puro: o histórico ainda vem de `listWritingSessions`
-// (/writing/sessions). A Fase 2 plugará /conversations no lugar — por isso a
-// listagem fica isolada aqui.
+// Fase 2: o histórico vem de `listConversations` (/conversations) — lista
+// unificada de conversas de escrita (kind=writing, retomada via /chat?edital=)
+// e do front door (kind=frontdoor, retomada via /?c=<session_id>).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -16,12 +16,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
-import { HISTORY_KEY } from "@/types/frontdoor";
+import { HISTORY_KEY, SESSION_ID_KEY } from "@/types/frontdoor";
 import {
-  listWritingSessions,
+  listConversations,
   deleteWritingSession,
   getEditalById,
-  type WritingSessionSummary,
+  type ConversationSummary,
 } from "@/lib/api";
 
 // ── Agrupamento por data ──────────────────────────────────────────────────────
@@ -68,6 +68,7 @@ const ICON_PATHS = {
     "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
   files:
     "M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z",
+  chat: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z",
   settings:
     "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z",
   dots: "M5 12h.01M12 12h.01M19 12h.01",
@@ -87,7 +88,7 @@ export function ConversationSidebar() {
   const { session, user, getToken, signOut } = useAuth();
   const isAuthed = !!session;
 
-  const [sessions, setSessions] = useState<WritingSessionSummary[]>([]);
+  const [sessions, setSessions] = useState<ConversationSummary[]>([]);
   const [titles, setTitles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -111,14 +112,16 @@ export function ConversationSidebar() {
           if (!cancelled) setLoading(false);
           return;
         }
-        const res = await listWritingSessions(token);
+        const res = await listConversations(token);
         if (cancelled) return;
-        setSessions(res.sessions ?? []);
+        setSessions(res.conversations ?? []);
 
-        // Resolve títulos faltantes via lookup do edital (com cache em `titles`),
-        // mesmo padrão da antiga /sessions.
-        const missing = (res.sessions ?? []).filter(
-          (s) => !s.edital_title && s.edital_id,
+        // Conversas de escrita: resolve o título via lookup do edital (com
+        // cache em `titles`), mesmo padrão da antiga /sessions. frontdoor já
+        // traz `title` próprio do banco.
+        const missing = (res.conversations ?? []).filter(
+          (s): s is ConversationSummary & { edital_id: string } =>
+            s.kind === "writing" && !!s.edital_id,
         );
         await Promise.all(
           missing.map(async (s) => {
@@ -157,10 +160,13 @@ export function ConversationSidebar() {
     return () => document.removeEventListener("mousedown", onClick);
   }, [menuOpen]);
 
-  // Título exibido: edital_title → lookup cacheado → fallback edital_id.
+  // Título exibido: frontdoor usa `title` do banco (1ª mensagem truncada);
+  // writing deriva do edital (lookup cacheado → fallback edital_id).
   const titleFor = useCallback(
-    (s: WritingSessionSummary) =>
-      s.edital_title || titles[s.edital_id] || s.edital_id,
+    (s: ConversationSummary) => {
+      if (s.kind === "frontdoor") return s.title || "Conversa";
+      return (s.edital_id && titles[s.edital_id]) || s.edital_id || "Proposta";
+    },
     [titles],
   );
 
@@ -170,7 +176,7 @@ export function ConversationSidebar() {
     const filtered = q
       ? sessions.filter((s) => titleFor(s).toLowerCase().includes(q))
       : sessions;
-    const map = new Map<Bucket, WritingSessionSummary[]>();
+    const map = new Map<Bucket, ConversationSummary[]>();
     for (const s of filtered) {
       const b = bucketFor(s.updated_at);
       const list = map.get(b);
@@ -189,6 +195,7 @@ export function ConversationSidebar() {
   const handleNew = useCallback(() => {
     try {
       window.sessionStorage.removeItem(HISTORY_KEY);
+      window.sessionStorage.removeItem(SESSION_ID_KEY);
     } catch {
       /* quota/modo privado — segue */
     }
@@ -198,6 +205,20 @@ export function ConversationSidebar() {
       router.push("/");
     }
   }, [pathname, router]);
+
+  // Retomada de conversa frontdoor: navegando de outra página, a home monta e
+  // lê o ?c=; já estando em "/", o Link não remonta a página — disparamos o
+  // evento que a home escuta (mesmo seam do "Nova conversa").
+  const handleOpenFrontdoor = useCallback(
+    (e: React.MouseEvent, sessionId: string) => {
+      if (pathname !== "/") return; // deixa o Link navegar normalmente
+      e.preventDefault();
+      window.dispatchEvent(
+        new CustomEvent("frontdoor:resume", { detail: sessionId }),
+      );
+    },
+    [pathname],
+  );
 
   const handleDelete = useCallback(
     async (sessionId: string) => {
@@ -309,20 +330,33 @@ export function ConversationSidebar() {
               </p>
               <div className="space-y-0.5">
                 {items.map((s) => {
-                  // Retomada de escrita: o fluxo atual resolve a sessão pelo
-                  // edital (/chat?edital={id}); /chat não consome ?session.
-                  const href = `/chat?edital=${encodeURIComponent(s.edital_id)}`;
+                  // Retomada por kind: escrita resolve a sessão pelo edital
+                  // (/chat?edital={id}; /chat não consome ?session); frontdoor
+                  // retoma pela home (/?c={session_id}).
+                  const isFrontdoor = s.kind === "frontdoor";
+                  const href = isFrontdoor
+                    ? `/?c=${encodeURIComponent(s.session_id)}`
+                    : `/chat?edital=${encodeURIComponent(s.edital_id ?? "")}`;
                   return (
                     <div key={s.session_id} className="group relative">
                       <Link
                         href={href}
                         title={titleFor(s)}
+                        onClick={
+                          isFrontdoor
+                            ? (e) => handleOpenFrontdoor(e, s.session_id)
+                            : undefined
+                        }
                         className={cn(
                           "flex items-center gap-2 pl-2 pr-7 py-2 rounded-lg text-sm font-sans transition-colors",
                           "text-content-secondary hover:bg-gray-100 hover:text-content-primary",
                           deleting === s.session_id && "opacity-40",
                         )}
                       >
+                        <Icon
+                          d={isFrontdoor ? ICON_PATHS.chat : ICON_PATHS.editais}
+                          className="w-3.5 h-3.5 shrink-0 opacity-70"
+                        />
                         <span className="truncate">{titleFor(s)}</span>
                       </Link>
                       {/* Hover-menu "..." */}
