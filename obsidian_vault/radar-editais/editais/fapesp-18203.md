@@ -22,7 +22,7 @@ tags:
 
 # 🟢 Chamada de Propostas para o Programa PIPE Jornada Tecnológica Soberania Digital – Fase 1
 
-> A chamada visa apoiar a execução de pesquisa científica e tecnológica inovativa em pequenas empresas do estado de São Paulo, com foco em desafios tecnológicos de interesse para a empresa ou mercado. O financiamento é destinado a projetos que busquem desenvolver soluções em áreas como Soberania Digital e Inteligência Artificial.
+> A chamada visa apoiar a execução de pesquisa científica e tecnológica inovativa em pequenas empresas do estado de São Paulo, com foco em desafios tecnológicos de interesse para a empresa ou mercado. O financiamento é destinado a projetos que representem um desafio tecnológico e que tenham potencial para gerar inovações.
 
 ## Fonte
 - [[radar-editais/fontes/fapesp|FAPESP]]
@@ -52,7 +52,7 @@ tags:
 ## Fatos-chave
 
 - Financiamento de até R$ 500.000,00 por projeto.
-- Apoio a inovações em áreas críticas como IA e cibersegurança.
+- Apoio a inovações em tecnologia com foco em Soberania Digital.
 - Duração do projeto de até 12 meses.
 - A proposta deve ser submetida por um Pesquisador Responsável vinculado à empresa.
 - A chamada está aberta até 24/06/2026.

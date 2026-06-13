@@ -11,6 +11,10 @@ tags:
   - edital
   - aberta
   - tema/agro-bioeconomia-e-alimentos
+  - tema/materiais-quimica-e-manufatura-avancada
+  - tema/energia-e-transicao-sustentavel
+  - tema/saude-e-ciencias-da-vida
+  - tema/espaco-defesa-e-seguranca
   - ano/2017
 ---
 
@@ -18,6 +22,10 @@ tags:
 
 ## Temas
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
+- [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
+- [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
+- [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
+- [[radar-editais/temas/espaco-defesa-e-seguranca|espaço - defesa e segurança]]
 
 ## Fonte
 - [[radar-editais/fontes/finep|FINEP]]
