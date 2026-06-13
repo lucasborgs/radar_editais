@@ -6,7 +6,7 @@ tags:
 
 # 🏷️ Tema: saúde e ciências da vida
 
-**5 editais** e **17 ICTs** relacionados a este tema.
+**5 editais**, **17 ICTs** e **2 investidores** relacionados a este tema.
 
 ## Editais
 
@@ -35,3 +35,8 @@ tags:
 - 🔬 [[radar-editais/icts/embrapii-biofarmacos-e-farmacos-cqmed|CQMED]]
 - 🔬 [[radar-editais/icts/embrapii-biotecnologia-cnpem|CNPEM]]
 - 🔬 [[radar-editais/icts/embrapii-descoberta-e-desenvolvimento-pre-clinico-de-farmacos-e-novas-formulaces-ceinfar-usp|CEINFAR-USP]]
+
+## Investidores
+
+- 💸 [[radar-editais/investidores/investidor-vox-capital|Vox Capital]]
+- 💸 [[radar-editais/investidores/investidor-kptl|KPTL]]

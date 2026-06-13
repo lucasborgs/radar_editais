@@ -6,7 +6,7 @@ tags:
 
 # 🏷️ Tema: agro - bioeconomia e alimentos
 
-**7 editais** e **22 ICTs** relacionados a este tema.
+**7 editais**, **22 ICTs** e **3 investidores** relacionados a este tema.
 
 ## Editais
 
@@ -42,3 +42,9 @@ tags:
 - 🔬 [[radar-editais/icts/embrapii-biotecnologia-cnpem|CNPEM]]
 - 🔬 [[radar-editais/icts/embrapii-biotecnologia-aplicada-a-micropropagaco-vegetal-biotec-cetene|BIOTEC-CETENE]]
 - 🔬 [[radar-editais/icts/embrapii-bioeconomia-florestal-bioindustria-e-bioinsumos-uft|Bioindústria e Bioinsumos – UFT]]
+
+## Investidores
+
+- 💸 [[radar-editais/investidores/investidor-yield-lab-latam|The Yield Lab Latam]]
+- 💸 [[radar-editais/investidores/investidor-sp-ventures|SP Ventures]]
+- 💸 [[radar-editais/investidores/investidor-barn-invest|Barn Invest]]

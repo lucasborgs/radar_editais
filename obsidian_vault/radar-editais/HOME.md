@@ -25,7 +25,8 @@ tags:
 - 🎯 [[radar-editais/desafios/]] — desafios (open innovation)
 - 🚀 [[radar-editais/programas/]] — programas (aceleração)
 - 🔬 [[radar-editais/icts/]] — ICTs parceiras (unidades EMBRAPII)
-- 🏷️ [[radar-editais/temas/]] — por tema (ponte editais↔ICTs)
+- 💸 [[radar-editais/investidores/]] — investidores (fundos/anjos)
+- 🏷️ [[radar-editais/temas/]] — por tema (ponte editais↔ICTs↔investidores)
 - 💰 [[radar-editais/fontes/]] — por fonte de recurso
 - 🏛️ [[radar-editais/subprogramas/]] — por subprograma / fundo setorial
 

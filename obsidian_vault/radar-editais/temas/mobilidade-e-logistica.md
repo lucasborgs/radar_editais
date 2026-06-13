@@ -6,7 +6,7 @@ tags:
 
 # 🏷️ Tema: mobilidade e logística
 
-**3 editais** e **13 ICTs** relacionados a este tema.
+**3 editais**, **13 ICTs** e **1 investidores** relacionados a este tema.
 
 ## Editais
 
@@ -29,3 +29,7 @@ tags:
 - 🔬 [[radar-editais/icts/embrapii-computaco-industrial-edge-ufal|EDGE-UFAL]]
 - 🔬 [[radar-editais/icts/embrapii-tecnologia-e-sistemas-veiculares-cin-ufpe|CIn-UFPE]]
 - 🔬 [[radar-editais/icts/embrapii-transmisso-de-potencia-ccm-ita|CCM-ITA]]
+
+## Investidores
+
+- 💸 [[radar-editais/investidores/investidor-barn-invest|Barn Invest]]

@@ -6,7 +6,7 @@ tags:
 
 # 🏷️ Tema: energia e transição sustentável
 
-**8 editais** e **27 ICTs** relacionados a este tema.
+**8 editais**, **27 ICTs** e **2 investidores** relacionados a este tema.
 
 ## Editais
 
@@ -48,3 +48,8 @@ tags:
 - 🔬 [[radar-editais/icts/embrapii-biotecnologia-cnpem|CNPEM]]
 - 🔬 [[radar-editais/icts/embrapii-tecnologias-em-otimizaco-de-energia-incluindo-as-renovaveis-cear-ufpb|CEAR-UFPB]]
 - 🔬 [[radar-editais/icts/embrapii-transmisso-de-potencia-ccm-ita|CCM-ITA]]
+
+## Investidores
+
+- 💸 [[radar-editais/investidores/investidor-vox-capital|Vox Capital]]
+- 💸 [[radar-editais/investidores/investidor-barn-invest|Barn Invest]]
