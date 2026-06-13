@@ -27,7 +27,6 @@ tags:
 - 🔬 [[radar-editais/icts/]] — ICTs parceiras (unidades EMBRAPII)
 - 🏷️ [[radar-editais/temas/]] — por tema (ponte editais↔ICTs)
 - 💰 [[radar-editais/fontes/]] — por fonte de recurso
-- 👥 [[radar-editais/publicos/]] — por público-alvo
 - 🏛️ [[radar-editais/subprogramas/]] — por subprograma / fundo setorial
 
 ## Editais Abertos

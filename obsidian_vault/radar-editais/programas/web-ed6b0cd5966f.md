@@ -10,15 +10,13 @@ tags:
   - edital
   - aberta
   - ano/desconhecido
+  - publico-alvo/startups
 ---
 
 # 🟢 Open Innovation Programe for Startups - Anprotec
 
 ## Fonte
 - [[radar-editais/fontes/web|WEB]]
-
-## Público-Alvo
-- [[radar-editais/publicos/startups|Startups]]
 
 ## Informações
 

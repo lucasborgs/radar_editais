@@ -13,6 +13,8 @@ tags:
   - tema/energia-e-transicao-sustentavel
   - tema/tecnologias-digitais-e-conectividade
   - ano/desconhecido
+  - publico-alvo/empresas
+  - publico-alvo/startups
 ---
 
 # 🟢 Open Innovation Challenges: Get Unlimited Technology Expertise
@@ -24,10 +26,6 @@ tags:
 
 ## Fonte
 - [[radar-editais/fontes/web|WEB]]
-
-## Público-Alvo
-- [[radar-editais/publicos/empresas|Empresas]]
-- [[radar-editais/publicos/startups|Startups]]
 
 ## Informações
 

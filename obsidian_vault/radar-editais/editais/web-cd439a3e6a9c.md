@@ -11,15 +11,13 @@ tags:
   - edital
   - aberta
   - ano/desconhecido
+  - publico-alvo/empresas
 ---
 
 # 🟢 Editais - CONFAP — Conselho Nacional das Fundações Estaduais de Amparo à Pesquisa
 
 ## Fonte
 - [[radar-editais/fontes/web|WEB]]
-
-## Público-Alvo
-- [[radar-editais/publicos/empresas|Empresas]]
 
 ## Informações
 

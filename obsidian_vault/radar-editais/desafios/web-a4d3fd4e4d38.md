@@ -12,6 +12,9 @@ tags:
   - tema/energia-e-transicao-sustentavel
   - tema/tecnologias-digitais-e-conectividade
   - ano/desconhecido
+  - publico-alvo/empresas
+  - publico-alvo/startups
+  - publico-alvo/universidades
 ---
 
 # 🟢 Inovação aberta: criamos Conexões para Inovação - Petrobras
@@ -22,11 +25,6 @@ tags:
 
 ## Fonte
 - [[radar-editais/fontes/web|WEB]]
-
-## Público-Alvo
-- [[radar-editais/publicos/empresas|Empresas]]
-- [[radar-editais/publicos/startups|Startups]]
-- [[radar-editais/publicos/universidades|Universidades]]
 
 ## Informações
 

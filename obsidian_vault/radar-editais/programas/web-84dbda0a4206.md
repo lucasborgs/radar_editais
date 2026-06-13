@@ -10,15 +10,13 @@ tags:
   - edital
   - aberta
   - ano/desconhecido
+  - publico-alvo/startups
 ---
 
 # 🟢 Oportunidade: Sebrae Minas abre editais para programa de aceleração de startups na Europa e imersão em Dubai
 
 ## Fonte
 - [[radar-editais/fontes/web|WEB]]
-
-## Público-Alvo
-- [[radar-editais/publicos/startups|Startups]]
 
 ## Informações
 
