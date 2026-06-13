@@ -223,7 +223,20 @@ def test_explore_tools_count_and_names():
     assert set(names) == {
         "list_editais", "get_edital", "find_analogues", "get_graph_neighbors",
         "find_ict_partners",
+        # Cross-dimensionais (Fase 2 — chat de Descoberta sobre todas as dimensões)
+        "list_icts", "list_investidores", "oportunidades_por_tema",
     }
+
+
+def test_oportunidades_por_tema_is_cross_dimensional():
+    """O panorama cobre as três frentes (eventos + ICTs + investidores) num só
+    retorno — robusto mesmo se alguma dimensão estiver vazia no ambiente."""
+    svc = KGMatchService()
+    tools = {t.name: t for t in build_explore_tools(svc)}
+    fn = getattr(tools["oportunidades_por_tema"], "func", tools["oportunidades_por_tema"])
+    out = fn(tema="agro")
+    assert isinstance(out, str)
+    assert "Editais" in out and "ICTs" in out and "Investidores" in out
 
 
 def test_list_editais_tool_returns_string_with_results():
