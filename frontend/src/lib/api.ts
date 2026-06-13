@@ -85,6 +85,9 @@ async function apiFetch<T>(
     ...options,
   });
   if (!res.ok) throw await buildApiError(res);
+  // 204 No Content (delete/archive/unarchive da library): corpo vazio —
+  // res.json() estouraria SyntaxError mesmo com sucesso.
+  if (res.status === 204) return undefined as T;
   return res.json();
 }
 
@@ -418,6 +421,12 @@ export const getLibraryItems = (
 
 export const archiveLibraryItem = (id: string, token: string) =>
   apiFetch<{ success: boolean }>(`/library/${id}/archive`, { method: "POST" }, token);
+
+// Desarquiva (restaura) item soft-deleted. Wrapper do endpoint já existente no
+// backend (POST /library/{id}/unarchive); usado pelo gerenciador "Arquivos"
+// para que arquivar não vire ação irrecuperável pela UI.
+export const unarchiveLibraryItem = (id: string, token: string) =>
+  apiFetch<void>(`/library/${id}/unarchive`, { method: "POST" }, token);
 
 export const getLibraryItem = (id: string, token: string) =>
   apiFetch<ContentItemFull>(`/library/${id}`, undefined, token);

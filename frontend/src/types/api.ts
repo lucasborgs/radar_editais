@@ -72,6 +72,10 @@ export interface ContentItemSummary {
   enrichment_status?: EnrichmentStatus;
   created_at: string;
   updated_at: string;
+  // Presente quando a listagem inclui arquivados (include_archived=true). String
+  // ISO se soft-deleted, null/ausente se ativo. Usado pela página "Arquivos"
+  // para distinguir, por linha, ativos de arquivados na mesma lista.
+  archived_at?: string | null;
 }
 
 export interface ContentItemFull extends ContentItemSummary {
