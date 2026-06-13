@@ -7,13 +7,18 @@ O Graph View nativo do Obsidian mostra as conexões automaticamente.
 Estrutura de pastas gerada no vault:
   finep/
   ├── editais/       → uma nota por edital
-  ├── temas/         → uma nota por tema
+  ├── icts/          → uma nota por ICT (unidade EMBRAPII; quadrante entidade)
+  ├── temas/         → uma nota por tema (nó compartilhado evento↔entidade)
   ├── fontes/        → uma nota por fonte de recurso
   ├── publicos/      → uma nota por público-alvo
   ├── anos/          → uma nota por ano de publicação (dimensão longitudinal)
   ├── mecanismos/    → uma nota por mecanismo financeiro (§5.1 WIKI.md)
   ├── subprogramas/  → uma nota por subprograma / fundo setorial (§5.6 WIKI.md)
   └── trl/           → uma nota por faixa TRL (§5.8 WIKI.md)
+
+Os ICTs (icts.json, do build_ict_graph) ligam-se aos MESMOS nós de tema dos
+editais — no Graph View isso conecta o quadrante de entidades (quem executa) ao
+de eventos (oportunidades), via o eixo de tema compartilhado.
 
 Uso:
     python scripts/export_to_obsidian.py --vault ~/Documents/Obsidian/MeuVault
@@ -31,6 +36,7 @@ from core.kg.edital_id import id_to_slug, source_of
 # e deriva a fonte de cada edital do próprio id prefixado. Sem hardcode de fonte.
 
 INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"  # vigentes por padrão; use --historico para todos
+ICTS_FILE = KNOWLEDGE_GRAPH_DIR / "icts.json"     # quadrante entidade (build_ict_graph); opcional
 FACTS_DIR = FINEP_PDFS_DIR
 
 
@@ -249,8 +255,95 @@ def edital_note(edital: dict, facts_by_id: dict, subfolder: str = "radar-editais
     return "\n".join(lines)
 
 
-def tema_note(tema_label: str, editais_ids: list[str], edital_by_id: dict, subfolder: str = "radar-editais") -> str:
-    """Gera nota Markdown para um tema."""
+def ict_note(ict: dict, subfolder: str = "radar-editais") -> str:
+    """Gera nota Markdown para um ICT (unidade EMBRAPII — quadrante entidade).
+
+    O ICT liga-se aos MESMOS nós de tema dos editais (wikilinks + tags `tema/…`):
+    é por aí que o Graph View conecta quem-executa (entidade) a quais-oportunidades
+    (evento). Sem prazo/status — ICT não é um evento datado, é um parceiro estável.
+    """
+    iid = ict["id"]
+    name = ict.get("name", iid)
+    themes = ict.get("themes", []) or []
+    areas = ict.get("areas_raw", []) or []
+    about = (ict.get("summary") or ict.get("about") or "").strip()
+    contact = ict.get("contact") or {}
+    address = ict.get("address", "") or ""
+    url = ict.get("url", "") or ""
+
+    lines = ["---"]
+    lines.append(f'title: "{safe_yaml_str(name)}"')
+    lines.append(f"ict_id: {iid}")
+    if url:
+        lines.append(f"link: {url}")
+    lines.append("tags:")
+    lines.append(f"  - {source_of(iid)}")   # embrapii
+    lines.append("  - ict")
+    for theme in themes:
+        lines.append(f"  - tema/{slugify(theme)}")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# 🔬 ICT: {name}")
+    lines.append("")
+
+    if about:
+        # `about` pode ser longo (texto cru da unidade); trunca pra um resumo legível.
+        snippet = about if len(about) <= 600 else about[:600].rstrip() + "…"
+        lines.append(f"> {snippet}")
+        lines.append("")
+
+    # Temas → nós compartilhados com os editais (a ponte evento↔entidade)
+    if themes:
+        lines.append("## Temas de atuação")
+        for t in themes:
+            lines.append(f"- [[{subfolder}/temas/{slugify(t)}|{t}]]")
+        lines.append("")
+
+    if areas:
+        lines.append("## Áreas de expertise")
+        for a in areas:
+            lines.append(f"- {a}")
+        lines.append("")
+
+    # Contato/endereço (do bloco ACF do WordPress EMBRAPII)
+    rows: list[tuple[str, str]] = []
+    if contact.get("responsavel"):
+        rows.append(("Responsável", contact["responsavel"]))
+    if contact.get("email"):
+        rows.append(("E-mail", contact["email"]))
+    if contact.get("telefone"):
+        rows.append(("Telefone", contact["telefone"]))
+    if contact.get("site"):
+        rows.append(("Site", contact["site"]))
+    if address:
+        rows.append(("Endereço", address))
+    if url:
+        rows.append(("Página EMBRAPII", f"[{url}]({url})"))
+    if rows:
+        lines.append("## Contato")
+        lines.append("")
+        lines.append("| Campo | Valor |")
+        lines.append("|---|---|")
+        for label, val in rows:
+            lines.append(f"| {label} | {val} |")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def tema_note(
+    tema_label: str,
+    editais_ids: list[str],
+    edital_by_id: dict,
+    subfolder: str = "radar-editais",
+    icts_for_theme: list[dict] | None = None,
+) -> str:
+    """Gera nota Markdown para um tema.
+
+    O tema é o nó-ponte entre eventos (editais) e entidades (ICTs): lista ambos,
+    para que a navegação e o Graph View mostrem os dois quadrantes em torno dele.
+    """
+    icts_for_theme = icts_for_theme or []
     lines = ["---"]
     lines.append(f'title: "{safe_yaml_str(tema_label)}"')
     lines.append("tags:")
@@ -259,7 +352,7 @@ def tema_note(tema_label: str, editais_ids: list[str], edital_by_id: dict, subfo
     lines.append("")
     lines.append(f"# 🏷️ Tema: {tema_label}")
     lines.append("")
-    lines.append(f"**{len(editais_ids)} editais** relacionados a este tema.")
+    lines.append(f"**{len(editais_ids)} editais** e **{len(icts_for_theme)} ICTs** relacionados a este tema.")
     lines.append("")
     lines.append("## Editais")
     lines.append("")
@@ -273,6 +366,15 @@ def tema_note(tema_label: str, editais_ids: list[str], edital_by_id: dict, subfo
         lines.append(f"- {emoji} [[{subfolder}/{folder}/{_edital_slug(eid)}|{title}]]")
 
     lines.append("")
+
+    if icts_for_theme:
+        lines.append("## ICTs parceiras")
+        lines.append("")
+        for ict in icts_for_theme:
+            name = ict.get("name", ict["id"])
+            lines.append(f"- 🔬 [[{subfolder}/icts/{_edital_slug(ict['id'])}|{name}]]")
+        lines.append("")
+
     return "\n".join(lines)
 
 
@@ -390,7 +492,8 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
     lines.append(f"- 📂 [[{subfolder}/editais/]] — todos os editais")
     lines.append(f"- 🎯 [[{subfolder}/desafios/]] — desafios (open innovation)")
     lines.append(f"- 🚀 [[{subfolder}/programas/]] — programas (aceleração)")
-    lines.append(f"- 🏷️ [[{subfolder}/temas/]] — por tema")
+    lines.append(f"- 🔬 [[{subfolder}/icts/]] — ICTs parceiras (unidades EMBRAPII)")
+    lines.append(f"- 🏷️ [[{subfolder}/temas/]] — por tema (ponte editais↔ICTs)")
     lines.append(f"- 💰 [[{subfolder}/fontes/]] — por fonte de recurso")
     lines.append(f"- 👥 [[{subfolder}/publicos/]] — por público-alvo")
     lines.append(f"- 🏛️ [[{subfolder}/subprogramas/]] — por subprograma / fundo setorial")
@@ -448,10 +551,23 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
 
     edital_by_id = {e["id"]: e for e in editais}
 
+    # ICTs (quadrante entidade) — opcional: só exporta se build_ict_graph rodou.
+    icts: list[dict] = []
+    icts_by_theme: dict[str, list[dict]] = {}
+    if ICTS_FILE.exists():
+        try:
+            icts_doc = json.loads(ICTS_FILE.read_text(encoding="utf-8"))
+            icts = icts_doc.get("icts", []) if isinstance(icts_doc, dict) else (icts_doc or [])
+            for ict in icts:
+                for theme in ict.get("themes", []) or []:
+                    icts_by_theme.setdefault(theme, []).append(ict)
+        except Exception:
+            icts = []
+
     # Base do vault — limpa notas antigas antes de re-exportar
     base = vault_path / subfolder
     # mechanism/ano/trl_faixa são tags, não nós (§6.1.1) — sem subpasta.
-    expected_subfolders = {"editais", "desafios", "programas", "temas", "fontes", "publicos", "subprogramas"}
+    expected_subfolders = {"editais", "desafios", "programas", "icts", "temas", "fontes", "publicos", "subprogramas"}
 
     # Detecta aninhamento: se `base/<subfolder>` já existe, significa que um export
     # anterior rodou com `--vault` apontando para dentro de `base`, criando estrutura
@@ -499,11 +615,27 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
         print(f"  {folder}: {n} notas → {base}/{folder}/")
     n_editais = sum(by_folder.values())
 
-    # Notas de temas
+    # Notas de ICTs (quadrante entidade)
+    n_icts = 0
+    for ict in icts:
+        content = ict_note(ict, subfolder)
+        note_path = base / "icts" / f"{_edital_slug(ict['id'])}.md"
+        note_path.write_text(content, encoding="utf-8")
+        n_icts += 1
+    if icts:
+        print(f"  ICTs: {n_icts} notas → {base}/icts/")
+
+    # Notas de temas — nó-ponte: lista editais E ICTs do tema. A união das chaves
+    # garante que um tema com ICTs mas sem edital (ou vice-versa) ainda vire nota.
     themes_index = index.get("themes_index", {})
     n_temas = 0
-    for tema_label, editais_ids in themes_index.items():
-        content = tema_note(tema_label, editais_ids, edital_by_id, subfolder)
+    all_theme_labels = dict.fromkeys([*themes_index.keys(), *icts_by_theme.keys()])
+    for tema_label in all_theme_labels:
+        editais_ids = themes_index.get(tema_label, [])
+        content = tema_note(
+            tema_label, editais_ids, edital_by_id, subfolder,
+            icts_for_theme=icts_by_theme.get(tema_label, []),
+        )
         slug = slugify(tema_label)
         note_path = base / "temas" / f"{slug}.md"
         note_path.write_text(content, encoding="utf-8")
@@ -550,7 +682,7 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
 
     print(f"  Subprogramas: {n_sub} notas → {base}/subprogramas/")
 
-    total = n_editais + n_temas + n_fontes + n_publicos + n_sub + 1
+    total = n_editais + n_icts + n_temas + n_fontes + n_publicos + n_sub + 1
     print(f"\n✓ {total} notas exportadas para: {base}")
     print("\nPróximos passos no Obsidian:")
     print(f"  1. Abra o vault em: {vault_path}")

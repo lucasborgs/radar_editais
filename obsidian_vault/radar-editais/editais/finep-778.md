@@ -16,6 +16,7 @@ tags:
   - aberta
   - mecanismo/subvencao
   - tema/mobilidade-e-logistica
+  - tema/espaco-defesa-e-seguranca
   - trl/trl_pesquisa
   - trl/trl_prototipo
   - trl/trl_industrial
@@ -28,6 +29,7 @@ tags:
 
 ## Temas
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]
+- [[radar-editais/temas/espaco-defesa-e-seguranca|espaço - defesa e segurança]]
 
 ## Fonte
 - [[radar-editais/fontes/finep|FINEP]]

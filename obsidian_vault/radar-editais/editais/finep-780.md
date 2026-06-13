@@ -7,7 +7,7 @@ pub_date: 12/03/2026
 mechanism: subvencao
 trl_min: 3
 trl_max: 8
-n_pdfs: 9
+n_pdfs: 11
 n_facts: 0
 link: https://www.finep.gov.br/e/chamada-publica/222684/755605
 tags:
@@ -44,7 +44,7 @@ tags:
 | TRL aceito | 3 a 8 |
 | Contrapartida | Obrigatória |
 | Entidades elegíveis | Startups, Cooperativas |
-| PDFs disponíveis | 9 |
+| PDFs disponíveis | 11 |
 | Fatos extraídos | 0 |
 | Link | [https://www.finep.gov.br/e/chamada-publica/222684/755605](https://www.finep.gov.br/e/chamada-publica/222684/755605) |
 
