@@ -188,6 +188,32 @@ def test_explore_agent_passes_history_window(monkeypatch):
     assert msgs[-1]["content"] == "nova pergunta"
 
 
+def test_explore_agent_includes_planning_tool(monkeypatch):
+    """O agente de explore ganha write_todos (Opção A) além das 8 tools de
+    leitura — habilita planejamento multi-etapa no chat de Descoberta."""
+    svc = KGMatchService()
+    captured: dict = {}
+
+    fake_result = AgentResult(
+        final_text="ok", steps=[], stop_reason="end_turn",
+        usage={"input_tokens": 0, "output_tokens": 0},
+    )
+
+    def fake_run_agent(**kw):
+        captured["tools"] = kw["tools"]
+        captured["max_steps"] = kw["max_steps"]
+        return fake_result
+
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
+    svc._explore_agent("oi", None, None, None, None)
+
+    names = {t.name for t in captured["tools"]}
+    assert "write_todos" in names
+    # as 8 de leitura continuam presentes
+    assert {"list_editais", "oportunidades_por_tema", "list_icts"} <= names
+    assert captured["max_steps"] >= 8  # espaço pra planejamento + multi-task
+
+
 def test_explore_agent_error_returns_friendly_message(monkeypatch):
     svc = KGMatchService()
     fake_result = AgentResult(
