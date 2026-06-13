@@ -11,6 +11,30 @@
 
 ## Aberto
 
+### Chat cross-dim — precisão de tema (ruído no explore, pós-Fase 2)
+
+- **O quê:** o chat de Descoberta cross-dimensional (PR #19/#22) recupera bem,
+  mas mistura ruído na resposta de um tema. Dois sintomas observados em teste
+  manual ("IA em saúde", 2026-06-13):
+  1. **Nó-notícia vira edital** — `web:ba26ff22d7b4` ("FINEP lança série de
+     editais R$3,3bi") aparece como oportunidade; é notícia/agregador, não uma
+     chamada. (O Lucas já apontou isso no Obsidian.)
+  2. **Over-assignment de tema nas ICTs** — unidades fora do tema (ex.: QUÍMICA
+     VERDE, ELETROQUÍMICA, EMBARCADOS sob "saúde") casam o tema. Vem do
+     normalizer de tema do `build_ict_graph` afrouxado na Fase 0 (matou órfãos
+     140→9 trocando precisão por recall).
+- **Frentes possíveis:** (a) marcar/filtrar nó-notícia para não graduar a edital
+  — triagem mais dura no `_TRIAGE_SYSTEM`/filtro do build, ou flag de
+  `verificacao`; (b) revisar o over-assignment de tema das ICTs (apertar o
+  prompt `_MAP_SYSTEM` do build_ict_graph ou um threshold de confiança).
+  Relaciona [[Re-tagger LLM de temas por item]] (mesma raiz: precisão temática).
+- **Por que adiado:** é débito de QUALIDADE DO GRAFO, não do matcher (o
+  `_theme_match` está correto e recall-first é intencional no explore). Sem dor
+  bloqueante — a resposta é útil, só larga.
+- **Gate:** se mexer em tema de ICT, conferir o chat cross-dim e (quando a
+  Fase 3 entrar) `core.eval matching`.
+- **Status:** aberto (2026-06-13).
+
 ### Golden RAG expandido — 24 → ~80 queries (item 3 da auditoria 2026-06-12)
 
 - **O quê:** o golden de retrieval (`eval_data/golden/finep.json`, 24 queries
