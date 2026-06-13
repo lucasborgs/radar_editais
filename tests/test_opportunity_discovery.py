@@ -96,7 +96,11 @@ class _FakeClient:
 def test_triage_parses_json():
     client = _FakeClient('{"is_opportunity": true, "is_hub": false, "agency": "FAPESC"}')
     out = od._triage(SearchHit("t", "http://u", "s", ""), client, "m")
-    assert out == {"is_opportunity": True, "is_hub": False, "agency": "FAPESC"}
+    # `reason` entra no retorno desde o cache negativo (spec 07): vazio quando o
+    # modelo não o fornece. Alimenta o log de descarte quando REJEITA.
+    assert out == {
+        "is_opportunity": True, "is_hub": False, "agency": "FAPESC", "reason": "",
+    }
 
 
 def test_triage_defaults_is_hub_false_when_absent():

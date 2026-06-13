@@ -34,3 +34,15 @@ def _ensure_llm_keys(monkeypatch):
         if not os.environ.get(var):
             monkeypatch.setenv(var, f"test-dummy-{var.lower()}")
     yield
+
+
+@pytest.fixture(autouse=True)
+def _clear_web_cache():
+    """A camada web canônica (core/web/fetch, spec 03) cacheia por URL/query em
+    memória. Sem isolamento, uma URL buscada num teste vaza pro próximo (cache
+    hit com dado obsoleto — ex.: links de uma página fetchada por outro teste).
+    Limpa antes e depois de cada teste."""
+    from core.web import fetch as _web_fetch
+    _web_fetch.clear_cache()
+    yield
+    _web_fetch.clear_cache()
