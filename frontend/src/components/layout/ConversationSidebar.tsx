@@ -94,7 +94,16 @@ export function ConversationSidebar() {
   const [query, setQuery] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  // Bump força recarga da lista (a home dispara `conversations:refresh` quando
+  // uma conversa nova é criada no servidor).
+  const [reloadKey, setReloadKey] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const bump = () => setReloadKey((k) => k + 1);
+    window.addEventListener("conversations:refresh", bump);
+    return () => window.removeEventListener("conversations:refresh", bump);
+  }, []);
 
   // Carrega o histórico de conversas (deslogado não lista).
   useEffect(() => {
@@ -146,7 +155,7 @@ export function ConversationSidebar() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthed, getToken]);
+  }, [isAuthed, getToken, reloadKey]);
 
   // Fecha o hover-menu "..." ao clicar fora.
   useEffect(() => {

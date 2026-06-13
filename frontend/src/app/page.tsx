@@ -7,6 +7,7 @@ import { ChatBubble } from "@/components/chat/ChatBubble";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { FrontDoorHeader } from "@/components/frontdoor/FrontDoorHeader";
+import { ConversationSidebar } from "@/components/layout/ConversationSidebar";
 import { StatusBar } from "@/components/frontdoor/StatusBar";
 import { SuggestionChips } from "@/components/frontdoor/SuggestionChips";
 import { Composer } from "@/components/frontdoor/Composer";
@@ -115,14 +116,21 @@ export default function FrontDoorPage() {
   const lastRadarRef = useRef<HTMLDivElement>(null);
 
   // Liga o estado local à conversa do servidor (e sobrevive a F5 na mesma aba).
-  const bindSession = useCallback((id: string) => {
-    setSessionId(id);
-    try {
-      window.sessionStorage.setItem(SESSION_ID_KEY, id);
-    } catch {
-      /* quota/modo privado — segue só em memória */
-    }
-  }, []);
+  // Binding novo (1º turno) avisa o sidebar para recarregar a lista.
+  const bindSession = useCallback(
+    (id: string) => {
+      if (id !== sessionId) {
+        window.dispatchEvent(new Event("conversations:refresh"));
+      }
+      setSessionId(id);
+      try {
+        window.sessionStorage.setItem(SESSION_ID_KEY, id);
+      } catch {
+        /* quota/modo privado — segue só em memória */
+      }
+    },
+    [sessionId],
+  );
 
   // Hidrata transcript + perfil local ao montar. Com ?c= na URL, o transcript
   // local NÃO é carregado — a conversa vem do servidor (efeito de retomada).
@@ -542,8 +550,15 @@ export default function FrontDoorPage() {
   });
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-app-bg">
-      <FrontDoorHeader isAuthed={isAuthed} onReset={handleReset} onSignOut={signOut} />
+    // A home é a tela principal do chat — o sidebar de conversas vive aqui
+    // também (não só nas páginas com DashboardLayout). Oculto em telas pequenas,
+    // como nos apps de chat de referência.
+    <div className="flex h-[100dvh] bg-app-bg">
+      <div className="hidden md:flex">
+        <ConversationSidebar />
+      </div>
+      <div className="flex flex-1 flex-col min-w-0">
+        <FrontDoorHeader isAuthed={isAuthed} onReset={handleReset} onSignOut={signOut} />
       <StatusBar
         completeness={completeness}
         hasRadar={hasRadar}
@@ -604,15 +619,16 @@ export default function FrontDoorPage() {
         )}
       </ChatMessageList>
 
-      <Composer
-        value={input}
-        onChange={setInput}
-        onSend={() => void send(input)}
-        onAttach={handleAttachClick}
-        onPickFile={handlePickFile}
-        disabled={sending}
-        placeholder="Conte o que sua empresa faz, ou pergunte sobre fomento…"
-      />
+        <Composer
+          value={input}
+          onChange={setInput}
+          onSend={() => void send(input)}
+          onAttach={handleAttachClick}
+          onPickFile={handlePickFile}
+          disabled={sending}
+          placeholder="Conte o que sua empresa faz, ou pergunte sobre fomento…"
+        />
+      </div>
     </div>
   );
 }
