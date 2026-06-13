@@ -6,7 +6,7 @@ tags:
 
 # 🏷️ Tema: materiais, química e manufatura avançada
 
-**7 editais** e **31 ICTs** relacionados a este tema.
+**7 editais**, **31 ICTs** e **2 investidores** relacionados a este tema.
 
 ## Editais
 
@@ -51,3 +51,8 @@ tags:
 - 🔬 [[radar-editais/icts/embrapii-biotecnologia-cnpem|CNPEM]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-inteligentes-certi|CERTI]]
 - 🔬 [[radar-editais/icts/embrapii-transmisso-de-potencia-ccm-ita|CCM-ITA]]
+
+## Investidores
+
+- 💸 [[radar-editais/investidores/investidor-indicator-capital|Indicator Capital]]
+- 💸 [[radar-editais/investidores/investidor-kptl|KPTL]]

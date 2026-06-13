@@ -6,7 +6,7 @@ tags:
 
 # 🏷️ Tema: espaço - defesa e segurança
 
-**6 editais** e **0 ICTs** relacionados a este tema.
+**6 editais**, **0 ICTs** e **0 investidores** relacionados a este tema.
 
 ## Editais
 

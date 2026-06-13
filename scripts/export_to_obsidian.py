@@ -8,6 +8,7 @@ Estrutura de pastas gerada no vault:
   finep/
   ├── editais/       → uma nota por edital
   ├── icts/          → uma nota por ICT (unidade EMBRAPII; quadrante entidade)
+  ├── investidores/  → uma nota por investidor (fundo/anjo Q3; quadrante entidade)
   ├── temas/         → uma nota por tema (nó compartilhado evento↔entidade)
   ├── fontes/        → uma nota por fonte de recurso
   ├── anos/          → uma nota por ano de publicação (dimensão longitudinal)
@@ -15,9 +16,10 @@ Estrutura de pastas gerada no vault:
   ├── subprogramas/  → uma nota por subprograma / fundo setorial (§5.6 WIKI.md)
   └── trl/           → uma nota por faixa TRL (§5.8 WIKI.md)
 
-Os ICTs (icts.json, do build_ict_graph) ligam-se aos MESMOS nós de tema dos
-editais — no Graph View isso conecta o quadrante de entidades (quem executa) ao
-de eventos (oportunidades), via o eixo de tema compartilhado.
+Os ICTs (icts.json, do build_ict_graph) e os investidores (investidores.json,
+diretório curado) ligam-se aos MESMOS nós de tema dos editais — no Graph View
+isso conecta o quadrante de entidades (quem executa / quem investe) ao de eventos
+(oportunidades), via o eixo de tema compartilhado (WIKI.md §6.1.2/§6.1.3).
 
 Uso:
     python scripts/export_to_obsidian.py --vault ~/Documents/Obsidian/MeuVault
@@ -36,6 +38,7 @@ from core.kg.edital_id import id_to_slug, source_of
 
 INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"  # vigentes por padrão; use --historico para todos
 ICTS_FILE = KNOWLEDGE_GRAPH_DIR / "icts.json"     # quadrante entidade (build_ict_graph); opcional
+INVESTIDORES_FILE = KNOWLEDGE_GRAPH_DIR / "investidores.json"  # quadrante entidade Q3 (curado); opcional
 FACTS_DIR = FINEP_PDFS_DIR
 
 
@@ -335,6 +338,97 @@ def ict_note(ict: dict, subfolder: str = "radar-editais") -> str:
     return "\n".join(lines)
 
 
+def investidor_note(inv: dict, subfolder: str = "radar-editais") -> str:
+    """Gera nota Markdown para um investidor (fundo/anjo — quadrante entidade Q3).
+
+    Como a ICT (§6.1.2), é entidade FORA do ciclo de edital: sem prazo/status. Liga-se
+    ao grafo pela PONTE DO NÓ `tema` (WIKI.md §6.1.3): os `tese_themes` (temas
+    canônicos) viram wikilinks `[[temas/…]]` — é por aí que o Graph View conecta
+    quem-investe a quais-oportunidades. Fundo generalista (sem tese setorial) tem
+    tese_themes=[] e casa por estágio, não por tema — fica sem ponte temática (ok).
+    """
+    iid = inv["id"]
+    name = inv.get("name", iid)
+    tese = (inv.get("tese") or "").strip()
+    tese_themes = inv.get("tese_themes", []) or []
+    tese_keywords = inv.get("tese_keywords", []) or []
+    setores = inv.get("setores", []) or []
+    estagios = inv.get("estagio_alvo", []) or []
+    ticket = inv.get("ticket_range") or {}
+    lead_follow = inv.get("lead_follow", "") or ""
+    generalista = inv.get("generalista", False)
+    fund_status = inv.get("fund_status", "") or ""
+    site = inv.get("site", "") or ""
+
+    lines = ["---"]
+    lines.append(f'title: "{safe_yaml_str(name)}"')
+    lines.append(f"investidor_id: {iid}")
+    if site:
+        lines.append(f"link: {site}")
+    lines.append("tags:")
+    lines.append("  - investidor")
+    # Tags de filtro (§6.1.1) conforme node_type investidor: estágio/tese/setor.
+    # Não criam aresta no grafo (isso é só dos wikilinks) — servem o filtro Obsidian.
+    for est in estagios:
+        lines.append(f"  - estagio/{slugify(est)}")
+    for t in tese_themes:
+        lines.append(f"  - tese/{slugify(t)}")
+    for s in setores:
+        lines.append(f"  - setor/{slugify(s)}")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# 💸 Investidor: {name}")
+    lines.append("")
+
+    if tese:
+        lines.append(f"> {tese}")
+        lines.append("")
+
+    # Teses temáticas → nós de tema compartilhados com editais e ICTs (a ponte
+    # cross-quadrante Q3↔eventos). Fundo generalista não tem — casa por estágio.
+    if tese_themes:
+        lines.append("## Teses de investimento")
+        for t in tese_themes:
+            lines.append(f"- [[{subfolder}/temas/{slugify(t)}|{t}]]")
+        lines.append("")
+    elif generalista:
+        lines.append("> 🎯 Fundo **generalista** (sem tese setorial) — avalia por estágio, não por tema.")
+        lines.append("")
+
+    # Perfil do fundo (campos categóricos — tabela legível, não nós).
+    rows: list[tuple[str, str]] = []
+    if estagios:
+        rows.append(("Estágio-alvo", ", ".join(estagios)))
+    if setores:
+        rows.append(("Setores", ", ".join(setores)))
+    if ticket.get("min_brl") or ticket.get("max_brl"):
+        t_min = f"R$ {ticket['min_brl']:,.0f}" if ticket.get("min_brl") else "—"
+        t_max = f"R$ {ticket['max_brl']:,.0f}" if ticket.get("max_brl") else "—"
+        rows.append(("Ticket", f"{t_min} a {t_max}"))
+    if lead_follow:
+        rows.append(("Lead/Follow", lead_follow))
+    if fund_status:
+        rows.append(("Status do fundo", fund_status))
+    if site:
+        rows.append(("Site", f"[{site}]({site})"))
+    if rows:
+        lines.append("## Perfil")
+        lines.append("")
+        lines.append("| Campo | Valor |")
+        lines.append("|---|---|")
+        for label, val in rows:
+            lines.append(f"| {label} | {val} |")
+        lines.append("")
+
+    if tese_keywords:
+        lines.append("## Palavras-chave da tese")
+        lines.append("")
+        lines.append(", ".join(tese_keywords))
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def fonte_entidade_note(label: str, icts: list[dict], subfolder: str = "radar-editais") -> str:
     """Nó-fonte de uma agência de entidades (ex.: EMBRAPII) — agrupa as unidades
     sob um nó-pai, análogo aos nós-fonte dos editais (ponto 3 do feedback de grafo)."""
@@ -363,13 +457,16 @@ def tema_note(
     edital_by_id: dict,
     subfolder: str = "radar-editais",
     icts_for_theme: list[dict] | None = None,
+    investidores_for_theme: list[dict] | None = None,
 ) -> str:
     """Gera nota Markdown para um tema.
 
-    O tema é o nó-ponte entre eventos (editais) e entidades (ICTs): lista ambos,
-    para que a navegação e o Graph View mostrem os dois quadrantes em torno dele.
+    O tema é o nó-ponte entre eventos (editais) e entidades (ICTs + investidores):
+    lista os três, para que a navegação e o Graph View mostrem todos os quadrantes
+    em torno dele (a ponte cross-dimensional, WIKI.md §6.1.2/§6.1.3).
     """
     icts_for_theme = icts_for_theme or []
+    investidores_for_theme = investidores_for_theme or []
     lines = ["---"]
     lines.append(f'title: "{safe_yaml_str(tema_label)}"')
     lines.append("tags:")
@@ -378,7 +475,10 @@ def tema_note(
     lines.append("")
     lines.append(f"# 🏷️ Tema: {tema_label}")
     lines.append("")
-    lines.append(f"**{len(editais_ids)} editais** e **{len(icts_for_theme)} ICTs** relacionados a este tema.")
+    lines.append(
+        f"**{len(editais_ids)} editais**, **{len(icts_for_theme)} ICTs** e "
+        f"**{len(investidores_for_theme)} investidores** relacionados a este tema."
+    )
     lines.append("")
     lines.append("## Editais")
     lines.append("")
@@ -399,6 +499,14 @@ def tema_note(
         for ict in icts_for_theme:
             name = ict.get("name", ict["id"])
             lines.append(f"- 🔬 [[{subfolder}/icts/{_edital_slug(ict['id'])}|{name}]]")
+        lines.append("")
+
+    if investidores_for_theme:
+        lines.append("## Investidores")
+        lines.append("")
+        for inv in investidores_for_theme:
+            name = inv.get("name", inv["id"])
+            lines.append(f"- 💸 [[{subfolder}/investidores/{_edital_slug(inv['id'])}|{name}]]")
         lines.append("")
 
     return "\n".join(lines)
@@ -492,7 +600,8 @@ def home_note(index: dict, subfolder: str = "radar-editais") -> str:
     lines.append(f"- 🎯 [[{subfolder}/desafios/]] — desafios (open innovation)")
     lines.append(f"- 🚀 [[{subfolder}/programas/]] — programas (aceleração)")
     lines.append(f"- 🔬 [[{subfolder}/icts/]] — ICTs parceiras (unidades EMBRAPII)")
-    lines.append(f"- 🏷️ [[{subfolder}/temas/]] — por tema (ponte editais↔ICTs)")
+    lines.append(f"- 💸 [[{subfolder}/investidores/]] — investidores (fundos/anjos)")
+    lines.append(f"- 🏷️ [[{subfolder}/temas/]] — por tema (ponte editais↔ICTs↔investidores)")
     lines.append(f"- 💰 [[{subfolder}/fontes/]] — por fonte de recurso")
     lines.append(f"- 🏛️ [[{subfolder}/subprogramas/]] — por subprograma / fundo setorial")
     lines.append("")
@@ -562,10 +671,26 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
         except Exception:
             icts = []
 
+    # Investidores (quadrante entidade Q3) — opcional: diretório curado à mão.
+    # Liga-se ao grafo pela ponte do tema (tese_themes ⊆ tema_vocab, §6.1.3).
+    investidores: list[dict] = []
+    inv_by_theme: dict[str, list[dict]] = {}
+    if INVESTIDORES_FILE.exists():
+        try:
+            inv_doc = json.loads(INVESTIDORES_FILE.read_text(encoding="utf-8"))
+            investidores = (inv_doc.get("investidores", []) if isinstance(inv_doc, dict)
+                            else (inv_doc or []))
+            for inv in investidores:
+                for theme in inv.get("tese_themes", []) or []:
+                    inv_by_theme.setdefault(theme, []).append(inv)
+        except Exception:
+            investidores = []
+
     # Base do vault — limpa notas antigas antes de re-exportar
     base = vault_path / subfolder
     # mechanism/ano/trl_faixa são tags, não nós (§6.1.1) — sem subpasta.
-    expected_subfolders = {"editais", "desafios", "programas", "icts", "temas", "fontes", "subprogramas"}
+    expected_subfolders = {"editais", "desafios", "programas", "icts", "investidores",
+                           "temas", "fontes", "subprogramas"}
 
     # Detecta aninhamento: se `base/<subfolder>` já existe, significa que um export
     # anterior rodou com `--vault` apontando para dentro de `base`, criando estrutura
@@ -623,16 +748,29 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     if icts:
         print(f"  ICTs: {n_icts} notas → {base}/icts/")
 
-    # Notas de temas — nó-ponte: lista editais E ICTs do tema. A união das chaves
-    # garante que um tema com ICTs mas sem edital (ou vice-versa) ainda vire nota.
+    # Notas de investidores (quadrante entidade Q3)
+    n_inv = 0
+    for inv in investidores:
+        content = investidor_note(inv, subfolder)
+        note_path = base / "investidores" / f"{_edital_slug(inv['id'])}.md"
+        note_path.write_text(content, encoding="utf-8")
+        n_inv += 1
+    if investidores:
+        print(f"  Investidores: {n_inv} notas → {base}/investidores/")
+
+    # Notas de temas — nó-ponte: lista editais, ICTs E investidores do tema. A
+    # união das chaves garante que um tema presente em qualquer quadrante vire nota.
     themes_index = index.get("themes_index", {})
     n_temas = 0
-    all_theme_labels = dict.fromkeys([*themes_index.keys(), *icts_by_theme.keys()])
+    all_theme_labels = dict.fromkeys(
+        [*themes_index.keys(), *icts_by_theme.keys(), *inv_by_theme.keys()]
+    )
     for tema_label in all_theme_labels:
         editais_ids = themes_index.get(tema_label, [])
         content = tema_note(
             tema_label, editais_ids, edital_by_id, subfolder,
             icts_for_theme=icts_by_theme.get(tema_label, []),
+            investidores_for_theme=inv_by_theme.get(tema_label, []),
         )
         slug = slugify(tema_label)
         note_path = base / "temas" / f"{slug}.md"
@@ -682,7 +820,7 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
 
     print(f"  Subprogramas: {n_sub} notas → {base}/subprogramas/")
 
-    total = n_editais + n_icts + n_temas + n_fontes + n_sub + 1
+    total = n_editais + n_icts + n_inv + n_temas + n_fontes + n_sub + 1
     print(f"\n✓ {total} notas exportadas para: {base}")
     print("\nPróximos passos no Obsidian:")
     print(f"  1. Abra o vault em: {vault_path}")
