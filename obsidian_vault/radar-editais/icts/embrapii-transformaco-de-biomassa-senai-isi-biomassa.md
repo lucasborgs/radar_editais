@@ -13,6 +13,9 @@ tags:
 
 > O Serviço Nacional de Aprendizagem Industrial (SENAI/DR-MS) – Instituto SENAI de Inovação em Biomassa (ISI BIOMASSA) é Unidade Embrapii na área de Transformação da Biomassa, com quatro sublinhas de atuação: Bioprocessos e Biotecnologia Integrada Energia e Sustentabilidade…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]

@@ -12,6 +12,9 @@ tags:
 
 > A Unidade EMBRAPII inoVARE/UFSC foi credenciada em 2014 como a “Unidade Polo/UFSC – Tecnologias em Refrigeração”, com foco nas áreas de: Novas Tecnologias, Eficiência Energética e Impacto Ambiental, Conforto Acústico, Confiabilidade de Componentes e Sistemas, Avaliação e…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 

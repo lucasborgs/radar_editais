@@ -13,6 +13,9 @@ tags:
 
 > Desde 2014 atuando como Unidade EMBRAPII na área de Materiais de Alto Desempenho, o Instituto de Pesquisas Tecnológicas (IPT) foi novamente credenciado, em 2016, para desenvolver projetos na área de Biotecnologia. As técnicas de biotecnologia trazem novas perspectivas para a…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]

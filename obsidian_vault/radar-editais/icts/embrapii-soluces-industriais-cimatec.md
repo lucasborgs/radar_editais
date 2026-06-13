@@ -12,6 +12,9 @@ tags:
 
 > O SENAI CIMATEC é credenciado pela EMBRAPII para atendimento na área de Soluções Industriais com um programa avançado de suporte tecnológico para promover a pesquisa aplicada nas tecnologias integradas da manufatura para atender a indústria brasileira, com desenvolvimento de…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 

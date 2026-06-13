@@ -12,6 +12,9 @@ tags:
 
 > O Instituto SENAI de Inovação em Engenharia de Estruturas é uma instituição notável, com uma impressionante infraestrutura de 1.800 m² de laboratórios e 4.000 m² de prédio, que ostenta a certificação LEED Platinum. Essas instalações abrigam 17 laboratórios dedicados…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 

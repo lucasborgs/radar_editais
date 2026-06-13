@@ -13,6 +13,9 @@ tags:
 
 > A sustentabilidade é condição fundamental para a competitividade da indústria atual. O Instituto SENAI de Inovação em Química Verde desenvolve soluções industriais utilizando técnicas alternativas e matérias-primas renováveis para a criação de produtos e processos mais…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]

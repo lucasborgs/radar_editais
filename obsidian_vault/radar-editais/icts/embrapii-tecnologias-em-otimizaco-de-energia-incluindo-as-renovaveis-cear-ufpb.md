@@ -12,6 +12,9 @@ tags:
 
 > O Centro de Energias Alternativas e Renováveis (CEAR-UFPB) é uma Unidade EMBRAPII credenciada para atuar na área Otimização de Energia, inclusive as renováveis, com foco nas áreas de Gerenciamento de Energia e Sistemas de Conversão e Eficiência de Energia. O CEAR possui…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 

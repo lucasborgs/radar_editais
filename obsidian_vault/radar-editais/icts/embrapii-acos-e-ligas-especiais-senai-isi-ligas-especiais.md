@@ -12,6 +12,9 @@ tags:
 
 > O Instituto SENAI de Inovação em Metalurgia e Ligas Especiais (ISI MLE) oferece soluções inovadoras em produtos e processos metalúrgicos. Com sete laboratórios e duas plantas-piloto, instalados em uma área construída de 2.500 m², em Belo Horizonte (MG), o Instituto possui um…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 

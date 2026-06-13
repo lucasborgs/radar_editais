@@ -13,6 +13,9 @@ tags:
 
 > A Unidade EMBRAPII Coppe é credenciada na área de ENGENHARIA DE PETRÓLEO E GÁS, com atuação em Upstream (Exploração e Produção de Petróleo e Gás) e Downstream (Refino, Processamento de Gás Natural e Produção de Derivados Petroquímicos). Seu credenciamento como Unidade EMBRAPII…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]

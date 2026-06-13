@@ -12,6 +12,9 @@ tags:
 
 > O Centro de Tecnologias Estratégicas do Nordeste (CETENE) é uma Unidade EMBRAPII (UE) que atua com pesquisa e inovação industrial na área de Biotecnologia aplicada à micropropagação vegetal, através da única Biofábrica do Ministério da Ciência, Tecnologia e Inovação (MCTI), a…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

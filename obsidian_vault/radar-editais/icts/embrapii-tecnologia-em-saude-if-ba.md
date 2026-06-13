@@ -12,6 +12,9 @@ tags:
 
 > A Unidade Embrapii do Instituto Federal de Educação, Ciência e Tecnologia da Bahia (IFBA) é credenciada para o desenvolvimento de soluções tecnológicas inovadoras na área das Tecnologias em Saúde, no subsistema de base eletrônica, mecânica e de materiais do Complexo Industrial…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 

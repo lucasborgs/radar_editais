@@ -12,6 +12,9 @@ tags:
 
 > O INDT (Instituto de Desenvolvimento Tecnológico) é credenciado pela EMBRAPII para atuar na área de competência Sistemas para Automação de Manufatura, com duas sublinhas de pesquisa: Software para automação da manufatura e Dispositivos e equipamentos para automação da…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 

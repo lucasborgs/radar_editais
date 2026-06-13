@@ -11,6 +11,9 @@ tags:
 
 > A Unidade Embrapii PROMEXBIO CETEM, inserida no contexto do Centro de Tecnologia Mineral (CETEM), dispõe de uma robusta infraestrutura laboratorial dedicada ao desenvolvimento de Pesquisa, Desenvolvimento e Inovação (PD&I) para empresas no setor mineral brasileiro. Esta…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Áreas de expertise
 - Desenvolvimento de processos de Biomineração
 - Desenvolvimento de processos em Metalurgia Extrativa

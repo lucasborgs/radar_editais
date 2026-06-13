@@ -13,6 +13,9 @@ tags:
 
 > O Instituto de Pesquisas ELDORADO é credenciado pela EMBRAPII para o desenvolvimento de projetos de inovação industrial nas áreas de Inteligência Embarcada e Inteligência Artificial e Ciência de Dados . Com uma trajetória sólida atuando em parceria com a indústria, o ELDORADO…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]

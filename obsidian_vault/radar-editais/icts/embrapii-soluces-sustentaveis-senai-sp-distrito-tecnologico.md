@@ -14,6 +14,9 @@ tags:
 
 > Distrito Tecnológico SENAI-SP O Distrito Tecnológico SENAI-SP , localizado em São Bernardo do Campo, é uma Unidade EMBRAPII credenciada para desenvolver projetos de Pesquisa, Desenvolvimento e Inovação (P&DI) voltados à sustentabilidade, descarbonização e digitalização da…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]

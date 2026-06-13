@@ -12,6 +12,9 @@ tags:
 
 > Credenciada para o desenvolvimento de projetos de PD&I na área de Computação Industrial, a Unidade EMBRAPII EDGE-UFAL é composta por um time de pesquisadores com competências complementares e possui um portfólio robusto, com mais de 40 projetos nas áreas automação, prototipação…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

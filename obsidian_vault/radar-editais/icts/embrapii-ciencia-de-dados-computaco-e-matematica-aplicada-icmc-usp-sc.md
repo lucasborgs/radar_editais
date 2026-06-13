@@ -12,6 +12,9 @@ tags:
 
 > O Instituto de Ciências Matemáticas e de Computação (ICMC) da Universidade de São Paulo é um dos principais institutos brasileiros de pesquisa e formação em matemática, matemática aplicada, computação e estatística. Além disso, é uma referência internacional na produção…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

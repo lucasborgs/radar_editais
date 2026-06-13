@@ -13,6 +13,9 @@ tags:
 
 > O Centro de Pesquisas Avançadas Wernher von Braun é uma instituição privada, sem fins lucrativos fundada em 1997, credenciada junto ao MCTI desde 2002 e Unidade EMBRAPII credenciada em 2023 na área de Internet das Coisas (em inglês, Internet of Things – IoT) e Indústria 4.0. O…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]

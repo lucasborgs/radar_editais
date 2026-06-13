@@ -12,6 +12,9 @@ tags:
 
 > A Unidade Embrapii do Instituto Federal Goiano (IF Goiano) desenvolve projetos na área de Tecnologias Agroindustriais, com foco em tecnologias para manejo agrícola e para processamento e armazenamento de grãos . Possui experiência no atendimento a demandas por P&D de indústrias…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

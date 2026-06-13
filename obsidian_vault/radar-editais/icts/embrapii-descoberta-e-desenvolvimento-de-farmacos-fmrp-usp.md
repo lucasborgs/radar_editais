@@ -12,6 +12,9 @@ tags:
 
 > A Unidade EMBRAPII Integrada de Descoberta e Desenvolvimento de Fármacos” da Faculdade de Medicina de Ribeirão Preto FMRP/USP tem o objetivo de desenvolver projetos de P,D&I em parceria com empresas farmacêuticas e startups para descobrimento e desenvolvimento de novos fármacos…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 

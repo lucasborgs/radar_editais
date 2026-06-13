@@ -12,6 +12,9 @@ tags:
 
 > O Instituto de Pesquisa em Petróleo e Energia – LITPEG/UFPE é credenciado como Unidade EMBRAPII na área de Modelagem de Reservatórios e Otimização Robusta Aplicadas a Recursos Energéticos e Meio Ambiente e atua no desenvolvimento de soluções inovadoras e tecnológicas voltadas…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 

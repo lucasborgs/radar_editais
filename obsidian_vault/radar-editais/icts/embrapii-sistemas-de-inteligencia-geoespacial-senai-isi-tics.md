@@ -12,6 +12,9 @@ tags:
 
 > O Instituto Senai de Inovação de Tecnologia da Informação e Comunicação em Sistemas (ISI-TICs) é um centro de excelência em Pesquisa, Desenvolvimento e Inovação (P,D&I) na área de tecnologia da informação e comunicação (TICs). Com uma sólida infraestrutura, o instituto é um…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

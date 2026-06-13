@@ -13,6 +13,9 @@ tags:
 
 > A Embrapa Agroenergia é credenciada pela EMBRAPII para desenvolver projetos em parceria com o setor industrial em biotecnologia com foco em bioquímica de renováveis. É um centro de pesquisa e inovação dedicado a desenvolver soluções tecnológicas inovadoras para a conversão…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]

@@ -12,6 +12,9 @@ tags:
 
 > O Instituto Federal do Amazonas (IFAM) foi credenciado para atender a indústria nacional no desenvolvimento de PD&I na área de tecnologias para processos de manufatura. Sub-linhas: Dispositivos para automação e controle Dispositivos para automação industrial: desenvolvimento de…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 
