@@ -5,6 +5,8 @@ link: https://embrapii.org.br/unidades/sistemas-inteligentes-em-geotecnologia-e-
 tags:
   - embrapii
   - ict
+  - tema/tecnologias-digitais-e-conectividade
+  - tema/agro-bioeconomia-e-alimentos
 ---
 
 # 🔬 ICT: ZETTA-UFLA
@@ -13,6 +15,10 @@ tags:
 
 ## Fonte
 - [[radar-editais/fontes/embrapii|EMBRAPII]]
+
+## Temas de atuação
+- [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
+- [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 
 ## Áreas de expertise
 - Inteligência computacional em geotecnologia e processamento de dados

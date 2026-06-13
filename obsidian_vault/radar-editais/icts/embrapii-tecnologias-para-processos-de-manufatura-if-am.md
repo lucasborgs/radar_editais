@@ -5,6 +5,7 @@ link: https://embrapii.org.br/unidades/tecnologias-para-processos-de-manufatura-
 tags:
   - embrapii
   - ict
+  - tema/tecnologias-digitais-e-conectividade
   - tema/materiais-quimica-e-manufatura-avancada
 ---
 
@@ -16,6 +17,7 @@ tags:
 - [[radar-editais/fontes/embrapii|EMBRAPII]]
 
 ## Temas de atuação
+- [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 
 ## Áreas de expertise

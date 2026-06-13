@@ -6,6 +6,7 @@ tags:
   - embrapii
   - ict
   - tema/mobilidade-e-logistica
+  - tema/tecnologias-digitais-e-conectividade
 ---
 
 # 🔬 ICT: TECGRAF
@@ -17,6 +18,7 @@ tags:
 
 ## Temas de atuação
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]
+- [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 
 ## Áreas de expertise
 - Automação, logística e otimização

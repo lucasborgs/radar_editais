@@ -5,6 +5,7 @@ link: https://embrapii.org.br/unidades/acos-e-ligas-especiais-senai-isi-ligas-es
 tags:
   - embrapii
   - ict
+  - tema/energia-e-transicao-sustentavel
   - tema/materiais-quimica-e-manufatura-avancada
 ---
 
@@ -16,6 +17,7 @@ tags:
 - [[radar-editais/fontes/embrapii|EMBRAPII]]
 
 ## Temas de atuação
+- [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 
 ## Áreas de expertise

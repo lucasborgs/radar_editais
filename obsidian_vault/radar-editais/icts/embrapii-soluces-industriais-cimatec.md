@@ -5,7 +5,9 @@ link: https://embrapii.org.br/unidades/soluces-industriais-cimatec/
 tags:
   - embrapii
   - ict
+  - tema/materiais-quimica-e-manufatura-avancada
   - tema/saude-e-ciencias-da-vida
+  - tema/tecnologias-digitais-e-conectividade
 ---
 
 # 🔬 ICT: CIMATEC
@@ -16,7 +18,9 @@ tags:
 - [[radar-editais/fontes/embrapii|EMBRAPII]]
 
 ## Temas de atuação
+- [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
+- [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 
 ## Áreas de expertise
 - Automação industrial

@@ -5,6 +5,7 @@ link: https://embrapii.org.br/unidades/tecnologias-em-mineraco-if-rn/
 tags:
   - embrapii
   - ict
+  - tema/materiais-quimica-e-manufatura-avancada
 ---
 
 # 🔬 ICT: IF-RN
@@ -13,6 +14,9 @@ tags:
 
 ## Fonte
 - [[radar-editais/fontes/embrapii|EMBRAPII]]
+
+## Temas de atuação
+- [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 
 ## Áreas de expertise
 - Exploração Mineral Especializada em Minerais Portadores do Futuro

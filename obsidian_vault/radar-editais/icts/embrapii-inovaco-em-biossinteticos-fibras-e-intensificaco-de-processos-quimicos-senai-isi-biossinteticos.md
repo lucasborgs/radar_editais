@@ -6,6 +6,7 @@ tags:
   - embrapii
   - ict
   - tema/agro-bioeconomia-e-alimentos
+  - tema/materiais-quimica-e-manufatura-avancada
 ---
 
 # 🔬 ICT: SENAI ISI BIOSSINTÉTICOS
@@ -17,6 +18,7 @@ tags:
 
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
+- [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 
 ## Áreas de expertise
 - Biologia sintética

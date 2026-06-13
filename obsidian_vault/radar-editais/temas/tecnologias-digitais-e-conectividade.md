@@ -6,7 +6,7 @@ tags:
 
 # 🏷️ Tema: tecnologias digitais e conectividade
 
-**8 editais** e **26 ICTs** relacionados a este tema.
+**8 editais** e **33 ICTs** relacionados a este tema.
 
 ## Editais
 
@@ -21,12 +21,17 @@ tags:
 
 ## ICTs parceiras
 
+- 🔬 [[radar-editais/icts/embrapii-tecnologias-avancadas-de-manufatura-laser-e-robotica-senai-manufatura-laser-e-robotica|SENAI MANUFATURA, LASER E ROBÓTICA]]
+- 🔬 [[radar-editais/icts/embrapii-refrigeraco-vibraco-acustica-e-energia-inovare-ufsc|inoVARE/UFSC]]
 - 🔬 [[radar-editais/icts/embrapii-inteligencia-embarcada-inteligencia-artificial-e-ciencia-de-dados-eldorado|ELDORADO]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-embarcados-e-inteligencia-artificial-if-ce|IF-CE]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-digitais-e-radiofrequencia-inatel|INATEL]]
 - 🔬 [[radar-editais/icts/embrapii-inteligencia-embarcada-lactec|LACTEC]]
 - 🔬 [[radar-editais/icts/embrapii-software-para-sistemas-ciberfisicos-dcc-ufmg|DCC-UFMG]]
+- 🔬 [[radar-editais/icts/embrapii-soluces-industriais-cimatec|CIMATEC]]
+- 🔬 [[radar-editais/icts/embrapii-sistemas-inteligentes-em-geotecnologia-e-agronegocio-zetta-ufla|ZETTA-UFLA]]
 - 🔬 [[radar-editais/icts/embrapii-iot-e-manufatura-40-vbl-iot-e-industria-40-von-braun|VBL IoT E INDÚSTRIA 4.0 – Von Braun]]
+- 🔬 [[radar-editais/icts/embrapii-soluces-computacionais-em-engenharia-tecgraf|TECGRAF]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-de-inteligencia-geoespacial-senai-isi-tics|SENAI ISI TICS]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-de-sensoriamento-senai-isi-sensoriamento|SENAI ISI SENSORIAMENTO]]
 - 🔬 [[radar-editais/icts/embrapii-tecnologias-em-quimica-verde-senai-isi-quimica-verde|SENAI ISI QUÍMICA VERDE]]
@@ -37,11 +42,13 @@ tags:
 - 🔬 [[radar-editais/icts/embrapii-sistemas-roboticos-e-automaco-itec-furg|ITEC-FURG]]
 - 🔬 [[radar-editais/icts/embrapii-manufatura-inteligente-instituto-atlantico|INSTITUTO ATLÂNTICO]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-para-manufatura-if-pb|IF-PB]]
+- 🔬 [[radar-editais/icts/embrapii-tecnologias-para-processos-de-manufatura-if-am|IF-AM]]
 - 🔬 [[radar-editais/icts/embrapii-ciencia-de-dados-computaco-e-matematica-aplicada-icmc-usp-sc|ICMC – USP-SC]]
 - 🔬 [[radar-editais/icts/embrapii-equipamentos-digitais-para-manufatura-inteligente-fitec-campinas|FITec Campinas]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-de-viso-computacional-inteligencia-artificial-e-conectividade-fitec-bh|FITec BH]]
 - 🔬 [[radar-editais/icts/embrapii-integraco-de-tecnologias-habilitadoras-no-agronegocio-embrapa-itech-agro|EMBRAPA ITECH-Agro]]
 - 🔬 [[radar-editais/icts/embrapii-computaco-industrial-edge-ufal|EDGE-UFAL]]
+- 🔬 [[radar-editais/icts/embrapii-materiais-avancados-e-nanotecnologia-ctnano-ufmg|CTNano-UFMG]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-de-comunicaces-avancadas-cpqd|CPqD]]
 - 🔬 [[radar-editais/icts/embrapii-produtos-conectados-cesar|CESAR]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-inteligentes-certi|CERTI]]

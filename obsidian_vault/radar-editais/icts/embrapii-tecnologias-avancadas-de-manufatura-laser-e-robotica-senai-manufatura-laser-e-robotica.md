@@ -6,6 +6,7 @@ tags:
   - embrapii
   - ict
   - tema/materiais-quimica-e-manufatura-avancada
+  - tema/tecnologias-digitais-e-conectividade
 ---
 
 # 🔬 ICT: SENAI MANUFATURA, LASER E ROBÓTICA
@@ -17,6 +18,7 @@ tags:
 
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
+- [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 
 ## Áreas de expertise
 - Desenvolvimento de Sistemas a Laser

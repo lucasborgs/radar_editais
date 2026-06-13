@@ -6,6 +6,7 @@ tags:
   - embrapii
   - ict
   - tema/tecnologias-digitais-e-conectividade
+  - tema/mobilidade-e-logistica
 ---
 
 # 🔬 ICT: EDGE-UFAL
@@ -17,6 +18,7 @@ tags:
 
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
+- [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]
 
 ## Áreas de expertise
 - Aplicações de inteligência artificial

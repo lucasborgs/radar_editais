@@ -5,6 +5,8 @@ link: https://embrapii.org.br/unidades/tecnologia-mineral-promexbio-cetem/
 tags:
   - embrapii
   - ict
+  - tema/materiais-quimica-e-manufatura-avancada
+  - tema/agro-bioeconomia-e-alimentos
 ---
 
 # 🔬 ICT: PROMEXBIO-CETEM
@@ -13,6 +15,10 @@ tags:
 
 ## Fonte
 - [[radar-editais/fontes/embrapii|EMBRAPII]]
+
+## Temas de atuação
+- [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
+- [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 
 ## Áreas de expertise
 - Desenvolvimento de processos de Biomineração
