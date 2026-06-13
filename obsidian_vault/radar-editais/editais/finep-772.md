@@ -7,7 +7,7 @@ pub_date: 06/02/2026
 mechanism: subvencao
 trl_min: 3
 trl_max: 8
-n_pdfs: 11
+n_pdfs: 15
 n_facts: 0
 link: https://www.finep.gov.br/e/chamada-publica/222684/754567
 tags:
@@ -16,6 +16,7 @@ tags:
   - aberta
   - mecanismo/subvencao
   - tema/agro-bioeconomia-e-alimentos
+  - tema/energia-e-transicao-sustentavel
   - trl/trl_pesquisa
   - trl/trl_prototipo
   - trl/trl_industrial
@@ -24,10 +25,11 @@ tags:
 
 # 🟢 Finep Mais Inovação Brasil – Rodada 2 – Transição Energética
 
-> Este edital financia projetos inovadores que visam o desenvolvimento de produtos ou processos nas áreas de transição energética, com foco em tecnologias de baixo carbono. É destinado a empresas brasileiras, incluindo startups e cooperativas, que atuem em parceria com Instituições Científicas, Tecnológicas e de Inovação (ICTs).
+> Este edital financia projetos inovadores que visam o desenvolvimento de produtos ou processos nas áreas de energia e transição sustentável, com foco em empresas brasileiras e ICTs. O objetivo é promover a inovação e a sustentabilidade no setor energético.
 
 ## Temas
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
+- [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 
 ## Fonte
 - [[radar-editais/fontes/finep|FINEP]]
@@ -48,7 +50,7 @@ tags:
 | TRL aceito | 3 a 8 |
 | Contrapartida | Obrigatória |
 | Entidades elegíveis | empresas, startups, ICTs |
-| PDFs disponíveis | 11 |
+| PDFs disponíveis | 15 |
 | Fatos extraídos | 0 |
 | Link | [https://www.finep.gov.br/e/chamada-publica/222684/754567](https://www.finep.gov.br/e/chamada-publica/222684/754567) |
 
@@ -66,4 +68,4 @@ tags:
 - Mínimo de R$ 150 milhões reservados para projetos nas regiões Norte, Nordeste e Centro-Oeste
 - Avaliação contínua das propostas até 31/08/2026
 - Propostas devem obter pontuação mínima de 14 pontos para aprovação
-- Cada empresa pode participar de até duas propostas
+- Participação em arranjos simples ou em rede com diferentes requisitos

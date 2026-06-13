@@ -7,7 +7,7 @@ pub_date: 06/02/2026
 mechanism: subvencao
 trl_min: 3
 trl_max: 8
-n_pdfs: 10
+n_pdfs: 12
 n_facts: 0
 link: https://www.finep.gov.br/e/chamada-publica/222684/754473
 tags:
@@ -16,6 +16,7 @@ tags:
   - aberta
   - mecanismo/subvencao
   - tema/energia-e-transicao-sustentavel
+  - tema/materiais-quimica-e-manufatura-avancada
   - trl/trl_pesquisa
   - trl/trl_prototipo
   - trl/trl_industrial
@@ -24,10 +25,11 @@ tags:
 
 # 🟢 Finep Mais Inovação Brasil – Rodada 2 – Transformação Mineral
 
-> Esta chamada pública visa conceder recursos de subvenção econômica para o desenvolvimento de produtos ou processos inovadores nas áreas de transformação mineral, com foco em minerais críticos e estratégicos, visando a transição energética e a descarbonização. O público-alvo inclui startups e cooperativas que atuam em parceria com Instituições Científicas e Tecnológicas (ICTs).
+> A chamada pública visa conceder recursos de subvenção econômica para o desenvolvimento de produtos ou processos inovadores nas áreas de energia e transição sustentável, materiais, química e manufatura avançada, direcionada a startups e cooperativas.
 
 ## Temas
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
+- [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 
 ## Fonte
 - [[radar-editais/fontes/finep|FINEP]]
@@ -47,23 +49,23 @@ tags:
 | Valor do projeto | R$ 5,000,000 a R$ 40,000,000 |
 | TRL aceito | 3 a 8 |
 | Contrapartida | Obrigatória |
-| Entidades elegíveis | empresas, startups, ICTs |
-| PDFs disponíveis | 10 |
+| Entidades elegíveis | startups, cooperativas |
+| PDFs disponíveis | 12 |
 | Fatos extraídos | 0 |
 | Link | [https://www.finep.gov.br/e/chamada-publica/222684/754473](https://www.finep.gov.br/e/chamada-publica/222684/754473) |
 
 ## Requisitos Principais
 
-- Propostas devem incluir a participação obrigatória de pelo menos uma ICT.
+- Participação obrigatória de pelo menos uma ICT.
+- Propostas devem ser apresentadas em arranjos simples ou em rede.
 - Valor solicitado deve estar entre R$ 5 milhões e R$ 40 milhões, dependendo do arranjo.
-- As propostas devem atender aos níveis de maturidade tecnológica (TRLs) especificados.
-- A contrapartida financeira mínima deve ser respeitada conforme o porte da empresa.
-- As propostas devem ser submetidas até 31/08/2026.
+- Prazo de execução do projeto de até 36 meses.
+- Pontuação mínima de 14 pontos na análise de mérito.
 
 ## Fatos-chave
 
 - Recursos totais disponíveis de R$ 200 milhões.
-- Apoio a projetos nas áreas de mineração urbana e tecnologias sustentáveis.
-- Propostas serão analisadas em fluxo contínuo até o esgotamento dos recursos.
-- A pontuação mínima para aprovação é de 14 pontos.
-- A participação em arranjos em rede é incentivada, com requisitos específicos.
+- Apoio a projetos nas regiões Norte, Nordeste e Centro-Oeste com reserva mínima de R$ 60 milhões.
+- Propostas podem ser submetidas até 31/08/2026.
+- A participação de ICTs é obrigatória para todas as propostas.
+- Avaliação das propostas será feita por ordem de chegada.

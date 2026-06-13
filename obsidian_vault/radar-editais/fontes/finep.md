@@ -18,7 +18,7 @@ tags:
 - 🟢 [[radar-editais/editais/finep-757|Seleção de Gestor para o FIP Complexo da Saúde]]
 - 🟢 [[radar-editais/editais/finep-613|Programa de Investimento em Startups Inovadoras 2ª Rodada]]
 - 🟢 [[radar-editais/editais/finep-612|Programa de Investimento em Startups Inovadoras 2ª Rodada]]
-- 🟢 [[radar-editais/editais/finep-782|Ecossistema Tecnológico de Biorrefino]]
+- 🟢 [[radar-editais/editais/finep-958302|CARTA CONVITE MCTI/FINEP - PROGRAMA TECNOVA 2026/2027 ]]
 - 🟢 [[radar-editais/editais/finep-775|Finep Mais Inovação Brasil – Rodada 2 - Base Industrial de Defesa]]
 - 🟢 [[radar-editais/editais/finep-780|Finep Mais Inovação Brasil – Rodada 2 – Semicondutores]]
 - 🟢 [[radar-editais/editais/finep-779|Finep Mais Inovação Brasil - Rodada 2 – Tecnologias Digitais]]
