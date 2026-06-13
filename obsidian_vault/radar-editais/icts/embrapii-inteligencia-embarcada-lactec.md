@@ -12,6 +12,9 @@ tags:
 
 > A inteligência embarcada tem como ênfase a eletrônica embarcada , que amplia as funcionalidades de produtos e sistemas compostos por microprocessadores com softwares dedicados, com inteligência e adaptabilidade, quem abrangem as competências emergentes e as novas tecnologias,…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

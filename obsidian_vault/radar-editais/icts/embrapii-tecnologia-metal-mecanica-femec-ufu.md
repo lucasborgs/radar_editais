@@ -12,6 +12,9 @@ tags:
 
 > Habilitado no desenvolvimento de Tecnologias Metal-Mecânica,s a Faculdade de Engenharia Mecânica (FEMEC) da Universidade Federal de Uberlândia (UFU) é credenciada pela EMBRAPII atuando nas linhas de Tecnologias de União (Soldagem) , Reparo e Adição , Tecnologias de Superfícies e…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 

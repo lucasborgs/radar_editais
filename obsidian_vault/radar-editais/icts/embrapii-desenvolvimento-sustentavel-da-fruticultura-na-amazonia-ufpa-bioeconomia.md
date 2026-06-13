@@ -12,6 +12,9 @@ tags:
 
 > A UFPA – BIOECONOMIA é uma Unidade EMBRAPII credenciada para atuar na área de Desenvolvimento Sustentável da Fruticultura na Amazônia, com foco em tecnologias e soluções em campo para produção sustentável de frutas, e inovações em processos industriais e produtos para o…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

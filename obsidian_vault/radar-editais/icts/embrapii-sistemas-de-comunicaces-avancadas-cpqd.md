@@ -13,6 +13,9 @@ tags:
 
 > CPQD | Unidade Embrapii em Conectividade e Transformação Digital O CPQD é uma Unidade Embrapii credenciada desde 2014, com foco em Conectividade e Transformação Digital. Essa atuação, baseada na convergência de tecnologias, permite atender às necessidades de empresas de…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]

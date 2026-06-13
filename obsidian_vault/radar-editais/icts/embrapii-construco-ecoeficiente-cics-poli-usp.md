@@ -12,6 +12,9 @@ tags:
 
 > A Unidade EMBRAPII de Construção Ecoeficiente | CICS Poli USP atua, desde 2016, na área de competência de Construção Ecoeficiente, sublinhas de Materiais de construção e de Componentes e sistemas construtivos, desenvolvendo produtos e processos inovadores para empresas…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 

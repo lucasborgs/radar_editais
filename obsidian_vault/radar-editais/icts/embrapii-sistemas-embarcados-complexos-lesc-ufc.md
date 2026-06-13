@@ -13,6 +13,9 @@ tags:
 
 > Especializado em Projetos de Pesquisa em Hardware e Sistemas de Computação. Laboratório de Engenharia de Sistemas Computação da Universidade Federal do Ceará. Fundado em 2003, o LESC desenvolve pesquisas nas áreas de sistemas embarcados, microeletrônica, sistemas tolerantes a…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]

@@ -12,6 +12,9 @@ tags:
 
 > Há mais de 20 anos a FITec BH promove transformação digital na indústria. Como Unidade Embrapii somos referência em Sistemas de Visão Computacional, Inteligência Artificial e Conectividade, possibilitando atender as empresas para o desenvolvimento de soluções de inovação…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

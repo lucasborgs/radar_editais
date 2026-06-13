@@ -12,6 +12,9 @@ tags:
 
 > O Centro de Engenharia Elétrica e Informática (CEEI) da Universidade Federal de Campina Grande (UFCG) desenvolve, como Unidade EMBRAPII, projetos na área de Software e Automação. A UE CEEI-UFCG tem mais de 130 projetos contratados com mais de 70 empresas parceiras da indústria,…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

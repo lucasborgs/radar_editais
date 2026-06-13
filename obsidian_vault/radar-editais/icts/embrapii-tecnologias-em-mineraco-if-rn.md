@@ -11,6 +11,9 @@ tags:
 
 > O Centro de Referência em Tecnologia Mineral do IFRN (CRTM/IFRN) é uma Unidade EMBRAPII credenciada para atuar na área de Tecnologias em Mineração, com foco nas áreas de Exploração Mineral especializada em Minerais Portadores do Futuro e Soluções Tecnológicas Inovadoras em…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Áreas de expertise
 - Exploração Mineral Especializada em Minerais Portadores do Futuro
 - Soluções Tecnológicas Inovadoras em Geometalurgia

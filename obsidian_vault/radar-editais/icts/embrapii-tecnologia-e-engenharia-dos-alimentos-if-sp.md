@@ -12,6 +12,9 @@ tags:
 
 > A Unidade EMBRAPII IFSP Matão é uma Unidade EMBRAPII credenciada para atuar na área de Tecnologia e Engenharia de Alimentos, com foco na pesquisa e desenvolvimento de processos e métodos de análises, no desenvolvimento de novos produtos, e também no manejo de resíduos,…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

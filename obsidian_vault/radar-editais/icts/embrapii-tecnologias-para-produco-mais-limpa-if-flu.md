@@ -13,6 +13,9 @@ tags:
 
 > O Polo de Inovação Campos dos Goytacazes (PICG) é uma unidade credenciada para atuar em Tecnologias para Produção Mais Limpa (P+L), nas subáreas: Eficiência Energética e Fontes Renováveis de Energia; Redução, Tratamento e Reaproveitamento de Resíduos; e Uso Racional de Recursos…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]

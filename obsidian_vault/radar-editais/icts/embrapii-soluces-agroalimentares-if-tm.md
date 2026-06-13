@@ -12,6 +12,9 @@ tags:
 
 > A Unidade EMBRAPII IFTM ( Instituto Federal de Educação, Ciência e Tecnologia do Triângulo Mineiro ) Soluções Agroalimentares, sediada em Uberaba-MG, tem como missão oferecer soluções para agricultura, pecuária, indústria de alimentos e outros setores que integram o setor…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

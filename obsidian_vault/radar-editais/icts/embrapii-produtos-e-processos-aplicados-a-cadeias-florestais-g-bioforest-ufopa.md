@@ -12,6 +12,9 @@ tags:
 
 > G-Bioforest: Impulsionando a Bioeconomia Florestal – Transforme o Futuro do Seu Negócio na Amazônia com Nossas Soluções Inovadoras Nossas Áreas de Atuação: Na unidade Bioforest, somos especializados em encontrar soluções para desenvolvimento de produtos e dirimir gargalos…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

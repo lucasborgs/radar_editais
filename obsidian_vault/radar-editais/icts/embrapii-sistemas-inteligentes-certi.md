@@ -12,6 +12,9 @@ tags:
 
 > A CERTI (Fundação Centros de Referência em Tecnologias Inovadoras) é credenciada pela EMBRAPII para atendimento na área de Sistemas Inteligentes para desenvolvimento de projetos em sistemas mecatrônicos, software para sistemas inteligentes e sistemas de manufatura. Atua de…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

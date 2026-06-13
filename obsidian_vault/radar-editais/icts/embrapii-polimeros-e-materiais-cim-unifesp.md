@@ -12,6 +12,9 @@ tags:
 
 > O Centro de Inovação em Materiais da Universidade Federal de São Paulo (CIM-Unifesp) é uma unidade EMBRAPII credenciada em 2020 para atuar na área de materiais poliméricos, compósitos, materiais metálicos, nanomateriais e processos de fabricação. O grupo de materiais do…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 

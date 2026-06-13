@@ -12,6 +12,9 @@ tags:
 
 > A Unidade Embrapii Metrópole Digital, vinculada à Universidade Federal do Rio Grande do Norte (UFRN), assume uma posição singular no cenário brasileiro como centro acadêmico e tecnológico. O cerne de sua missão consiste em impulsionar o desenvolvimento de um sólido polo…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

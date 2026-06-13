@@ -12,6 +12,9 @@ tags:
 
 > A Unidade Embrapii LSI-TEC desenvolve projetos em Internet das Coisas (IoT) e Manufatura 4.0, contando com uma infraestrutura moderna e eficiente. Esta infraestrutura inclui estações de trabalho, servidores, rede e ferramentas de projeto, bem como ferramentas EDA para projeto de…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

@@ -13,6 +13,9 @@ tags:
 
 > O Instituto Federal da Paraíba é uma instituição centenária com forte vínculo com a indústria desde a sua origem, tendo sido denominada inclusive como Escola Técnica Industrial ao longo da sua história. No início dos anos 1960, a já então Escola Técnica Federal da Paraíba…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]

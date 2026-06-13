@@ -13,6 +13,9 @@ tags:
 
 > O Instituto SENAI de Inovação em Engenharia de Polímeros é uma unidade credenciada pela Embrapii para desenvolver projetos de PD&I, na área de competência Polímeros, tendo como foco nas sub-áreas Elastômeros (Borrachas), Plásticos, Compósitos, Tintas e Adesivos. O mesmo conta…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]

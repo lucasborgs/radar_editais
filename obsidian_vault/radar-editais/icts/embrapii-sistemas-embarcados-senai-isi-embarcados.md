@@ -13,6 +13,9 @@ tags:
 
 > O Instituto SENAI de Inovação em Sistemas Embarcados (ISI-SE), localizado em Florianópolis – SC, atua junto à indústria nacional no desenvolvimento e aplicação de conhecimento nas áreas de Dispositivos e equipamentos para computação embarcada, Sistemas de aquisição e controle e…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]

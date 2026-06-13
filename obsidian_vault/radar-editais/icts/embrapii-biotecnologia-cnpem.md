@@ -14,6 +14,9 @@ tags:
 
 > Unidade EMBRAPII de BIOTECNOLOGIA | CNPEM – Centro Nacional de Pesquisa em Energia e Materiais AREA DE ATUAÇÃO O Centro Nacional de Pesquisa em Energia e Materiais (CNPEM) é uma unidade EMBRAPII com infraestrutura de ponta e profissionais qualificados que atua no desenvolvimento…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]

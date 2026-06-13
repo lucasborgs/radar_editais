@@ -13,6 +13,9 @@ tags:
 
 > A Unidade Embrapii TecnoGreen é resultado da união de pesquisadores da Escola Politécnica da USP nas diversas áreas de Engenharia. Há pelo menos 25 anos, são desenvolvidos projetos de PD&I em parceria com indústrias de diversos setores visando melhorar a competitividade. A…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]

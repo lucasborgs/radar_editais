@@ -12,6 +12,9 @@ tags:
 
 > A Escola Superior de Agricultura “Luiz de Queiroz” (ESALQ) da Universidade de São Paulo (USP), em Piracicaba, é Unidade EMBRAPII credenciada para atuar com Biocontroladores e processos biotecnológicos no manejo sustentável de pragas agrícolas . A unidade ESALQ é um centro de…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

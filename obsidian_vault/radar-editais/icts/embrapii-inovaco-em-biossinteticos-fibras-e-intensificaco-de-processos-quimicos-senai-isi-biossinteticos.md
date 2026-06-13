@@ -12,6 +12,9 @@ tags:
 
 > O Instituto SENAI de Inovação em Biossintéticos e Fibras do SENAI CETIQT (ISI B&F) é uma Unidade Embrapii credenciada para atuar na área de Biologia Sintética, Fibras e Intensificação de Processos Químicos. O foco da Unidade é no desenvolvimento de novos materiais e moléculas,…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

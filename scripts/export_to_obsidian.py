@@ -292,6 +292,13 @@ def ict_note(ict: dict, subfolder: str = "radar-editais") -> str:
         lines.append(f"> {snippet}")
         lines.append("")
 
+    # Fonte = agência da entidade (EMBRAPII), análogo ao nó-fonte dos editais —
+    # dá um nó-pai que agrupa todas as unidades (ponto 3 do feedback de grafo).
+    src = source_of(iid)
+    lines.append("## Fonte")
+    lines.append(f"- [[{subfolder}/fontes/{src}|{src.upper()}]]")
+    lines.append("")
+
     # Temas → nós compartilhados com os editais (a ponte evento↔entidade)
     if themes:
         lines.append("## Temas de atuação")
@@ -328,6 +335,28 @@ def ict_note(ict: dict, subfolder: str = "radar-editais") -> str:
             lines.append(f"| {label} | {val} |")
         lines.append("")
 
+    return "\n".join(lines)
+
+
+def fonte_entidade_note(label: str, icts: list[dict], subfolder: str = "radar-editais") -> str:
+    """Nó-fonte de uma agência de entidades (ex.: EMBRAPII) — agrupa as unidades
+    sob um nó-pai, análogo aos nós-fonte dos editais (ponto 3 do feedback de grafo)."""
+    lines = ["---"]
+    lines.append(f'title: "{safe_yaml_str(label)}"')
+    lines.append("tags:")
+    lines.append("  - fonte-recurso")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# 💰 Fonte: {label}")
+    lines.append("")
+    lines.append(f"**{len(icts)} ICTs** credenciadas por esta agência.")
+    lines.append("")
+    lines.append("## ICTs")
+    lines.append("")
+    for ict in icts:
+        name = ict.get("name", ict["id"])
+        lines.append(f"- 🔬 [[{subfolder}/icts/{_edital_slug(ict['id'])}|{name}]]")
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -652,6 +681,16 @@ def export(vault_path: Path, subfolder: str = "radar-editais") -> None:
     n_fontes = 0
     for src, editais_ids in agencia_index.items():
         content = fonte_note(src.upper(), editais_ids, edital_by_id, subfolder)
+        note_path = base / "fontes" / f"{src}.md"
+        note_path.write_text(content, encoding="utf-8")
+        n_fontes += 1
+
+    # Nós-fonte das entidades (agrupa ICTs sob o nó-pai da agência, ex.: EMBRAPII).
+    icts_by_source: dict[str, list[dict]] = {}
+    for ict in icts:
+        icts_by_source.setdefault(source_of(ict["id"]), []).append(ict)
+    for src, src_icts in icts_by_source.items():
+        content = fonte_entidade_note(src.upper(), src_icts, subfolder)
         note_path = base / "fontes" / f"{src}.md"
         note_path.write_text(content, encoding="utf-8")
         n_fontes += 1

@@ -12,6 +12,9 @@ tags:
 
 > A FarmaVax é uma unidade Embrapii que engloba quatro Centros Institucionais de Tecnologia e Inovação da Universidade Federal de Minas Gerais (UFMG), sendo eles: Medicina Molecular, Nanobiomateriais, Terapias Avançadas e Inovadoras e Vacinas. Ela tem como objetivo atender às…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 

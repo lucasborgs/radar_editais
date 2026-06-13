@@ -12,6 +12,9 @@ tags:
 
 > Agrotec – Bioeconomia no Agronegócio nasceu em 26 de outubro de 2021 quando a Universidade Federal de Mato Grosso do Sul (UFMS) foi credenciada como uma Unidade Embrapii. Credenciada na área de Tecnologias Aplicadas , a unidade atua no segmento da bioeconomia desenvolvendo…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

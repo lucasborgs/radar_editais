@@ -12,6 +12,9 @@ tags:
 
 > O Instituto SENAI de Inovação em Manufatura e Laser em Joinville-SC é uma Unidade Embrapii credenciada para atuar na área de Mecânica e Manufatura na área de competência de Tecnologias Avançadas de Manufatura, Laser e Robótica, é constituída por cinco sub linhas, quais sejam,…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 

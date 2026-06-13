@@ -12,6 +12,9 @@ tags:
 
 > O Instituto Tecgraf/PUC-Rio é credenciado como Unidade Embrapii na área de Soluções Computacionais em Engenharia, para desenvolver sistemas computacionais técnico-científicos complexos que exigem pesquisa avançada e soluções inovadoras abrangendo as competências: Computação…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]
 

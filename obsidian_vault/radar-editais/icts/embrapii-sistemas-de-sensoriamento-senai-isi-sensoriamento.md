@@ -12,6 +12,9 @@ tags:
 
 > O Instituto SENAI de Inovação de Sistemas de Sensoriamento é uma unidade credenciada pela Embrapii para desenvolver projetos de PD&I com foco em três temas: desenvolvimento e integração de sensores, desenvolvimento de sistemas de visão computacional e desenvolvimento de sistemas…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

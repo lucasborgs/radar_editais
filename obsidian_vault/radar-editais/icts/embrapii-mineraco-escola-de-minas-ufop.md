@@ -11,6 +11,9 @@ tags:
 
 > A unidade UFOP Escola de Minas é uma Unidade EMBRAPII credenciada para atuar na cadeia produtiva de mineração focada em mineração sustentável. A unidade EMBRAPII UFOP Escola de Minas visa a propiciar uma relação de confiança entre o setor mineral e a sociedade via atividades de…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Áreas de expertise
 - Operações Sustentáveis de Mina
 - Processos Sustentáveis na Mineração
