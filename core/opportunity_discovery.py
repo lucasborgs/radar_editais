@@ -109,8 +109,15 @@ _TRIAGE_SYSTEM = (
     "portal/agregador de editais ('editais abertos', 'oportunidades'), homepage "
     "de programa/agência, ou notícia que anuncia VÁRIOS editais de uma vez — "
     "essas páginas não viram um registro útil (1 URL = 1 oportunidade). "
+    "MAS sinalize is_hub=true SÓ no caso específico de um PORTAL DE INOVAÇÃO ABERTA "
+    "de uma empresa/aceleradora que LISTA MÚLTIPLOS DESAFIOS TECNOLÓGICOS concretos, "
+    "cada um com sua própria página de detalhe (ex.: 'inovação aberta', 'desafios "
+    "tecnológicos', 'challenges') — esses valem um crawl raso pra extrair cada "
+    "desafio. is_hub=false para agregador genérico de editais públicos, lista de "
+    "notícias ou homepage institucional. "
     "Responda só JSON: "
-    '{"is_opportunity": true|false, "agency": "sigla/nome curto da agência ou \\"\\""}.'
+    '{"is_opportunity": true|false, "is_hub": true|false, '
+    '"agency": "sigla/nome curto da agência ou \\"\\""}.'
 )
 
 
@@ -123,10 +130,11 @@ def _triage(hit: websearch.SearchHit, client, model) -> dict:
             max_tokens=200,
         )
         return {"is_opportunity": bool(data.get("is_opportunity")),
+                "is_hub": bool(data.get("is_hub")),
                 "agency": (data.get("agency") or "").strip()}
     except Exception as e:
         logger.warning("triagem falhou (%s): %s", hit.url, e)
-        return {"is_opportunity": False, "agency": ""}
+        return {"is_opportunity": False, "is_hub": False, "agency": ""}
 
 
 def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, model) -> dict | None:
@@ -232,6 +240,81 @@ def _is_dedicated_source(url: str) -> bool:
     return any(host == d or host.endswith("." + d) for d in _DEDICATED_SOURCE_DOMAINS)
 
 
+# =============================================================================
+# Crawl de hub (1 nível) — portais de inovação aberta listam vários desafios em
+# links-filho que a torneira de 1-URL-1-oportunidade nunca explorava (o nó-hub
+# ficava pobre). Quando a triagem marca is_hub, fazemos fan-out raso: cada
+# desafio-filho vira um candidato normal (passa por triagem + extração). Gated
+# por DISCOVERY_HUB_CRAWL_ENABLED (= padrão dos outros geradores). Determinístico
+# e capado — sem agente, sem profundidade > 1.
+# =============================================================================
+
+# Slugs que sinalizam página de desafio/chamada num link-filho (além do "está sob
+# o caminho do hub"). Conservador: o filho ainda passa pela triagem LLM depois.
+_HUB_CHILD_KEYWORDS = (
+    "desafio", "challenge", "edital", "chamada", "inscri", "oportunidade",
+)
+# Teto defensivo de hubs expandidos por execução — o custo real é triagem +
+# extração de CADA filho; este cap × max_hub_children limita o blow-up.
+_MAX_HUBS_PER_RUN = 5
+
+
+def _hub_child_hits(
+    hub_url: str, links: list[dict], known_norm: set[str], max_children: int,
+) -> list[websearch.SearchHit]:
+    """Dos links de um hub ({text, href}), devolve SearchHits dos desafios-filho
+    plausíveis: MESMO domínio, sob o caminho do hub OU com slug de desafio/chamada,
+    deduplicados e capados. Pura (sem rede) — testável com uma lista de links."""
+    from urllib.parse import urljoin, urlsplit
+
+    hub = urlsplit(hub_url)
+    hub_host = hub.netloc.lower()
+    hub_path = hub.path.rstrip("/")
+    out: list[websearch.SearchHit] = []
+    seen: set[str] = set()
+    for link in links:
+        href = (link.get("href") or "").strip()
+        text = (link.get("text") or "").strip()
+        if not href:
+            continue
+        absu = urljoin(hub_url, href)
+        parts = urlsplit(absu)
+        if parts.scheme not in ("http", "https") or parts.netloc.lower() != hub_host:
+            continue  # só http(s) do mesmo domínio do hub
+        path = parts.path.rstrip("/")
+        if not path or path == hub_path:
+            continue  # raiz ou o próprio hub
+        under_hub = bool(hub_path) and path.startswith(hub_path + "/")
+        keyworded = any(kw in (path + " " + text).lower() for kw in _HUB_CHILD_KEYWORDS)
+        if not (under_hub or keyworded):
+            continue
+        nu = _norm_url(absu)
+        if nu in known_norm or nu in seen or _is_social(absu) or _is_dedicated_source(absu):
+            continue
+        seen.add(nu)
+        out.append(websearch.SearchHit(
+            title=text or path.split("/")[-1], url=absu, snippet=text, content="",
+        ))
+        if len(out) >= max_children:
+            break
+    return out
+
+
+def _expand_hub(
+    hit: websearch.SearchHit, known_norm: set[str], max_children: int,
+) -> list[websearch.SearchHit]:
+    """Fetcha o HTML do hub e extrai os desafios-filho (1 nível). [] em falha."""
+    try:
+        from core.llm.agent_tools.profile_tools import _fetch_and_parse
+        data = _fetch_and_parse(hit.url) or {}
+    except Exception as e:
+        logger.warning("hub-crawl: falha ao buscar hub %s: %s", hit.url, e)
+        return []
+    children = _hub_child_hits(hit.url, data.get("links", []), known_norm, max_children)
+    logger.info("hub-crawl: %s → %d desafios-filho", hit.url, len(children))
+    return children
+
+
 def _load_ledger() -> set[str]:
     """Ledger via kg_store (blob `discovery_ledger`, {"urls": [...]}) ∪ ledger
     file-based legado, se existir — migração por união: o legado é absorvido no
@@ -275,6 +358,8 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     k = int(cfg.get("max_results_per_query", 8))
     max_cand = int(cfg.get("max_candidates", 40))
     max_dou = int(cfg.get("max_dou_candidates", 80))
+    max_hub_children = int(cfg.get("max_hub_children", 8))
+    hub_enabled = os.getenv("DISCOVERY_HUB_CRAWL_ENABLED", "0") == "1"
     if not queries:
         logger.warning("descoberta: sem queries em wikis/_discovery.md")
         return []
@@ -334,9 +419,31 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         logger.warning("descoberta: sem credencial LLM — abortando triagem/extração")
         return []
 
+    # Fila (hit, depth): candidatos de busca são depth 0; desafios-filho de um
+    # hub entram em depth 1 e NÃO re-expandem (crawl de 1 nível, sem loop). Quando
+    # hub_enabled=False a fila se comporta exatamente como o loop antigo.
     records: list[dict] = []
-    for h in candidates:
+    queue: list[tuple[websearch.SearchHit, int]] = [(h, 0) for h in candidates]
+    hubs_expanded = 0
+    i = 0
+    while i < len(queue):
+        h, depth = queue[i]
+        i += 1
         verdict = _triage(h, tri_client, tri_model)
+        # Hub de inovação aberta (só depth 0): em vez de descartar, faz fan-out
+        # raso — cada desafio-filho vira candidato normal (passa por triagem +
+        # extração e classifica opportunity_type=desafio na extração).
+        if (hub_enabled and depth == 0 and verdict.get("is_hub")
+                and hubs_expanded < _MAX_HUBS_PER_RUN):
+            hubs_expanded += 1
+            for child in _expand_hub(h, known | seen_now, max_hub_children):
+                nu = _norm_url(child.url)
+                if nu in seen_now:
+                    continue
+                seen_now.add(nu)
+                queue.append((child, 1))
+            if not verdict["is_opportunity"]:
+                continue  # o hub em si raramente é UMA oportunidade
         if not verdict["is_opportunity"]:
             continue
         page_text = _page_text(h)
