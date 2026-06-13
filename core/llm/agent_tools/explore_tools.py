@@ -21,19 +21,46 @@ Princípios:
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING
 
 from core.kg import kg_store
 from core.llm.agent_runtime import Tool, tool
 
+# Stopwords PT/EN + conectivos que não discriminam tema (não devem casar
+# sozinhos). Termos curtos como "ia"/"ai" caem pelo corte de tamanho (<4).
+_THEME_STOPWORDS = {
+    "de", "da", "do", "das", "dos", "e", "em", "no", "na", "nos", "nas",
+    "para", "por", "com", "sem", "ou", "the", "of", "for", "and", "que",
+    "uma", "um", "sobre", "como",
+}
+
+
+def _theme_tokens(text: str) -> list[str]:
+    """Tokens significativos (≥4 chars, sem stopwords), lowercase."""
+    raw = re.findall(r"\w+", (text or "").lower(), flags=re.UNICODE)
+    return [t for t in raw if len(t) >= 4 and t not in _THEME_STOPWORDS]
+
 
 def _theme_match(needle: str, themes: list[str]) -> bool:
-    """Match case-insensitive por substring do tema/setor (needle) nos temas de
-    um nó. Vazio = casa tudo (sem filtro)."""
+    """Casa uma query de tema (needle) contra os temas/setores de um nó. Vazio =
+    casa tudo (sem filtro).
+
+    Tolerante a linguagem natural: além do substring direto, casa por TOKEN
+    BIDIRECIONAL — qualquer token significativo (≥4 chars) da query que seja
+    substring de um token do tema, ou vice-versa. Assim 'IA em saúde' casa
+    'saúde e ciências da vida' (via 'saúde') e 'IA no agronegócio' casa 'agro,
+    bioeconomia e alimentos' (via agro⊂agronegócio). Recall-first: o explore
+    prefere oferecer demais a devolver vazio para uma pergunta razoável."""
     n = (needle or "").strip().lower()
     if not n:
         return True
-    return any(n in (t or "").lower() for t in themes)
+    blob = " ".join(t or "" for t in themes).lower()
+    if n in blob:  # caminho rápido: substring direto
+        return True
+    ntoks = _theme_tokens(n)
+    ttoks = _theme_tokens(blob)
+    return any(nt in tt or tt in nt for nt in ntoks for tt in ttoks)
 
 if TYPE_CHECKING:
     from core.services.kg_match_service import KGMatchService
@@ -64,17 +91,19 @@ def build_explore_tools(service: KGMatchService) -> list[Tool]:
 
         Args:
             status: "ABERTA" | "ENCERRADA" | "" (vazio = todos)
-            tema: substring case-insensitive nos temas do edital;
+            tema: palavra-chave ou tema (casa por token, tolerante a frase —
+                  ex.: "IA em saúde" casa "saúde e ciências da vida");
                   "" = nenhum filtro de tema
             limit: máximo de editais a listar (default 20, max 50)
         """
         limit = max(1, min(int(limit), 50))
         try:
-            editais = service.list_editais(
-                status=status or None,
-                tema=tema or None,
-                limit=limit,
-            )
+            # Filtro de tema robusto (token bidirecional) no lado da tool — não
+            # delega o `tema` ao service (substring-direto, frágil p/ frase).
+            editais = service.list_editais(status=status or None, limit=200)
+            if tema:
+                editais = [e for e in editais if _theme_match(tema, e.get("themes", []))]
+            editais = editais[:limit]
         except Exception as e:
             return f"Erro ao listar editais: {e}."
 
@@ -278,7 +307,8 @@ def build_explore_tools(service: KGMatchService) -> list[Tool]:
         específico, prefira find_ict_partners.
 
         Args:
-            tema: substring case-insensitive nos temas da ICT; "" = todas
+            tema: palavra-chave ou tema (casa por token, tolerante a frase);
+                  "" = todas
             limit: máximo a listar (default 20, max 50)
         """
         limit = max(1, min(int(limit), 50))
@@ -304,7 +334,8 @@ def build_explore_tools(service: KGMatchService) -> list[Tool]:
         (resumo), estágio-alvo e site.
 
         Args:
-            tema: substring case-insensitive nos temas/setores da tese; "" = todos
+            tema: palavra-chave ou tema (casa por token, tolerante a frase);
+                  "" = todos
             limit: máximo a listar (default 20, max 50)
         """
         limit = max(1, min(int(limit), 50))
@@ -337,12 +368,14 @@ def build_explore_tools(service: KGMatchService) -> list[Tool]:
         com get_edital, list_icts ou list_investidores conforme o interesse.
 
         Args:
-            tema: substring case-insensitive do tema/setor (ex.: "agro", "saúde")
+            tema: palavra-chave ou tema; casa por token e tolera frase natural
+                  (ex.: "agro", "saúde", "IA em saúde", "IA no agronegócio")
         """
         out: list[str] = [f"Panorama de oportunidades em '{tema}':"]
-        # Eventos (editais/desafios/programas vêm do índice via list_editais)
+        # Eventos (editais/desafios/programas) — filtro de tema robusto na tool.
         try:
-            editais = service.list_editais(status="ABERTA", tema=tema or None, limit=10)
+            abertos = service.list_editais(status="ABERTA", limit=200)
+            editais = [e for e in abertos if _theme_match(tema, e.get("themes", []))]
         except Exception:
             editais = []
         out.append(f"\n📋 Editais/desafios abertos ({len(editais)}):")
