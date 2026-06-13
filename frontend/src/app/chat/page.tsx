@@ -37,6 +37,7 @@ import { ConversationSidebar } from "@/components/layout/ConversationSidebar";
 import { ModelTierSelector } from "@/components/ui/ModelTierSelector";
 import { MentionsTextarea } from "@/components/ui/MentionsTextarea";
 import { PendingUserInputPrompt } from "@/components/writing/PendingUserInputPrompt";
+import { AttachToLibrary } from "@/components/writing/AttachToLibrary";
 import { DocumentCanvas } from "@/components/writing/DocumentCanvas";
 import type { ChecklistItem } from "@/components/writing/ChecklistPanel";
 import { ChatBubble } from "@/components/chat/ChatBubble";
@@ -588,6 +589,19 @@ function WritingPageInner() {
                 />
               </div>
               <div className="flex gap-2">
+                {/* 📎 Anexa arquivo à biblioteca (mesmo caminho da /library); fica
+                    disponível para @ menção logo após o upload. */}
+                <AttachToLibrary
+                  token={authToken}
+                  disabled={!sessionId || loading}
+                  onAttached={(item) =>
+                    setInput((prev) =>
+                      prev.endsWith(" ") || prev === ""
+                        ? `${prev}@${item.id} `
+                        : `${prev} @${item.id} `
+                    )
+                  }
+                />
                 <MentionsTextarea
                   rows={2}
                   value={input}
