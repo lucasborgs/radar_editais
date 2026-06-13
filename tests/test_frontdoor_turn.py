@@ -48,7 +48,12 @@ def test_frontdoor_turn_empty_message_422():
     from backend.routers.frontdoor import FrontdoorTurnRequest, frontdoor_turn
 
     with pytest.raises(HTTPException) as exc:
-        frontdoor_turn(_fake_request(), FrontdoorTurnRequest(message="   "))
+        frontdoor_turn(
+            _fake_request(),
+            FrontdoorTurnRequest(message="   "),
+            user_id=None,
+            db=None,
+        )
     assert exc.value.status_code == 422
 
 
@@ -79,10 +84,16 @@ def test_frontdoor_turn_short_message_no_diff(monkeypatch):
     )
 
     out = frontdoor.frontdoor_turn(
-        _fake_request(), frontdoor.FrontdoorTurnRequest(message="oi?"),
+        _fake_request(),
+        frontdoor.FrontdoorTurnRequest(message="oi?"),
+        user_id=None,
+        db=None,
     )
     assert out["answer"] == "resposta curta"
     assert out["profile_diff"] is None
+    # Anônimo: nada persiste, response sem session_id/entry_ids.
+    assert "session_id" not in out
+    assert "entry_ids" not in out
 
 
 # ============================================================================
