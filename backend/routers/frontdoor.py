@@ -13,6 +13,7 @@ junto com o tier barato do extrator de diff — B5).
 
 from __future__ import annotations
 
+import logging
 import os
 
 from fastapi import APIRouter, HTTPException, Request
@@ -20,7 +21,12 @@ from pydantic import BaseModel
 
 from backend.common import CompanyProfileSchema, kg_service
 from backend.rate_limit import limiter
+from core.auth import OptionalDbClient, OptionalUserId
 from core.profile_extractor import ProfileExtractor
+from core.services.content_library import get_workspace_id
+from core.services.writing_session import persist_frontdoor_turn
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["frontdoor"])
 
@@ -30,6 +36,9 @@ class FrontdoorTurnRequest(BaseModel):
     history: list[dict] = []
     # Perfil parcial mantido pelo cliente (localStorage no anônimo). Opcional.
     profile: CompanyProfileSchema | None = None
+    # Retomada de conversa (usuário logado): quando presente, o turno é anexado
+    # à conversa existente em vez de criar uma nova. Ignorado no anônimo.
+    session_id: str | None = None
 
 
 def _profile_context_block(profile: CompanyProfileSchema | None) -> str:
@@ -57,10 +66,23 @@ def _profile_context_block(profile: CompanyProfileSchema | None) -> str:
     return "[Perfil parcial da empresa do usuário] " + " · ".join(filled)
 
 
-@router.post("/frontdoor/turn", summary="Turno do front-door: resposta + proposta de diff de perfil (público)")
+@router.post("/frontdoor/turn", summary="Turno do front-door: resposta + proposta de diff de perfil (auth opcional)")
 @limiter.limit("10/minute")
-def frontdoor_turn(request: Request, req: FrontdoorTurnRequest):
+def frontdoor_turn(
+    request: Request,
+    req: FrontdoorTurnRequest,
+    user_id: OptionalUserId,
+    db: OptionalDbClient,
+):
     """Um turno da conversa da porta de entrada.
+
+    Auth é OPCIONAL (porta pública, rate-limit por IP inalterado):
+      - Anônimo (sem JWT): comportamento de hoje byte a byte — nada persiste, a
+        response NÃO carrega session_id/entry_ids (o front usa sessionStorage).
+      - Logado: a conversa é persistida (kind='frontdoor'), retomável via
+        session_id. A persistência é tolerante a falha — se o DB cair, logamos
+        um warning e devolvemos a resposta normal (a conversa vale mais que o
+        histórico, spec fase 2).
 
     `answer`: reusa o caminho do `kg_explore` (mesma flag de agente). O perfil
     parcial entra como um bloco de contexto leve prefixado à mensagem (seam
@@ -87,4 +109,24 @@ def frontdoor_turn(request: Request, req: FrontdoorTurnRequest):
     current = req.profile.model_dump() if req.profile is not None else {}
     diff = ProfileExtractor().extract_diff_from_message(message, current)
 
-    return {"answer": answer, "profile_diff": diff or None}
+    response: dict = {"answer": answer, "profile_diff": diff or None}
+
+    # Persistência só no caminho autenticado. db pode ser None mesmo logado em
+    # cenários degenerados; guardamos contra isso. Falha NÃO derruba o turno.
+    if user_id is not None and db is not None:
+        try:
+            workspace_id = get_workspace_id(db, user_id)
+            persisted = persist_frontdoor_turn(
+                db=db,
+                workspace_id=workspace_id,
+                user_message=message,
+                assistant_message=answer,
+                profile_diff=diff or None,
+                session_id=req.session_id,
+            )
+            response["session_id"] = persisted["session_id"]
+            response["entry_ids"] = persisted["entry_ids"]
+        except Exception as e:
+            logger.warning("Falha ao persistir turno do front door (segue sem histórico): %s", e)
+
+    return response
