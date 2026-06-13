@@ -6,14 +6,19 @@ tags:
   - embrapii
   - ict
   - tema/materiais-quimica-e-manufatura-avancada
+  - tema/energia-e-transicao-sustentavel
 ---
 
 # 🔬 ICT: CICS Poli-USP
 
 > A Unidade EMBRAPII de Construção Ecoeficiente | CICS Poli USP atua, desde 2016, na área de competência de Construção Ecoeficiente, sublinhas de Materiais de construção e de Componentes e sistemas construtivos, desenvolvendo produtos e processos inovadores para empresas…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
+- [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 
 ## Áreas de expertise
 - Componentes e sistemas construtivos

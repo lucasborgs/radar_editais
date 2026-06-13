@@ -12,6 +12,9 @@ tags:
 
 > O Departamento de Engenharia Florestal (DEF) da Universidade Federal de Viçosa (UFV) é uma Unidade Embrapii credenciada para atuar na área de Fibras Florestais com foco em: Produção e qualidade das fibras florestais; Conversão das fibras florestais em materiais e produtos;…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

@@ -13,6 +13,9 @@ tags:
 
 > A Unidade Embrapii do Instituto Federal de Santa Catarina (UE IFSC) – Campus Florianópolis é credenciada como Unidade Embrapii na área de competência em Sistemas Inteligentes de Energia envolvendo pesquisadores e infraestrutura pertencentes aos cursos de graduação em Engenharia…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]

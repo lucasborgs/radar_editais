@@ -7,15 +7,20 @@ tags:
   - ict
   - tema/energia-e-transicao-sustentavel
   - tema/agro-bioeconomia-e-alimentos
+  - tema/saude-e-ciencias-da-vida
 ---
 
 # 🔬 ICT: EMBRAPA AGROENERGIA
 
 > A Embrapa Agroenergia é credenciada pela EMBRAPII para desenvolver projetos em parceria com o setor industrial em biotecnologia com foco em bioquímica de renováveis. É um centro de pesquisa e inovação dedicado a desenvolver soluções tecnológicas inovadoras para a conversão…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
+- [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 
 ## Áreas de expertise
 - Biocombustíveis e Bioprodutos

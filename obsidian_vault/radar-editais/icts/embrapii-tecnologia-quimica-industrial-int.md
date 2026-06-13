@@ -13,6 +13,9 @@ tags:
 
 > Diante do histórico de desenvolvimento de projetos inovadores, desde a sua fundação em 1921, o Instituto Nacional de Tecnologia (INT) é a unidade de pesquisa pioneira do Ministério da Ciência, Tecnologia e Inovações (MCTI), credenciada, desde o início do Programa EMBRAPII em…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]

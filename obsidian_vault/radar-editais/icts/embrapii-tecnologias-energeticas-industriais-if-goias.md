@@ -12,6 +12,9 @@ tags:
 
 > A Unidade EMBRAPII de Eficiência Energética IFG – Instituto Federal de Goiás, credenciada por intermédio do Centro de Referência em Pesquisa e Inovação (CiteLab) da Instituição, é uma unidade EMBRAPII com atuação na área de Tecnologias Energéticas Industriais, com foco nas áreas…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 

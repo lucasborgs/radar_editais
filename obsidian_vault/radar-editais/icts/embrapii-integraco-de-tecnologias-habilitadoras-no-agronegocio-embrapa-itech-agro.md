@@ -13,6 +13,9 @@ tags:
 
 > A Unidade Embrapii ITECH-Agro/Embrapa Instrumentação – “Integração de Tecnologias Habilitadoras no Agronegócio” foi credenciada em julho de 2023. Atua no desenvolvimento de materiais avançados e insumos nanotecnológicos e biotecnológicos para o agronegócio; sensores,…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]

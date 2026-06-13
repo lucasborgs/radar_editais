@@ -12,6 +12,9 @@ tags:
 
 > A Unidade EMBRAPII DCC/UFMG (Departamento de Ciência da Computação da Universidade Federal de Minas Gerais) é credenciada pela EMBRAPII para atuar na área de Software para Sistemas Ciberfísicos, desenvolvendo projetos que integram soluções em diversos segmentos industriais, nas…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 

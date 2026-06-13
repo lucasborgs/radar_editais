@@ -12,6 +12,9 @@ tags:
 
 > A InovaAgro – é uma Unidade EMBRAPII credenciada para atuar na área de Tecnologias para a Agricultura, com foco nas áreas de Tecnologias para proteção de cultivos, Tecnologia para produção de cultivos e qualidade de qualidade grãos e Equipamentos, máquinas agrícolas e irrigação.…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

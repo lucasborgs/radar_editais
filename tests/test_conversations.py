@@ -28,7 +28,6 @@ from fastapi import HTTPException  # noqa: E402
 
 from backend.rate_limit import limiter  # noqa: E402
 
-
 # =============================================================================
 # Fake Supabase client (query-builder em memória)
 # =============================================================================
@@ -97,7 +96,7 @@ class _Query:
 
 
 class _Table:
-    def __init__(self, db: "FakeDb", name: str):
+    def __init__(self, db: FakeDb, name: str):
         self._db = db
         self._name = name
 

@@ -7,15 +7,20 @@ tags:
   - ict
   - tema/saude-e-ciencias-da-vida
   - tema/energia-e-transicao-sustentavel
+  - tema/agro-bioeconomia-e-alimentos
 ---
 
 # 🔬 ICT: IPT-Bio
 
 > Desde 2014 atuando como Unidade EMBRAPII na área de Materiais de Alto Desempenho, o Instituto de Pesquisas Tecnológicas (IPT) foi novamente credenciado, em 2016, para desenvolver projetos na área de Biotecnologia. As técnicas de biotecnologia trazem novas perspectivas para a…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
+- [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 
 ## Áreas de expertise
 - Biofármacos e farmoquímicos

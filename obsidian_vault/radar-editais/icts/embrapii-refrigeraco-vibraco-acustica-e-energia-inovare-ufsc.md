@@ -5,15 +5,22 @@ link: https://embrapii.org.br/unidades/refrigeraco-vibraco-acustica-e-energia-in
 tags:
   - embrapii
   - ict
+  - tema/materiais-quimica-e-manufatura-avancada
   - tema/energia-e-transicao-sustentavel
+  - tema/tecnologias-digitais-e-conectividade
 ---
 
 # 🔬 ICT: inoVARE/UFSC
 
 > A Unidade EMBRAPII inoVARE/UFSC foi credenciada em 2014 como a “Unidade Polo/UFSC – Tecnologias em Refrigeração”, com foco nas áreas de: Novas Tecnologias, Eficiência Energética e Impacto Ambiental, Conforto Acústico, Confiabilidade de Componentes e Sistemas, Avaliação e…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
+- [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
+- [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 
 ## Áreas de expertise
 - Avaliação e certificação

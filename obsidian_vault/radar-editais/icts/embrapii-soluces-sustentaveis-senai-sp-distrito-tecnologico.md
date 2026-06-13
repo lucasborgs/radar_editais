@@ -6,18 +6,21 @@ tags:
   - embrapii
   - ict
   - tema/agro-bioeconomia-e-alimentos
-  - tema/energia-e-transicao-sustentavel
   - tema/materiais-quimica-e-manufatura-avancada
+  - tema/energia-e-transicao-sustentavel
 ---
 
 # 🔬 ICT: SENAI/SP – Distrito Tecnológico
 
 > Distrito Tecnológico SENAI-SP O Distrito Tecnológico SENAI-SP , localizado em São Bernardo do Campo, é uma Unidade EMBRAPII credenciada para desenvolver projetos de Pesquisa, Desenvolvimento e Inovação (P&DI) voltados à sustentabilidade, descarbonização e digitalização da…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
-- [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
+- [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 
 ## Áreas de expertise
 - Biosustentabilidade e Bioprocessos avançados

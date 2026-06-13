@@ -10,15 +10,13 @@ tags:
   - edital
   - aberta
   - ano/desconhecido
+  - publico-alvo/startups
 ---
 
 # 🟢 100 Open Startups - Desafio Pequenas Empresas
 
 ## Fonte
 - [[radar-editais/fontes/web|WEB]]
-
-## Público-Alvo
-- [[radar-editais/publicos/startups|Startups]]
 
 ## Informações
 

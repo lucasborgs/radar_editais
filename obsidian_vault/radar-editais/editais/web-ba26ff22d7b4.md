@@ -16,6 +16,9 @@ tags:
   - tema/espaco-defesa-e-seguranca
   - tema/materiais-quimica-e-manufatura-avancada
   - ano/desconhecido
+  - publico-alvo/empresas
+  - publico-alvo/icts
+  - publico-alvo/cooperativas
 ---
 
 # 🟢 FINEP lança série de editais com R$ 3,3 bilhões para impulsionar a inovação no Brasil
@@ -30,11 +33,6 @@ tags:
 
 ## Fonte
 - [[radar-editais/fontes/web|WEB]]
-
-## Público-Alvo
-- [[radar-editais/publicos/empresas|Empresas]]
-- [[radar-editais/publicos/icts|ICTs]]
-- [[radar-editais/publicos/cooperativas|Cooperativas]]
 
 ## Informações
 

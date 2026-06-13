@@ -6,7 +6,7 @@ tags:
 
 # 🏷️ Tema: saúde e ciências da vida
 
-**5 editais** e **14 ICTs** relacionados a este tema.
+**5 editais** e **17 ICTs** relacionados a este tema.
 
 ## Editais
 
@@ -18,10 +18,12 @@ tags:
 
 ## ICTs parceiras
 
+- 🔬 [[radar-editais/icts/embrapii-insumos-quimicos-e-bioquimicos-sinteticos-iqsint-usp|IQSint-USP]]
 - 🔬 [[radar-editais/icts/embrapii-inteligencia-embarcada-inteligencia-artificial-e-ciencia-de-dados-eldorado|ELDORADO]]
 - 🔬 [[radar-editais/icts/embrapii-escalonamento-e-desenvolvimento-de-processos-biotecnologicos-ipt-bio|IPT-Bio]]
 - 🔬 [[radar-editais/icts/embrapii-soluces-industriais-cimatec|CIMATEC]]
 - 🔬 [[radar-editais/icts/embrapii-biofotonica-e-instrumentaco-usp-ifsc|USP-IFSC]]
+- 🔬 [[radar-editais/icts/embrapii-tecnologias-em-quimica-verde-senai-isi-quimica-verde|SENAI ISI QUÍMICA VERDE]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-embarcados-senai-isi-embarcados|SENAI ISI EMBARCADOS]]
 - 🔬 [[radar-editais/icts/embrapii-eletroquimica-industrial-senai-isi-eletroquimica|SENAI ISI ELETROQUÍMICA]]
 - 🔬 [[radar-editais/icts/embrapii-desenvolvimento-de-hardware-e-software-para-saude-nutes-uepb|NUTES-UEPB]]
@@ -29,6 +31,7 @@ tags:
 - 🔬 [[radar-editais/icts/embrapii-tecnologias-para-produco-mais-limpa-if-flu|IF-FLU]]
 - 🔬 [[radar-editais/icts/embrapii-tecnologia-em-saude-if-ba|IF-BA]]
 - 🔬 [[radar-editais/icts/embrapii-descoberta-e-desenvolvimento-de-farmacos-fmrp-usp|FMRP-USP]]
+- 🔬 [[radar-editais/icts/embrapii-bioquimica-e-quimica-de-renovaveis-embrapa-agroenergia|EMBRAPA AGROENERGIA]]
 - 🔬 [[radar-editais/icts/embrapii-biofarmacos-e-farmacos-cqmed|CQMED]]
 - 🔬 [[radar-editais/icts/embrapii-biotecnologia-cnpem|CNPEM]]
 - 🔬 [[radar-editais/icts/embrapii-descoberta-e-desenvolvimento-pre-clinico-de-farmacos-e-novas-formulaces-ceinfar-usp|CEINFAR-USP]]

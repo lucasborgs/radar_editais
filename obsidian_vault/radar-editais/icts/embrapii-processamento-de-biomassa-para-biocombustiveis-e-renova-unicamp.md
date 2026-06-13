@@ -5,7 +5,6 @@ link: https://embrapii.org.br/unidades/processamento-de-biomassa-para-biocombust
 tags:
   - embrapii
   - ict
-  - tema/agro-bioeconomia-e-alimentos
   - tema/energia-e-transicao-sustentavel
 ---
 
@@ -13,8 +12,10 @@ tags:
 
 > A Unidade Embrapii E-RENOVA é um centro de pesquisa de destaque dedicado à pesquisa avançada em energias renováveis. O novo centro de Pesquisa e Desenvolvimento está localizado na Faculdade de Engenharia Química (FEQ/Unicamp) realizará estudos para criação de novos produtos e…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
-- [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 
 ## Áreas de expertise

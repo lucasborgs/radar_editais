@@ -218,6 +218,20 @@ def _is_social(url: str) -> bool:
     return any(host == d or host.endswith("." + d) for d in _SOCIAL_DOMAINS)
 
 
+# Fontes com extrator DEDICADO (ETL próprio, SCRAPER_REGISTRY): a torneira web
+# as ignora para não duplicar/ruidar o grafo — ex.: a notícia "FINEP lança série
+# de editais" virava um nó-notícia inútil, e os editais reais já entram pelo ETL.
+_DEDICATED_SOURCE_DOMAINS = (
+    "finep.gov.br",
+    "fapesp.br",
+)
+
+
+def _is_dedicated_source(url: str) -> bool:
+    host = _norm_url(url).split("//")[-1].split("/")[0]
+    return any(host == d or host.endswith("." + d) for d in _DEDICATED_SOURCE_DOMAINS)
+
+
 def _load_ledger() -> set[str]:
     """Ledger via kg_store (blob `discovery_ledger`, {"urls": [...]}) ∪ ledger
     file-based legado, se existir — migração por união: o legado é absorvido no
@@ -285,7 +299,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
             if len(candidates) >= max_dou:
                 break
             nu = _norm_url(h.url)
-            if nu and nu not in known and nu not in seen_now:
+            if nu and nu not in known and nu not in seen_now and not _is_dedicated_source(h.url):
                 seen_now.add(nu)
                 candidates.append(h)
         logger.info("descoberta: %d candidatos DOU (%s)", len(candidates),
@@ -303,7 +317,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
             continue
         for h in hits:
             nu = _norm_url(h.url)
-            if not nu or nu in known or nu in seen_now or _is_social(h.url):
+            if not nu or nu in known or nu in seen_now or _is_social(h.url) or _is_dedicated_source(h.url):
                 continue
             seen_now.add(nu)
             candidates.append(h)

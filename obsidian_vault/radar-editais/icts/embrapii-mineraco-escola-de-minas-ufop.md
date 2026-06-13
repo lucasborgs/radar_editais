@@ -5,11 +5,20 @@ link: https://embrapii.org.br/unidades/mineraco-escola-de-minas-ufop/
 tags:
   - embrapii
   - ict
+  - tema/energia-e-transicao-sustentavel
+  - tema/materiais-quimica-e-manufatura-avancada
 ---
 
 # 🔬 ICT: Escola de Minas – UFOP
 
 > A unidade UFOP Escola de Minas é uma Unidade EMBRAPII credenciada para atuar na cadeia produtiva de mineração focada em mineração sustentável. A unidade EMBRAPII UFOP Escola de Minas visa a propiciar uma relação de confiança entre o setor mineral e a sociedade via atividades de…
+
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
+## Temas de atuação
+- [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
+- [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 
 ## Áreas de expertise
 - Operações Sustentáveis de Mina

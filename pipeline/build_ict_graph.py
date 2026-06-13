@@ -80,10 +80,18 @@ def canonical_themes() -> list[str]:
 
 _MAP_SYSTEM = (
     "Você mapeia áreas de expertise de instituições de C&T para uma lista FECHADA "
-    "de temas canônicos de editais de fomento. Para cada área, escolha o tema "
-    "canônico mais próximo SE houver correspondência clara; caso contrário, deixe "
-    "vazio (string \"\"). NUNCA invente temas fora da lista. Uma área pode mapear "
-    "para no máximo um tema. Responda só com JSON: {\"area\": \"tema_ou_vazio\", ...}."
+    "de temas canônicos de editais de fomento. Os temas são AMPLOS — quase toda "
+    "área de C&T cabe em um deles. Para cada área, escolha SEMPRE o tema mais "
+    "próximo; só deixe vazio (string \"\") se a área não tiver QUALQUER relação "
+    "com nenhum tema (caso raro). Exemplos de mapeamento: mineração/metalurgia/"
+    "transformação mineral → 'materiais, química e manufatura avançada'; "
+    "logística/transporte/automotivo → 'mobilidade e logística'; "
+    "software/IA/dados/eletrônica → 'tecnologias digitais e conectividade'; "
+    "biotecnologia/fármacos/dispositivos médicos → 'saúde e ciências da vida'; "
+    "petróleo/renováveis/eficiência energética → 'energia e transição sustentável'; "
+    "alimentos/agro/florestal → 'agro - bioeconomia e alimentos'. "
+    "NUNCA invente temas fora da lista. Uma área mapeia para no máximo um tema. "
+    "Responda só com JSON: {\"area\": \"tema_ou_vazio\", ...}."
 )
 _MAP_USER = (
     "TEMAS CANÔNICOS (lista fechada):\n{themes}\n\n"

@@ -12,6 +12,9 @@ tags:
 
 > O CIn-UFPE desenvolve, como Unidade EMBRAPII, projetos na área de Tecnologias e Sistemas Veiculares. Seus focos são em Sistemas Automotivos, Software para Sistemas Veiculares, e Automação, Modelagem e Segurança Veicular. O objetivo do Centro é se tornar referência nacional no…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]
 

@@ -12,6 +12,9 @@ tags:
 
 > O Grupo de Ciência, Tecnologia e Inovação em Materiais (CTIM) é credenciado na área de Materiais Funcionais desde 2020, com foco nas sub-áreas “Polímeros Funcionais” e “Superfícies e Interfaces Funcionais”. A expertise do CTIM atende diversos setores, como a indústria de…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 

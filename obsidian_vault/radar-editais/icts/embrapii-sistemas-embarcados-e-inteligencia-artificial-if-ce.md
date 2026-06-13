@@ -13,6 +13,9 @@ tags:
 
 > O Polo de Inovação Fortaleza está credenciado como Unidade EMBRAPII para atuar nas áreas de competência de Sistemas Embarcados e Mobilidade Digital , permitindo que empresas do setor industrial desenvolvam projetos de produtos e/ou processos inovadores. A Unidade proporciona,…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]

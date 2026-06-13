@@ -19,6 +19,7 @@ tags:
   - trl/trl_prototipo
   - trl/trl_industrial
   - ano/2025
+  - publico-alvo/cooperativas
 ---
 
 # 🟢 SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT - Subvenção Econômica à Inovação - DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR
@@ -30,9 +31,6 @@ tags:
 
 ## Fonte
 - [[radar-editais/fontes/finep|FINEP]]
-
-## Público-Alvo
-- [[radar-editais/publicos/cooperativas|Cooperativas]]
 
 ## Informações
 

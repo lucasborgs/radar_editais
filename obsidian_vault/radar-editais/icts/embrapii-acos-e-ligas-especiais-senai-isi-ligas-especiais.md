@@ -5,6 +5,7 @@ link: https://embrapii.org.br/unidades/acos-e-ligas-especiais-senai-isi-ligas-es
 tags:
   - embrapii
   - ict
+  - tema/energia-e-transicao-sustentavel
   - tema/materiais-quimica-e-manufatura-avancada
 ---
 
@@ -12,7 +13,11 @@ tags:
 
 > O Instituto SENAI de Inovação em Metalurgia e Ligas Especiais (ISI MLE) oferece soluções inovadoras em produtos e processos metalúrgicos. Com sete laboratórios e duas plantas-piloto, instalados em uma área construída de 2.500 m², em Belo Horizonte (MG), o Instituto possui um…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
+- [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 
 ## Áreas de expertise

@@ -12,6 +12,9 @@ tags:
 
 > A Unidade Embrapii Bioindústria e Bioinsumos da Universidade Federal do Tocantins (UFT) tem atuação na área de Bioeconomia Florestal para apoio e desenvolvimento de projetos de Pesquisa, Desenvolvimento e Inovação (PD&I) inseridos nos níveis de maturidade tecnológica (Technology…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 

@@ -12,6 +12,9 @@ tags:
 
 > O CEINFAR tem como principal impulsionador a demanda da indústria farmacêutica pelo desenvolvimento de medicamentos inovadores em parceria com a universidade e com menores riscos de investimento, seguindo o modelo EMBRAPII. A equipe que compõe a Unidade EMBRAPII CEINFAR possui…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 

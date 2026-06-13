@@ -6,14 +6,19 @@ tags:
   - embrapii
   - ict
   - tema/materiais-quimica-e-manufatura-avancada
+  - tema/saude-e-ciencias-da-vida
 ---
 
 # 🔬 ICT: IQSint-USP
 
 > O Instituto de Química da Universidade de São Paulo (IQ-USP) é uma Unidade Embrapii credenciada para atuar com Insumos Químicos e Bioquímicos Sintéticos (IQSint-USP). A IQSint-USP tem sublinhas de atuação voltadas para os diversos setores da economia, dentro os quais:…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
+- [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 
 ## Áreas de expertise
 - Especialidades Químicas

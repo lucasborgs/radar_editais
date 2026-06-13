@@ -6,14 +6,19 @@ tags:
   - embrapii
   - ict
   - tema/tecnologias-digitais-e-conectividade
+  - tema/materiais-quimica-e-manufatura-avancada
 ---
 
 # 🔬 ICT: ITEC-FURG
 
 > Surgindo a partir do amadurecimento de grupos de pesquisa na universidade, que há 20 anos realizam projetos de Pesquisa, Desenvolvimento e Inovação (PD&I), o iTec/FURG – Centro em Ciência de Dados e Robótica é uma unidade que conecta a academia com o setor industrial. Com a…
 
+## Fonte
+- [[radar-editais/fontes/embrapii|EMBRAPII]]
+
 ## Temas de atuação
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
+- [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 
 ## Áreas de expertise
 - Ferramentas robóticas e de automação
