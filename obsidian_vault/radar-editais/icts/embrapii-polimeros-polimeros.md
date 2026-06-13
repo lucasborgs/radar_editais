@@ -6,7 +6,6 @@ tags:
   - embrapii
   - ict
   - tema/materiais-quimica-e-manufatura-avancada
-  - tema/agro-bioeconomia-e-alimentos
 ---
 
 # 🔬 ICT: Polímeros
@@ -18,7 +17,6 @@ tags:
 
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
-- [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
 
 ## Áreas de expertise
 - Circularidade em Polímeros

@@ -6,6 +6,7 @@ tags:
   - embrapii
   - ict
   - tema/materiais-quimica-e-manufatura-avancada
+  - tema/energia-e-transicao-sustentavel
 ---
 
 # 🔬 ICT: CICS Poli-USP
@@ -17,6 +18,7 @@ tags:
 
 ## Temas de atuação
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
+- [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 
 ## Áreas de expertise
 - Componentes e sistemas construtivos

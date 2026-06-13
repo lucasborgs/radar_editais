@@ -7,6 +7,7 @@ tags:
   - ict
   - tema/energia-e-transicao-sustentavel
   - tema/agro-bioeconomia-e-alimentos
+  - tema/saude-e-ciencias-da-vida
 ---
 
 # 🔬 ICT: EMBRAPA AGROENERGIA
@@ -19,6 +20,7 @@ tags:
 ## Temas de atuação
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 - [[radar-editais/temas/agro-bioeconomia-e-alimentos|agro - bioeconomia e alimentos]]
+- [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 
 ## Áreas de expertise
 - Biocombustíveis e Bioprodutos

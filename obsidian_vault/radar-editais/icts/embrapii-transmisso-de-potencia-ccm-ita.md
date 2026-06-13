@@ -5,6 +5,7 @@ link: https://embrapii.org.br/unidades/transmisso-de-potencia-ccm-ita/
 tags:
   - embrapii
   - ict
+  - tema/mobilidade-e-logistica
   - tema/materiais-quimica-e-manufatura-avancada
   - tema/energia-e-transicao-sustentavel
 ---
@@ -17,6 +18,7 @@ tags:
 - [[radar-editais/fontes/embrapii|EMBRAPII]]
 
 ## Temas de atuação
+- [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]
 - [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
 - [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
 

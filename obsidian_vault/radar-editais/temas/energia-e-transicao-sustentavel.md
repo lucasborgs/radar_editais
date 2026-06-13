@@ -6,7 +6,7 @@ tags:
 
 # 🏷️ Tema: energia e transição sustentável
 
-**8 editais** e **24 ICTs** relacionados a este tema.
+**8 editais** e **27 ICTs** relacionados a este tema.
 
 ## Editais
 
@@ -24,12 +24,13 @@ tags:
 - 🔬 [[radar-editais/icts/embrapii-soluces-sustentaveis-senai-sp-distrito-tecnologico|SENAI/SP – Distrito Tecnológico]]
 - 🔬 [[radar-editais/icts/embrapii-refrigeraco-vibraco-acustica-e-energia-inovare-ufsc|inoVARE/UFSC]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-embarcados-e-inteligencia-artificial-if-ce|IF-CE]]
+- 🔬 [[radar-editais/icts/embrapii-construco-ecoeficiente-cics-poli-usp|CICS Poli-USP]]
 - 🔬 [[radar-editais/icts/embrapii-engenharia-de-petroleo-gas-e-energias-renovaveis-coppe|COPPE]]
 - 🔬 [[radar-editais/icts/embrapii-tecnologias-verdes-tecnogreen|TECNOGREEN]]
 - 🔬 [[radar-editais/icts/embrapii-escalonamento-e-desenvolvimento-de-processos-biotecnologicos-ipt-bio|IPT-Bio]]
 - 🔬 [[radar-editais/icts/embrapii-energia-e-mobilidade-inri-ufsm|INRI-UFSM]]
 - 🔬 [[radar-editais/icts/embrapii-materiais-avancados-ufscar-materiais|UFSCar – Materiais]]
-- 🔬 [[radar-editais/icts/embrapii-tecnologias-em-quimica-verde-senai-isi-quimica-verde|SENAI ISI QUÍMICA VERDE]]
+- 🔬 [[radar-editais/icts/embrapii-acos-e-ligas-especiais-senai-isi-ligas-especiais|SENAI ISI LIGAS ESPECIAIS]]
 - 🔬 [[radar-editais/icts/embrapii-eletroquimica-industrial-senai-isi-eletroquimica|SENAI ISI ELETROQUÍMICA]]
 - 🔬 [[radar-editais/icts/embrapii-transformaco-de-biomassa-senai-isi-biomassa|SENAI ISI BIOMASSA]]
 - 🔬 [[radar-editais/icts/embrapii-tecnologias-aplicadas-a-powertrains-powertrain-usp|Powertrain-USP]]
@@ -40,8 +41,10 @@ tags:
 - 🔬 [[radar-editais/icts/embrapii-sistemas-inteligentes-de-energia-if-sc-fln|IF-SC – FLN]]
 - 🔬 [[radar-editais/icts/embrapii-tecnologias-energeticas-industriais-if-goias|IF-Goiás]]
 - 🔬 [[radar-editais/icts/embrapii-tecnologias-para-produco-mais-limpa-if-flu|IF-FLU]]
+- 🔬 [[radar-editais/icts/embrapii-mineraco-escola-de-minas-ufop|Escola de Minas – UFOP]]
 - 🔬 [[radar-editais/icts/embrapii-bioquimica-e-quimica-de-renovaveis-embrapa-agroenergia|EMBRAPA AGROENERGIA]]
 - 🔬 [[radar-editais/icts/embrapii-processamento-de-biomassa-para-biocombustiveis-e-renova-unicamp|E-RENOVA – Unicamp]]
 - 🔬 [[radar-editais/icts/embrapii-sistemas-de-comunicaces-avancadas-cpqd|CPqD]]
+- 🔬 [[radar-editais/icts/embrapii-biotecnologia-cnpem|CNPEM]]
 - 🔬 [[radar-editais/icts/embrapii-tecnologias-em-otimizaco-de-energia-incluindo-as-renovaveis-cear-ufpb|CEAR-UFPB]]
 - 🔬 [[radar-editais/icts/embrapii-transmisso-de-potencia-ccm-ita|CCM-ITA]]

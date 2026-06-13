@@ -5,6 +5,7 @@ link: https://embrapii.org.br/unidades/biofotonica-e-instrumentaco-usp-ifsc/
 tags:
   - embrapii
   - ict
+  - tema/mobilidade-e-logistica
   - tema/saude-e-ciencias-da-vida
 ---
 
@@ -16,6 +17,7 @@ tags:
 - [[radar-editais/fontes/embrapii|EMBRAPII]]
 
 ## Temas de atuação
+- [[radar-editais/temas/mobilidade-e-logistica|mobilidade e logística]]
 - [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 
 ## Áreas de expertise

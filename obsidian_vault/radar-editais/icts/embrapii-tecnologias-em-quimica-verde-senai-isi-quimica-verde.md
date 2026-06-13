@@ -5,7 +5,8 @@ link: https://embrapii.org.br/unidades/tecnologias-em-quimica-verde-senai-isi-qu
 tags:
   - embrapii
   - ict
-  - tema/energia-e-transicao-sustentavel
+  - tema/materiais-quimica-e-manufatura-avancada
+  - tema/saude-e-ciencias-da-vida
   - tema/tecnologias-digitais-e-conectividade
 ---
 
@@ -17,7 +18,8 @@ tags:
 - [[radar-editais/fontes/embrapii|EMBRAPII]]
 
 ## Temas de atuação
-- [[radar-editais/temas/energia-e-transicao-sustentavel|energia e transição sustentável]]
+- [[radar-editais/temas/materiais-quimica-e-manufatura-avancada|materiais, química e manufatura avançada]]
+- [[radar-editais/temas/saude-e-ciencias-da-vida|saúde e ciências da vida]]
 - [[radar-editais/temas/tecnologias-digitais-e-conectividade|tecnologias digitais e conectividade]]
 
 ## Áreas de expertise
