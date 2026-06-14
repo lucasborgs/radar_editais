@@ -840,6 +840,12 @@ de fora — nenhum bloqueia o que foi entregue.
 - **Ponto de entrada:** `core/skills.py` (loader), `opportunity_discovery._extract`
   (mechanism), `compliance_monitor.py` + `writing_tools.load_skill` (roteamento).
 - **Status:** spec travada (2026-06-14), implementação aberta.
+- **Overlay `source/bndes/credito.md` (pendente de fonte):** a entrevista de `credito`
+  (2026-06-14) rendeu praxe BNDES rica (análise econômico-financeira/governança no
+  centro, narrativa corporativa menos tecnológica, FGI/FGO como garantia), mas BNDES
+  **não é fonte indexada** hoje — só FINEP/FAPESP. Matéria-prima está em
+  `docs/specs/playbook-interview-credito.md` (bloco F). **Gatilho:** BNDES virar fonte
+  ativa do pipeline → criar o overlay a partir dessas respostas.
 
 ---
 
