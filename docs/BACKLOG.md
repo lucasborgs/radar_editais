@@ -763,6 +763,35 @@ de fora — nenhum bloqueia o que foi entregue.
 
 ---
 
+### Gate de grounding (writing eval) confiável — investigado 2026-06-13
+
+- **O quê:** `pct_grounded` do `core.eval writing` não é gate confiável. Investigação
+  (PR #25) provou que NÃO é regressão de produto nem do retriever (finep:774=83
+  chunks, finep:769=151, `retrieve_chunks` saudável; suspeitos `1eb00699a`/`8e29384b6`
+  LIMPOS). A instabilidade (medido 0.05–0.625 entre runs do MESMO fixture) tem duas
+  causas: (a) fixture **misfit** — iFlorestal (florestal) pareada com editais de
+  agro/agricultura familiar → o agente fabrica claims de fit que o juiz corretamente
+  não sustenta; (b) **variância do output do agente** entre runs (drafts estocásticos
+  → nº de claims e grounding mudam por run). Micro-média (Σgrounded/Σclaims) foi
+  avaliada e descartada: NÃO resolve — a variância é do draft, não da agregação
+  (spread 0.59 ≈ macro 0.575 nos 3 runs reais).
+- **Por que adiado:** a investigação já entregou o valor (o número não é regressão;
+  o gate é que é cego). Tornar o gate útil é trabalho de fixture + custo de N-runs,
+  sem decisão de retrieval pendente agora.
+- **Como fazer:** (a) adicionar casos empresa↔edital **bem-casados** (grounding com
+  denominador significativo e agente consistente); (b) domar variância via **N-runs
+  + média** ou temp fixa no eval (tradeoff: N-runs multiplica custo de LLM); (c) opc.:
+  reportar grounding só quando Σclaims do run ≥ limiar. Sinal de produto SEPARADO a
+  testar com fixture próprio: agente fabricar fit em par misfit (anti-fabricação,
+  `3f15122b4`).
+- **Gatilho para retomar:** querer usar `pct_grounded` como gate de merge real, OU
+  mexer no Redator de um jeito que precise medir grounding com confiança.
+- **Ponto de entrada:** `tests/fixtures/eval_cases.json`, `core/eval/writing.py`
+  (`run_grounding_micro`, `task`), `core/writing_eval.py` (juízes).
+- **Status:** aberto (2026-06-13). Ver memory `project-agent-patterns-deepagents`.
+
+---
+
 ## Fechado-adiado (revisitar só no gatilho)
 
 ### ICT — tuning do flag `requires_ict_partner`
