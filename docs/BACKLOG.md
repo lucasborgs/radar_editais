@@ -792,6 +792,30 @@ de fora — nenhum bloqueia o que foi entregue.
 
 ---
 
+### Playbooks: conhecimento tácito por mecanismo — spec travada 2026-06-14
+
+- **O quê:** redesenho do subsistema de "skills" do Redator/Monitor. Hoje são
+  keyed por fonte (`skills/<source>_compliance.md`) e misturam regra dura (que é do
+  edital/RAG) com tácito. Spec completa em [docs/specs/skills-by-mechanism.md](specs/skills-by-mechanism.md):
+  separar **normativo (RAG)** de **tácito (playbook)**; keying por **mecanismo**
+  (campo já estruturado) + overlays de fonte; **seções-nomeadas = tipos =
+  roteamento** pros consumidores que já existem (Redator↔escrita/tom,
+  Monitor↔heurísticas/anti-padrões, Critic intocado). 7 decisões (D1–D7) travadas.
+- **Por que adiado:** decisão de design fechada (validada contra 2 modelos
+  externos), mas a implementação é média (loader + extrator web + roteamento) e o
+  conteúdo de domínio (playbooks por mecanismo) é o gargalo, incremental.
+- **Pré-requisito de dados:** `mechanism` está 100% vazio na web (extrator da
+  Descoberta não preenche) — estender `_extract` faz parte do roteiro (D7).
+- **Conexão:** mover tácito do prompt de geração pro avaliador é fix plausível
+  parcial do grounding (ver entrada acima).
+- **Gatilho para retomar:** querer subir a qualidade/aderência da escrita para
+  além do RAG puro, OU FAPESP/web entrarem em produção precisando de praxe curada.
+- **Ponto de entrada:** `core/skills.py` (loader), `opportunity_discovery._extract`
+  (mechanism), `compliance_monitor.py` + `writing_tools.load_skill` (roteamento).
+- **Status:** spec travada (2026-06-14), implementação aberta.
+
+---
+
 ## Fechado-adiado (revisitar só no gatilho)
 
 ### ICT — tuning do flag `requires_ict_partner`
