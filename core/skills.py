@@ -47,10 +47,17 @@ def load_skill(source: str, skill_type: str = SKILL_COMPLIANCE) -> str:
         logger.debug("skill ausente: %s", skill_file.name)
         return ""
     try:
-        return skill_file.read_text(encoding="utf-8")
+        text = skill_file.read_text(encoding="utf-8")
     except Exception as e:
         logger.warning("falha ao ler skill %s: %s", skill_file, e)
         return ""
+    # Skills em scaffolding (corpo só com TODOs) carregam o marcador PLACEHOLDER
+    # no título. Tratá-las como AUSENTES evita que TODOs vazem como "regras" —
+    # tanto no ComplianceMonitor quanto na tool load_skill do Redator (spec 05).
+    if "PLACEHOLDER" in text:
+        logger.debug("skill %s é placeholder — tratada como ausente", skill_file.name)
+        return ""
+    return text
 
 
 def available_skills() -> list[dict]:

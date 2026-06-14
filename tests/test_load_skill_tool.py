@@ -26,7 +26,7 @@ def _build_load_skill(monkeypatch, wiki):
 def test_load_skill_returns_source_rules(monkeypatch):
     """source com skill existente (finep_compliance.md) → devolve o conteúdo."""
     tool = _build_load_skill(monkeypatch, {"source": "finep"})
-    out = tool.call({"skill_type": "compliance"})
+    out = tool.call({})  # sem param skill_type (só compliance existe)
     assert "REGRAS DA FONTE (finep, compliance)" in out
     assert len(out) > 50  # trouxe conteúdo real do .md, não só o cabeçalho
 
@@ -34,15 +34,17 @@ def test_load_skill_returns_source_rules(monkeypatch):
 def test_load_skill_graceful_when_no_source(monkeypatch):
     """Edital sem source (ex.: pitch/fundo) → mensagem amigável, não quebra."""
     tool = _build_load_skill(monkeypatch, {})
-    out = tool.call({"skill_type": "compliance"})
+    out = tool.call({})
     assert "não tem regras específicas de fonte" in out
 
 
-def test_load_skill_graceful_when_skill_type_absent(monkeypatch):
-    """source válido mas sem skills/<source>_writing.md → ausência amigável."""
-    tool = _build_load_skill(monkeypatch, {"source": "finep"})
-    out = tool.call({"skill_type": "writing"})
-    assert "Sem skill 'writing'" in out
+def test_load_skill_skips_placeholder_skill(monkeypatch):
+    """source com skill PLACEHOLDER (fapesp scaffolding) → tratada como ausente,
+    não vaza TODOs como regras (guard em core.skills.load_skill)."""
+    tool = _build_load_skill(monkeypatch, {"source": "fapesp"})
+    out = tool.call({})
+    assert "Sem regras de compliance carregáveis" in out
+    assert "TODO" not in out
 
 
 def test_load_skill_is_in_writer_toolset(monkeypatch):
@@ -51,3 +53,19 @@ def test_load_skill_is_in_writer_toolset(monkeypatch):
     names = {t.name for t in writing_tools.build_writing_tools(_FakeSession())}
     assert "load_skill" in names
     assert "plan_writing_session" not in names  # removida no spec 04
+
+
+# ---------------------------------------------------------------------------
+# Guard de placeholder no loader de skills (core.skills) — beneficia tanto a
+# tool load_skill quanto o ComplianceMonitor de uma vez.
+# ---------------------------------------------------------------------------
+
+def test_core_load_skill_returns_real_content_for_finep():
+    from core.skills import load_skill
+    assert "Contrapartida" in load_skill("finep", "compliance")
+
+
+def test_core_load_skill_skips_placeholder():
+    """fapesp_compliance.md é scaffolding (marcador PLACEHOLDER) → "" (ausente)."""
+    from core.skills import load_skill
+    assert load_skill("fapesp", "compliance") == ""
