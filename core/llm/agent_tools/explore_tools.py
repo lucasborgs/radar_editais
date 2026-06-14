@@ -21,11 +21,13 @@ Princípios:
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import TYPE_CHECKING
 
 from core.kg import kg_store
-from core.llm.agent_runtime import Tool, tool
+from core.llm.agent_runtime import Tool, _cap, tool
+from core.retrieval.retriever import format_chunks_for_prompt, retrieve_chunks
 
 # Stopwords PT/EN + conectivos que não discriminam tema (não devem casar
 # sozinhos). Termos curtos como "ia"/"ai" caem pelo corte de tamanho (<4).
@@ -66,6 +68,13 @@ if TYPE_CHECKING:
     from core.services.kg_match_service import KGMatchService
 
 logger = logging.getLogger(__name__)
+
+# Caps de orçamento de contexto para search_edital_trechos. O explore soma N
+# editais × k trechos numa só chamada — cresce rápido. Defaults folgados;
+# calibrar com o log de disparo (mesma disciplina do writing/spec 02).
+EXPLORE_CHUNK_CHAR_CAP = int(os.getenv("EXPLORE_CHUNK_CHAR_CAP", "800"))   # por trecho
+EXPLORE_TRECHOS_CHAR_CAP = int(os.getenv("EXPLORE_TRECHOS_CHAR_CAP", "6000"))  # total da tool-result
+MAX_EDITAIS = 5  # teto de editais por chamada (orçamento de contexto)
 
 
 def build_explore_tools(service: KGMatchService) -> list[Tool]:
@@ -407,5 +416,68 @@ def build_explore_tools(service: KGMatchService) -> list[Tool]:
             out.append("  (nenhum no tema)")
         return "\n".join(out)
 
+    @tool
+    def search_edital_trechos(
+        edital_ids: list[str],
+        query: str,
+        k_por_edital: int = 3,
+    ) -> str:
+        """Recupera TRECHOS LITERAIS dos editais para detalhe fino ou comparação fundamentada.
+
+        Use SÓ quando a pergunta exige o texto real — ex.: "compare a contrapartida
+        exigida nestes editais", "o que o edital X exige de TRL no detalhe". Para
+        panorama/triagem, use list_editais / get_edital / oportunidades_por_tema:
+        o resumo basta e é mais barato.
+
+        Localize PRIMEIRO os edital_ids (list_editais, oportunidades_por_tema,
+        get_graph_neighbors) e passe-os aqui.
+
+        Args:
+            edital_ids: IDs já localizados (máx 5). Ex.: ["<id_a>", "<id_b>"]
+            query: o aspecto a detalhar/comparar, PT-BR. Frases curtas funcionam melhor.
+            k_por_edital: trechos por edital (default 3, máx 5).
+        """
+        ids = [e for e in (edital_ids or []) if e][:MAX_EDITAIS]
+        if not ids:
+            return (
+                "Nenhum edital_id válido. Localize IDs com list_editais / "
+                "oportunidades_por_tema antes."
+            )
+        k = max(1, min(int(k_por_edital), 5))
+
+        blocos: list[str] = []
+        for eid in ids:
+            try:
+                # 1 edital por vez → cada um garante representação. Numa união
+                # ranqueada (edital_ids=[a,b,c] numa só chamada), um edital pode
+                # dominar o top-k e sufocar os outros — ruim p/ comparação.
+                # `db=None`: retrieve_chunks ignora o parâmetro e conecta sozinha.
+                chunks = retrieve_chunks(None, [eid], query=query, k=k)
+            except Exception as e:
+                logger.warning("search_edital_trechos: falha em %s: %s", eid, e)
+                blocos.append(f"### {eid}\n(erro ao recuperar: {e})")
+                continue
+            if not chunks:
+                blocos.append(f"### {eid}\n(sem trecho relevante p/ a query)")
+                continue
+            # Cap por trecho: cada chunk é truncado antes da concatenação
+            # (k chunks inteiros somam rápido). Cap total na sequência.
+            for c in chunks:
+                txt = c.get("text", "")
+                if txt:
+                    c["text"] = _cap(
+                        txt, EXPLORE_CHUNK_CHAR_CAP,
+                        tool_name="search_edital_trechos[chunk]",
+                    )
+            blocos.append(
+                f"### {eid}\n" + format_chunks_for_prompt(chunks, edital_ids=[eid])
+            )
+
+        return _cap(
+            "\n\n".join(blocos), EXPLORE_TRECHOS_CHAR_CAP,
+            tool_name="search_edital_trechos",
+        )
+
     return [list_editais, get_edital, find_analogues, get_graph_neighbors,
-            find_ict_partners, list_icts, list_investidores, oportunidades_por_tema]
+            find_ict_partners, list_icts, list_investidores, oportunidades_por_tema,
+            search_edital_trechos]

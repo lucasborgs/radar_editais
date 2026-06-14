@@ -338,6 +338,46 @@
       "gold_text": "[…] por órgão de pesquisa, garantida, sempre que possível, a anonimização dos dados pessoais; e) quando necessário para a execução de contrato ou de procedimentos preliminares relacionados a contrato do qual seja parte o titular, a pedido do titular dos dados; f) para o exercício regular de direitos em processo judicial, administrativo ou arbitral, esse último nos termos da Lei nº 9.307, de 23 de setembro de 1996 (Lei de Arbitragem); g) quando necessário para atender aos interesses legítimos das PARTES ou de terceiros, exceto no caso de prevalecerem direitos e liberdades fundamentais do titular que exijam a proteção dos dados pessoais; ou h) para a proteção do crédito, inclusive quanto ao disposto na legislação pertinente.\n\nAs PARTES poderão tratar dados pessoais sensíveis, conforme autorizado pela legislação:\n\na) quando o titular ou seu responsável legal consentir, de forma específica e destacada, para finalidades específicas; ou\nb) sem fornecimento de consentimento do titular, nas hipóteses em que for indispensável para: (i) cumprimento de obrigação legal ou regulatória pelas PARTES; (ii) tratamento compartilhado de dados necessários à execução, pela\n\nadministração pública, de políticas públicas previstas em leis ou regulamentos; (iii) exercício regular de direitos, inclusive em contrato e em processo judicial, administrativo e arbitral, este último nos termos da Lei nº 9.307, de 23 de setembro de 1996 (Lei de Arbitragem).",
       "category": "objective",
       "_source_chunk_index": 145
+    },
+    {
+      "id": "finep_cmp_valor_finep:772",
+      "edital_id": "finep:772",
+      "query": "Qual o valor máximo do recurso solicitado por proposta neste edital?",
+      "expected": [],
+      "gold_text": "O valor solicitado deve estar entre R$ 5.000.000,00 (cinco milhões de reais) e R$ 50.000.000,00 (cinquenta milhões de reais).",
+      "category": "comparison_grounded",
+      "_comparison_group": "cmp_valor_rodada2",
+      "_comment": "Caso de COMPARAÇÃO FUNDAMENTADA (spec docs/specs/explore-grounded-comparison.md). Par: finep:772 (Transição Energética) x finep:774 (Cadeias Agroindustriais Sustentáveis) — ambos da linha 'Finep Mais Inovação Brasil – Rodada 2', tema compartilhado (energia e transição sustentável / agro), bons candidatos a comparação. Aspecto comparado: TETO DO VALOR SOLICITADO, que difere (772 vai a R$ 50M, 774 a R$ 40M) — detalhe decisivo que vive no trecho do edital, não no resumo do card. A query é a MESMA nos dois ids do grupo; cada id tem seu gold_text literal. Caminho de eval: gold_recall_at_k (token-recall, chunking-invariante, NÃO exige casar section). expected=[] de propósito — não temos acesso ao source_file/section exato sem DB; o sinal vem do gold_text. PRECISA de run com DB para confirmar que os chunks de finep:772 existem em edital_chunks e que o gold_recall passa: python -m core.eval rag --no-push --limit N."
+    },
+    {
+      "id": "finep_cmp_valor_finep:774",
+      "edital_id": "finep:774",
+      "query": "Qual o valor máximo do recurso solicitado por proposta neste edital?",
+      "expected": [],
+      "gold_text": "O valor solicitado deve estar entre R$ 5.000.000,00 (cinco milhões de reais) e R$ 40.000.000,00 (quarenta milhões de reais).",
+      "category": "comparison_grounded",
+      "_comparison_group": "cmp_valor_rodada2",
+      "_comment": "Par do grupo cmp_valor_rodada2 — lado finep:774 (Cadeias Agroindustriais Sustentáveis). Mesma query do finep:772; teto distinto (R$ 40M). Ver _comment do finep_cmp_valor_finep:772 para a justificativa do par e o caminho de validação por DB."
+    },
+    {
+      "id": "finep_cmp_eleg_finep:769",
+      "edital_id": "finep:769",
+      "query": "Quais requisitos de elegibilidade e tempo de funcionamento a empresa proponente precisa cumprir?",
+      "expected": [],
+      "gold_text": "A empresa proponente deve estar registrada na Junta Comercial até 31 de dezembro do ano anterior à apresentação da proposta e comprovar atividade operacional regular nos doze meses anteriores, com objeto social compatível com as atividades do projeto.",
+      "category": "comparison_grounded",
+      "_comparison_group": "cmp_eleg_agro",
+      "_comment": "Caso de COMPARAÇÃO FUNDAMENTADA. Par: finep:769 (Subvenção — Desafios Tecnológicos para Agricultura Familiar) x finep:774 (Cadeias Agroindustriais Sustentáveis) — tema compartilhado 'agro - bioeconomia e alimentos', ambos com n_pdfs>0 no index.json. Aspecto comparado: REGRAS DE ELEGIBILIDADE/CONTRAPARTIDA, que divergem no detalhe — 769 exige registro na Junta Comercial e tempo mínimo de operação e participação de ICT é apenas DESEJÁVEL; 774 exige ICT OBRIGATÓRIA em arranjo simples ou em rede. Esse contraste (obrigatório vs. desejável; registro/tempo de operação) é exatamente o detalhe lossy que o resumo do card omite e que só o trecho cru carrega. expected=[] — sinal via gold_recall_at_k (chunking-invariante). PRECISA de run com DB: python -m core.eval rag --no-push --limit N para confirmar chunks de finep:769 e o recall."
+    },
+    {
+      "id": "finep_cmp_eleg_finep:774",
+      "edital_id": "finep:774",
+      "query": "Quais requisitos de elegibilidade e tempo de funcionamento a empresa proponente precisa cumprir?",
+      "expected": [],
+      "gold_text": "É obrigatória a participação de pelo menos uma ICT, e as propostas devem ser apresentadas em arranjos simples ou em rede, atendendo aos critérios de elegibilidade e à documentação exigida.",
+      "category": "comparison_grounded",
+      "_comparison_group": "cmp_eleg_agro",
+      "_comment": "Par do grupo cmp_eleg_agro — lado finep:774. Mesma query do finep:769; aqui o requisito distintivo é a ICT OBRIGATÓRIA e o arranjo (simples ou em rede). Ver _comment do finep_cmp_eleg_finep:769 para justificativa do par e validação por DB."
     }
   ]
 }

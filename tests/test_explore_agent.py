@@ -251,6 +251,8 @@ def test_explore_tools_count_and_names():
         "find_ict_partners",
         # Cross-dimensionais (Fase 2 — chat de Descoberta sobre todas as dimensões)
         "list_icts", "list_investidores", "oportunidades_por_tema",
+        # Comparação/detalhe fundamentado (KG localiza → RAG recupera trecho)
+        "search_edital_trechos",
     }
 
 
