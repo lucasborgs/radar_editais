@@ -7,21 +7,30 @@ externos (2026-06-14). Substitui o esboço inicial "skills por mecanismo".
 
 ## Princípio central (a decisão mais importante do subsistema)
 
-Separar **verdade normativa** de **conhecimento tácito**. É isso que impede o
-produto de virar um amontoado de prompts envelhecendo e passando regra errada.
+**A skill NÃO é conhecimento — é competência.** O grafo (KG) é a fonte de
+conhecimento; a skill é o *especialista em escrita de propostas/projetos de
+inovação* que sabe redigir aquilo para aquele instrumento. Três coisas, três
+lugares:
 
-| Camada | Conteúdo | Fonte da verdade | Quem entrega |
+| Camada | Exemplo | Onde mora | Quem entrega |
 |---|---|---|---|
-| **Normativo** | prazos, contrapartida %, rubricas, TRL exigido, documentos, vedações escritas | o **edital** | RAG (`search_edital`) |
-| **Tácito (playbook)** | praxe da agência, red flags não-escritos, tom que aprova, anti-padrões, padrões de escrita | conhecimento **curado** | este subsistema |
+| **Fato do edital** | prazo, contrapartida %, rubricas, TRL exigido deste edital | nó do **edital** | RAG (`search_edital`) |
+| **Fato do instrumento** | "subvenção avalia risco tecnológico"; "FINEP raramente passa < TRL 4" | nó de **mecanismo/fonte** no KG | KG (futuro; ver substrato) |
+| **Competência (skill)** | *"logo, abra a justificativa provando viabilidade já demonstrada"* | **playbook** | este subsistema |
 
-Regra dura **está no edital** → curar isso num markdown paralelo cria inferno de
-manutenção e faz a skill **contradizer o edital vigente** (o LLM tenta reconciliar
-e alucina). O fosso competitivo é o **meta-jogo** do fomento — o que não se infere
-lendo o PDF. Ex.: *"FINEP aceita TRL 3 no papel, mas subvenção abaixo de TRL 4
-reprova na triagem técnica por risco; foque o texto em viabilidade comercial."*
+Regra dura — e até **fato de praxe do instrumento** — é conhecimento → vai pro KG.
+Curar fato num markdown paralelo cria inferno de manutenção e faz a skill
+**contradizer o edital vigente**. A skill fica **fina e estável**: é craft (como
+escrever como um expert), não conteúdo. O fosso é o **meta-jogo** do fomento —
+a competência de transformar o fato do grafo na narrativa que aprova.
 
-→ **Renomeado de "compliance skill" para "playbook"** (heurística, não norma).
+→ **Renomeado de "compliance skill" para "playbook"** (competência, não norma).
+
+**Substrato (destino):** o conhecimento mora no **nó do KG** (mecanismo/fonte como
+nós com wiki_page — "o grafo é a fonte de conhecimento", à la LLM-wiki). Arquivos
+`skills/*.md` em git são o **bootstrap** (tier-0) para autorar a competência agora.
+**Evolução por uso (learning loop)** → parado no [BACKLOG](../BACKLOG.md) até haver
+usuários/outcomes reais.
 
 ## Problema (o que estava errado)
 
