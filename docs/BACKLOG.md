@@ -846,8 +846,12 @@ de fora — nenhum bloqueia o que foi entregue.
   **não é fonte indexada** hoje — só FINEP/FAPESP. Matéria-prima está em
   `docs/specs/playbook-interview-credito.md` (bloco F). **Gatilho:** BNDES virar fonte
   ativa do pipeline → criar o overlay a partir dessas respostas.
-
----
+- **Playbook `matching` (EMBRAPII) — adiado por escopo (2026-06-14):** EMBRAPII/ICT
+  são insumo do **Match** (parceria empresa↔ICT), não da **escrita**; não há valor em
+  autorar o playbook de redação agora. Template de entrevista preenchido já existe em
+  `docs/specs/playbook-interview-matching.md` (semente). `bolsa` ficou **fora de
+  escopo** de vez (sistema não atende bolsas). **Gatilho:** decidir que a escrita
+  cooperativa entra no produto → rodar a entrevista e destilar `skills/mechanism/matching.md`.
 
 ## Fechado-adiado (revisitar só no gatilho)
 
