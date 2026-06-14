@@ -72,7 +72,11 @@ do RAG). Responda com especificidade, exemplos, pares "ruim→bom", instant-kill
 
 - [x] `subvencao` (gabarito) + overlay `finep`
 - [x] `credito` (financiamento reembolsável) + overlay `finep` — lente: capacidade de pagamento/fluxo de caixa
-- [ ] `bolsa` — lente: pesquisador/equipe, mérito científico
-- [ ] `matching` (EMBRAPII) — lente: parceria empresa↔ICT real
-- [ ] `equity` (pitch) — **outro gênero**, roteado ao agente de pitch, não compliance
+- [~] `bolsa` — **FORA DE ESCOPO** (2026-06-14): o sistema não atende o público de
+  bolsas. Playbook intencionalmente não autorado; edital classificado como `bolsa`
+  cai no fallback genérico (D3). Reabrir só se o escopo mudar.
+- [~] `matching` (EMBRAPII) — **ADIADO (BACKLOG, 2026-06-14)**: EMBRAPII/ICT são
+  insumo do Match, não da escrita. Template-semente em `playbook-interview-matching.md`.
+- [x] `equity` (pitch) — **outro gênero**, roteado ao agente de pitch (mode=pitch),
+  não compliance. Overlay por tipo de investidor/estágio adiado (sem demanda).
 - Overlays de fonte pendentes: `source/fapesp/*` (lado PIPE do contraste F12).
