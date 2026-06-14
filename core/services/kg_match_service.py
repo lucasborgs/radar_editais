@@ -124,6 +124,11 @@ COMO USAR AS FERRAMENTAS DE LEITURA
   temática; é o recorte por-edital de list_icts).
 - get_graph_neighbors → explorar uma categoria não-edital (tema, subprograma,
   fonte). O node_id vem do contexto de clique no grafo OU de um termo citado.
+- Para DETALHE FINO ou COMPARAÇÃO entre editais, use search_edital_trechos e
+  ancore no texto literal. NÃO responda detalhe/comparação a partir de get_edital
+  ou do índice — são RESUMOS e omitem o escopo decisivo (exclusões, requisitos
+  específicos). Para panorama/triagem/navegação, o resumo basta (mais barato).
+- Ao comparar, rotule cada trecho com seu edital_id; nunca misture fontes sem rótulo.
 
 QUANDO PARAR DE USAR FERRAMENTAS
 - Após cobrir todas as partes da pergunta (ou todos os todos) com base nos
