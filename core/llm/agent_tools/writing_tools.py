@@ -336,25 +336,22 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
     # que duplicava com uma chamada LLM extra). Persistência cross-turn dos todos
     # fica fora de escopo (ver spec).
     @tool
-    def load_skill(skill_type: str = "compliance") -> str:
-        """Carrega as regras específicas da FONTE deste edital (formato de
-        orçamento, contrapartida, prestação de contas, linguagem esperada).
+    def load_skill() -> str:
+        """Carrega as regras de aderência específicas da FONTE deste edital
+        (formato de orçamento, contrapartida, prestação de contas, linguagem
+        esperada).
 
-        Use ao redigir uma seção sujeita a regras de aderência da fonte —
-        orçamento, cronograma físico-financeiro, plano de prestação de contas —
-        para seguir o formato exigido. Puxa só o que precisa, quando precisa.
-
-        Args:
-            skill_type: "compliance" (regras de aderência, default) ou "writing"
-                (orientação de estilo/tom da fonte).
+        Use ao redigir uma seção sujeita a regras da fonte — orçamento,
+        cronograma físico-financeiro, plano de prestação de contas — para seguir
+        o formato exigido. Puxa só o que precisa, quando precisa.
         """
         from core.skills import load_skill as _load_skill_file
         if not _skill_source:
             return "Este edital não tem regras específicas de fonte carregáveis."
-        content = _load_skill_file(_skill_source, skill_type)
+        content = _load_skill_file(_skill_source, "compliance")
         if not content.strip():
-            return f"Sem skill '{skill_type}' para a fonte {_skill_source}."
-        return f"REGRAS DA FONTE ({_skill_source}, {skill_type}):\n{content}"
+            return f"Sem regras de compliance carregáveis para a fonte {_skill_source}."
+        return f"REGRAS DA FONTE ({_skill_source}, compliance):\n{content}"
 
     from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
     from core.llm.agent_tools.research_tools import build_research_tools
