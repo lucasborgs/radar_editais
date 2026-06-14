@@ -792,6 +792,33 @@ de fora — nenhum bloqueia o que foi entregue.
 
 ---
 
+### Learning loop dos playbooks/KG — evolução por uso (parado: sem usuários)
+
+- **O quê:** como o ecossistema de conhecimento (nós de mecanismo/fonte + skills)
+  evolui pelo uso. Motor JÁ existe no tier-empresa: outcome (`aprovada/reprovada` em
+  applications) → `reflect_workspace` ([reflection_service.py](../core/reflection_service.py))
+  com `MIN_OUTCOMES_FOR_REFLECTION=3` + `confidence` low/med/high + `evidence_ids`
+  (provenance) → auto-insert (privado, blast radius 1). Falta levantar o mesmo motor
+  a **dois tiers compartilhados** (overlay de fonte, base de mecanismo).
+- **Gate compartilhado (a desenhar):** piso cross-workspace (≥N outcomes de ≥K
+  workspaces), só `confidence=high` elegível, **fila de curadoria humana**
+  (não auto-promove — filosofia Grantable), eval-gate (precisa do grounding
+  confiável), provenance+data p/ aposentar, e **filtro fato↔craft**: delta que é
+  FATO do instrumento → vai pro nó KG (conhecimento); delta que é CRAFT → vai pra
+  skill (competência).
+- **Substrato (decisão):** o destino do conhecimento é o **nó do KG** (mecanismo/
+  fonte como nós com wiki_page, à la LLM-wiki de Karpathy — "o grafo é a fonte de
+  conhecimento"). Arquivos `skills/*.md` em git são o **bootstrap** (tier-0); o
+  loop é idêntico nos dois (escreve delta em markdown). Reconciliação Karpathy:
+  o LLM **propõe** sempre; o gate **promove** nas páginas compartilhadas.
+- **Por que parado:** sem usuários reais não há outcomes → nada a aprender. É
+  fundação de aparato, não de produto. Espelha a disciplina do golden RAG.
+- **Gatilho para retomar:** volume de outcomes reais (aplicações com status final)
+  acumulando + decisão de subir qualidade além da curadoria manual.
+- **Ponto de entrada:** `core/reflection_service.py` (motor), `applications.py`
+  (trigger), o substrato de nó KG (`core/kg/`), `docs/specs/skills-by-mechanism.md`.
+- **Status:** desenho fechado, implementação parada (2026-06-14).
+
 ### Playbooks: conhecimento tácito por mecanismo — spec travada 2026-06-14
 
 - **O quê:** redesenho do subsistema de "skills" do Redator/Monitor. Hoje são
