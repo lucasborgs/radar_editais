@@ -778,17 +778,46 @@ de fora — nenhum bloqueia o que foi entregue.
 - **Por que adiado:** a investigação já entregou o valor (o número não é regressão;
   o gate é que é cego). Tornar o gate útil é trabalho de fixture + custo de N-runs,
   sem decisão de retrieval pendente agora.
-- **Como fazer:** (a) adicionar casos empresa↔edital **bem-casados** (grounding com
-  denominador significativo e agente consistente); (b) domar variância via **N-runs
-  + média** ou temp fixa no eval (tradeoff: N-runs multiplica custo de LLM); (c) opc.:
-  reportar grounding só quando Σclaims do run ≥ limiar. Sinal de produto SEPARADO a
-  testar com fixture próprio: agente fabricar fit em par misfit (anti-fabricação,
-  `3f15122b4`).
-- **Gatilho para retomar:** querer usar `pct_grounded` como gate de merge real, OU
-  mexer no Redator de um jeito que precise medir grounding com confiança.
+- **Como fazer:** (a) ✅ FEITO 2026-06-14 — fixture reescrita com pares **bem-casados
+  ancorados nos CHUNKS** (não no resumo do wiki): `espectra`→finep:774 (linha
+  hiperespectral) e `tratorbr`→finep:769 (trator+implementos). Grounding pooled
+  0.05→0.50, factual_errors 0.67→0.33, saved 0.83→1.0, e um caso limpo a 3/3=1.0,
+  0 erros (prova que o agente ANCORA bem em fit limpo). (b) domar variância via
+  **N-runs + média** ou temp fixa no eval — AINDA ABERTO (tradeoff: N-runs multiplica
+  custo de LLM); (c) opc.: reportar grounding só quando Σclaims do run ≥ limiar.
+- **LIÇÃO METODOLÓGICA (2026-06-14):** não dá pra desenhar fixture de fit a partir do
+  resumo do wiki (themes/objective) — escopo real (exclusões, entregáveis obrigatórios)
+  vive nos chunks. It.1 (perfis do wiki) falhou: finep:774 EXCLUI cana (perfil usava
+  bagaço de cana); finep:769 exige `trator + 6 implementos obrigatórios` (perfil era
+  sensor+app). Só ler os chunks deu fit limpo. Registrado no `_comment` da fixture.
+- **Gatilho para retomar:** querer usar `pct_grounded` como gate de merge real (falta
+  só domar variância, item b), OU mexer no Redator.
 - **Ponto de entrada:** `tests/fixtures/eval_cases.json`, `core/eval/writing.py`
-  (`run_grounding_micro`, `task`), `core/writing_eval.py` (juízes).
-- **Status:** aberto (2026-06-13). Ver memory `project-agent-patterns-deepagents`.
+  (`task`), `core/writing_eval.py` (juízes).
+- **Status:** parcialmente resolvido (2026-06-14): fixture bem-casada feita; resta
+  domar variância (b). Ver memory `project-agent-patterns-deepagents`.
+
+### Redator inventa escopo/procedimento do edital (resíduo real, fixture limpa)
+
+- **O quê:** com fixture bem-casada (2026-06-14), os erros factuais que SOBRAM são
+  sinal de produto real, não artefato. Em `tratorbr`→finep:769 o redator: (1)
+  **mischaracterizou o escopo** do edital — afirmou que finep:769 "apoia Agritech /
+  agricultura de precisão" quando o edital é de MECANIZAÇÃO (trator+implementos);
+  (2) **inventou um passo procedural** — "Reuniões iniciais com a equipe da Finep" na
+  metodologia, que VIOLA a regra de conflito de interesse do edital (especialistas
+  ad-hoc sem vínculo). Ambos pegos pelo juiz factual.
+- **Por que adiado:** estreito (1 dos 2 perfis, minoria das seções) e não bloqueia —
+  o agente ancora bem em fit limpo (espectra 3/3). Mas é a próxima alavanca real de
+  qualidade de escrita, agora que o instrumento mede a coisa certa.
+- **Frentes possíveis:** (a) prompt do redator — instruir a NÃO afirmar o escopo do
+  edital sem respaldo em chunk recuperado (descrever só o que o edital diz, verbatim);
+  (b) puxar regras procedurais (conflito de interesse, vínculos) pro contexto via
+  retrieval antes de redigir metodologia; (c) ComplianceMonitor/Critic pegar esse
+  tipo de claim antes do save.
+- **Gatilho:** próxima rodada de melhoria do Redator, ou se grounding virar gate.
+- **Ponto de entrada:** prompt do redator em `core/services/writing_session.py`,
+  juiz `judge_factual_errors` em `core/writing_eval.py`.
+- **Status:** aberto (2026-06-14).
 
 ---
 
