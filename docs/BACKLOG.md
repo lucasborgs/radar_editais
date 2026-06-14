@@ -839,7 +839,13 @@ de fora — nenhum bloqueia o que foi entregue.
   além do RAG puro, OU FAPESP/web entrarem em produção precisando de praxe curada.
 - **Ponto de entrada:** `core/skills.py` (loader), `opportunity_discovery._extract`
   (mechanism), `compliance_monitor.py` + `writing_tools.load_skill` (roteamento).
-- **Status:** spec travada (2026-06-14), implementação aberta.
+- **Status:** **loader + flip dos consumidores IMPLEMENTADOS (2026-06-14)** —
+  `load_playbook` compõe 3 camadas por seção; Monitor/Redator flipados; antigos
+  `*_compliance.md` removidos (tácito FINEP → `source/finep/global.md`). Playbooks de
+  `subvencao`/`credito`/`equity` ativos (SEED). **Pendente:** (a) extrator web preencher
+  `mechanism` (D7) — web 100% None; (b) migrar os 5 `investimento`→`credito` na fonte de
+  dados (D2); (c) `mechanism/_generic.md` p/ o fallback None não ficar vazio (D3);
+  (d) shadow/eval de injeção + learning loop (sem usuários ainda).
 - **Overlay `source/bndes/credito.md` (pendente de fonte):** a entrevista de `credito`
   (2026-06-14) rendeu praxe BNDES rica (análise econômico-financeira/governança no
   centro, narrativa corporativa menos tecnológica, FGI/FGO como garantia), mas BNDES

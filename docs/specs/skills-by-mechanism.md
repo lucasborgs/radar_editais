@@ -43,9 +43,14 @@ usuários/outcomes reais.
 
 ## Estado atual (código)
 
-- `load_skill(source, type)` resolve `skills/<source>_<type>.md` por fonte
-  ([skills.py:32](../../core/skills.py)); guard de PLACEHOLDER já trata
-  scaffolding como ausente.
+- **Loader implementado (2026-06-14):** `load_playbook(mechanism, source)`
+  ([core/skills.py](../../core/skills.py)) compõe as 3 camadas por seção, expõe
+  `for_writer()`/`for_monitor()`, captura a Lente, dropa o rodapé fato↔craft (corte em
+  `---`), normaliza o vocabulário (D1/D2) e cai em `confidence="low"` no fallback (D3);
+  guard de PLACEHOLDER preservado. Consumidores **já flipados**: ComplianceMonitor puxa
+  `for_monitor()`; a tool `load_skill` do Redator puxa `for_writer()` (pitch→equity). Os
+  `skills/<source>_compliance.md` antigos foram removidos (craft tácito migrou p/
+  `source/finep/global.md`; regra dura é RAG). Critic intocado.
 - `mechanism` **já é campo estruturado** de todo edital — `MATCH_FIELDS`
   ([wiki_schema.py:46](../../core/kg/wiki_schema.py)), extraído no Stage 1.
 - **Distribuição real (41 editais):** `subvencao`=13, `investimento`=5, `None`=23
@@ -120,6 +125,11 @@ ponto (mapa de sinônimos → slug).
 | **D7** | Ordem | **Loader + skills de mecanismo primeiro, validado em FINEP/FAPESP** (mechanism limpo); **extrator web cedo/em paralelo**; overlays depois. | Loader é independente e FINEP/FAPESP dão set de validação limpo → não bloqueia por web vazio. Extrator é cedo-não-último porque web é o volume. |
 
 ## Roteiro de implementação
+
+> **Estado (2026-06-14):** itens 1, 4 e 6 **feitos** (loader + flip dos consumidores
+> + overlay `source/finep/global.md`); 2 parcial (normalização no loader feita; a
+> **migração dos 5 `investimento`** na fonte de dados ainda não); 3 feito p/ subvenção
+> e crédito; **5 (extrator web) e 7 (conteúdo incremental) pendentes**.
 
 1. **Loader novo** (`core/skills.py`): resolve `mechanism` (+ `source`) da wiki
    page e compõe as 3 camadas por seção; expõe seções nomeadas; preserva guard de
