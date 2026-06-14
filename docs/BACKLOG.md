@@ -801,7 +801,7 @@ de fora — nenhum bloqueia o que foi entregue.
 
 - **O quê:** com fixture bem-casada (2026-06-14), os erros factuais que SOBRAM são
   sinal de produto real, não artefato. Em `tratorbr`→finep:769 o redator: (1)
-  **mischaracterizou o escopo** do edital — afirmou que finep:769 "apoia Agritech /
+  **deturpou o escopo** do edital — afirmou que finep:769 "apoia Agritech /
   agricultura de precisão" quando o edital é de MECANIZAÇÃO (trator+implementos);
   (2) **inventou um passo procedural** — "Reuniões iniciais com a equipe da Finep" na
   metodologia, que VIOLA a regra de conflito de interesse do edital (especialistas
