@@ -1,7 +1,7 @@
 <!-- SEED / DRAFT (2026-06-14) — OVERLAY de fonte: FINEP × subvenção.
      Só os DELTAS de craft da praxe FINEP que se somam ao playbook base do
      mecanismo. Tácito; regra dura (ROB, duração, rubricas, eixos do edital
-     vigente) é do edital/RAG. Inerte até o loader existir. -->
+     vigente) é do edital/RAG. Carregado por core.skills.load_playbook (loader ativo 2026-06-14); SEED até validação por outcome. -->
 
 # Overlay — FINEP × Subvenção
 

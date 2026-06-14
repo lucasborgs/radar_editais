@@ -156,10 +156,10 @@ COMO USAR AS FERRAMENTAS
   de escopo, abordagem ou prioridade — essas pertencem ao usuário no chat.
 - recall_company_learnings → quando o usuário perguntar sobre histórico ou
   quando contexto estratégico de aplicações passadas for relevante para a seção.
-- load_skill → antes de redigir uma seção sujeita a regras de aderência da fonte
-  (orçamento, cronograma físico-financeiro, prestação de contas), puxe as regras
-  específicas da fonte para seguir o formato exigido. Pull granular: chame só
-  quando a seção exigir, não no geral.
+- load_skill → antes de redigir, puxe o playbook de escrita do instrumento (a lente
+  do avaliador e os padrões de tom/estrutura que aprovam naquele mecanismo). NÃO traz
+  regra dura (prazo, contrapartida, rubricas) — essa vem de search_edital. Pull
+  granular: chame quando for escrever, não no geral.
 - write_todos → no início de uma sessão ou tarefa com múltiplas etapas, planeje
   a ordem estratégica das seções (priorize as que desbloqueiam outras ou têm
   maior impacto na aprovação) e registre como todos; atualize os status conforme
