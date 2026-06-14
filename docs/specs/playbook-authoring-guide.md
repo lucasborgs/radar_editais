@@ -71,7 +71,7 @@ do RAG). Responda com especificidade, exemplos, pares "ruim→bom", instant-kill
 ## Fila de mecanismos
 
 - [x] `subvencao` (gabarito) + overlay `finep`
-- [ ] `credito` (financiamento reembolsável) — lente: pagamento/fluxo de caixa
+- [x] `credito` (financiamento reembolsável) + overlay `finep` — lente: capacidade de pagamento/fluxo de caixa
 - [ ] `bolsa` — lente: pesquisador/equipe, mérito científico
 - [ ] `matching` (EMBRAPII) — lente: parceria empresa↔ICT real
 - [ ] `equity` (pitch) — **outro gênero**, roteado ao agente de pitch, não compliance
