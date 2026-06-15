@@ -11,6 +11,63 @@
 
 ## Aberto
 
+### Deploy — aplicar migrations 021-024 no Supabase remoto (knowledge-evolution)
+
+- **O quê:** as migrations `021_weight_change_log`, `022_episodic_signal`,
+  `023_research_findings`, `024_playbook_overlays` (PR #26) foram aplicadas e validadas
+  só no Supabase **local**. Quando o #26 for pra prod, rodar no remoto (`supabase db push`
+  ou pelo runbook de deploy).
+- **Por que adiado:** é passo de deploy, não de PR. O #26 está empilhado sobre o #25 —
+  só vira prod depois do #25 mergear + retarget pra main.
+- **Risco:** baixo — sobem limpas no local (schema/RLS/FK conferidos via psql). A diferença
+  no remoto seria estado de dados, não SQL.
+- **Status:** aberto (2026-06-15).
+
+### Job `run_meta_reflection` — Item 3 (learned overlays de playbook) só tem scaffold
+
+- **O quê:** o Item 3 da spec de knowledge-evolution entregou só a estrutura — tabelas
+  `playbook_overlays`/`meta_reflection_runs` (GLOBAL) + 4ª camada no `load_playbook` +
+  `GET /playbooks/{m}/layers`. Falta o **job que ESCREVE overlays**: meta-reflexão
+  cross-tenant que agrega `application_log` anonimizado por `(mechanism, source)`, roda
+  LLM e insere overlays de nível 3.
+- **Por que adiado:** depende de **volume cross-tenant** real — sem dados acumulados de
+  vários workspaces, a meta-reflexão não produz nada testável. A 4ª camada é no-op até o
+  job popular as tabelas.
+- **Onde está specado:** `docs/spec_knowledge_evolution.md` (Item 3, plano passo 2);
+  memory `project-knowledge-evolution-spec`.
+- **Ponto de entrada:** novo job em `core/tasks.py` (procrastinate) escrevendo via
+  `get_supabase_service`; `meta_reflection_runs` é a trilha de auditoria já criada.
+- **Gatilho:** quando houver N workspaces com outcomes suficientes por mecanismo.
+- **Status:** aberto (2026-06-15) — scaffold no PR #26.
+
+### Smoke e2e do happy-path dos endpoints de escrita novos (knowledge-evolution)
+
+- **O quê:** os writes novos (`POST /research-findings/{id}/promote`, `/writing/{id}/close`,
+  `/me/weight-changes/{id}/revert`) foram smoke-testados só nos caminhos de **erro** (401
+  sem auth, 404/200 com ID inexistente — zero 500). O **happy-path** (promover um finding
+  real → vira content_item; fechar sessão com turnos → extrai sinal; reverter um peso
+  aplicado) nunca foi exercitado ponta-a-ponta contra dados reais.
+- **Por que adiado:** exige seed de dados (finding/sessão/weight_change reais) + chamadas
+  LLM (extração de sinal no close). Lógica coberta por unit tests (mocks) e erro-path
+  confirmado em runtime — risco baixo.
+- **Ponto de entrada:** subir backend local + JWT do `EVAL_WORKSPACE_ID`; seed via psql no
+  container `supabase_db_radar_editais`.
+- **Status:** aberto (2026-06-15).
+
+### Auto-apply de pesos — sem dedup de sugestão repetida entre ciclos (Item 1)
+
+- **O quê:** `auto_apply_suggestions` lê `current_weights` fresco a cada ciclo e aplica o
+  delta. Se o LLM sugerir a MESMA dimensão (ex.: `trl +5`) em ciclos sucessivos, o peso
+  acumula (+5/ciclo até o clamp 0-100). Não há dedup contra "já apliquei essa sugestão
+  recentemente".
+- **Por que adiado:** é *by design* pela spec ("|delta|≤5 por dimensão por ciclo") +
+  reversibilidade via `weight_change_log`. Vira problema só com auto-trigger frequente.
+- **Como fazer:** a própria spec prevê "após N ciclos, comparar performance do match
+  antes/depois como sinal real" — ou olhar o `weight_change_log` recente da dimensão antes
+  de reaplicar.
+- **Ponto de entrada:** `core/weight_approval.py::auto_apply_suggestions`.
+- **Status:** aberto (2026-06-15) — watch-item do PR #26.
+
 ### Explicador de mecanismo no explore (tool user-facing)
 
 - **O quê:** tool nova no agente de explore que explica, pro usuário final, o que
@@ -535,9 +592,13 @@
 - **Feito (Fase A):** `core/web_search.py` (port Tavily REST), `core/deep_research.py`
   (subagente run_agent + anti-fabricação), tool `deep_research` no Redator. Stateless,
   não persiste. Falta `TAVILY_API_KEY` no ambiente para uso real.
-- **Fase B (aberto):** gate de learning — endpoint `POST /library/from-research` +
-  `create_item(type_='web_research', source_url=…, enrich=True)` + painel de "fontes
-  pendentes" no frontend. É onde o fato escolhido vira memória do projeto.
+- **Fase B (FEITO — PR #26, 2026-06-15):** entregue como `research_findings` (staging
+  table, verified=false) + `build_research_tools(workspace_id, db)` persistindo silencioso
+  + `GET /research-findings` + `POST /research-findings/{id}/promote` (cria content_item,
+  type='other'+tag deep_research) + `ResearchFindingsQueue` na library. Difere do shape
+  esboçado aqui (`/library/from-research`/`web_research`) mas cumpre a mesma intenção: o
+  fato escolhido vira memória via gate humano de baixo atrito. Guardrails: cap de pendentes
+  (`RESEARCH_FINDINGS_MAX_PENDING=50`) + TTL 30d (filtro no GET).
 - **Fase C (aberto):** decay por tipo (`web_research` com meia-vida menor) + tool no
   Explorador + eval anti-fabricação (casos cuja resposta certa é "não encontrei").
 - **Onde:** [spec_deepresearch.md](spec_deepresearch.md).
@@ -818,6 +879,11 @@ de fora — nenhum bloqueia o que foi entregue.
   (`task`), `core/writing_eval.py` (juízes).
 - **Status:** parcialmente resolvido (2026-06-14): fixture bem-casada feita; resta
   domar variância (b). Ver memory `project-agent-patterns-deepagents`.
+- **Corroboração (2026-06-15, PR #26):** o gate do Item 5 (Critic sub-agente) rodou um
+  A/B writing eval critic-novo vs critic-antigo: grounding **flat ~0.40** nos dois
+  (0.417 vs 0.396) → reconfirma que o número é do writer/retrieval, **independente** do
+  critic. Item 5 não regrediu nada (saved=1.0, zero over-block). Reforça item (b): a
+  alavanca real é variância do draft + qualidade de ancoragem do redator, não o critic.
 
 ### Redator inventa escopo/procedimento do edital (resíduo real, fixture limpa)
 
