@@ -52,21 +52,43 @@ def test_build_context_defensive_without_attrs():
     assert "Nenhuma outra seção" in ctx
 
 
-def test_run_critic_injects_siblings_into_prompt(monkeypatch):
+# ── Critic-como-sub-agente (Item 5 da spec) ──
+# run_critic agora roda via run_subagent: o substrato (edital/fundo, perfil,
+# outras seções) chega por TOOLS, não mais context-stuffed num único prompt.
+# Mockamos run_subagent para (a) capturar as tools e os params de invocação e
+# (b) exercitar as tools, verificando o roteamento de substrato por gênero.
+from core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
+
+
+def _canned_result(content: str, n_steps: int = 1) -> AgentResult:
+    steps = [TraceStep(kind="llm", text=content) for _ in range(n_steps)]
+    return AgentResult(final_text=content, steps=steps, stop_reason="end_turn", usage={})
+
+
+def test_run_critic_subagent_proposal_siblings_via_tool(monkeypatch):
+    """Gênero proposta: o critic usa run_subagent (provider=openai, gpt-4o,
+    temperature=0.05); a seção irmã chega via a tool read_proposal_sections, e o
+    edital via read_target_context (que faz o retrieve)."""
+    import core.llm.agent_tools.critic_agent as ca
     captured = {}
 
-    def fake_create(**kw):
-        captured["messages"] = kw["messages"]
-        content = '{"approved": false, "issues": ["A conclusão cita 5 pesquisadores, mas a seção Equipe diz 3"], "feedback": "conflito entre seções"}'
-        return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+    monkeypatch.setattr(
+        "core.retrieval.retriever.retrieve_chunks", lambda *a, **k: []
+    )
+
+    def fake_run_subagent(**kw):
+        captured.update(kw)
+        # Exercita as tools para provar o roteamento de substrato.
+        tools_by_name = {t.name: t for t in kw["tools"]}
+        captured["tool_names"] = set(tools_by_name)
+        captured["siblings"] = tools_by_name["read_proposal_sections"].call({})
+        captured["target"] = tools_by_name["read_target_context"].call({"query": "equipe"})
+        return _canned_result(
+            '{"approved": false, "issues": ["A conclusão cita 5 pesquisadores, '
+            'mas a seção Equipe diz 3"], "feedback": "conflito entre seções"}'
         )
 
-    fake_client = SimpleNamespace(
-        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
-    )
-    monkeypatch.setattr("core.llm.llm_client.make_client", lambda **kw: fake_client)
-    monkeypatch.setattr("core.retrieval.retriever.retrieve_chunks", lambda *a, **k: [])
+    monkeypatch.setattr(ca, "run_subagent", fake_run_subagent)
 
     s = _StubSession(
         ["1. Equipe", "2. Conclusão"],
@@ -78,34 +100,38 @@ def test_run_critic_injects_siblings_into_prompt(monkeypatch):
         s,
     )
 
-    user_msg = captured["messages"][1]["content"]
-    assert "OUTRAS SEÇÕES JÁ REDIGIDAS" in user_msg
-    assert "3 pesquisadores" in user_msg  # conteúdo da seção irmã entrou no prompt
+    assert captured["provider"] == "openai"
+    assert captured["model"] in ("gpt-4o",) or captured["model"]
+    assert captured["temperature"] == 0.05
+    assert captured["max_steps"] == 3
+    assert captured["tool_names"] == {
+        "read_target_context", "read_company_profile", "read_proposal_sections",
+    }
+    assert "3 pesquisadores" in captured["siblings"]  # seção irmã via tool
     assert res.approved is False
     assert res.issues
 
 
-def test_run_critic_pitch_uses_fund_node_not_edital_chunks(monkeypatch):
-    """No mode=pitch, o critic cruza contra o nó do fundo (context-stuffing) e
-    NÃO chama retrieve_chunks (edital_chunks). Substrato e prompt mudam."""
+def test_run_critic_subagent_pitch_target_is_fund_node(monkeypatch):
+    """mode=pitch: read_target_context retorna o nó do fundo (context-stuffing) e
+    NÃO chama retrieve_chunks (edital_chunks)."""
+    import core.llm.agent_tools.critic_agent as ca
     captured = {}
 
-    def fake_create(**kw):
-        captured["messages"] = kw["messages"]
-        content = '{"approved": false, "issues": ["O pitch diz que o fundo investe em série B, mas o estágio alvo é seed"], "feedback": "contradiz o fundo"}'
-        return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
-        )
-
-    fake_client = SimpleNamespace(
-        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
-    )
-    monkeypatch.setattr("core.llm.llm_client.make_client", lambda **kw: fake_client)
-
-    # Se o critic tentar retrieve_chunks no pitch, o teste falha (não deve tocar edital_chunks).
     def _boom(*a, **k):
         raise AssertionError("retrieve_chunks não deve ser chamado no mode=pitch")
     monkeypatch.setattr("core.retrieval.retriever.retrieve_chunks", _boom)
+
+    def fake_run_subagent(**kw):
+        captured.update(kw)
+        tools_by_name = {t.name: t for t in kw["tools"]}
+        captured["target"] = tools_by_name["read_target_context"].call({"query": "estágio"})
+        return _canned_result(
+            '{"approved": false, "issues": ["O pitch diz que o fundo investe em '
+            'série B, mas o estágio alvo é seed"], "feedback": "contradiz o fundo"}'
+        )
+
+    monkeypatch.setattr(ca, "run_subagent", fake_run_subagent)
 
     s = _StubSession(["1. Time", "2. Fit com a tese do fundo"], {})
     s.mode = "pitch"
@@ -119,9 +145,35 @@ def test_run_critic_pitch_uses_fund_node_not_edital_chunks(monkeypatch):
         s,
     )
 
-    system_msg = captured["messages"][0]["content"]
-    user_msg = captured["messages"][1]["content"]
-    assert "pitches de captação" in system_msg          # prompt de pitch, não de edital
-    assert "DADOS DO FUNDO-ALVO" in user_msg
-    assert "Estágio alvo: seed" in user_msg             # nó do fundo entrou no prompt
+    # prompt de pitch, não de edital
+    assert "pitches de captação" in captured["system"]
+    # nó do fundo retornado pela tool (sem tocar edital_chunks)
+    assert "Estágio alvo: seed" in captured["target"]
     assert res.approved is False
+
+
+def test_run_critic_degrades_on_subagent_error(monkeypatch):
+    """stop_reason=='error' do sub-agente → approved=True (save nunca bloqueia)."""
+    import core.llm.agent_tools.critic_agent as ca
+
+    monkeypatch.setattr(
+        ca, "run_subagent",
+        lambda **kw: AgentResult(final_text="", steps=[], stop_reason="error", usage={}),
+    )
+    s = _StubSession(["1. Equipe"], {"1. Equipe": "x"})
+    res = run_critic("qualquer rascunho", "1. Equipe", s)
+    assert res.approved is True
+    assert "indisponível" in res.feedback.lower()
+
+
+def test_run_critic_degrades_on_unparseable_verdict(monkeypatch):
+    """final_text não-JSON → approved=True por fallback."""
+    import core.llm.agent_tools.critic_agent as ca
+
+    monkeypatch.setattr(
+        ca, "run_subagent",
+        lambda **kw: _canned_result("não consegui decidir, desculpe"),
+    )
+    s = _StubSession(["1. Equipe"], {"1. Equipe": "x"})
+    res = run_critic("qualquer rascunho", "1. Equipe", s)
+    assert res.approved is True
