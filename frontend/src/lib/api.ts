@@ -715,6 +715,41 @@ export const revertWeightChange = (changeId: string, token: string) =>
     token,
   );
 
+// ── Research findings (Item 2, Fase B do deep_research) ────
+// Staging area: findings do sub-agente de pesquisa chegam verified=false; o
+// usuário promove à content_library o que quiser manter (gate humano).
+
+export interface ResearchFindingSource {
+  url: string;
+  title: string;
+}
+
+export interface ResearchFinding {
+  id: string;
+  question: string;
+  answer: string | null;
+  sources: ResearchFindingSource[];
+  query: string | null;
+  verified: boolean;
+  created_at: string;
+  reviewed_at: string | null;
+  promoted_to_library_id: string | null;
+}
+
+export const getResearchFindings = (token: string) =>
+  apiFetch<{ findings: ResearchFinding[] }>(
+    "/research-findings",
+    undefined,
+    token,
+  );
+
+export const promoteResearchFinding = (id: string, token: string) =>
+  apiFetch<{ promoted: boolean; library_id: string }>(
+    `/research-findings/${id}/promote`,
+    { method: "POST" },
+    token,
+  );
+
 // ── Profile drift (Gap 4) ─────────────────────────────────
 
 export interface ProfileDriftSignal {
