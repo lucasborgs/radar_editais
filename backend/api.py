@@ -38,7 +38,9 @@ from backend.routers.files import router as files_router
 from backend.routers.frontdoor import router as frontdoor_router
 from backend.routers.graph import router as graph_router
 from backend.routers.matching import router as matching_router
+from backend.routers.playbooks import router as playbooks_router
 from backend.routers.profile import router as profile_router
+from backend.routers.research import router as research_router
 from backend.routers.writing import router as writing_router
 from core.logging_config import request_id_var, setup_logging
 
@@ -160,3 +162,5 @@ app.include_router(writing_router)
 app.include_router(conversations_router)
 app.include_router(files_router)
 app.include_router(profile_router)
+app.include_router(research_router)
+app.include_router(playbooks_router)
