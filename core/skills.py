@@ -182,11 +182,68 @@ class Playbook:
         return not self.lente and not any(self.sections.values())
 
 
-def load_playbook(mechanism: str | None, source: str | None = None) -> Playbook:
-    """Compõe o playbook efetivo para (mechanism, source), merge por seção.
+@dataclass
+class PlaybookLayer:
+    """Uma camada resolvida do playbook (para auditoria visual camada-por-camada).
 
-    Fallback gracioso: mechanism None/desconhecido → tenta `mechanism/_generic.md`,
-    marca `confidence="low"` e NÃO bloqueia (D3). Camada/seção ausente é ignorada.
+    `layer` ∈ {"git_base", "git_source", "learned_overlay"}.
+    """
+    layer: str
+    lente: str = ""
+    sections: dict[str, str] = field(default_factory=dict)
+
+
+# ── 4ª camada: learned overlays do banco (Item 3) ────────────────────────────
+# Lidos via service-role (tabela GLOBAL/cross-workspace, sem RLS — ver
+# migration 024). TODO acesso ao banco é GUARDADO: qualquer falha (sem DB
+# configurado, query quebra, sem linhas) → retorna [] e o loader cai no caminho
+# git-only de sempre, sem regressão.
+
+def _load_overlays(mechanism: str, source: str) -> list[tuple[str, str]]:
+    """Busca learned overlays para (mechanism, source) → [(section, body), ...].
+
+    Casa overlays do mecanismo cujo `source` é exatamente `source` OU NULL
+    (overlay vale para qualquer fonte). Retorna [] em QUALQUER falha — o acesso
+    ao DB é totalmente opcional e nunca pode quebrar o caminho git-only.
+    """
+    if not mechanism:
+        return []
+    try:
+        from core.db import get_supabase_service
+
+        db = get_supabase_service()
+        res = (
+            db.table("playbook_overlays")
+            .select("source, section, body, created_at")
+            .eq("mechanism", mechanism)
+            .order("created_at")
+            .execute()
+        )
+        rows = res.data or []
+    except Exception as e:  # sem DB / query falha / env ausente → git-only
+        logger.debug("learned overlays indisponíveis para %s/%s: %s", mechanism, source, e)
+        return []
+
+    out: list[tuple[str, str]] = []
+    for row in rows:
+        row_src = _normalize_source(row.get("source"))
+        # source NULL/"" no banco = vale para qualquer fonte; senão tem que casar.
+        if row_src and row_src != source:
+            continue
+        section = (row.get("section") or "").strip()
+        body = (row.get("body") or "").strip()
+        if section and body:
+            out.append((section, body))
+    return out
+
+
+def _load_git_layers(
+    mechanism: str | None, source: str | None
+) -> tuple[str | None, str, list[PlaybookLayer]]:
+    """Resolve as camadas GIT (base + source) separadas, para merge ou auditoria.
+
+    Retorna (mech_canônico, confidence, [camadas git na ordem de aplicação]).
+    Réplica exata da resolução git-only de antes — não toca no banco.
     """
     mech = _normalize_mechanism(mechanism)
     src = _normalize_source(source)
@@ -197,24 +254,69 @@ def load_playbook(mechanism: str | None, source: str | None = None) -> Playbook:
         confidence = "low"
         base = _parse_playbook_file(_SKILLS_DIR / "mechanism" / "_generic.md")
 
+    layers: list[PlaybookLayer] = []
+    if base:
+        bl, bsecs = base
+        layers.append(PlaybookLayer("git_base", lente=bl, sections={k: v for k, v in bsecs.items() if v}))
+
+    if src and mech:
+        src_lente = ""
+        src_secs: dict[str, str] = {}
+        for fname in ("global.md", f"{mech}.md"):
+            parsed = _parse_playbook_file(_SKILLS_DIR / "source" / src / fname)
+            if not parsed:
+                continue
+            l, secs = parsed
+            if l and not src_lente:
+                src_lente = l
+            for name, body in secs.items():
+                if body:
+                    # dentro da camada git_source, global.md + <mech>.md acumulam por seção
+                    src_secs[name] = (src_secs[name] + "\n\n" + body) if name in src_secs else body
+        if src_lente or src_secs:
+            layers.append(PlaybookLayer("git_source", lente=src_lente, sections=src_secs))
+
+    return mech, confidence, layers
+
+
+def load_playbook(
+    mechanism: str | None,
+    source: str | None = None,
+    *,
+    include_overlays: bool = True,
+) -> Playbook:
+    """Compõe o playbook efetivo para (mechanism, source), merge por seção.
+
+    Camadas, na ordem de aplicação (merge POR SEÇÃO; cada camada adiciona/acumula):
+        git base (mechanism/<mech>.md)
+          + git source (source/<src>/global.md + source/<src>/<mech>.md)
+          + learned overlays do banco (playbook_overlays)  ← 4ª camada (Item 3)
+
+    Backward-compat: `include_overlays` é keyword-only e default True, mas o acesso
+    ao banco é totalmente GUARDADO (`_load_overlays` devolve [] em qualquer falha).
+    Sem DB configurado → resultado idêntico ao caminho git-only de antes. Passe
+    `include_overlays=False` para forçar git-only sem nem tocar no banco.
+
+    Fallback gracioso: mechanism None/desconhecido → tenta `mechanism/_generic.md`,
+    marca `confidence="low"` e NÃO bloqueia (D3). Camada/seção ausente é ignorada.
+    """
+    mech, confidence, git_layers = _load_git_layers(mechanism, source)
+    src = _normalize_source(source)
+
     lente = ""
     merged: dict[str, list[str]] = {}
 
-    def _add(parsed: tuple[str, dict[str, str]] | None) -> None:
-        nonlocal lente
-        if not parsed:
-            return
-        l, secs = parsed
-        if l and not lente:
-            lente = l
-        for name, body in secs.items():
+    for layer in git_layers:
+        if layer.lente and not lente:
+            lente = layer.lente
+        for name, body in layer.sections.items():
             if body:
                 merged.setdefault(name, []).append(body)
 
-    _add(base)
-    if src and mech:
-        _add(_parse_playbook_file(_SKILLS_DIR / "source" / src / "global.md"))
-        _add(_parse_playbook_file(_SKILLS_DIR / "source" / src / f"{mech}.md"))
+    # 4ª camada: learned overlays do banco, mergeados DEPOIS das camadas git.
+    if include_overlays and mech:
+        for name, body in _load_overlays(mech, src):
+            merged.setdefault(name, []).append(body)
 
     sections = {name: "\n\n".join(parts) for name, parts in merged.items()}
     return Playbook(
@@ -224,6 +326,30 @@ def load_playbook(mechanism: str | None, source: str | None = None) -> Playbook:
         sections=sections,
         confidence=confidence,
     )
+
+
+def resolve_playbook_layers(
+    mechanism: str | None, source: str | None = None
+) -> tuple[str | None, str | None, list[PlaybookLayer]]:
+    """Resolve o playbook CAMADA POR CAMADA (git base, git source, learned overlay).
+
+    Para a auditoria visual "o que veio de onde" (endpoint /playbooks/.../layers).
+    NÃO mergeia — devolve cada camada separada na ordem de aplicação. O acesso ao
+    banco é guardado (sem overlays / sem DB → só as camadas git).
+
+    Retorna (mech_canônico, source_normalizado_ou_None, [PlaybookLayer, ...]).
+    """
+    mech, _confidence, layers = _load_git_layers(mechanism, source)
+    src = _normalize_source(source)
+
+    if mech:
+        overlay_secs: dict[str, str] = {}
+        for name, body in _load_overlays(mech, src):
+            overlay_secs[name] = (overlay_secs[name] + "\n\n" + body) if name in overlay_secs else body
+        if overlay_secs:
+            layers.append(PlaybookLayer("learned_overlay", sections=overlay_secs))
+
+    return mech, (src or None), layers
 
 
 def available_skills() -> list[dict]:
