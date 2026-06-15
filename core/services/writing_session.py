@@ -231,6 +231,33 @@ COMPRESS_SYSTEM = """Resuma os turnos abaixo em um parágrafo conciso (máx. 200
 Preserve: decisões tomadas, trechos aprovados pelo usuário e informações adicionais fornecidas.
 Responda apenas com o resumo."""
 
+# Prompt B (Item 4, Sprint 2): extração de sinal estruturado ao comprimir/fechar
+# a sessão. Roda em PARALELO com COMPRESS_SYSTEM sobre os mesmos turnos. Enquanto
+# o resumo captura "o que foi dito" (alimenta o próximo turno), este captura
+# "o que deu atrito" (alimenta o aprendizado de longo prazo via reflection_insights).
+SIGNAL_SYSTEM = """Você analisa uma sessão de escrita de proposta para captação de recursos.
+A partir dos turnos abaixo, extraia SINAL sobre o processo de escrita — onde houve
+atrito e onde fluiu bem. Não resuma o conteúdo; foque no processo.
+
+Procure especificamente por:
+1. Seções que o Critic REJEITOU antes de aprovar. Marcadores no histórico:
+   textos como "Critic encontrou N problema(s)". Se a mesma seção foi rejeitada
+   e depois salva, registre quantas iterações levou até aprovar.
+2. Afirmações que o usuário CORRIGIU explicitamente (ex.: "não, o TRL é 6, não 4",
+   "a empresa não atua nesse setor", "isso está errado").
+3. Seções que fluíram SEM ATRITO — escritas e aprovadas de primeira (sinal positivo).
+
+Regras:
+- NÃO invente. Se não houver evidência clara de um tipo, não gere item desse tipo.
+- Cada item deve ser uma observação factual curta, citando a evidência do histórico.
+- Evidência = trecho curto (≤ 200 chars) do histórico que justifica o item.
+
+Responda APENAS com JSON (sem texto fora do JSON), uma lista:
+[
+  {"insight": "...", "kind": "critic_rejection" | "user_correction" | "smooth", "evidence": "..."}
+]
+Lista vazia [] se não houver sinal relevante."""
+
 
 # =============================================================================
 # WRITING SESSION
@@ -1119,6 +1146,33 @@ class WritingSession:
         to_compress = self._history[:-(HISTORY_WINDOW * 2)]
         self._history = self._history[-(HISTORY_WINDOW * 2):]
 
+        # Item 4 (Sprint 2): compressão episódica com extração de sinal.
+        # Dois propósitos no mesmo momento, rodando em PARALELO sobre os mesmos
+        # turnos (`to_compress`):
+        #   - Prompt A (narrativa) → writing_sessions.summary (alimenta o próximo turno)
+        #   - Prompt B (sinal)     → reflection_insights (alimenta o aprendizado)
+        # Ambos os caminhos são síncronos (self._call_llm), então usamos
+        # ThreadPoolExecutor (2 workers), não asyncio. O future do sinal é
+        # isolado: qualquer falha nele NÃO pode afetar a compressão narrativa.
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            narrative_future = pool.submit(self._compress_narrative, to_compress)
+            signal_future = pool.submit(self.extract_session_signal, to_compress)
+
+            # Narrativa: comportamento idêntico ao legado.
+            narrative_future.result()
+
+            # Sinal: best-effort. Isolado para nunca derrubar o turno/compressão.
+            try:
+                signals = signal_future.result()
+                if signals:
+                    self._persist_session_signals(signals)
+            except Exception as e:
+                logger.warning("[%s] Extração de sinal falhou: %s", self.session_id, e)
+
+    def _compress_narrative(self, to_compress: list[dict]) -> None:
+        """Prompt A: compressão narrativa → writing_sessions.summary (legado)."""
         turns_text = "\n".join(
             f"{msg['role'].upper()}: {msg['content']}" for msg in to_compress
         )
@@ -1137,6 +1191,93 @@ class WritingSession:
                 }).eq("id", self.session_id).execute()
             except Exception as e:
                 logger.warning("[%s] Falha ao salvar summary: %s", self.session_id, e)
+
+    def extract_session_signal(self, turns: list[dict]) -> list[dict]:
+        """Prompt B (Item 4): extrai sinal estruturado de uma janela de turnos.
+
+        Identifica seções rejeitadas pelo Critic (e nº de iterações até aprovar),
+        afirmações que o usuário corrigiu, e seções que fluíram sem atrito.
+
+        Retorna lista de `{"insight", "kind", "evidence"}`. NUNCA propaga exceção:
+        falha de LLM ou de parse vira `[]` — a compressão não pode quebrar o turno.
+        O insert em reflection_insights é responsabilidade de `_persist_session_signals`.
+        """
+        if not turns:
+            return []
+        turns_text = "\n".join(
+            f"{msg['role'].upper()}: {msg['content']}" for msg in turns
+        )
+        messages = [
+            {"role": "system", "content": SIGNAL_SYSTEM},
+            {"role": "user",   "content": f"Turnos da sessão:\n\n{turns_text}"},
+        ]
+        try:
+            success, raw, _ = self._call_llm(messages, temperature=0.2, max_tokens=600)
+        except Exception as e:
+            logger.warning("[%s] extract_session_signal: LLM falhou: %s", self.session_id, e)
+            return []
+        if not success or not raw.strip():
+            return []
+
+        text = raw.strip()
+        if "```" in text:
+            text = re.sub(r"```(?:json)?", "", text).strip()
+        try:
+            data = json.loads(text)
+        except Exception as e:
+            logger.warning("[%s] extract_session_signal: parse falhou: %s", self.session_id, e)
+            return []
+
+        if not isinstance(data, list):
+            return []
+        valid_kinds = {"critic_rejection", "user_correction", "smooth"}
+        out: list[dict] = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            insight = (item.get("insight") or "").strip()
+            if not insight:
+                continue
+            kind = item.get("kind")
+            if kind not in valid_kinds:
+                kind = "smooth"
+            out.append({
+                "insight": insight,
+                "kind": kind,
+                "evidence": (item.get("evidence") or "").strip(),
+            })
+        return out
+
+    def _persist_session_signals(self, signals: list[dict]) -> int:
+        """Insere sinais extraídos em reflection_insights (origin=episodic_compression).
+
+        level=1 (observação), confidence='low' (extração heurística — conservador).
+        Retorna o número de rows inseridas. Best-effort: loga e retorna 0 em falha.
+        """
+        if not signals:
+            return 0
+        rows = [
+            {
+                "workspace_id": self.workspace_id,
+                "level": 1,
+                "insight": s["insight"],
+                "evidence": json.dumps({
+                    "kind": s.get("kind"),
+                    "evidence": s.get("evidence", ""),
+                    "session_id": self.session_id,
+                }),
+                "origin": "episodic_compression",
+                "confidence": "low",
+            }
+            for s in signals
+        ]
+        try:
+            self._db.table("reflection_insights").insert(rows).execute()
+        except Exception as e:
+            logger.warning("[%s] _persist_session_signals: insert falhou: %s", self.session_id, e)
+            return 0
+        logger.info("[%s] %d sinal(is) episódico(s) extraído(s)", self.session_id, len(rows))
+        return len(rows)
 
     # ------------------------------------------------------------------
     # Content Library
