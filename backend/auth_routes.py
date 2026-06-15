@@ -245,6 +245,33 @@ def revert_weight(dimension: str, user_id: CurrentUserId, db: DbClient):
     return {"success": True, "dimension": dimension}
 
 
+@router.get(
+    "/me/weight-changes",
+    summary="Feed de mudanças de peso auto-aplicadas (Item 1, fechamento do loop)",
+)
+def get_weight_changes(user_id: CurrentUserId, db: DbClient):
+    """Histórico de pesos auto-aplicados pela reflexão (+ reverts), mais
+    recentes primeiro. Cada linha é reversível via POST .../revert."""
+    from core.weight_approval import list_weight_changes
+    workspace = _ensure_workspace(user_id, db)
+    return {"changes": list_weight_changes(db, workspace["id"])}
+
+
+@router.post(
+    "/me/weight-changes/{change_id}/revert",
+    summary="Reverte uma mudança de peso auto-aplicada (Item 1)",
+)
+def revert_weight_change_endpoint(
+    change_id: str, user_id: CurrentUserId, db: DbClient
+):
+    """Desfaz o delta daquela mudança (aplica o inverso) e registra o revert no
+    log. Retorna reverted=False se a mudança não existe ou já foi revertida."""
+    from core.weight_approval import revert_weight_change
+    workspace = _ensure_workspace(user_id, db)
+    reverted = revert_weight_change(db, workspace["id"], change_id)
+    return {"reverted": reverted}
+
+
 # =============================================================================
 # PROFILE DRIFT (Gap 4)
 # =============================================================================
