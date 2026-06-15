@@ -345,23 +345,31 @@ def _call_openai(
     messages: list[dict[str, Any]],
     tools_schema: list[dict[str, Any]],
     model: str,
+    temperature: float | None = None,
 ) -> _LLMStep:
     """Adapter OpenAI Chat Completions (function calling).
 
     System message é injetado como primeira message (formato OpenAI). Messages
     de input já vêm sem system — o caller (`run_agent`) garante isso.
+
+    `temperature` é opcional: None (default) preserva o comportamento atual de
+    todos os call sites (não passa o param → default do provider). Só o critic
+    sub-agente força um valor baixo para fact-checking determinístico.
     """
     from core.llm.llm_client import make_client
 
     client = make_client(api_key=os.environ["OPENAI_API_KEY"])
     full_messages = [{"role": "system", "content": system}] + messages
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=full_messages,
-        tools=tools_schema if tools_schema else None,
-        tool_choice="auto" if tools_schema else None,
-    )
+    create_kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": full_messages,
+        "tools": tools_schema if tools_schema else None,
+        "tool_choice": "auto" if tools_schema else None,
+    }
+    if temperature is not None:
+        create_kwargs["temperature"] = temperature
+    response = client.chat.completions.create(**create_kwargs)
 
     choice = response.choices[0]
     msg = choice.message
@@ -424,10 +432,14 @@ def _call_anthropic(
     messages: list[dict[str, Any]],
     tools_schema: list[dict[str, Any]],
     model: str,
+    temperature: float | None = None,
 ) -> _LLMStep:
     """Adapter Anthropic Messages API (tool use).
 
     System message é parâmetro top-level, não vai em messages[].
+
+    `temperature` é opcional: None (default) preserva o comportamento atual
+    (não passa o param → default do provider). Passthrough simétrico ao OpenAI.
     """
     from anthropic import Anthropic
 
@@ -437,13 +449,16 @@ def _call_anthropic(
         max_retries=_MAX_RETRIES,
     )
 
-    response = client.messages.create(
-        model=model,
-        system=system,
-        messages=messages,
-        tools=tools_schema if tools_schema else [],
-        max_tokens=4096,
-    )
+    create_kwargs: dict[str, Any] = {
+        "model": model,
+        "system": system,
+        "messages": messages,
+        "tools": tools_schema if tools_schema else [],
+        "max_tokens": 4096,
+    }
+    if temperature is not None:
+        create_kwargs["temperature"] = temperature
+    response = client.messages.create(**create_kwargs)
 
     text_parts: list[str] = []
     tool_uses: list[dict[str, Any]] = []
@@ -597,6 +612,7 @@ async def run_agent_async(
     on_step: Callable[[TraceStep], None] | None = None,
     reflect_every: int | None = None,
     span_name: str | None = None,
+    temperature: float | None = None,
 ) -> AgentResult:
     """Executa o loop do agente até `end_turn`, `max_steps` ou erro.
 
@@ -621,6 +637,10 @@ async def run_agent_async(
             `f"agent.{provider}.{model}"`. `run_subagent` passa
             `f"subagent.{name}"` para distinguir subagente de agente top-level
             no trace — não muda comportamento, só o rótulo.
+        temperature: temperatura repassada ao adapter do provider. None (default)
+            preserva o comportamento atual de todos os call sites (não seta o
+            param → default do provider). O critic sub-agente passa um valor
+            baixo (0.05) para fact-checking determinístico.
 
     Returns:
         AgentResult com texto final, trace completo, stop_reason e usage total.
@@ -629,13 +649,25 @@ async def run_agent_async(
     if provider == "openai":
         tools_schema = registry.to_openai_schema()
         format_results = _format_tool_results_openai
-        call_llm = _call_openai
+        _adapter = _call_openai
     elif provider == "anthropic":
         tools_schema = registry.to_anthropic_schema()
         format_results = _format_tool_results_anthropic
-        call_llm = _call_anthropic
+        _adapter = _call_anthropic
     else:
         raise ValueError(f"provider desconhecido: {provider}")
+
+    # Bind da temperature no adapter: o loop chama call_llm(system, messages,
+    # tools_schema, model); o passthrough opcional fica encapsulado aqui sem
+    # tocar o call site no loop. Quando temperature is None (todos os call sites
+    # exceto o critic), NÃO passamos o kwarg — preserva 100% da assinatura antiga
+    # e não quebra fakes de teste que monkeypatcham adapters com `(system,
+    # messages, tools_schema, model)` posicional, sem aceitar temperature.
+    if temperature is None:
+        call_llm = _adapter
+    else:
+        def call_llm(sys_: str, msgs: list[dict[str, Any]], schema: list[dict[str, Any]], mdl: str) -> _LLMStep:
+            return _adapter(sys_, msgs, schema, mdl, temperature=temperature)
 
     messages = list(initial_messages)
     steps: list[TraceStep] = []
@@ -830,6 +862,7 @@ def run_agent(
     on_step: Callable[[TraceStep], None] | None = None,
     reflect_every: int | None = None,
     span_name: str | None = None,
+    temperature: float | None = None,
 ) -> AgentResult:
     """Shim síncrono sobre `run_agent_async` (spec 01).
 
@@ -854,6 +887,7 @@ def run_agent(
             on_step=on_step,
             reflect_every=reflect_every,
             span_name=span_name,
+            temperature=temperature,
         )
 
     try:
@@ -881,6 +915,7 @@ def run_subagent(
     provider: Provider = "anthropic",
     model: str | None = None,
     max_steps: int = 5,
+    temperature: float | None = None,
 ) -> AgentResult:
     """Roda um subagente-como-tool: resolve provider, executa `run_agent` e
     degrada graciosamente em caso de erro.
@@ -900,6 +935,8 @@ def run_subagent(
         provider: provider preferido (resolve_agent_provider faz fallback por key).
         model: modelo desejado; None → default do provider via resolve.
         max_steps: limite de iterações do loop interno (subagentes são curtos).
+        temperature: repassada ao loop/adapter; None (default) preserva o
+            comportamento atual (sem set → default do provider).
 
     Returns:
         AgentResult do loop interno; ou, em falha de resolução/execução,
@@ -918,6 +955,7 @@ def run_subagent(
             provider=prov,
             max_steps=max_steps,
             span_name=f"subagent.{name}",
+            temperature=temperature,
         )
     except Exception as e:
         logger.error("run_subagent '%s' falhou: %s", name, e)
