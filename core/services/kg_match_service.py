@@ -689,6 +689,24 @@ class KGMatchService:
             logger.error("Erro LLM no explore: %s", e)
             return "Desculpe, não consegui processar agora. Tente novamente em instantes."
 
+    def _explore_tools(self) -> list:
+        """Tools do agente de explore: leitura cross-dim + planejamento, e
+        opcionalmente deep_research (subagente web).
+
+        PlanState próprio por turno (stateless entre chamadas), igual ao writing.
+        `deep_research` fica atrás de EXPLORE_DEEP_RESEARCH_ENABLED (default off):
+        o explore é endpoint PÚBLICO/não-auth e o crawl multi-step é vetor de
+        custo — liga-se conscientemente.
+        """
+        from core.llm.agent_tools import build_explore_tools
+        from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
+
+        tools = build_explore_tools(self) + build_planning_tools(PlanState())
+        if os.getenv("EXPLORE_DEEP_RESEARCH_ENABLED", "false").lower() == "true":
+            from core.llm.agent_tools.research_tools import build_research_tools
+            tools = tools + build_research_tools()
+        return tools
+
     def _explore_agent(
         self,
         message: str,
@@ -697,7 +715,8 @@ class KGMatchService:
         node_id: str | None,
         node_type: str | None,
     ) -> str:
-        """Pipeline agente (Sprint 3 do Cenário B): run_agent + 4 tools.
+        """Pipeline agente (Sprint 3 do Cenário B): run_agent + tools cross-dim,
+        planejamento e (gated) deep_research — montadas em `_explore_tools`.
 
         Diferenças vs legacy:
           • Sem catálogo inteiro no prompt — agente busca via list_editais
@@ -705,8 +724,6 @@ class KGMatchService:
           • Dica de clique no grafo vira message extra (não substitui análise)
         """
         from core.llm.agent_runtime import resolve_agent_provider, run_agent
-        from core.llm.agent_tools import build_explore_tools
-        from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
 
         self._load_index()  # garante índice carregado (não usa self._client)
 
@@ -725,9 +742,7 @@ class KGMatchService:
 
         messages.append({"role": "user", "content": message})
 
-        # Tools de leitura cross-dim + planejamento (write_todos): PlanState
-        # próprio por turno (stateless entre chamadas), igual ao writing agent.
-        tools = build_explore_tools(self) + build_planning_tools(PlanState())
+        tools = self._explore_tools()
         provider, model = resolve_agent_provider(
             "anthropic", ANTHROPIC_MODEL_AGENT_EXPLORE,
         )

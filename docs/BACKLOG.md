@@ -11,6 +11,28 @@
 
 ## Aberto
 
+### Explicador de mecanismo no explore (tool user-facing)
+
+- **O quê:** tool nova no agente de explore que explica, pro usuário final, o que
+  cada mecanismo significa (subvenção = não-reembolsável/risco; crédito =
+  reembolsável/folga; equity = upside/troca de participação) — "o que é / o que
+  muda pra você / quando faz sentido". Agrega quando o explore compara editais de
+  mecanismos diferentes (que ele já faz). **NÃO** é o `load_skill` (craft de
+  ESCRITA, público errado) — é texto próprio voltado a quem ESCOLHE.
+- **Esforço:** baixo (~meio dia, dominado pela redação + sua revisão). Função pura
+  retornando texto de um dict estático — sem DB, sem LLM, sem retrieval, sem
+  eval-gate (zero superfície de alucinação). Plumbing ~1h (padrão da
+  `search_edital_trechos`); o gargalo é escrever bem 3 explicações user-facing e
+  revisar (é orientação sobre dinheiro público).
+- **Cobertura:** `subvencao` + `investimento`(→equity) no catálogo; `credito` tem
+  playbook mas nenhum edital ainda. Cobrir os 3 + None/desconhecido → genérico.
+- **Ponto de entrada:** `core/llm/agent_tools/explore_tools.py` (build_explore_tools)
+  + linha no `EXPLORE_AGENT_SYSTEM` (kg_match_service.py). Vocab no `mechanism` do
+  index.json.
+- **Por que adiado:** nice-to-have de clareza, sem dor bloqueante; priorizado
+  atrás do deep_research no explore.
+- **Status:** aberto (2026-06-15).
+
 ### Chat cross-dim — precisão de tema (ruído no explore, pós-Fase 2)
 
 - **O quê:** o chat de Descoberta cross-dimensional (PR #19/#22) recupera bem,
