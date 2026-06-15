@@ -704,6 +704,9 @@ class KGMatchService:
         tools = build_explore_tools(self) + build_planning_tools(PlanState())
         if os.getenv("EXPLORE_DEEP_RESEARCH_ENABLED", "false").lower() == "true":
             from core.llm.agent_tools.research_tools import build_research_tools
+            # Stateless de propósito: o explore é endpoint PÚBLICO/não-auth — não há
+            # workspace_id nem db autenticado neste escopo. Sem onde (e sem permissão
+            # RLS para) persistir findings, então mantém a Fase A aqui.
             tools = tools + build_research_tools()
         return tools
 

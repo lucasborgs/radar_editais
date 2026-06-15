@@ -379,6 +379,13 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
         save_draft,
         request_user_info,
         recall_company_learnings,
-        *build_research_tools(),
+        # Fase B (Item 2): com session, deep_research persiste cada finding em
+        # research_findings (verified=false) para o gate humano de promoção.
+        # getattr defensivo: sessões sem workspace_id/_db (fakes, contextos sem
+        # auth) caem no modo stateless da Fase A em vez de quebrar.
+        *build_research_tools(
+            workspace_id=getattr(session, "workspace_id", None),
+            db=getattr(session, "_db", None),
+        ),
         *build_planning_tools(PlanState()),
     ]
