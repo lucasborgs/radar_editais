@@ -14,9 +14,13 @@ import pkgutil
 import core.llm.agent_tools as agent_tools
 
 # Factories deliberadamente NÃO exportadas em __all__. Cada entrada precisa de
-# uma justificativa (ciclo de import, helper interno, etc.). Hoje: vazia —
-# todas as factories públicas são exportadas. Para adicionar, documente o porquê.
-INTERNAL_ALLOWLIST: dict[str, str] = {}
+# uma justificativa (ciclo de import, helper interno, etc.).
+INTERNAL_ALLOWLIST: dict[str, str] = {
+    # Helper interno do critic (Item 5): monta as 3 tools do sub-agente e é
+    # consumido só por run_critic dentro de critic_agent.py — não é um toolset
+    # público anexável a um agente, então fica fora de __all__.
+    "build_critic_tools": "uso interno de run_critic (critic_agent.py)",
+}
 
 
 def _iter_package_modules():
