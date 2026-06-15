@@ -388,6 +388,48 @@ def writing_save_to_storage(session_id: str, user_id: CurrentUserId, db: DbClien
     return {"path": path, "signed_url": signed.get("signedURL"), "session_id": session_id}
 
 
+@router.post("/writing/{session_id}/close", summary="Fecha a sessão e extrai sinal episódico")
+def writing_close(session_id: str, user_id: CurrentUserId, db: DbClient):
+    """Marca a sessão como `completed` e extrai sinal episódico da janela viva.
+
+    Item 4 (Sprint 2): a compressão (`_compress_history`) já extrai sinal de
+    turnos que saíram da janela. Mas sessões curtas (abaixo do threshold de
+    compressão) nunca disparam compressão — seu sinal se perderia. Este endpoint
+    cobre esse caso: roda `extract_session_signal` sobre o `_history` ainda na
+    janela viva.
+
+    Idempotência best-effort: pode haver leve sobreposição com o que a compressão
+    já extraiu (os turnos comprimidos saem de `_history`, mas a janela viva pode
+    conter turnos parcialmente já vistos em runs anteriores deste endpoint). O
+    custo é um insight duplicado, não corrupção — aceitável dado o sinal heurístico.
+    """
+    workspace_id = get_workspace_id(db, user_id)
+    profile = profile_from_workspace(db, workspace_id)
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            session_id=session_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    # Marca a sessão como fechada. `status` aceita active | completed | abandoned
+    # (ver list_sessions); 'completed' é o terminal de uma sessão concluída.
+    try:
+        db.table("writing_sessions").update({"status": "completed"}).eq(
+            "id", session_id
+        ).execute()
+    except Exception:
+        pass
+
+    # Extrai sinal da janela viva (turnos que nunca foram comprimidos).
+    signals = session.extract_session_signal(session._history)
+    inserted = session._persist_session_signals(signals) if signals else 0
+    return {"closed": True, "signals_extracted": inserted}
+
+
 @router.post("/writing/section-start", summary="Mensagem inicial para uma seção da proposta")
 @limiter.limit("10/minute")
 def writing_section_start(
