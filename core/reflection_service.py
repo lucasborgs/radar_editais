@@ -134,6 +134,9 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
           - patterns_inserted (int)
           - weight_suggestions (list)
           - confidence (str)
+          - auto_applied (list) — mudanças de peso auto-aplicadas (Item 1):
+            só não-vazio quando os 3 guardas passam (high + >=5 outcomes +
+            |delta|<=5). O restante das sugestões fica no fluxo manual.
           - skipped_reason (str) se reflexão não foi gerada
     """
     outcomes = _load_outcomes(db, workspace_id)
@@ -144,6 +147,7 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
             "patterns_inserted": 0,
             "weight_suggestions": [],
             "confidence": None,
+            "auto_applied": [],
             "skipped_reason": f"poucos outcomes ({len(outcomes)} < {MIN_OUTCOMES_FOR_REFLECTION})",
         }
 
@@ -172,6 +176,7 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
             "patterns_inserted": 0,
             "weight_suggestions": [],
             "confidence": None,
+            "auto_applied": [],
             "skipped_reason": f"LLM error: {e}",
         }
 
@@ -198,14 +203,23 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
             "outcomes_window_end": window_end,
             "confidence": confidence_col,
         })
+    # Índice (dentro de rows_to_insert) do insight level-2 que carrega as
+    # weight_suggestions — precisamos do id da row inserida para auto_apply.
+    suggestions_carrier_idx: int | None = None
     for pat in patterns:
+        is_carrier = suggestions_carrier_idx is None and bool(weight_suggestions)
+        if is_carrier:
+            suggestions_carrier_idx = len(rows_to_insert)
         rows_to_insert.append({
             "workspace_id": workspace_id,
             "level": 2,
             "insight": pat.get("text", ""),
             "evidence": json.dumps({
                 "observation_indices": pat.get("observation_indices", []),
-                "weight_suggestions": weight_suggestions,
+                # weight_suggestions ficam só no primeiro padrão (carrier), pra
+                # não duplicar e pra que list_pending_suggestions não as conte
+                # múltiplas vezes.
+                "weight_suggestions": weight_suggestions if is_carrier else [],
                 "confidence": confidence,
             }),
             "outcomes_window_start": window_start,
@@ -213,6 +227,7 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
             "confidence": confidence_col,
         })
 
+    auto_applied: list[dict] = []
     if rows_to_insert:
         # Supersede: desativa o lote de insights anterior deste workspace antes
         # de inserir o novo, para que `load_active_insights` (deactivated_at IS
@@ -225,16 +240,37 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
             {"deactivated_at": now_iso}
         ).eq("workspace_id", workspace_id).is_("deactivated_at", "null").execute()
 
-        db.table("reflection_insights").insert(rows_to_insert).execute()
+        inserted = db.table("reflection_insights").insert(rows_to_insert).execute()
+        inserted_rows = inserted.data or []
 
-    # Weight suggestions são apenas sugestões — NÃO aplicamos automaticamente
-    # em matching_weights nesta versão. Log para revisão humana.
-    if weight_suggestions and confidence == "high":
-        logger.info(
-            "reflect_workspace: workspace=%s tem %d sugestões de peso (conf=high) — "
-            "revisar para aplicação manual em matching_weights",
-            workspace_id, len(weight_suggestions),
-        )
+        # Fechamento do loop de pesos (Item 1, Sprint 1): COEXISTÊNCIA.
+        # auto_apply_suggestions materializa o subconjunto que passa nos 3
+        # guardas (high + >=5 outcomes + |delta|<=5); o resto continua no fluxo
+        # manual /me/weights/pending. Precisamos do id da row inserida do insight
+        # level-2 que carrega as weight_suggestions (suggestions_carrier_idx).
+        if (
+            weight_suggestions
+            and suggestions_carrier_idx is not None
+            and suggestions_carrier_idx < len(inserted_rows)
+        ):
+            carrier_id = inserted_rows[suggestions_carrier_idx].get("id")
+            if carrier_id:
+                try:
+                    from core.weight_approval import auto_apply_suggestions
+                    auto_applied = auto_apply_suggestions(
+                        db, workspace_id, carrier_id, weight_suggestions,
+                        outcomes_considered=len(outcomes), confidence=confidence,
+                    )
+                except Exception as e:  # auto-apply nunca derruba a reflexão
+                    logger.warning(
+                        "reflect_workspace: auto_apply falhou (ws=%s): %s",
+                        workspace_id, e,
+                    )
+            else:
+                logger.warning(
+                    "reflect_workspace: insert não retornou id do carrier — "
+                    "auto-apply pulado (ws=%s)", workspace_id,
+                )
 
     return {
         "outcomes_considered": len(outcomes),
@@ -242,6 +278,7 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
         "patterns_inserted": len(patterns),
         "weight_suggestions": weight_suggestions,
         "confidence": confidence,
+        "auto_applied": auto_applied,
         "skipped_reason": None,
     }
 
