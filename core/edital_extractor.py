@@ -187,13 +187,39 @@ _SKELETON = {
 }
 
 
+def _make_client():
+    """Resolve (client, model) por `LLM_BACKEND` — mesmo contrato de structurer/
+    kg_match_service, mas com os defaults da EXTRAÇÃO (slot OPENAI_MODEL_PRO).
+
+    Sem env, é idêntico a hoje: gpt-4o no endpoint canônico OpenAI. `LLM_BACKEND=gemini`
+    aponta o slot pro AI Studio (modelo via GEMINI_MODEL); `=ollama` pro local.
+    `max_retries=6`: em tiers de TPM baixo o lote sequencial bate o rate-limit/min
+    e o SDK respeita o Retry-After re-tentando sozinho.
+    """
+    from core.llm.llm_client import make_client
+    backend = os.getenv("LLM_BACKEND", "openai").lower()
+    if backend == "gemini":
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY não definida")
+        return make_client(
+            api_key=api_key, max_retries=6,
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        ), os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    if backend == "ollama":
+        return make_client(api_key="ollama", max_retries=6,
+                           base_url="http://localhost:11434/v1"), \
+            os.getenv("OLLAMA_MODEL", "llama3.2")
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY não definida")
+    return make_client(api_key=api_key, max_retries=6), os.getenv("OPENAI_MODEL_PRO", "gpt-4o")
+
+
 def extract_edital(source: str, native_id: str, raw: str, *, model: str | None = None) -> EditalExtraction:
     """Extrai um `EditalExtraction` do texto bruto via LLM (JSON mode + validação)."""
-    from openai import OpenAI
-    # max_retries alto: em tiers de TPM baixo, o lote sequencial pode bater o
-    # rate-limit/min; o SDK respeita o Retry-After e re-tenta sozinho.
-    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], max_retries=6)
-    model = model or os.getenv("OPENAI_MODEL_PRO", "gpt-4o")
+    client, default_model = _make_client()
+    model = model or default_model
 
     user = _USER.format(schema=json.dumps(_SKELETON, ensure_ascii=False, indent=2),
                         source=source, raw=raw)
