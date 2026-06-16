@@ -34,6 +34,7 @@ from backend.routers.applications import router as applications_router
 from backend.routers.brief import router as brief_router
 from backend.routers.catalog import router as catalog_router
 from backend.routers.conversations import router as conversations_router
+from backend.routers.discovered import router as discovered_router
 from backend.routers.files import router as files_router
 from backend.routers.frontdoor import router as frontdoor_router
 from backend.routers.graph import router as graph_router
@@ -163,4 +164,5 @@ app.include_router(conversations_router)
 app.include_router(files_router)
 app.include_router(profile_router)
 app.include_router(research_router)
+app.include_router(discovered_router)
 app.include_router(playbooks_router)
