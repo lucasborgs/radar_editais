@@ -27,13 +27,21 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 # Skip por keyword: arquivos que não acrescentam ao RAG nem à síntese
-# (minuta, declarações, cartas, slides, ofícios, telas, ebook).
-_SKIP_KEYWORDS = [
+# (minuta, declarações, cartas, slides, ofícios, telas, ebook, peças judiciais).
+# FONTE AUTORITATIVA = wikis/finep.md §4.2 (lido via wiki_schema.skip_keywords).
+# Esta constante é só FALLBACK defensivo se o doc estiver ausente/ilegível.
+_SKIP_KEYWORDS_FALLBACK = [
     "minuta", "declaracao", "carta_de_manifestacao",
     "apresentacao", "resultado", "oficio", "telas_fap",
     "orientacoes_para_apresentacao",
-    "orientacoes_para_despesas", "relatorio_parcial", "ebook",
+    "orientacoes_para_despesas", "relatorio_parcial", "ebook", "agravo",
 ]
+
+
+def _skip_keywords() -> list[str]:
+    """Skip-list autoritativa do doc (wikis/finep.md §4.2); fallback à constante."""
+    from core.kg import wiki_schema  # import tardio: evita ciclo no import do pipeline
+    return wiki_schema.skip_keywords("finep") or _SKIP_KEYWORDS_FALLBACK
 
 _FAQ_VERSION_RE = re.compile(r"vers[aã]o[_\s\-]*(\d+)")
 _FAQ_DATE_RE = re.compile(r"(\d{2})[_\s\-]?(\d{2})[_\s\-]?(\d{4})")
@@ -132,9 +140,10 @@ class Adapter(SourceAdapter):
             logger.warning("finep adapter: diretório não encontrado: %s", pdf_dir)
             return []
 
+        skip = _skip_keywords()
         candidates = [
             p for p in sorted(pdf_dir.glob("*.pdf"))
-            if not any(kw in p.stem.lower() for kw in _SKIP_KEYWORDS)
+            if not any(kw in p.stem.lower() for kw in skip)
         ]
         candidates = _filter_to_latest_versions(candidates)
 

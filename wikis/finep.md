@@ -76,16 +76,18 @@ skip_keywords:
   - minuta
   - declaracao
   - carta_de_manifestacao
-  - faq
   - apresentacao
   - resultado
   - oficio
   - telas_fap
   - orientacoes_para_apresentacao
-  - tabela_com_requisitos
   - orientacoes_para_despesas
   - relatorio_parcial
+  - ebook
+  - agravo
 ```
+
+> **`agravo`** descarta peças judiciais (ex.: `Decisão_TRF1_-Agravo_de_instrumento.pdf`) que o portal anexa à chamada — conteúdo não-normativo e ruído no RAG. `faq` e `tabela_com_requisitos` foram REMOVIDOS da lista: medição com golden de proveniência independente (NotebookLM, 2026-06-15) mostrou que o FAQ oficial é o alvo de retrieval mais alinhado a perguntas de fundador (estilo P&R), e descartá-lo derrubava o recall. A skip-list filtra o **não-normativo-e-inútil**, não o **não-normativo-mas-útil-pra-RAG**.
 
 ---
 
