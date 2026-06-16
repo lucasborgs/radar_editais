@@ -340,12 +340,53 @@ class _LLMStep:
     raw_response: Any = None                    # resposta crua do SDK (p/ telemetria de custo)
 
 
+def _openai_agent_client(base_url: str | None = None, api_key: str | None = None):
+    """Constrói o cliente OpenAI-compat do tier agêntico.
+
+    Capability do bake-off (docs/specs/llm-embedding-bakeoff.md): permitir mirar
+    o provider "openai" do agente para um endpoint OpenAI-COMPAT arbitrário
+    (DeepSeek, vLLM/local, modelo ZDR pago) sem editar código, mantendo o tier
+    swappable além do anthropic/openai canônico. Mesmo contrato do embedder
+    (core/retrieval/embedder.py): base_url+key por env, key opcional em endpoint
+    custom.
+
+    Precedência: overrides explícitos (`base_url`/`api_key`, usados pelo critic
+    para mirar um endpoint próprio) → envs AGENT_OPENAI_BASE_URL/_API_KEY do tier
+    agêntico → OPENAI_API_KEY canônica.
+
+    - Endpoint canônico OpenAI (sem base_url): exige uma key (AGENT_OPENAI_API_KEY
+      ou OPENAI_API_KEY) — comportamento BYTE-IDÊNTICO ao anterior
+      (`make_client(api_key=os.environ["OPENAI_API_KEY"])`).
+    - Endpoint custom (base_url setado): a key é opcional; usamos um placeholder
+      se nenhuma for fornecida (servidores OpenAI-compat locais ignoram a key).
+
+    AVISO (tier agêntico = dado de cliente): o writing agent e o critic processam
+    propostas/pitches com dados confidenciais do cliente. É PROIBIDO apontar este
+    tier para um endpoint free-tier-com-treino; use só provider ZDR/pago.
+    """
+    from core.llm.llm_client import make_client
+
+    resolved_base = base_url or os.environ.get("AGENT_OPENAI_BASE_URL") or None
+    resolved_key = (
+        api_key
+        or os.environ.get("AGENT_OPENAI_API_KEY")
+        or os.environ.get("OPENAI_API_KEY")
+    )
+    kwargs: dict[str, Any] = {}
+    if resolved_base:
+        kwargs["base_url"] = resolved_base
+        resolved_key = resolved_key or "not-needed"
+    return make_client(api_key=resolved_key, **kwargs)
+
+
 def _call_openai(
     system: str,
     messages: list[dict[str, Any]],
     tools_schema: list[dict[str, Any]],
     model: str,
     temperature: float | None = None,
+    openai_base_url: str | None = None,
+    openai_api_key: str | None = None,
 ) -> _LLMStep:
     """Adapter OpenAI Chat Completions (function calling).
 
@@ -355,10 +396,13 @@ def _call_openai(
     `temperature` é opcional: None (default) preserva o comportamento atual de
     todos os call sites (não passa o param → default do provider). Só o critic
     sub-agente força um valor baixo para fact-checking determinístico.
-    """
-    from core.llm.llm_client import make_client
 
-    client = make_client(api_key=os.environ["OPENAI_API_KEY"])
+    `openai_base_url`/`openai_api_key` são overrides opcionais do endpoint
+    OpenAI-compat (default None → resolve por env em `_openai_agent_client`). O
+    critic os usa para mirar um endpoint próprio (CRITIC_OPENAI_*). Tier agêntico
+    = dado de cliente → endpoint deve ser ZDR/pago, nunca free-tier-com-treino.
+    """
+    client = _openai_agent_client(base_url=openai_base_url, api_key=openai_api_key)
     full_messages = [{"role": "system", "content": system}] + messages
 
     create_kwargs: dict[str, Any] = {
@@ -567,9 +611,17 @@ def resolve_agent_provider(
     Raises:
         RuntimeError: se nenhuma API key de LLM estiver disponível.
     """
+    # "openai" cobre tanto o endpoint canônico (OPENAI_API_KEY) quanto um
+    # endpoint OpenAI-compat custom do tier agêntico (AGENT_OPENAI_BASE_URL, com
+    # key opcional — ver _openai_agent_client). Sem nenhuma env nova, isto é
+    # exatamente `bool(OPENAI_API_KEY)` — comportamento idêntico ao anterior.
     have = {
         "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY")),
-        "openai": bool(os.environ.get("OPENAI_API_KEY")),
+        "openai": bool(
+            os.environ.get("OPENAI_API_KEY")
+            or os.environ.get("AGENT_OPENAI_API_KEY")
+            or os.environ.get("AGENT_OPENAI_BASE_URL")
+        ),
     }
     if have[preferred]:
         return preferred, model
@@ -613,6 +665,8 @@ async def run_agent_async(
     reflect_every: int | None = None,
     span_name: str | None = None,
     temperature: float | None = None,
+    openai_base_url: str | None = None,
+    openai_api_key: str | None = None,
 ) -> AgentResult:
     """Executa o loop do agente até `end_turn`, `max_steps` ou erro.
 
@@ -641,6 +695,11 @@ async def run_agent_async(
             preserva o comportamento atual de todos os call sites (não seta o
             param → default do provider). O critic sub-agente passa um valor
             baixo (0.05) para fact-checking determinístico.
+        openai_base_url / openai_api_key: overrides do endpoint OpenAI-compat,
+            só relevantes quando provider=="openai" (ignorados no Anthropic).
+            None (default) → resolve por env (AGENT_OPENAI_*/OPENAI_API_KEY) em
+            `_openai_agent_client`. O critic os passa para mirar um endpoint
+            próprio (CRITIC_OPENAI_*). Tier agêntico = dado de cliente → ZDR/pago.
 
     Returns:
         AgentResult com texto final, trace completo, stop_reason e usage total.
@@ -657,17 +716,27 @@ async def run_agent_async(
     else:
         raise ValueError(f"provider desconhecido: {provider}")
 
-    # Bind da temperature no adapter: o loop chama call_llm(system, messages,
-    # tools_schema, model); o passthrough opcional fica encapsulado aqui sem
-    # tocar o call site no loop. Quando temperature is None (todos os call sites
-    # exceto o critic), NÃO passamos o kwarg — preserva 100% da assinatura antiga
-    # e não quebra fakes de teste que monkeypatcham adapters com `(system,
-    # messages, tools_schema, model)` posicional, sem aceitar temperature.
-    if temperature is None:
+    # Bind de kwargs opcionais no adapter: o loop chama call_llm(system, messages,
+    # tools_schema, model); os passthroughs opcionais (temperature + overrides de
+    # endpoint OpenAI-compat) ficam encapsulados aqui sem tocar o call site no
+    # loop. Quando NENHUM extra está setado (todos os call sites exceto o critic),
+    # usamos o adapter cru — preserva 100% a assinatura antiga e não quebra fakes
+    # de teste que monkeypatcham adapters com `(system, messages, tools_schema,
+    # model)` posicional, sem aceitar os kwargs novos. Os overrides de endpoint só
+    # fazem sentido no adapter OpenAI; o Anthropic os ignora.
+    _extra: dict[str, Any] = {}
+    if temperature is not None:
+        _extra["temperature"] = temperature
+    if provider == "openai":
+        if openai_base_url is not None:
+            _extra["openai_base_url"] = openai_base_url
+        if openai_api_key is not None:
+            _extra["openai_api_key"] = openai_api_key
+    if not _extra:
         call_llm = _adapter
     else:
         def call_llm(sys_: str, msgs: list[dict[str, Any]], schema: list[dict[str, Any]], mdl: str) -> _LLMStep:
-            return _adapter(sys_, msgs, schema, mdl, temperature=temperature)
+            return _adapter(sys_, msgs, schema, mdl, **_extra)
 
     messages = list(initial_messages)
     steps: list[TraceStep] = []
@@ -863,6 +932,8 @@ def run_agent(
     reflect_every: int | None = None,
     span_name: str | None = None,
     temperature: float | None = None,
+    openai_base_url: str | None = None,
+    openai_api_key: str | None = None,
 ) -> AgentResult:
     """Shim síncrono sobre `run_agent_async` (spec 01).
 
@@ -888,6 +959,8 @@ def run_agent(
             reflect_every=reflect_every,
             span_name=span_name,
             temperature=temperature,
+            openai_base_url=openai_base_url,
+            openai_api_key=openai_api_key,
         )
 
     try:
@@ -916,6 +989,8 @@ def run_subagent(
     model: str | None = None,
     max_steps: int = 5,
     temperature: float | None = None,
+    openai_base_url: str | None = None,
+    openai_api_key: str | None = None,
 ) -> AgentResult:
     """Roda um subagente-como-tool: resolve provider, executa `run_agent` e
     degrada graciosamente em caso de erro.
@@ -937,6 +1012,10 @@ def run_subagent(
         max_steps: limite de iterações do loop interno (subagentes são curtos).
         temperature: repassada ao loop/adapter; None (default) preserva o
             comportamento atual (sem set → default do provider).
+        openai_base_url / openai_api_key: overrides do endpoint OpenAI-compat,
+            repassados ao loop (só usados quando o provider resolvido é "openai").
+            None (default) → resolve por env. O critic os passa para mirar seu
+            próprio endpoint ZDR/pago (CRITIC_OPENAI_*).
 
     Returns:
         AgentResult do loop interno; ou, em falha de resolução/execução,
@@ -956,6 +1035,8 @@ def run_subagent(
             max_steps=max_steps,
             span_name=f"subagent.{name}",
             temperature=temperature,
+            openai_base_url=openai_base_url,
+            openai_api_key=openai_api_key,
         )
     except Exception as e:
         logger.error("run_subagent '%s' falhou: %s", name, e)
