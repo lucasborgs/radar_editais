@@ -66,6 +66,34 @@ Maior win provável (coração do RAG; Qwen3-0.6B já mede acima no MTEB) e **is
 - **Pré-req 2 (dimensão):** a coluna `edital_chunks.embedding` é `vector(1536)`. Qwen3-0.6B/BGE-M3 são **1024** → mismatch. Não dá pra reusar a coluna. Opções: (a) eval **offline** em numpy sobre o corpus golden (cosseno, mede só o braço dense — decide o teto barato); (b) coluna-sombra `embedding_<modelo>` com a dim certa p/ eval end-to-end (RRF+rerank).
 - **Gate:** `core.eval rag` — Recall@K/MRR ≥ baseline. **Não re-indexar prod até ganhar.**
 
+#### Critério de promoção do filtro offline (revisado 2026-06-16)
+
+O filtro offline mede o **dense isolado**, mas o arranjo de prod é híbrido: FTS
+(léxico, model-agnostic) + RRF (k=60, por rank, scale-free) + **reranker**
+(cross-encoder sobre um pool top-`k_candidates=20`, model-independent). Só **um**
+knob é co-adaptado ao baseline OpenAI: `fts_weight=0.3` → o dense pesa **0.7**
+([retriever.py](../../core/retrieval/retriever.py), calibrado no corpus FINEP
+assumindo dense forte). Consequência: o dense-only é **conservador e pode dar
+falso-negativo** — um candidato levemente abaixo ainda pode ganhar end-to-end se
+(a) colocar o chunk certo no **pool top-20** (o reranker conserta a ordem) e/ou
+(b) for socorrido por `fts_weight` maior. Logo "perdeu no dense isolado" **não
+implica** "perde em produção".
+
+Por isso medir o candidato em **dois `--top-k`**: `5` (qualidade final) **e `20`**
+(contenção no pool do reranker). Três baldes:
+
+| Resultado dense-only | Decisão |
+|---|---|
+| **WIN** — ≥ baseline em gold_recall@5 & recall@5 & MRR | promove ao `core.eval rag` (coluna-sombra), prioridade alta |
+| **CLOSE** — abaixo no top-5 mas dentro do ruído (~≤0.05 em gold_recall@5) **ou** empata baseline em recall@20 / gold_recall@20 | **NÃO rejeita** — promove ao end-to-end varrendo `fts_weight`; rerank+fusão podem fechar o gap |
+| **REJECT** — claramente abaixo **mesmo em k=20** (chunk certo não entra no pool) | descarta — o reranker não tem o que salvar (caso Qwen3-0.6B) |
+
+**Caveat de amostra:** golden = 28 queries → gaps sub-0.05 são ruído, não sinal.
+Re-tunar várias peças do arranjo por candidato (top-N do rerank, chunk size, k do
+RRF) é overfit + combinatória → **fora do tier-1**; só `fts_weight` (1 knob) entra
+na varredura end-to-end. O esparso/ColBERT do BGE-M3 é **outro track** (trocar o
+braço léxico), não escolha de embedding.
+
 ### 2. 🟢 Tier barato — `rag` (rerank/contextual) + olho na triagem
 - Slot: `OPENAI_MODEL` (+ `LLM_BACKEND=gemini`).
 - Candidatos: Gemini Flash-Lite (free), Gemini Flash (free).

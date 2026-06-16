@@ -16,9 +16,13 @@ Dois eixos testáveis (independentes):
 O que mede e o que NÃO mede
 ---------------------------
 Isola o braço DENSE puro: top-k por cosseno query×chunk, SEM FTS, SEM RRF, SEM
-rerank, SEM metadata-boost. É o TETO do dense — decide se um braço merece o
-investimento da coluna-sombra/re-index. Quem perde aqui não ganha end-to-end;
-quem ganha ainda precisa passar no `core.eval rag` real antes de promover.
+rerank, SEM metadata-boost. É uma TRIAGEM CONSERVADORA do dense — decide se um
+braço merece o investimento da coluna-sombra/re-index, mas pode dar
+FALSO-NEGATIVO: em prod o rerank (pool top-20) + a fusão (fts_weight) podem
+socorrer um candidato levemente abaixo. Logo "perdeu aqui" ≠ "perde end-to-end".
+Por isso mede recall@20 (=POOL_K, pool do reranker em prod) além de @5. Critério
+de promoção (WIN/CLOSE/REJECT) em docs/specs/llm-embedding-bakeoff.md §1. Quem passa a triagem
+ainda precisa do `core.eval rag` real (FTS+RRF+rerank) antes de promover.
 
 Métricas (reusa core.rag_eval, mesmas do gate `rag`):
   • recall@{1,3,5} + MRR   — contra `expected` (source_file + section) do golden
@@ -106,6 +110,76 @@ def _load_embedder(embed: dict):
     return embedder.embed_texts, embedder.embed_query
 
 
+# ---------------------------------------------------------------------------
+# Backend sentence-transformers (in-process) — para modelos HF sem API
+# OpenAI-compat. NÃO toca core/retrieval/embedder.py (produção); vive só aqui.
+#
+# Por que in-process e não TEI/shim: modelos E5/EmbeddingGemma são ASSIMÉTRICOS
+# — query e passagem exigem prefixos diferentes. O harness chama embed_texts
+# (passagens) e embed_query (query) separadamente, mas um endpoint OpenAI-compat
+# recebe ambos sem saber o papel → não dá pra aplicar o prefixo certo, o que
+# mutila o modelo e o reprova injustamente. Aqui injetamos o prefixo por papel.
+#
+# O prefixo é propriedade do modelo (não escolha de runtime) → registry abaixo.
+# query_prefix/passage_prefix são prepended a cada texto antes do encode.
+# trust_remote_code só p/ modelos que exigem (ex.: Jina v2).
+# ---------------------------------------------------------------------------
+
+_ST_REGISTRY: dict[str, dict] = {
+    # E5: esquema "query: " / "passage: " (assimétrico clássico).
+    "intfloat/multilingual-e5-large": {
+        "query_prefix": "query: ",
+        "passage_prefix": "passage: ",
+    },
+    # E5-instruct: query leva bloco de instrução; passagem fica crua.
+    "intfloat/multilingual-e5-large-instruct": {
+        "query_prefix": (
+            "Instruct: Given a web search query, retrieve relevant passages "
+            "that answer the query\nQuery: "
+        ),
+        "passage_prefix": "",
+    },
+    # Jina v2 PT: simétrico (sem prefixo), mas exige trust_remote_code.
+    "jinaai/jina-embeddings-v2-base-pt": {
+        "query_prefix": "",
+        "passage_prefix": "",
+        "trust_remote_code": True,
+    },
+    # EmbeddingGemma (PT-podado): prompts nativos do modelo.
+    "tardellirs/embeddinggemma-pt-br": {
+        "query_prefix": "task: search result | query: ",
+        "passage_prefix": "title: none | text: ",
+    },
+}
+
+
+def _load_st_embedder(model_name: str):
+    """Carrega um SentenceTransformer e devolve (embed_texts, embed_query)
+    com os prefixos por papel do registry. Modelo desconhecido → sem prefixo."""
+    from sentence_transformers import SentenceTransformer
+
+    cfg = _ST_REGISTRY.get(model_name, {})
+    qp = cfg.get("query_prefix", "")
+    pp = cfg.get("passage_prefix", "")
+    trust = cfg.get("trust_remote_code", False)
+    # ST_DEVICE permite forçar cpu/mps; default deixa o sentence-transformers decidir.
+    device = os.environ.get("ST_DEVICE") or None
+    model = SentenceTransformer(model_name, trust_remote_code=trust, device=device)
+
+    def embed_texts(texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        vecs = model.encode([pp + t for t in texts], batch_size=32,
+                            show_progress_bar=False, normalize_embeddings=False)
+        return vecs.tolist()
+
+    def embed_query(text: str) -> list[float]:
+        vec = model.encode(qp + text, normalize_embeddings=False)
+        return vec.tolist()
+
+    return embed_texts, embed_query
+
+
 def _load_contextualizer(ctx: dict | None):
     """Seta o env do contextualizador e recarrega contextual_retrieval.
 
@@ -186,7 +260,16 @@ def _rank_by_cosine(query_vec, chunk_vecs, chunks: list[dict]) -> list[dict]:
 # Avaliação de um braço (embedding model + contextualizador opcional)
 # ---------------------------------------------------------------------------
 
-def _eval_arm(arm: dict, golden: dict, corpus: dict[str, list[dict]], top_k: int) -> dict:
+# Profundidades de recall medidas. POOL_K=20 = DEFAULT_RERANK_CANDIDATES de prod
+# (retriever.py): recall@20 mede se o chunk certo ENTRA no pool que o reranker
+# reordena → discrimina FALSO-NEGATIVO (perde no top-5 mas o rerank salvaria) de
+# REJECT real (não entra nem no pool). Ver critério em llm-embedding-bakeoff.md §1.
+POOL_K = 20
+_KS = (1, 3, 5, POOL_K)
+_GOLD_KS = (3, 5, POOL_K)
+
+
+def _eval_arm(arm: dict, golden: dict, corpus: dict[str, list[dict]]) -> dict:
     from core.rag_eval import (
         aggregate_runs,
         evaluate_query,
@@ -195,7 +278,10 @@ def _eval_arm(arm: dict, golden: dict, corpus: dict[str, list[dict]], top_k: int
     )
 
     contextualize = _load_contextualizer(arm.get("ctx"))
-    embed_texts, embed_query = _load_embedder(arm["embed"])
+    if arm.get("st"):
+        embed_texts, embed_query = _load_st_embedder(arm["st"])
+    else:
+        embed_texts, embed_query = _load_embedder(arm["embed"])
 
     # Embeda o corpus uma vez por edital. Se há contextualizador, prepende o
     # contexto-no-chunk antes (por edital, igual ao chunk_edital_task de prod).
@@ -210,8 +296,9 @@ def _eval_arm(arm: dict, golden: dict, corpus: dict[str, list[dict]], top_k: int
     embed_corpus_s = time.perf_counter() - t0
 
     per_query: list[dict] = []
-    gold_recall = {3: [], 5: []}
-    gold_best = {3: [], 5: []}
+    gold_recall = {k: [] for k in _GOLD_KS}
+    gold_best = {k: [] for k in _GOLD_KS}
+    max_k = max(_KS)
     for q in golden.get("queries", []):
         eid = str(q["edital_id"])
         chunks = corpus.get(eid, [])
@@ -219,10 +306,10 @@ def _eval_arm(arm: dict, golden: dict, corpus: dict[str, list[dict]], top_k: int
             continue
         qv = embed_query(q["query"])
         ranked = _rank_by_cosine(qv, corpus_vecs[eid], chunks)
-        per_query.append(evaluate_query(ranked[:top_k], q.get("expected", [])))
+        per_query.append(evaluate_query(ranked[:max_k], q.get("expected", []), ks=_KS))
         gold = q.get("gold_text", "")
         if gold:
-            for k in (3, 5):
+            for k in _GOLD_KS:
                 r = gold_recall_at_k(ranked, gold, k)
                 b = gold_best_chunk_recall_at_k(ranked, gold, k)
                 if r is not None:
@@ -230,8 +317,8 @@ def _eval_arm(arm: dict, golden: dict, corpus: dict[str, list[dict]], top_k: int
                 if b is not None:
                     gold_best[k].append(b)
 
-    agg = aggregate_runs(per_query)
-    for k in (3, 5):
+    agg = aggregate_runs(per_query, ks=_KS)
+    for k in _GOLD_KS:
         if gold_recall[k]:
             agg[f"gold_recall_at_{k}"] = round(sum(gold_recall[k]) / len(gold_recall[k]), 4)
         if gold_best[k]:
@@ -245,9 +332,10 @@ def _eval_arm(arm: dict, golden: dict, corpus: dict[str, list[dict]], top_k: int
 # ---------------------------------------------------------------------------
 
 _METRICS = [
-    "recall_at_1", "recall_at_3", "recall_at_5", "mrr",
-    "gold_recall_at_3", "gold_recall_at_5",
+    "recall_at_1", "recall_at_3", "recall_at_5", f"recall_at_{POOL_K}", "mrr",
+    "gold_recall_at_3", "gold_recall_at_5", f"gold_recall_at_{POOL_K}",
     "gold_best_chunk_recall_at_3", "gold_best_chunk_recall_at_5",
+    f"gold_best_chunk_recall_at_{POOL_K}",
 ]
 
 
@@ -282,7 +370,11 @@ def main() -> int:
                         help="golden a usar (default: finep)")
     parser.add_argument("--candidate", action="append", default=[],
                         metavar="model|dims|base_url",
-                        help="tier 1 — modelo de embedding alternativo (repetível)")
+                        help="tier 1 — modelo de embedding alternativo via OpenAI-compat (repetível)")
+    parser.add_argument("--st-candidate", action="append", default=[],
+                        metavar="hf_model_name",
+                        help="tier 1 — modelo HF via sentence-transformers in-process; "
+                             "prefixos query/passagem vêm do _ST_REGISTRY (repetível)")
     parser.add_argument("--contextualizer", action="append", default=[],
                         metavar="model|base_url|KEY_ENV",
                         help="tier 2 — LLM de contextualização (repetível); embed fica no baseline")
@@ -291,7 +383,6 @@ def main() -> int:
     parser.add_argument("--editais", default=None,
                         help="restringe a estes edital_ids (CSV, ex.: 'finep:768,finep:743') — "
                              "corta o nº de chunks a contextualizar/embedar")
-    parser.add_argument("--top-k", type=int, default=5, help="top-k do recall (default: 5)")
     args = parser.parse_args()
 
     golden = _load_golden(args.source)
@@ -314,6 +405,8 @@ def main() -> int:
         arms.append({"label": "baseline (cru)", "embed": base_embed, "ctx": None})
     for s in args.candidate:
         arms.append({"label": _parse_embed_spec(s)["model"], "embed": _parse_embed_spec(s), "ctx": None})
+    for m in args.st_candidate:
+        arms.append({"label": f"st:{m.split('/')[-1]}", "embed": base_embed, "ctx": None, "st": m})
     for s in args.contextualizer:
         ctx = _parse_ctx_spec(s)
         arms.append({"label": f"ctx:{ctx['model']}", "embed": base_embed, "ctx": ctx})
@@ -323,10 +416,11 @@ def main() -> int:
     results: list[tuple[str, dict]] = []
     for arm in arms:
         print(f"\n→ avaliando {arm['label']} ...")
-        agg = _eval_arm(arm, golden, corpus, args.top_k)
+        agg = _eval_arm(arm, golden, corpus)
         results.append((arm["label"], agg))
-        print(f"   recall@5={agg.get('recall_at_5')}  mrr={agg.get('mrr'):.3f}  "
-              f"gold_recall@5={agg.get('gold_recall_at_5')}  embed={agg.get('embed_corpus_s')}s")
+        print(f"   recall@5={agg.get('recall_at_5')}  recall@{POOL_K}={agg.get(f'recall_at_{POOL_K}')}  "
+              f"mrr={agg.get('mrr'):.3f}  gold_recall@5={agg.get('gold_recall_at_5')}  "
+              f"embed={agg.get('embed_corpus_s')}s")
 
     _print_table(results)
 
@@ -338,7 +432,7 @@ def main() -> int:
         "source": args.source,
         "edital_ids": edital_ids,
         "n_chunks": n_chunks,
-        "top_k": args.top_k,
+        "ks": list(_KS),
         "generated_at": ts,
         "results": [{"arm": name, "aggregate": agg} for name, agg in results],
     }, ensure_ascii=False, indent=2), encoding="utf-8")
