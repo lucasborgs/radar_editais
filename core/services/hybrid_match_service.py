@@ -566,6 +566,19 @@ dimensões em 1 frase cada:
 
 
 def _make_client():
+    """Cliente + modelo do raciocínio do match (Stage 2), parametrizável por env.
+
+    Bake-off (docs/specs/llm-embedding-bakeoff.md, tier 3 — gateado por `matching`):
+    o slot de raciocínio precisa trocar de modelo/provider por env, sem editar
+    código. Os defaults preservam EXATAMENTE o comportamento anterior: sem env
+    setada, isto usa gpt-4o-mini no endpoint canônico OpenAI (ou gemini-2.5-flash
+    com LLM_BACKEND=gemini), idêntico a hoje.
+
+    Envs (todas opcionais):
+        LLM_BACKEND        openai (default) | gemini
+        OPENAI_MODEL       modelo no backend openai      (default: gpt-4o-mini)
+        GEMINI_MODEL       modelo no backend gemini       (default: gemini-2.5-flash)
+    """
     from core.llm.llm_client import make_client
     backend = os.getenv("LLM_BACKEND", "openai").lower()
 
@@ -576,7 +589,7 @@ def _make_client():
         return make_client(
             api_key=api_key,
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-        ), "gemini-2.5-flash"
+        ), os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:

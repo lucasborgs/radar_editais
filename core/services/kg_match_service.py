@@ -187,7 +187,20 @@ score deve ser de 0.0 a 10.0. match_dimensions deve ter no máximo 4 dimensões 
 # =============================================================================
 
 def _make_client():
-    """Cria cliente LLM baseado em variáveis de ambiente."""
+    """Cria cliente LLM + modelo a partir do ambiente, parametrizável por env.
+
+    Bake-off (docs/specs/llm-embedding-bakeoff.md, tier 3 — gateado por `matching`):
+    o slot de raciocínio sobre o KG troca de modelo/provider por env, sem editar
+    código. Os defaults preservam EXATAMENTE o comportamento anterior: sem env
+    setada, gpt-4o-mini no endpoint canônico OpenAI (ou gemini-2.5-flash com
+    LLM_BACKEND=gemini, llama3.2 com LLM_BACKEND=ollama), idêntico a hoje.
+
+    Envs (todas opcionais):
+        LLM_BACKEND        openai (default) | gemini | ollama
+        OPENAI_MODEL       modelo no backend openai      (default: gpt-4o-mini)
+        GEMINI_MODEL       modelo no backend gemini       (default: gemini-2.5-flash)
+        OLLAMA_MODEL       modelo no backend ollama       (default: llama3.2)
+    """
     backend = os.getenv("LLM_BACKEND", "openai").lower()
 
     if backend == "gemini":
@@ -198,7 +211,7 @@ def _make_client():
         return make_client(
             api_key=api_key,
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-        ), "gemini-2.5-flash"
+        ), os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     elif backend == "openai":
         from core.llm.llm_client import make_client
