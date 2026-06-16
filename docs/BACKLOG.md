@@ -909,6 +909,30 @@ de fora — nenhum bloqueia o que foi entregue.
 
 ---
 
+### Tool-calling como teto do bake-off no tier agêntico (tier 5)
+
+- **O quê:** o tier agêntico (writing + critic) usa function/tool calling em LOOP.
+  A capability de plugar qualquer modelo já existe (2 protocolos: Anthropic nativo +
+  OpenAI-compat com base_url — `AGENT_OPENAI_BASE_URL`/`CRITIC_OPENAI_BASE_URL`, commit
+  8b2eadf63). Mas **conectar ≠ funcionar**: modelos open/baratos falam chat.completions
+  e mesmo assim têm tool-calling fraco → quebram o loop (JSON de tool malformado, não
+  param, ignoram a tool). Esse é o TETO real do open no tier 5, não o protocolo.
+- **Por que está parado:** depende de dois pré-requisitos que ainda não existem —
+  (a) **gate de grounding confiável** (ver entradas acima; sem ele não dá pra julgar a
+  saída agêntica), e (b) um **provider ZDR/pago** (writing/profile = dado de cliente →
+  proibido free-tier-com-treino). Sem os dois, testar candidato barato aqui seria
+  degradar às cegas — viola a premissa "só corta custo com gate verde".
+- **O que medir quando destravar:** taxa de tool-calls válidos / loops concluídos sem
+  fallback, ANTES da qualidade (BFCL é proxy — Qwen3.5-397B lidera o open; DeepSeek
+  decente). Só candidato que sustenta o loop entra no gate `writing`.
+- **Gatilho para retomar:** gate de grounding confiável + escolha de provider ZDR.
+- **Ponto de entrada:** `core/llm/agent_runtime.py` (`run_agent`/`_call_openai`),
+  `core/llm/agent_tools/critic_agent.py`; perfil em `docs/specs/demo-cost-profile.md`,
+  spec em `docs/specs/llm-embedding-bakeoff.md` §5.
+- **Status:** aberto (2026-06-16) — capability pronta, promoção bloqueada.
+
+---
+
 ### Learning loop dos playbooks/KG — evolução por uso (parado: sem usuários)
 
 - **O quê:** como o ecossistema de conhecimento (nós de mecanismo/fonte + skills)
