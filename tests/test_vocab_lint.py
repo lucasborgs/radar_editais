@@ -54,16 +54,19 @@ def test_collect_variacoes_dedup_index_historico(monkeypatch):
     assert agg["robótica avançada"]["count"] == 1
 
 
-def test_collect_tema_livre_from_bronze(monkeypatch, tmp_path):
-    bronze = tmp_path / "web_raw"
-    bronze.mkdir()
-    (bronze / "web_discovery_1.json").write_text(json.dumps([
-        {"url_hash": "aaa", "url": "http://x/a", "tema_livre": "Computação Quântica"},
-        {"url_hash": "bbb", "url": "http://x/b", "tema_livre": "computação quântica; Robótica"},
-        {"url_hash": "ccc", "url": "http://x/c", "tema_livre": ""},  # ignorado
-        {"url_hash": "ddd", "url": "http://x/d"},  # sem campo, ignorado
-    ], ensure_ascii=False), encoding="utf-8")
-    monkeypatch.setattr(vocab_lint, "_WEB_BRONZE_DIR", bronze)
+def test_collect_tema_livre_from_staging(monkeypatch):
+    # tema_livre agora vem da staging discovered_opportunities (Parte C): rows com
+    # url_hash no topo e o registro bruto (com tema_livre) em `raw`.
+    rows = [
+        {"url_hash": "aaa", "url": "http://x/a", "status": "pending",
+         "raw": {"tema_livre": "Computação Quântica"}},
+        {"url_hash": "bbb", "url": "http://x/b", "status": "promoted",
+         "raw": {"tema_livre": "computação quântica; Robótica"}},
+        {"url_hash": "ccc", "url": "http://x/c", "status": "pending",
+         "raw": {"tema_livre": ""}},                          # ignorado
+        {"url_hash": "ddd", "url": "http://x/d", "status": "pending", "raw": {}},  # sem campo
+    ]
+    monkeypatch.setattr(vocab_lint, "_fetch_discovered_rows", lambda: rows)
 
     agg = vocab_lint.collect_tema_livre()
     assert agg["computação quântica"]["count"] == 2
@@ -93,7 +96,7 @@ def test_collect_evidence_serializable_and_sorted(monkeypatch, tmp_path):
         {"id": "finep:3", "source": "finep", "themes_raw": ["Tema B"], "themes": ["saúde e ciências da vida"]},
     ]
     _patch_index(monkeypatch, vigente, [])
-    monkeypatch.setattr(vocab_lint, "_WEB_BRONZE_DIR", tmp_path / "empty")
+    monkeypatch.setattr(vocab_lint, "_fetch_discovered_rows", lambda: [])
 
     ev = vocab_lint.collect_evidence()
     # fontes serializadas como lista (JSON-safe).

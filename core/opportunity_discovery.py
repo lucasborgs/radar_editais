@@ -1,21 +1,23 @@
 """Engine de descoberta de oportunidades (item 2.2).
 
 Varre a web por editais/chamadas/desafios de fomento, tria (é oportunidade real?),
-extrai campos e grava no bronze da fonte `web`. A Descoberta é a TORNEIRA
-AUTOMÁTICA da fonte web (a outra é a seed list manual em `web_sources`): não tem
-mais bronze/índice próprios. Os registros entram em `web_raw/` com
-`verificacao=provisorio` e, daí pra frente, são páginas web como quaisquer
-outras — `build_knowledge_graph` os ingere via `_build_editais("web")` e o
-adapter `pipeline.adapters.web` os chunka pro RAG (Opção A, WIKI.md §12.4).
+extrai campos e os deixa numa STAGING (`discovered_opportunities`) como `pending`.
+A Descoberta é a TORNEIRA AUTOMÁTICA da fonte web (a outra é a seed list manual
+em `web_sources`).
+
+GATE HUMANO (Parte C): a torneira NÃO escreve mais no KG. Um humano revê a fila e
+PROMOVE o que vale — a promoção insere a URL em `web_sources`, e daí o WebScraper
+a trata como fonte curada (HTML cru → chunk → KG). Link morto / notícia rasa /
+duplicata morrem na fila sem nunca tocar o RAG ("a IA mostra, o humano decide").
 
 Pipeline:
   queries (wikis/_discovery.md) → web_search (Tavily) → dedup (ledger + KG)
     → triagem (LLM barato: é fomento? agência?) → extração (LLM capaz: campos)
-    → full-fetch do texto da página → web_raw/web_discovery_*.json + ledger
+    → full-fetch do texto da página → discovered_opportunities (pending) + ledger
 
 Custo: triagem roda em muitos candidatos (modelo barato); extração só nos que
-passaram (modelo capaz). Nada entra no KG aqui — isso é o build, e tudo provisório.
-Funções de LLM/busca isoladas para teste com mocks.
+passaram (modelo capaz). Nada entra no KG aqui — só a promoção humana cria nó.
+Funções de LLM/busca/staging isoladas para teste com mocks.
 """
 from __future__ import annotations
 
@@ -33,8 +35,6 @@ from core.web_identity import normalize_web_url, web_url_hash
 
 logger = logging.getLogger(__name__)
 
-# Bronze de saída: o MESMO da fonte web (a Descoberta é uma torneira dela).
-_WEB_BRONZE_DIR = BRONZE_DIR / "web_raw"
 # Ledger LEGADO (file-based, pré-kg_store): mantido só como fonte de migração —
 # o ledger vive no kg_store (`discovery_ledger`), durável em Postgres quando
 # configurado (o FS do worker de prod é efêmero; sem isto, cada redeploy
@@ -406,6 +406,49 @@ def _known_urls() -> set[str]:
 
 
 # =============================================================================
+# Staging (Parte C) — achados pousam em `discovered_opportunities` (pending);
+# nada entra no KG até a promoção humana. Upsert por url_hash (dedup idempotente).
+# =============================================================================
+
+def _stage_records(records: list[dict]) -> int:
+    """Insere os achados na staging `discovered_opportunities` (status=pending).
+
+    Upsert por `url_hash` ignorando duplicatas (re-rodar não duplica a fila).
+    Retorna o nº de linhas enviadas. Degrada para 0 (logando) sem cliente
+    Supabase — o caller não levanta."""
+    if not records:
+        return 0
+    try:
+        from core.db import get_supabase_service  # noqa: PLC0415
+        db = get_supabase_service()
+    except Exception as e:
+        logger.warning("staging: sem cliente Supabase (%s) — achados NÃO persistidos", e)
+        return 0
+    rows = [{
+        "url": r["url"],
+        "url_hash": r["url_hash"],
+        "title": r.get("title"),
+        "agency": r.get("agency"),
+        "fonte": r.get("fonte"),
+        "descricao": r.get("descricao"),
+        "prazo_envio": r.get("prazo_envio"),
+        "publico_alvo": r.get("publico_alvo"),
+        "tema": r.get("tema"),
+        "opportunity_type": r.get("opportunity_type"),
+        "raw": r,
+        "status": "pending",
+    } for r in records]
+    try:
+        (db.table("discovered_opportunities")
+           .upsert(rows, on_conflict="url_hash", ignore_duplicates=True)
+           .execute())
+        return len(rows)
+    except Exception as e:
+        logger.error("staging: falha ao inserir %d achados: %s", len(rows), e)
+        return 0
+
+
+# =============================================================================
 # Orquestração
 # =============================================================================
 
@@ -536,15 +579,9 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
                 triage_skipped, reject_ttl_days)
 
     if write:
-        if records:
-            _WEB_BRONZE_DIR.mkdir(parents=True, exist_ok=True)
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            # Prefixo `web_discovery_` distingue a torneira automática da manual
-            # (`web_scan_`) dentro do mesmo bronze; ambas são unidas por url_hash.
-            out = _WEB_BRONZE_DIR / f"web_discovery_{ts}.json"
-            out.write_text(json.dumps(records, ensure_ascii=False, indent=2),
-                           encoding="utf-8")
-            logger.info("descoberta: %d oportunidades → %s", len(records), out.name)
+        n = _stage_records(records)
+        if n:
+            logger.info("descoberta: %d oportunidades → staging discovered_opportunities (pending)", n)
         # Persiste o ledger SEMPRE que escrevemos: aprovados (dedup positivo) +
         # cache negativo (rejeições desta rodada), mesmo sem nenhum aprovado — é o
         # caso comum (rodada só de lixo) e é justamente quando o cache mais paga.
