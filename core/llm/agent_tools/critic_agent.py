@@ -293,6 +293,20 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
     # confiável a instrução "só contradição, nunca omissão" → falsos-positivos.
     model = os.getenv("OPENAI_MODEL_CRITIC") or os.getenv("OPENAI_MODEL_PRO") or "gpt-4o"
 
+    # Endpoint OpenAI-compat do critic, parametrizável (bake-off,
+    # docs/specs/llm-embedding-bakeoff.md): permite mirar o critic para um provider
+    # OpenAI-COMPAT arbitrário (DeepSeek, vLLM/local, modelo ZDR pago) SEM editar
+    # código, independentemente do endpoint do writing agent. Precedência:
+    # CRITIC_OPENAI_* → AGENT_OPENAI_* (resolvido no agent_runtime) → OPENAI
+    # canônica. None (default, nenhuma env nova setada) → comportamento
+    # BYTE-IDÊNTICO ao anterior (endpoint canônico OpenAI).
+    #
+    # AVISO (tier agêntico = dado de cliente): o critic lê rascunhos de
+    # proposta/pitch com dados confidenciais do cliente. É PROIBIDO mirar um
+    # endpoint free-tier-com-treino; use só provider ZDR/pago.
+    critic_base_url = os.getenv("CRITIC_OPENAI_BASE_URL") or None
+    critic_api_key = os.getenv("CRITIC_OPENAI_API_KEY") or None
+
     result = run_subagent(
         name="critic",
         system=system_prompt,
@@ -302,6 +316,8 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         model=model,
         max_steps=3,
         temperature=0.05,
+        openai_base_url=critic_base_url,
+        openai_api_key=critic_api_key,
     )
 
     session_id = getattr(session, "session_id", "?")
