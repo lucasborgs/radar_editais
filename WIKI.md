@@ -913,6 +913,10 @@ source_adapters:
     module: "pipeline.adapters.fapesp"
     raw_dir: "fapesp_raw"
     strategy: "html_body"    # texto_cru do bronze como 1 doc
+  fapesc:
+    module: "pipeline.adapters.fapesc"
+    raw_dir: "fapesc_raw"
+    strategy: "pdf"          # texto vem do PDF anexo (extraído no scraper) → texto_cru
   web:
     module: "pipeline.adapters.web"
     raw_dir: "web_raw"
