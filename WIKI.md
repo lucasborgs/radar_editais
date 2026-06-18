@@ -518,6 +518,30 @@ investidor_schema:
     - "investidores.json espelha icts.json: {investidores:[...], total_investidores, themes_index, last_updated}. NÃO entra no index.json (invariante de-risk ①)."
 ```
 
+#### 6.1.4 Nó `programa` (entidade recorrente, fora do ciclo de edital)
+
+Programas de fomento RECORRENTES (aceleração/incubação/subvenção/fundo que se
+repetem por edição — ex.: Centelha, BNDES Garagem, InovAtiva). Como `investidor`
+(§6.1.3), é **entidade fora do ciclo de edital**: artefato próprio
+(`programas.json`), NÃO entra no index.json, liga-se ao grafo pela ponte do nó
+`tema`. Populado por **curadoria manual** (não descoberta). DISTINTO do
+`opportunity_type=programa` (um evento datado): aqui é o programa-âncora ESTÁVEL.
+
+```yaml
+programa_schema:
+  artifact: "knowledge_graph/programas.json"
+  id_format: "programa:<slug>"          # ex.: programa:centelha
+  node_fields: [id, name, operador, tipo, descricao, formato, cadencia, beneficio, ticket_range, tese_themes, setores, estagio_alvo, elegibilidade, site, faq_url, source_urls, status, verificado_em]
+  required_fields: [id, name, operador, tipo, estagio_alvo]
+  notes:
+    - "tipo: aceleracao|incubacao|subvencao|fundo|capacitacao — natureza do programa."
+    - "formato: cohort|edital-periodico|fluxo-continuo. cadencia: texto livre (anual, 2x/ano, contínuo)."
+    - "tese_themes ⊆ tema_vocab (§5.9; [] se multissetorial); setores ⊆ setor_vocab; estagio_alvo ⊆ estagio_vocab (§5.9.1). Mesma ponte do investidor (edital.themes ∩ programa.tese_themes)."
+    - "status: ativo|dormante — frescor da entidade (dormante = ruído). verificado_em + source_urls: proveniência da curadoria."
+    - "faq_url: P&R oficial do programa — alvo de retrieval valioso p/ escrita conversacional."
+    - "programas.json espelha investidores.json: {programas:[...], total_programas, themes_index, last_updated}. NÃO entra no index.json (invariante de-risk ①)."
+```
+
 ### 6.2 Tipos de link
 
 Expressos como wikilinks Markdown. Formato: `[[{subfolder}/{node_folder}/{slug}|{label}]]`.
