@@ -45,6 +45,7 @@ _FILES: dict[str, str] = {
     "index_historico": "index_historico.json",
     "icts": "icts.json",
     "investidores": "investidores.json",
+    "programas": "programas.json",
     # Estado operacional do pipeline (não-artefato do grafo, mas mesmo seam):
     # em prod o FS do worker é EFÊMERO — sem durabilidade aqui, cada redeploy
     # re-sintetiza toda wiki (rate limit) e a Descoberta re-tria URLs já vistas.
@@ -151,6 +152,12 @@ def load_investidores() -> list[dict]:
     """Lista de investidores (Q3) do `investidores.json` — diretório CURADO à mão
     (espelha load_icts). Entidade fora do ciclo de edital, fora do index.json."""
     return load("investidores", default={}).get("investidores", [])
+
+
+def load_programas() -> list[dict]:
+    """Lista de programas recorrentes do `programas.json` — diretório CURADO à mão
+    (espelha load_investidores). Entidade fora do ciclo de edital, fora do index.json."""
+    return load("programas", default={}).get("programas", [])
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-"""Matching: editais (híbrido), investidores (Q3) e radar unificado (L2)."""
+"""Matching: editais (híbrido), investidores (Q3), programas recorrentes e radar unificado (L2)."""
 
 from __future__ import annotations
 
@@ -64,7 +64,21 @@ def match_investidores_endpoint(
     return {"matches": match_investidores(profile, top_k=req.top_k)}
 
 
-@router.post("/match/radar", summary="Radar unificado (L2): eventos + investidores num ranking só")
+@router.post("/match/programas", summary="Rankeamento de programas recorrentes por estágio/aderência")
+@limiter.limit("10/minute")
+def match_programas_endpoint(
+    request: Request, req: MatchRequest, user_id: CurrentUserId, db: DbClient
+):
+    """Perfil da startup → programas recorrentes (aceleração/incubação/subvenção/
+    capacitação) rankeados por aderência: ESTÁGIO + elegibilidade + tema/setor
+    (quando o programa tem tese). SEM gate — entidade não elimina. Caminho isolado:
+    não toca o matcher de edital nem o de investidor."""
+    from core.services.programa_match import match_programas
+    profile = to_py_profile(req.profile)
+    return {"matches": match_programas(profile, top_k=req.top_k)}
+
+
+@router.post("/match/radar", summary="Radar unificado (L2): eventos + investidores + programas num ranking só")
 @limiter.limit("10/minute")
 def match_radar(
     request: Request, req: RadarRequest, user_id: OptionalUserId, db: OptionalDbClient,
