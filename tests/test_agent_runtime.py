@@ -33,6 +33,14 @@ from core.llm.agent_runtime import (  # noqa: E402
     tool,
 )
 
+
+@pytest.fixture(autouse=True)
+def _force_legacy_runtime(monkeypatch):
+    """Testam o loop LEGADO via stub de `_call_anthropic`. Com o LangGraph como
+    default, fixamos o legado (caminho de rollback AGENT_RUNTIME=legacy)."""
+    monkeypatch.setenv("AGENT_RUNTIME", "legacy")
+
+
 # ============================================================================
 # @tool decorator
 # ============================================================================

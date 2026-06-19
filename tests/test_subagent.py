@@ -15,8 +15,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+import pytest
+
 import core.llm.agent_runtime as ar
 from core.llm.agent_runtime import _LLMStep, run_subagent, tool
+
+
+@pytest.fixture(autouse=True)
+def _force_legacy_runtime(monkeypatch):
+    """Estes testes exercitam a mecânica do loop LEGADO (stub de `_call_anthropic`,
+    span_name via telemetry). Com o LangGraph como default, fixamos o legado —
+    eles guardam o caminho de rollback (AGENT_RUNTIME=legacy)."""
+    monkeypatch.setenv("AGENT_RUNTIME", "legacy")
 
 
 def _make_fake_call(sequence: list[_LLMStep]):
