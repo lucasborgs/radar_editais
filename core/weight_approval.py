@@ -32,6 +32,45 @@ DELTA_MAX = 10
 WEIGHT_MIN = 0.0
 WEIGHT_MAX = 100.0
 
+# Guardas do auto-apply (Item 1, Sprint 1). Mais apertados que o fluxo manual:
+# o auto-apply só dispara quando os 3 passam SIMULTANEAMENTE.
+AUTO_APPLY_MIN_OUTCOMES = 5
+AUTO_APPLY_MAX_ABS_DELTA = 5
+
+
+def _clamp_weight(value: float) -> float:
+    return max(WEIGHT_MIN, min(WEIGHT_MAX, value))
+
+
+def _materialize_weight(
+    db: Client,
+    workspace_id: str,
+    dimension: str,
+    new_weight: float,
+    insight_id: str,
+) -> dict | None:
+    """Upsert canônico de um peso em matching_weights.
+
+    Compartilhado por approve_suggestions (manual) e auto_apply_suggestions
+    (automático). source='reflection', approved_from_insight_id e approved_at
+    populados para audit. on_conflict cobre o UNIQUE (workspace_id, dimension).
+
+    Returns a row upsertada (ou None se o DB não retornou data).
+    """
+    result = (
+        db.table("matching_weights")
+        .upsert({
+            "workspace_id": workspace_id,
+            "dimension": dimension,
+            "weight": new_weight,
+            "source": "reflection",
+            "approved_from_insight_id": insight_id,
+            "approved_at": "now()",
+        }, on_conflict="workspace_id,dimension")
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
 
 def _parse_evidence(raw) -> dict:
     """`evidence` é jsonb no schema mas chega como dict OU string crua dependendo
@@ -233,22 +272,10 @@ def approve_suggestions(
 
     upserted: list[dict] = []
     for dim, delta in normalized:
-        new_weight = max(WEIGHT_MIN, min(WEIGHT_MAX, current_weights.get(dim, 0.0) + delta))
-        # UPSERT via on_conflict — UNIQUE (workspace_id, dimension) cobre o caso.
-        result = (
-            db.table("matching_weights")
-            .upsert({
-                "workspace_id": workspace_id,
-                "dimension": dim,
-                "weight": new_weight,
-                "source": "reflection",
-                "approved_from_insight_id": insight_id,
-                "approved_at": "now()",
-            }, on_conflict="workspace_id,dimension")
-            .execute()
-        )
-        if result.data:
-            upserted.append(result.data[0])
+        new_weight = _clamp_weight(current_weights.get(dim, 0.0) + delta)
+        row = _materialize_weight(db, workspace_id, dim, new_weight, insight_id)
+        if row:
+            upserted.append(row)
 
     # Invalida cache do get_weights para que o próximo match use os pesos novos
     # imediatamente (sem esperar o TTL de 60s).
@@ -282,6 +309,193 @@ def revert_workspace_weight(
         _invalidate_weights_cache(workspace_id)
         return True
     return False
+
+
+def auto_apply_suggestions(
+    db: Client,
+    workspace_id: str,
+    insight_id: str,
+    suggestions: list[dict],
+    outcomes_considered: int,
+    confidence: str,
+) -> list[dict]:
+    """Auto-aplica weight_suggestions quando os 3 guardas passam SIMULTANEAMENTE.
+
+    Coexiste com o fluxo manual (approve_suggestions): o que NÃO passa nos
+    guardas continua disponível em /me/weights/pending para aprovação humana —
+    esta função apenas materializa o subconjunto "óbvio o suficiente" sem
+    intervenção, e deixa rastro reversível em weight_change_log.
+
+    Guardas (todos obrigatórios):
+      - confidence == "high"
+      - outcomes_considered >= 5  (AUTO_APPLY_MIN_OUTCOMES)
+      - |delta| <= 5 por dimensão  (AUTO_APPLY_MAX_ABS_DELTA) — cap mais apertado
+        que o DELTA_MIN/MAX=±10 do fluxo manual; validado aqui sem relaxar o cap
+        manual. Sugestões com |delta| > 5 são puladas (caem no fluxo manual).
+
+    Para cada sugestão que passa: new_weight = clamp(current + delta, 0, 100),
+    upsert idêntico ao manual (source='reflection', approved_from_insight_id),
+    e INSERT em weight_change_log (old/new/delta, confidence, outcomes_window,
+    rationale, insight_id). Invalida o cache de pesos no fim.
+
+    Returns lista das mudanças aplicadas (uma por dimensão materializada). [] se
+    os guardas globais falham ou nenhuma sugestão individual passa.
+    """
+    if confidence != "high" or outcomes_considered < AUTO_APPLY_MIN_OUTCOMES:
+        return []
+    if not suggestions:
+        return []
+
+    from core.services.hybrid_match_service import get_weights
+    current_weights = get_weights(workspace_id)
+
+    applied: list[dict] = []
+    for sug in suggestions:
+        if not isinstance(sug, dict):
+            continue
+        dim = sug.get("dimension")
+        if dim not in VALID_DIMENSIONS:
+            continue
+        try:
+            delta = int(sug.get("delta", 0))
+        except (TypeError, ValueError):
+            continue
+        if abs(delta) > AUTO_APPLY_MAX_ABS_DELTA:
+            # Cap apertado do auto — sobra para o fluxo manual.
+            continue
+
+        old_weight = float(current_weights.get(dim, 0.0))
+        new_weight = _clamp_weight(old_weight + delta)
+        row = _materialize_weight(db, workspace_id, dim, new_weight, insight_id)
+        if not row:
+            continue
+
+        log = (
+            db.table("weight_change_log")
+            .insert({
+                "workspace_id": workspace_id,
+                "dimension": dim,
+                "old_weight": old_weight,
+                "new_weight": new_weight,
+                "delta": delta,
+                "confidence": confidence,
+                "outcomes_window": outcomes_considered,
+                "rationale": sug.get("rationale", ""),
+                "insight_id": insight_id,
+            })
+            .execute()
+        )
+        applied.append(log.data[0] if log.data else {
+            "dimension": dim,
+            "old_weight": old_weight,
+            "new_weight": new_weight,
+            "delta": delta,
+        })
+
+    if applied:
+        _invalidate_weights_cache(workspace_id)
+
+    logger.info(
+        "auto_apply_suggestions: workspace=%s insight=%s conf=%s outcomes=%d aplicadas=%d/%d",
+        workspace_id, insight_id, confidence, outcomes_considered,
+        len(applied), len(suggestions),
+    )
+    return applied
+
+
+def list_weight_changes(db: Client, workspace_id: str, limit: int = 50) -> list[dict]:
+    """Feed de mudanças de peso (auto-apply + reverts) do workspace.
+
+    Ordenado por applied_at desc. Inclui ativas (reverted_at NULL) e revertidas,
+    para o usuário ver o histórico completo e decidir reverter.
+    """
+    result = (
+        db.table("weight_change_log")
+        .select("*")
+        .eq("workspace_id", workspace_id)
+        .order("applied_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
+
+
+def revert_weight_change(db: Client, workspace_id: str, change_id: str) -> bool:
+    """Reverte uma mudança de peso específica do log.
+
+    Semântica escolhida — "desfazer aquele delta específico":
+      1. Marca reverted_at=now() na linha original (idempotente: linha já
+         revertida retorna False sem efeito).
+      2. Aplica o delta INVERSO ao peso atual da dimensão:
+         new = clamp(current - delta_original, 0, 100). Isto desfaz a
+         contribuição daquela mudança independentemente de mudanças posteriores
+         na mesma dimensão (composição de deltas), em vez de "restaurar
+         old_weight" cego (que apagaria deltas legítimos aplicados depois).
+      3. INSERE uma nova linha de log representando o próprio revert: delta
+         inverso, old/new = estado antes/depois do revert, confidence/insight
+         herdados como NULL, rationale="revert de <change_id>". Essa linha de
+         revert nasce ativa (reverted_at NULL).
+      4. Invalida o cache de pesos.
+
+    Nota: se a dimensão não tem mais override em matching_weights (ex.: já foi
+    revertida via /me/weights/{dimension}), o peso corrente vem do global via
+    get_weights — o revert reaplica como override do workspace com o peso
+    ajustado. Coerente: o log permanece a fonte da verdade do que foi auto.
+
+    Returns True se reverteu, False se change_id não existe, é de outro
+    workspace (RLS), ou já estava revertida.
+    """
+    rows = (
+        db.table("weight_change_log")
+        .select("*")
+        .eq("id", change_id)
+        .eq("workspace_id", workspace_id)
+        .is_("reverted_at", "null")
+        .execute()
+    ).data or []
+    if not rows:
+        return False
+    change = rows[0]
+
+    dimension = change["dimension"]
+    delta = float(change["delta"])
+
+    # Marca a original como revertida.
+    db.table("weight_change_log").update(
+        {"reverted_at": "now()"}
+    ).eq("id", change_id).eq("workspace_id", workspace_id).execute()
+
+    # Aplica o delta inverso ao peso corrente.
+    from core.services.hybrid_match_service import get_weights
+    current_weights = get_weights(workspace_id)
+    old_weight = float(current_weights.get(dimension, 0.0))
+    new_weight = _clamp_weight(old_weight - delta)
+
+    # Materializa. insight_id da linha original preserva a cadeia de audit no
+    # peso (de onde a dimensão "veio"); aceitável herdar.
+    _materialize_weight(
+        db, workspace_id, dimension, new_weight, change.get("insight_id")
+    )
+
+    # Linha de log do próprio revert (delta inverso), nasce ativa.
+    db.table("weight_change_log").insert({
+        "workspace_id": workspace_id,
+        "dimension": dimension,
+        "old_weight": old_weight,
+        "new_weight": new_weight,
+        "delta": -delta,
+        "confidence": None,
+        "outcomes_window": None,
+        "rationale": f"revert de {change_id}",
+        "insight_id": change.get("insight_id"),
+    }).execute()
+
+    _invalidate_weights_cache(workspace_id)
+    logger.info(
+        "revert_weight_change: workspace=%s change=%s dim=%s delta_inverso=%s",
+        workspace_id, change_id, dimension, -delta,
+    )
+    return True
 
 
 def _invalidate_weights_cache(workspace_id: str) -> None:

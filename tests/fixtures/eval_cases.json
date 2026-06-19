@@ -1,54 +1,67 @@
 {
-  "_comment": "Casos-semente do eval de escrita. Perfil iFlorestal inline. Os section titles são VERBATIM do proposal_sections de cada edital (senão save_draft rejeita o título). CURADORIA 2026-06-05: a fixture agora pareia iFlorestal SÓ com editais de fit real, para medir QUALIDADE DE ESCRITA (grounding) e não mismatch perfil↔edital. finep:774 (Cadeias Agroindustriais Sustentáveis) é fit forte — rastreabilidade de cadeias da bioeconomia casa direto. finep:769 (agricultura familiar / pacotes tecnológicos) é fit moderado — iFlorestal serve cooperativas extrativistas (produção familiar/comunitária sustentável). REMOVIDOS: finep:772 (transição energética) e finep:777 (economia circular/cidades) eram mismatch temático → o agente esticava a narrativa e o juiz flagrava mismatch como 'erro factual', confundindo a métrica de grounding. Seções priorizam justificativa/metodologia/descrição (ricas em afirmações verificáveis).",
+  "_comment": "Casos-semente do eval de escrita. Os section titles são VERBATIM do proposal_sections de cada edital (senão save_draft rejeita o título). CURADORIA 2026-06-14 (it.2): a fixture mede QUALIDADE DE ESCRITA (grounding), então cada par perfil↔edital é fit FORTE — um escritor competente CONSEGUE ancorar as afirmações no edital. LIÇÃO METODOLÓGICA: o resumo do wiki (themes/objective) é GROSSO DEMAIS para desenhar um perfil que case de verdade — o escopo real (linhas temáticas, exclusões, entregáveis obrigatórios) vive nos CHUNKS. A iteração 1 (perfis 'agrofibra'/'semeartech' desenhados do wiki) falhou: o juiz flagrou que finep:774 EXCLUI cana-de-açúcar (perfil usava bagaço de cana) e que finep:769 exige especificamente 'trator + 6 implementos obrigatórios' (perfil era sensor+app). Os perfis atuais são ancorados em LINHA TEMÁTICA verbatim do chunk: 'espectra' (tecnologias hiperespectrais/sensores embarcados em drones e satélites para classificação e detecção não-destrutiva na cadeia agroindustrial → finep:774, linha temática explícita, sem exclusão) e 'tratorbr' (trator compacto de baixo custo + implementos para mecanização da agricultura familiar → finep:769, que financia exatamente 'pacote tecnológico = trator + 6 implementos obrigatórios'). Seções priorizam descrição/justificativa/metodologia/objetivo — ricas em afirmações verificáveis. NOTA: pares de MISMATCH (medir se o agente se RECUSA a fabricar alinhamento) pertencem a uma suíte negativa separada.",
   "profiles": {
-    "iflorestal": {
-      "nome": "iFlorestal Tecnologia",
+    "espectra": {
+      "nome": "Espectra Agro Sensoriamento",
       "tipo_entidade": "empresa",
       "tamanho_empresa": "ME",
-      "capital_social": 200000,
+      "capital_social": 350000,
       "trl": 5,
-      "one_liner": "Plataforma de monitoramento florestal por sensoriamento remoto e IA para rastreabilidade de cadeias produtivas da bioeconomia.",
-      "solution_summary": "Combina imagens de satélite, dados de campo e modelos de visão computacional para detectar desmatamento, estimar biomassa e certificar origem de produtos florestais não-madeireiros.",
-      "descricao_atividades": "Desenvolvimento de software de geointeligência florestal; serviços de monitoramento ambiental para cooperativas extrativistas e indústria de base florestal na Amazônia.",
-      "portfolio_projetos": "Piloto de rastreabilidade de castanha-do-brasil com cooperativa no Acre; mapeamento de regeneração em áreas degradadas no Pará.",
-      "equipe_resumo": "3 engenheiros florestais, 2 cientistas de dados, 1 especialista em sensoriamento remoto.",
+      "one_liner": "Tecnologias hiperespectrais embarcadas em drones e plataformas terrestres para classificação e detecção não-destrutiva de qualidade e adulteração em cadeias agroindustriais de alimentos.",
+      "solution_summary": "Sensores e câmeras hiperespectrais integrados a modelos de visão computacional que classificam produtos agroindustriais e detectam, de forma não-destrutiva, adulterações, vida útil restante e conformidade com especificações do comprador ao longo da cadeia.",
+      "descricao_atividades": "Desenvolvimento de hardware de sensoriamento hiperespectral e software de classificação para a cadeia agroindustrial; serviços de inspeção de qualidade não-destrutiva para indústrias de alimentos e cooperativas.",
+      "portfolio_projetos": "Piloto de classificação hiperespectral de grãos em cooperativa no Paraná; detecção não-destrutiva de adulteração em laticínios com indústria em MG.",
+      "equipe_resumo": "2 engenheiros de visão computacional, 1 PhD em sensoriamento óptico, 2 engenheiros eletrônicos, 1 engenheiro de alimentos.",
+      "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "pesquisa_colaborativa"]
+    },
+    "tratorbr": {
+      "nome": "TratorBR Máquinas Agrícolas",
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "ME",
+      "capital_social": 400000,
+      "trl": 5,
+      "one_liner": "Trator compacto de baixo custo e conjunto de implementos agrícolas para mecanização da agricultura familiar, voltado a aumentar a oferta de alimentos.",
+      "solution_summary": "Desenvolvimento de um pacote tecnológico de mecanização — trator de pequeno porte acessível mais implementos obrigatórios (plantadeira, arado, pulverizador, roçadeira, sulcador e carreta) — projetado para as condições e a escala da agricultura familiar, com transferência da tecnologia ao final do projeto.",
+      "descricao_atividades": "Engenharia e fabricação de tratores compactos e implementos agrícolas de baixo custo; testes de campo e adequação à mecanização da pequena produção familiar de alimentos.",
+      "portfolio_projetos": "Protótipo de trator compacto de 25 cv testado com cooperativa de agricultura familiar no agreste de PE; conjunto de implementos validado em lavoura de mandioca e feijão.",
+      "equipe_resumo": "3 engenheiros mecânicos, 1 engenheiro agrônomo, 2 projetistas de implementos, 1 especialista em mecanização agrícola.",
       "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "pesquisa_colaborativa"]
     }
   },
   "cases": [
     {
-      "id": "iflorestal_finep774_descricao",
-      "profile": "iflorestal", "edital_id": "finep:774",
+      "id": "espectra_finep774_descricao",
+      "profile": "espectra", "edital_id": "finep:774",
       "section": "2. Descrição do projeto",
       "instruction": "Redija a descrição do projeto ancorando nos temas e exigências do edital. Salve o rascunho."
     },
     {
-      "id": "iflorestal_finep774_justificativa",
-      "profile": "iflorestal", "edital_id": "finep:774",
+      "id": "espectra_finep774_justificativa",
+      "profile": "espectra", "edital_id": "finep:774",
       "section": "3. Justificativa",
-      "instruction": "Escreva a justificativa conectando a rastreabilidade de cadeias agroindustriais ao foco do edital. Salve quando concluir."
+      "instruction": "Escreva a justificativa conectando o sensoriamento hiperespectral da cadeia agroindustrial ao foco do edital. Salve quando concluir."
     },
     {
-      "id": "iflorestal_finep774_objetivos",
-      "profile": "iflorestal", "edital_id": "finep:774",
-      "section": "4. Objetivos",
-      "instruction": "Redija os objetivos do projeto alinhados ao foco do edital. Salve o rascunho."
-    },
-    {
-      "id": "iflorestal_finep774_metodologia",
-      "profile": "iflorestal", "edital_id": "finep:774",
+      "id": "espectra_finep774_metodologia",
+      "profile": "espectra", "edital_id": "finep:774",
       "section": "5. Metodologia",
       "instruction": "Descreva a metodologia ancorando nas exigências técnicas do edital. Salve quando fechar."
     },
     {
-      "id": "iflorestal_finep769_justificativa",
-      "profile": "iflorestal", "edital_id": "finep:769",
-      "section": "3. Justificativa",
-      "instruction": "Escreva a justificativa relacionando nosso projeto aos temas e requisitos do edital. Salve quando concluir."
+      "id": "tratorbr_finep769_objetivo",
+      "profile": "tratorbr", "edital_id": "finep:769",
+      "section": "2. Objetivo do projeto",
+      "instruction": "Redija o objetivo do projeto alinhado ao foco do edital. Salve o rascunho."
     },
     {
-      "id": "iflorestal_finep769_metodologia",
-      "profile": "iflorestal", "edital_id": "finep:769",
+      "id": "tratorbr_finep769_justificativa",
+      "profile": "tratorbr", "edital_id": "finep:769",
+      "section": "3. Justificativa",
+      "instruction": "Escreva a justificativa relacionando o pacote de mecanização (trator + implementos) aos temas e requisitos do edital. Salve quando concluir."
+    },
+    {
+      "id": "tratorbr_finep769_metodologia",
+      "profile": "tratorbr", "edital_id": "finep:769",
       "section": "4. Metodologia",
       "instruction": "Descreva a metodologia ancorando nas exigências do edital. Salve quando fechar."
     }

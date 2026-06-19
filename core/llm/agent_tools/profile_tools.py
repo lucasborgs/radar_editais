@@ -25,17 +25,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import requests
-from bs4 import BeautifulSoup
 
 from core.llm.agent_runtime import Tool, tool
+from core.web.fetch import fetch_and_parse as _fetch_and_parse  # camada canônica
 
 logger = logging.getLogger(__name__)
 
 # Limites defensivos compartilhados.
 _MAX_PAGES = 10
-_PAGE_CHAR_LIMIT = 12000
 _MAX_LINKS = 20
-_HTTP_TIMEOUT = 12.0
 _BRASILAPI_TIMEOUT = 8.0
 _USER_AGENT = "Mozilla/5.0 (compatible; RadarEditais-Agent/1.0)"
 
@@ -54,37 +52,6 @@ class ExtractionState:
     """
     fetched: dict[str, dict[str, Any]] = field(default_factory=dict)
     submitted_profile: dict | None = None
-
-
-def _fetch_and_parse(url: str) -> dict[str, Any]:
-    """HTTP GET + extração de texto limpo e lista de (texto, href).
-
-    Levanta exceção em falha — caller (a tool) captura e converte em string-erro.
-    """
-    resp = requests.get(
-        url,
-        headers={"User-Agent": _USER_AGENT},
-        timeout=_HTTP_TIMEOUT,
-    )
-    resp.raise_for_status()
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-    for tag in soup(["script", "style", "nav", "footer", "header"]):
-        tag.decompose()
-
-    title = soup.title.string.strip() if soup.title and soup.title.string else url
-    text = " ".join(soup.get_text(separator=" ").split())
-    text = text[:_PAGE_CHAR_LIMIT]
-
-    links: list[dict[str, str]] = []
-    for a in soup.find_all("a", href=True):
-        href = a["href"].strip()
-        link_text = " ".join(a.get_text(separator=" ").split())[:80]
-        if not href or href.startswith(("javascript:", "mailto:", "#")):
-            continue
-        links.append({"text": link_text, "href": href})
-
-    return {"text": text, "title": title, "links": links}
 
 
 def build_profile_tools(state: ExtractionState) -> list[Tool]:

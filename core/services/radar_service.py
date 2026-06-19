@@ -1,13 +1,14 @@
 """Radar unificado (Layer 2 do matching multi-quadrante, spec §3.8).
 
-Junta os dois matchers que já existem — HybridMatch (eventos: edital/desafio/
-programa) e investor_match (entidade: investidor) — num ÚNICO ranking. É a
-costura "match = produto": normaliza scores heterogêneos, anexa o sinal "por que
-agora" (countdown de deadline p/ evento, força-de-tese p/ entidade) e aplica um
-cap por quadrante (anti-inundação).
+Junta os matchers que já existem — HybridMatch (eventos: edital/desafio/programa),
+investor_match (entidade: investidor) e programa_match (entidade: programa
+recorrente) — num ÚNICO ranking. É a costura "match = produto": normaliza scores
+heterogêneos, anexa o sinal "por que agora" (countdown de deadline p/ evento,
+força-de-tese p/ entidade) e aplica um cap por quadrante (anti-inundação).
 
-Aditivo e isolado (de-risk): NÃO toca HybridMatchService nem match_investidores —
-apenas orquestra. `/match` e `/match/investidores` seguem existindo intactos.
+Aditivo e isolado (de-risk): NÃO toca HybridMatchService, match_investidores nem
+match_programas — apenas orquestra. `/match`, `/match/investidores` e
+`/match/programas` seguem existindo intactos.
 
 MVP ingênuo por design (a spec autoriza): ranking = score + cap por quadrante; o
 `why_now` é sinal de display, não fator de ranking. Afinar o ranking unificado é
@@ -87,6 +88,23 @@ def _entity_item(m: dict) -> dict:
     }
 
 
+def _programa_item(m: dict) -> dict:
+    """Normaliza um match de programa recorrente (programa_match) ao item comum.
+    opportunity_type `programa-recorrente` (NÃO `programa`, que é o evento datado)
+    p/ o cap e o display distinguirem a entidade-âncora do edital-programa."""
+    return {
+        "id": m.get("id", ""),
+        "kind_class": "entidade",
+        "opportunity_type": "programa-recorrente",
+        # diretório de programas é curado à mão — sempre verificado
+        "verificacao": "verificado",
+        "title": m.get("name", ""),
+        "score": float(m.get("score") or 0.0),
+        "why_now": "Programa recorrente (edição periódica)",
+        "payload": m,
+    }
+
+
 def _apply_cap(items: list[dict], per_type_cap: int | None) -> list[dict]:
     """Mantém a ordem (por score), limitando a `per_type_cap` itens por
     opportunity_type (anti-inundação). None → sem cap."""
@@ -123,6 +141,7 @@ def _is_weak(item: dict, entity_floor: float) -> bool:
 def merge_radar(
     events: list[dict],
     entities: list[dict],
+    programas: list[dict] | None = None,
     *,
     top_k: int = 10,
     per_type_cap: int | None = None,
@@ -138,12 +157,14 @@ def merge_radar(
     """
     evs = [_event_item(m) for m in (events or [])]
     ents = [_entity_item(m) for m in (entities or [])]
+    progs = [_programa_item(m) for m in (programas or [])]
     _rank_within_source(evs)        # eventos rankeados entre si
-    _rank_within_source(ents)       # entidades rankeadas entre si
+    _rank_within_source(ents)       # entidades (investidor) rankeadas entre si
+    _rank_within_source(progs)      # programas recorrentes rankeados entre si
 
     strong: list[dict] = []
     weak: list[dict] = []
-    for it in evs + ents:
+    for it in evs + ents + progs:
         weak_flag = _is_weak(it, entity_floor)
         it["tier"] = "fraco" if weak_flag else "forte"
         (weak if weak_flag else strong).append(it)
@@ -183,9 +204,16 @@ def build_radar(
     except Exception as e:
         logger.warning("radar: match de entidades falhou: %s", e)
         entities = []
+    try:
+        from core.services.programa_match import match_programas
+        programas = match_programas(profile, top_k=top_k) or []
+    except Exception as e:
+        logger.warning("radar: match de programas falhou: %s", e)
+        programas = []
 
     return merge_radar(
-        events, entities, top_k=top_k, per_type_cap=per_type_cap, entity_floor=entity_floor,
+        events, entities, programas,
+        top_k=top_k, per_type_cap=per_type_cap, entity_floor=entity_floor,
     )
 
 

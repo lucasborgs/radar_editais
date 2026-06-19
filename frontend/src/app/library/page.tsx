@@ -32,6 +32,7 @@ import type {
 } from "@/types/api";
 import { Modal, Skeleton } from "@/components/ui";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { ResearchFindingsQueue } from "@/components/ResearchFindingsQueue";
 
 // ── Constantes de rótulo ────────────────────────────────────────────────────
 
@@ -51,17 +52,17 @@ const ENRICHMENT_LABEL: Record<EnrichmentStatus, string> = {
 };
 
 const ENRICHMENT_COLOR: Record<EnrichmentStatus, string> = {
-  pending: "bg-amber-50 text-amber-700 border border-amber-200",
-  processing: "bg-amber-50 text-amber-700 border border-amber-200",
+  pending: "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900",
+  processing: "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900",
   done: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-  failed: "bg-red-50 text-red-700 border border-red-200",
+  failed: "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900",
 };
 
 const INPUT_CLS = cn(
   "w-full rounded-lg border border-border px-3 py-2 text-sm font-sans",
   "text-content-primary placeholder:text-content-secondary",
   "focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary",
-  "transition-colors bg-white"
+  "transition-colors bg-surface"
 );
 
 const ACCEPT = ".pdf,.docx,.txt,.md";
@@ -195,7 +196,7 @@ function UploadModal({
         </div>
 
         {error && (
-          <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-sans">
+          <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 px-3 py-2 text-xs text-red-700 dark:text-red-300 font-sans">
             {error}
           </div>
         )}
@@ -245,19 +246,19 @@ function ViewModal({
           <Skeleton className="h-32 w-full" />
         </div>
       ) : error ? (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-sans">
+        <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 px-3 py-2 text-xs text-red-700 dark:text-red-300 font-sans">
           {error}
         </div>
       ) : item ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full font-sans bg-gray-100 text-content-secondary">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full font-sans bg-content-secondary/10 text-content-secondary">
               {TYPE_LABELS[item.type]}
             </span>
             {item.tags.map((t) => (
               <span
                 key={t}
-                className="text-[10px] bg-gray-100 text-content-secondary px-1.5 py-0.5 rounded-full font-sans"
+                className="text-[10px] bg-content-secondary/10 text-content-secondary px-1.5 py-0.5 rounded-full font-sans"
               >
                 {t}
               </span>
@@ -340,8 +341,8 @@ function RowActions({
         }}
         className={cn(
           "w-7 h-7 rounded-md flex items-center justify-center text-content-secondary",
-          "hover:bg-gray-100 hover:text-content-primary transition-colors",
-          open && "bg-gray-100 text-content-primary"
+          "hover:bg-content-secondary/10 hover:text-content-primary transition-colors",
+          open && "bg-content-secondary/10 text-content-primary"
         )}
       >
         <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor" aria-hidden>
@@ -351,7 +352,7 @@ function RowActions({
         </svg>
       </button>
       {open && (
-        <div className="absolute right-0 top-8 z-30 w-40 rounded-lg border border-border bg-white shadow-lg py-1">
+        <div className="absolute right-0 top-8 z-30 w-40 rounded-lg border border-border bg-surface shadow-lg py-1">
           {archived ? (
             <button
               type="button"
@@ -360,7 +361,7 @@ function RowActions({
                 setOpen(false);
                 onUnarchive();
               }}
-              className="w-full text-left px-3 py-1.5 text-xs font-sans text-content-primary hover:bg-gray-50"
+              className="w-full text-left px-3 py-1.5 text-xs font-sans text-content-primary hover:bg-content-secondary/5"
             >
               Restaurar
             </button>
@@ -372,7 +373,7 @@ function RowActions({
                 setOpen(false);
                 onArchive();
               }}
-              className="w-full text-left px-3 py-1.5 text-xs font-sans text-content-primary hover:bg-gray-50"
+              className="w-full text-left px-3 py-1.5 text-xs font-sans text-content-primary hover:bg-content-secondary/5"
             >
               Arquivar
             </button>
@@ -384,7 +385,7 @@ function RowActions({
               setOpen(false);
               onDelete();
             }}
-            className="w-full text-left px-3 py-1.5 text-xs font-sans text-red-600 hover:bg-red-50"
+            className="w-full text-left px-3 py-1.5 text-xs font-sans text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
           >
             Excluir
           </button>
@@ -497,6 +498,9 @@ export default function FilesPage() {
           </button>
         </div>
 
+        {/* Fila de findings do deep_research (Item 2, Fase B) — aditivo, some se vazia */}
+        <ResearchFindingsQueue token={token} />
+
         {/* Toggle de arquivados */}
         <div className="flex items-center justify-end">
           <label className="text-xs font-sans text-content-secondary flex items-center gap-1.5 cursor-pointer">
@@ -533,7 +537,7 @@ export default function FilesPage() {
             </button>
           </div>
         ) : (
-          <div className="rounded-xl border border-border bg-white divide-y divide-border overflow-hidden">
+          <div className="rounded-xl border border-border bg-surface divide-y divide-border overflow-hidden">
             {items.map((item) => {
               const status = item.enrichment_status;
               const isArchived = !!item.archived_at;

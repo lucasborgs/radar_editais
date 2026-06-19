@@ -20,6 +20,11 @@ from concurrent.futures import ThreadPoolExecutor
 logger = logging.getLogger(__name__)
 
 _MODEL = os.getenv("CONTEXTUAL_RETRIEVAL_MODEL", "gpt-4o-mini")
+# Endpoint/key parametrizáveis (bake-off): permite trocar o contextualizador por
+# um modelo free/open (ex.: Gemini Flash) sem editar código. Defaults preservam
+# o gpt-4o-mini no endpoint canônico OpenAI.
+_BASE_URL = os.getenv("CONTEXTUAL_RETRIEVAL_BASE_URL") or None
+_API_KEY_ENV = os.getenv("CONTEXTUAL_RETRIEVAL_API_KEY") or os.getenv("OPENAI_API_KEY")
 _DOC_CHARS = 12000      # doc-contexto truncado (custo/latência por chamada)
 _CHUNK_CHARS = 1500
 _MAX_WORKERS = 8
@@ -33,11 +38,12 @@ _PROMPT = (
 
 
 def is_enabled() -> bool:
-    """Liga por default; desliga com CONTEXTUAL_RETRIEVAL=false. Sem
-    OPENAI_API_KEY também desliga (degrada para embed cru)."""
+    """Liga por default; desliga com CONTEXTUAL_RETRIEVAL=false. Sem key
+    (CONTEXTUAL_RETRIEVAL_API_KEY/OPENAI_API_KEY) também desliga (degrada para
+    embed cru) — salvo endpoint custom, que aceita key placeholder."""
     if os.getenv("CONTEXTUAL_RETRIEVAL", "true").lower() in ("false", "0", "no"):
         return False
-    return bool(os.getenv("OPENAI_API_KEY"))
+    return bool(_API_KEY_ENV or _BASE_URL)
 
 
 def contextualize_chunks(chunks: list[dict]) -> list[str]:
@@ -51,7 +57,10 @@ def contextualize_chunks(chunks: list[dict]) -> list[str]:
 
     try:
         from core.llm.llm_client import make_client
-        client = make_client(api_key=os.environ["OPENAI_API_KEY"])
+        kwargs: dict = {"api_key": _API_KEY_ENV or "not-needed"}
+        if _BASE_URL:
+            kwargs["base_url"] = _BASE_URL
+        client = make_client(**kwargs)
     except Exception as e:  # noqa: BLE001
         logger.warning("contextual_retrieval: cliente LLM indisponível (%s) — embed cru", e)
         return texts

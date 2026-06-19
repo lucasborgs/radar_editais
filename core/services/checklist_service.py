@@ -22,6 +22,15 @@ import re
 
 from core.kg import kg_store
 
+# Importado no nível do módulo (em vez de dentro de auto_review_checklist) para
+# que os testes possam monkeypatchar `make_async_client`. O SDK OpenAI é uma
+# dependência declarada (pyproject), então o import não deve falhar; mantemos o
+# fallback resiliente no entry point caso o ambiente esteja degradado.
+try:
+    from core.llm.llm_client import make_async_client
+except ImportError:  # pragma: no cover - ambiente sem o SDK OpenAI
+    make_async_client = None  # type: ignore[assignment]
+
 logger = logging.getLogger(__name__)
 
 _OBLIGATION_PATTERN = re.compile(
@@ -314,6 +323,87 @@ _FALLBACK_COMPLETENESS = {"sections": [], "missing_sections": [], "overall_score
 
 
 # ---------------------------------------------------------------------------
+# Triage determinística (gates ~zero-custo antes do gather)
+# ---------------------------------------------------------------------------
+#
+# Antes de disparar os passes LLM, decidimos quais têm de fato algo a avaliar.
+# Os gates são CONSERVADORES: só pulam um passe quando ele é comprovadamente
+# vazio. Passe pulado devolve um resultado sintético "ok / não aplicável" com o
+# MESMO shape do passe real, para não quebrar o consumidor.
+#
+# SHADOW (gate manual do usuário): para validar que a triage não perde achados,
+# rode o all-3 em paralelo forçando `CHECKLIST_FORCE_ALL_PASSES=1` no ambiente
+# (ou `force_all_passes=True`) e compare o set de issues contra o run triaged
+# (sem a flag) sobre as mesmas propostas. Promova a triage só se o triaged não
+# perder nenhum achado que o all-3 produzia. A flag existe exatamente para
+# permitir esse A/B sem mudar o caller.
+
+_PLACEHOLDER_PATTERN = re.compile(r"\[\s*a\s+preencher\s*\]", re.IGNORECASE)
+
+# Resultados sintéticos para passes pulados pela triage. Score "ok" (100):
+# o gate só dispara quando não há nada a apontar (sem requisitos / tudo
+# preenchido), então a aderência/completude é trivialmente total.
+_SKIPPED_COMPLIANCE = {"issues": [], "score": 100, "skipped": "no_requirements"}
+_SKIPPED_COMPLETENESS = {
+    "sections": [],
+    "missing_sections": [],
+    "overall_score": 100,
+    "skipped": "all_sections_filled",
+}
+
+
+def _force_all_passes(force_all_passes: bool) -> bool:
+    """True se a triage deve ser desligada (shadow/all-3)."""
+    if force_all_passes:
+        return True
+    return os.getenv("CHECKLIST_FORCE_ALL_PASSES", "").strip().lower() in {"1", "true", "yes"}
+
+
+def _all_sections_filled(proposal: str, outline: list[str]) -> bool:
+    """
+    True se TODAS as seções do outline têm conteúdo real no documento.
+
+    Estrutural, sem LLM. O documento é montado como blocos '## <título>' (ver
+    backend/routers/writing.py). Para cada título do outline, localiza o bloco
+    e verifica que o corpo é não-vazio e não é um placeholder '[A preencher]'.
+
+    Conservador: se não houver outline, ou se algum título não puder ser
+    localizado/confirmado, retorna False (não pula o passe).
+    """
+    if not outline:
+        return False
+
+    # Particiona o documento em blocos por cabeçalho '## '. Cada item:
+    # (título_normalizado, corpo).
+    blocks: dict[str, str] = {}
+    current_title: str | None = None
+    current_body: list[str] = []
+    for line in proposal.splitlines():
+        header = re.match(r"^\s*##\s+(.*\S)\s*$", line)
+        if header:
+            if current_title is not None:
+                blocks[current_title] = "\n".join(current_body)
+            current_title = header.group(1).strip().lower()
+            current_body = []
+        elif current_title is not None:
+            current_body.append(line)
+    if current_title is not None:
+        blocks[current_title] = "\n".join(current_body)
+
+    for title in outline:
+        body = blocks.get(title.strip().lower())
+        if body is None:
+            return False  # seção não encontrada no documento → não pular
+        cleaned = _PLACEHOLDER_PATTERN.sub("", body).strip()
+        # Remove marcação de ênfase residual (ex.: '*[A preencher]*' → '*…*').
+        cleaned = cleaned.strip("*").strip()
+        if not cleaned:
+            return False  # seção vazia / só placeholder → não pular
+
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Entry point (async): roda os 3 passes em paralelo
 # ---------------------------------------------------------------------------
 
@@ -321,9 +411,18 @@ async def auto_review_checklist(
     proposal: str,
     edital_requirements: list[dict] | None = None,
     outline: list[str] | None = None,
+    force_all_passes: bool = False,
 ) -> dict:
     """
-    Executa as 3 passes de revisão em paralelo via asyncio.gather.
+    Executa as passes de revisão em paralelo via asyncio.gather.
+
+    Triage determinística (custo ~zero) decide quais passes têm o que avaliar
+    ANTES do gather — pula compliance sem requisitos e completude com todas as
+    seções preenchidas; qualidade roda sempre. Passe pulado devolve resultado
+    sintético "ok / não aplicável" (mesmo shape do real).
+
+    `force_all_passes=True` (ou env CHECKLIST_FORCE_ALL_PASSES=1) desliga a
+    triage e roda os 3 passes — usado no shadow A/B para comparar achados.
 
     Retorna um dict com:
       - compliance:   {issues, score}
@@ -343,47 +442,72 @@ async def auto_review_checklist(
             "error":        None,
         }
 
-    try:
-        from core.llm.llm_client import make_async_client
-    except ImportError as e:
-        logger.error("AsyncOpenAI indisponível: %s", e)
+    if make_async_client is None:
+        logger.error("AsyncOpenAI indisponível: make_async_client não importado")
         return {
             "compliance":   dict(_FALLBACK_COMPLIANCE),
             "quality":      dict(_FALLBACK_QUALITY),
             "completeness": dict(_FALLBACK_COMPLETENESS),
-            "error":        [{"pass": "all", "message": str(e)}],
+            "error":        [{"pass": "all", "message": "make_async_client indisponível"}],
         }
+
+    # --- Triage determinística (gates antes do gather) ---------------------
+    force_all = _force_all_passes(force_all_passes)
+
+    # compliance: pular se não há requisito contra o qual checar.
+    run_compliance = force_all or bool(edital_requirements)
+    # completude: pular se todas as seções já estão preenchidas (estrutural).
+    run_completeness = force_all or not _all_sections_filled(proposal, outline)
+    # qualidade: sempre roda (subjetivo, sem gate barato confiável).
+
+    # Resultados sintéticos para passes pulados (mesmo shape do real).
+    compliance_res: dict | BaseException = dict(_SKIPPED_COMPLIANCE)
+    completeness_res: dict | BaseException = dict(_SKIPPED_COMPLETENESS)
+    quality_res: dict | BaseException = dict(_FALLBACK_QUALITY)
 
     api_key, model, base_url = _llm_config()
     client_kwargs = {"api_key": api_key}
     if base_url:
         client_kwargs["base_url"] = base_url
 
+    # Monta só os passes elegíveis; mantém o mapeamento posição→nome para
+    # reatribuir os resultados na ordem certa após o gather.
     async with make_async_client(**client_kwargs) as client:
-        results = await asyncio.gather(
-            _pass_compliance(proposal, edital_requirements, client, model),
-            _pass_quality(proposal, client, model),
-            _pass_completeness(proposal, outline, client, model),
-            return_exceptions=True,
-        )
+        coros = []
+        labels: list[str] = []
+        if run_compliance:
+            coros.append(_pass_compliance(proposal, edital_requirements, client, model))
+            labels.append("compliance")
+        coros.append(_pass_quality(proposal, client, model))
+        labels.append("quality")
+        if run_completeness:
+            coros.append(_pass_completeness(proposal, outline, client, model))
+            labels.append("completeness")
 
-    compliance_res, quality_res, completeness_res = results
+        results = await asyncio.gather(*coros, return_exceptions=True)
+
+    by_label = dict(zip(labels, results))
     errors: list[dict] = []
 
-    if isinstance(compliance_res, BaseException):
-        logger.error("Pass compliance falhou: %s", compliance_res)
-        errors.append({"pass": "compliance", "message": str(compliance_res)})
-        compliance_res = dict(_FALLBACK_COMPLIANCE)
+    if "compliance" in by_label:
+        compliance_res = by_label["compliance"]
+        if isinstance(compliance_res, BaseException):
+            logger.error("Pass compliance falhou: %s", compliance_res)
+            errors.append({"pass": "compliance", "message": str(compliance_res)})
+            compliance_res = dict(_FALLBACK_COMPLIANCE)
 
+    quality_res = by_label["quality"]
     if isinstance(quality_res, BaseException):
         logger.error("Pass quality falhou: %s", quality_res)
         errors.append({"pass": "quality", "message": str(quality_res)})
         quality_res = dict(_FALLBACK_QUALITY)
 
-    if isinstance(completeness_res, BaseException):
-        logger.error("Pass completeness falhou: %s", completeness_res)
-        errors.append({"pass": "completeness", "message": str(completeness_res)})
-        completeness_res = dict(_FALLBACK_COMPLETENESS)
+    if "completeness" in by_label:
+        completeness_res = by_label["completeness"]
+        if isinstance(completeness_res, BaseException):
+            logger.error("Pass completeness falhou: %s", completeness_res)
+            errors.append({"pass": "completeness", "message": str(completeness_res)})
+            completeness_res = dict(_FALLBACK_COMPLETENESS)
 
     return {
         "compliance":   compliance_res,

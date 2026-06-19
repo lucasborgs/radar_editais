@@ -11,6 +11,85 @@
 
 ## Aberto
 
+### Deploy — aplicar migrations 021-024 no Supabase remoto (knowledge-evolution)
+
+- **O quê:** as migrations `021_weight_change_log`, `022_episodic_signal`,
+  `023_research_findings`, `024_playbook_overlays` (PR #26) foram aplicadas e validadas
+  só no Supabase **local**. Quando o #26 for pra prod, rodar no remoto (`supabase db push`
+  ou pelo runbook de deploy).
+- **Por que adiado:** é passo de deploy, não de PR. O #26 está empilhado sobre o #25 —
+  só vira prod depois do #25 mergear + retarget pra main.
+- **Risco:** baixo — sobem limpas no local (schema/RLS/FK conferidos via psql). A diferença
+  no remoto seria estado de dados, não SQL.
+- **Status:** aberto (2026-06-15).
+
+### Job `run_meta_reflection` — Item 3 (learned overlays de playbook) só tem scaffold
+
+- **O quê:** o Item 3 da spec de knowledge-evolution entregou só a estrutura — tabelas
+  `playbook_overlays`/`meta_reflection_runs` (GLOBAL) + 4ª camada no `load_playbook` +
+  `GET /playbooks/{m}/layers`. Falta o **job que ESCREVE overlays**: meta-reflexão
+  cross-tenant que agrega `application_log` anonimizado por `(mechanism, source)`, roda
+  LLM e insere overlays de nível 3.
+- **Por que adiado:** depende de **volume cross-tenant** real — sem dados acumulados de
+  vários workspaces, a meta-reflexão não produz nada testável. A 4ª camada é no-op até o
+  job popular as tabelas.
+- **Onde está specado:** `docs/spec_knowledge_evolution.md` (Item 3, plano passo 2);
+  memory `project-knowledge-evolution-spec`.
+- **Ponto de entrada:** novo job em `core/tasks.py` (procrastinate) escrevendo via
+  `get_supabase_service`; `meta_reflection_runs` é a trilha de auditoria já criada.
+- **Gatilho:** quando houver N workspaces com outcomes suficientes por mecanismo.
+- **Status:** aberto (2026-06-15) — scaffold no PR #26.
+
+### Smoke e2e do happy-path dos endpoints de escrita novos (knowledge-evolution)
+
+- **O quê:** os writes novos (`POST /research-findings/{id}/promote`, `/writing/{id}/close`,
+  `/me/weight-changes/{id}/revert`) foram smoke-testados só nos caminhos de **erro** (401
+  sem auth, 404/200 com ID inexistente — zero 500). O **happy-path** (promover um finding
+  real → vira content_item; fechar sessão com turnos → extrai sinal; reverter um peso
+  aplicado) nunca foi exercitado ponta-a-ponta contra dados reais.
+- **Por que adiado:** exige seed de dados (finding/sessão/weight_change reais) + chamadas
+  LLM (extração de sinal no close). Lógica coberta por unit tests (mocks) e erro-path
+  confirmado em runtime — risco baixo.
+- **Ponto de entrada:** subir backend local + JWT do `EVAL_WORKSPACE_ID`; seed via psql no
+  container `supabase_db_radar_editais`.
+- **Status:** aberto (2026-06-15).
+
+### Auto-apply de pesos — sem dedup de sugestão repetida entre ciclos (Item 1)
+
+- **O quê:** `auto_apply_suggestions` lê `current_weights` fresco a cada ciclo e aplica o
+  delta. Se o LLM sugerir a MESMA dimensão (ex.: `trl +5`) em ciclos sucessivos, o peso
+  acumula (+5/ciclo até o clamp 0-100). Não há dedup contra "já apliquei essa sugestão
+  recentemente".
+- **Por que adiado:** é *by design* pela spec ("|delta|≤5 por dimensão por ciclo") +
+  reversibilidade via `weight_change_log`. Vira problema só com auto-trigger frequente.
+- **Como fazer:** a própria spec prevê "após N ciclos, comparar performance do match
+  antes/depois como sinal real" — ou olhar o `weight_change_log` recente da dimensão antes
+  de reaplicar.
+- **Ponto de entrada:** `core/weight_approval.py::auto_apply_suggestions`.
+- **Status:** aberto (2026-06-15) — watch-item do PR #26.
+
+### Explicador de mecanismo no explore (tool user-facing)
+
+- **O quê:** tool nova no agente de explore que explica, pro usuário final, o que
+  cada mecanismo significa (subvenção = não-reembolsável/risco; crédito =
+  reembolsável/folga; equity = upside/troca de participação) — "o que é / o que
+  muda pra você / quando faz sentido". Agrega quando o explore compara editais de
+  mecanismos diferentes (que ele já faz). **NÃO** é o `load_skill` (craft de
+  ESCRITA, público errado) — é texto próprio voltado a quem ESCOLHE.
+- **Esforço:** baixo (~meio dia, dominado pela redação + sua revisão). Função pura
+  retornando texto de um dict estático — sem DB, sem LLM, sem retrieval, sem
+  eval-gate (zero superfície de alucinação). Plumbing ~1h (padrão da
+  `search_edital_trechos`); o gargalo é escrever bem 3 explicações user-facing e
+  revisar (é orientação sobre dinheiro público).
+- **Cobertura:** `subvencao` + `investimento`(→equity) no catálogo; `credito` tem
+  playbook mas nenhum edital ainda. Cobrir os 3 + None/desconhecido → genérico.
+- **Ponto de entrada:** `core/llm/agent_tools/explore_tools.py` (build_explore_tools)
+  + linha no `EXPLORE_AGENT_SYSTEM` (kg_match_service.py). Vocab no `mechanism` do
+  index.json.
+- **Por que adiado:** nice-to-have de clareza, sem dor bloqueante; priorizado
+  atrás do deep_research no explore.
+- **Status:** aberto (2026-06-15).
+
 ### Chat cross-dim — precisão de tema (ruído no explore, pós-Fase 2)
 
 - **O quê:** o chat de Descoberta cross-dimensional (PR #19/#22) recupera bem,
@@ -204,6 +283,25 @@
   específica desses serviços; criar fixture mínima).
 - **Ponto de entrada:** `core/kg_store.py`, `pipeline/etl_process.py` (escritor), os 4 leitores.
   **Status:** aberto (Tier 1 feito; Tier 2 secundário). Ver [[project_data_plane_prod]].
+
+### BM25 — IMPLEMENTADO (2026-06-19). HyDE implementado, desativado por default
+
+- **BM25:** substituiu `ts_rank` (FTS) como braço sparse do RRF. Implementado via
+  `rank-bm25` (Python puro, sem mudança de schema). `sparse="bm25"` é o novo default
+  em `retrieve_chunks`; `sparse="fts"` mantém o caminho legado. Teste offline
+  (edital FINEP 768, 253 chunks): recall@5 sparse isolado 0.375→0.875. FTS legado e
+  GIN index no `text_search` mantidos no schema por ora.
+
+- **HyDE (Hypothetical Document Embeddings):** implementado em `core/retrieval/hyde.py`
+  (`generate_hyde_doc`) e disponível em `retrieve_chunks(hyde=True)`. **Mantido com
+  `hyde=False` como default** — eval offline mostrou regressão no braço dense isolado
+  (recall@5 0.50→0.42 no golden FINEP com OpenAI embedding). Hipótese: golden anotado
+  por `section/source_file` favorece vocabulário literal; HyDE move o vetor para
+  paráfrases formais que divergem das anotações. Re-avaliar com pipeline completo
+  (rerank ativo, `core.eval rag`) e com embedding Gemma antes de ativar em prod.
+  Modelo configurável via `HYDE_MODEL` / `HYDE_BASE_URL` / `HYDE_API_KEY` (Ollama-ready).
+  Script `eval_embedding_offline.py` aceita `--hyde` para testes isolados.
+- **Status:** BM25 em prod. HyDE na branch, `hyde=False` até nova avaliação.
 
 ### Parsing/chunking estrutura-aware — INVESTIGADO E REFUTADO (benchmark-driven, 2026-06-06)
 - **Hipótese:** parser estrutura-aware (Docling p/ PDF, numbering p/ FAPESP texto-plano)
@@ -513,9 +611,13 @@
 - **Feito (Fase A):** `core/web_search.py` (port Tavily REST), `core/deep_research.py`
   (subagente run_agent + anti-fabricação), tool `deep_research` no Redator. Stateless,
   não persiste. Falta `TAVILY_API_KEY` no ambiente para uso real.
-- **Fase B (aberto):** gate de learning — endpoint `POST /library/from-research` +
-  `create_item(type_='web_research', source_url=…, enrich=True)` + painel de "fontes
-  pendentes" no frontend. É onde o fato escolhido vira memória do projeto.
+- **Fase B (FEITO — PR #26, 2026-06-15):** entregue como `research_findings` (staging
+  table, verified=false) + `build_research_tools(workspace_id, db)` persistindo silencioso
+  + `GET /research-findings` + `POST /research-findings/{id}/promote` (cria content_item,
+  type='other'+tag deep_research) + `ResearchFindingsQueue` na library. Difere do shape
+  esboçado aqui (`/library/from-research`/`web_research`) mas cumpre a mesma intenção: o
+  fato escolhido vira memória via gate humano de baixo atrito. Guardrails: cap de pendentes
+  (`RESEARCH_FINDINGS_MAX_PENDING=50`) + TTL 30d (filtro no GET).
 - **Fase C (aberto):** decay por tipo (`web_research` com meia-vida menor) + tool no
   Explorador + eval anti-fabricação (casos cuja resposta certa é "não encontrei").
 - **Onde:** [spec_deepresearch.md](spec_deepresearch.md).
@@ -762,6 +864,160 @@ de fora — nenhum bloqueia o que foi entregue.
   falso-negativo estrutural (limite da heurística, documentado em §5.10).
 
 ---
+
+### Gate de grounding (writing eval) confiável — investigado 2026-06-13
+
+- **O quê:** `pct_grounded` do `core.eval writing` não é gate confiável. Investigação
+  (PR #25) provou que NÃO é regressão de produto nem do retriever (finep:774=83
+  chunks, finep:769=151, `retrieve_chunks` saudável; suspeitos `1eb00699a`/`8e29384b6`
+  LIMPOS). A instabilidade (medido 0.05–0.625 entre runs do MESMO fixture) tem duas
+  causas: (a) fixture **misfit** — iFlorestal (florestal) pareada com editais de
+  agro/agricultura familiar → o agente fabrica claims de fit que o juiz corretamente
+  não sustenta; (b) **variância do output do agente** entre runs (drafts estocásticos
+  → nº de claims e grounding mudam por run). Micro-média (Σgrounded/Σclaims) foi
+  avaliada e descartada: NÃO resolve — a variância é do draft, não da agregação
+  (spread 0.59 ≈ macro 0.575 nos 3 runs reais).
+- **Por que adiado:** a investigação já entregou o valor (o número não é regressão;
+  o gate é que é cego). Tornar o gate útil é trabalho de fixture + custo de N-runs,
+  sem decisão de retrieval pendente agora.
+- **Como fazer:** (a) ✅ FEITO 2026-06-14 — fixture reescrita com pares **bem-casados
+  ancorados nos CHUNKS** (não no resumo do wiki): `espectra`→finep:774 (linha
+  hiperespectral) e `tratorbr`→finep:769 (trator+implementos). Grounding pooled
+  0.05→0.50, factual_errors 0.67→0.33, saved 0.83→1.0, e um caso limpo a 3/3=1.0,
+  0 erros (prova que o agente ANCORA bem em fit limpo). (b) domar variância via
+  **N-runs + média** ou temp fixa no eval — AINDA ABERTO (tradeoff: N-runs multiplica
+  custo de LLM); (c) opc.: reportar grounding só quando Σclaims do run ≥ limiar.
+- **LIÇÃO METODOLÓGICA (2026-06-14):** não dá pra desenhar fixture de fit a partir do
+  resumo do wiki (themes/objective) — escopo real (exclusões, entregáveis obrigatórios)
+  vive nos chunks. It.1 (perfis do wiki) falhou: finep:774 EXCLUI cana (perfil usava
+  bagaço de cana); finep:769 exige `trator + 6 implementos obrigatórios` (perfil era
+  sensor+app). Só ler os chunks deu fit limpo. Registrado no `_comment` da fixture.
+- **Gatilho para retomar:** querer usar `pct_grounded` como gate de merge real (falta
+  só domar variância, item b), OU mexer no Redator.
+- **Ponto de entrada:** `tests/fixtures/eval_cases.json`, `core/eval/writing.py`
+  (`task`), `core/writing_eval.py` (juízes).
+- **Status:** parcialmente resolvido (2026-06-14): fixture bem-casada feita; resta
+  domar variância (b). Ver memory `project-agent-patterns-deepagents`.
+- **Corroboração (2026-06-15, PR #26):** o gate do Item 5 (Critic sub-agente) rodou um
+  A/B writing eval critic-novo vs critic-antigo: grounding **flat ~0.40** nos dois
+  (0.417 vs 0.396) → reconfirma que o número é do writer/retrieval, **independente** do
+  critic. Item 5 não regrediu nada (saved=1.0, zero over-block). Reforça item (b): a
+  alavanca real é variância do draft + qualidade de ancoragem do redator, não o critic.
+
+### Redator inventa escopo/procedimento do edital (resíduo real, fixture limpa)
+
+- **O quê:** com fixture bem-casada (2026-06-14), os erros factuais que SOBRAM são
+  sinal de produto real, não artefato. Em `tratorbr`→finep:769 o redator: (1)
+  **deturpou o escopo** do edital — afirmou que finep:769 "apoia Agritech /
+  agricultura de precisão" quando o edital é de MECANIZAÇÃO (trator+implementos);
+  (2) **inventou um passo procedural** — "Reuniões iniciais com a equipe da Finep" na
+  metodologia, que VIOLA a regra de conflito de interesse do edital (especialistas
+  ad-hoc sem vínculo). Ambos pegos pelo juiz factual.
+- **Por que adiado:** estreito (1 dos 2 perfis, minoria das seções) e não bloqueia —
+  o agente ancora bem em fit limpo (espectra 3/3). Mas é a próxima alavanca real de
+  qualidade de escrita, agora que o instrumento mede a coisa certa.
+- **Frentes possíveis:** (a) prompt do redator — instruir a NÃO afirmar o escopo do
+  edital sem respaldo em chunk recuperado (descrever só o que o edital diz, verbatim);
+  (b) puxar regras procedurais (conflito de interesse, vínculos) pro contexto via
+  retrieval antes de redigir metodologia; (c) ComplianceMonitor/Critic pegar esse
+  tipo de claim antes do save.
+- **Gatilho:** próxima rodada de melhoria do Redator, ou se grounding virar gate.
+- **Ponto de entrada:** prompt do redator em `core/services/writing_session.py`,
+  juiz `judge_factual_errors` em `core/writing_eval.py`.
+- **Status:** aberto (2026-06-14).
+
+---
+
+### Tool-calling como teto do bake-off no tier agêntico (tier 5)
+
+- **O quê:** o tier agêntico (writing + critic) usa function/tool calling em LOOP.
+  A capability de plugar qualquer modelo já existe (2 protocolos: Anthropic nativo +
+  OpenAI-compat com base_url — `AGENT_OPENAI_BASE_URL`/`CRITIC_OPENAI_BASE_URL`, commit
+  8b2eadf63). Mas **conectar ≠ funcionar**: modelos open/baratos falam chat.completions
+  e mesmo assim têm tool-calling fraco → quebram o loop (JSON de tool malformado, não
+  param, ignoram a tool). Esse é o TETO real do open no tier 5, não o protocolo.
+- **Por que está parado:** depende de dois pré-requisitos que ainda não existem —
+  (a) **gate de grounding confiável** (ver entradas acima; sem ele não dá pra julgar a
+  saída agêntica), e (b) um **provider ZDR/pago** (writing/profile = dado de cliente →
+  proibido free-tier-com-treino). Sem os dois, testar candidato barato aqui seria
+  degradar às cegas — viola a premissa "só corta custo com gate verde".
+- **O que medir quando destravar:** taxa de tool-calls válidos / loops concluídos sem
+  fallback, ANTES da qualidade (BFCL é proxy — Qwen3.5-397B lidera o open; DeepSeek
+  decente). Só candidato que sustenta o loop entra no gate `writing`.
+- **Gatilho para retomar:** gate de grounding confiável + escolha de provider ZDR.
+- **Ponto de entrada:** `core/llm/agent_runtime.py` (`run_agent`/`_call_openai`),
+  `core/llm/agent_tools/critic_agent.py`; perfil em `docs/specs/demo-cost-profile.md`,
+  spec em `docs/specs/llm-embedding-bakeoff.md` §5.
+- **Status:** aberto (2026-06-16) — capability pronta, promoção bloqueada.
+
+---
+
+### Learning loop dos playbooks/KG — evolução por uso (parado: sem usuários)
+
+- **O quê:** como o ecossistema de conhecimento (nós de mecanismo/fonte + skills)
+  evolui pelo uso. Motor JÁ existe no tier-empresa: outcome (`aprovada/reprovada` em
+  applications) → `reflect_workspace` ([reflection_service.py](../core/reflection_service.py))
+  com `MIN_OUTCOMES_FOR_REFLECTION=3` + `confidence` low/med/high + `evidence_ids`
+  (provenance) → auto-insert (privado, blast radius 1). Falta levantar o mesmo motor
+  a **dois tiers compartilhados** (overlay de fonte, base de mecanismo).
+- **Gate compartilhado (a desenhar):** piso cross-workspace (≥N outcomes de ≥K
+  workspaces), só `confidence=high` elegível, **fila de curadoria humana**
+  (não auto-promove — filosofia Grantable), eval-gate (precisa do grounding
+  confiável), provenance+data p/ aposentar, e **filtro fato↔craft**: delta que é
+  FATO do instrumento → vai pro nó KG (conhecimento); delta que é CRAFT → vai pra
+  skill (competência).
+- **Substrato (decisão):** o destino do conhecimento é o **nó do KG** (mecanismo/
+  fonte como nós com wiki_page, à la LLM-wiki de Karpathy — "o grafo é a fonte de
+  conhecimento"). Arquivos `skills/*.md` em git são o **bootstrap** (tier-0); o
+  loop é idêntico nos dois (escreve delta em markdown). Reconciliação Karpathy:
+  o LLM **propõe** sempre; o gate **promove** nas páginas compartilhadas.
+- **Por que parado:** sem usuários reais não há outcomes → nada a aprender. É
+  fundação de aparato, não de produto. Espelha a disciplina do golden RAG.
+- **Gatilho para retomar:** volume de outcomes reais (aplicações com status final)
+  acumulando + decisão de subir qualidade além da curadoria manual.
+- **Ponto de entrada:** `core/reflection_service.py` (motor), `applications.py`
+  (trigger), o substrato de nó KG (`core/kg/`), `docs/specs/skills-by-mechanism.md`.
+- **Status:** desenho fechado, implementação parada (2026-06-14).
+
+### Playbooks: conhecimento tácito por mecanismo — spec travada 2026-06-14
+
+- **O quê:** redesenho do subsistema de "skills" do Redator/Monitor. Hoje são
+  keyed por fonte (`skills/<source>_compliance.md`) e misturam regra dura (que é do
+  edital/RAG) com tácito. Spec completa em [docs/specs/skills-by-mechanism.md](specs/skills-by-mechanism.md):
+  separar **normativo (RAG)** de **tácito (playbook)**; keying por **mecanismo**
+  (campo já estruturado) + overlays de fonte; **seções-nomeadas = tipos =
+  roteamento** pros consumidores que já existem (Redator↔escrita/tom,
+  Monitor↔heurísticas/anti-padrões, Critic intocado). 7 decisões (D1–D7) travadas.
+- **Por que adiado:** decisão de design fechada (validada contra 2 modelos
+  externos), mas a implementação é média (loader + extrator web + roteamento) e o
+  conteúdo de domínio (playbooks por mecanismo) é o gargalo, incremental.
+- **Pré-requisito de dados:** `mechanism` está 100% vazio na web (extrator da
+  Descoberta não preenche) — estender `_extract` faz parte do roteiro (D7).
+- **Conexão:** mover tácito do prompt de geração pro avaliador é fix plausível
+  parcial do grounding (ver entrada acima).
+- **Gatilho para retomar:** querer subir a qualidade/aderência da escrita para
+  além do RAG puro, OU FAPESP/web entrarem em produção precisando de praxe curada.
+- **Ponto de entrada:** `core/skills.py` (loader), `opportunity_discovery._extract`
+  (mechanism), `compliance_monitor.py` + `writing_tools.load_skill` (roteamento).
+- **Status:** **loader + flip dos consumidores IMPLEMENTADOS (2026-06-14)** —
+  `load_playbook` compõe 3 camadas por seção; Monitor/Redator flipados; antigos
+  `*_compliance.md` removidos (tácito FINEP → `source/finep/global.md`). Playbooks de
+  `subvencao`/`credito`/`equity` ativos (SEED). **Pendente:** (a) extrator web preencher
+  `mechanism` (D7) — web 100% None; (b) migrar os 5 `investimento`→`credito` na fonte de
+  dados (D2); (c) `mechanism/_generic.md` p/ o fallback None não ficar vazio (D3);
+  (d) shadow/eval de injeção + learning loop (sem usuários ainda).
+- **Overlay `source/bndes/credito.md` (pendente de fonte):** a entrevista de `credito`
+  (2026-06-14) rendeu praxe BNDES rica (análise econômico-financeira/governança no
+  centro, narrativa corporativa menos tecnológica, FGI/FGO como garantia), mas BNDES
+  **não é fonte indexada** hoje — só FINEP/FAPESP. Matéria-prima está em
+  `docs/specs/playbook-interview-credito.md` (bloco F). **Gatilho:** BNDES virar fonte
+  ativa do pipeline → criar o overlay a partir dessas respostas.
+- **Playbook `matching` (EMBRAPII) — adiado por escopo (2026-06-14):** EMBRAPII/ICT
+  são insumo do **Match** (parceria empresa↔ICT), não da **escrita**; não há valor em
+  autorar o playbook de redação agora. Template de entrevista preenchido já existe em
+  `docs/specs/playbook-interview-matching.md` (semente). `bolsa` ficou **fora de
+  escopo** de vez (sistema não atende bolsas). **Gatilho:** decidir que a escrita
+  cooperativa entra no produto → rodar a entrevista e destilar `skills/mechanism/matching.md`.
 
 ## Fechado-adiado (revisitar só no gatilho)
 

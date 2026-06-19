@@ -1,21 +1,23 @@
 """Engine de descoberta de oportunidades (item 2.2).
 
 Varre a web por editais/chamadas/desafios de fomento, tria (é oportunidade real?),
-extrai campos e grava no bronze da fonte `web`. A Descoberta é a TORNEIRA
-AUTOMÁTICA da fonte web (a outra é a seed list manual em `web_sources`): não tem
-mais bronze/índice próprios. Os registros entram em `web_raw/` com
-`verificacao=provisorio` e, daí pra frente, são páginas web como quaisquer
-outras — `build_knowledge_graph` os ingere via `_build_editais("web")` e o
-adapter `pipeline.adapters.web` os chunka pro RAG (Opção A, WIKI.md §12.4).
+extrai campos e os deixa numa STAGING (`discovered_opportunities`) como `pending`.
+A Descoberta é a TORNEIRA AUTOMÁTICA da fonte web (a outra é a seed list manual
+em `web_sources`).
+
+GATE HUMANO (Parte C): a torneira NÃO escreve mais no KG. Um humano revê a fila e
+PROMOVE o que vale — a promoção insere a URL em `web_sources`, e daí o WebScraper
+a trata como fonte curada (HTML cru → chunk → KG). Link morto / notícia rasa /
+duplicata morrem na fila sem nunca tocar o RAG ("a IA mostra, o humano decide").
 
 Pipeline:
   queries (wikis/_discovery.md) → web_search (Tavily) → dedup (ledger + KG)
     → triagem (LLM barato: é fomento? agência?) → extração (LLM capaz: campos)
-    → full-fetch do texto da página → web_raw/web_discovery_*.json + ledger
+    → full-fetch do texto da página → discovered_opportunities (pending) + ledger
 
 Custo: triagem roda em muitos candidatos (modelo barato); extração só nos que
-passaram (modelo capaz). Nada entra no KG aqui — isso é o build, e tudo provisório.
-Funções de LLM/busca isoladas para teste com mocks.
+passaram (modelo capaz). Nada entra no KG aqui — só a promoção humana cria nó.
+Funções de LLM/busca/staging isoladas para teste com mocks.
 """
 from __future__ import annotations
 
@@ -33,8 +35,6 @@ from core.web_identity import normalize_web_url, web_url_hash
 
 logger = logging.getLogger(__name__)
 
-# Bronze de saída: o MESMO da fonte web (a Descoberta é uma torneira dela).
-_WEB_BRONZE_DIR = BRONZE_DIR / "web_raw"
 # Ledger LEGADO (file-based, pré-kg_store): mantido só como fonte de migração —
 # o ledger vive no kg_store (`discovery_ledger`), durável em Postgres quando
 # configurado (o FS do worker de prod é efêmero; sem isto, cada redeploy
@@ -44,6 +44,11 @@ _LEGACY_LEDGER = BRONZE_DIR / "discovery_raw" / ".ledger.json"
 # Cap defensivo do texto guardado por página (o chunker re-fatia depois). Páginas
 # de fomento ficam bem abaixo; evita um caso patológico inflar o bronze.
 _TEXTO_CRU_CAP = 60_000
+
+# TTL default do cache negativo (dias) — sobrescrito por
+# `reject_cache_ttl_days` em wikis/_discovery.md. Após o TTL, uma URL antes
+# rejeitada volta a ser triada (o conteúdo da página pode ter mudado).
+_DEFAULT_REJECT_TTL_DAYS = 30
 
 
 # =============================================================================
@@ -117,7 +122,8 @@ _TRIAGE_SYSTEM = (
     "notícias ou homepage institucional. "
     "Responda só JSON: "
     '{"is_opportunity": true|false, "is_hub": true|false, '
-    '"agency": "sigla/nome curto da agência ou \\"\\""}.'
+    '"agency": "sigla/nome curto da agência ou \\"\\"", '
+    '"reason": "motivo curto (<=12 palavras) — sobretudo quando REJEITAR"}.'
 )
 
 
@@ -131,10 +137,12 @@ def _triage(hit: websearch.SearchHit, client, model) -> dict:
         )
         return {"is_opportunity": bool(data.get("is_opportunity")),
                 "is_hub": bool(data.get("is_hub")),
-                "agency": (data.get("agency") or "").strip()}
+                "agency": (data.get("agency") or "").strip(),
+                "reason": (data.get("reason") or "").strip()}
     except Exception as e:
         logger.warning("triagem falhou (%s): %s", hit.url, e)
-        return {"is_opportunity": False, "is_hub": False, "agency": ""}
+        return {"is_opportunity": False, "is_hub": False, "agency": "",
+                "reason": "triagem falhou"}
 
 
 def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, model) -> dict | None:
@@ -331,8 +339,62 @@ def _load_ledger() -> set[str]:
     return urls
 
 
-def _save_ledger(urls: set[str]) -> None:
-    kg_store.save("discovery_ledger", {"urls": sorted(urls)})
+def _save_ledger(urls: set[str], rejected: dict[str, dict] | None = None) -> None:
+    """Persiste o ledger. `urls` = aprovados/vistos (dedup positivo). `rejected`
+    = cache negativo {url_norm: {"reason", "ts"}}; quando None, preserva o que já
+    está no blob (não apaga rejeições só porque esta rodada não as tocou)."""
+    blob: dict = {"urls": sorted(urls)}
+    blob["rejected"] = _load_rejected() if rejected is None else rejected
+    kg_store.save("discovery_ledger", blob)
+
+
+# =============================================================================
+# Cache negativo (URLs rejeitadas na triagem) — reusa o blob do ledger
+# =============================================================================
+# Persistido NO MESMO blob `discovery_ledger` sob a chave `rejected`:
+#   {url_norm: {"reason": "<motivo curto da triagem>", "ts": "<iso8601 UTC>"}}.
+# É JSONB em kg_artifacts — estender o schema do blob NÃO exige migração SQL e dá
+# a observabilidade do descarte de graça (audita falso-negativos + custo evitado).
+# Antes de triar, consultamos o cache: URL rejeitada e DENTRO do TTL é pulada sem
+# chamada LLM. O TTL (reject_cache_ttl_days) impede prender para sempre uma URL
+# cujo conteúdo pode virar relevante.
+
+
+def _load_rejected() -> dict[str, dict]:
+    """Mapa {url_norm: {"reason", "ts"}} do cache negativo. {} se ausente."""
+    try:
+        rej = kg_store.load("discovery_ledger", default={}).get("rejected") or {}
+    except Exception:
+        return {}
+    return rej if isinstance(rej, dict) else {}
+
+
+def _reject_fresh(rejected: dict[str, dict], norm_url: str, now: datetime,
+                  ttl_days: int) -> bool:
+    """True se `norm_url` está no cache negativo e DENTRO do TTL (deve pular a
+    triagem). Entrada sem `ts` parseável é tratada como expirada (re-tria)."""
+    entry = rejected.get(norm_url)
+    if not entry:
+        return False
+    ts = entry.get("ts")
+    if not ts:
+        return False
+    try:
+        rejected_at = datetime.fromisoformat(ts)
+    except (ValueError, TypeError):
+        return False
+    if rejected_at.tzinfo is None:
+        rejected_at = rejected_at.replace(tzinfo=timezone.utc)
+    return (now - rejected_at) < timedelta(days=ttl_days)
+
+
+def _record_rejection(rejected: dict[str, dict], norm_url: str, reason: str,
+                      now: datetime) -> None:
+    """Registra/atualiza uma rejeição no mapa do cache negativo (in-place) e loga
+    o descarte (observabilidade de custo evitado + auditoria da triagem)."""
+    rejected[norm_url] = {"reason": (reason or "").strip()[:200],
+                          "ts": now.isoformat()}
+    logger.info("descoberta: descarte na triagem (%s) — %s", norm_url, reason)
 
 
 def _known_urls() -> set[str]:
@@ -341,6 +403,49 @@ def _known_urls() -> set[str]:
     idx = kg_store.load_index()
     known |= {_norm_url(e.get("link", "")) for e in idx.get("editais", [])}
     return known
+
+
+# =============================================================================
+# Staging (Parte C) — achados pousam em `discovered_opportunities` (pending);
+# nada entra no KG até a promoção humana. Upsert por url_hash (dedup idempotente).
+# =============================================================================
+
+def _stage_records(records: list[dict]) -> int:
+    """Insere os achados na staging `discovered_opportunities` (status=pending).
+
+    Upsert por `url_hash` ignorando duplicatas (re-rodar não duplica a fila).
+    Retorna o nº de linhas enviadas. Degrada para 0 (logando) sem cliente
+    Supabase — o caller não levanta."""
+    if not records:
+        return 0
+    try:
+        from core.db import get_supabase_service  # noqa: PLC0415
+        db = get_supabase_service()
+    except Exception as e:
+        logger.warning("staging: sem cliente Supabase (%s) — achados NÃO persistidos", e)
+        return 0
+    rows = [{
+        "url": r["url"],
+        "url_hash": r["url_hash"],
+        "title": r.get("title"),
+        "agency": r.get("agency"),
+        "fonte": r.get("fonte"),
+        "descricao": r.get("descricao"),
+        "prazo_envio": r.get("prazo_envio"),
+        "publico_alvo": r.get("publico_alvo"),
+        "tema": r.get("tema"),
+        "opportunity_type": r.get("opportunity_type"),
+        "raw": r,
+        "status": "pending",
+    } for r in records]
+    try:
+        (db.table("discovered_opportunities")
+           .upsert(rows, on_conflict="url_hash", ignore_duplicates=True)
+           .execute())
+        return len(rows)
+    except Exception as e:
+        logger.error("staging: falha ao inserir %d achados: %s", len(rows), e)
+        return 0
 
 
 # =============================================================================
@@ -359,6 +464,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     max_cand = int(cfg.get("max_candidates", 40))
     max_dou = int(cfg.get("max_dou_candidates", 80))
     max_hub_children = int(cfg.get("max_hub_children", 8))
+    reject_ttl_days = int(cfg.get("reject_cache_ttl_days", _DEFAULT_REJECT_TTL_DAYS))
     hub_enabled = os.getenv("DISCOVERY_HUB_CRAWL_ENABLED", "0") == "1"
     if not queries:
         logger.warning("descoberta: sem queries em wikis/_discovery.md")
@@ -423,12 +529,23 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     # hub entram em depth 1 e NÃO re-expandem (crawl de 1 nível, sem loop). Quando
     # hub_enabled=False a fila se comporta exatamente como o loop antigo.
     records: list[dict] = []
+    # Cache negativo: carregado uma vez por rodada. `triage_skipped` conta as
+    # chamadas _triage que o cache eliminou (medido pelo dry-run, spec §Validação).
+    rejected = _load_rejected()
+    now = datetime.now(timezone.utc)
+    triage_skipped = 0
     queue: list[tuple[websearch.SearchHit, int]] = [(h, 0) for h in candidates]
     hubs_expanded = 0
     i = 0
     while i < len(queue):
         h, depth = queue[i]
         i += 1
+        # Cache negativo: URL rejeitada na triagem e ainda dentro do TTL é pulada
+        # SEM chamada LLM (corta a re-triagem diária das mesmas URLs lixo).
+        if _reject_fresh(rejected, _norm_url(h.url), now, reject_ttl_days):
+            triage_skipped += 1
+            logger.debug("descoberta: cache negativo pula triagem de %s", h.url)
+            continue
         verdict = _triage(h, tri_client, tri_model)
         # Hub de inovação aberta (só depth 0): em vez de descartar, faz fan-out
         # raso — cada desafio-filho vira candidato normal (passa por triagem +
@@ -443,8 +560,12 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
                 seen_now.add(nu)
                 queue.append((child, 1))
             if not verdict["is_opportunity"]:
-                continue  # o hub em si raramente é UMA oportunidade
+                continue  # o hub em si raramente é UMA oportunidade (não cacheia
+                          # como rejeição: já foi expandido e pode render filhos)
         if not verdict["is_opportunity"]:
+            # Cache negativo + log de descarte: registra a rejeição para que a
+            # próxima rodada pule esta URL sem re-pagar a triagem (dentro do TTL).
+            _record_rejection(rejected, _norm_url(h.url), verdict.get("reason", ""), now)
             continue
         page_text = _page_text(h)
         # Prefere o órgão que a FONTE já conhece (ex.: DOU lê do artCategory) ao
@@ -454,16 +575,17 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         if rec:
             records.append(rec)
 
-    if write and records:
-        _WEB_BRONZE_DIR.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        # Prefixo `web_discovery_` distingue a torneira automática da manual
-        # (`web_scan_`) dentro do mesmo bronze; ambas são unidas por url_hash.
-        out = _WEB_BRONZE_DIR / f"web_discovery_{ts}.json"
-        out.write_text(json.dumps(records, ensure_ascii=False, indent=2),
-                       encoding="utf-8")
-        _save_ledger(known | {_norm_url(r["url"]) for r in records})
-        logger.info("descoberta: %d oportunidades → %s", len(records), out.name)
+    logger.info("descoberta: %d triagens puladas pelo cache negativo (TTL %dd)",
+                triage_skipped, reject_ttl_days)
+
+    if write:
+        n = _stage_records(records)
+        if n:
+            logger.info("descoberta: %d oportunidades → staging discovered_opportunities (pending)", n)
+        # Persiste o ledger SEMPRE que escrevemos: aprovados (dedup positivo) +
+        # cache negativo (rejeições desta rodada), mesmo sem nenhum aprovado — é o
+        # caso comum (rodada só de lixo) e é justamente quando o cache mais paga.
+        _save_ledger(known | {_norm_url(r["url"]) for r in records}, rejected)
 
     return records
 

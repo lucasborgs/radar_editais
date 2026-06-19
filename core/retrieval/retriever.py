@@ -3,7 +3,10 @@ Hybrid retrieval over edital_chunks.
 
 Two retrievers, fused via Reciprocal Rank Fusion (RRF, k=60):
   • Dense: cosine similarity over the `embedding` column (HNSW index)
-  • Sparse: tsvector FTS over `text_search` (GIN index, Portuguese)
+  • Sparse: BM25 Okapi em Python (`rank_bm25`) sobre os chunks dos editais
+    (default), ou tsvector FTS over `text_search` (GIN index, Portuguese) via
+    `sparse="fts"` (legado). BM25 adiciona saturação k1 e normalização por
+    comprimento b que o `ts_rank` não tem.
 
 ADR A3 (RAG for WritingSession only) — this module MUST NOT be imported by
 matching code. M9: matching uses summary-level embeddings, not chunks.
@@ -37,7 +40,10 @@ from supabase import Client
 logger = logging.getLogger(__name__)
 
 DEFAULT_TOP_K = 5
-DEFAULT_FTS_WEIGHT = 0.3    # ver "Tuning do default" no docstring de `retrieve_chunks`
+DEFAULT_FTS_WEIGHT = 0.5    # ver "Tuning do default" no docstring de `retrieve_chunks`
+# Coluna de embedding a usar no braço dense. "embedding_gemma" (768d, embeddinggemma-pt-br)
+# é o default após promoção do bake-off (2026-06-16). Trocar por env para fallback OpenAI.
+RETRIEVAL_EMBEDDING_COLUMN = os.environ.get("RETRIEVAL_EMBEDDING_COLUMN", "embedding_gemma")
 DEFAULT_MAX_PER_SOURCE = 2  # diversidade: nº máx de chunks do mesmo PDF no top-K
 DEFAULT_RERANK_CANDIDATES = 20  # tamanho do pool reordenado pelo reranker (Front 4)
 DEFAULT_METADATA_BOOST = 1.2    # boost de chunks cujas flags de metadata casam com a query
@@ -90,6 +96,50 @@ def _build_or_tsquery(query: str, max_terms: int = 8, min_len: int = 3) -> str:
         if len(keepers) >= max_terms:
             break
     return " | ".join(keepers)
+
+
+def _bm25_tokenize(text: str) -> list[str]:
+    """Tokeniza com a mesma lógica do braço FTS (`_WORD_RE` + stopwords PT-BR).
+
+    Usar o mesmo tokenizador do FTS mantém os dois braços sparse comparáveis no
+    bake-off: a diferença medida é puramente o ranker (BM25 Okapi vs ts_rank),
+    não o pré-processamento do texto.
+    """
+    return [
+        w for w in _WORD_RE.findall(text.lower())
+        if len(w) >= 3 and w not in _PT_STOPWORDS
+    ]
+
+
+def _bm25_retrieve(
+    all_chunks: list[tuple[str, str]],
+    query: str,
+    limit: int,
+) -> list[str]:
+    """Top-`limit` chunk ids por BM25 Okapi sobre o corpus em memória.
+
+    `all_chunks` é uma lista de (id, text) — tipicamente todos os chunks dos
+    editais em jogo, corpus pequeno (~100-400 por edital). Tokeniza corpus e
+    query com `_bm25_tokenize`, builda `BM25Okapi` e ordena por score. Chunks
+    sem token útil (corpo vazio após stopwords) recebem score 0 e só entram se
+    houver score positivo — descartamos os zerados para não poluir o RRF.
+
+    Retorna lista de ids ordenada por score decrescente (até `limit`). Vazia se
+    o corpus estiver vazio ou a query não tiver token válido.
+    """
+    if not all_chunks:
+        return []
+    query_tokens = _bm25_tokenize(query)
+    if not query_tokens:
+        return []
+    from rank_bm25 import BM25Okapi
+
+    ids = [cid for cid, _ in all_chunks]
+    corpus_tokens = [_bm25_tokenize(text or "") for _, text in all_chunks]
+    bm25 = BM25Okapi(corpus_tokens)
+    scores = bm25.get_scores(query_tokens)
+    order = sorted(range(len(ids)), key=lambda i: scores[i], reverse=True)
+    return [ids[i] for i in order[:limit] if scores[i] > 0.0]
 
 
 # Detecção de intenção da query → flags de metadata do chunker.
@@ -240,6 +290,7 @@ def retrieve_chunks(
     rerank: bool = True,
     k_candidates: int = DEFAULT_RERANK_CANDIDATES,
     metadata_boost: float = DEFAULT_METADATA_BOOST,
+    sparse: str = "bm25",
 ) -> list[dict]:
     """Hybrid retrieval over edital_chunks para um ou mais editais.
 
@@ -287,6 +338,12 @@ def retrieve_chunks(
             primary_boost, porque o cross-encoder já vê o texto do chunk e
             julgar relevância à query é exatamente o trabalho dele; reaplicar
             contaria o sinal duas vezes. Use 1.0 pra desativar.
+        sparse: ranker do braço sparse. "bm25" (default) usa BM25 Okapi em
+            Python (`rank_bm25`) sobre todos os chunks dos editais em memória —
+            saturação de frequência (k1) e normalização por comprimento (b) que
+            o `ts_rank` do Postgres não tem. "fts" mantém o caminho legado
+            (tsvector + `ts_rank` no banco). A fusão RRF e `fts_weight` são
+            idênticos nos dois casos; só muda quem produz a lista sparse.
 
     Tuning do default
     -----------------
@@ -309,6 +366,8 @@ def retrieve_chunks(
         return []
     if not query or not query.strip():
         return []
+    if sparse not in ("bm25", "fts"):
+        raise ValueError(f"sparse deve ser 'bm25' ou 'fts', recebido: {sparse!r}")
     fts_weight = max(0.0, min(1.0, fts_weight))
     dense_weight = 1.0 - fts_weight
 
@@ -335,26 +394,34 @@ def retrieve_chunks(
             #     `list[str]` Python para `text[]` Postgres automaticamente.
             dense_rows: list[tuple[Any, ...]] = []
             if dense_weight > 0.0:
+                # RETRIEVAL_EMBEDDING_COLUMN é valor de código (env interna), não input
+                # de usuário — f-string é segura aqui; não interpolar dados externos.
+                emb_col = RETRIEVAL_EMBEDDING_COLUMN
                 cur.execute(
-                    """
+                    f"""
                     SELECT id::text, edital_id, chunk_index, text, section, source_file, page_range, metadata
                       FROM public.edital_chunks
                      WHERE edital_id = ANY(%s)
-                       AND embedding IS NOT NULL
-                     ORDER BY embedding <=> %s::vector
+                       AND {emb_col} IS NOT NULL
+                     ORDER BY {emb_col} <=> %s::vector
                      LIMIT %s
                     """,
                     (edital_ids, vec_literal, _CANDIDATE_LIMIT),
                 )
                 dense_rows = cur.fetchall()
 
-            # 2b. Sparse FTS retrieval (Portuguese tsvector).
-            #     Usamos OR-tsquery construído da query (vide `_build_or_tsquery`).
-            #     `plainto_tsquery` faz AND e zera o recall em queries naturais
-            #     longas — substituímos por `to_tsquery('portuguese', 'a | b | c')`.
-            #     Se a query não tiver nenhum termo válido após filtragem, pula.
+            # 2b. Sparse retrieval.
+            #     sparse="fts": tsvector FTS no banco (legado). OR-tsquery
+            #       construído da query (`_build_or_tsquery`) porque
+            #       `plainto_tsquery` faz AND e zera recall em queries longas.
+            #     sparse="bm25" (default): busca TODOS os chunks dos editais
+            #       (corpus pequeno por edital) para rankear por BM25 Okapi em
+            #       Python fora da conexão — o ts_rank não tem saturação k1 nem
+            #       normalização por comprimento b. O GIN em text_search fica
+            #       ocioso aqui (sem migration; ainda serve o caminho FTS).
             sparse_rows: list[tuple[Any, ...]] = []
-            if fts_weight > 0.0 and ts_or_query:
+            bm25_rows: list[tuple[Any, ...]] = []
+            if fts_weight > 0.0 and sparse == "fts" and ts_or_query:
                 cur.execute(
                     """
                     SELECT id::text, edital_id, chunk_index, text, section, source_file, page_range, metadata
@@ -367,14 +434,26 @@ def retrieve_chunks(
                     (edital_ids, ts_or_query, ts_or_query, _CANDIDATE_LIMIT),
                 )
                 sparse_rows = cur.fetchall()
+            elif fts_weight > 0.0 and sparse == "bm25":
+                cur.execute(
+                    """
+                    SELECT id::text, edital_id, chunk_index, text, section, source_file, page_range, metadata
+                      FROM public.edital_chunks
+                     WHERE edital_id = ANY(%s)
+                    """,
+                    (edital_ids,),
+                )
+                bm25_rows = cur.fetchall()
     except Exception as e:
         logger.error("retrieve_chunks: erro de SQL para editais=%s: %s", edital_ids, e)
         raise
 
     # 3. Build id→row index for assembly after fusion. The same id may appear
-    #    in both lists; we keep one canonical row payload.
+    #    in both lists; we keep one canonical row payload. bm25_rows carrega o
+    #    corpus inteiro dos editais; só os ids que entram no top sparse (via
+    #    _bm25_retrieve) ou no dense recebem score no RRF — o resto fica inerte.
     by_id: dict[str, dict] = {}
-    for row in dense_rows + sparse_rows:
+    for row in dense_rows + sparse_rows + bm25_rows:
         _id, edital_id_val, chunk_index, text, section, source_file, page_range, metadata = row
         if _id not in by_id:
             by_id[_id] = {
@@ -389,7 +468,12 @@ def retrieve_chunks(
             }
 
     dense_ids = [r[0] for r in dense_rows]
-    sparse_ids = [r[0] for r in sparse_rows]
+    if sparse == "bm25":
+        sparse_ids = _bm25_retrieve(
+            [(r[0], r[3]) for r in bm25_rows], query, _CANDIDATE_LIMIT
+        )
+    else:
+        sparse_ids = [r[0] for r in sparse_rows]
     scores = _rrf_merge(dense_ids, sparse_ids, dense_weight, fts_weight)
 
     if not scores:

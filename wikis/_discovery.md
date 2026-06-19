@@ -50,4 +50,10 @@ discovery:
   # este nº de desafios-filho por hub vira candidato. Custo = triagem+extração
   # por filho; o teto de hubs/execução é _MAX_HUBS_PER_RUN no código.
   max_hub_children: 8
+  # Cache negativo: URLs rejeitadas na triagem são persistidas no ledger com
+  # este TTL (dias). Dentro do TTL, a URL é pulada SEM nova chamada de triagem
+  # (corta a re-triagem diária das mesmas URLs lixo). O TTL evita prender para
+  # sempre uma URL cujo conteúdo pode virar relevante; calibrar pela cadência de
+  # mudança das fontes (fontes estáveis toleram TTL maior).
+  reject_cache_ttl_days: 30
 ```

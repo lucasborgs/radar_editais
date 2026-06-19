@@ -63,17 +63,19 @@ JSON:
 
 
 def _load_edital_requirements(edital_id: str) -> tuple[list[str], str]:
-    """Lê key_requirements + source da wiki page. Retorna ([], "") se ausente.
+    """Lê key_requirements + mechanism da wiki page. ([], "") se ausente.
 
-    Source é usado para carregar skills/<source>_compliance.md (Fase 4 #26).
+    `mechanism` keya o playbook. A agência (overlay de fonte) NÃO vem do campo
+    `source` da wiki page — esse guarda a proveniência da ingestão
+    (`etl_process`/`web`) — e sim do prefixo do edital_id (`edital_id.source_of`).
     """
     data = kg_store.load_wiki_page(edital_id)
     if not data:
         return [], ""
     try:
         reqs = data.get("key_requirements", []) or []
-        source = str(data.get("source", "") or "")
-        return [str(r) for r in reqs], source
+        mechanism = str(data.get("mechanism", "") or "")
+        return [str(r) for r in reqs], mechanism
     except Exception as e:
         logger.warning("ComplianceMonitor: falha ao ler wiki page %s: %s", edital_id, e)
         return [], ""
@@ -96,21 +98,33 @@ def check_compliance(user_message: str, edital_id: str) -> list[dict]:
     if not user_message.strip():
         return []
 
-    requirements, source = _load_edital_requirements(edital_id)
+    requirements, mechanism = _load_edital_requirements(edital_id)
     if not requirements:
         return []
 
     requirements_block = "\n".join(f"- {r}" for r in requirements)
 
-    # Skill por fonte (Fase 4 #26): se houver, anexa ao system prompt.
-    from core.skills import load_skill
-    source_skill = load_skill(source) if source else ""
+    # Playbook do mecanismo (+ overlay de fonte): heurísticas de aprovação e
+    # anti-padrões tácitos. Substitui a injeção do skill por-fonte inteiro — a
+    # regra dura do edital já vem em `requirements` (RAG), não no playbook.
+    # Agência (overlay) = prefixo do edital_id, não o campo `source` da wiki.
+    from core.kg.edital_id import source_of
+    from core.skills import load_playbook
+    try:
+        agency = source_of(edital_id)
+    except ValueError:
+        agency = ""
+    playbook = load_playbook(mechanism, agency)
+    monitor_skill = playbook.for_monitor()
     system_prompt = _MONITOR_SYSTEM
-    if source_skill:
+    if monitor_skill:
+        label = playbook.mechanism or "genérico"
+        if playbook.source:
+            label += f" · {playbook.source}"
         system_prompt = (
             _MONITOR_SYSTEM
-            + f"\n\nREGRAS ESPECÍFICAS DA FONTE ({source}):\n"
-            + source_skill
+            + f"\n\nHEURÍSTICAS DE AVALIAÇÃO ({label}):\n"
+            + monitor_skill
         )
 
     user_msg = _MONITOR_USER.format(

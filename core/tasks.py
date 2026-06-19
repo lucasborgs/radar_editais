@@ -197,13 +197,75 @@ async def reflect_workspace_task(workspace_id: str) -> None:
     db = get_supabase_service()
     result = await asyncio.to_thread(reflect_workspace, db, workspace_id)
     logger.info(
-        "reflect_workspace_task: workspace=%s outcomes=%d obs=%d patterns=%d skip=%s",
+        "reflect_workspace_task: workspace=%s outcomes=%d obs=%d skip=%s",
         workspace_id,
         result["outcomes_considered"],
         result["observations_inserted"],
-        result["patterns_inserted"],
         result.get("skipped_reason"),
     )
+
+
+@app.task(name="synthesize_patterns", queue="default")
+async def synthesize_patterns_task(workspace_id: str) -> None:
+    """Sintetiza padrões (level 2) a partir do corpus de observações (level 1).
+
+    Etapa de longo prazo, separada de reflect_workspace: lê as observações
+    factuais (level 1) acumuladas e ativas do workspace e destila padrões
+    interpretativos (level 2) + weight_suggestions, sem zerar o corpus de
+    level 1.
+
+    Triggers:
+      - Periódico: cron semanal (domingo 05:00 UTC) para todos os workspaces
+        ativos (ver synthesize_patterns_cron).
+      - On-demand: POST /me/synthesize.
+
+    Self-gateia em MIN_LEVEL1_FOR_SYNTHESIS (pula se há poucas observações
+    ativas), então é seguro enfileirar livremente.
+    """
+    from core.reflection_service import synthesize_patterns
+
+    db = get_supabase_service()
+    result = await asyncio.to_thread(synthesize_patterns, db, workspace_id)
+    logger.info(
+        "synthesize_patterns_task: workspace=%s level1=%d patterns=%d auto_applied=%d skip=%s",
+        workspace_id,
+        result["level1_considered"],
+        result["patterns_inserted"],
+        len(result.get("auto_applied") or []),
+        result.get("skipped_reason"),
+    )
+
+
+@app.periodic(cron="0 5 * * 0")
+@app.task(name="synthesize_patterns_cron", queue="default")
+async def synthesize_patterns_cron(timestamp: int) -> None:
+    """Cron semanal (domingo 05:00 UTC): enfileira síntese de padrões para
+    todos os workspaces ativos.
+
+    Lê os ids de workspaces e enfileira `synthesize_patterns_task` para cada um.
+    A própria task self-gateia (pula workspaces com poucas observações ativas),
+    então enfileirar todos é barato. `timestamp` vem do procrastinate periodic
+    (UNIX epoch).
+    """
+    db = get_supabase_service()
+
+    fetch = await asyncio.to_thread(
+        lambda: db.table("workspaces").select("id").execute()
+    )
+    workspace_ids = [row["id"] for row in (fetch.data or []) if row.get("id")]
+    logger.info(
+        "synthesize_patterns_cron: enfileirando síntese para %d workspaces (timestamp=%s)",
+        len(workspace_ids), timestamp,
+    )
+    for ws_id in workspace_ids:
+        try:
+            await app.configure_task("synthesize_patterns").defer_async(
+                workspace_id=ws_id,
+            )
+        except Exception as e:
+            logger.warning(
+                "synthesize_patterns_cron: falha ao enfileirar ws=%s: %s", ws_id, e,
+            )
 
 
 # =============================================================================

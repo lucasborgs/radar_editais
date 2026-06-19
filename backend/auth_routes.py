@@ -178,6 +178,34 @@ def trigger_reflection(user_id: CurrentUserId, db: DbClient):
     return result
 
 
+@router.post(
+    "/me/synthesize",
+    summary="Dispara a síntese de padrões (level 2) on-demand (Gap 1)",
+)
+async def trigger_synthesis(user_id: CurrentUserId, db: DbClient):
+    """Enfileira `synthesize_patterns_task` para o workspace do usuário.
+
+    Diferente de /me/reflect (que roda inline e gera observações level 1), a
+    síntese destila padrões (level 2) sobre o corpus acumulado de observações.
+    Vai pela fila procrastinate porque a síntese é uma etapa de longo prazo
+    (não precisa de retorno imediato) e self-gateia se houver poucas
+    observações ativas.
+    """
+    workspace = _ensure_workspace(user_id, db)
+    try:
+        from core.tasks import app as tasks_app
+        async with tasks_app.open_async():
+            await tasks_app.configure_task("synthesize_patterns").defer_async(
+                workspace_id=str(workspace["id"])
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Falha ao enfileirar a síntese — tente novamente.",
+        ) from e
+    return {"status": "enqueued", "workspace_id": workspace["id"]}
+
+
 # =============================================================================
 # WEIGHT APPROVAL (Gap 2 — fecha Loop C)
 # =============================================================================

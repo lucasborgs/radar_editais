@@ -124,6 +124,11 @@ COMO USAR AS FERRAMENTAS DE LEITURA
   temática; é o recorte por-edital de list_icts).
 - get_graph_neighbors → explorar uma categoria não-edital (tema, subprograma,
   fonte). O node_id vem do contexto de clique no grafo OU de um termo citado.
+- Para DETALHE FINO ou COMPARAÇÃO entre editais, use search_edital_trechos e
+  ancore no texto literal. NÃO responda detalhe/comparação a partir de get_edital
+  ou do índice — são RESUMOS e omitem o escopo decisivo (exclusões, requisitos
+  específicos). Para panorama/triagem/navegação, o resumo basta (mais barato).
+- Ao comparar, rotule cada trecho com seu edital_id; nunca misture fontes sem rótulo.
 
 QUANDO PARAR DE USAR FERRAMENTAS
 - Após cobrir todas as partes da pergunta (ou todos os todos) com base nos
@@ -182,7 +187,20 @@ score deve ser de 0.0 a 10.0. match_dimensions deve ter no máximo 4 dimensões 
 # =============================================================================
 
 def _make_client():
-    """Cria cliente LLM baseado em variáveis de ambiente."""
+    """Cria cliente LLM + modelo a partir do ambiente, parametrizável por env.
+
+    Bake-off (docs/specs/llm-embedding-bakeoff.md, tier 3 — gateado por `matching`):
+    o slot de raciocínio sobre o KG troca de modelo/provider por env, sem editar
+    código. Os defaults preservam EXATAMENTE o comportamento anterior: sem env
+    setada, gpt-4o-mini no endpoint canônico OpenAI (ou gemini-2.5-flash com
+    LLM_BACKEND=gemini, llama3.2 com LLM_BACKEND=ollama), idêntico a hoje.
+
+    Envs (todas opcionais):
+        LLM_BACKEND        openai (default) | gemini | ollama
+        OPENAI_MODEL       modelo no backend openai      (default: gpt-4o-mini)
+        GEMINI_MODEL       modelo no backend gemini       (default: gemini-2.5-flash)
+        OLLAMA_MODEL       modelo no backend ollama       (default: llama3.2)
+    """
     backend = os.getenv("LLM_BACKEND", "openai").lower()
 
     if backend == "gemini":
@@ -193,7 +211,7 @@ def _make_client():
         return make_client(
             api_key=api_key,
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-        ), "gemini-2.5-flash"
+        ), os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     elif backend == "openai":
         from core.llm.llm_client import make_client
@@ -684,6 +702,27 @@ class KGMatchService:
             logger.error("Erro LLM no explore: %s", e)
             return "Desculpe, não consegui processar agora. Tente novamente em instantes."
 
+    def _explore_tools(self) -> list:
+        """Tools do agente de explore: leitura cross-dim + planejamento, e
+        opcionalmente deep_research (subagente web).
+
+        PlanState próprio por turno (stateless entre chamadas), igual ao writing.
+        `deep_research` fica atrás de EXPLORE_DEEP_RESEARCH_ENABLED (default off):
+        o explore é endpoint PÚBLICO/não-auth e o crawl multi-step é vetor de
+        custo — liga-se conscientemente.
+        """
+        from core.llm.agent_tools import build_explore_tools
+        from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
+
+        tools = build_explore_tools(self) + build_planning_tools(PlanState())
+        if os.getenv("EXPLORE_DEEP_RESEARCH_ENABLED", "false").lower() == "true":
+            from core.llm.agent_tools.research_tools import build_research_tools
+            # Stateless de propósito: o explore é endpoint PÚBLICO/não-auth — não há
+            # workspace_id nem db autenticado neste escopo. Sem onde (e sem permissão
+            # RLS para) persistir findings, então mantém a Fase A aqui.
+            tools = tools + build_research_tools()
+        return tools
+
     def _explore_agent(
         self,
         message: str,
@@ -692,7 +731,8 @@ class KGMatchService:
         node_id: str | None,
         node_type: str | None,
     ) -> str:
-        """Pipeline agente (Sprint 3 do Cenário B): run_agent + 4 tools.
+        """Pipeline agente (Sprint 3 do Cenário B): run_agent + tools cross-dim,
+        planejamento e (gated) deep_research — montadas em `_explore_tools`.
 
         Diferenças vs legacy:
           • Sem catálogo inteiro no prompt — agente busca via list_editais
@@ -700,8 +740,6 @@ class KGMatchService:
           • Dica de clique no grafo vira message extra (não substitui análise)
         """
         from core.llm.agent_runtime import resolve_agent_provider, run_agent
-        from core.llm.agent_tools import build_explore_tools
-        from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
 
         self._load_index()  # garante índice carregado (não usa self._client)
 
@@ -720,9 +758,7 @@ class KGMatchService:
 
         messages.append({"role": "user", "content": message})
 
-        # Tools de leitura cross-dim + planejamento (write_todos): PlanState
-        # próprio por turno (stateless entre chamadas), igual ao writing agent.
-        tools = build_explore_tools(self) + build_planning_tools(PlanState())
+        tools = self._explore_tools()
         provider, model = resolve_agent_provider(
             "anthropic", ANTHROPIC_MODEL_AGENT_EXPLORE,
         )

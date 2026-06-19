@@ -24,14 +24,13 @@ CLI:
 from __future__ import annotations
 
 import argparse
-import glob
 import json
 import logging
 import os
 import re
 from datetime import datetime, timezone
 
-from config import BRONZE_DIR, ROOT
+from config import ROOT
 from core.kg import kg_store
 from core.kg import wiki_schema as ws
 from domain.vocabulary import canonicalize_themes
@@ -40,8 +39,6 @@ logger = logging.getLogger(__name__)
 
 # Diretório de saída dos relatórios (derivado; criado on-demand, gitignored).
 DEFAULT_OUT_DIR = ROOT / "data" / "vocab_lint"
-# Bronze da fonte web (onde a Descoberta grava `tema_livre`).
-_WEB_BRONZE_DIR = BRONZE_DIR / "web_raw"
 # Máximo de entries sem-tema mandadas pro contexto da LLM (evita inflar o prompt).
 _MAX_SEM_TEMA = 30
 # Truncamento do texto descritivo de cada sem-tema.
@@ -97,31 +94,40 @@ def collect_variacoes(vocab: set[str]) -> dict:
     return agg
 
 
+def _fetch_discovered_rows() -> list[dict]:
+    """Rows NÃO-rejeitadas da staging `discovered_opportunities` (Parte C).
+    Isolada para teste (monkeypatch). [] sem acesso ao Supabase (degrada)."""
+    try:
+        from core.db import get_supabase_service  # noqa: PLC0415
+        db = get_supabase_service()
+        res = (db.table("discovered_opportunities")
+                 .select("url_hash, url, raw, status")
+                 .neq("status", "rejected")
+                 .execute())
+        return res.data or []
+    except Exception as e:
+        logger.warning("vocab_lint: sem acesso à staging discovered_opportunities (%s)", e)
+        return []
+
+
 def collect_tema_livre() -> dict:
-    """`tema_livre` da web: percorre data/bronze/web_raw/web_discovery_*.json e
-    agrega cada tema-candidato (canonicalizado p/ casar variações de grafia)."""
+    """`tema_livre` da web: lê a staging `discovered_opportunities` (Parte C) e
+    agrega cada tema-candidato (canonicalizado p/ casar variações de grafia).
+    Exclui rejeitados (não são oportunidade real → ruído de vocab)."""
     agg: dict = {}
-    pattern = str(_WEB_BRONZE_DIR / "web_discovery_*.json")
-    for path in sorted(glob.glob(pattern)):
-        try:
-            with open(path, encoding="utf-8") as fh:
-                records = json.load(fh)
-        except Exception as e:  # pragma: no cover - defensivo
-            logger.warning("vocab_lint: falha ao ler %s: %s", path, e)
+    for row in _fetch_discovered_rows():
+        raw = row.get("raw") or {}
+        tl = raw.get("tema_livre")
+        if not tl:
             continue
-        for rec in records or []:
-            tl = rec.get("tema_livre")
-            if not tl:
-                continue
-            # Mesma serialização "; ".join da Descoberta.
-            parts = [p.strip() for p in str(tl).split(";") if p.strip()]
-            eid = rec.get("url_hash") or rec.get("url") or ""
-            if eid and rec.get("url_hash"):
-                eid = f"web:{rec['url_hash']}"
-            for raw in parts:
-                canon = canonicalize_themes([raw])
-                if canon:
-                    _agg_add(agg, canon[0], edital_id=eid, fonte="web")
+        # Mesma serialização "; ".join da Descoberta.
+        parts = [p.strip() for p in str(tl).split(";") if p.strip()]
+        uh = row.get("url_hash")
+        eid = f"web:{uh}" if uh else (row.get("url") or "")
+        for raw_t in parts:
+            canon = canonicalize_themes([raw_t])
+            if canon:
+                _agg_add(agg, canon[0], edital_id=eid, fonte="web")
     return agg
 
 

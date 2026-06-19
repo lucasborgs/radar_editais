@@ -7,6 +7,7 @@
 # `display_name` é só pra logging/UX.
 
 from .base import BaseScraper
+from .fapesc import FAPESCScraper
 from .fapesp import FAPESPScraper
 from .finep import FINEPScraper
 from .web import WebScraper
@@ -23,6 +24,13 @@ SCRAPER_REGISTRY = {
         # FAPESP não tem modo histórico via API; histórico é o que já está em
         # bronze_data/fapesp_raw/. Adapter L1 lê o snapshot mais recente.
     ),
+    "fapesc": dict(
+        source="fapesc", display_name="FAPESC", bronze_dir="fapesc_raw",
+        cls=FAPESCScraper, kwargs={},
+        # WordPress server-side; varre /chamadas-abertas/ (só ABERTAS). Sem
+        # histórico via API — snapshot mais recente. Edital vem do PDF anexo
+        # (estratégia pdf): o scraper baixa+extrai → texto_cru. Ver wikis/fapesc.md §8.
+    ),
     "web": dict(
         source="web", display_name="Web", bronze_dir="web_raw",
         cls=WebScraper, kwargs={},
@@ -36,5 +44,6 @@ __all__ = [
     "SCRAPER_REGISTRY",
     "FINEPScraper",
     "FAPESPScraper",
+    "FAPESCScraper",
     "WebScraper",
 ]
