@@ -20,9 +20,10 @@ tags:
 
 ## Informações
 
-| Campo | Valor |
-|---|---|
-| Status | 🟢 ABERTA |
-| PDFs disponíveis | 0 |
-| Fatos extraídos | 0 |
-| Link | [https://admin.vumborastartups.com.br/uploads/edital_1d045594db.pdf](https://admin.vumborastartups.com.br/uploads/edital_1d045594db.pdf) |
+| Campo            | Valor                                                                                                                                    |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Status           | 🟢 ABERTA                                                                                                                                |
+| PDFs disponíveis | 0                                                                                                                                        |
+| Fatos extraídos  | 0                                                                                                                                        |
+| Link             | [https://admin.vumborastartups.com.br/uploads/edital_1d045594db.pdf](https://admin.vumborastartups.com.br/uploads/edital_1d045594db.pdf) |
+|                  |                                                                                                                                          |

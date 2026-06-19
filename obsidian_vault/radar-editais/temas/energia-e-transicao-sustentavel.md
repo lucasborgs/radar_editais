@@ -1,5 +1,5 @@
 ---
-title: "energia e transição sustentável"
+title: energia e transição sustentável
 tags:
   - tema
 ---
