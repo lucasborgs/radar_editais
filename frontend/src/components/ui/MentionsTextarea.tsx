@@ -253,7 +253,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
             ref={dropdownRef}
             style={{ position: "fixed", top: coords.top, left: coords.left, zIndex: 60 }}
             className={cn(
-              "w-72 max-h-64 overflow-y-auto bg-white border border-border rounded-lg shadow-lg",
+              "w-72 max-h-64 overflow-y-auto bg-surface border border-border rounded-lg shadow-lg",
               "text-sm font-sans"
             )}
           >
@@ -276,7 +276,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
                 onMouseEnter={() => setHighlight(idx)}
                 className={cn(
                   "w-full text-left px-3 py-2 flex flex-col gap-0.5 transition-colors",
-                  idx === highlight ? "bg-primary/10" : "hover:bg-gray-50"
+                  idx === highlight ? "bg-primary/10" : "hover:bg-content-secondary/5"
                 )}
               >
                 <span className="text-content-primary font-medium truncate">{item.title}</span>

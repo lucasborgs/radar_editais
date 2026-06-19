@@ -8,7 +8,7 @@ const INPUT_CLS = cn(
   "w-full rounded-lg border border-border px-3 py-2 text-sm font-sans",
   "text-content-primary placeholder:text-content-secondary",
   "focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary",
-  "transition-colors bg-white"
+  "transition-colors bg-surface"
 );
 
 export default function LoginPage() {
@@ -49,7 +49,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-border p-6 shadow-card">
+        <div className="bg-surface rounded-2xl border border-border p-6 shadow-card">
           {sent ? (
             <div className="text-center space-y-3">
               <div className="text-4xl">📬</div>
@@ -79,7 +79,7 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-sans">
+                <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 px-3 py-2 text-xs text-red-700 dark:text-red-300 font-sans">
                   {error}
                 </div>
               )}

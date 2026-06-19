@@ -104,7 +104,7 @@ export function DocumentCanvas({
                 {done}/{total}
               </span>
             </div>
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-content-secondary/10 rounded-full overflow-hidden">
               <div
                 className="h-full bg-primary rounded-full transition-all duration-300"
                 style={{ width: `${pct}%` }}
@@ -123,7 +123,7 @@ export function DocumentCanvas({
                   "w-full text-left px-4 py-2 flex items-center gap-2.5 transition-colors text-sm font-sans",
                   activeSection === s.title
                     ? "bg-primary/8 text-primary font-medium"
-                    : "text-content-primary hover:bg-gray-50",
+                    : "text-content-primary hover:bg-content-secondary/5",
                   s.isGeneral && "border-t border-border mt-1 pt-2.5"
                 )}
               >

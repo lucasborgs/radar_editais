@@ -104,7 +104,7 @@ export default function PipelinePage() {
             </div>
           </>
         ) : error ? (
-          <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 font-sans">
+          <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 px-4 py-3 text-sm text-amber-800 dark:text-amber-300 font-sans">
             {error}
           </div>
         ) : apps.length === 0 ? (

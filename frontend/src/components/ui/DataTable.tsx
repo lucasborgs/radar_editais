@@ -27,7 +27,7 @@ function SkeletonRow({ cols }: { cols: number }) {
     <tr className="animate-pulse">
       {Array.from({ length: cols }).map((_, i) => (
         <td key={i} className="px-4 py-3.5 border-b border-border/60">
-          <div className="h-4 bg-gray-200 rounded w-3/4" />
+          <div className="h-4 bg-content-secondary/15 rounded w-3/4" />
         </td>
       ))}
     </tr>
@@ -49,7 +49,7 @@ export function DataTable<T extends { id: string }>({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-border bg-white",
+        "overflow-hidden rounded-xl border border-border bg-surface",
         className
       )}
     >
@@ -57,7 +57,7 @@ export function DataTable<T extends { id: string }>({
         <table className="w-full text-sm border-collapse">
           {/* Header */}
           <thead>
-            <tr className="bg-gray-50 border-b border-border">
+            <tr className="bg-content-secondary/5 border-b border-border">
               {columns.map((col) => (
                 <th
                   key={String(col.key)}
@@ -95,7 +95,7 @@ export function DataTable<T extends { id: string }>({
                   className={cn(
                     "border-b border-border/60 last:border-0",
                     onRowClick &&
-                      "hover:bg-gray-50 cursor-pointer transition-colors"
+                      "hover:bg-content-secondary/5 cursor-pointer transition-colors"
                   )}
                 >
                   {columns.map((col) => {

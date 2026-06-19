@@ -14,9 +14,9 @@ const REC_LABEL: Record<BriefRecommendation, string> = {
 };
 
 const REC_CLASS: Record<BriefRecommendation, string> = {
-  GO: "bg-[#1DB954]/15 text-[#169c46]",
-  GO_COM_RESSALVAS: "bg-amber-100 text-amber-700",
-  NO_GO: "bg-red-100 text-red-700",
+  GO: "bg-[#1DB954]/15 text-[#169c46] dark:text-[#3ddc84]",
+  GO_COM_RESSALVAS: "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300",
+  NO_GO: "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300",
 };
 
 const DIM_LABELS: Record<string, string> = {
@@ -70,7 +70,7 @@ export function BriefView({ brief }: { brief: OpportunityBrief }) {
                 <span className="w-24 shrink-0 text-[11px] text-content-secondary">
                   {DIM_LABELS[row.dimension] ?? row.dimension}
                 </span>
-                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-content-secondary/10">
                   <div
                     className="h-full rounded-full"
                     style={{ width: `${pct}%`, backgroundColor: color }}

@@ -40,7 +40,7 @@ export function PipelineBriefing({ applications }: PipelineBriefingProps) {
     : "Sem prazos próximos";
 
   return (
-    <section className="rounded-xl border border-border bg-white shadow-card p-5 space-y-4">
+    <section className="rounded-xl border border-border bg-surface shadow-card p-5 space-y-4">
       <div>
         <h2 className="font-heading text-lg font-bold text-content-primary">
           {greeting()} — seu pipeline hoje

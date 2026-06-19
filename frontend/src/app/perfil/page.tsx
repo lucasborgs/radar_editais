@@ -73,7 +73,7 @@ function FieldInput({
 }) {
   const spec = fieldSpec(field);
   const base =
-    "w-full rounded-lg border border-border bg-white px-3 py-2 text-sm font-sans text-content-primary focus:outline-none focus:ring-2 focus:ring-primary/40";
+    "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-sans text-content-primary focus:outline-none focus:ring-2 focus:ring-primary/40";
 
   if (spec.kind === "textarea") {
     return (
@@ -124,7 +124,7 @@ function FieldInput({
                 "px-2.5 py-1 rounded-full text-xs font-sans border transition-colors",
                 on
                   ? "bg-primary/10 border-primary/40 text-primary"
-                  : "border-border text-content-secondary hover:bg-gray-100",
+                  : "border-border text-content-secondary hover:bg-content-secondary/10",
               )}
             >
               {o.label}
@@ -328,7 +328,7 @@ export default function PerfilPage() {
     <DashboardLayout title="Perfil">
       <div className="max-w-3xl mx-auto space-y-8 pb-16">
         {/* Extração automática */}
-        <section className="rounded-xl border border-border bg-white p-5">
+        <section className="rounded-xl border border-border bg-surface p-5">
           <h2 className="font-heading text-sm font-bold text-content-primary mb-1">
             Preencher automaticamente
           </h2>
@@ -343,7 +343,7 @@ export default function PerfilPage() {
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && void handleExtractUrl()}
               placeholder="https://suaempresa.com.br"
-              className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
             <button
               onClick={() => void handleExtractUrl()}
@@ -355,7 +355,7 @@ export default function PerfilPage() {
             <button
               onClick={() => docInputRef.current?.click()}
               disabled={extracting}
-              className="px-4 py-2 rounded-lg border border-border text-sm font-medium font-sans text-content-primary disabled:opacity-50 hover:bg-gray-100 transition-colors whitespace-nowrap"
+              className="px-4 py-2 rounded-lg border border-border text-sm font-medium font-sans text-content-primary disabled:opacity-50 hover:bg-content-secondary/10 transition-colors whitespace-nowrap"
             >
               Enviar documento
             </button>
@@ -377,12 +377,12 @@ export default function PerfilPage() {
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 rounded-xl bg-gray-100 animate-pulse" />
+              <div key={i} className="h-24 rounded-xl bg-content-secondary/10 animate-pulse" />
             ))}
           </div>
         ) : (
           FIELD_GROUPS.map((group) => (
-            <section key={group.title} className="rounded-xl border border-border bg-white p-5">
+            <section key={group.title} className="rounded-xl border border-border bg-surface p-5">
               <h2 className="font-heading text-sm font-bold text-content-primary mb-4">
                 {group.title}
               </h2>
@@ -409,7 +409,7 @@ export default function PerfilPage() {
         )}
 
         {/* Arquivos da empresa (org memory) */}
-        <section className="rounded-xl border border-border bg-white p-5">
+        <section className="rounded-xl border border-border bg-surface p-5">
           <div className="flex items-center justify-between mb-1">
             <h2 className="font-heading text-sm font-bold text-content-primary">
               Arquivos da empresa
@@ -417,7 +417,7 @@ export default function PerfilPage() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium font-sans text-content-primary disabled:opacity-50 hover:bg-gray-100 transition-colors"
+              className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium font-sans text-content-primary disabled:opacity-50 hover:bg-content-secondary/10 transition-colors"
             >
               {uploading ? "Enviando…" : "+ Anexar arquivo"}
             </button>
@@ -454,7 +454,7 @@ export default function PerfilPage() {
                   </div>
                   <button
                     onClick={() => void handleDeleteItem(it.id)}
-                    className="text-xs font-sans text-red-600 hover:underline shrink-0"
+                    className="text-xs font-sans text-red-600 dark:text-red-400 hover:underline shrink-0"
                   >
                     Excluir
                   </button>
@@ -467,7 +467,7 @@ export default function PerfilPage() {
 
       {/* Barra de salvar fixa quando há mudanças */}
       {dirty && !loading && (
-        <div className="sticky bottom-0 left-0 right-0 border-t border-border bg-white px-5 py-3 flex items-center justify-end gap-3 -mx-6 mt-6">
+        <div className="sticky bottom-0 left-0 right-0 border-t border-border bg-surface px-5 py-3 flex items-center justify-end gap-3 -mx-6 mt-6">
           <span className="text-xs text-content-secondary font-sans">Alterações não salvas</span>
           <button
             onClick={() => void handleSave()}

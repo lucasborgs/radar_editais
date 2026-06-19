@@ -23,7 +23,7 @@ export function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
         {title && (
-          <header className="h-14 flex-shrink-0 border-b border-border bg-white flex items-center px-6">
+          <header className="h-14 flex-shrink-0 border-b border-border bg-surface flex items-center px-6">
             <h1 className="font-heading text-base font-bold text-content-primary">
               {title}
             </h1>

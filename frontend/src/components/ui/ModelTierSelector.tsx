@@ -35,7 +35,7 @@ export function ModelTierSelector({ value, onChange, disabled, className }: Prop
   return (
     <div
       className={cn(
-        "inline-flex items-center rounded-lg border border-border bg-white p-0.5",
+        "inline-flex items-center rounded-lg border border-border bg-surface p-0.5",
         disabled && "opacity-50 pointer-events-none",
         className
       )}
@@ -56,7 +56,7 @@ export function ModelTierSelector({ value, onChange, disabled, className }: Prop
               "px-2.5 py-1 text-xs font-sans rounded-md transition-colors",
               active
                 ? "bg-primary text-white font-semibold"
-                : "text-content-secondary hover:text-content-primary hover:bg-gray-50"
+                : "text-content-secondary hover:text-content-primary hover:bg-content-secondary/5"
             )}
           >
             {t.label}

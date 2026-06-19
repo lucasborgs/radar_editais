@@ -14,20 +14,45 @@
 @tailwind utilities;
 
 /* ── CSS Design Tokens ───────────────────────────────────── */
+/* Canais RGB (sem rgb()) para o Tailwind aplicar opacidade — ver
+   tailwind.config.ts. Tema = classe `dark` no <html> (ThemeProvider). */
 @layer base {
   :root {
-    --color-primary: #1db954;
-    --color-primary-hover: #1ed760;
-    --color-app-bg: #f9fafb;
-    --color-surface: #ffffff;
-    --color-text-primary: #111827;
-    --color-text-secondary: #6b7280;
-    --color-border: #e5e7eb;
+    --color-primary: 29 185 84; /* #1DB954 */
+    --color-primary-hover: 30 215 96; /* #1ED760 */
+    --color-app-bg: 249 250 251; /* #F9FAFB */
+    --color-surface: 255 255 255; /* #FFFFFF */
+    --color-content-primary: 17 24 39; /* #111827 */
+    --color-content-secondary: 107 114 128; /* #6B7280 */
+    --color-border: 229 231 235; /* #E5E7EB */
+  }
+
+  .dark {
+    --color-primary: 30 215 96; /* #1ED760 — um pouco mais vivo no escuro */
+    --color-primary-hover: 41 224 107; /* #29E06B */
+    --color-app-bg: 15 17 21; /* #0F1115 */
+    --color-surface: 26 29 35; /* #1A1D23 */
+    --color-content-primary: 229 231 235; /* #E5E7EB */
+    --color-content-secondary: 156 163 175; /* #9CA3AF */
+    --color-border: 42 46 55; /* #2A2E37 */
   }
 
   html {
-    background-color: #f9fafb;
-    color: #111827;
+    background-color: rgb(var(--color-app-bg));
+    color: rgb(var(--color-content-primary));
+    /* combina com os scrollbars/form controls nativos no tema ativo */
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+
+  /* Transição suave ao trocar de tema (sem animar layout/transform) */
+  body,
+  body * {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-duration: 150ms;
+    transition-timing-function: ease;
   }
 
   /* Headings use Cabinet Grotesk */
@@ -43,7 +68,7 @@
 
   /* Remove default focus ring and replace with green accent */
   *:focus-visible {
-    outline: 2px solid #1db954;
+    outline: 2px solid rgb(var(--color-primary));
     outline-offset: 2px;
   }
 }

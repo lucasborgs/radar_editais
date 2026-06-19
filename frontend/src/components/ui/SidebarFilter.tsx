@@ -73,7 +73,7 @@ function CheckItem({
           "w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
           checked
             ? "bg-primary border-primary"
-            : "border-border bg-white group-hover:border-primary/50"
+            : "border-border bg-surface group-hover:border-primary/50"
         )}
       >
         <Checkbox.Indicator>
@@ -125,7 +125,7 @@ export function SidebarFilter({
   return (
     <div
       className={cn(
-        "bg-white rounded-xl border border-border p-4 space-y-5",
+        "bg-surface rounded-xl border border-border p-4 space-y-5",
         className
       )}
     >
@@ -211,7 +211,7 @@ export function SidebarFilter({
                   deadlineAfter: e.target.value || null,
                 })
               }
-              className="w-full rounded-lg border border-border px-3 py-1.5 text-sm font-sans text-content-primary bg-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+              className="w-full rounded-lg border border-border px-3 py-1.5 text-sm font-sans text-content-primary bg-surface focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
             />
           </div>
           <div>
@@ -227,7 +227,7 @@ export function SidebarFilter({
                   deadlineBefore: e.target.value || null,
                 })
               }
-              className="w-full rounded-lg border border-border px-3 py-1.5 text-sm font-sans text-content-primary bg-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+              className="w-full rounded-lg border border-border px-3 py-1.5 text-sm font-sans text-content-primary bg-surface focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
             />
           </div>
         </div>

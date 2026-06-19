@@ -49,7 +49,7 @@ export function FrontDoorHeader({
     "block w-full px-3 py-2 text-left text-sm font-sans text-content-primary hover:bg-app-bg";
 
   return (
-    <header className="shrink-0 border-b border-border bg-white">
+    <header className="shrink-0 border-b border-border bg-surface">
       <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
         <span className="text-sm font-semibold text-content-primary font-sans">
           Radar de Editais
@@ -86,7 +86,7 @@ export function FrontDoorHeader({
             {menuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-border bg-white py-1 shadow-lg"
+                className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-border bg-surface py-1 shadow-lg"
               >
                 {isAuthed &&
                   AUTHED_LINKS.map((l) => (

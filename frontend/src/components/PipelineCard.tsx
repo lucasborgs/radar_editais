@@ -44,8 +44,8 @@ function DeadlineChip({ daysLeft }: { daysLeft: number | null }) {
       className={cn(
         "inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full font-sans",
         urgent
-          ? "bg-red-500/15 text-red-700"
-          : "bg-gray-500/15 text-gray-600",
+          ? "bg-red-500/15 text-red-700 dark:text-red-300"
+          : "bg-content-secondary/15 text-content-secondary",
       )}
     >
       ⏰ {daysLeft < 0 ? `${Math.abs(daysLeft)}d atrás` : `${daysLeft}d`}
@@ -67,7 +67,7 @@ export function PipelineCard({ app, onStatusChange, busy }: PipelineCardProps) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-white shadow-card p-3 space-y-2.5 transition-colors",
+        "rounded-xl border border-border bg-surface shadow-card p-3 space-y-2.5 transition-colors",
         clickable && "cursor-pointer hover:border-primary/40",
         busy && "opacity-60",
       )}
@@ -98,7 +98,7 @@ export function PipelineCard({ app, onStatusChange, busy }: PipelineCardProps) {
       </div>
 
       {app.session_id && (
-        <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-1.5 w-full rounded-full bg-content-secondary/10 overflow-hidden">
           <div
             className="h-full bg-primary rounded-full transition-all"
             style={{ width: `${Math.min(100, Math.max(0, app.progress_pct))}%` }}

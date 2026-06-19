@@ -21,7 +21,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border border-border p-5 mb-4">
+    <div className="bg-surface rounded-xl border border-border p-5 mb-4">
       <h2 className="font-heading text-sm font-bold text-content-primary mb-3 pb-2 border-b border-border">
         {title}
       </h2>
@@ -81,7 +81,7 @@ export default function EditalDetailPage() {
   if (error || !edital) {
     return (
       <DashboardLayout title="Edital">
-        <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-sm text-red-700 font-sans">
+        <div className="rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 p-6 text-sm text-red-700 dark:text-red-300 font-sans">
           <strong>Edital não encontrado.</strong> {error}
           <br />
           <button
@@ -114,7 +114,7 @@ export default function EditalDetailPage() {
       </div>
 
       {/* Header card */}
-      <div className="bg-white rounded-xl border border-border p-5 mb-4">
+      <div className="bg-surface rounded-xl border border-border p-5 mb-4">
         <div className="flex items-start justify-between gap-4 mb-3">
           <h1 className="font-heading text-lg font-bold text-content-primary leading-snug flex-1">
             {edital.title}
@@ -177,13 +177,13 @@ export default function EditalDetailPage() {
 
       {/* Themes & audiences */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 mb-4">
-        <div className="bg-white rounded-xl border border-border p-5">
+        <div className="bg-surface rounded-xl border border-border p-5">
           <h2 className="font-heading text-sm font-bold text-content-primary mb-3 pb-2 border-b border-border">
             Temas
           </h2>
           <TagList tags={edital.themes} />
         </div>
-        <div className="bg-white rounded-xl border border-border p-5">
+        <div className="bg-surface rounded-xl border border-border p-5">
           <h2 className="font-heading text-sm font-bold text-content-primary mb-3 pb-2 border-b border-border">
             Público-alvo
           </h2>
@@ -220,7 +220,7 @@ export default function EditalDetailPage() {
       )}
 
       {/* CTA — Iniciar sessão de escrita */}
-      <div className="bg-white rounded-xl border border-border p-5 flex items-center justify-between">
+      <div className="bg-surface rounded-xl border border-border p-5 flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-content-primary font-sans">
             Pronto para escrever a proposta?

@@ -57,7 +57,7 @@ export function Composer({
   const canSend = value.trim().length > 0 && !disabled;
 
   return (
-    <div className="border-t border-border bg-white px-4 py-3">
+    <div className="border-t border-border bg-surface px-4 py-3">
       <div className="mx-auto flex max-w-2xl items-end gap-2">
         <input
           ref={fileRef}

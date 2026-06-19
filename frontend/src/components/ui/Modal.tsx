@@ -49,7 +49,7 @@ export function Modal({
           <Dialog.Content
             onPointerDownOutside={onClose}
             className={cn(
-              "w-full bg-white rounded-xl shadow-card border border-border",
+              "w-full bg-surface rounded-xl shadow-card border border-border",
               "flex max-h-[85vh] flex-col overflow-hidden focus:outline-none",
               "transition-all duration-200",
               "data-[state=open]:opacity-100 data-[state=open]:scale-100",

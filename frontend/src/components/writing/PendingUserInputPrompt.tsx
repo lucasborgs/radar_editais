@@ -49,7 +49,7 @@ export function PendingUserInputPrompt({
   return (
     <div
       className={cn(
-        "rounded-lg border border-amber-300 bg-amber-50",
+        "rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30",
         "px-4 py-3 mb-3 shadow-sm",
       )}
       role="region"
@@ -63,13 +63,13 @@ export function PendingUserInputPrompt({
           ?
         </span>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-amber-800 font-sans uppercase tracking-wide mb-1">
+          <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 font-sans uppercase tracking-wide mb-1">
             O agente precisa de uma informação
           </p>
           <p className="text-sm text-content-primary font-sans leading-snug mb-2">
             {pending.prompt}
           </p>
-          <p className="text-[10px] text-amber-700/80 font-data uppercase tracking-wide mb-2">
+          <p className="text-[10px] text-amber-700 dark:text-amber-300/80 font-data uppercase tracking-wide mb-2">
             campo: {pending.field}
           </p>
 
@@ -82,7 +82,7 @@ export function PendingUserInputPrompt({
               disabled={disabled}
               placeholder="Sua resposta..."
               className={cn(
-                "flex-1 rounded-md border border-amber-300 bg-white",
+                "flex-1 rounded-md border border-amber-300 dark:border-amber-800 bg-surface",
                 "px-3 py-1.5 text-sm font-sans",
                 "focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400",
                 "disabled:opacity-50",
