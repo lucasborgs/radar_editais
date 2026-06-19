@@ -116,7 +116,8 @@ DIRETRIZES DE REDAÇÃO
 - Baseie-se nas informações do edital e no perfil da empresa fornecidos.
 - Use Markdown para estruturar trechos da proposta.
 - Quando produzir um trecho, seja propositivo: "faremos", não "poderíamos fazer".
-- Nunca invente dados numéricos. Se faltar, peça ao usuário ou use [COMPLETAR: ...].
+- Nunca invente dados numéricos. Se faltar, peça ao usuário via request_user_info
+  (não deixe marcadores de placeholder no texto da proposta).
 - Quando uma seção ativa for indicada, concentre a resposta nessa seção.
 - Ancore cada afirmação sobre o edital num trecho de search_edital; não cite de
   memória nem infira requisitos que você não viu.
@@ -155,12 +156,15 @@ COMO USAR AS FERRAMENTAS
   de escopo, abordagem ou prioridade — essas pertencem ao usuário no chat.
 - recall_company_learnings → quando o usuário perguntar sobre histórico ou
   quando contexto estratégico de aplicações passadas for relevante para a seção.
-- plan_writing_session → no início de uma sessão ou quando o usuário pedir
-  orientação sobre por onde começar ou em que focar.
-- write_todos → em tarefas com múltiplas etapas, registre seu plano e atualize
-  os status conforme avança (in_progress ao começar, completed ao terminar). Se
-  usar plan_writing_session, transcreva a estratégia para write_todos antes de
-  executar. Em pedido trivial de uma etapa só, não precisa.
+- load_skill → antes de redigir, puxe o playbook de escrita do instrumento (a lente
+  do avaliador e os padrões de tom/estrutura que aprovam naquele mecanismo). NÃO traz
+  regra dura (prazo, contrapartida, rubricas) — essa vem de search_edital. Pull
+  granular: chame quando for escrever, não no geral.
+- write_todos → no início de uma sessão ou tarefa com múltiplas etapas, planeje
+  a ordem estratégica das seções (priorize as que desbloqueiam outras ou têm
+  maior impacto na aprovação) e registre como todos; atualize os status conforme
+  avança (in_progress ao começar, completed ao terminar). Em pedido trivial de
+  uma etapa só, não precisa.
 
 QUANDO PARAR DE USAR FERRAMENTAS
 - Após responder à pergunta do usuário com clareza.
@@ -204,7 +208,7 @@ DIRETRIZES DE REDAÇÃO
 - O texto é OUTBOUND e personalizado: não há "edital a cumprir". O que condiciona o pitch é a TESE do fundo-alvo (tese, temas, setores, estágio, ticket, portfólio) — fornecida no contexto.
 - Conecte explicitamente a startup à tese daquele fundo: estágio, setor, ticket alvo, e por que o portfólio dele sugere fit (sem bajulação vazia).
 - Use Markdown. Seja propositivo e específico: "faremos", não "poderíamos".
-- Nunca invente números (tração, mercado, ticket). Se faltar, peça ao usuário ou use [COMPLETAR: ...].
+- Nunca invente números (tração, mercado, ticket). Se faltar, peça ao usuário via request_user_info (não deixe marcadores de placeholder no texto do pitch).
 - NÃO afirme que o fundo investe em X, ou que tem tese Y, a menos que apareça no contexto do fundo. Não infira a tese de memória.
 - Se a startup claramente NÃO encaixa na tese do fundo (estágio/setor/ticket incompatíveis), DIGA isso ao usuário em vez de forjar aderência — sinalizar o mismatch é melhor que inventar fit.
 
@@ -214,6 +218,7 @@ COMO USAR AS FERRAMENTAS
 - read_section / read_full_proposal → antes de redigir sumário/conclusão ou revisar coerência.
 - save_draft → SEMPRE que produzir um rascunho de seção, persista NO MESMO TURNO com o título exato da seção. Colar no chat NÃO conta.
 - request_user_info → APENAS para info concreta e ausente (MRR/ARR, round alvo, cap table, tração específica).
+- write_todos → no início de uma sessão ou pitch com várias seções, planeje a ordem (problema → solução → mercado → tração → time → ask) e registre como todos; atualize os status conforme avança. Em pedido trivial de uma seção só, não precisa.
 
 QUANDO PARAR
 - Após responder com clareza, salvar o rascunho pedido, ou pedir info necessária. Não fique chamando tools em loop.
@@ -225,6 +230,33 @@ LIMITES
 COMPRESS_SYSTEM = """Resuma os turnos abaixo em um parágrafo conciso (máx. 200 palavras).
 Preserve: decisões tomadas, trechos aprovados pelo usuário e informações adicionais fornecidas.
 Responda apenas com o resumo."""
+
+# Prompt B (Item 4, Sprint 2): extração de sinal estruturado ao comprimir/fechar
+# a sessão. Roda em PARALELO com COMPRESS_SYSTEM sobre os mesmos turnos. Enquanto
+# o resumo captura "o que foi dito" (alimenta o próximo turno), este captura
+# "o que deu atrito" (alimenta o aprendizado de longo prazo via reflection_insights).
+SIGNAL_SYSTEM = """Você analisa uma sessão de escrita de proposta para captação de recursos.
+A partir dos turnos abaixo, extraia SINAL sobre o processo de escrita — onde houve
+atrito e onde fluiu bem. Não resuma o conteúdo; foque no processo.
+
+Procure especificamente por:
+1. Seções que o Critic REJEITOU antes de aprovar. Marcadores no histórico:
+   textos como "Critic encontrou N problema(s)". Se a mesma seção foi rejeitada
+   e depois salva, registre quantas iterações levou até aprovar.
+2. Afirmações que o usuário CORRIGIU explicitamente (ex.: "não, o TRL é 6, não 4",
+   "a empresa não atua nesse setor", "isso está errado").
+3. Seções que fluíram SEM ATRITO — escritas e aprovadas de primeira (sinal positivo).
+
+Regras:
+- NÃO invente. Se não houver evidência clara de um tipo, não gere item desse tipo.
+- Cada item deve ser uma observação factual curta, citando a evidência do histórico.
+- Evidência = trecho curto (≤ 200 chars) do histórico que justifica o item.
+
+Responda APENAS com JSON (sem texto fora do JSON), uma lista:
+[
+  {"insight": "...", "kind": "critic_rejection" | "user_correction" | "smooth", "evidence": "..."}
+]
+Lista vazia [] se não houver sinal relevante."""
 
 
 # =============================================================================
@@ -1114,6 +1146,33 @@ class WritingSession:
         to_compress = self._history[:-(HISTORY_WINDOW * 2)]
         self._history = self._history[-(HISTORY_WINDOW * 2):]
 
+        # Item 4 (Sprint 2): compressão episódica com extração de sinal.
+        # Dois propósitos no mesmo momento, rodando em PARALELO sobre os mesmos
+        # turnos (`to_compress`):
+        #   - Prompt A (narrativa) → writing_sessions.summary (alimenta o próximo turno)
+        #   - Prompt B (sinal)     → reflection_insights (alimenta o aprendizado)
+        # Ambos os caminhos são síncronos (self._call_llm), então usamos
+        # ThreadPoolExecutor (2 workers), não asyncio. O future do sinal é
+        # isolado: qualquer falha nele NÃO pode afetar a compressão narrativa.
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            narrative_future = pool.submit(self._compress_narrative, to_compress)
+            signal_future = pool.submit(self.extract_session_signal, to_compress)
+
+            # Narrativa: comportamento idêntico ao legado.
+            narrative_future.result()
+
+            # Sinal: best-effort. Isolado para nunca derrubar o turno/compressão.
+            try:
+                signals = signal_future.result()
+                if signals:
+                    self._persist_session_signals(signals)
+            except Exception as e:
+                logger.warning("[%s] Extração de sinal falhou: %s", self.session_id, e)
+
+    def _compress_narrative(self, to_compress: list[dict]) -> None:
+        """Prompt A: compressão narrativa → writing_sessions.summary (legado)."""
         turns_text = "\n".join(
             f"{msg['role'].upper()}: {msg['content']}" for msg in to_compress
         )
@@ -1132,6 +1191,93 @@ class WritingSession:
                 }).eq("id", self.session_id).execute()
             except Exception as e:
                 logger.warning("[%s] Falha ao salvar summary: %s", self.session_id, e)
+
+    def extract_session_signal(self, turns: list[dict]) -> list[dict]:
+        """Prompt B (Item 4): extrai sinal estruturado de uma janela de turnos.
+
+        Identifica seções rejeitadas pelo Critic (e nº de iterações até aprovar),
+        afirmações que o usuário corrigiu, e seções que fluíram sem atrito.
+
+        Retorna lista de `{"insight", "kind", "evidence"}`. NUNCA propaga exceção:
+        falha de LLM ou de parse vira `[]` — a compressão não pode quebrar o turno.
+        O insert em reflection_insights é responsabilidade de `_persist_session_signals`.
+        """
+        if not turns:
+            return []
+        turns_text = "\n".join(
+            f"{msg['role'].upper()}: {msg['content']}" for msg in turns
+        )
+        messages = [
+            {"role": "system", "content": SIGNAL_SYSTEM},
+            {"role": "user",   "content": f"Turnos da sessão:\n\n{turns_text}"},
+        ]
+        try:
+            success, raw, _ = self._call_llm(messages, temperature=0.2, max_tokens=600)
+        except Exception as e:
+            logger.warning("[%s] extract_session_signal: LLM falhou: %s", self.session_id, e)
+            return []
+        if not success or not raw.strip():
+            return []
+
+        text = raw.strip()
+        if "```" in text:
+            text = re.sub(r"```(?:json)?", "", text).strip()
+        try:
+            data = json.loads(text)
+        except Exception as e:
+            logger.warning("[%s] extract_session_signal: parse falhou: %s", self.session_id, e)
+            return []
+
+        if not isinstance(data, list):
+            return []
+        valid_kinds = {"critic_rejection", "user_correction", "smooth"}
+        out: list[dict] = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            insight = (item.get("insight") or "").strip()
+            if not insight:
+                continue
+            kind = item.get("kind")
+            if kind not in valid_kinds:
+                kind = "smooth"
+            out.append({
+                "insight": insight,
+                "kind": kind,
+                "evidence": (item.get("evidence") or "").strip(),
+            })
+        return out
+
+    def _persist_session_signals(self, signals: list[dict]) -> int:
+        """Insere sinais extraídos em reflection_insights (origin=episodic_compression).
+
+        level=1 (observação), confidence='low' (extração heurística — conservador).
+        Retorna o número de rows inseridas. Best-effort: loga e retorna 0 em falha.
+        """
+        if not signals:
+            return 0
+        rows = [
+            {
+                "workspace_id": self.workspace_id,
+                "level": 1,
+                "insight": s["insight"],
+                "evidence": json.dumps({
+                    "kind": s.get("kind"),
+                    "evidence": s.get("evidence", ""),
+                    "session_id": self.session_id,
+                }),
+                "origin": "episodic_compression",
+                "confidence": "low",
+            }
+            for s in signals
+        ]
+        try:
+            self._db.table("reflection_insights").insert(rows).execute()
+        except Exception as e:
+            logger.warning("[%s] _persist_session_signals: insert falhou: %s", self.session_id, e)
+            return 0
+        logger.info("[%s] %d sinal(is) episódico(s) extraído(s)", self.session_id, len(rows))
+        return len(rows)
 
     # ------------------------------------------------------------------
     # Content Library

@@ -251,7 +251,25 @@ def test_explore_tools_count_and_names():
         "find_ict_partners",
         # Cross-dimensionais (Fase 2 — chat de Descoberta sobre todas as dimensões)
         "list_icts", "list_investidores", "oportunidades_por_tema",
+        # Comparação/detalhe fundamentado (KG localiza → RAG recupera trecho)
+        "search_edital_trechos",
     }
+
+
+def test_explore_tools_deep_research_gated(monkeypatch):
+    """deep_research só entra no toolset com EXPLORE_DEEP_RESEARCH_ENABLED=true
+    (explore é endpoint público; o crawl web é vetor de custo)."""
+    svc = KGMatchService()
+
+    monkeypatch.delenv("EXPLORE_DEEP_RESEARCH_ENABLED", raising=False)
+    off = {t.name for t in svc._explore_tools()}
+    assert "deep_research" not in off
+    # write_todos (planning) segue presente independentemente da flag
+    assert "write_todos" in off
+
+    monkeypatch.setenv("EXPLORE_DEEP_RESEARCH_ENABLED", "true")
+    on = {t.name for t in svc._explore_tools()}
+    assert "deep_research" in on
 
 
 def test_oportunidades_por_tema_is_cross_dimensional():

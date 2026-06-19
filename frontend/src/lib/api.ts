@@ -688,6 +688,68 @@ export const revertWorkspaceWeight = (dimension: WeightDimension, token: string)
     token,
   );
 
+// Item 1 (fechamento do loop): mudanças de peso AUTO-aplicadas pela reflexão.
+// Uma linha por delta aplicado (confidence != null) ou por revert (confidence
+// == null, rationale "revert de <id>"). reverted_at != null = já revertida.
+export interface WeightChange {
+  id: string;
+  dimension: WeightDimension;
+  old_weight: number;
+  new_weight: number;
+  delta: number;
+  confidence: "low" | "medium" | "high" | null;
+  outcomes_window: number | null;
+  rationale: string | null;
+  insight_id: string | null;
+  applied_at: string;
+  reverted_at: string | null;
+}
+
+export const getWeightChanges = (token: string) =>
+  apiFetch<{ changes: WeightChange[] }>("/me/weight-changes", undefined, token);
+
+export const revertWeightChange = (changeId: string, token: string) =>
+  apiFetch<{ reverted: boolean }>(
+    `/me/weight-changes/${changeId}/revert`,
+    { method: "POST" },
+    token,
+  );
+
+// ── Research findings (Item 2, Fase B do deep_research) ────
+// Staging area: findings do sub-agente de pesquisa chegam verified=false; o
+// usuário promove à content_library o que quiser manter (gate humano).
+
+export interface ResearchFindingSource {
+  url: string;
+  title: string;
+}
+
+export interface ResearchFinding {
+  id: string;
+  question: string;
+  answer: string | null;
+  sources: ResearchFindingSource[];
+  query: string | null;
+  verified: boolean;
+  created_at: string;
+  reviewed_at: string | null;
+  promoted_to_library_id: string | null;
+}
+
+export const getResearchFindings = (token: string) =>
+  apiFetch<{ findings: ResearchFinding[] }>(
+    "/research-findings",
+    undefined,
+    token,
+  );
+
+export const promoteResearchFinding = (id: string, token: string) =>
+  apiFetch<{ promoted: boolean; library_id: string }>(
+    `/research-findings/${id}/promote`,
+    { method: "POST" },
+    token,
+  );
+
 // ── Profile drift (Gap 4) ─────────────────────────────────
 
 export interface ProfileDriftSignal {

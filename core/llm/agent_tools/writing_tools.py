@@ -21,9 +21,10 @@ Princípios (vide core/agent_runtime.py):
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING
 
-from core.llm.agent_runtime import Tool, tool
+from core.llm.agent_runtime import Tool, _cap, tool
 from core.retrieval.retriever import (
     format_chunks_for_prompt,
     retrieve_chunks,
@@ -35,6 +36,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Caps por-tool (spec 02): complementares ao cap central em agent_runtime.
+# Semânticos — evitam que read_full_proposal/search_edital inflem o histórico
+# antes mesmo do teto global. Defaults folgados; calibrar com o log de disparo.
+# Cap total de read_full_proposal: proposta inteira é cara; acima disso, o aviso
+# orienta o modelo a usar read_section para detalhe pontual.
+READ_FULL_PROPOSAL_CHAR_CAP = int(os.getenv("READ_FULL_PROPOSAL_CHAR_CAP", "8000"))
+# Cap por chunk em search_edital: cada trecho do edital é truncado antes de
+# concatenar (k chunks somam rápido). Cap total da tool-result fica no env abaixo.
+SEARCH_EDITAL_CHUNK_CHAR_CAP = int(os.getenv("SEARCH_EDITAL_CHUNK_CHAR_CAP", "1500"))
+SEARCH_EDITAL_CHAR_CAP = int(os.getenv("SEARCH_EDITAL_CHAR_CAP", "8000"))
+
 
 def build_writing_tools(session: WritingSession) -> list[Tool]:
     """Constrói a lista de tools para o agente desta sessão.
@@ -43,6 +55,31 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
     (save_draft, request_user_info) ficam visíveis após o agente terminar
     — a WritingSession persiste o estado final via update no Postgres.
     """
+
+    # mechanism (+ source) do edital → habilita a tool load_skill (spec 05): o
+    # Redator PUXA o playbook de escrita do instrumento sob demanda (lente + padrões
+    # de tom/estrutura), em vez de regra dura — que vem de search_edital (RAG).
+    # Resolve uma vez por sessão. Pitch (nó do fundo, sem edital) → mechanism=equity.
+    _skill_mechanism = ""
+    _skill_source = ""
+    if getattr(session, "mode", "proposal") == "pitch":
+        _skill_mechanism = "equity"  # gênero outbound roteado ao agente de pitch (D4)
+    else:
+        # Agência (overlay de fonte) = prefixo do edital_id; o campo `source` da wiki
+        # é proveniência de ingestão (etl_process/web), não a agência.
+        try:
+            from core.kg.edital_id import source_of
+            _skill_source = source_of(session.edital_id)
+        except Exception:
+            _skill_source = ""
+        try:
+            from core.kg import kg_store
+            _wiki = kg_store.load_wiki_page(session.edital_id)
+            if _wiki:
+                _skill_mechanism = str(_wiki.get("mechanism", "") or "")
+        except Exception as e:  # nunca quebra a construção do toolset
+            logger.debug("load_skill: falha ao resolver mechanism de %s: %s",
+                         getattr(session, "edital_id", "?"), e)
 
     @tool
     def search_edital(query: str, k: int = 5) -> str:
@@ -74,8 +111,20 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
                     "Nenhum trecho relevante encontrado para essa query. "
                     "Tente reformular ou prossiga com o que já tem."
                 )
-            return format_chunks_for_prompt(
+            # Cap por chunk: cada trecho é truncado antes da concatenação
+            # (k chunks inteiros somam rápido). Cap total na sequência.
+            for c in chunks:
+                txt = c.get("text", "")
+                if txt:
+                    c["text"] = _cap(
+                        txt, SEARCH_EDITAL_CHUNK_CHAR_CAP,
+                        tool_name="search_edital[chunk]",
+                    )
+            formatted = format_chunks_for_prompt(
                 chunks, edital_ids=session._scope_edital_ids,
+            )
+            return _cap(
+                formatted, SEARCH_EDITAL_CHAR_CAP, tool_name="search_edital",
             )
         except Exception as e:
             logger.warning("[%s] search_edital falhou: %s", session.session_id, e)
@@ -165,78 +214,19 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
 
         if not any_content:
             return "Proposta ainda vazia — nenhuma seção foi redigida."
-        return "\n\n---\n\n".join(parts)
-
-    @tool
-    def plan_writing_session(focus: str = "") -> str:
-        """Gera um plano de trabalho estratégico para esta sessão de escrita.
-
-        Analisa o estado atual da proposta (quais seções estão vazias, em
-        rascunho ou completas) e sugere a ordem mais estratégica para trabalhar,
-        com justificativa para cada prioridade.
-
-        Use no início de uma sessão, ou quando o usuário pedir orientação sobre
-        por onde começar ou em que focar.
-
-        Args:
-            focus: objetivo específico desta sessão, se houver
-                   (ex: "terminar a parte técnica", "revisar orçamento").
-                   Deixe vazio para plano geral.
-        """
-        import os
-
-        from core.llm.llm_client import make_client
-
-        outline = session._proposal_outline
-        if not outline:
-            return "Proposta sem outline definido — peça ao usuário que defina as seções primeiro."
-
-        status_lines = []
-        for title in outline:
-            content = session._doc_sections.get(title, "")
-            wc = len(content.split()) if content.strip() else 0
-            if wc == 0:
-                st = "vazia"
-            elif wc < 80:
-                st = f"rascunho inicial ({wc} palavras)"
-            else:
-                st = f"redigida ({wc} palavras)"
-            status_lines.append(f"• {title}: {st}")
-
-        sections_block = "\n".join(status_lines)
-        focus_line = f"\nOBJETIVO DESTA SESSÃO: {focus.strip()}" if focus.strip() else ""
-
-        system = (
-            "Você é um consultor de captação de recursos especializado em estratégia "
-            "de escrita de propostas para editais de fomento no Brasil. "
-            "Seja direto, prático e acionável."
-        )
-        user = (
-            f"ESTADO ATUAL DA PROPOSTA:\n{sections_block}\n{focus_line}\n\n"
-            "Sugira a ordem estratégica para trabalhar as seções nesta sessão. "
-            "Para cada seção priorizada, inclua 1 linha de justificativa. "
-            "Priorize seções que desbloqueiam outras ou têm maior impacto na aprovação."
-        )
-
-        try:
-            client = make_client(api_key=os.environ["OPENAI_API_KEY"])
-            model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-            resp = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                temperature=0.3,
-                max_tokens=600,
+        full = "\n\n---\n\n".join(parts)
+        # Cap total: a proposta inteira é cara em tokens. Se estourar, trunca e
+        # avisa o modelo a usar read_section para o detalhe pontual que precisar.
+        if len(full) > READ_FULL_PROPOSAL_CHAR_CAP:
+            full = _cap(
+                full, READ_FULL_PROPOSAL_CHAR_CAP, tool_name="read_full_proposal",
             )
-            return resp.choices[0].message.content.strip()
-        except Exception as e:
-            logger.warning("[%s] plan_writing_session: LLM falhou: %s", session.session_id, e)
-            return (
-                "Plano sem IA (use como ponto de partida):\n"
-                + "\n".join(f"{i + 1}. {t}" for i, t in enumerate(outline))
+            full += (
+                "\n\nAVISO: proposta truncada por exceder o orçamento de contexto. "
+                "Use read_section(title) para ler o conteúdo completo de uma seção "
+                "específica quando precisar de detalhe."
             )
+        return full
 
     @tool
     def save_draft(section_title: str, content: str, force: bool = False) -> str:
@@ -351,21 +341,51 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
 
     # DeepResearch (Fase A): tool stateless de busca web. Subagente-como-tool —
     # devolve fato COM fonte; NÃO persiste (gate humano → library é a Fase B).
-    # write_todos: PlanState interno por chamada (= por turno). Tracking de
-    # execução anti-drift; complementa plan_writing_session (que é 1-shot).
-    # Persistência cross-turn dos todos fica fora de escopo (ver spec).
+    # write_todos: PlanState interno por chamada (= por turno). É o ÚNICO
+    # mecanismo de planejamento do Redator (spec 04 removeu plan_writing_session,
+    # que duplicava com uma chamada LLM extra). Persistência cross-turn dos todos
+    # fica fora de escopo (ver spec).
+    @tool
+    def load_skill() -> str:
+        """Carrega o PLAYBOOK DE ESCRITA deste instrumento: a lente do avaliador e
+        os padrões de tom/estrutura que aprovam neste mecanismo (+ praxe da fonte).
+
+        Use antes de redigir, para escrever como um especialista naquele
+        instrumento. NÃO traz regra dura (prazo, contrapartida %, rubricas, TRL
+        exigido) — isso vem de search_edital (edital). Puxa só quando a seção pede.
+        """
+        from core.skills import load_playbook
+        playbook = load_playbook(_skill_mechanism, _skill_source)
+        content = playbook.for_writer()
+        if not content.strip():
+            return (
+                "Sem playbook de escrita específico para este instrumento; "
+                "siga o perfil da empresa e os dados do edital (search_edital)."
+            )
+        label = playbook.mechanism or "genérico"
+        if playbook.source:
+            label += f" · {playbook.source}"
+        return f"PLAYBOOK DE ESCRITA ({label}):\n{content}"
+
     from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
     from core.llm.agent_tools.research_tools import build_research_tools
 
     return [
-        plan_writing_session,
         search_edital,
+        load_skill,
         search_library,
         read_section,
         read_full_proposal,
         save_draft,
         request_user_info,
         recall_company_learnings,
-        *build_research_tools(),
+        # Fase B (Item 2): com session, deep_research persiste cada finding em
+        # research_findings (verified=false) para o gate humano de promoção.
+        # getattr defensivo: sessões sem workspace_id/_db (fakes, contextos sem
+        # auth) caem no modo stateless da Fase A em vez de quebrar.
+        *build_research_tools(
+            workspace_id=getattr(session, "workspace_id", None),
+            db=getattr(session, "_db", None),
+        ),
         *build_planning_tools(PlanState()),
     ]

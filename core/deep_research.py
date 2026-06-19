@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 
 from core import web_search as ws
 from core.llm.agent_runtime import run_subagent, tool
+from core.web import fetch as web_fetch
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ def run_deep_research(
         """Busca na web por uma query. Retorna título, URL e trecho de cada
         resultado. Use para encontrar fontes sobre o que o usuário pediu."""
         try:
-            hits = ws.web_search(query, k)
+            hits = web_fetch.web_search(query, k)
         except ws.WebSearchError as e:
             return f"Busca web indisponível: {e}."
         except Exception as e:  # rede/HTTP — não quebra o loop
@@ -93,12 +94,10 @@ def run_deep_research(
     def fetch_url(url: str) -> str:
         """Lê o conteúdo de uma URL específica (texto limpo). Use quando o trecho
         da busca não basta e a página parece ter a resposta."""
-        from core.llm.agent_tools.profile_tools import _fetch_and_parse
         try:
-            d = _fetch_and_parse(url)
+            return web_fetch.fetch_url(url, char_limit=_FETCH_CHAR_LIMIT)
         except Exception as e:
             return f"Erro ao ler {url}: {e}."
-        return f"{d.get('title', url)}\n{d.get('text', '')[:_FETCH_CHAR_LIMIT]}"
 
     # Subagente-como-tool: run_subagent resolve provider e degrada graciosamente
     # (exceção → stop_reason="error"). A dedup de sources e o formato do
