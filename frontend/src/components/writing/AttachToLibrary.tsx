@@ -87,7 +87,7 @@ export function AttachToLibrary({
         disabled={disabled || uploading}
         className={cn(
           "self-end shrink-0 w-10 h-10 rounded-xl flex items-center justify-center",
-          "border border-border text-content-secondary bg-white",
+          "border border-border text-content-secondary bg-surface",
           "hover:text-content-primary hover:border-content-secondary transition-colors",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           className,

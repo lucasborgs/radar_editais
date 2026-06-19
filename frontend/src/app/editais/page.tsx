@@ -129,7 +129,7 @@ export default function EditaisPage() {
     >
       {/* Error banner */}
       {error && (
-        <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-sans">
+        <div className="mb-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 px-4 py-3 text-sm text-red-700 dark:text-red-300 font-sans">
           <strong>Erro ao carregar editais:</strong> {error}
           <br />
           <span className="text-xs">

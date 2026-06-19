@@ -1,6 +1,12 @@
 import type { Config } from "tailwindcss";
 
+// Cores semânticas são dirigidas por CSS vars (canais RGB) definidas em
+// globals.css — `:root` (claro) e `.dark` (escuro). A forma `rgb(var(--x) /
+// <alpha-value>)` preserva os modificadores de opacidade do Tailwind
+// (bg-primary/10, border-primary/30, etc.). Trocar de tema = trocar a classe
+// `dark` no <html>; nenhuma classe de cor precisa mudar.
 const config: Config = {
+  darkMode: "class",
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -10,19 +16,20 @@ const config: Config = {
     extend: {
       colors: {
         primary: {
-          DEFAULT: "#1DB954",
-          hover: "#1ED760",
+          DEFAULT: "rgb(var(--color-primary) / <alpha-value>)",
+          hover: "rgb(var(--color-primary-hover) / <alpha-value>)",
         },
         app: {
-          bg: "#F9FAFB",
-          surface: "#FFFFFF",
+          bg: "rgb(var(--color-app-bg) / <alpha-value>)",
+          surface: "rgb(var(--color-surface) / <alpha-value>)",
         },
+        surface: "rgb(var(--color-surface) / <alpha-value>)",
         content: {
-          primary: "#111827",
-          secondary: "#6B7280",
+          primary: "rgb(var(--color-content-primary) / <alpha-value>)",
+          secondary: "rgb(var(--color-content-secondary) / <alpha-value>)",
         },
         border: {
-          DEFAULT: "#E5E7EB",
+          DEFAULT: "rgb(var(--color-border) / <alpha-value>)",
         },
       },
       fontFamily: {

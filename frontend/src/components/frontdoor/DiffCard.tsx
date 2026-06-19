@@ -81,7 +81,7 @@ function FieldEditor({
                 "px-2 py-0.5 rounded-full text-xs font-sans border transition-colors",
                 active
                   ? "bg-primary text-white border-primary"
-                  : "bg-white text-content-secondary border-border hover:border-primary/50",
+                  : "bg-surface text-content-secondary border-border hover:border-primary/50",
               )}
             >
               {o.label}
@@ -149,7 +149,7 @@ export function DiffCard({
   return (
     <div
       className={cn(
-        "rounded-xl border bg-white px-4 py-3 text-sm font-sans",
+        "rounded-xl border bg-surface px-4 py-3 text-sm font-sans",
         decided ? "border-border opacity-90" : "border-primary/30 shadow-card",
       )}
     >
@@ -162,8 +162,8 @@ export function DiffCard({
             className={cn(
               "rounded-full px-2 py-0.5 text-[10px] font-medium",
               status === "accepted"
-                ? "bg-[#1DB954]/15 text-[#169c46]"
-                : "bg-gray-200 text-gray-600",
+                ? "bg-[#1DB954]/15 text-[#169c46] dark:text-[#3ddc84]"
+                : "bg-content-secondary/15 text-content-secondary",
             )}
           >
             {status === "accepted" ? "aplicado" : "descartado"}

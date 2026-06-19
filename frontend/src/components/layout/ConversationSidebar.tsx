@@ -16,6 +16,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
+import { ThemeToggle } from "./ThemeToggle";
 import { HISTORY_KEY, SESSION_ID_KEY } from "@/types/frontdoor";
 import {
   listConversations,
@@ -243,7 +244,7 @@ export function ConversationSidebar() {
   );
 
   return (
-    <aside className="w-64 flex-shrink-0 flex flex-col bg-white border-r border-border">
+    <aside className="w-64 flex-shrink-0 flex flex-col bg-surface border-r border-border">
       {/* Topo: marca + Nova conversa */}
       <div className="px-3 pt-3 pb-2 space-y-3">
         <Link href="/" className="flex items-center gap-2.5 px-2 pt-1">
@@ -269,7 +270,7 @@ export function ConversationSidebar() {
           onClick={handleNew}
           className={cn(
             "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium font-sans",
-            "border border-border text-content-primary hover:bg-gray-100 transition-colors",
+            "border border-border text-content-primary hover:bg-content-secondary/10 transition-colors",
           )}
         >
           <Icon d={ICON_PATHS.plus} />
@@ -286,8 +287,8 @@ export function ConversationSidebar() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar conversas"
             className={cn(
-              "w-full pl-8 pr-3 py-2 rounded-lg text-sm font-sans bg-gray-50",
-              "border border-transparent focus:border-border focus:bg-white",
+              "w-full pl-8 pr-3 py-2 rounded-lg text-sm font-sans bg-content-secondary/5",
+              "border border-transparent focus:border-border focus:bg-surface",
               "text-content-primary placeholder:text-content-secondary outline-none transition-colors",
             )}
           />
@@ -313,7 +314,7 @@ export function ConversationSidebar() {
           // Carregando: skeleton.
           <div className="space-y-1.5 pt-2">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-8 rounded-lg bg-gray-100 animate-pulse" />
+              <div key={i} className="h-8 rounded-lg bg-content-secondary/10 animate-pulse" />
             ))}
           </div>
         ) : sections.length === 0 ? (
@@ -355,7 +356,7 @@ export function ConversationSidebar() {
                         }
                         className={cn(
                           "flex items-center gap-2 pl-2 pr-7 py-2 rounded-lg text-sm font-sans transition-colors",
-                          "text-content-secondary hover:bg-gray-100 hover:text-content-primary",
+                          "text-content-secondary hover:bg-content-secondary/10 hover:text-content-primary",
                           deleting === s.session_id && "opacity-40",
                         )}
                       >
@@ -376,7 +377,7 @@ export function ConversationSidebar() {
                         }}
                         className={cn(
                           "absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-md text-content-secondary",
-                          "opacity-0 group-hover:opacity-100 hover:bg-gray-200 transition-opacity",
+                          "opacity-0 group-hover:opacity-100 hover:bg-content-secondary/15 transition-opacity",
                           menuOpen === s.session_id && "opacity-100",
                         )}
                         aria-label="Ações da conversa"
@@ -386,11 +387,11 @@ export function ConversationSidebar() {
                       {menuOpen === s.session_id && (
                         <div
                           ref={menuRef}
-                          className="absolute right-1 top-9 z-10 w-32 rounded-lg border border-border bg-white shadow-card py-1"
+                          className="absolute right-1 top-9 z-10 w-32 rounded-lg border border-border bg-surface shadow-card py-1"
                         >
                           <button
                             onClick={() => handleDelete(s.session_id)}
-                            className="w-full text-left px-3 py-1.5 text-sm font-sans text-red-600 hover:bg-red-50 transition-colors"
+                            className="w-full text-left px-3 py-1.5 text-sm font-sans text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                           >
                             Excluir
                           </button>
@@ -418,7 +419,7 @@ export function ConversationSidebar() {
                 "flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm font-sans transition-colors",
                 active
                   ? "text-primary bg-primary/10"
-                  : "text-content-secondary hover:bg-gray-100 hover:text-content-primary",
+                  : "text-content-secondary hover:bg-content-secondary/10 hover:text-content-primary",
               )}
             >
               <Icon d={d} />
@@ -426,6 +427,9 @@ export function ConversationSidebar() {
             </Link>
           );
         })}
+
+        {/* Tema claro/escuro */}
+        <ThemeToggle />
 
         {/* Identidade do usuário */}
         {isAuthed ? (
@@ -439,7 +443,7 @@ export function ConversationSidebar() {
             <button
               onClick={() => signOut()}
               title="Sair"
-              className="p-1 rounded-md text-content-secondary hover:bg-gray-100 hover:text-content-primary transition-colors"
+              className="p-1 rounded-md text-content-secondary hover:bg-content-secondary/10 hover:text-content-primary transition-colors"
               aria-label="Sair"
             >
               <Icon
@@ -451,7 +455,7 @@ export function ConversationSidebar() {
         ) : (
           <Link
             href="/login"
-            className="flex items-center gap-2.5 px-2 py-1.5 mt-1 rounded-lg text-sm font-sans text-content-secondary hover:bg-gray-100 hover:text-content-primary transition-colors border-t border-border pt-2"
+            className="flex items-center gap-2.5 px-2 py-1.5 mt-1 rounded-lg text-sm font-sans text-content-secondary hover:bg-content-secondary/10 hover:text-content-primary transition-colors border-t border-border pt-2"
           >
             Entrar
           </Link>

@@ -18,12 +18,12 @@ export function StatusBar({
   onEditProfile: () => void;
 }) {
   return (
-    <div className="border-b border-border bg-white">
+    <div className="border-b border-border bg-surface">
       <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-2">
         <span className="shrink-0 text-xs font-medium text-content-secondary font-sans">
           Perfil
         </span>
-        <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-gray-100">
+        <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-content-secondary/10">
           <div
             className="h-full rounded-full bg-primary transition-all"
             style={{ width: `${completeness}%` }}

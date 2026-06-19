@@ -64,7 +64,7 @@ export function ChecklistPanel({
             onClick={() =>
               onToggle(item.id, item.status === "addressed" ? "pending" : "addressed")
             }
-            className="w-full text-left px-4 py-2 flex items-start gap-2 hover:bg-gray-50 transition-colors group"
+            className="w-full text-left px-4 py-2 flex items-start gap-2 hover:bg-content-secondary/5 transition-colors group"
           >
             <span className="text-xs shrink-0 mt-0.5">
               {CHECKLIST_STATUS_ICON[item.status]}

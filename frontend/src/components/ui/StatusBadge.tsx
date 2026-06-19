@@ -12,7 +12,7 @@ interface StatusBadgeProps {
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const config = STATUS_CONFIG[status] ?? {
     label: status,
-    className: "bg-gray-500/15 text-gray-600",
+    className: "bg-content-secondary/15 text-content-secondary",
   };
 
   return (

@@ -17,7 +17,7 @@ const REASON: Record<GateAction, string> = {
 
 export function GateCard({ action }: { action: GateAction }) {
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-sans">
+    <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm font-sans">
       <p className="text-content-primary">{REASON[action]}</p>
       <Link
         href="/login"

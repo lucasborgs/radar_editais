@@ -27,7 +27,7 @@ export function ChatBubble({
           "max-w-[82%] rounded-2xl px-4 py-3 text-sm font-sans leading-relaxed",
           isUser
             ? "bg-primary text-white rounded-br-sm"
-            : "bg-white border border-border text-content-primary rounded-bl-sm",
+            : "bg-surface border border-border text-content-primary rounded-bl-sm",
           className
         )}
       >

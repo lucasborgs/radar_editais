@@ -23,7 +23,7 @@ function Toggle({
   return (
     <label
       className={cn(
-        "flex items-start gap-4 p-4 rounded-xl border border-border bg-white",
+        "flex items-start gap-4 p-4 rounded-xl border border-border bg-surface",
         disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer hover:border-primary/30 transition-colors"
       )}
     >
@@ -41,7 +41,7 @@ function Toggle({
         onClick={() => !disabled && onChange(!checked)}
         className={cn(
           "relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors mt-0.5",
-          checked ? "bg-primary" : "bg-gray-300",
+          checked ? "bg-primary" : "bg-gray-300 dark:bg-gray-600",
           "focus:outline-none focus:ring-2 focus:ring-primary/40",
           disabled && "cursor-not-allowed"
         )}
@@ -154,7 +154,7 @@ export default function SettingsPage() {
           </h2>
 
           {loading ? (
-            <div className="bg-white rounded-xl border border-border p-4 h-24 animate-pulse" />
+            <div className="bg-surface rounded-xl border border-border p-4 h-24 animate-pulse" />
           ) : (
             <Toggle
               checked={contribute}
@@ -168,7 +168,7 @@ export default function SettingsPage() {
           )}
 
           {error && (
-            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 font-sans">
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 font-sans">
               {error}
             </div>
           )}

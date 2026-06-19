@@ -17,9 +17,9 @@ interface MetricCardProps {
 }
 
 const trendStyles: Record<TrendProps["direction"], string> = {
-  up: "bg-[#1DB954]/15 text-[#169c46]",
-  down: "bg-red-500/15 text-red-700",
-  neutral: "bg-gray-500/15 text-gray-600",
+  up: "bg-[#1DB954]/15 text-[#169c46] dark:text-[#3ddc84]",
+  down: "bg-red-500/15 text-red-700 dark:text-red-300",
+  neutral: "bg-content-secondary/15 text-content-secondary",
 };
 
 const trendArrows: Record<TrendProps["direction"], string> = {
@@ -39,7 +39,7 @@ export function MetricCard({
   return (
     <div
       className={cn(
-        "relative bg-white rounded-xl shadow-card border border-border overflow-hidden",
+        "relative bg-surface rounded-xl shadow-card border border-border overflow-hidden",
         className
       )}
     >

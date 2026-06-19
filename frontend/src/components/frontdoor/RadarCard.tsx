@@ -17,9 +17,9 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 const TYPE_CLASS: Record<string, string> = {
-  edital: "bg-[#e07b39]/15 text-[#b35e22]",
+  edital: "bg-[#e07b39]/15 text-[#b35e22] dark:text-[#e8945a]",
   desafio: "bg-purple-100 text-purple-700",
-  programa: "bg-blue-100 text-blue-700",
+  programa: "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300",
   investidor: "bg-emerald-100 text-emerald-700",
 };
 
@@ -189,7 +189,7 @@ function RadarRow({
     <li
       className={cn(
         "rounded-lg border px-3 py-2 transition-colors",
-        item.tier === "fraco" ? "border-border bg-app-bg/40" : "border-border bg-white",
+        item.tier === "fraco" ? "border-border bg-app-bg/40" : "border-border bg-surface",
       )}
     >
       <button
@@ -210,13 +210,13 @@ function RadarRow({
             <span
               className={cn(
                 "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-                TYPE_CLASS[type] ?? "bg-gray-100 text-gray-600",
+                TYPE_CLASS[type] ?? "bg-content-secondary/10 text-content-secondary",
               )}
             >
               {TYPE_LABEL[type] ?? type}
             </span>
             {provisorio && (
-              <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+              <span className="rounded-full bg-content-secondary/10 px-1.5 py-0.5 text-[10px] font-medium text-content-secondary">
                 não verificado
               </span>
             )}
@@ -274,7 +274,7 @@ export function RadarCard({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-xl border border-border bg-white px-4 py-3 text-sm font-sans text-content-secondary">
+      <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm font-sans text-content-secondary">
         Nenhuma oportunidade casou com o perfil atual. Refine a descrição ou
         adicione TRL / porte / UF para melhorar o radar.
       </div>
@@ -282,7 +282,7 @@ export function RadarCard({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-white px-4 py-3 shadow-card">
+    <div className="rounded-xl border border-border bg-surface px-4 py-3 shadow-card">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-wide text-content-secondary font-sans">
           Radar · {items.length}{" "}

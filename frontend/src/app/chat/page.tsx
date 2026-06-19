@@ -462,7 +462,7 @@ function WritingPageInner() {
       </div>
 
       {/* ── Centro: chat da proposta ───────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col min-w-0 border-r border-border bg-white">
+      <div className="flex flex-1 flex-col min-w-0 border-r border-border bg-surface">
         {/* Header do chat */}
         <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0 gap-3">
           <div className="min-w-0">
@@ -488,7 +488,7 @@ function WritingPageInner() {
                 onChange={(e) => {
                   if (e.target.value) void handleSelectSection(e.target.value);
                 }}
-                className="lg:hidden text-xs font-sans rounded-lg border border-border bg-white px-2 py-1 text-content-primary max-w-[9rem] focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="lg:hidden text-xs font-sans rounded-lg border border-border bg-surface px-2 py-1 text-content-primary max-w-[9rem] focus:outline-none focus:ring-2 focus:ring-primary/40"
                 aria-label="Selecionar seção"
               >
                 <option value="" disabled>
@@ -526,7 +526,7 @@ function WritingPageInner() {
 
         {/* Erro */}
         {error && (
-          <div className="mx-4 mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-sans">
+          <div className="mx-4 mt-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 px-3 py-2 text-xs text-red-700 dark:text-red-300 font-sans">
             {error}
           </div>
         )}
@@ -553,7 +553,7 @@ function WritingPageInner() {
             <ChatMessageList deps={[loading, sectionLoading]}>
               {sectionLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-white border border-border rounded-2xl rounded-bl-sm px-4 py-3">
+                  <div className="bg-surface border border-border rounded-2xl rounded-bl-sm px-4 py-3">
                     <TypingIndicator />
                   </div>
                 </div>
@@ -563,7 +563,7 @@ function WritingPageInner() {
               ))}
               {loading && (
                 <div className="flex justify-start">
-                  <div className="bg-white border border-border rounded-2xl rounded-bl-sm px-4 py-3">
+                  <div className="bg-surface border border-border rounded-2xl rounded-bl-sm px-4 py-3">
                     <TypingIndicator />
                   </div>
                 </div>
@@ -639,7 +639,7 @@ function WritingPageInner() {
 
       {/* ── Direita: canvas (Documento | Checklist) ────────────────────────── */}
       {canvasOpen && (
-        <div className="hidden lg:flex w-[28rem] shrink-0 flex-col bg-white">
+        <div className="hidden lg:flex w-[28rem] shrink-0 flex-col bg-surface">
           <DocumentCanvas
             sections={sections}
             activeSection={activeSection}
