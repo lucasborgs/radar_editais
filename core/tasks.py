@@ -433,7 +433,7 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
             "section": c.get("section"),
             "source_file": c.get("source_file"),
             "page_range": c.get("page_range"),
-            "embedding": emb,
+            "embedding_gemma": emb,
             # SEM content_hash aqui — o marcador de conclusão é gravado no
             # chunk 0 só depois do último batch (ver abaixo).
             "metadata": c.get("metadata") or {},
@@ -502,14 +502,14 @@ def _insert_chunks_psycopg(rows: list[dict]) -> None:
 
     with psycopg.connect(dsn, autocommit=True) as conn, conn.cursor() as cur:
         for r in rows:
-            emb = r["embedding"]
+            emb = r["embedding_gemma"]
             # pgvector textual literal — '[v1,v2,...]'.
             vec_literal = "[" + ",".join(f"{x:.7f}" for x in emb) + "]"
             meta_literal = json.dumps(r.get("metadata") or {})
             cur.execute(
                 """
                 INSERT INTO public.edital_chunks
-                    (edital_id, chunk_index, text, section, source_file, page_range, embedding, metadata)
+                    (edital_id, chunk_index, text, section, source_file, page_range, embedding_gemma, metadata)
                 VALUES (%s, %s, %s, %s, %s, %s, %s::vector, %s::jsonb)
                 """,
                 (
