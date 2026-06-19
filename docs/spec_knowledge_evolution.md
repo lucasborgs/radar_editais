@@ -1,8 +1,22 @@
 # Spec: Evolução do Ecossistema de Conhecimento
 
-**Data:** 2026-06-15
-**Status:** Proposto — aguarda implementação
-**Branch sugerida:** `feat/knowledge-evolution`
+**Data:** 2026-06-15 (status atualizado 2026-06-16)
+**Status:** Em implementação — ver tabela abaixo
+**Branch:** `feat/knowledge-evolution`
+
+## Status de implementação
+
+| Item | Estado | Onde / o que falta |
+|------|--------|--------------------|
+| **1 — loop de pesos** | ✅ Feito | auto-apply gated + `weight_change_log` (migration 021, commit ed74d1572). Pendência: dedup de sugestão repetida entre ciclos (BACKLOG) |
+| **2 — deep_research → staging** | ✅ Feito (Fase B) | `research_findings` (migration 023) + router `research.py` (commit bdab8b82f) |
+| **3 — overlays de playbook** | 🟡 Só scaffold | tabela `playbook_overlays` (024) + loader da 4ª camada (leitura) + router. **Falta o job `run_meta_reflection` que aprende/escreve** (BACKLOG) |
+| **4 — compressão + extração de sinal** | ✅ Feito (na compressão) | `extract_session_signal` (migration 022, commit d8cceaabe). **Fase B "ao vivo" = proposta nova, ver no Item 4** |
+| **5 — Critic sub-agente** | ✅ Feito | 3 tools + `max_steps=3` (commit e9595c290) |
+| **6 — deprecação (`forget`)** | 🔵 Proposto | ver abaixo |
+| **7 — rastro do orquestrador humano** | 🔵 Proposto | nova frente, ver abaixo |
+
+**Pendência transversal:** migrations 021–024 ainda não aplicadas no Supabase remoto (BACKLOG — deploy).
 
 ## Princípio transversal
 
@@ -128,6 +142,23 @@ O passo de "extrator de por que falhou" colapsa dentro da compressão — mesmo 
 3. Inserir em `reflection_insights` com `origin="episodic_compression"`
 4. Rodar também em `POST /writing/{id}/close` para sessões abaixo do threshold de compressão
 
+**Fase B — extração ao vivo (proposta 2026-06-16):** hoje o sinal só é extraído na
+compressão (≥10 turnos) ou no close. Mas a reflexão *intra-run* (o `_REFLECT_PROMPT` no
+`agent_runtime`) já produz a síntese mais rica do agente no meio do loop — e ela é descartada
+com o turno. Capturá-la é quase de graça: o texto já existe no `messages[]`.
+
+- **Demux obrigatório:** a reflexão mistura "o que aprendi" (observação de instância →
+  episódica) com "o que ainda falta" (estado de tarefa → memória de trabalho, morre certo).
+  Só a primeira parte é persistida.
+- **Mesmo extrator, gatilho diferente:** reusar `extract_session_signal` num novo
+  `extract_intra_run_signal`, disparado pelos **mesmos sinais leves** que já acionam a reflexão
+  dinâmica (erro de tool, mudança de plano via `write_todos`, output acumulado). Não persiste
+  rodada trivial.
+- **Destino é episódica, não procedural:** grava em `reflection_insights` com
+  `origin="intra_run"`, level=1, **tagueado por `mechanism`**. Vira procedural só depois,
+  via a meta-reflexão do Item 3 (n=1 → overlay seria overfitting). A tag de `mechanism` é a
+  ponte que liga esta captura ao Item 3.
+
 ---
 
 ## Item 5 — Critic como sub-agente
@@ -160,6 +191,87 @@ Temperature: 0.05. Falha graciosa: erro no sub-agente → `CriticResult(approved
 
 ---
 
+## Item 6 — Deprecação de conhecimento (o `forget` explícito)
+
+**Contexto:** Os Itens 1–5 cobrem `remember` (escrita: findings, overlays, insights), `recall`
+(RAG, KG, merge de playbook) e `improve` (pesos, meta-reflexão, Critic). Mas os únicos
+mecanismos de esquecimento atuais agem só na *borda*: TTL de findings **não revisados**
+(Item 2), revert de pesos (Item 1) e `archived_at` manual da `content_library`. Nada deprecia
+conhecimento que **entrou, foi válido, e apodreceu**. Em domínio com prazo (editais expiram)
+e numa camada de aprendizado append-only, isso é dívida que cresce sozinha: o sistema aprende
+mas quase não esquece.
+
+**Decisão:** Esquecimento por evidência e por expiração, em três frentes — mantendo tudo
+auditável e reversível (nunca DELETE; sempre soft-deprecate com timestamp + origin).
+
+**A) Domínio expira (liga com o ETL incremental):** quando o refresh incremental detecta
+edital encerrado/removido, marcar `content_library` items e `edital_chunks` derivados com
+`deprecated_at` + `deprecated_reason`. Excluídos do `recall` por padrão (filtro no retriever),
+mantidos para auditoria. Promoções de `research_findings` herdam o vínculo ao edital de origem
+para serem deprecadas junto.
+
+**B) Overlays apodrecem por evidência:** `playbook_overlays` ganha decaimento — um overlay
+contradito por outcomes recentes tem `confidence` reduzida; abaixo do threshold de merge ele
+sai do `load_playbook` sem ser apagado (campo `retired_at` + origin do retiro). Aposentadoria
+por evidência, não por PR humano — coerente com "AI acts, Human can correct".
+
+**C) Insights decaem na janela:** a meta-reflexão (Item 3A) passa a ponderar `reflection_insights`
+por recência (half-life ou janela deslizante configurável), para evidência velha não dominar
+padrões de nível 3.
+
+**Consequências:**
+- Positivo: `recall` para de servir ruído expirado; merge de playbook não vira sedimento;
+  meta-reflexão reflete o presente
+- Risco: deprecar cedo demais perde conhecimento ainda útil. Mitigação: soft-deprecate +
+  reversibilidade + `recall` pode opt-in incluir deprecados para auditoria
+- Risco: decaimento de overlay/insight é mais um knob a calibrar. Mitigação: threshold e
+  half-life configuráveis por (mechanism, source), começando conservadores
+- Dependência: frente A precisa do ETL incremental detectando encerramento; B/C dependem de
+  volume de outcomes (após Item 3/4 consolidados)
+
+**Plano:**
+1. Migration: `deprecated_at` + `deprecated_reason` em `content_library` e `edital_chunks`;
+   `retired_at` + `retired_reason` em `playbook_overlays`
+2. Hook no refresh incremental: ao marcar edital encerrado, propagar `deprecated_at` para
+   chunks e library items vinculados
+3. Filtro padrão `deprecated_at IS NULL` no retriever e no `load_playbook` (4ª camada)
+4. Decaimento de overlay: no `run_meta_reflection`, reduzir `confidence` de overlays
+   contraditos por outcomes recentes; aposentar abaixo do threshold
+5. Ponderação por recência dos `reflection_insights` na agregação da meta-reflexão
+6. Endpoint/UI: incluir itens deprecados/aposentados nos feeds de auditoria com motivo
+
+---
+
+## Item 7 — Rastro do orquestrador humano (proposta 2026-06-16)
+
+**Contexto:** o orquestrador do ecossistema é o humano (Loop A da arquitetura de memória):
+ele roteia (escolhe edital, library items, escopo) e *integra* (conecta o raciocínio entre os
+especialistas). Mas as decisões dele viram **ações** — uma WritingSession nasce, um peso muda —
+e o **porquê** evapora. O sistema vê o *quê*, nunca o *motivo*. É a mesma amnésia da reflexão
+intra-run (Item 4 Fase B), só que na escala macro.
+
+**Decisão:** capturar uma fração do raciocínio de roteamento, sem transformar o humano em
+formulário. Campo opcional "por quê?" (uma linha) nos momentos de orquestração de maior valor:
+início de WritingSession, escolha de escopo análogo, promoção de finding. Persistido como
+`reflection_insights` com `origin="human_routing"`, level=2, tagueado por edital + `mechanism`.
+
+- **Opt-in, nunca bloqueante:** vazio é o default; jamais trava o fluxo.
+- **Mesmo cano:** reaproveita `reflection_insights` e a meta-reflexão do Item 3 — o "porquê"
+  humano é evidência de altíssima qualidade para padrões de nível 3.
+- **Coerência Grantable:** o humano segue sendo o orquestrador; só passa a *deixar rastro*.
+
+**Consequências:**
+- Positivo: o único raciocínio cross-domínio do ecossistema deixa de ser descartado
+- Risco: fricção / campos ignorados. Mitigação: opt-in, uma linha, só nos pontos de maior valor
+- Evolutivo: com volume, o sistema pode *sugerir* o roteamento e medir contra a escolha humana
+
+**Plano:**
+1. Campo opcional `rationale` nos endpoints de orquestração (writing/start, escopo, promote)
+2. Persistir em `reflection_insights` com `origin="human_routing"` + tags
+3. Incluir na agregação da meta-reflexão (Item 3A) como evidência ponderada
+
+---
+
 ## Dependências e ordem de implementação
 
 ```
@@ -171,10 +283,18 @@ Item 1 (pesos)           ← pode ser feito agora, infraestrutura existe (weight
 Item 5 (Critic)          ← independente, arquiteturalmente isolado
 Item 2 (deep_research)   ← independente, nova tabela
 Item 3 (cross-workspace) ← depende de volume; após Item 4 consolidado
+
+Item 6 (forget)
+    frente A (domínio)     ← depende do ETL incremental detectar encerramento; independente do resto
+    frente B (overlays)    ← depende do Item 3 (playbook_overlays + run_meta_reflection)
+    frente C (insights)    ← depende do Item 3A (meta-reflexão) e do volume do Item 4
+
+Item 4 Fase B (ao vivo)   ← independente; reusa extract_session_signal. Alimenta Item 1 e Item 3
+Item 7 (rastro humano)    ← independente; reusa reflection_insights. Alimenta Item 3A
 ```
 
 **Sprint sugerida:**
 - Sprint 1: Item 1 + Item 5 (menores, impacto imediato)
 - Sprint 2: Item 4 (fundação do aprendizado)
-- Sprint 3: Item 2 (Fase B do deep_research)
-- Sprint 4: Item 3 (cross-workspace — precisa de dados acumulados)
+- Sprint 3: Item 2 (Fase B do deep_research) + Item 6A (domínio expira — pareia com o ETL incremental)
+- Sprint 4: Item 3 (cross-workspace) + Item 6B/6C (decaimento — junto da infra de overlays/meta-reflexão que habilitam)

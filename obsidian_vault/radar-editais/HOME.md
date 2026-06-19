@@ -5,7 +5,7 @@ tags:
 
 # 📡 Radar de Editais
 
-> Última atualização: **2026-06-13 00:36:13**
+> Última atualização: **2026-06-13 09:04:14**
 
 ## Resumo
 
