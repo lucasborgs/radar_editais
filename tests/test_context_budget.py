@@ -1,34 +1,19 @@
 """Testes do orçamento de contexto nas tool-results (spec 02).
 
 Cobre:
-  (a) tool que devolve 50k chars → result capado com marcador de truncamento;
-  (b) output abaixo do cap passa intacto;
-  (c) cap por-chunk em search_edital (via mock de retrieve_chunks).
+  (a) helper `_cap` — trunca/marca, passa intacto abaixo do limite, limite ≤0;
+  (b) cap por-chunk em search_edital (via mock de retrieve_chunks).
+
+O cap CENTRAL no loop é testado no grafo (tests/test_agent_graph_golden.py
+::test_graph_caps_tool_result) — pós-migração LangGraph ele vive no nó `tools`.
 """
 from __future__ import annotations
 
-import pytest
-
-from core.llm import agent_runtime
-from core.llm.agent_runtime import (
-    TOOL_RESULT_CHAR_CAP,
-    _cap,
-    _LLMStep,
-    run_agent,
-    tool,
-)
-
-
-@pytest.fixture(autouse=True)
-def _force_legacy_runtime(monkeypatch):
-    """Cap central testado no loop LEGADO (spy de `_format_tool_results_anthropic`).
-    Com o LangGraph como default, fixamos o legado; o cap no grafo tem teste próprio
-    em tests/test_agent_graph_golden.py."""
-    monkeypatch.setenv("AGENT_RUNTIME", "legacy")
+from core.llm.agent_runtime import _cap
 
 
 # ---------------------------------------------------------------------------
-# (a) + (b): helper _cap e cap central no loop
+# (a): helper _cap
 # ---------------------------------------------------------------------------
 
 def test_cap_trunca_e_marca():
@@ -51,64 +36,8 @@ def test_cap_limite_zero_ou_negativo_nao_trunca():
     assert _cap(text, -5) == text
 
 
-def _step(*, tool_uses, text=""):
-    return _LLMStep(
-        stop_reason="tool_use" if tool_uses else "end_turn",
-        text=text,
-        tool_uses=tool_uses,
-        assistant_message={"role": "assistant", "content": text},
-        usage={"input_tokens": 0, "output_tokens": 0},
-        raw_response=None,
-    )
-
-
-def test_cap_central_no_loop_trunca_tool_result(monkeypatch):
-    """Uma tool que devolve 50k chars deve ter o output capado no histórico."""
-
-    @tool
-    def big_tool() -> str:
-        """Devolve um output enorme."""
-        return "y" * 50_000
-
-    captured: dict[str, str] = {}
-
-    real_format = agent_runtime._format_tool_results_anthropic
-
-    def spy_format(tool_results):
-        # captura o output já capado que iria pro histórico
-        captured["output"] = tool_results[0]["output"]
-        return real_format(tool_results)
-
-    # Primeira chamada do modelo: pede a tool. Segunda: encerra o turno.
-    steps = iter([
-        _step(tool_uses=[{"id": "t1", "name": "big_tool", "input": {}}]),
-        _step(tool_uses=[], text="pronto"),
-    ])
-
-    monkeypatch.setattr(
-        agent_runtime, "_call_anthropic", lambda *a, **k: next(steps),
-    )
-    monkeypatch.setattr(
-        agent_runtime, "_format_tool_results_anthropic", spy_format,
-    )
-
-    result = run_agent(
-        system="sys",
-        initial_messages=[{"role": "user", "content": "vai"}],
-        tools=[big_tool],
-        model="fake",
-        provider="anthropic",
-        max_steps=4,
-    )
-
-    out = captured["output"]
-    assert len(out) <= TOOL_RESULT_CHAR_CAP + 80  # cap + marcador
-    assert "…[truncado:" in out
-    assert result.final_text == "pronto"
-
-
 # ---------------------------------------------------------------------------
-# (c): cap por-chunk em search_edital
+# (b): cap por-chunk em search_edital
 # ---------------------------------------------------------------------------
 
 class _FakeSession:
@@ -134,7 +63,7 @@ def test_search_edital_cap_por_chunk(monkeypatch):
     tools = writing_tools.build_writing_tools(_FakeSession())
     search_edital = next(t for t in tools if t.name == "search_edital")
 
-    out = search_edital.call({"query": "requisitos", "k": 5})
+    out = search_edital.invoke({"query": "requisitos", "k": 5})
 
     # O chunk de 10k deve ter sido truncado para ~1500 chars + marcador.
     assert "z" * writing_tools.SEARCH_EDITAL_CHUNK_CHAR_CAP in out

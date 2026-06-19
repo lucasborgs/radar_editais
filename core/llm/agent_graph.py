@@ -33,7 +33,7 @@ from langchain_core.messages import (
     SystemMessage,
     ToolMessage,
 )
-from langchain_core.tools import StructuredTool
+from langchain_core.tools import BaseTool
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -49,7 +49,6 @@ from core.llm.agent_runtime import (
     AgentResult,
     Provider,
     StopReason,
-    Tool,
     TraceStep,
     _cap,
 )
@@ -68,28 +67,6 @@ class AgentState(TypedDict):
     rounds_since_reflect: int
     chars_since_reflect: int
     reflect_pending: bool
-
-
-# =============================================================================
-# Bridge Tool → StructuredTool (preserva _cap + error-string; removido na Etapa 2)
-# =============================================================================
-
-def _to_lc_tool(t: Tool) -> StructuredTool:
-    """Envolve nossa `Tool` numa `StructuredTool` LangChain preservando:
-      • degradação graciosa (erro → string `"Erro ao executar 'X': …"`),
-      • cap central de tool-result (`_cap`).
-    O schema de args é inferido da função original (mesmos type hints)."""
-    async def _runner(**kwargs: Any) -> str:
-        out = await t.call_async(kwargs)
-        return _cap(out, TOOL_RESULT_CHAR_CAP, tool_name=t.name)
-
-    # from_function infere args_schema da func original; coroutine executa o wrapper.
-    return StructuredTool.from_function(
-        func=t.func,
-        coroutine=_runner,
-        name=t.name,
-        description=t.description,
-    )
 
 
 # =============================================================================
@@ -143,9 +120,16 @@ def _build_chat_model(
 # Graph builder
 # =============================================================================
 
-def _build_graph(model, lc_tools: list[StructuredTool], *, max_steps: int, reflect_every: int | None):
+def _tool_error_to_str(e: Exception) -> str:
+    """Degradação graciosa (Etapa 2): tool que levanta vira ToolMessage-string em
+    vez de quebrar o grafo. Mantém o prefixo "Erro ao executar" — o sinal que o
+    nó `tools` usa para antecipar a reflexão (espelha o loop legado)."""
+    return f"Erro ao executar a tool: {e}"
+
+
+def _build_graph(model, lc_tools: list[BaseTool], *, max_steps: int, reflect_every: int | None):
     bound = model.bind_tools(lc_tools) if lc_tools else model
-    tool_node = ToolNode(lc_tools)
+    tool_node = ToolNode(lc_tools, handle_tool_errors=_tool_error_to_str)
 
     async def agent(state: AgentState) -> dict:
         resp = await bound.ainvoke(state["messages"])
@@ -160,6 +144,13 @@ def _build_graph(model, lc_tools: list[StructuredTool], *, max_steps: int, refle
     async def tools(state: AgentState) -> dict:
         out = await tool_node.ainvoke(state)
         tmsgs = out["messages"]
+        # Cap central (movido do bridge na Etapa 2): trunca cada tool-result acima
+        # do orçamento antes de ir ao histórico. Caps por-tool (writing_tools) já
+        # podem ter agido antes; este é o teto de segurança final.
+        for m in tmsgs:
+            m.content = _cap(
+                str(m.content), TOOL_RESULT_CHAR_CAP, tool_name=getattr(m, "name", None),
+            )
         chars = sum(len(str(m.content)) for m in tmsgs)
         rsr = state["rounds_since_reflect"] + 1
         csr = state["chars_since_reflect"] + chars
@@ -283,7 +274,7 @@ async def run_agent_graph_async(
     *,
     system: str,
     initial_messages: list[dict[str, Any]],
-    tools: list[Tool],
+    tools: list[BaseTool],
     model: str,
     provider: Provider = "anthropic",
     max_steps: int = 8,
@@ -294,15 +285,17 @@ async def run_agent_graph_async(
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
 ) -> AgentResult:
-    """Equivalente LangGraph de `run_agent_async` (mesma assinatura/contrato)."""
-    lc_tools = [_to_lc_tool(t) for t in tools]
+    """Equivalente LangGraph de `run_agent_async` (mesma assinatura/contrato).
+
+    `tools` são tools nativas do LangChain (Etapa 2): consumidas direto pelo
+    ToolNode, sem bridge."""
     chat = _build_chat_model(
         provider, model,
         temperature=temperature,
         openai_base_url=openai_base_url,
         openai_api_key=openai_api_key,
     )
-    graph = _build_graph(chat, lc_tools, max_steps=max_steps, reflect_every=reflect_every)
+    graph = _build_graph(chat, tools, max_steps=max_steps, reflect_every=reflect_every)
 
     init: AgentState = {
         "messages": [SystemMessage(content=system), *_to_lc_messages(initial_messages)],
