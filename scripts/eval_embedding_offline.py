@@ -125,32 +125,9 @@ def _load_embedder(embed: dict):
 # trust_remote_code só p/ modelos que exigem (ex.: Jina v2).
 # ---------------------------------------------------------------------------
 
-_ST_REGISTRY: dict[str, dict] = {
-    # E5: esquema "query: " / "passage: " (assimétrico clássico).
-    "intfloat/multilingual-e5-large": {
-        "query_prefix": "query: ",
-        "passage_prefix": "passage: ",
-    },
-    # E5-instruct: query leva bloco de instrução; passagem fica crua.
-    "intfloat/multilingual-e5-large-instruct": {
-        "query_prefix": (
-            "Instruct: Given a web search query, retrieve relevant passages "
-            "that answer the query\nQuery: "
-        ),
-        "passage_prefix": "",
-    },
-    # Jina v2 PT: simétrico (sem prefixo), mas exige trust_remote_code.
-    "jinaai/jina-embeddings-v2-base-pt": {
-        "query_prefix": "",
-        "passage_prefix": "",
-        "trust_remote_code": True,
-    },
-    # EmbeddingGemma (PT-podado): prompts nativos do modelo.
-    "tardellirs/embeddinggemma-pt-br": {
-        "query_prefix": "task: search result | query: ",
-        "passage_prefix": "title: none | text: ",
-    },
-}
+# Fonte de verdade em core/retrieval/embedder.py — importamos daqui para evitar
+# divergência de prefixos entre o eval offline e o caminho de prod/bake-off.
+from core.retrieval.embedder import _ST_REGISTRY  # noqa: E402
 
 
 def _load_st_embedder(model_name: str):
@@ -257,6 +234,80 @@ def _rank_by_cosine(query_vec, chunk_vecs, chunks: list[dict]) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Braço sparse (BM25/FTS) + fusão RRF — opcional via --sparse
+#
+# O modo default do script isola o dense puro. Com --sparse, ativamos um braço
+# sparse e fundimos por RRF, permitindo comparar BM25 vs FTS isoladamente ANTES
+# de tocar o retriever de prod. Pesos 0.5/0.5 (não o fts_weight de prod) de
+# propósito: queremos a contribuição máxima do sparse para discriminar os
+# rankers, não a mistura calibrada de produção.
+# ---------------------------------------------------------------------------
+
+_RRF_CONSTANT = 60  # mesmo k clássico do retriever de prod
+
+
+def _cosine_order(query_vec, chunk_vecs) -> list[int]:
+    """Índices dos chunks em ordem decrescente de cosseno (sem montar dicts)."""
+    import numpy as np
+    q = np.asarray(query_vec, dtype=np.float32)
+    M = np.asarray(chunk_vecs, dtype=np.float32)
+    qn = q / (np.linalg.norm(q) + 1e-9)
+    Mn = M / (np.linalg.norm(M, axis=1, keepdims=True) + 1e-9)
+    return [int(i) for i in np.argsort(-(Mn @ qn))]
+
+
+def _bm25_order(query: str, chunks: list[dict], limit: int) -> list[int]:
+    """Índices dos chunks por BM25 Okapi (reusa o ranker do retriever de prod)."""
+    from core.retrieval.retriever import _bm25_retrieve
+    pairs = [(str(i), c["text"]) for i, c in enumerate(chunks)]
+    return [int(i) for i in _bm25_retrieve(pairs, query, limit)]
+
+
+def _fts_order(query: str, edital_id: str, chunks: list[dict], limit: int) -> list[int]:
+    """Índices dos chunks por FTS/ts_rank no banco, mapeados via chunk_index.
+
+    Espelha o braço FTS de prod (to_tsquery OR + ts_rank). Reconsulta o banco
+    porque o tsvector vive lá; mapeia o resultado para os índices da lista
+    `chunks` (ordenada por chunk_index em `_fetch_corpus`).
+    """
+    import psycopg
+    from core.retrieval.retriever import _build_or_tsquery
+    ts_or = _build_or_tsquery(query)
+    if not ts_or:
+        return []
+    by_chunk_index = {c["chunk_index"]: i for i, c in enumerate(chunks)}
+    with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT chunk_index
+              FROM public.edital_chunks
+             WHERE edital_id = %s
+               AND text_search @@ to_tsquery('portuguese', %s)
+             ORDER BY ts_rank(text_search, to_tsquery('portuguese', %s)) DESC
+             LIMIT %s
+            """,
+            (edital_id, ts_or, ts_or, limit),
+        )
+        out: list[int] = []
+        for (chunk_index,) in cur.fetchall():
+            idx = by_chunk_index.get(chunk_index)
+            if idx is not None:
+                out.append(idx)
+        return out
+
+
+def _rrf_fuse(dense_idx: list[int], sparse_idx: list[int], chunks: list[dict]) -> list[dict]:
+    """Funde dois rankings de índices via RRF (0.5/0.5) → lista de dicts."""
+    scores: dict[int, float] = {}
+    for rank, i in enumerate(dense_idx):
+        scores[i] = scores.get(i, 0.0) + 0.5 / (_RRF_CONSTANT + rank + 1)
+    for rank, i in enumerate(sparse_idx):
+        scores[i] = scores.get(i, 0.0) + 0.5 / (_RRF_CONSTANT + rank + 1)
+    order = sorted(scores, key=lambda i: scores[i], reverse=True)
+    return [{**chunks[i], "score": scores[i]} for i in order]
+
+
+# ---------------------------------------------------------------------------
 # Avaliação de um braço (embedding model + contextualizador opcional)
 # ---------------------------------------------------------------------------
 
@@ -295,6 +346,7 @@ def _eval_arm(arm: dict, golden: dict, corpus: dict[str, list[dict]]) -> dict:
         corpus_vecs[eid] = embed_texts(texts)
     embed_corpus_s = time.perf_counter() - t0
 
+    sparse = arm.get("sparse")
     per_query: list[dict] = []
     gold_recall = {k: [] for k in _GOLD_KS}
     gold_best = {k: [] for k in _GOLD_KS}
@@ -305,7 +357,15 @@ def _eval_arm(arm: dict, golden: dict, corpus: dict[str, list[dict]]) -> dict:
         if not chunks:
             continue
         qv = embed_query(q["query"])
-        ranked = _rank_by_cosine(qv, corpus_vecs[eid], chunks)
+        if sparse:
+            dense_idx = _cosine_order(qv, corpus_vecs[eid])
+            if sparse == "fts":
+                sparse_idx = _fts_order(q["query"], eid, chunks, POOL_K)
+            else:
+                sparse_idx = _bm25_order(q["query"], chunks, POOL_K)
+            ranked = _rrf_fuse(dense_idx, sparse_idx, chunks)
+        else:
+            ranked = _rank_by_cosine(qv, corpus_vecs[eid], chunks)
         per_query.append(evaluate_query(ranked[:max_k], q.get("expected", []), ks=_KS))
         gold = q.get("gold_text", "")
         if gold:
@@ -339,7 +399,7 @@ _METRICS = [
 ]
 
 
-def _print_table(results: list[tuple[str, dict]]) -> None:
+def _print_table(results: list[tuple[str, dict]], sparse: str | None = None) -> None:
     baseline_agg = results[0][1]
     header = "metric".ljust(28) + "".join(name[:18].rjust(22) for name, _ in results)
     print("\n" + header)
@@ -359,8 +419,9 @@ def _print_table(results: list[tuple[str, dict]]) -> None:
             row += cell.rjust(22)
         print(row)
     print("-" * len(header))
-    print("n_queries=" + str(baseline_agg.get("n_queries", 0))
-          + "  (braço DENSE puro, offline — sem FTS/RRF/rerank)")
+    mode = (f"DENSE+{sparse} via RRF (0.5/0.5), sem rerank" if sparse
+            else "braço DENSE puro, sem FTS/RRF/rerank")
+    print("n_queries=" + str(baseline_agg.get("n_queries", 0)) + f"  ({mode}, offline)")
 
 
 def main() -> int:
@@ -383,6 +444,10 @@ def main() -> int:
     parser.add_argument("--editais", default=None,
                         help="restringe a estes edital_ids (CSV, ex.: 'finep:768,finep:743') — "
                              "corta o nº de chunks a contextualizar/embedar")
+    parser.add_argument("--sparse", choices=["bm25", "fts"], default=None,
+                        help="ativa o braço sparse e funde com o dense via RRF (0.5/0.5): "
+                             "'bm25' (rank_bm25 em Python) ou 'fts' (ts_rank no banco). "
+                             "Default: só dense. Use para comparar BM25 vs FTS offline.")
     args = parser.parse_args()
 
     golden = _load_golden(args.source)
@@ -412,6 +477,10 @@ def main() -> int:
         arms.append({"label": f"ctx:{ctx['model']}", "embed": base_embed, "ctx": ctx})
     if not arms:
         raise SystemExit("nada a avaliar — passe --candidate/--contextualizer ou rode com baseline.")
+    if args.sparse:
+        for arm in arms:
+            arm["sparse"] = args.sparse
+            arm["label"] = f"{arm['label']} +{args.sparse}"
 
     results: list[tuple[str, dict]] = []
     for arm in arms:
@@ -422,13 +491,14 @@ def main() -> int:
               f"mrr={agg.get('mrr'):.3f}  gold_recall@5={agg.get('gold_recall_at_5')}  "
               f"embed={agg.get('embed_corpus_s')}s")
 
-    _print_table(results)
+    _print_table(results, sparse=args.sparse)
 
     RESULTS_DIR.mkdir(exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out_path = RESULTS_DIR / f"{ts}_embedding_offline.json"
     out_path.write_text(json.dumps({
-        "kind": "embedding_offline_dense",
+        "kind": f"embedding_offline_dense+{args.sparse}" if args.sparse else "embedding_offline_dense",
+        "sparse": args.sparse,
         "source": args.source,
         "edital_ids": edital_ids,
         "n_chunks": n_chunks,

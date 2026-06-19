@@ -284,6 +284,25 @@
 - **Ponto de entrada:** `core/kg_store.py`, `pipeline/etl_process.py` (escritor), os 4 leitores.
   **Status:** aberto (Tier 1 feito; Tier 2 secundário). Ver [[project_data_plane_prod]].
 
+### BM25 — IMPLEMENTADO (2026-06-19). HyDE implementado, desativado por default
+
+- **BM25:** substituiu `ts_rank` (FTS) como braço sparse do RRF. Implementado via
+  `rank-bm25` (Python puro, sem mudança de schema). `sparse="bm25"` é o novo default
+  em `retrieve_chunks`; `sparse="fts"` mantém o caminho legado. Teste offline
+  (edital FINEP 768, 253 chunks): recall@5 sparse isolado 0.375→0.875. FTS legado e
+  GIN index no `text_search` mantidos no schema por ora.
+
+- **HyDE (Hypothetical Document Embeddings):** implementado em `core/retrieval/hyde.py`
+  (`generate_hyde_doc`) e disponível em `retrieve_chunks(hyde=True)`. **Mantido com
+  `hyde=False` como default** — eval offline mostrou regressão no braço dense isolado
+  (recall@5 0.50→0.42 no golden FINEP com OpenAI embedding). Hipótese: golden anotado
+  por `section/source_file` favorece vocabulário literal; HyDE move o vetor para
+  paráfrases formais que divergem das anotações. Re-avaliar com pipeline completo
+  (rerank ativo, `core.eval rag`) e com embedding Gemma antes de ativar em prod.
+  Modelo configurável via `HYDE_MODEL` / `HYDE_BASE_URL` / `HYDE_API_KEY` (Ollama-ready).
+  Script `eval_embedding_offline.py` aceita `--hyde` para testes isolados.
+- **Status:** BM25 em prod. HyDE na branch, `hyde=False` até nova avaliação.
+
 ### Parsing/chunking estrutura-aware — INVESTIGADO E REFUTADO (benchmark-driven, 2026-06-06)
 - **Hipótese:** parser estrutura-aware (Docling p/ PDF, numbering p/ FAPESP texto-plano)
   → modelo de blocos tipado → melhor `section_path` → melhor retrieval. Motivada pela
