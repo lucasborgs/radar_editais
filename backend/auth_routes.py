@@ -178,6 +178,34 @@ def trigger_reflection(user_id: CurrentUserId, db: DbClient):
     return result
 
 
+@router.post(
+    "/me/synthesize",
+    summary="Dispara a síntese de padrões (level 2) on-demand (Gap 1)",
+)
+async def trigger_synthesis(user_id: CurrentUserId, db: DbClient):
+    """Enfileira `synthesize_patterns_task` para o workspace do usuário.
+
+    Diferente de /me/reflect (que roda inline e gera observações level 1), a
+    síntese destila padrões (level 2) sobre o corpus acumulado de observações.
+    Vai pela fila procrastinate porque a síntese é uma etapa de longo prazo
+    (não precisa de retorno imediato) e self-gateia se houver poucas
+    observações ativas.
+    """
+    workspace = _ensure_workspace(user_id, db)
+    try:
+        from core.tasks import app as tasks_app
+        async with tasks_app.open_async():
+            await tasks_app.configure_task("synthesize_patterns").defer_async(
+                workspace_id=str(workspace["id"])
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Falha ao enfileirar a síntese — tente novamente.",
+        ) from e
+    return {"status": "enqueued", "workspace_id": workspace["id"]}
+
+
 # =============================================================================
 # WEIGHT APPROVAL (Gap 2 — fecha Loop C)
 # =============================================================================
@@ -243,33 +271,6 @@ def revert_weight(dimension: str, user_id: CurrentUserId, db: DbClient):
     if not reverted:
         raise HTTPException(status_code=404, detail="Sem override para esta dimensão")
     return {"success": True, "dimension": dimension}
-
-
-@router.get(
-    "/me/weight-changes",
-    summary="Feed de mudanças de peso auto-aplicadas (Item 1, fechamento do loop)",
-)
-def get_weight_changes(user_id: CurrentUserId, db: DbClient):
-    """Histórico de pesos auto-aplicados pela reflexão (+ reverts), mais
-    recentes primeiro. Cada linha é reversível via POST .../revert."""
-    from core.weight_approval import list_weight_changes
-    workspace = _ensure_workspace(user_id, db)
-    return {"changes": list_weight_changes(db, workspace["id"])}
-
-
-@router.post(
-    "/me/weight-changes/{change_id}/revert",
-    summary="Reverte uma mudança de peso auto-aplicada (Item 1)",
-)
-def revert_weight_change_endpoint(
-    change_id: str, user_id: CurrentUserId, db: DbClient
-):
-    """Desfaz o delta daquela mudança (aplica o inverso) e registra o revert no
-    log. Retorna reverted=False se a mudança não existe ou já foi revertida."""
-    from core.weight_approval import revert_weight_change
-    workspace = _ensure_workspace(user_id, db)
-    reverted = revert_weight_change(db, workspace["id"], change_id)
-    return {"reverted": reverted}
 
 
 # =============================================================================

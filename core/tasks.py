@@ -197,13 +197,75 @@ async def reflect_workspace_task(workspace_id: str) -> None:
     db = get_supabase_service()
     result = await asyncio.to_thread(reflect_workspace, db, workspace_id)
     logger.info(
-        "reflect_workspace_task: workspace=%s outcomes=%d obs=%d patterns=%d skip=%s",
+        "reflect_workspace_task: workspace=%s outcomes=%d obs=%d skip=%s",
         workspace_id,
         result["outcomes_considered"],
         result["observations_inserted"],
-        result["patterns_inserted"],
         result.get("skipped_reason"),
     )
+
+
+@app.task(name="synthesize_patterns", queue="default")
+async def synthesize_patterns_task(workspace_id: str) -> None:
+    """Sintetiza padrões (level 2) a partir do corpus de observações (level 1).
+
+    Etapa de longo prazo, separada de reflect_workspace: lê as observações
+    factuais (level 1) acumuladas e ativas do workspace e destila padrões
+    interpretativos (level 2) + weight_suggestions, sem zerar o corpus de
+    level 1.
+
+    Triggers:
+      - Periódico: cron semanal (domingo 05:00 UTC) para todos os workspaces
+        ativos (ver synthesize_patterns_cron).
+      - On-demand: POST /me/synthesize.
+
+    Self-gateia em MIN_LEVEL1_FOR_SYNTHESIS (pula se há poucas observações
+    ativas), então é seguro enfileirar livremente.
+    """
+    from core.reflection_service import synthesize_patterns
+
+    db = get_supabase_service()
+    result = await asyncio.to_thread(synthesize_patterns, db, workspace_id)
+    logger.info(
+        "synthesize_patterns_task: workspace=%s level1=%d patterns=%d auto_applied=%d skip=%s",
+        workspace_id,
+        result["level1_considered"],
+        result["patterns_inserted"],
+        len(result.get("auto_applied") or []),
+        result.get("skipped_reason"),
+    )
+
+
+@app.periodic(cron="0 5 * * 0")
+@app.task(name="synthesize_patterns_cron", queue="default")
+async def synthesize_patterns_cron(timestamp: int) -> None:
+    """Cron semanal (domingo 05:00 UTC): enfileira síntese de padrões para
+    todos os workspaces ativos.
+
+    Lê os ids de workspaces e enfileira `synthesize_patterns_task` para cada um.
+    A própria task self-gateia (pula workspaces com poucas observações ativas),
+    então enfileirar todos é barato. `timestamp` vem do procrastinate periodic
+    (UNIX epoch).
+    """
+    db = get_supabase_service()
+
+    fetch = await asyncio.to_thread(
+        lambda: db.table("workspaces").select("id").execute()
+    )
+    workspace_ids = [row["id"] for row in (fetch.data or []) if row.get("id")]
+    logger.info(
+        "synthesize_patterns_cron: enfileirando síntese para %d workspaces (timestamp=%s)",
+        len(workspace_ids), timestamp,
+    )
+    for ws_id in workspace_ids:
+        try:
+            await app.configure_task("synthesize_patterns").defer_async(
+                workspace_id=ws_id,
+            )
+        except Exception as e:
+            logger.warning(
+                "synthesize_patterns_cron: falha ao enfileirar ws=%s: %s", ws_id, e,
+            )
 
 
 # =============================================================================
@@ -634,27 +696,55 @@ async def run_daily_etl_task(timestamp: int) -> None:
 # Descoberta — busca livre por termos (torneira automática da fonte web)
 # =============================================================================
 # Procrastinate periodic: cron diário 04:00 UTC (após o ETL das 03:00). Roda a
-# busca livre (Tavily) e deixa os achados na STAGING `discovered_opportunities`
-# (pending). NÃO toca o KG — a promoção humana (endpoint /discovered-opportunities)
-# é que insere a URL em web_sources e dá início ao tratamento completo (Parte C).
-# Requer TAVILY_API_KEY + chave LLM; sem elas, degrada para no-op.
+# busca livre (Tavily), grava os achados em web_raw/ como `provisorio`, enfileira
+# o chunking de cada um e reconstrói o índice. É a Opção A (WIKI.md §12.4): a
+# Descoberta não tem pipeline próprio — alimenta a MESMA fonte `web` que a seed
+# list manual. Requer TAVILY_API_KEY + chave LLM; sem elas, degrada para no-op.
 
 
 @app.periodic(cron="0 4 * * *")
 @app.task(name="discover_opportunities", queue="etl")
 async def discover_opportunities_task(timestamp: int) -> None:
-    """Cron diário (4am UTC): busca livre → staging discovered_opportunities.
+    """Cron diário (4am UTC): busca livre → web_raw provisorio → chunk → índice.
 
-    Só roda a torneira: `discover_opportunities(write=True)` busca/tria/extrai e
-    grava os achados como `pending` na staging. NÃO enfileira chunking nem
-    reconstrói o índice — nada entra no KG até um humano promover um item da fila
-    (gate humano, Parte C). `timestamp` vem do procrastinate periodic (UNIX epoch).
+    Espelha `run_daily_etl_task`, mas para a torneira automática da fonte web:
+      1. `discover_opportunities` busca/tria/extrai e grava web_raw/web_discovery_*.json
+      2. enfileira `chunk_edital(web:<url_hash>)` para cada achado (RAG da escrita)
+      3. reconstrói o índice (pure-Python) para os provisorios entrarem no KG
+
+    `timestamp` vem do procrastinate periodic (instante agendado, UNIX epoch).
     """
+    from core.kg.edital_id import make_id  # noqa: PLC0415
     from core.opportunity_discovery import discover_opportunities  # noqa: PLC0415
 
     logger.info("discover_opportunities_task: iniciando (timestamp=%s)", timestamp)
+
     records = await asyncio.to_thread(discover_opportunities, write=True)
-    logger.info(
-        "discover_opportunities_task: %d oportunidades → staging (pending, aguardando revisão)",
-        len(records),
-    )
+    logger.info("discover_opportunities_task: %d oportunidades novas", len(records))
+
+    for r in records:
+        url_hash = r.get("url_hash")
+        if not url_hash:
+            continue
+        edital_id = make_id("web", url_hash)
+        try:
+            await app.configure_task("chunk_edital").defer_async(edital_id=edital_id)
+        except Exception as e:
+            logger.warning(
+                "discover_opportunities_task: falha ao enfileirar chunk p/ %s: %s",
+                edital_id, e,
+            )
+
+    # Rebuild do índice — os provisorios só entram no KG (match/escrita) após o
+    # build varrer web_raw. Pure-Python, idempotente, barato (sem LLM).
+    if records:
+        try:
+            from pipeline import build_knowledge_graph  # noqa: PLC0415
+            await asyncio.to_thread(build_knowledge_graph.main)
+            logger.info("discover_opportunities_task: índice reconstruído")
+        except Exception as e:
+            logger.error(
+                "discover_opportunities_task: falha ao reconstruir índice: %s", e
+            )
+
+    logger.info("discover_opportunities_task: concluído")
