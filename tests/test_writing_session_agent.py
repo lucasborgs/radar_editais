@@ -129,6 +129,50 @@ def test_extract_tool_trace_empty_when_no_tools():
     assert WritingSession._extract_tool_trace(steps) == []
 
 
+def test_extract_tool_trace_save_draft_exposes_saved_section():
+    """W-D1: save_draft bem-sucedido carrega `saved_section` com o título
+    NORMALIZADO (do output da tool), não o que o agente digitou no input."""
+    steps = [
+        TraceStep(
+            kind="llm", text="vou salvar",
+            tool_uses=[{"id": "tu_1", "name": "save_draft",
+                        "input": {"section_title": "metodologia", "content": "..."}}],
+            usage={},
+        ),
+        TraceStep(
+            kind="tool", name="save_draft",
+            input={"section_title": "metodologia", "content": "..."},
+            output="Rascunho salvo em '2. Metodologia' (320 chars) (aprovado pelo critic). "
+                   "Continue a conversa ou prossiga para a próxima seção.",
+        ),
+    ]
+    trace = WritingSession._extract_tool_trace(steps)
+    assert len(trace) == 1
+    assert trace[0]["name"] == "save_draft"
+    assert trace[0]["saved_section"] == "2. Metodologia"
+
+
+def test_extract_tool_trace_save_draft_blocked_has_no_saved_section():
+    """Quando o critic bloqueia (output não começa com 'Rascunho salvo'),
+    a entrada NÃO carrega saved_section — nenhuma seção foi tocada."""
+    steps = [
+        TraceStep(
+            kind="llm", text="",
+            tool_uses=[{"id": "tu_1", "name": "save_draft",
+                        "input": {"section_title": "2. Metodologia", "content": "x"}}],
+            usage={},
+        ),
+        TraceStep(
+            kind="tool", name="save_draft",
+            input={"section_title": "2. Metodologia", "content": "x"},
+            output="Critic encontrou 1 problema(s) antes de salvar:\n• Vago demais.",
+        ),
+    ]
+    trace = WritingSession._extract_tool_trace(steps)
+    assert len(trace) == 1
+    assert "saved_section" not in trace[0]
+
+
 # ============================================================================
 # turn() — sempre roda o agente (Front 1: legacy aposentado)
 # ============================================================================

@@ -6,6 +6,7 @@ import type { CompanyProfile } from "@/types/profile";
 import type {
   WritingStartResponse,
   WritingTurnResponse,
+  WritingMode,
   SectionStartResponse,
   ExtractProfileResponse,
   ContentItemSummary,
@@ -326,11 +327,12 @@ export const getInvestorMatches = (profile: CompanyProfile, topK: number = 6) =>
 
 export const startWritingSession = (
   editalId: string,
-  profile: CompanyProfile
+  profile: CompanyProfile,
+  mode?: WritingMode,  // W-D3: opcional; omitido → modo derivado do id no backend
 ) =>
   apiFetch<WritingStartResponse>("/writing/start", {
     method: "POST",
-    body: JSON.stringify({ edital_id: editalId, profile }),
+    body: JSON.stringify({ edital_id: editalId, profile, mode }),
   });
 
 export type ModelTier = "fast" | "auto" | "pro";
@@ -473,8 +475,17 @@ export const deleteLibraryItem = (id: string, token: string) =>
 
 export interface DocumentSection { title: string; content: string }
 
+// GET /writing/{id}/document → outline (em ordem) + conteúdo por seção + o
+// edital/alvo da sessão. É a fonte de verdade do documento que o workspace
+// recarrega após cada turno (spec §9).
+export interface WritingDocument {
+  session_id: string;
+  edital_id: string;
+  sections: DocumentSection[];
+}
+
 export const getWritingDocument = (sessionId: string) =>
-  apiFetch<{ session_id: string; sections: DocumentSection[] }>(`/writing/${sessionId}/document`);
+  apiFetch<WritingDocument>(`/writing/${sessionId}/document`);
 
 export const saveDocumentSection = (
   sessionId: string,
@@ -488,6 +499,57 @@ export const saveDocumentSection = (
 
 export const exportDocument = (sessionId: string) =>
   apiFetch<{ markdown: string; session_id: string }>(`/writing/${sessionId}/export`);
+
+// ── Auto-review (checklist 3-passes, ancorado por seção) ───
+// Shape REAL do core/services/checklist_service.py + enriquecimento `section`
+// feito no router (backend/routers/writing.py:_attach_issue_sections).
+export interface ComplianceIssue {
+  requirement: string;
+  status: "ok" | "missing" | "partial";
+  evidence: string;
+  suggestion: string;
+  section: string; // anexado pelo backend (W6)
+}
+
+export interface QualityIssue {
+  category: "clarity" | "coherence" | "persuasion" | "tone";
+  severity: "low" | "medium" | "high";
+  excerpt: string;
+  suggestion: string;
+  section: string;
+}
+
+export interface CompletenessSection {
+  title: string;
+  status: "empty" | "shallow" | "adequate" | "thorough";
+  suggestion: string;
+  section: string;
+}
+
+export interface AutoReview {
+  compliance: { issues: ComplianceIssue[]; score: number };
+  quality: { issues: QualityIssue[]; overall_score: number };
+  completeness: {
+    sections: CompletenessSection[];
+    missing_sections: string[];
+    overall_score: number;
+  };
+  error: Array<{ pass: string; message: string }> | null;
+}
+
+export const autoReviewChecklist = (sessionId: string, token: string) =>
+  apiFetch<{ session_id: string; review: AutoReview }>(
+    `/writing/${sessionId}/checklist/auto-review`,
+    { method: "POST" },
+    token,
+  );
+
+export const saveSessionToStorage = (sessionId: string, token: string) =>
+  apiFetch<{ path: string; signed_url: string; session_id: string }>(
+    `/writing/${sessionId}/save-to-storage`,
+    { method: "POST" },
+    token,
+  );
 
 // ── Writing Sessions list (resumable) ──────────────────────
 
