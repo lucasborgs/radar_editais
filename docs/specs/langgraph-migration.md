@@ -233,6 +233,26 @@ com closures sobre o estado — **compatível com o `@tool` LangChain** (closure
 - `test_context_budget` verde com cap no nó.
 - Suítes de serviço verdes sem mudança de comportamento.
 
+## FECHADA (2026-06-19) — legado APOSENTADO
+LangGraph é o **runtime único**; o loop legado, adapters, `Tool`/`@tool`/
+`ToolRegistry`/`_LLMStep` foram **deletados** de `agent_runtime.py` (agora facade
+fina: contrato + `resolve_agent_provider` + shims + `run_subagent` + `_cap`).
+- 8 arquivos com `from core.llm.agent_runtime import tool` → `from
+  langchain_core.tools import tool`; `list[Tool]` → `list[BaseTool]`. Zero
+  override `@tool(...)` → swap trivial.
+- `agent_graph`: bridge removido (ToolNode consome tools nativas); cap central
+  movido pro nó `tools`; `ToolNode(handle_tool_errors=_tool_error_to_str)`
+  preserva a degradação graciosa (erro de tool → string com prefixo "Erro ao
+  executar", que mantém o sinal de reflexão).
+- **Diferença de camada**: o LangChain valida args contra o schema pydantic
+  ANTES da função → shape inválido levanta (no loop o ToolNode converte em
+  string). Validação semântica do tool segue retornando string.
+- Testes: `.call(...)` → `.invoke(...)` em 7 arquivos de teste; `test_agent_runtime`
+  enxugado p/ só `resolve_agent_provider`; goldens viraram graph-only.
+- **Suíte: 678 passed**, regressão-zero (só a flake pré-existente
+  `test_contextual_retrieval`). Schemas LangChain já validados com modelo real na
+  Etapa 1 (o bridge usava `StructuredTool.from_function` = mesma inferência).
+
 ---
 
 # Etapa 3 — WritingSession: TypedDict + checkpoints no Postgres
@@ -482,8 +502,8 @@ eval não regridem. Portão final da migração.
 
 | Etapa | Spec | Implementação |
 |---|---|---|
-| 1 Runtime core | ✅ | ✅ **FECHADA** — LangGraph é default; legado = rollback via `AGENT_RUNTIME=legacy`; validado (golden + suíte + smoke real + eval writing) |
-| 2 Tools | ✅ | ⬜ |
+| 1 Runtime core | ✅ | ✅ **FECHADA** — LangGraph default; validado (golden + suíte + smoke real + eval writing). Legado deletado na Etapa 2 |
+| 2 Tools | ✅ | ✅ **FECHADA** — @tool nativo LangChain; legado APOSENTADO; suíte 678 passed |
 | 3 WritingSession + checkpoints | ✅ | ⬜ |
 | 4 Sub-agentes | ✅ | ⬜ |
 | 5 Memória (Store) | ✅ | ⬜ |

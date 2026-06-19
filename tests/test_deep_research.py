@@ -27,7 +27,7 @@ def test_run_deep_research_collects_and_dedups_sources(monkeypatch):
 
     def fake_run_subagent(**kw):
         tools = {t.name: t for t in kw["tools"]}
-        tools["web_search"].call({"query": "tamanho mercado X", "k": 3})
+        tools["web_search"].invoke({"query": "tamanho mercado X", "k": 3})
         return AgentResult(final_text="O mercado X cresce 10% [http://a].",
                            steps=[], stop_reason="end_turn", usage={})
 
@@ -55,7 +55,7 @@ def test_web_search_tool_handles_no_key(monkeypatch):
     """A tool interna web_search converte WebSearchError em string (não quebra)."""
     def fake_run_subagent(**kw):
         tools = {t.name: t for t in kw["tools"]}
-        out = tools["web_search"].call({"query": "q"})
+        out = tools["web_search"].invoke({"query": "q"})
         assert "indispon" in out.lower()  # mensagem amigável, não exceção
         return AgentResult(final_text="não encontrei", steps=[],
                            stop_reason="end_turn", usage={})
@@ -80,7 +80,7 @@ def test_deep_research_tool_formats_with_sources(monkeypatch):
                         lambda q: result)
     tool = build_research_tools()[0]
     assert tool.name == "deep_research"
-    out = tool.call({"question": "qualquer"})
+    out = tool.invoke({"question": "qualquer"})
     assert "Resposta sintetizada." in out
     assert "Fontes encontradas:" in out
     assert "http://a" in out and "http://b" in out
@@ -92,7 +92,7 @@ def test_deep_research_tool_graceful_when_empty(monkeypatch):
         lambda q: dr.DeepResearchResult(answer="", sources=[], stop_reason="error"),
     )
     tool = build_research_tools()[0]
-    out = tool.call({"question": "x"})
+    out = tool.invoke({"question": "x"})
     assert "não consegui pesquisar" in out.lower()
 
 

@@ -17,8 +17,9 @@ import os
 from dataclasses import dataclass, field
 
 from core import web_search as ws
-from core.llm.agent_runtime import run_subagent, tool
+from core.llm.agent_runtime import run_subagent
 from core.web import fetch as web_fetch
+from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
 

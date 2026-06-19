@@ -81,8 +81,8 @@ def test_run_critic_subagent_proposal_siblings_via_tool(monkeypatch):
         # Exercita as tools para provar o roteamento de substrato.
         tools_by_name = {t.name: t for t in kw["tools"]}
         captured["tool_names"] = set(tools_by_name)
-        captured["siblings"] = tools_by_name["read_proposal_sections"].call({})
-        captured["target"] = tools_by_name["read_target_context"].call({"query": "equipe"})
+        captured["siblings"] = tools_by_name["read_proposal_sections"].invoke({})
+        captured["target"] = tools_by_name["read_target_context"].invoke({"query": "equipe"})
         return _canned_result(
             '{"approved": false, "issues": ["A conclusão cita 5 pesquisadores, '
             'mas a seção Equipe diz 3"], "feedback": "conflito entre seções"}'
@@ -125,7 +125,7 @@ def test_run_critic_subagent_pitch_target_is_fund_node(monkeypatch):
     def fake_run_subagent(**kw):
         captured.update(kw)
         tools_by_name = {t.name: t for t in kw["tools"]}
-        captured["target"] = tools_by_name["read_target_context"].call({"query": "estágio"})
+        captured["target"] = tools_by_name["read_target_context"].invoke({"query": "estágio"})
         return _canned_result(
             '{"approved": false, "issues": ["O pitch diz que o fundo investe em '
             'série B, mas o estágio alvo é seed"], "feedback": "contradiz o fundo"}'

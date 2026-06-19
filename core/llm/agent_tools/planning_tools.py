@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from core.llm.agent_runtime import Tool, tool
+from langchain_core.tools import BaseTool, tool
 
 # Status válidos e seus marcadores de render. A ordem define a iconografia.
 _STATUS_MARKER = {
@@ -58,7 +58,7 @@ def _render(todos: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def build_planning_tools(state: PlanState) -> list[Tool]:
+def build_planning_tools(state: PlanState) -> list[BaseTool]:
     """Constrói a tool de planejamento fechando sobre `state`.
 
     Cada execução (turno do writing, extração de perfil) cria seu próprio

@@ -24,7 +24,8 @@ import logging
 import os
 from typing import TYPE_CHECKING
 
-from core.llm.agent_runtime import Tool, _cap, tool
+from core.llm.agent_runtime import _cap
+from langchain_core.tools import BaseTool, tool
 from core.retrieval.retriever import (
     format_chunks_for_prompt,
     retrieve_chunks,
@@ -48,7 +49,7 @@ SEARCH_EDITAL_CHUNK_CHAR_CAP = int(os.getenv("SEARCH_EDITAL_CHUNK_CHAR_CAP", "15
 SEARCH_EDITAL_CHAR_CAP = int(os.getenv("SEARCH_EDITAL_CHAR_CAP", "8000"))
 
 
-def build_writing_tools(session: WritingSession) -> list[Tool]:
+def build_writing_tools(session: WritingSession) -> list[BaseTool]:
     """Constrói a lista de tools para o agente desta sessão.
 
     Cada tool é uma closure sobre `session`. Mutações em session

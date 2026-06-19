@@ -1,8 +1,9 @@
 """Factories de tools para cada agente do Cenário B.
 
-Cada módulo expõe `build_<agente>_tools(state) -> list[Tool]` que captura o
-estado necessário (db client, workspace_id, scope, etc.) via closure e devolve
-tools prontas para `core.llm.agent_runtime.run_agent`.
+Cada módulo expõe `build_<agente>_tools(state) -> list[BaseTool]` (tools nativas
+do LangChain, `@tool`) que captura o estado necessário (db client, workspace_id,
+scope, etc.) via closure e devolve tools prontas para
+`core.llm.agent_runtime.run_agent` (que delega ao grafo LangGraph).
 
 Por que closures e não classes globais: tools precisam de RLS/workspace
 isolation. Closure por sessão garante que duas WritingSessions concorrentes

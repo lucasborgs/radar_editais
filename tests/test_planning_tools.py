@@ -10,6 +10,9 @@ import inspect
 import sys
 from pathlib import Path
 
+import pydantic
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -25,7 +28,7 @@ def _write_todos(state: PlanState):
 
 def test_render_with_markers_and_count():
     state = PlanState()
-    out = _write_todos(state).call({"todos": [
+    out = _write_todos(state).invoke({"todos": [
         {"content": "Buscar requisitos", "status": "completed"},
         {"content": "Redigir metodologia", "status": "in_progress"},
         {"content": "Salvar rascunho", "status": "pending"},
@@ -39,8 +42,8 @@ def test_render_with_markers_and_count():
 def test_replace_is_total_not_merge():
     state = PlanState()
     tool = _write_todos(state)
-    tool.call({"todos": [{"content": "A"}, {"content": "B"}]})
-    out = tool.call({"todos": [{"content": "C", "status": "completed"}]})
+    tool.invoke({"todos": [{"content": "A"}, {"content": "B"}]})
+    out = tool.invoke({"todos": [{"content": "C", "status": "completed"}]})
     # A e B somem — substituição integral, não merge.
     assert [t["content"] for t in state.todos] == ["C"]
     assert "A" not in out and "B" not in out
@@ -49,37 +52,43 @@ def test_replace_is_total_not_merge():
 
 def test_status_defaults_to_pending():
     state = PlanState()
-    out = _write_todos(state).call({"todos": [{"content": "Sem status"}]})
+    out = _write_todos(state).invoke({"todos": [{"content": "Sem status"}]})
     assert state.todos == [{"content": "Sem status", "status": "pending"}]
     assert "☐ Sem status" in out
 
 
 def test_invalid_shape_returns_error_string_not_exception():
+    """Validação SEMÂNTICA (content vazio, status inválido) volta como string de
+    erro — o tool não quebra. Shape inválido a nível de SCHEMA (item não-dict) é
+    barrado pelo pydantic do LangChain e convertido em string pelo ToolNode no
+    loop (ver test_agent_graph_golden::test_tool_error_recovers)."""
     state = PlanState()
     tool = _write_todos(state)
-    # item não-dict
-    out = tool.call({"todos": ["string solta"]})
-    assert out.startswith("Erro")
+
+    # content vazio (shape válido; validação semântica do tool)
+    out = tool.invoke({"todos": [{"content": "   "}]})
+    assert "content" in out and out.startswith("Erro")
     assert state.todos == []  # nada gravado em erro
 
-    # content vazio
-    out = tool.call({"todos": [{"content": "   "}]})
-    assert "content" in out and out.startswith("Erro")
-
     # status inválido
-    out = tool.call({"todos": [{"content": "ok", "status": "doing"}]})
+    out = tool.invoke({"todos": [{"content": "ok", "status": "doing"}]})
     assert "status" in out.lower() and "Erro" in out
+
+    # shape inválido (item não-dict): barrado pelo schema LangChain (pydantic).
+    with pytest.raises(pydantic.ValidationError):
+        tool.invoke({"todos": ["string solta"]})
+    assert state.todos == []
 
 
 def test_content_trimmed_and_stored():
     state = PlanState()
-    _write_todos(state).call({"todos": [{"content": "  espaços  "}]})
+    _write_todos(state).invoke({"todos": [{"content": "  espaços  "}]})
     assert state.todos[0]["content"] == "espaços"
 
 
 def test_empty_list_renders_vazio():
     state = PlanState()
-    out = _write_todos(state).call({"todos": []})
+    out = _write_todos(state).invoke({"todos": []})
     assert "vazio" in out.lower()
 
 

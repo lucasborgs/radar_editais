@@ -1,34 +1,32 @@
-"""Golden test do spike Etapa 1 (docs/specs/langgraph-migration.md).
+"""Testes de runtime do grafo LangGraph (core.llm.agent_graph).
 
-Roda os MESMOS cenários no runtime legado (`run_agent` + `_call_anthropic`
-stubbado) e no runtime LangGraph (`run_agent_graph_async` + `_build_chat_model`
-stubbado) e exige `AgentResult` equivalente — prova de que o tradutor de contrato
-e o loop StateGraph preservam o comportamento.
-
-Não toca rede: ambos os LLMs são fakes scriptados a partir de uma única fonte.
+Pós-Etapa 2 o grafo é o único runtime; estes testes exercitam o loop + tradutor
+de contrato com um chat model scriptado (zero rede): no-tool, 1-tool, tool-error,
+max_steps (com trace completo), reflexão, cap central, degradação por erro de
+modelo, span_name. Equivalência ao runtime legado foi provada na Etapa 1 (antes
+de o legado ser aposentado) e está congelada nas asserções diretas abaixo.
 """
 from __future__ import annotations
 
 import asyncio
 
-import pytest
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.tools import tool
 from pydantic import PrivateAttr
 
-from core.llm.agent_runtime import TOOL_RESULT_CHAR_CAP, _LLMStep, run_agent, tool
 import core.llm.agent_graph as ag
 from core.llm.agent_graph import run_agent_graph_async
+from core.llm.agent_runtime import TOOL_RESULT_CHAR_CAP
 
 
 # ---------------------------------------------------------------------------
-# Fakes scriptados (uma fonte → dois runtimes)
+# Chat model scriptado (zero rede)
 # ---------------------------------------------------------------------------
 
 class ScriptedChatModel(BaseChatModel):
-    """ChatModel fake: devolve `responses[i]` na i-ésima chamada. Registra as
-    mensagens recebidas em `received` (p/ assertar injeção de reflexão)."""
+    """Devolve `responses[i]` na i-ésima chamada; registra as mensagens recebidas."""
     responses: list
     _idx: int = PrivateAttr(default=0)
     _received: list = PrivateAttr(default_factory=list)
@@ -47,19 +45,6 @@ class ScriptedChatModel(BaseChatModel):
         return self
 
 
-def _legacy_step(turn: dict) -> _LLMStep:
-    return _LLMStep(
-        stop_reason="end_turn",
-        text=turn["text"],
-        tool_uses=[
-            {"id": tc["id"], "name": tc["name"], "input": tc["args"]}
-            for tc in turn["tool_calls"]
-        ],
-        assistant_message={"role": "assistant", "content": turn["text"]},
-        usage=turn["usage"],
-    )
-
-
 def _graph_msg(turn: dict) -> AIMessage:
     return AIMessage(
         content=turn["text"],
@@ -75,61 +60,19 @@ def _graph_msg(turn: dict) -> AIMessage:
     )
 
 
-def _make_legacy_call(turns: list[dict]):
-    state = {"i": 0}
-
-    def call(system, messages, tools_schema, model):
-        step = _legacy_step(turns[state["i"]])
-        state["i"] += 1
-        return step
-
-    return call
-
-
-# ---------------------------------------------------------------------------
-# Comparador
-# ---------------------------------------------------------------------------
-
-def _assert_equiv(legacy, graph) -> None:
-    assert legacy.final_text == graph.final_text, "final_text difere"
-    assert legacy.stop_reason == graph.stop_reason, "stop_reason difere"
-    assert legacy.usage == graph.usage, f"usage difere: {legacy.usage} != {graph.usage}"
-    assert len(legacy.steps) == len(graph.steps), (
-        f"nº de steps difere: {[s.kind for s in legacy.steps]} != {[s.kind for s in graph.steps]}"
-    )
-    for ls, gs in zip(legacy.steps, graph.steps):
-        assert ls.kind == gs.kind
-        if ls.kind == "llm":
-            assert ls.tool_uses == gs.tool_uses, f"tool_uses: {ls.tool_uses} != {gs.tool_uses}"
-            assert ls.usage == gs.usage
-        else:  # tool
-            assert ls.name == gs.name
-            assert ls.input == gs.input, f"tool input: {ls.input} != {gs.input}"
-            assert ls.output == gs.output, f"tool output: {ls.output} != {gs.output}"
-
-
-def _run_both(monkeypatch, turns, tools, *, max_steps=8):
-    """Roda os mesmos `turns` nos dois runtimes e devolve (legacy, graph)."""
-    # Lado legado: força o loop legado (o default agora é langgraph), senão
-    # `run_agent` despacharia pro grafo e ignoraria o stub de `_call_anthropic`.
-    monkeypatch.setenv("AGENT_RUNTIME", "legacy")
-    monkeypatch.setattr("core.llm.agent_runtime._call_anthropic", _make_legacy_call(turns))
-    legacy = run_agent(
-        system="sys", initial_messages=[{"role": "user", "content": "vai"}],
-        tools=tools, model="claude-sonnet-4-6", provider="anthropic", max_steps=max_steps,
-    )
-
+def _run_graph(monkeypatch, turns, tools, *, max_steps=8, reflect_every=None):
     scripted = ScriptedChatModel(responses=[_graph_msg(t) for t in turns])
     monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: scripted)
-    graph = asyncio.run(run_agent_graph_async(
+    result = asyncio.run(run_agent_graph_async(
         system="sys", initial_messages=[{"role": "user", "content": "vai"}],
-        tools=tools, model="claude-sonnet-4-6", provider="anthropic", max_steps=max_steps,
+        tools=tools, model="m", provider="anthropic",
+        max_steps=max_steps, reflect_every=reflect_every,
     ))
-    return legacy, graph
+    return result, scripted
 
 
 # ---------------------------------------------------------------------------
-# Cenários de paridade
+# Loop + tradutor de contrato
 # ---------------------------------------------------------------------------
 
 def test_no_tool_one_step(monkeypatch):
@@ -139,11 +82,11 @@ def test_no_tool_one_step(monkeypatch):
         return "x"
 
     turns = [{"text": "Olá!", "tool_calls": [], "usage": {"input_tokens": 30, "output_tokens": 10}}]
-    legacy, graph = _run_both(monkeypatch, turns, [search])
-    _assert_equiv(legacy, graph)
+    graph, _ = _run_graph(monkeypatch, turns, [search])
     assert graph.final_text == "Olá!"
     assert graph.stop_reason == "end_turn"
     assert [s.kind for s in graph.steps] == ["llm"]
+    assert graph.usage == {"input_tokens": 30, "output_tokens": 10}
 
 
 def test_one_tool_then_response(monkeypatch):
@@ -159,8 +102,8 @@ def test_one_tool_then_response(monkeypatch):
         {"text": "O prazo é 30/06.", "tool_calls": [],
          "usage": {"input_tokens": 150, "output_tokens": 15}},
     ]
-    legacy, graph = _run_both(monkeypatch, turns, [search])
-    _assert_equiv(legacy, graph)
+    graph, _ = _run_graph(monkeypatch, turns, [search])
+    assert graph.final_text == "O prazo é 30/06."
     assert [s.kind for s in graph.steps] == ["llm", "tool", "llm"]
     assert graph.steps[1].output == "resultado para prazo"
     assert graph.steps[1].input == {"q": "prazo"}
@@ -179,37 +122,33 @@ def test_tool_error_recovers(monkeypatch):
         {"text": "Não consegui, mas sigo.", "tool_calls": [],
          "usage": {"input_tokens": 60, "output_tokens": 8}},
     ]
-    legacy, graph = _run_both(monkeypatch, turns, [flaky])
-    _assert_equiv(legacy, graph)
-    # degradação graciosa: erro vira string idêntica nos dois runtimes
-    assert "Erro ao executar 'flaky'" in graph.steps[1].output
-    assert graph.steps[1].output == legacy.steps[1].output
+    graph, _ = _run_graph(monkeypatch, turns, [flaky])
+    # degradação graciosa: tool que levanta vira string de erro (ToolNode handler)
+    assert "Erro ao executar a tool" in graph.steps[1].output
+    assert graph.final_text == "Não consegui, mas sigo."
 
 
 def test_max_steps_stop_reason(monkeypatch):
-    """Modelo insiste em tool além do teto → stop_reason=max_steps nos dois."""
+    """Modelo insiste em tool além do teto → stop_reason=max_steps; tools da última
+    rodada SÃO executadas (trace llm,tool,llm,tool)."""
     @tool
     def search(q: str) -> str:
         """Busca."""
         return "mais"
 
-    # 2 turns, ambos pedindo tool; max_steps=2 → as tools da 2ª rodada SÃO
-    # executadas (paridade com o legado) e então o teto corta.
     turns = [
         {"text": "t1", "tool_calls": [{"id": "a", "name": "search", "args": {"q": "1"}}],
          "usage": {"input_tokens": 10, "output_tokens": 2}},
         {"text": "t2", "tool_calls": [{"id": "b", "name": "search", "args": {"q": "2"}}],
          "usage": {"input_tokens": 10, "output_tokens": 2}},
     ]
-    legacy, graph = _run_both(monkeypatch, turns, [search], max_steps=2)
-    _assert_equiv(legacy, graph)
+    graph, _ = _run_graph(monkeypatch, turns, [search], max_steps=2)
     assert graph.stop_reason == "max_steps"
-    # trace completo: llm, tool, llm, tool (a última rodada de tools roda)
     assert [s.kind for s in graph.steps] == ["llm", "tool", "llm", "tool"]
 
 
 # ---------------------------------------------------------------------------
-# Reflexão (graph-only): com reflect_every=1, o nó reflect injeta o prompt
+# Reflexão / cap / degradação / span_name
 # ---------------------------------------------------------------------------
 
 def test_reflection_node_injects_prompt(monkeypatch):
@@ -223,12 +162,7 @@ def test_reflection_node_injects_prompt(monkeypatch):
          "usage": {"input_tokens": 10, "output_tokens": 2}},
         {"text": "pronto", "tool_calls": [], "usage": {"input_tokens": 10, "output_tokens": 2}},
     ]
-    scripted = ScriptedChatModel(responses=[_graph_msg(t) for t in turns])
-    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: scripted)
-    graph = asyncio.run(run_agent_graph_async(
-        system="sys", initial_messages=[{"role": "user", "content": "vai"}],
-        tools=[search], model="claude-sonnet-4-6", provider="anthropic", reflect_every=1,
-    ))
+    graph, scripted = _run_graph(monkeypatch, turns, [search], reflect_every=1)
     # 2ª chamada ao modelo deve conter o prompt de reflexão injetado pelo nó reflect.
     second_call_msgs = scripted._received[1]
     assert any(
@@ -238,9 +172,24 @@ def test_reflection_node_injects_prompt(monkeypatch):
     assert graph.final_text == "pronto"
 
 
-# ---------------------------------------------------------------------------
-# Cobertura de runtime do grafo (espelha garantias dos testes de adapter legado)
-# ---------------------------------------------------------------------------
+def test_graph_caps_tool_result(monkeypatch):
+    """Tool que devolve 50k chars → output capado no trace (cap central no nó tools)."""
+    @tool
+    def big_tool(_: str = "") -> str:
+        """Devolve um output enorme."""
+        return "y" * 50_000
+
+    turns = [
+        {"text": "", "tool_calls": [{"id": "t1", "name": "big_tool", "args": {}}],
+         "usage": {"input_tokens": 5, "output_tokens": 1}},
+        {"text": "pronto", "tool_calls": [], "usage": {"input_tokens": 5, "output_tokens": 1}},
+    ]
+    graph, _ = _run_graph(monkeypatch, turns, [big_tool])
+    tool_step = next(s for s in graph.steps if s.kind == "tool")
+    assert len(tool_step.output) <= TOOL_RESULT_CHAR_CAP + 80
+    assert "…[truncado:" in tool_step.output
+    assert graph.final_text == "pronto"
+
 
 class RaisingChatModel(BaseChatModel):
     """Modelo que sempre levanta — exercita a degradação graciosa do grafo."""
@@ -253,30 +202,6 @@ class RaisingChatModel(BaseChatModel):
 
     def bind_tools(self, tools, **kwargs):  # noqa: ANN001
         return self
-
-
-def test_graph_caps_tool_result(monkeypatch):
-    """Tool que devolve 50k chars → output capado no trace (espelha test_context_budget)."""
-    @tool
-    def big_tool() -> str:
-        """Devolve um output enorme."""
-        return "y" * 50_000
-
-    turns = [
-        {"text": "", "tool_calls": [{"id": "t1", "name": "big_tool", "args": {}}],
-         "usage": {"input_tokens": 5, "output_tokens": 1}},
-        {"text": "pronto", "tool_calls": [], "usage": {"input_tokens": 5, "output_tokens": 1}},
-    ]
-    scripted = ScriptedChatModel(responses=[_graph_msg(t) for t in turns])
-    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: scripted)
-    graph = asyncio.run(run_agent_graph_async(
-        system="sys", initial_messages=[{"role": "user", "content": "vai"}],
-        tools=[big_tool], model="m", provider="anthropic",
-    ))
-    tool_step = next(s for s in graph.steps if s.kind == "tool")
-    assert len(tool_step.output) <= TOOL_RESULT_CHAR_CAP + 80
-    assert "…[truncado:" in tool_step.output
-    assert graph.final_text == "pronto"
 
 
 def test_graph_degrades_on_model_error(monkeypatch):
@@ -310,14 +235,14 @@ def test_graph_honors_span_name(monkeypatch):
 
     monkeypatch.setattr(telemetry, "agent_run", fake_agent_run)
 
-    turns = [{"text": "ok", "tool_calls": [], "usage": {"input_tokens": 1, "output_tokens": 1}}]
-    scripted = ScriptedChatModel(responses=[_graph_msg(t) for t in turns])
-    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: scripted)
-
     @tool
     def noop(x: str) -> str:
         """noop."""
         return x
+
+    turns = [{"text": "ok", "tool_calls": [], "usage": {"input_tokens": 1, "output_tokens": 1}}]
+    scripted = ScriptedChatModel(responses=[_graph_msg(t) for t in turns])
+    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: scripted)
 
     asyncio.run(run_agent_graph_async(
         system="sys", initial_messages=[{"role": "user", "content": "x"}],

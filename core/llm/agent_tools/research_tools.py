@@ -20,7 +20,7 @@ import logging
 import os
 
 from core.deep_research import run_deep_research
-from core.llm.agent_runtime import Tool, tool
+from langchain_core.tools import BaseTool, tool
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def _persist_finding(db, workspace_id: str, question: str, res) -> None:
         logger.warning("Falha ao persistir research_finding: %s", e)
 
 
-def build_research_tools(workspace_id: str | None = None, db=None) -> list[Tool]:
+def build_research_tools(workspace_id: str | None = None, db=None) -> list[BaseTool]:
     """Tool de pesquisa web. Backward-compatible:
 
     - Sem args (`build_research_tools()`): stateless, comportamento da Fase A.

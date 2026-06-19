@@ -26,7 +26,7 @@ from typing import Any
 
 import requests
 
-from core.llm.agent_runtime import Tool, tool
+from langchain_core.tools import BaseTool, tool
 from core.web.fetch import fetch_and_parse as _fetch_and_parse  # camada canônica
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ class ExtractionState:
     submitted_profile: dict | None = None
 
 
-def build_profile_tools(state: ExtractionState) -> list[Tool]:
+def build_profile_tools(state: ExtractionState) -> list[BaseTool]:
     """Constrói as 4 tools do agente de extração de perfil.
 
     O `state` é um ExtractionState criado por extração — captura cache de

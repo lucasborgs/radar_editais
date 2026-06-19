@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from core.llm.agent_runtime import Tool, tool
+from langchain_core.tools import BaseTool, tool
 
 
 @dataclass
@@ -32,7 +32,7 @@ class Scratchpad:
 
 def build_scratchpad_tools(
     pad: Scratchpad, *, max_notes: int = 20, max_chars: int = 4000,
-) -> list[Tool]:
+) -> list[BaseTool]:
     """Constrói write_note + read_note fechando sobre `pad`.
 
     Args:

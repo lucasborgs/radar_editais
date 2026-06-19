@@ -26,7 +26,8 @@ import re
 from typing import TYPE_CHECKING
 
 from core.kg import kg_store
-from core.llm.agent_runtime import Tool, _cap, tool
+from core.llm.agent_runtime import _cap
+from langchain_core.tools import BaseTool, tool
 from core.retrieval.retriever import format_chunks_for_prompt, retrieve_chunks
 
 # Stopwords PT/EN + conectivos que não discriminam tema (não devem casar
@@ -77,7 +78,7 @@ EXPLORE_TRECHOS_CHAR_CAP = int(os.getenv("EXPLORE_TRECHOS_CHAR_CAP", "6000"))  #
 MAX_EDITAIS = 5  # teto de editais por chamada (orçamento de contexto)
 
 
-def build_explore_tools(service: KGMatchService) -> list[Tool]:
+def build_explore_tools(service: KGMatchService) -> list[BaseTool]:
     """Constrói as 4 tools do agente de explore.
 
     `service` precisa estar inicializado (com índice carregado). O agente é

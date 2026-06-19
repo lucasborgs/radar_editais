@@ -181,7 +181,7 @@ def build_critic_tools(session, section_title: str):
     Toda tool falha graciosamente: erro → string de "indisponível", nunca
     propaga exceção pro loop do agente.
     """
-    from core.llm.agent_runtime import tool
+    from langchain_core.tools import tool
 
     @tool
     def read_target_context(query: str) -> str:
