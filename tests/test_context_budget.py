@@ -7,6 +7,8 @@ Cobre:
 """
 from __future__ import annotations
 
+import pytest
+
 from core.llm import agent_runtime
 from core.llm.agent_runtime import (
     TOOL_RESULT_CHAR_CAP,
@@ -15,6 +17,14 @@ from core.llm.agent_runtime import (
     run_agent,
     tool,
 )
+
+
+@pytest.fixture(autouse=True)
+def _force_legacy_runtime(monkeypatch):
+    """Cap central testado no loop LEGADO (spy de `_format_tool_results_anthropic`).
+    Com o LangGraph como default, fixamos o legado; o cap no grafo tem teste próprio
+    em tests/test_agent_graph_golden.py."""
+    monkeypatch.setenv("AGENT_RUNTIME", "legacy")
 
 
 # ---------------------------------------------------------------------------

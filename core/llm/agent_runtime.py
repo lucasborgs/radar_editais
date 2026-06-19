@@ -704,6 +704,27 @@ async def run_agent_async(
     Returns:
         AgentResult com texto final, trace completo, stop_reason e usage total.
     """
+    # Etapa 1 (docs/specs/langgraph-migration.md): runtime LangGraph é o DEFAULT.
+    # O loop legado abaixo segue como rollback instantâneo via AGENT_RUNTIME=legacy
+    # (intacto + testado). Mesma assinatura/contrato — delegação transparente.
+    if os.getenv("AGENT_RUNTIME", "langgraph") != "legacy":
+        from core.llm.agent_graph import run_agent_graph_async
+
+        return await run_agent_graph_async(
+            system=system,
+            initial_messages=initial_messages,
+            tools=tools,
+            model=model,
+            provider=provider,
+            max_steps=max_steps,
+            on_step=on_step,
+            reflect_every=reflect_every,
+            span_name=span_name,
+            temperature=temperature,
+            openai_base_url=openai_base_url,
+            openai_api_key=openai_api_key,
+        )
+
     registry = ToolRegistry.from_list(tools)
     if provider == "openai":
         tools_schema = registry.to_openai_schema()
