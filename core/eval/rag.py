@@ -30,13 +30,16 @@ def load_data() -> list[dict]:
     )
     golden = json.loads(path.read_text(encoding="utf-8"))
     items = []
+    # RETRIEVAL_FTS_WEIGHT override para varredura no bake-off (sem alterar o golden).
+    fts_weight_override = os.getenv("RETRIEVAL_FTS_WEIGHT")
+    fts_weight = float(fts_weight_override) if fts_weight_override else DEFAULT_FTS_WEIGHT
     for q in golden.get("queries", []):
         items.append({
             "input": {
                 "edital_id": str(q["edital_id"]),
                 "query": q["query"],
                 "k": DEFAULT_TOP_K,
-                "fts_weight": DEFAULT_FTS_WEIGHT,
+                "fts_weight": fts_weight,
                 "max_per_source": DEFAULT_MAX_PER_SOURCE,
             },
             "expected_output": q.get("expected", []),
