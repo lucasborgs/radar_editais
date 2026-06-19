@@ -40,9 +40,11 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 from core.llm.agent_runtime import (
+    _MAX_RETRIES,
     _PLAN_TOOL_NAMES,
     _REFLECT_CHAR_THRESHOLD,
     _REFLECT_PROMPT,
+    _TIMEOUT,
     TOOL_RESULT_CHAR_CAP,
     AgentResult,
     Provider,
@@ -104,10 +106,16 @@ def _build_chat_model(
 ):
     """Constrói o ChatModel LangChain. Espelha a resolução de endpoint de
     `_openai_agent_client` (ZDR/custom OpenAI-compat)."""
+    # Paridade de resiliência com o tier legado (make_client / _call_anthropic):
+    # timeout + retries explícitos. Sem isto, um 429 transitório (TPM) derruba o
+    # turno inteiro em vez de re-tentar com backoff.
     if provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
 
-        kw: dict[str, Any] = {"model": model, "max_tokens": 4096}
+        kw: dict[str, Any] = {
+            "model": model, "max_tokens": 4096,
+            "timeout": _TIMEOUT, "max_retries": _MAX_RETRIES,
+        }
         if temperature is not None:
             kw["temperature"] = temperature
         return ChatAnthropic(**kw)
@@ -120,7 +128,7 @@ def _build_chat_model(
         or os.environ.get("AGENT_OPENAI_API_KEY")
         or os.environ.get("OPENAI_API_KEY")
     )
-    kw = {"model": model}
+    kw = {"model": model, "timeout": _TIMEOUT, "max_retries": _MAX_RETRIES}
     if temperature is not None:
         kw["temperature"] = temperature
     if base:
