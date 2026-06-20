@@ -328,6 +328,53 @@ resultado (reusa `_messages_to_agent_result` ou consome o estado direto).
 - `request_user_info` → interrupt → resume funciona end-to-end (manual + teste).
 - Eval `writing` real sem regressão.
 
+## FECHADA (2026-06-19, branch `feat/langgraph-etapa1`)
+WritingSession invoca o grafo com checkpointer durável; `request_user_info` virou
+`interrupt()` nativo com retomada. Decisões de produto (AskUserQuestion): semântica
+**bloqueante + retomada**; retomada **reusa `POST /writing/turn`** (a próxima mensagem
+é a resposta — detecção em `WritingSession.turn`).
+- **Deps** — `+ langgraph-checkpoint-postgres>=2` (resolveu 3.1.0; psycopg/pool já vinham
+  do procrastinate).
+- **thread_id por turno-run** `"{workspace_id}:{session_id}:{turn_index}"` (resolve a
+  tensão thread-estável-vs-efêmero da spec): turno fresco semeia o state de
+  `_build_agent_initial_messages`; se interrompe, persiste `{field, prompt, thread_id,
+  n_msgs}` em `writing_sessions.pending_user_input` (JSONB, sem migration de coluna) e o
+  turno N grava `assistant = prompt`. O resume fatia o delta por `prior_n_msgs` para não
+  dobrar trace/custo.
+- [agent_graph.py](../../core/llm/agent_graph.py) — `+ run_writing_turn`
+  (`WritingTurnOutcome{result, interrupt, n_messages}`), `_get_writing_checkpointer`
+  (singleton `AsyncPostgresSaver` sobre `AsyncConnectionPool(DATABASE_URL)`; **InMemorySaver**
+  de fallback sem DSN), **event loop dedicado** em thread daemon (o pool async fica bound
+  a ele; callers sync via `run_coroutine_threadsafe`). `_build_graph(checkpointer=...)`.
+- `request_user_info` ([writing_tools.py](../../core/llm/agent_tools/writing_tools.py)) →
+  `interrupt({field, prompt})`; docstring + `WRITER/PITCH_AGENT_SYSTEM` reescritos
+  (chamar sozinha; sem `[COMPLETAR:]`).
+- **Segurança (RLS-bypass, risco-mor)**: tabelas do checkpointer criadas por `.setup()`
+  (não migration — evita drift); [027_langgraph_checkpointer_rls.sql](../../supabase/migrations/027_langgraph_checkpointer_rls.sql)
+  + [scripts/setup_checkpointer.py](../../scripts/setup_checkpointer.py) ligam RLS + revogam
+  anon/authenticated (senão o blob seria legível via PostgREST por outro workspace).
+  Isolamento real = namespacing do `thread_id`.
+
+### Validação
+- [test_agent_graph_checkpointer.py](../../tests/test_agent_graph_checkpointer.py) (zero
+  rede, InMemorySaver + modelo scriptado): interrupt pausa com payload → `Command(resume)`
+  retoma → texto final; **custo só do delta** no resume; **re-execução do batch** (risco #1
+  documentado); **isolamento por thread_id**.
+- `test_writing_session_agent` adaptado (stub `run_writing_turn`→`WritingTurnOutcome`) +
+  ciclo interrupt→persistência(turno N=pergunta) → resume(turno N+1, pending limpo).
+- [test_checkpointer_postgres.py](../../tests/test_checkpointer_postgres.py) — integração
+  **gated em `DATABASE_URL`** (skip no CI): AsyncPostgresSaver REAL — interrupt→resume
+  durável + **leak test cross-workspace** (state de A invisível pelo thread_id de B). Rodou
+  local: 2 passed. **setup_checkpointer.py validado**: 4 tabelas + RLS=True + grants
+  anon/authenticated vazios (PostgREST bloqueado), confirmado no Postgres local.
+- **Suíte: 685 passed** (CI: + 2 skipped gated; só a flake pré-existente
+  `test_contextual_retrieval`).
+
+### Não feito (deferido)
+- Eval `writing --limit 1` pelo caminho com checkpointer (gate semântico, custo real —
+  premissa MVP: rodar manual antes do merge).
+- Cleanup de checkpoints de turnos completos (lixo pequeno; fora do MVP).
+
 ---
 
 # Etapa 4 — Sub-agentes (Critic, Deep Research) como subgrafos
@@ -376,6 +423,36 @@ endpoint próprios (gpt-4o ZDR, `CRITIC_OPENAI_*`).
 - `test_subagent` verde.
 - Critic degrada para `approved=True` em falha (teste de injeção de erro).
 - Trace do critic aparece aninhado sob o turn da WritingSession no Langfuse.
+
+## FECHADA (2026-06-19) — já entregue pelas Etapas 1-2 (verificação + 1 teste novo)
+**Achado:** a Etapa 4 não exigiu mudança de código. O design "subagente = tool que
+invoca um subgrafo efêmero" já era a realidade desde a Etapa 2: `run_subagent` →
+`run_agent` → `run_agent_graph_async` → `_build_graph(..., checkpointer=None)` (grafo
+compilado por chamada, sem checkpointer). A Etapa 3 não tocou esse caminho (o
+checkpointer só entra via `run_writing_turn`, não via `run_agent`).
+- **Degradação graciosa**: `run_subagent` mantém o try/except → `AgentResult(error)`;
+  `run_critic` mapeia `error`/parse inválido → `approved=True`. Coberto por
+  `test_run_critic_degrades_on_subagent_error` / `..._unparseable_verdict`
+  ([test_critic_coherence.py](../../tests/test_critic_coherence.py)) e
+  `test_run_subagent_degrades_*` ([test_subagent.py](../../tests/test_subagent.py)).
+- **Provider/endpoint próprios** (critic: OpenAI gpt-4o ZDR `CRITIC_OPENAI_*`): já
+  parametrizados via `run_subagent(openai_base_url/key=)`; o subgrafo tem sua própria
+  factory de modelo.
+- **`span_name=subagent.{name}`**: já propagado (`test_run_subagent_propagates_span_name`).
+- **Novo teste (interação Etapa 4 × Etapa 3)**:
+  `test_subagent_inside_checkpointed_writing_turn` ([test_agent_graph_checkpointer.py](../../tests/test_agent_graph_checkpointer.py))
+  — prova que o subagente (run_subagent → `asyncio.run` em worker thread, sem
+  checkpointer) roda DENTRO do grafo de escrita com checkpointer (no bg-loop) sem
+  conflito de event loop; é o caminho real do critic dentro de `save_draft`. Verde.
+- **Suíte subagent+critic: 12 passed** + o novo (6 no arquivo do checkpointer).
+
+### Não feito (deferido para Etapa 6)
+- **Nesting do trace do critic sob o turn no Langfuse** (risco #1 da etapa): hoje a
+  telemetria é por contextvars (`telemetry.agent_run`) e o subagente roda em
+  thread/loop separados do bg-loop do checkpointer → o contextvar do pai pode não
+  propagar. A solução é o `CallbackHandler` LangChain com `config` (parent run_id)
+  propagado ao `invoke` — Etapa 6. **Nota nova p/ Etapa 6**: propagar o callback
+  ATRAVÉS da fronteira de thread (run_subagent roda noutro loop).
 
 ---
 
@@ -435,6 +512,68 @@ admite "evolução futura: filtrar por similaridade via embeddings".
 - Supersede/`deactivate_insight` removem do Store também.
 - Eval `writing` não regride com retrieval semântico vs bloco fixo (gate).
 
+## FECHADA (2026-06-20, branch `feat/langgraph-etapa1`)
+Store como projeção read-only dos `reflection_insights`; injeção saiu do prefixo
+estático → **query-conditioned na camada de serviço** (decisão de produto: não um nó
+do grafo — o grafo compartilhado fica intocado; a query existe na WritingSession).
+
+- **Schema dedicado `agent_memory`** (substitui o band-aid da 027): checkpointer (Et.3,
+  retroativo) **e** Store conectam com `search_path=agent_memory,public,extensions`. O
+  PostgREST do Supabase só expõe `public/storage/graphql_public` (config.toml) → schema
+  fora dessa lista é **invisível por construção**, sem RLS+revoke tabela-a-tabela.
+  [028_agent_memory_schema.sql](../../supabase/migrations/028_agent_memory_schema.sql)
+  cria o schema + dropa as tabelas órfãs do checkpointer em `public` (pré-launch).
+  `_make_agent_memory_pool` (helper compartilhado) garante o schema (`CREATE SCHEMA IF
+  NOT EXISTS`, defensivo) e `min_size=1` (< `max_size=2` do Store).
+- **Store singleton no bg-loop** ([agent_graph.py](../../core/llm/agent_graph.py)):
+  `_get_memory_store` (AsyncPostgresStore sobre o mesmo loop dedicado do checkpointer),
+  `_aembed_for_store` = embeddings **OS** (`core.retrieval.embedder` via `asyncio.to_thread`
+  — `embed_texts` é bloqueante; rodá-lo no bg-loop o travaria). **Sem fallback InMemory**
+  (diferente do checkpointer): sem DATABASE_URL → `None` e a injeção cai no bloco estático.
+  Um InMemoryStore embedaria a query a cada turno (premissa MVP: não queimar OpenAI).
+  Dims lidos do **ENV em call-time** (não a constante import-time do embedder) — casa com
+  a coluna pgvector (768 do modelo OS vs 1536 default conforme ordem de carga do .env).
+- **API pública** (`memory_put`/`memory_delete`/`memory_search`, sync sobre o bg-loop):
+  todas degradam graciosamente (Store off/falho → no-op ou `[]`).
+- **Projeção** ([reflection_service.py](../../core/reflection_service.py)
+  `_project_to_store`): `reflect_workspace`/`synthesize_patterns`/`_persist_session_signals`
+  espelham insert→`put` e supersede→`delete`; `deactivate_insight` → `delete`. **Key do
+  Store = id da row** → delete idempotente. A tabela segue **autoritativa**
+  (supersede/audit/weight_suggestions nunca viram blob KV).
+- **Injeção query-conditioned** ([writing_session.py](../../core/services/writing_session.py)):
+  `_build_reflection_context_for_turn(user_message, section_hint)` faz `memory_search` e
+  cai no bloco estático (`load_active_insights`) se Store vazio/off — **regressão-zero pré-
+  backfill**. Posicionado no **tail dinâmico** (junto de mentions/section) p/ preservar o
+  prompt caching do prefixo estável. Flag de rollback `WRITING_SEMANTIC_MEMORY=0` (gate).
+- **Tool** `recall_company_learnings` → `search_insights_for_tool(..., query=topic)` agora
+  semântica (Store), com fallback estático.
+- **Backfill** [scripts/backfill_memory_store.py](../../scripts/backfill_memory_store.py):
+  embeda os insights ativos de todos os workspaces no Store (idempotente).
+  [setup_checkpointer.py](../../scripts/setup_checkpointer.py) agora provisiona Store +
+  checkpointer no schema dedicado e **removeu** o `_lock_down_rls`.
+
+### Validação
+- [test_memory_store.py](../../tests/test_memory_store.py) (11, zero rede — InMemoryStore +
+  embed fake injetados): namespace/leak, relevância semântica, delete, degradação (Store
+  off / query vazia), projeção (`_project_to_store` espelha put/delete), tool semântica vs
+  fallback, e os 3 caminhos da injeção da WritingSession (semântico / fallback estático /
+  flag off).
+- [test_memory_store_postgres.py](../../tests/test_memory_store_postgres.py) (gated em
+  DATABASE_URL, embed fake → zero token): put/search/delete durável, **leak cross-workspace**
+  contra o Postgres real, e tabelas em `agent_memory` (não `public`). Dims do fake alinhados
+  aos do Store (`index_config`).
+- [test_checkpointer_postgres.py](../../tests/test_checkpointer_postgres.py) atualizado:
+  `_delete_threads` agora aponta para `agent_memory.*` (tabelas migraram de `public`).
+- **Suíte: 699 passed** + gated (3 store run local / 2 ckpt skip por ordem de coleta); só a
+  flake pré-existente `test_contextual_retrieval` (ambiental, não tocada).
+
+### Não feito (deferido)
+- **GATE de eval `writing`** (semântico vs bloco fixo — risco #4): custo real, premissa MVP
+  → rodar manual com `EMBEDDING_BACKEND=sentence_transformers` antes de mergear/cortar de
+  vez o bloco fixo. Até lá o fallback estático cobre, e `WRITING_SEMANTIC_MEMORY=0` reverte.
+- Ruído cosmético de teardown (`pool-N-scheduler`) nos gated locais — idêntico ao do
+  checkpointer, fora do CI.
+
 ---
 
 # Etapa 6 — Eval + telemetria
@@ -486,13 +625,73 @@ eval não regridem. Portão final da migração.
 - Custo por turno (input+output, +cache se aplicável) visível no Langfuse.
 - Trace de uma WritingSession mostra: turn → agent → tools → critic (aninhado).
 
+## FECHADA (2026-06-20, branch `feat/langgraph-etapa1`)
+Telemetria migrada para a **`langfuse.langchain.CallbackHandler` nativa** (decisão de
+produto: meta-pacote `langchain` oficial, não handler custom) — spans por-step com
+timing real + usage automático, substituindo o `_replay_step_spans` pós-hoc da Etapa 1.
+
+- **Dep**: `+ langchain>=1.0` (o `CallbackHandler` faz `import langchain`; resolveu 1.3.10).
+- **[telemetry.py](../../core/telemetry.py)**: `make_callback_handler()` (factory da
+  CallbackHandler; None se Langfuse off), `current_trace_context()` (captura
+  `{trace_id, parent_span_id}` do span corrente), `agent_run(trace_context=)` (enraíza
+  sob parent remoto). Removidos `llm_generation`/`tool_call` (mortos pós-handler);
+  `record_usage` mantido (testado, extrai usage de respostas CRUAS de SDK — fora do
+  caminho do grafo). `flush()` hookado em `shutdown_writing_runtime` (CLI/scripts).
+- **[agent_graph.py](../../core/llm/agent_graph.py)**: `run_agent_graph_async` e
+  `_writing_turn_async` montam o handler e o passam em `config["callbacks"]`; `agent_run`
+  segue como span-raiz nomeado que ancora o nesting. `_replay_step_spans` deletado.
+- **Nesting cross-thread do critic (risco #1 da Et.4, resolvido)**: `run_subagent`
+  ([agent_runtime.py](../../core/llm/agent_runtime.py)) captura `current_trace_context()`
+  na thread do grafo PAI (antes do `run_agent` cruzar para a worker thread) e propaga
+  `trace_context` → `run_agent` → `run_agent_async` → `run_agent_graph_async` → `agent_run`.
+  Resolve o contextvar OTel que não cruza a fronteira de thread (o subagente roda noutro
+  loop). Sem isso o critic viraria uma trace-raiz separada.
+- **Eval**: o harness ([harness.py](../../core/eval/harness.py)) já fazia o wiring de
+  Experiments/scores (Langfuse) com fallback local — **inalterado**.
+
+### Validação
+- [test_telemetry_callbacks.py](../../tests/test_telemetry_callbacks.py) (5, zero rede):
+  handler entra no `config["callbacks"]`; sem handler quando off (sem overhead);
+  `trace_context` repassado ao `agent_run`; `run_subagent` captura e propaga o trace do
+  pai (`span_name=subagent.critic`); factories viram no-op com Langfuse off.
+- Smoke de construção: `make_callback_handler()` com Langfuse habilitado retorna a
+  `CallbackHandler` sem rede (degrada a None se a construção falhar).
+- **Suíte: 705 passed** (regressão-zero; só a flake ambiental pré-existente
+  `test_contextual_retrieval`). `test_agent_graph_golden::test_graph_honors_span_name`
+  segue verde (o fake `agent_run` aceita o novo kwarg).
+- **Eval `writing --limit 1` (gate parcial, rodado)**: `saved=1, coherent=1,
+  factual_errors=0`. Caminho real completo (agente + tools + critic + RAG, embeddings
+  OS gemma-768, agente/critic em gpt-4o fallback). **Pegou um bug** (abaixo).
+
+### Bug cross-loop do checkpointer (latente desde a Et.3, PEGO pelo gate de eval)
+O critic (subagente dentro de `save_draft`) falhava com `Lock is bound to a different
+event loop` e degradava pra `approved=True` — o critic ficava inerte. Causa: o caminho
+stateless (`run_agent_graph_async`) compilava o subgrafo com `checkpointer=None`, e o
+LangGraph trata `None` como **"herde o checkpointer do pai quando rodar como subgrafo"**
+(via contextvar do config). O critic herdava o `AsyncPostgresSaver` do turno de escrita
+(lock preso ao bg-loop da Et.3) e tentava usá-lo a partir do seu próprio loop → erro.
+Latente desde a Et.3 porque o `InMemorySaver` (fallback sem DSN, usado nos testes) não
+tem lock preso a loop; só aparece com o Postgres real — e o gate de eval da Et.3 foi
+deferido. **Fix**: `run_agent_graph_async` compila com `checkpointer=False` (corta a
+herança; subagente nunca persiste). Guard:
+`test_subagent_graph_compiles_with_checkpointer_false`.
+
+### Não feito (deferido — exige token/Langfuse real, premissa MVP)
+- **Gate de não-regressão das 11 suítes de eval** rodadas real + re-wire do Experiment:
+  custo de token → manual (mesmo padrão do gate de `writing` da Et.5, no BACKLOG).
+- **Parity de usage cache/reasoning** (risco #2): confirmar que o handler emite
+  `cache_read`/`reasoning` com as keys canônicas exige um run real; até lá `record_usage`
+  fica como referência da extração. Se faltar, escrever um callback de usage custom.
+- **Descontinuidade de nomes de span** (`llm.step_N` → spans nativos LangChain):
+  comparabilidade histórica de dashboards corta aqui (documentado, esperado).
+
 ---
 
 # Riscos transversais (consolidado)
 
 | Tema | Etapas | Síntese |
 |---|---|---|
-| **Bypass de RLS** (checkpointer + Store escritos pelo service role) | 3, 5 | Isolamento multi-tenant migra de RLS para `thread_id`/namespace por `workspace_id`. **Maior risco de segurança da migração.** Teste de vazamento cross-workspace obrigatório em ambas. |
+| **Bypass de RLS** (checkpointer + Store escritos pelo service role) | 3, 5 | Isolamento multi-tenant migra de RLS para `thread_id`/namespace por `workspace_id`. **Maior risco de segurança da migração.** Teste de vazamento cross-workspace obrigatório em ambas. **RESOLVIDO (Et.5)**: a maquinaria vive num schema dedicado `agent_memory` (search_path), fora dos schemas que o PostgREST expõe → invisível por construção (substitui o RLS+revoke da 027). |
 | **Fidelidade de contrato** (tradutor de estado → `AgentResult`) | 1, 3 | Drift silencioso quebra persistência de trace + custo. Golden tests. |
 | **Comportamentos custom** (reflexão, cap, error-string, degradação) | 1, 2, 4 | Não têm equivalente prebuilt; cada um re-implementado deliberadamente, com teste. |
 | **Telemetria** (descontinuidade de span) | 1→6 | Janela cega de comparabilidade; começar callback cedo, parity no fim. |
@@ -504,7 +703,7 @@ eval não regridem. Portão final da migração.
 |---|---|---|
 | 1 Runtime core | ✅ | ✅ **FECHADA** — LangGraph default; validado (golden + suíte + smoke real + eval writing). Legado deletado na Etapa 2 |
 | 2 Tools | ✅ | ✅ **FECHADA** — @tool nativo LangChain; legado APOSENTADO; suíte 678 passed |
-| 3 WritingSession + checkpoints | ✅ | ⬜ |
-| 4 Sub-agentes | ✅ | ⬜ |
-| 5 Memória (Store) | ✅ | ⬜ |
-| 6 Eval + telemetria | ✅ | ⬜ |
+| 3 WritingSession + checkpoints | ✅ | ✅ **FECHADA** — checkpointer Postgres + interrupt/resume; suíte 685 passed. Gate manual pendente: leak test PG real + eval writing |
+| 4 Sub-agentes | ✅ | ✅ **FECHADA** — já entregue pelas Etapas 1-2 (run_subagent = subgrafo efêmero); +1 teste da interação com o checkpointer da Et.3. Nesting de trace → Et.6 |
+| 5 Memória (Store) | ✅ | ✅ **FECHADA** — PostgresStore (projeção) em schema dedicado `agent_memory`; injeção query-conditioned no serviço + fallback estático; embeddings OS. Gate manual: eval writing semântico-vs-fixo |
+| 6 Eval + telemetria | ✅ | ✅ **FECHADA** — CallbackHandler nativo do Langfuse (spans reais + usage auto); nesting cross-thread do critic via trace_context; `_replay_step_spans` removido. Gate manual: 11 suítes de eval + parity de usage cache/reasoning |

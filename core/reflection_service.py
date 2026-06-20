@@ -131,6 +131,35 @@ def _make_client():
     return make_client(api_key=os.environ["OPENAI_API_KEY"]), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
+def _project_to_store(
+    workspace_id: str,
+    *,
+    deleted: list[dict] | None = None,
+    inserted: list[dict] | None = None,
+) -> None:
+    """Espelha mudanças de `reflection_insights` no LangGraph Store (projeção de
+    leitura da Etapa 5 — recuperação semântica na WritingSession).
+
+    `reflection_insights` é AUTORITATIVA (supersede/audit/weight_suggestions); o Store
+    é só uma projeção read-optimized. Best-effort: falha aqui (Store off, import) nunca
+    derruba a reflexão/síntese. Import lazy — evita carregar langgraph no boot do módulo.
+    `key` do Store = id da row → delete idempotente no supersede/deactivate.
+    """
+    try:
+        from core.llm.agent_graph import memory_delete, memory_put
+    except Exception as e:  # noqa: BLE001
+        logger.debug("store projection indisponível: %s", e)
+        return
+    for row in (deleted or []):
+        rid = row.get("id")
+        if rid:
+            memory_delete(workspace_id, str(rid))
+    for row in (inserted or []):
+        rid, text = row.get("id"), row.get("insight")
+        if rid and text:
+            memory_put(workspace_id, str(rid), text, level=row.get("level"))
+
+
 def _load_outcomes(db: Client, workspace_id: str) -> list[dict]:
     """Carrega application_log com status terminal/submetida ordenado por updated_at desc."""
     result = (
@@ -243,7 +272,7 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
         # vivos seguem ativos. Só desativa quando há substituto (lote novo
         # não-vazio), nunca apaga sem repor.
         now_iso = datetime.now(timezone.utc).isoformat()
-        (
+        superseded = (
             db.table("reflection_insights")
             .update({"deactivated_at": now_iso})
             .eq("workspace_id", workspace_id)
@@ -252,7 +281,11 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
             .execute()
         )
 
-        db.table("reflection_insights").insert(rows_to_insert).execute()
+        inserted = db.table("reflection_insights").insert(rows_to_insert).execute()
+        # Espelha no Store (Etapa 5): tira o lote antigo de level 1, põe o novo.
+        _project_to_store(
+            workspace_id, deleted=superseded.data, inserted=inserted.data,
+        )
 
     return {
         "outcomes_considered": len(outcomes),
@@ -392,7 +425,7 @@ def synthesize_patterns(db: Client, workspace_id: str) -> dict:
     if rows_to_insert:
         # Supersede SÓ o level 2 ativo do workspace. O level 1 (corpus) fica.
         now_iso = datetime.now(timezone.utc).isoformat()
-        (
+        superseded = (
             db.table("reflection_insights")
             .update({
                 "deactivated_at": now_iso,
@@ -407,6 +440,10 @@ def synthesize_patterns(db: Client, workspace_id: str) -> dict:
 
         inserted = db.table("reflection_insights").insert(rows_to_insert).execute()
         inserted_rows = inserted.data or []
+        # Espelha no Store (Etapa 5): tira o lote antigo de level 2, põe o novo.
+        _project_to_store(
+            workspace_id, deleted=superseded.data, inserted=inserted_rows,
+        )
 
         if (
             weight_suggestions
@@ -462,18 +499,28 @@ def load_active_insights(db: Client, workspace_id: str, max_total: int = 6) -> l
     return result.data or []
 
 
-def search_insights_for_tool(db: Client, workspace_id: str) -> str:
+def search_insights_for_tool(db: Client, workspace_id: str, query: str = "") -> str:
     """Retorna insights ativos formatados para consumo como tool response.
 
-    Versão inicial: devolve todos os insights ativos (max 6) sem filtragem
-    semântica — o conjunto costuma ser pequeno e toda informação é relevante.
-    Evolução futura: filtrar por similaridade ao `topic` da query via embeddings.
+    Etapa 5: com `query` não-vazia, filtra por similaridade semântica via o LangGraph
+    Store (embeddings OS). Sem query, ou se o Store estiver vazio/off, cai no conjunto
+    estático (load_active_insights, max 6) — o corpus costuma ser pequeno e toda
+    informação é relevante.
     """
-    try:
-        insights = load_active_insights(db, workspace_id, max_total=6)
-    except Exception as e:
-        logger.warning("search_insights_for_tool: falha ao carregar: %s", e)
-        return "Erro ao acessar aprendizados — tente novamente."
+    insights: list[dict] = []
+    if (query or "").strip():
+        try:
+            from core.llm.agent_graph import memory_search
+            insights = memory_search(workspace_id, query, limit=6)
+        except Exception as e:  # noqa: BLE001 — degrada para o caminho estático
+            logger.debug("search_insights_for_tool: memory_search indisponível: %s", e)
+            insights = []
+    if not insights:
+        try:
+            insights = load_active_insights(db, workspace_id, max_total=6)
+        except Exception as e:
+            logger.warning("search_insights_for_tool: falha ao carregar: %s", e)
+            return "Erro ao acessar aprendizados — tente novamente."
     if not insights:
         return "Nenhum aprendizado registrado para este workspace ainda."
     parts = ["Aprendizados de aplicações anteriores desta empresa:"]
@@ -520,4 +567,9 @@ def deactivate_insight(
         .is_("deactivated_at", "null")
         .execute()
     )
+    # Espelha a desativação no Store (Etapa 5). A row atualizada traz o workspace_id.
+    if result.data:
+        ws = result.data[0].get("workspace_id")
+        if ws:
+            _project_to_store(str(ws), deleted=result.data)
     return bool(result.data)

@@ -15,8 +15,14 @@ from unittest.mock import MagicMock
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from core.llm.agent_graph import WritingTurnOutcome  # noqa: E402
 from core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
 from core.services.writing_session import WritingSession  # noqa: E402
+
+
+def _outcome(result: AgentResult, *, interrupt=None, n_messages=0) -> WritingTurnOutcome:
+    """Atalho para o retorno de run_writing_turn nos stubs (Etapa 3)."""
+    return WritingTurnOutcome(result=result, interrupt=interrupt, n_messages=n_messages)
 
 
 def _make_session() -> WritingSession:
@@ -239,10 +245,10 @@ def test_turn_agent_happy_path_no_tools(monkeypatch):
         usage={"input_tokens": 50, "output_tokens": 10},
     )
 
-    def fake_run_agent(**kwargs):
-        return fake_result
+    def fake_run_writing_turn(**kwargs):
+        return _outcome(fake_result)
 
-    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr("core.llm.agent_graph.run_writing_turn", fake_run_writing_turn)
 
     s._turn_count = 1
     result = s._turn_agent("oi", section_hint=None, user_turn_index=1)
@@ -278,7 +284,9 @@ def test_turn_agent_with_tools_persists_trace(monkeypatch):
         stop_reason="end_turn",
         usage={"input_tokens": 250, "output_tokens": 18},
     )
-    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr(
+        "core.llm.agent_graph.run_writing_turn", lambda **kw: _outcome(fake_result),
+    )
 
     s._turn_count = 1
     result = s._turn_agent("qual o prazo?", section_hint=None, user_turn_index=1)
@@ -306,7 +314,9 @@ def test_turn_agent_error_returns_error_dict(monkeypatch):
         stop_reason="error",
         usage={"input_tokens": 0, "output_tokens": 0},
     )
-    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr(
+        "core.llm.agent_graph.run_writing_turn", lambda **kw: _outcome(fake_result),
+    )
 
     s._turn_count = 1
     result = s._turn_agent("oi", section_hint=None, user_turn_index=1)
@@ -316,41 +326,83 @@ def test_turn_agent_error_returns_error_dict(monkeypatch):
     assert s._turn_count == 0
 
 
-def test_turn_agent_pending_user_input_propagates(monkeypatch):
-    """Quando uma tool seta session._pending_user_input, o response carrega."""
+def test_turn_agent_interrupt_surfaces_pending_and_persists_question(monkeypatch):
+    """Etapa 3: request_user_info → interrupt(). O outcome traz `interrupt`; a
+    PERGUNTA vira a msg do assistente, o response carrega {field, prompt}, e o
+    estado interno guarda thread_id + n_msgs para a retomada."""
     s = _make_session()
 
-    # Simula a tool request_user_info mutando state durante run_agent
-    fake_result = AgentResult(
-        final_text="Encaminhei a pergunta.",
+    # Trace parcial: o agente chamou search antes de pedir info (turno interrompido).
+    partial = AgentResult(
+        final_text="",
         steps=[
-            TraceStep(
-                kind="llm", text="",
-                tool_uses=[{"id": "tu_1", "name": "request_user_info",
-                            "input": {"field": "cnpj", "prompt": "Qual o CNPJ?"}}],
-                usage={},
-            ),
-            TraceStep(
-                kind="tool", name="request_user_info",
-                input={"field": "cnpj", "prompt": "Qual o CNPJ?"},
-                output="Pergunta encaminhada.",
-            ),
-            TraceStep(kind="llm", text="Encaminhei a pergunta.", tool_uses=[], usage={}),
+            TraceStep(kind="llm", text="vou pedir",
+                      tool_uses=[{"id": "tu_1", "name": "request_user_info",
+                                  "input": {"field": "cnpj", "prompt": "Qual o CNPJ?"}}],
+                      usage={"input_tokens": 100, "output_tokens": 10}),
         ],
         stop_reason="end_turn",
         usage={"input_tokens": 100, "output_tokens": 10},
     )
-
-    def fake_run_agent(**kw):
-        # Tool factory ainda não roda dentro do stub; simulamos o side effect aqui
-        s._pending_user_input = {"field": "cnpj", "prompt": "Qual o CNPJ?"}
-        return fake_result
-
-    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr(
+        "core.llm.agent_graph.run_writing_turn",
+        lambda **kw: _outcome(
+            partial, interrupt={"field": "cnpj", "prompt": "Qual o CNPJ?"}, n_messages=3,
+        ),
+    )
 
     s._turn_count = 1
-    result = s._turn_agent("preciso preencher o CNPJ", section_hint=None, user_turn_index=1)
+    result = s._turn_agent("escreva a identificação", section_hint=None, user_turn_index=1)
+
+    # Response expõe só {field, prompt} (sem thread_id interno).
     assert result["pending_user_input"] == {"field": "cnpj", "prompt": "Qual o CNPJ?"}
+    # A pergunta é a msg do assistente persistida (espelha o chat).
+    assert result["assistant_message"] == "Qual o CNPJ?"
+    # Estado interno guarda thread_id + n_msgs para retomar.
+    assert s._pending_user_input["thread_id"] == "ws_1:sess_1:1"
+    assert s._pending_user_input["n_msgs"] == 3
+
+
+def test_turn_agent_resume_routes_command_and_clears_pending(monkeypatch):
+    """Quando há interrupt pendente (com thread_id), turn() retoma o thread via
+    resume= e fecha a pergunta: pending limpo, resposta final no chat."""
+    s = _make_session()
+    # Estado de uma sessão recarregada com interrupt em aberto.
+    s._pending_user_input = {
+        "field": "cnpj", "prompt": "Qual o CNPJ?",
+        "thread_id": "ws_1:sess_1:1", "n_msgs": 3,
+    }
+
+    captured: dict = {}
+
+    final = AgentResult(
+        final_text="CNPJ registrado. Seção concluída.",
+        steps=[
+            TraceStep(kind="tool", name="request_user_info",
+                      input={}, output="O usuário respondeu (campo 'cnpj'): 12.345"),
+            TraceStep(kind="llm", text="CNPJ registrado. Seção concluída.",
+                      tool_uses=[], usage={"input_tokens": 80, "output_tokens": 12}),
+        ],
+        stop_reason="end_turn",
+        usage={"input_tokens": 80, "output_tokens": 12},
+    )
+
+    def fake(**kw):
+        captured.update(kw)
+        return _outcome(final, interrupt=None, n_messages=5)
+
+    monkeypatch.setattr("core.llm.agent_graph.run_writing_turn", fake)
+
+    result = s.turn("12.345.678/0001-90")
+
+    # Retomou o MESMO thread com resume = a resposta do usuário.
+    assert captured["resume"] == "12.345.678/0001-90"
+    assert captured["thread_id"] == "ws_1:sess_1:1"
+    assert captured["prior_n_msgs"] == 3
+    # Pergunta fechada: pending limpo e resposta final no chat.
+    assert s._pending_user_input is None
+    assert result["pending_user_input"] is None
+    assert result["assistant_message"] == "CNPJ registrado. Seção concluída."
 
 
 # ============================================================================
