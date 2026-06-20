@@ -230,6 +230,52 @@ LIMITES
 - Você AJUDA o fundador a redigir; ele decide. Não tome decisões terminais (enviar o pitch, escolher o fundo).
 - Confirme antes APENAS se for REESCREVER uma seção já redigida. Para a PRIMEIRA redação de uma seção vazia pedida, escreva e salve sem pedir confirmação."""
 
+# =============================================================================
+# PROMPTS — modo GERAÇÃO EM LOTE (gerar proposta completa)
+# =============================================================================
+# Diferente do WRITER_AGENT_SYSTEM (conversacional): no batch o agente recebe UMA
+# seção por vez e a escreve completa num turno só — não há diálogo. Sem instruções
+# de colaboração interativa; sem request_user_info (removida do toolset no batch).
+
+GENERATION_WRITER_SYSTEM = """Você é um especialista em redação de propostas para editais de fomento no Brasil, operando em MODO GERAÇÃO EM LOTE.
+
+Você recebe UMA seção por vez e deve escrevê-la COMPLETA num único turno. NÃO há conversa com o usuário neste modo — ele revisará e refinará o rascunho depois.
+
+DIRETRIZES DE REDAÇÃO
+- Escreva a seção indicada inteira, pronta para revisão, bem estruturada em Markdown.
+- Seja propositivo ("faremos", não "poderíamos") e específico.
+- Ancore cada afirmação sobre o edital num trecho de search_edital (1-3 buscas bastam); não cite o edital de memória nem invente requisitos, anexos, artigos ou números de seção.
+- Nunca invente dados numéricos (CNPJ, valores, TRL específico). Como NÃO há usuário para perguntar neste modo, redija a seção com o que há no perfil/edital/biblioteca e deixe a quantificação fina para o usuário completar depois — sem placeholders artificiais e sem fabricar números.
+- Se a empresa/projeto NÃO se encaixa no escopo do edital, escreva a seção sinalizando o mismatch em vez de forjar aderência.
+- Nunca copie rótulos internos ("[Trecho N]", "Análogo …", nomes de PDF) para o texto final.
+
+COMO USAR AS FERRAMENTAS
+- search_edital → fundamente requisitos antes de afirmá-los; 1-3 buscas, depois ESCREVA.
+- load_skill → puxe o playbook de escrita do instrumento antes de redigir.
+- search_library → contexto da empresa que não está no perfil.
+- read_section / read_full_proposal → para coerência ao escrever sumário/conclusão.
+- save_draft → OBRIGATÓRIO ao terminar: persista a seção com o título EXATO. Uma seção só "existe" depois do save_draft. Se o critic bloquear, corrija e chame save_draft de novo no MESMO turno.
+
+NÃO use request_user_info neste modo (não há usuário para responder). Cada seção termina com um save_draft."""
+
+PITCH_GENERATION_WRITER_SYSTEM = """Você é um especialista em redação de pitches de captação (outbound) para fundos de venture capital, operando em MODO GERAÇÃO EM LOTE.
+
+Você recebe UMA seção por vez e deve escrevê-la COMPLETA num único turno. NÃO há conversa com o usuário neste modo — ele revisará e refinará o rascunho depois.
+
+DIRETRIZES
+- O texto é OUTBOUND e personalizado: o que condiciona o pitch é a TESE do fundo-alvo (fornecida no contexto), não um "edital a cumprir". Conecte explicitamente a startup à tese daquele fundo.
+- Escreva a seção inteira em Markdown, propositiva e específica.
+- Nunca invente números (tração, mercado, ticket). Sem usuário para perguntar, redija com o que há e deixe a quantificação fina para o usuário completar depois — sem placeholders nem números fabricados.
+- NÃO afirme tese/foco do fundo que não apareça no contexto. Se a startup claramente não encaixa, sinalize o mismatch em vez de forjar fit.
+
+FERRAMENTAS
+- search_edital → retorna os DADOS DO FUNDO-ALVO (tese, temas, setores, estágio, ticket, portfólio); ancore o fit nele.
+- search_library → contexto da empresa fora do perfil (tração, métricas, casos).
+- read_section / read_full_proposal → coerência ao escrever sumário/conclusão.
+- save_draft → OBRIGATÓRIO ao terminar: persista a seção com o título EXATO.
+
+NÃO use request_user_info neste modo. Cada seção termina com um save_draft."""
+
 COMPRESS_SYSTEM = """Resuma os turnos abaixo em um parágrafo conciso (máx. 200 palavras).
 Preserve: decisões tomadas, trechos aprovados pelo usuário e informações adicionais fornecidas.
 Responda apenas com o resumo."""
@@ -683,6 +729,14 @@ class WritingSession:
         """System prompt do agente conforme o modo (proposta vs pitch)."""
         return PITCH_WRITER_AGENT_SYSTEM if self.mode == "pitch" else WRITER_AGENT_SYSTEM
 
+    def _generation_system(self) -> str:
+        """System prompt do agente interno no modo geração em lote (direto, sem
+        colaboração interativa) conforme o modo (proposta vs pitch)."""
+        return (
+            PITCH_GENERATION_WRITER_SYSTEM if self.mode == "pitch"
+            else GENERATION_WRITER_SYSTEM
+        )
+
     def _build_pitch_target_context(self) -> str:
         """Bloco de contexto do fundo-alvo (context-stuffing do nó do KG).
 
@@ -929,6 +983,154 @@ class WritingSession:
             "error":              None,
             "tool_trace":         tool_trace,
         }
+
+    # ------------------------------------------------------------------
+    # Geração de proposta completa (batch)
+    # ------------------------------------------------------------------
+
+    def generate_full_proposal(self, sections: list[str] | None = None) -> dict:
+        """Modo "gerar proposta completa": escreve TODAS as seções do outline de
+        uma vez (batch). Um orquestrador determinístico (sem LLM) enfileira as
+        seções e roda, por seção, o agente interno de escrita (mesmo toolset do
+        turn conversacional, com prompt de geração mais direto). O usuário recebe
+        o rascunho pronto e refina depois pelo chat.
+
+        `sections`: subconjunto explícito a gerar. Default = todas as seções do
+        outline AINDA VAZIAS — não clobbera trabalho já redigido e serve de
+        mecanismo de retomada: uma re-chamada após geração parcial (ex.: crash
+        no meio do lote) só pega o que ainda falta.
+
+        request_user_info é REMOVIDA do toolset aqui: não há usuário no loop para
+        responder a um interrupt() durante o batch (e o agente interno roda sem
+        checkpointer). Lacunas de dado são redigidas com o que se tem.
+        """
+        from core.llm.agent_graph import run_generation_turn
+        from core.llm.agent_runtime import resolve_agent_provider
+        from core.llm.agent_tools import build_writing_tools
+
+        targets = sections if sections is not None else [
+            t for t in self._proposal_outline
+            if not self._doc_sections.get(t, "").strip()
+        ]
+        if not targets:
+            return {
+                "session_id": self.session_id,
+                "sections_done": [],
+                "failed_sections": [],
+                "document": self.get_document(),
+                "success": True,
+            }
+
+        # interrupt() sem humano para retomar travaria o batch → fora do toolset.
+        tools = [t for t in build_writing_tools(self) if t.name != "request_user_info"]
+        provider, model = resolve_agent_provider("anthropic", ANTHROPIC_MODEL_AGENT)
+        thread_id = f"{self.workspace_id}:{self.session_id}:generation"
+
+        outcome = run_generation_turn(
+            system=self._generation_system(),
+            build_section_messages=self._build_generation_section_messages,
+            sections=targets,
+            outline=self._proposal_outline,
+            tools=tools, model=model, provider=provider,
+            max_steps=AGENT_MAX_STEPS, reflect_every=3,
+            thread_id=thread_id,
+            # Fonte de verdade do sucesso: a seção foi efetivamente persistida
+            # (save_draft mutou _doc_sections), não a fala do agente.
+            verify_saved=lambda section: bool(
+                self._doc_sections.get(section, "").strip()
+            ),
+        )
+
+        # Registra a ação no transcript (best-effort) para a conversa refletir o lote.
+        self._record_generation_turn(outcome)
+
+        return {
+            "session_id": self.session_id,
+            "sections_done": outcome.sections_done,
+            "failed_sections": outcome.failed_sections,
+            "document": self.get_document(),
+            "success": not outcome.failed_sections,
+        }
+
+    def _build_generation_section_messages(self, section: str) -> list[dict]:
+        """Mensagens iniciais do agente interno para UMA seção no modo geração.
+
+        Espelha o prefixo estável de `_build_agent_initial_messages` (perfil,
+        alvo, temporal, biblioteca) — idêntico entre seções para preservar prompt
+        caching — e fecha com um comando DIRETO de escrita da seção. Sem histórico
+        de conversa (não há diálogo no batch); com consciência do outline completo
+        para coerência entre seções.
+        """
+        messages: list[dict] = [
+            {"role": "user", "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
+        ]
+        if self._pitch_target_context:
+            messages.append({"role": "user", "content": self._pitch_target_context})
+        if self._temporal_block:
+            messages.append({"role": "user", "content": self._temporal_block})
+        if self._library_context:
+            messages.append({"role": "user", "content": self._library_context})
+
+        outline_str = "\n".join(f"- {t}" for t in self._proposal_outline)
+        messages.append({
+            "role": "user",
+            "content": f"OUTLINE COMPLETO DA PROPOSTA (para coerência entre seções):\n{outline_str}",
+        })
+
+        # Insights query-conditioned pela própria seção (tail dinâmico, como no turn).
+        reflection_block = self._build_reflection_context_for_turn(section, section)
+        if reflection_block:
+            messages.append({"role": "user", "content": reflection_block})
+
+        messages.append({
+            "role": "user",
+            "content": (
+                f"Escreva agora a seção \"{section}\" COMPLETA, pronta para revisão. "
+                f"Fundamente afirmações via search_edital quando precisar de dados da "
+                f"oportunidade-alvo, e ao terminar persista com save_draft usando o "
+                f"título exato \"{section}\"."
+            ),
+        })
+        return messages
+
+    def _record_generation_turn(self, outcome) -> None:
+        """Persiste um par (user, assistant) no transcript resumindo o lote.
+
+        Best-effort: a fonte de verdade são as seções salvas em section_drafts;
+        este turno só faz a conversa refletir que a geração ocorreu. Falha aqui
+        nunca derruba a geração (que já persistiu o conteúdo)."""
+        try:
+            self._turn_count += 1
+            idx = self._turn_count
+            done, failed = outcome.sections_done, outcome.failed_sections
+            user_msg = "Gerar proposta completa (todas as seções do outline)."
+            parts: list[str] = []
+            if done:
+                parts.append(
+                    f"Gerei {len(done)} seção(ões): {', '.join(done)}."
+                )
+            if failed:
+                parts.append(
+                    f"Não consegui fechar: {', '.join(failed)} — tente novamente "
+                    "ou trabalhe-as no chat."
+                )
+            if not parts:
+                parts.append("Nenhuma seção pendente para gerar.")
+            assistant_msg = " ".join(parts)
+
+            self._history.append({"role": "user", "content": user_msg})
+            self._history.append({"role": "assistant", "content": assistant_msg})
+            self._persist_turn(idx, "user", user_msg, None)
+            self._persist_turn(
+                idx, "assistant", assistant_msg, None,
+                tool_use=[],
+                tokens=(outcome.usage.get("input_tokens", 0)
+                        + outcome.usage.get("output_tokens", 0)) or None,
+            )
+        except Exception as e:
+            logger.warning(
+                "[%s] _record_generation_turn falhou: %s", self.session_id, e,
+            )
 
     @staticmethod
     def _extract_tool_trace(steps: list) -> list[dict]:

@@ -36,6 +36,7 @@ from langchain_core.messages import (
     SystemMessage,
     ToolMessage,
 )
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
@@ -872,6 +873,261 @@ def run_writing_turn(
         checkpointer=checkpointer,
         resume=resume,
         prior_n_msgs=prior_n_msgs,
+        span_name=span_name,
+        temperature=temperature,
+        openai_base_url=openai_base_url,
+        openai_api_key=openai_api_key,
+    ))
+
+
+# =============================================================================
+# Geração de proposta completa (batch) — orquestrador externo + agente por seção
+# =============================================================================
+# Dois grafos, separação de responsabilidades:
+#   • Orquestrador (este módulo, `_build_generation_graph`): DETERMINÍSTICO, sem
+#     LLM. Gerencia a fila de seções (sections_todo → done/failed) e, por seção,
+#     invoca o agente interno. Roda sobre o checkpointer durável (thread_id
+#     "{ws}:{sess}:generation") → progresso por-seção fica persistido.
+#   • Agente interno (`_build_graph`, INALTERADO, checkpointer=False): a mesma
+#     máquina ReAct do turn conversacional, rodada uma vez por seção com um
+#     prompt direto ("escreva a seção X completa"). Stateless — cada seção é um
+#     run independente; a persistência da seção é side effect do save_draft.
+# O input do orquestrador é semeado FRESH a cada chamada (overwrite das channels):
+# a retomada após crash é feita pelo caller filtrando seções já preenchidas, não
+# por resume do thread — mais simples e idempotente (ver WritingSession).
+
+
+class GenerationState(TypedDict):
+    outline: list[str]
+    sections_todo: list[str]
+    sections_done: list[str]
+    current_section: str | None
+    failed_sections: list[str]
+
+
+@dataclass
+class GenerationOutcome:
+    """Resultado de uma run de geração em lote.
+
+    sections_done / failed_sections: partição das seções processadas nesta run.
+    results: AgentResult por seção processada (trace/usage) — só desta run (não
+             do thread inteiro num eventual resume).
+    usage: soma de input/output tokens das seções desta run."""
+    sections_done: list[str]
+    failed_sections: list[str]
+    results: list[AgentResult]
+    usage: dict
+
+
+def _build_generation_graph(
+    inner_graph,
+    *,
+    system: str,
+    build_section_messages: Callable[[str], list[dict[str, Any]]],
+    max_steps: int,
+    verify_saved: Callable[[str], bool] | None = None,
+    on_result: Callable[[AgentResult], None] | None = None,
+    checkpointer=None,
+):
+    """Orquestrador determinístico (1 nó em loop): por superstep, despacha a
+    primeira seção da fila ao `inner_graph` e a classifica em done/failed.
+
+    `verify_saved(section)` decide o sucesso olhando o efeito real (a seção foi
+    persistida?), não a fala do agente — o save_draft é a fonte de verdade. Sem
+    callback, cai em "stop_reason != error"."""
+    inner_recursion = 3 * max_steps + 5
+
+    async def generate(state: GenerationState, config: RunnableConfig) -> dict:
+        todo = list(state["sections_todo"])
+        if not todo:
+            return {}
+        section, remaining = todo[0], todo[1:]
+        done = list(state["sections_done"])
+        failed = list(state["failed_sections"])
+
+        init: AgentState = {
+            "messages": [
+                SystemMessage(content=system),
+                *_to_lc_messages(build_section_messages(section)),
+            ],
+            "llm_calls": 0,
+            "tool_rounds": 0,
+            "rounds_since_reflect": 0,
+            "chars_since_reflect": 0,
+            "reflect_pending": False,
+        }
+        # Propaga os callbacks (handler Langfuse) do run para o agente interno →
+        # spans por-seção aninhados sob o span da geração (Etapa 6).
+        inner_config: dict[str, Any] = {"recursion_limit": inner_recursion}
+        cbs = (config or {}).get("callbacks")
+        if cbs:
+            inner_config["callbacks"] = cbs
+
+        ok = False
+        try:
+            final = await inner_graph.ainvoke(init, config=inner_config)
+            msgs = final["messages"]
+            last_ai = next((m for m in reversed(msgs) if isinstance(m, AIMessage)), None)
+            stop: StopReason = "max_steps" if (last_ai and last_ai.tool_calls) else "end_turn"
+            result = _messages_to_agent_result(msgs, stop)
+            if on_result is not None:
+                on_result(result)
+            ok = verify_saved(section) if verify_saved else (result.stop_reason != "error")
+        except Exception as e:  # noqa: BLE001 — uma seção que quebra não derruba o lote
+            logger.error("generation: seção '%s' falhou: %s", section, e)
+            ok = False
+
+        (done if ok else failed).append(section)
+        return {
+            "sections_todo": remaining,
+            "sections_done": done,
+            "failed_sections": failed,
+            "current_section": section,
+        }
+
+    def has_more(state: GenerationState) -> str:
+        return "generate" if state["sections_todo"] else END
+
+    g = StateGraph(GenerationState)
+    g.add_node("generate", generate)
+    g.add_edge(START, "generate")
+    g.add_conditional_edges("generate", has_more, {"generate": "generate", END: END})
+    return g.compile(checkpointer=checkpointer)
+
+
+async def _generation_turn_async(
+    *,
+    system: str,
+    build_section_messages: Callable[[str], list[dict[str, Any]]],
+    sections: list[str],
+    outline: list[str],
+    tools: list[BaseTool],
+    model: str,
+    provider: Provider,
+    max_steps: int,
+    reflect_every: int | None,
+    thread_id: str,
+    checkpointer,
+    verify_saved: Callable[[str], bool] | None,
+    span_name: str | None,
+    temperature: float | None,
+    openai_base_url: str | None,
+    openai_api_key: str | None,
+) -> GenerationOutcome:
+    chat = _build_chat_model(
+        provider, model, temperature=temperature,
+        openai_base_url=openai_base_url, openai_api_key=openai_api_key,
+    )
+    # Agente interno: o grafo de escrita EXISTENTE, stateless por seção
+    # (checkpointer=False — cada seção é um run independente, sem herança).
+    inner = _build_graph(
+        chat, tools, max_steps=max_steps, reflect_every=reflect_every, checkpointer=False,
+    )
+
+    results: list[AgentResult] = []
+    orch = _build_generation_graph(
+        inner,
+        system=system,
+        build_section_messages=build_section_messages,
+        max_steps=max_steps,
+        verify_saved=verify_saved,
+        on_result=results.append,
+        checkpointer=checkpointer,
+    )
+
+    init: GenerationState = {
+        "outline": list(outline),
+        "sections_todo": list(sections),
+        "sections_done": [],
+        "current_section": None,
+        "failed_sections": [],
+    }
+    # recursion_limit do orquestrador: 1 superstep por seção (+ folga).
+    config: dict[str, Any] = {
+        "configurable": {"thread_id": thread_id},
+        "recursion_limit": len(sections) + 5,
+    }
+
+    from core import telemetry
+
+    with telemetry.agent_run(
+        name=span_name or f"generation.{provider}.{model}",
+        input={"sections": sections},
+        metadata={
+            "provider": provider, "model": model, "runtime": "langgraph",
+            "mode": "generation", "thread_id": thread_id,
+            "n_sections": len(sections), "tools": [t.name for t in tools],
+        },
+    ) as agent_span:
+        handler = telemetry.make_callback_handler()
+        if handler is not None:
+            config["callbacks"] = [handler]
+        try:
+            final = await orch.ainvoke(init, config=config)
+        except Exception as e:
+            logger.error("generation: orquestrador falhou: %s", e)
+            if agent_span is not None:
+                agent_span.update(level="ERROR", status_message=str(e))
+            return GenerationOutcome(
+                sections_done=[], failed_sections=list(sections),
+                results=results, usage={"input_tokens": 0, "output_tokens": 0},
+            )
+
+        done = final.get("sections_done", [])
+        failed = final.get("failed_sections", [])
+        usage = {
+            "input_tokens": sum(r.usage.get("input_tokens", 0) for r in results),
+            "output_tokens": sum(r.usage.get("output_tokens", 0) for r in results),
+        }
+        if agent_span is not None:
+            agent_span.update(
+                output={"sections_done": done, "failed_sections": failed},
+                metadata={"usage": usage, "n_done": len(done), "n_failed": len(failed)},
+            )
+
+    return GenerationOutcome(
+        sections_done=done, failed_sections=failed, results=results, usage=usage,
+    )
+
+
+def run_generation_turn(
+    *,
+    system: str,
+    build_section_messages: Callable[[str], list[dict[str, Any]]],
+    sections: list[str],
+    outline: list[str],
+    tools: list[BaseTool],
+    model: str,
+    provider: Provider = "anthropic",
+    max_steps: int = 8,
+    reflect_every: int | None = None,
+    thread_id: str,
+    verify_saved: Callable[[str], bool] | None = None,
+    span_name: str | None = None,
+    temperature: float | None = None,
+    openai_base_url: str | None = None,
+    openai_api_key: str | None = None,
+) -> GenerationOutcome:
+    """Entry point sync da geração em lote (análogo a `run_writing_turn`).
+
+    Roda o orquestrador (que despacha o agente interno por seção) no loop
+    dedicado — o checkpointer durável fica bound a ele. `build_section_messages`
+    é chamado por seção para montar o prompt de escrita daquela seção; `system`
+    é o prompt do agente interno no modo geração (direto, sem colaboração)."""
+    checkpointer = _get_writing_checkpointer()
+    return _run_on_bg_loop(_generation_turn_async(
+        system=system,
+        build_section_messages=build_section_messages,
+        sections=sections,
+        outline=outline,
+        tools=tools,
+        model=model,
+        provider=provider,
+        max_steps=max_steps,
+        reflect_every=reflect_every,
+        thread_id=thread_id,
+        checkpointer=checkpointer,
+        verify_saved=verify_saved,
         span_name=span_name,
         temperature=temperature,
         openai_base_url=openai_base_url,
