@@ -154,6 +154,9 @@ COMO USAR AS FERRAMENTAS
 - request_user_info → APENAS para info concreta e ausente (CNPJ, valor de
   contrapartida, nome de coordenador, TRL específico). NÃO use para decisões
   de escopo, abordagem ou prioridade — essas pertencem ao usuário no chat.
+  Ela PAUSA o turno até o usuário responder (a resposta volta como resultado da
+  tool). Por isso: pesquise e escreva o que já dá ANTES de chamar, e chame-a
+  SOZINHA — não no mesmo passo que save_draft/search (senão repetem ao retomar).
 - recall_company_learnings → quando o usuário perguntar sobre histórico ou
   quando contexto estratégico de aplicações passadas for relevante para a seção.
 - load_skill → antes de redigir, puxe o playbook de escrita do instrumento (a lente
@@ -217,7 +220,7 @@ COMO USAR AS FERRAMENTAS
 - search_library → contexto da empresa que não está no perfil (métricas, tração, casos de uso, narrativa).
 - read_section / read_full_proposal → antes de redigir sumário/conclusão ou revisar coerência.
 - save_draft → SEMPRE que produzir um rascunho de seção, persista NO MESMO TURNO com o título exato da seção. Colar no chat NÃO conta.
-- request_user_info → APENAS para info concreta e ausente (MRR/ARR, round alvo, cap table, tração específica).
+- request_user_info → APENAS para info concreta e ausente (MRR/ARR, round alvo, cap table, tração específica). PAUSA o turno até o usuário responder; escreva o que já dá ANTES de chamar, e chame-a SOZINHA (sem save_draft/search no mesmo passo).
 - write_todos → no início de uma sessão ou pitch com várias seções, planeje a ordem (problema → solução → mercado → tração → time → ask) e registre como todos; atualize os status conforme avança. Em pedido trivial de uma seção só, não precisa.
 
 QUANDO PARAR
@@ -748,7 +751,14 @@ class WritingSession:
             "created_at":         self.created_at,
             # Sprint 2 do Cenário B: se há pergunta pendente do agente, frontend
             # renderiza prompt destacado ao retomar a sessão (não só após turn).
-            "pending_user_input": self._pending_user_input,
+            # Só expõe {field, prompt} — thread_id/n_msgs são internos do resume.
+            "pending_user_input": (
+                {
+                    "field": self._pending_user_input.get("field"),
+                    "prompt": self._pending_user_input.get("prompt"),
+                }
+                if isinstance(self._pending_user_input, dict) else None
+            ),
         }
 
     def turn(self, user_message: str, section_hint: str | None = None) -> dict:
@@ -766,14 +776,21 @@ class WritingSession:
 
         # Consumir pending_user_input se houver: o user_message ATUAL responde a
         # ela. Limpamos antes de processar pra evitar reapresentar a pergunta.
-        had_pending = self._pending_user_input is not None
+        # Se o pendente carrega thread_id, é um interrupt() em aberto (Etapa 3) →
+        # esta mensagem é a RESPOSTA e retomamos o grafo no ponto da pausa, em vez
+        # de iniciar um turno fresco.
+        pending = self._pending_user_input
+        had_pending = isinstance(pending, dict)
+        resume_ctx = pending if (had_pending and pending.get("thread_id")) else None
         self._pending_user_input = None
 
         try:
             if self._turn_count > COMPRESS_THRESHOLD:
                 self._compress_history()
 
-            result = self._turn_agent(user_message, section_hint, user_turn_index)
+            result = self._turn_agent(
+                user_message, section_hint, user_turn_index, resume_ctx=resume_ctx,
+            )
 
             # Persiste pending_user_input se a tool request_user_info disparou
             # neste turn; OU limpa no DB se consumimos um pendente acima.
@@ -790,37 +807,59 @@ class WritingSession:
         user_message: str,
         section_hint: str | None,
         user_turn_index: int,
+        resume_ctx: dict | None = None,
     ) -> dict:
-        """Path de escrita: run_agent + tools (search_edital, search_library,
-        read_section, read_full_proposal, save_draft, request_user_info, ...).
+        """Path de escrita: grafo LangGraph + tools (search_edital, search_library,
+        read_section, read_full_proposal, save_draft, request_user_info, ...) sobre
+        um checkpointer durável keyed por `thread_id` (Etapa 3 da migração).
 
         Características:
           • Sem RAG eager — o agente decide via search_edital / search_library
           • Sem retrieval auto de library — idem
           • save_draft tool persiste a seção (com critic) como side effect
-          • request_user_info emite sinal estruturado pro frontend quando falta
-            info concreta do usuário
+          • request_user_info → interrupt() nativo: o grafo PAUSA, a pergunta vira
+            a msg do assistente deste turno, e o estado em-voo fica no checkpoint.
+            O próximo turno (resume_ctx setado) retoma o thread com Command(resume).
           • mentions resolvem antes (intenção explícita do usuário)
         """
-        from core.llm.agent_runtime import resolve_agent_provider, run_agent
+        from core.llm.agent_graph import run_writing_turn
+        from core.llm.agent_runtime import resolve_agent_provider
         from core.llm.agent_tools import build_writing_tools
 
-        mentions_context = self._resolve_mentions(user_message)
-        messages = self._build_agent_initial_messages(
-            user_message, section_hint, mentions_context,
-        )
         tools = build_writing_tools(self)
-
         provider, model = resolve_agent_provider("anthropic", ANTHROPIC_MODEL_AGENT)
-        result = run_agent(
-            system=self._writer_system(),
-            initial_messages=messages,
-            tools=tools,
-            model=model,
-            provider=provider,
-            max_steps=AGENT_MAX_STEPS,
-            reflect_every=3,
-        )
+
+        if resume_ctx:
+            # Retomada: a mensagem do usuário é a RESPOSTA ao interrupt pendente.
+            # Reinjeta no thread original; prior_n_msgs fatia o delta deste turno
+            # (o thread acumula as mensagens do turno que perguntou).
+            thread_id = resume_ctx["thread_id"]
+            outcome = run_writing_turn(
+                system=self._writer_system(),
+                initial_messages=[],
+                tools=tools, model=model, provider=provider,
+                max_steps=AGENT_MAX_STEPS, reflect_every=3,
+                thread_id=thread_id,
+                resume=user_message,
+                prior_n_msgs=resume_ctx.get("n_msgs", 0),
+            )
+        else:
+            mentions_context = self._resolve_mentions(user_message)
+            messages = self._build_agent_initial_messages(
+                user_message, section_hint, mentions_context,
+            )
+            thread_id = f"{self.workspace_id}:{self.session_id}:{user_turn_index}"
+            outcome = run_writing_turn(
+                system=self._writer_system(),
+                initial_messages=messages,
+                tools=tools, model=model, provider=provider,
+                max_steps=AGENT_MAX_STEPS, reflect_every=3,
+                thread_id=thread_id,
+                resume=None,
+                prior_n_msgs=0,
+            )
+
+        result = outcome.result
 
         if result.stop_reason == "error":
             self._turn_count -= 1
@@ -829,23 +868,51 @@ class WritingSession:
                 "AGENT_ERROR",
             )
 
-        assistant_text = result.final_text or ""
-
         # Reconstrói tool_use trace para persistência: [{id, name, input, output}]
         # pareando tool_use blocks com seus tool_result subsequentes no `steps`.
         tool_trace = self._extract_tool_trace(result.steps)
 
-        # Atualiza histórico in-memory (sem o trace — chat só vê o texto final).
-        self._history.append({"role": "user",      "content": user_message})
-        self._history.append({"role": "assistant", "content": assistant_text})
-
-        # Persiste turn: user sem tool_use, assistant com tool_use (mesmo se vazio,
-        # pra distinguir de legacy onde tool_use é NULL).
-        # tokens: soma input+output de TODAS as chamadas LLM do agente neste turn
-        # (result.usage agrega o loop inteiro) — custo/turno fica mensurável. Vai
-        # na row assistant; a row user fica com tokens NULL (não há custo nela).
+        # tokens: soma input+output das chamadas LLM DESTE turno-run (o delta do
+        # thread — não dobra a contagem do turno que perguntou no caso de resume).
         turn_tokens = (result.usage.get("input_tokens", 0)
                        + result.usage.get("output_tokens", 0)) or None
+
+        if outcome.interrupt:
+            # Agente pausou pedindo info concreta. A PERGUNTA é a msg do assistente
+            # deste turno; o estado em-voo fica no checkpoint (thread_id) e a sessão
+            # guarda thread_id + n_msgs para retomar quando o usuário responder.
+            question = outcome.interrupt.get("prompt", "") or ""
+            self._pending_user_input = {
+                "field": outcome.interrupt.get("field"),
+                "prompt": outcome.interrupt.get("prompt"),
+                "thread_id": thread_id,
+                "n_msgs": outcome.n_messages,
+            }
+            self._history.append({"role": "user",      "content": user_message})
+            self._history.append({"role": "assistant", "content": question})
+            self._persist_turn(user_turn_index, "user", user_message, section_hint)
+            self._persist_turn(
+                user_turn_index, "assistant", question, section_hint,
+                tool_use=tool_trace, tokens=turn_tokens,
+            )
+            return {
+                "session_id":         self.session_id,
+                "assistant_message":  question,
+                "draft_content":      None,
+                "pending_user_input": {
+                    "field": outcome.interrupt.get("field"),
+                    "prompt": outcome.interrupt.get("prompt"),
+                },
+                "turn_number":        self._turn_count,
+                "success":            True,
+                "error":              None,
+                "tool_trace":         tool_trace,
+            }
+
+        # Turno completou (fresh sem interrupt OU resume que fechou a pergunta).
+        assistant_text = result.final_text or ""
+        self._history.append({"role": "user",      "content": user_message})
+        self._history.append({"role": "assistant", "content": assistant_text})
         self._persist_turn(user_turn_index, "user", user_message, section_hint)
         self._persist_turn(
             user_turn_index, "assistant", assistant_text, section_hint,
@@ -856,7 +923,7 @@ class WritingSession:
             "session_id":         self.session_id,
             "assistant_message":  assistant_text,
             "draft_content":      None,  # save_draft tool já persistiu via side effect
-            "pending_user_input": self._pending_user_input,
+            "pending_user_input": None,
             "turn_number":        self._turn_count,
             "success":            True,
             "error":              None,
@@ -865,10 +932,10 @@ class WritingSession:
 
     @staticmethod
     def _extract_tool_trace(steps: list) -> list[dict]:
-        """Extrai trace persistível dos steps de run_agent.
+        """Extrai trace persistível dos steps do grafo (run_writing_turn).
 
         Pareia tool_use (vindos do step llm) com tool_result (vindos do step tool)
-        por ordem — o run_agent garante que a sequência é llm → tool* → llm → ...
+        por ordem — o grafo garante que a sequência é llm → tool* → llm → ...
         e que cada tool_use é seguido por um step tool com o mesmo nome.
         """
         # Mapa tool_use_id → input (vem dos steps kind="llm" em tool_uses)
@@ -945,12 +1012,13 @@ class WritingSession:
         mentions_context: str,
     ) -> list[dict]:
         """Prefixo estável + mensagem atual, no formato esperado pelo Anthropic
-        (sem system; ele vai como parâmetro top-level do run_agent).
+        (sem system; ele vai como parâmetro top-level do run_writing_turn).
 
         A ordem espelha `_build_messages` (legacy), com 2 diferenças:
           • Sem RAG / sem retrieval auto de library: o agente busca via tools
-          • Mantém perfil + library_anexada + insights + summary + history
-            antes da mensagem para preservar prompt caching.
+          • Prefixo estável (perfil + library_anexada + summary + history) antes
+            da mensagem para preservar prompt caching; insights (Etapa 5) ficam no
+            tail dinâmico por serem query-conditioned.
         """
         messages: list[dict] = [
             {"role": "user", "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
@@ -961,12 +1029,18 @@ class WritingSession:
             messages.append({"role": "user", "content": self._temporal_block})
         if self._library_context:
             messages.append({"role": "user", "content": self._library_context})
-        if self._reflection_insights_context:
-            messages.append({"role": "user", "content": self._reflection_insights_context})
         if self._history_summary:
             messages.append({"role": "user", "content": self._history_summary})
 
         messages.extend(self._history)
+
+        # Insights query-conditioned (Etapa 5): posicionados no TAIL dinâmico (junto
+        # de mentions/section, que já variam por turno) para preservar o prompt
+        # caching do prefixo estável (perfil/library/summary/history) — a busca
+        # semântica muda o bloco a cada turno e quebraria o cache se viesse antes.
+        reflection_block = self._build_reflection_context_for_turn(user_message, section_hint)
+        if reflection_block:
+            messages.append({"role": "user", "content": reflection_block})
 
         if mentions_context:
             messages.append({"role": "user", "content": mentions_context})
@@ -1306,10 +1380,16 @@ class WritingSession:
             for s in signals
         ]
         try:
-            self._db.table("reflection_insights").insert(rows).execute()
+            inserted = self._db.table("reflection_insights").insert(rows).execute()
         except Exception as e:
             logger.warning("[%s] _persist_session_signals: insert falhou: %s", self.session_id, e)
             return 0
+        # Espelha os sinais episódicos no Store (Etapa 5) — projeção de leitura.
+        try:
+            from core.reflection_service import _project_to_store
+            _project_to_store(self.workspace_id, inserted=inserted.data)
+        except Exception as e:  # noqa: BLE001 — projeção best-effort
+            logger.debug("[%s] projeção episódica no Store falhou: %s", self.session_id, e)
         logger.info("[%s] %d sinal(is) episódico(s) extraído(s)", self.session_id, len(rows))
         return len(rows)
 
@@ -1328,8 +1408,25 @@ class WritingSession:
                 parts.append(f"  • {fact}")
         return "\n".join(parts)
 
+    @staticmethod
+    def _format_reflection_block(items: list[dict]) -> str:
+        """Formata insights (dicts com `level`/`insight`) no bloco de pano-de-fundo.
+        Compartilhado pelo caminho estático (load_active_insights) e pelo semântico
+        (Store). Vazio → string vazia."""
+        if not items:
+            return ""
+        parts = [
+            "INSIGHTS DA EMPRESA (síntese de aplicações anteriores — use como pano de fundo, "
+            "não cite explicitamente):",
+        ]
+        for ins in items:
+            level_label = "Padrão" if ins.get("level") == 2 else "Observação"
+            parts.append(f"• [{level_label}] {ins.get('insight', '')}")
+        return "\n".join(parts)
+
     def _build_reflection_context(self, workspace_id: str) -> str:
-        """Carrega insights ativos do ReflectionService (Fase 2 #18).
+        """Bloco ESTÁTICO de insights ativos (top-6, level-2 priorizado) — fallback
+        do caminho semântico (Etapa 5) e usado quando WRITING_SEMANTIC_MEMORY=0.
 
         Os insights são síntese de outcomes de aplicações anteriores deste
         workspace, gerados periodicamente pelo `reflect_workspace_task`. Falhas
@@ -1341,16 +1438,28 @@ class WritingSession:
         except Exception as e:
             logger.debug("Falha ao carregar reflection_insights: %s", e)
             return ""
-        if not insights:
-            return ""
-        parts = [
-            "INSIGHTS DA EMPRESA (síntese de aplicações anteriores — use como pano de fundo, "
-            "não cite explicitamente):",
-        ]
-        for ins in insights:
-            level_label = "Padrão" if ins.get("level") == 2 else "Observação"
-            parts.append(f"• [{level_label}] {ins.get('insight', '')}")
-        return "\n".join(parts)
+        return self._format_reflection_block(insights)
+
+    def _build_reflection_context_for_turn(
+        self, user_message: str, section_hint: str | None,
+    ) -> str:
+        """Bloco de insights QUERY-CONDITIONED (Etapa 5): busca semântica no Store
+        pelo teor do turno (seção + mensagem). Cai no bloco estático
+        (`self._reflection_insights_context`) se o Store estiver vazio/off ou a busca
+        semântica desligada (WRITING_SEMANTIC_MEMORY=0). O fallback garante regressão-
+        zero enquanto o Store não tem corpus (pré-backfill)."""
+        if os.getenv("WRITING_SEMANTIC_MEMORY", "1") == "1":
+            query = " ".join(p for p in (section_hint, user_message) if p).strip()
+            try:
+                from core.llm.agent_graph import memory_search
+                hits = memory_search(self.workspace_id, query, limit=6)
+            except Exception as e:  # noqa: BLE001
+                logger.debug("memory_search indisponível: %s", e)
+                hits = []
+            block = self._format_reflection_block(hits)
+            if block:
+                return block
+        return self._reflection_insights_context
 
     # ------------------------------------------------------------------
     # Chamadas LLM

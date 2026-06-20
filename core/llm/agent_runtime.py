@@ -227,6 +227,7 @@ async def run_agent_async(
     temperature: float | None = None,
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
+    trace_context: dict | None = None,
 ) -> AgentResult:
     """Loop ReAct do agente sobre LangGraph. Delega para o grafo compilado em
     `core.llm.agent_graph.run_agent_graph_async`.
@@ -268,6 +269,7 @@ async def run_agent_async(
         temperature=temperature,
         openai_base_url=openai_base_url,
         openai_api_key=openai_api_key,
+        trace_context=trace_context,
     )
 
 
@@ -285,6 +287,7 @@ def run_agent(
     temperature: float | None = None,
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
+    trace_context: dict | None = None,
 ) -> AgentResult:
     """Shim síncrono sobre `run_agent_async`.
 
@@ -309,6 +312,7 @@ def run_agent(
             temperature=temperature,
             openai_base_url=openai_base_url,
             openai_api_key=openai_api_key,
+            trace_context=trace_context,
         )
 
     try:
@@ -367,6 +371,13 @@ def run_subagent(
         AgentResult(final_text="", steps=[], stop_reason="error", usage={}).
     """
     try:
+        # Captura a trace do pai AGORA (mesma thread/contexto do grafo pai): o
+        # run_agent abaixo roda o subgrafo noutra thread/loop, onde o contextvar OTel
+        # do Langfuse não chega → sem isto o critic viraria uma trace-raiz separada.
+        # Passando o trace_context, o agent_run do subagente aninha sob o turno (Et.6).
+        from core import telemetry
+        parent_ctx = telemetry.current_trace_context()
+
         prov, mdl = resolve_agent_provider(
             provider,
             model or os.getenv("ANTHROPIC_MODEL_AGENT", "claude-sonnet-4-6"),
@@ -382,6 +393,7 @@ def run_subagent(
             temperature=temperature,
             openai_base_url=openai_base_url,
             openai_api_key=openai_api_key,
+            trace_context=parent_ctx,
         )
     except Exception as e:
         logger.error("run_subagent '%s' falhou: %s", name, e)
