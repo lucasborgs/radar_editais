@@ -479,7 +479,7 @@ taxonomia perfeita.
 ict_schema:
   artifact: "knowledge_graph/icts.json"
   id_format: "<source>:<slug>"          # ex.: embrapii:inteligencia-artificial-ceia-ufg
-  node_fields: [id, name, kind, source, url, about, address, contact, areas_raw, themes, themes_proposed, summary]
+  node_fields: [id, name, kind, source, url, about, address, contact, areas_raw, themes, themes_proposed, summary, brings_cofinancing]
   required_fields: [id, name, kind, source, themes]
   kinds: [embrapii_unit, laboratorio, instituto, universidade]
   sources: [embrapii, pnipe]
@@ -488,6 +488,7 @@ ict_schema:
     - "O alvo do mapeamento é o vocabulário de temas EMERGENTE do index.json (não há vocab fixo; canonicalize_themes é stub). Mapeamento fino→macro é LLM."
     - "areas_raw: rótulos de expertise crus da fonte (EMBRAPII: action_lines + tech_skills). Display + matching fino futuro."
     - "themes_proposed: áreas que não casaram com nenhum tema de edital — candidatas à expansão do vocabulário (não entram em themes nem na ponte)."
+    - "brings_cofinancing: bool. ICT cujo ARRANJO aporta recurso não-reembolsável ao projeto (Unidade EMBRAPII: ~1/3 do custo do projeto vem do aporte EMBRAPII). É o que dispara o selo 'pode trazer co-financiamento' no complemento do match. Default false; derivado true para source=='embrapii'. Generaliza além do kind (um lab PNIPE não traz). Opcional (não em required_fields) — ICTs antigas sem o campo seguem válidas."
     - "contact: dict {responsavel, email, telefone, site, ...} (campos opcionais)."
     - "icts.json espelha index.json: {icts: [...], total_icts, themes_index, themes_proposed_index, last_updated}."
 ```
