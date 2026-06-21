@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { getEditalById, type RadarItem, type RadarResponse } from "@/lib/api";
-import type { KGMatchResult, EditalCard } from "@/types/edital";
+import type { KGMatchResult, EditalCard, IctPartner } from "@/types/edital";
 import type { InvestorMatch } from "@/types/investidor";
 import { scoreColor } from "@/lib/constants";
 import { BriefView } from "./BriefView";
@@ -36,6 +36,51 @@ function formatBRL(v: number | null | undefined): string {
 function itemReason(item: RadarItem): string {
   const p = item.payload as Partial<KGMatchResult & InvestorMatch>;
   return p.justificativa ?? "";
+}
+
+// ── Parceiros ICT (complemento ao match, spec D3c) ───────────────────────────
+// Sugestão no match, NUNCA compromisso (guard-rail project_ict_mapping). O selo
+// de co-financiamento usa linguagem de POSSIBILIDADE — sugestão ≠ garantia.
+function IctPartners({ item }: { item: RadarItem }) {
+  const p = item.payload as Partial<KGMatchResult>;
+  const partners: IctPartner[] = p.ict_partners ?? [];
+  if (partners.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5 pt-1">
+      <p className="font-medium text-content-primary">
+        Possíveis parceiros ICT
+      </p>
+      <ul className="space-y-1.5">
+        {partners.map((partner) => (
+          <li key={partner.id} className="flex flex-wrap items-center gap-1.5">
+            {partner.url ? (
+              <a
+                href={partner.url}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-content-primary hover:underline"
+              >
+                {partner.name} ↗
+              </a>
+            ) : (
+              <span className="font-medium text-content-primary">{partner.name}</span>
+            )}
+            {partner.themes_match?.length > 0 && (
+              <span className="text-content-secondary">
+                temas em comum: {partner.themes_match.join(", ")}
+              </span>
+            )}
+            {partner.brings_cofinancing && (
+              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                Pode trazer co-financiamento
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 // ── Expansão de item ────────────────────────────────────────────────────────
@@ -95,6 +140,8 @@ function EventExpansion({
           {reason}
         </p>
       )}
+
+      <IctPartners item={item} />
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
@@ -292,6 +339,27 @@ export function RadarCard({
   const items = data.radar ?? [];
   const visible = showAll ? items : items.slice(0, 5);
 
+  // Agrupa por cluster de display (spec D2), PRESERVANDO a ordem do ranking
+  // dentro de cada grupo. Itens sem `cluster` (payload legado) caem em fomento.
+  const CAPITAL = "capital de risco";
+  const capitalItems = visible.filter((it) => it.cluster === CAPITAL);
+  const fomentoItems = visible.filter((it) => it.cluster !== CAPITAL);
+
+  const renderRow = (item: RadarItem) => (
+    <RadarRow
+      key={`${item.kind_class}:${item.id}`}
+      item={item}
+      expanded={expandedId === item.id}
+      onToggle={() =>
+        setExpandedId((cur) => (cur === item.id ? null : item.id))
+      }
+      brief={briefs[item.id] ?? null}
+      onBrief={onBrief}
+      onProposta={onProposta}
+      onPitch={onPitch}
+    />
+  );
+
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm font-sans text-content-secondary">
@@ -310,22 +378,26 @@ export function RadarCard({
         </span>
       </div>
 
-      <ul className="space-y-1.5">
-        {visible.map((item) => (
-          <RadarRow
-            key={`${item.kind_class}:${item.id}`}
-            item={item}
-            expanded={expandedId === item.id}
-            onToggle={() =>
-              setExpandedId((cur) => (cur === item.id ? null : item.id))
-            }
-            brief={briefs[item.id] ?? null}
-            onBrief={onBrief}
-            onProposta={onProposta}
-            onPitch={onPitch}
-          />
-        ))}
-      </ul>
+      <div className="space-y-3">
+        {fomentoItems.length > 0 && (
+          <div className="space-y-1.5">
+            {capitalItems.length > 0 && (
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-content-secondary font-sans">
+                Fomento
+              </p>
+            )}
+            <ul className="space-y-1.5">{fomentoItems.map(renderRow)}</ul>
+          </div>
+        )}
+        {capitalItems.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-content-secondary font-sans">
+              Capital de risco
+            </p>
+            <ul className="space-y-1.5">{capitalItems.map(renderRow)}</ul>
+          </div>
+        )}
+      </div>
 
       {items.length > 5 && (
         <button

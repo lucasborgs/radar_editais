@@ -38,6 +38,28 @@ _RRF_K = 60
 #     ~8-9.5); abaixo de _ENTITY_FLOOR = "morno". É o único knob — calibrar com dado.
 _ENTITY_FLOOR = 6.0
 
+# Cluster de DISPLAY (spec mechanism-scope-decisions, D2): agrupa no front-door a
+# "trilha de capital de risco" — investidores (entidade) + editais cujo mechanism
+# é `investimento` (os FIPs). É só rótulo de exibição: NÃO afeta score/RRF/tier/
+# ordenação. Tudo o mais (subvenção, programa-recorrente, etc.) cai em "fomento".
+_CLUSTER_CAPITAL_DE_RISCO = "capital de risco"
+_CLUSTER_FOMENTO = "fomento"
+
+
+def _cluster_for(item: dict) -> str:
+    """Deriva o cluster de display de um item já normalizado do radar.
+
+    - investidor (entidade) → capital de risco
+    - evento com payload.mechanism == "investimento" (editais FIP) → capital de risco
+    - resto → fomento
+    """
+    if item.get("opportunity_type") == "investidor":
+        return _CLUSTER_CAPITAL_DE_RISCO
+    payload = item.get("payload") or {}
+    if payload.get("mechanism") == "investimento":
+        return _CLUSTER_CAPITAL_DE_RISCO
+    return _CLUSTER_FOMENTO
+
 
 def _why_now_event(edital_id: str) -> str:
     """Sinal de urgência de um evento via core.kg.temporal (defensivo: '' em falha)."""
@@ -165,6 +187,7 @@ def merge_radar(
     strong: list[dict] = []
     weak: list[dict] = []
     for it in evs + ents + progs:
+        it["cluster"] = _cluster_for(it)  # rótulo de DISPLAY (não toca ranking)
         weak_flag = _is_weak(it, entity_floor)
         it["tier"] = "fraco" if weak_flag else "forte"
         (weak if weak_flag else strong).append(it)

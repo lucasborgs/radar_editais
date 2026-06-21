@@ -57,6 +57,17 @@ export interface MatchDimensions {
   contrapartida?: DimScore;
 }
 
+// Parceiro ICT sugerido para um edital (spec mechanism-scope-decisions, D3c).
+// Produzido pela FRENTE A no payload do match; consumido como DISPLAY. ICT é
+// sugestão no match, nunca compromisso (guard-rail project_ict_mapping).
+export interface IctPartner {
+  id: string;
+  name: string;
+  themes_match: string[];        // temas em comum com o edital/perfil
+  brings_cofinancing: boolean;   // arranjo PODE aportar co-financiamento (possibilidade)
+  url: string;
+}
+
 export interface KGMatchResult {
   id: string;
   title: string;
@@ -72,6 +83,10 @@ export interface KGMatchResult {
   justificativa: string;
   key_requirements?: string[];
   objective?: string;
+  // Contrato D2/D3c (FRENTE A produz, FRENTE B consome) — todos opcionais:
+  mechanism?: string | null;            // mechanism do card; "investimento" → cluster capital de risco
+  requires_ict_partner?: boolean;       // edital exige/beneficia parceiro ICT
+  ict_partners?: IctPartner[];          // parceiros ICT sugeridos (display)
 }
 
 export interface DashboardStats {
