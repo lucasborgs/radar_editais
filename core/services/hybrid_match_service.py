@@ -54,12 +54,13 @@ _PORTE_CONTRAPARTIDA_OK = {"MEDIO", "GRANDE"}
 _PORTE_CONTRAPARTIDA_PARCIAL = {"EPP"}
 
 # tipos_financiamento_interesse → mechanism do card
+# Escopo reduzido (spec mechanism-scope-decisions): só sobram mecanismos
+# competitivos por mérito, onde a IA de escrita alavanca. `credito_reembolsavel`
+# (D1, backlog v2), `investimento_direto` (D2, vira trilha de investidor) e
+# `matching_embrapii` (D3, vira complemento ICT) foram removidos.
 _MECHANISM_MAP: dict[str, set[str]] = {
     "subvencao_nao_reembolsavel": {"subvencao", "misto"},
-    "credito_reembolsavel":       {"reembolsavel", "misto"},
-    "investimento_direto":        {"investimento", "misto"},
     "pesquisa_colaborativa":      {"subvencao", "misto"},
-    "matching_embrapii":          {"investimento", "misto"},
 }
 
 # Palavras irrelevantes para matching temático
@@ -304,6 +305,14 @@ def _score_mecanismo(
         accepted = _MECHANISM_MAP.get(_normalize(interesse), set())
         if card_mechanism in accepted:
             return w
+
+    # Editais de `investimento` (5 FIPs) perderam a única opção de perfil que
+    # casava com eles (investimento_direto/matching_embrapii saíram do map na
+    # spec mechanism-scope-decisions, D2). Espelhamos a regra "card sem
+    # mechanism → neutro" acima e damos neutro em vez de 0, para não afundá-los
+    # silenciosamente (eles passam a ser surfados na trilha de investidor).
+    if card_mechanism == "investimento":
+        return w / 2
 
     return 0
 
@@ -886,6 +895,12 @@ class HybridMatchService:
                 "justificativa": "",
                 "key_requirements": r.card.get("key_requirements", []),
                 "objective": r.card.get("objective"),
+                # Complemento ICT (spec mechanism-scope-decisions, D3). Aditivo:
+                # NÃO entra no score nem na ordenação. `ict_partners` é populado
+                # só no top-K abaixo, e só quando o edital exige parceiro ICT.
+                "mechanism": r.card.get("mechanism"),
+                "requires_ict_partner": bool(r.card.get("requires_ict_partner", False)),
+                "ict_partners": [],
             }
             if no_eligible:
                 item["eligibility_warning"] = (
@@ -897,6 +912,36 @@ class HybridMatchService:
 
         combined.sort(key=lambda x: x["score"], reverse=True)
         top = combined[:top_k]
+
+        # --- Complemento ICT (spec mechanism-scope-decisions, D3) ---
+        # Aditivo e isolado: enriquece SÓ o top-K e SÓ editais que exigem parceiro
+        # ICT, com até 3 sugestões. Não toca score nem ordenação. Defensivo: se
+        # find_partners falhar (ex.: icts.json ausente), mantém [] e nunca levanta.
+        # Guard-rail (project_ict_mapping): ICT é sugestão no match, jamais entra
+        # na escrita — por isso fica só no payload de /match.
+        for it in top:
+            if not it.get("requires_ict_partner"):
+                continue
+            try:
+                from core.ict_match import find_partners
+                partners = find_partners(it["id"], k=3)
+                it["ict_partners"] = [
+                    {
+                        "id": p.id,
+                        "name": p.name,
+                        "themes_match": p.themes_match,
+                        # getattr defensivo: outro agente adiciona brings_cofinancing
+                        # ao PartnerSuggestion em paralelo (D3 parte b).
+                        "brings_cofinancing": getattr(p, "brings_cofinancing", False),
+                        "url": p.url,
+                    }
+                    for p in partners
+                ]
+            except Exception as e:
+                logger.warning(
+                    "Complemento ICT falhou para %s — mantendo lista vazia: %s",
+                    it["id"], e,
+                )
 
         # --- Stage 2b: EXPLICAÇÃO (justificativa/dimensões) só do top-K exibido ---
         if top and not no_eligible:

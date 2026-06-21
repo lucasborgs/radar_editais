@@ -225,9 +225,9 @@ def _rank_by_cosine(query_vec, chunk_vecs, chunks: list[dict]) -> list[dict]:
     """Top chunks por similaridade de cosseno query×chunk (ordem decrescente)."""
     import numpy as np
     q = np.asarray(query_vec, dtype=np.float32)
-    M = np.asarray(chunk_vecs, dtype=np.float32)
+    M = np.asarray(chunk_vecs, dtype=np.float32)  # noqa: N806  (matriz, convenção numpy)
     qn = q / (np.linalg.norm(q) + 1e-9)
-    Mn = M / (np.linalg.norm(M, axis=1, keepdims=True) + 1e-9)
+    Mn = M / (np.linalg.norm(M, axis=1, keepdims=True) + 1e-9)  # noqa: N806
     sims = Mn @ qn
     order = np.argsort(-sims)
     return [{**chunks[i], "score": float(sims[i])} for i in order]
@@ -250,9 +250,9 @@ def _cosine_order(query_vec, chunk_vecs) -> list[int]:
     """Índices dos chunks em ordem decrescente de cosseno (sem montar dicts)."""
     import numpy as np
     q = np.asarray(query_vec, dtype=np.float32)
-    M = np.asarray(chunk_vecs, dtype=np.float32)
+    M = np.asarray(chunk_vecs, dtype=np.float32)  # noqa: N806  (matriz, convenção numpy)
     qn = q / (np.linalg.norm(q) + 1e-9)
-    Mn = M / (np.linalg.norm(M, axis=1, keepdims=True) + 1e-9)
+    Mn = M / (np.linalg.norm(M, axis=1, keepdims=True) + 1e-9)  # noqa: N806
     return [int(i) for i in np.argsort(-(Mn @ qn))]
 
 
@@ -271,6 +271,7 @@ def _fts_order(query: str, edital_id: str, chunks: list[dict], limit: int) -> li
     `chunks` (ordenada por chunk_index em `_fetch_corpus`).
     """
     import psycopg
+
     from core.retrieval.retriever import _build_or_tsquery
     ts_or = _build_or_tsquery(query)
     if not ts_or:

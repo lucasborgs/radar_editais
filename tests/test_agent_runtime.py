@@ -22,12 +22,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from core.llm.agent_runtime import (  # noqa: E402
+    _REFLECT_PROMPT,
     ToolRegistry,
     TraceStep,
     _format_tool_results_anthropic,
     _format_tool_results_openai,
     _LLMStep,
-    _REFLECT_PROMPT,
     resolve_agent_provider,
     run_agent,
     tool,
