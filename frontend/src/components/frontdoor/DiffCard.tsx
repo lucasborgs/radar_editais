@@ -18,6 +18,7 @@ import { fieldSpec, coerceFieldValue, renderFieldValue } from "./profileFields";
 const TITLES: Record<NonNullable<DiffEntry["origin"]> | "default", string> = {
   turn: "Atualização de perfil sugerida",
   document: "Extraído do documento",
+  extract: "Extraído do site — revise e ajuste",
   merge: "Importar da conversa?",
   manual: "Editar perfil",
   default: "Atualização de perfil sugerida",
@@ -29,17 +30,18 @@ function isAdd(item: ProfileDiffItem): boolean {
     (Array.isArray(old) && old.length === 0);
 }
 
-// Editor de uma linha (input tipado por campo).
-function FieldEditor({
-  item,
+// Editor de uma linha (input tipado por campo). Exportado para reuso pelo
+// UnlockCard (Etapa 2 do onboarding) — mesmo input tipado, sem duplicar widget.
+export function FieldEditor({
+  field,
   value,
   onChange,
 }: {
-  item: ProfileDiffItem;
+  field: keyof CompanyProfile;
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
-  const spec = fieldSpec(item.field as keyof CompanyProfile);
+  const spec = fieldSpec(field);
   const base = cn(
     "w-full rounded-md border border-border px-2 py-1 text-sm font-sans",
     "text-content-primary focus:outline-none focus:ring-2 focus:ring-primary/40",
@@ -190,7 +192,7 @@ export function DiffCard({
                 {editing && !decided ? (
                   <div className="mt-1">
                     <FieldEditor
-                      item={item}
+                      field={item.field as keyof CompanyProfile}
                       value={draft[item.field]}
                       onChange={(v) =>
                         setDraft((d) => ({ ...d, [item.field]: v }))

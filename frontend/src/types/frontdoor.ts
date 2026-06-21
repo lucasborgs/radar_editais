@@ -28,8 +28,9 @@ export interface DiffEntry {
   status: DiffStatus;
   // Origem do diff: "turn" (proposta do LLM no turno), "document" (extração de
   // anexo), "merge" (conflito conta vs. conversa no login), "manual" (editar
-  // perfil pela barra de status). Só muda a copy/título do card.
-  origin?: "turn" | "document" | "merge" | "manual";
+  // perfil pela barra de status), "extract" (hero de URL da Etapa 1 do
+  // onboarding). Só muda a copy/título do card.
+  origin?: "turn" | "document" | "merge" | "manual" | "extract";
   // Id da row em session_turns quando a conversa é persistida (logado, spec
   // chat-first fase 2) — alvo do PATCH no aceite/descarte.
   entryId?: number;
@@ -214,31 +215,103 @@ export function applyDiff(
   return next;
 }
 
+// Rótulos PT-BR dos campos do perfil para os cards de diff. Compartilhado entre
+// o "editar perfil" (diffFromProfile) e a extração por URL/documento
+// (diffFromExtracted) — evita rótulos crus (nome do campo) na 1ª impressão.
+export const PROFILE_FIELD_LABELS: Partial<Record<keyof CompanyProfile, string>> = {
+  nome: "Nome",
+  tipo_entidade: "Tipo de entidade",
+  one_liner: "Proposta (one-liner)",
+  solution_summary: "Resumo da solução",
+  descricao_atividades: "Descrição das atividades",
+  tamanho_empresa: "Porte",
+  uf: "UF",
+  ano_fundacao: "Ano de fundação",
+  trl: "TRL",
+  faturamento_anual: "Faturamento anual",
+  tipos_financiamento_interesse: "Interesse de financiamento",
+  estagio: "Estágio",
+  mrr_arr: "MRR/ARR",
+  round_alvo_brl: "Round alvo (R$)",
+};
+
 // Constrói um diff "manual" com TODOS os campos atuais do perfil (para o
 // "editar perfil" da barra de status reusar o DiffCard em modo edição).
 export function diffFromProfile(profile: CompanyProfile): ProfileDiffItem[] {
-  const LABELS: Partial<Record<keyof CompanyProfile, string>> = {
-    nome: "Nome",
-    tipo_entidade: "Tipo de entidade",
-    one_liner: "Proposta (one-liner)",
-    solution_summary: "Resumo da solução",
-    descricao_atividades: "Descrição das atividades",
-    tamanho_empresa: "Porte",
-    trl: "TRL",
-    uf: "UF",
-    ano_fundacao: "Ano de fundação",
-    faturamento_anual: "Faturamento anual",
-    tipos_financiamento_interesse: "Interesse de financiamento",
-    estagio: "Estágio",
-    mrr_arr: "MRR/ARR",
-    round_alvo_brl: "Round alvo (R$)",
-  };
-  return (Object.keys(LABELS) as (keyof CompanyProfile)[]).map((field) => ({
+  return (Object.keys(PROFILE_FIELD_LABELS) as (keyof CompanyProfile)[]).map((field) => ({
     field,
-    label: LABELS[field] ?? field,
+    label: PROFILE_FIELD_LABELS[field] ?? field,
     old: profile[field],
     new: profile[field],
   }));
+}
+
+// Diff só dos campos que a extração (URL/documento) preencheu, em relação ao
+// perfil atual. Usado pelo hero de URL (Etapa 1) e pelo anexo de documento:
+// "AI drafts, humans decide" — o humano revisa antes de aplicar. Campos vazios
+// na extração ficam de fora.
+export function diffFromExtracted(
+  current: CompanyProfile,
+  extracted: CompanyProfile,
+): ProfileDiffItem[] {
+  const out: ProfileDiffItem[] = [];
+  for (const field of Object.keys(EMPTY_PROFILE) as (keyof CompanyProfile)[]) {
+    const v = extracted[field];
+    const empty = Array.isArray(v) ? v.length === 0 : v === "" || v === null;
+    if (empty) continue;
+    out.push({
+      field,
+      label: PROFILE_FIELD_LABELS[field] ?? field,
+      old: current[field],
+      new: v,
+    });
+  }
+  return out;
+}
+
+// ── Etapa 2 do onboarding: "destravar mais matches" (gap-driven) ─────────────
+// Campo faltante de alto impacto + por que pedir. Determinístico (não depende do
+// LLM lembrar de perguntar). Spec onboarding-input-ux, Decisão 3.
+export interface ProfileGap {
+  field: keyof CompanyProfile;
+  prompt: string; // pergunta curta
+  why: string; // o que destrava
+}
+
+// Lacunas de maior alavanca, ordenadas por impacto, dado o perfil + o radar atual.
+// `capital_social` é CONDICIONAL: só com porte pequeno (MEI/ME) e algum evento no
+// radar — proxy do "edital exige contrapartida" (o flag por-edital não vem no
+// payload do radar; simplificação sancionada na spec). Retorna no máx. 3 itens.
+export function missingHighImpact(
+  profile: CompanyProfile,
+  radar: RadarResponse | null,
+): ProfileGap[] {
+  const gaps: ProfileGap[] = [];
+
+  if (profile.tipos_financiamento_interesse.length === 0) {
+    gaps.push({
+      field: "tipos_financiamento_interesse",
+      prompt: "Que tipo de fomento te interessa?",
+      why: "Define o eixo de mecanismo do match.",
+    });
+  }
+  if (profile.faturamento_anual === null) {
+    gaps.push({
+      field: "faturamento_anual",
+      prompt: "Qual o faturamento anual aproximado (R$)?",
+      why: "Vários editais filtram por porte/receita.",
+    });
+  }
+  const small = profile.tamanho_empresa === "MEI" || profile.tamanho_empresa === "ME";
+  const hasEvento = !!radar?.radar.some((i) => i.kind_class === "evento");
+  if (profile.capital_social === null && small && hasEvento) {
+    gaps.push({
+      field: "capital_social",
+      prompt: "Qual o capital social da empresa (R$)?",
+      why: "Pode destravar editais que exigem contrapartida.",
+    });
+  }
+  return gaps.slice(0, 3);
 }
 
 // Mensagem local (sem LLM) explicando o que falta para rodar o radar.
