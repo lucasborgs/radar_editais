@@ -61,6 +61,7 @@ def load_data() -> list[dict]:
             "expected_output": {
                 "expected_top": case.get("expected_top", []),
                 "expected_top_n": case.get("expected_top_n", 3),
+                "expected_above": case.get("expected_above", {}),
             },
             "metadata": {"case_id": case["id"], "profile_name": case["profile"]},
         })
@@ -133,6 +134,29 @@ def eval_expected_hit(*, output, expected_output, **_) -> Evaluation | None:
     return {"name": "expected_hit", "value": hit, "comment": f"esperados={expected}"}
 
 
+def eval_expected_above(*, output, expected_output, **_) -> Evaluation | None:
+    """Ordenação relativa: `a` rankeia ACIMA de `b`? (prova da elegibilidade dura.)
+
+    Gate-ável SÓ quando ambos os ids estão no resultado. `b` ausente do ranking
+    conta como satisfeito (caiu abaixo de tudo → trivialmente abaixo de `a`).
+    `a` ausente = violação (não subiu). None quando o caso não declara o par.
+    """
+    pairs = (expected_output or {}).get("expected_above", {})
+    if not pairs:
+        return None
+    ids = output.get("result_ids", []) if isinstance(output, dict) else []
+    pos = {eid: i for i, eid in enumerate(ids)}
+    ok = True
+    for above, below in pairs.items():
+        ia = pos.get(above)
+        ib = pos.get(below)
+        if ia is None:                      # o esperado-acima nem entrou → falha
+            ok = False
+        elif ib is not None and ia >= ib:   # ambos presentes mas ordem invertida
+            ok = False
+    return {"name": "expected_above", "value": ok, "comment": f"pares={pairs}"}
+
+
 def _prereqs() -> str | None:
     if not os.getenv("OPENAI_API_KEY"):
         return "requer OPENAI_API_KEY (juiz da rúbrica + Stage 2)"
@@ -147,6 +171,6 @@ SUITE = Suite(
     description="Precisão@K do HybridMatch via rúbrica LLM + vigência/elegibilidade.",
     load_data=load_data,
     task=task,
-    evaluators=[eval_rubric_precision, eval_expected_hit],
+    evaluators=[eval_rubric_precision, eval_expected_hit, eval_expected_above],
     prereqs=_prereqs,
 )
