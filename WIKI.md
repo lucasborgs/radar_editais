@@ -90,6 +90,7 @@ wiki_page_synthesized_fields:
   required_certifications: { type: "list[str]", default: [] }
   counterpart_required:    { type: "bool",      default: false }
   key_requirements:        { type: "list[str]", max_items: 5, desc: "requisitos concretos e verificáveis" }
+  eligibility_constraints: { type: "list[obj]", default: [], shape: "{type: enum(region|company_age|revenue|cnae|consortium), description: str, evidence: str|null}", desc: "restrições organizacionais duras tipadas — contexto p/ re-rank soft, nunca gate (§D2)" }
   key_facts:               { type: "list[str]", max_items: 5, desc: "fatos mais relevantes para decisão" }
   proposal_sections:       { type: "list[str]", min_items: 6, max_items: 12, desc: "seções obrigatórias da proposta" }
 ```
@@ -648,6 +649,7 @@ extraction_prompt: |
     "required_certifications": [],
     "counterpart_required": false,
     "key_requirements": ["máx 5 requisitos concretos e objetivos"],
+    "eligibility_constraints": [{{"type": "region|company_age|revenue|cnae|consortium", "description": "restrição em texto curto", "evidence": "trecho verbatim do edital que afirma a restrição"}}],
     "key_facts": ["5 fatos mais relevantes para uma empresa decidir se candidatar"],
     "proposal_sections": [
       "1. Título e identificação do projeto",
@@ -660,6 +662,9 @@ extraction_prompt: |
   - trl_range: inteiros 1-9, null se não mencionado
   - value_range: valores em reais como inteiros, null se não mencionado
   - key_requirements: máx 5 itens, cada um autocontido e verificável
+  - eligibility_constraints: SÓ restrições organizacionais duras explícitas (sede em UF/região,
+    idade/tempo de constituição da empresa, faturamento, CNAE, exigência de consórcio). `evidence`
+    = trecho verbatim do edital. Lista vazia [] se o texto não afirmar nenhuma — não inferir.
   - key_facts: os 5 fatos que uma empresa usaria para decidir se vale candidatar
   - proposal_sections: seções obrigatórias da proposta na ordem exigida pelo edital,
     extraídas das instruções de inscrição e formulários. Se o edital não especificar
