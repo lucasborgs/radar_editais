@@ -24,7 +24,6 @@ _MODEL = os.getenv("CONTEXTUAL_RETRIEVAL_MODEL", "gpt-4o-mini")
 # um modelo free/open (ex.: Gemini Flash) sem editar código. Defaults preservam
 # o gpt-4o-mini no endpoint canônico OpenAI.
 _BASE_URL = os.getenv("CONTEXTUAL_RETRIEVAL_BASE_URL") or None
-_API_KEY_ENV = os.getenv("CONTEXTUAL_RETRIEVAL_API_KEY") or os.getenv("OPENAI_API_KEY")
 _DOC_CHARS = 12000      # doc-contexto truncado (custo/latência por chamada)
 _CHUNK_CHARS = 1500
 _MAX_WORKERS = 8
@@ -37,13 +36,19 @@ _PROMPT = (
 )
 
 
+def _api_key() -> str | None:
+    """Resolve a key em CALL-TIME (não no import) — senão monkeypatch.setenv nos
+    testes e mudanças de env pós-import seriam ignoradas (era raiz de flakes)."""
+    return os.getenv("CONTEXTUAL_RETRIEVAL_API_KEY") or os.getenv("OPENAI_API_KEY")
+
+
 def is_enabled() -> bool:
     """Liga por default; desliga com CONTEXTUAL_RETRIEVAL=false. Sem key
     (CONTEXTUAL_RETRIEVAL_API_KEY/OPENAI_API_KEY) também desliga (degrada para
     embed cru) — salvo endpoint custom, que aceita key placeholder."""
     if os.getenv("CONTEXTUAL_RETRIEVAL", "true").lower() in ("false", "0", "no"):
         return False
-    return bool(_API_KEY_ENV or _BASE_URL)
+    return bool(_api_key() or _BASE_URL)
 
 
 def contextualize_chunks(chunks: list[dict]) -> list[str]:
@@ -57,7 +62,7 @@ def contextualize_chunks(chunks: list[dict]) -> list[str]:
 
     try:
         from core.llm.llm_client import make_client
-        kwargs: dict = {"api_key": _API_KEY_ENV or "not-needed"}
+        kwargs: dict = {"api_key": _api_key() or "not-needed"}
         if _BASE_URL:
             kwargs["base_url"] = _BASE_URL
         client = make_client(**kwargs)
