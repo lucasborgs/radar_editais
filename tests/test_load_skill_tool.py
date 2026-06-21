@@ -7,10 +7,9 @@ playbook.
 """
 from __future__ import annotations
 
-from core.llm.agent_tools import writing_tools
 from core import skills
+from core.llm.agent_tools import writing_tools
 from core.skills import load_playbook
-
 
 # ── Loader: composição em 3 camadas, merge por seção ────────────────────────
 

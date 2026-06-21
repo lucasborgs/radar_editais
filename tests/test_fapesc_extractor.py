@@ -146,16 +146,15 @@ def test_parse_chamada_ignores_signature_far_future_date():
     from datetime import date
     yr = date.today().year
     pdf_text = (
-        "Submissão de propostas até 30/09/%d.\n\n"
-        'Assinado por: "SGP-e", emitido em 15/04/%d e válido até 15/04/2126 - código.'
-        % (yr + 1, yr)
+        f"Submissão de propostas até 30/09/{yr + 1}.\n\n"
+        f'Assinado por: "SGP-e", emitido em 15/04/{yr} e válido até 15/04/2126 - código.'
     )
     scraper = FAPESCScraper()
     url = "https://fapesc.sc.gov.br/edital-de-chamada-publica-fapesc-n-o-004-2026-x"
     with patch.object(scraper, "_fetch", return_value=_PAGE_HTML), \
          patch.object(scraper, "_extract_pdf_text", return_value=pdf_text):
         row = scraper._parse_chamada(url, "x")
-    assert row["data_limite"] == "30/09/%d" % (yr + 1)  # não 15/04/2126
+    assert row["data_limite"] == f"30/09/{yr + 1}"  # não 15/04/2126
 
 
 def test_parse_chamada_falls_back_to_html_when_pdf_empty():
