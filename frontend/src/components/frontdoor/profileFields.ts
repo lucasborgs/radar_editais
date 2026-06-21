@@ -20,8 +20,6 @@ const UFS = [
 
 const FINANCIAMENTO_OPTIONS = [
   { value: "subvencao_nao_reembolsavel", label: "Subvenção (não reembolsável)" },
-  { value: "credito_reembolsavel", label: "Crédito reembolsável" },
-  { value: "matching_embrapii", label: "Matching EMBRAPII" },
   { value: "pesquisa_colaborativa", label: "Pesquisa colaborativa" },
 ];
 

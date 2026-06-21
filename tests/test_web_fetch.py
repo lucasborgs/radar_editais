@@ -11,7 +11,6 @@ import pytest
 
 from core.web import fetch as web_fetch
 
-
 _HTML = (
     "<html><head><title>  Acme Corp  </title></head>"
     "<body>"
