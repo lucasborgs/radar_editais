@@ -9,8 +9,11 @@ julga o top-K de um match contra a rúbrica única da spec (por edital):
 A partir do veredicto por edital, computa precisão@K e se um edital esperado
 (ex.: finep:612 para iFlorestal) aparece no topo.
 
-Juiz com modelo FIXO e capaz (gpt-4o por default) — comparabilidade entre
-runs. Funções de PARSE/MÉTRICA são puras (testáveis sem rede); só
+Juiz com modelo FIXO — comparabilidade entre runs. Default gpt-4o-mini
+(decisão pré-lançamento 2026-06-21: sem usuários reais nem baseline em produção
+a preservar, o custo do juiz pesa mais que a comparabilidade histórica; régua
+mais forte continua disponível via MATCHING_EVAL_MODEL=gpt-4o p/ um estudo de
+concordância). Funções de PARSE/MÉTRICA são puras (testáveis sem rede); só
 `judge_match_rubric` toca a OpenAI.
 """
 from __future__ import annotations
@@ -25,7 +28,10 @@ logger = logging.getLogger(__name__)
 
 
 def _eval_model() -> str:
-    return os.getenv("MATCHING_EVAL_MODEL") or os.getenv("OPENAI_MODEL_PRO") or "gpt-4o"
+    # Régua do juiz. gpt-4o-mini por default (barato); bump explícito para uma
+    # régua mais forte via MATCHING_EVAL_MODEL (ex.: gpt-4o). Desacoplado do
+    # OPENAI_MODEL_PRO de propósito — o juiz agora é deliberadamente leve.
+    return os.getenv("MATCHING_EVAL_MODEL") or "gpt-4o-mini"
 
 
 def _strip_code_fence(raw: str) -> str:
