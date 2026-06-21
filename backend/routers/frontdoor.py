@@ -84,13 +84,13 @@ def frontdoor_turn(
         um warning e devolvemos a resposta normal (a conversa vale mais que o
         histórico, spec fase 2).
 
-    `answer`: reusa o caminho do `kg_explore` (mesma flag de agente). O perfil
-    parcial entra como um bloco de contexto leve prefixado à mensagem (seam
-    mínimo-invasivo: não altera a assinatura de `kg_service.explore`).
-
-    `profile_diff`: chamada LLM SEPARADA e focada (tier barato) que devolve só
-    os campos que a última mensagem do usuário preenche/altera. None quando nada
-    é extraído. O endpoint não aplica o diff nem roda match — isso é o front.
+    `answer` + `profile_diff`: no caminho default (1-shot), `kg_service.explore_turn`
+    devolve OS DOIS numa única chamada LLM — a resposta E os campos do
+    CompanyProfile que a última mensagem preenche/altera (decisão 2026-06-21:
+    elimina a 2ª passada que o extract_diff_from_message fazia sobre a mesma
+    mensagem). No caminho agente (flag ON) a resposta vem do `explore` agêntico e
+    o diff continua numa chamada focada separada. `profile_diff` é None quando
+    nada é extraído. O endpoint não aplica o diff nem roda match — isso é o front.
     """
     message = req.message.strip()
     if not message:
@@ -101,13 +101,22 @@ def frontdoor_turn(
     # Perfil no contexto do explore: prefixo leve à mensagem (sem mexer no explore).
     ctx = _profile_context_block(req.profile)
     explore_message = f"{ctx}\n\n{message}" if ctx else message
-    answer = kg_service.explore(
-        explore_message, req.history, [], None, None, agent_enabled=agent_enabled,
-    )
-
-    # Diff de perfil: passo separado, tier barato (B5). Perfil atual como dict.
     current = req.profile.model_dump() if req.profile is not None else {}
-    diff = ProfileExtractor().extract_diff_from_message(message, current)
+
+    # Resposta + diff de perfil. Caminho 1-shot (default): `explore_turn` devolve
+    # ambos numa só chamada LLM (decisão 2026-06-21 — elimina a 2ª passada que o
+    # extract_diff_from_message fazia sobre a MESMA mensagem). Caminho agente
+    # (LangGraph, flag ON) não extrai inline → mantém a chamada focada separada.
+    if agent_enabled:
+        answer = kg_service.explore(
+            explore_message, req.history, [], None, None, agent_enabled=True,
+        )
+        diff = ProfileExtractor().extract_diff_from_message(message, current)
+    else:
+        answer, profile_updates = kg_service.explore_turn(
+            explore_message, req.history, [], None, None,
+        )
+        diff = ProfileExtractor().diff_from_updates(profile_updates, current)
 
     response: dict = {"answer": answer, "profile_diff": diff or None}
 

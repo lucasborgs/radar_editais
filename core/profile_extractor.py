@@ -374,6 +374,19 @@ class ProfileExtractor:
             return []
         return self._build_diff(raw, current_profile)
 
+    def diff_from_updates(
+        self, updates: dict | None, current_profile: dict | None = None,
+    ) -> list[dict]:
+        """Monta o `profile_diff` a partir de updates JÁ extraídos por outra via.
+
+        Usado pelo explore unificado (`KGMatchService.explore_turn`), que devolve
+        os campos alterados na MESMA chamada da resposta — então aqui NÃO há LLM,
+        só o shaping determinístico de `_build_diff` (filtra campos desconhecidos,
+        vazios e os que não mudam vs. o perfil atual). Espelha o pós-processamento
+        do `extract_diff_from_message`, sem a chamada focada extra.
+        """
+        return self._build_diff(updates or {}, current_profile or {})
+
     @staticmethod
     def _build_diff(raw: dict, current_profile: dict) -> list[dict]:
         """Monta as linhas do diff (old/new/label) a partir do dict do LLM.
