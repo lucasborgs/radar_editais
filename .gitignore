@@ -70,3 +70,4 @@ supabase/.branches/
 supabase/.temp/
 *.bak
 data/knowledge_graph/.discovery_ledger.json
+.eligibility_cache.json

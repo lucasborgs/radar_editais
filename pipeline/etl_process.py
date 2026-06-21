@@ -228,6 +228,10 @@ def _save_wiki_page(entry: dict, synthesized: dict) -> dict:
         "key_requirements":        synthesized.get("key_requirements", []),
         "key_facts":               synthesized.get("key_facts", []),
         "proposal_sections":       synthesized.get("proposal_sections", []),
+        # Campo synthesized declarado (WIKI.md §4). Default [] aqui; o produtor
+        # de elegibilidade (core.eligibility_producer) o POPULA num passo de
+        # enriquecimento separado, lendo o mesmo texto silver.
+        "eligibility_constraints": synthesized.get("eligibility_constraints", []),
         "generated_at":            datetime.now().strftime("%Y-%m-%d"),
         "source":                  "etl_process",
     }
@@ -262,6 +266,7 @@ def _save_minimal_wiki_page(entry: dict) -> dict:
         "key_requirements":        [],
         "key_facts":               [],
         "proposal_sections":       [],
+        "eligibility_constraints": [],  # sem texto → nada a extrair (campo declarado)
         "generated_at":            datetime.now().strftime("%Y-%m-%d"),
         "source":                  "metadata_only",
     }
