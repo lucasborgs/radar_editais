@@ -72,6 +72,40 @@ PERGUNTA DO VISITANTE:
 {message}"""
 
 
+# Extração de perfil ACOPLADA ao turno do front-door (decisão 2026-06-21): em vez
+# de uma 2ª chamada LLM (extract_diff_from_message) sobre a mesma mensagem, o MESMO
+# turno do explore devolve resposta + profile_updates num único JSON. Anexado ao
+# EXPLORE_SYSTEM_PROMPT só no caminho `explore_turn`. As chaves espelham
+# _DIFF_FIELD_LABELS de core.profile_extractor (o _build_diff filtra desconhecidos).
+# NB: esta string nunca passa por .format() — chaves literais com 1 par de {}.
+EXPLORE_PROFILE_EXTRACTION_INSTRUCTION = """
+
+———
+ALÉM de responder, EXTRAIA atualizações do perfil da empresa a partir da ÚLTIMA mensagem do visitante.
+Responda SEMPRE com UM objeto JSON válido (sem markdown em volta) com DUAS chaves:
+{
+  "answer": "<sua resposta ao visitante, em markdown>",
+  "profile_updates": { <só os campos que a ÚLTIMA mensagem preenche/altera; {} se nenhum> }
+}
+Chaves possíveis em profile_updates (use exatamente estas; NUNCA use null — omita o campo):
+- nome (string)
+- tipo_entidade ("empresa" | "startup" | "universidade" | "ICT")
+- one_liner (string, 1 frase)
+- solution_summary (string)
+- descricao_atividades (string)
+- tamanho_empresa ("MEI" | "ME" | "EPP" | "MEDIO" | "GRANDE")
+- trl (int 1-9)
+- uf (sigla de 2 letras, ex.: "SP")
+- ano_fundacao (int)
+- faturamento_anual (number, R$)
+- tipos_financiamento_interesse (array de strings)
+- estagio ("pre-seed" | "seed" | "serie-a")
+- mrr_arr (number, R$)
+- round_alvo_brl (number, R$)
+Inclua um campo SOMENTE se a última mensagem trouxer essa informação de fato. Se for só uma
+pergunta sem fato sobre a empresa, devolva "profile_updates": {}."""
+
+
 # Sistema prompt do modo agente (Sprint 3 do Cenário B). Substitui o
 # EXPLORE_SYSTEM_PROMPT quando agent_enabled=True. As ferramentas de leitura são
 # registradas via core.llm.agent_tools.build_explore_tools (8 tools cross-dim) e
@@ -647,16 +681,21 @@ class KGMatchService:
             message, history, edital_ids, node_id, node_type,
         )
 
-    def _explore_legacy(
+    def _build_legacy_messages(
         self,
         message: str,
         history: list[dict] | None,
         edital_ids: list[str] | None,
         node_id: str | None,
         node_type: str | None,
-    ) -> str:
-        """Pipeline original (pre-Sprint 3): catálogo inteiro injetado no prompt
-        + 1 LLM call. Mantido durante o rollout do agente."""
+        *,
+        system: str = EXPLORE_SYSTEM_PROMPT,
+    ) -> list[dict]:
+        """Monta as mensagens do explore legacy (catálogo + detalhes + histórico).
+
+        Extraído de `_explore_legacy` para ser reaproveitado por `explore_turn`
+        (front-door), que injeta um `system` aumentado com extração de perfil.
+        """
         self._ensure_client()
         index_str = self._get_index_for_prompt()
 
@@ -675,7 +714,7 @@ class KGMatchService:
         focus_ids = self._resolve_focus_ids(message, scope_ids or edital_ids)
         details_block = self._build_edital_details(focus_ids)
 
-        messages: list[dict] = [{"role": "system", "content": EXPLORE_SYSTEM_PROMPT}]
+        messages: list[dict] = [{"role": "system", "content": system}]
         for turn in (history or [])[-8:]:
             role = turn.get("role")
             content = turn.get("content")
@@ -689,7 +728,21 @@ class KGMatchService:
                 message=message,
             ),
         })
+        return messages
 
+    def _explore_legacy(
+        self,
+        message: str,
+        history: list[dict] | None,
+        edital_ids: list[str] | None,
+        node_id: str | None,
+        node_type: str | None,
+    ) -> str:
+        """Pipeline original (pre-Sprint 3): catálogo inteiro injetado no prompt
+        + 1 LLM call. Mantido durante o rollout do agente."""
+        messages = self._build_legacy_messages(
+            message, history, edital_ids, node_id, node_type,
+        )
         try:
             response = self._client.chat.completions.create(
                 model=self._model,
@@ -701,6 +754,55 @@ class KGMatchService:
         except Exception as e:
             logger.error("Erro LLM no explore: %s", e)
             return "Desculpe, não consegui processar agora. Tente novamente em instantes."
+
+    def explore_turn(
+        self,
+        message: str,
+        history: list[dict] | None = None,
+        edital_ids: list[str] | None = None,
+        node_id: str | None = None,
+        node_type: str | None = None,
+    ) -> tuple[str, dict]:
+        """Explore legacy + extração de `profile_updates` na MESMA chamada LLM.
+
+        Front-door (decisão 2026-06-21): elimina a 2ª passada de LLM que o
+        `extract_diff_from_message` fazia sobre a mesma mensagem. Uma única
+        completion devolve, em JSON, a resposta ao visitante E os campos do
+        CompanyProfile que a última mensagem preenche/altera. Retorna
+        `(answer, profile_updates)`; `profile_updates` é {} quando não há fato
+        novo — o modelo decide ("gate" emergente, sem regex nem 2ª chamada).
+
+        Degrada com segurança: qualquer falha de JSON/LLM cai no `_explore_legacy`
+        de texto puro (resposta preservada) com updates vazios — o diff daquele
+        turno se perde, mas é recuperável no próximo (o perfil persiste).
+        """
+        system = EXPLORE_SYSTEM_PROMPT + EXPLORE_PROFILE_EXTRACTION_INSTRUCTION
+        messages = self._build_legacy_messages(
+            message, history, edital_ids, node_id, node_type, system=system,
+        )
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=messages,
+                temperature=0.3,
+                max_tokens=1400,
+                response_format={"type": "json_object"},
+            )
+            raw = (response.choices[0].message.content or "").strip()
+            data = json.loads(raw)
+            answer = (data.get("answer") or "").strip()
+            if not answer:
+                raise ValueError("explore_turn: JSON sem 'answer' útil")
+            updates = data.get("profile_updates")
+            return answer, updates if isinstance(updates, dict) else {}
+        except Exception as e:
+            logger.warning(
+                "explore_turn: extração unificada falhou (%s) — fallback texto puro", e,
+            )
+            return (
+                self._explore_legacy(message, history, edital_ids, node_id, node_type),
+                {},
+            )
 
     def _explore_tools(self) -> list:
         """Tools do agente de explore: leitura cross-dim + planejamento, e
