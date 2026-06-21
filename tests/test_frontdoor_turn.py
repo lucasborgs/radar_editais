@@ -76,7 +76,8 @@ def test_frontdoor_turn_short_message_no_diff(monkeypatch):
     """Mensagem curta: explore roda (resposta), mas diff é pulado → profile_diff None."""
     from backend.routers import frontdoor
 
-    monkeypatch.setattr(frontdoor.kg_service, "explore", lambda *a, **k: "resposta curta")
+    monkeypatch.setenv("AGENT_EXPLORE_DEFAULT_ENABLED", "false")
+    monkeypatch.setattr(frontdoor.kg_service, "explore_turn", lambda *a, **k: ("resposta curta", {}))
     # garante que o LLM de diff nunca é chamado para mensagem curta
     monkeypatch.setattr(
         ProfileExtractor, "_call_diff_llm",
