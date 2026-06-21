@@ -22,6 +22,17 @@
       "solution_summary": "Infraestrutura de pagamentos com antifraude por machine learning.",
       "descricao_atividades": "Software financeiro B2B; integração com adquirentes e bancos.",
       "tipos_financiamento_interesse": ["credito_reembolsavel"]
+    },
+    "ia_digital_mg": {
+      "nome": "NeuralMinas Tecnologia",
+      "tipo_entidade": "startup",
+      "tamanho_empresa": "ME",
+      "uf": "MG",
+      "trl": 4,
+      "one_liner": "Plataforma de IA generativa e conectividade para indústria 4.0.",
+      "solution_summary": "Modelos de IA aplicada e tecnologias digitais para automação industrial e análise de dados em tempo real.",
+      "descricao_atividades": "Desenvolvimento de software de inteligência artificial e tecnologias digitais; soluções de conectividade para chão de fábrica em Minas Gerais.",
+      "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel"]
     }
   },
   "cases": [
@@ -36,6 +47,14 @@
       "profile": "fintech_saas",
       "expected_top": [],
       "expected_top_n": 3
+    },
+    {
+      "_comment": "Golden de elegibilidade DURA (spec edital-eligibility-constraints, PR2/PR3). Perfil de startup digital/IA sediada em MG. O controle ELEGÍVEL finep:779 (Tecnologias Digitais, sem restrição regional) deve aparecer no top; o region-restrito fapesp:18203 (PIPE: 'sede no estado de São Paulo') é inelegível por região para MG e deve cair ABAIXO de 779. VERMELHO sem o produtor (dimensão dormente, 18203 e 779 empatam no tema digital); VERDE depois que o produtor popular o `eligibility_constraints` de 18203.",
+      "id": "ia_digital_mg",
+      "profile": "ia_digital_mg",
+      "expected_top": ["finep:779"],
+      "expected_top_n": 3,
+      "expected_above": {"finep:779": "fapesp:18203"}
     }
   ]
 }
