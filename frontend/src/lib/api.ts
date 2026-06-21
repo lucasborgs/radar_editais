@@ -217,6 +217,9 @@ export interface RadarItem {
   score: number;
   why_now: string;            // sinal "por que agora" (countdown / tese)
   tier: RadarTier;            // "fraco" = rebaixado (aproximado/abaixo do floor)
+  // Cluster de DISPLAY (spec D2): "capital de risco" (investidores + editais de
+  // investimento/FIP) vs "fomento" (resto). Só agrupamento — não toca ranking.
+  cluster?: string;
   rank: number;
   rrf: number;
   // payload cru do matcher de origem — tipado por kind_class no consumo.
