@@ -12,6 +12,7 @@ from backend.library_routes import MAX_UPLOAD_MB
 from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient
 from core.profile_extractor import ExtractResult, ProfileExtractor
+from core.profile_inference import infer_financiamento
 from core.services.content_library import extract_document_text, get_item, get_workspace_id
 
 router = APIRouter(tags=["profile"])
@@ -27,6 +28,14 @@ def _serialize_extract_result(result: ExtractResult) -> dict:
     Centraliza o dict campo-a-campo do perfil para os três endpoints
     (extract, extract-from-document, extract-from-library).
     """
+    # Decisão 1 (docs/specs/onboarding-input-ux.md): infere mecanismos de
+    # financiamento candidatos quando a extração não os trouxe. PROPOSTA pré-marcada
+    # — humano confirma/desmarca no review; eval-gated (dimensão mecanismo, peso 15).
+    # Não sobrescreve valor já presente (ex.: vindo de edição manual/library).
+    tipos_financiamento = (
+        result.profile.tipos_financiamento_interesse
+        or infer_financiamento(result.profile)
+    )
     return {
         "profile": {
             "nome": result.profile.nome,
@@ -43,7 +52,7 @@ def _serialize_extract_result(result: ExtractResult) -> dict:
             "ano_fundacao": result.profile.ano_fundacao,
             "trl": result.profile.trl,
             "equipe_resumo": result.profile.equipe_resumo,
-            "tipos_financiamento_interesse": result.profile.tipos_financiamento_interesse,
+            "tipos_financiamento_interesse": tipos_financiamento,
         },
         "confidence": result.confidence,
         "source_title": result.source_title,

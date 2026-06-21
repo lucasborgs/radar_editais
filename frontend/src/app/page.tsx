@@ -14,6 +14,8 @@ import { Composer } from "@/components/frontdoor/Composer";
 import { DiffCard } from "@/components/frontdoor/DiffCard";
 import { RadarCard } from "@/components/frontdoor/RadarCard";
 import { GateCard } from "@/components/frontdoor/GateCard";
+import { UrlHero } from "@/components/frontdoor/UrlHero";
+import { UnlockCard } from "@/components/frontdoor/UnlockCard";
 import {
   frontdoorTurn,
   getRadar,
@@ -43,10 +45,12 @@ import {
   toApiHistory,
   applyDiff,
   diffFromProfile,
+  diffFromExtracted,
   entriesFromServer,
   profileCompleteness,
   isRadarReady,
   missingForRadar,
+  missingHighImpact,
   type TranscriptEntry,
 } from "@/types/frontdoor";
 
@@ -113,6 +117,11 @@ export default function FrontDoorPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   // Retomada via sidebar: /?c=<session_id>. Lido uma vez na montagem.
   const [resumeId, setResumeId] = useState<string | null>(null);
+  // Hero de URL (Etapa 1): some quando o usuário extrai um site ou escolhe
+  // "prefiro descrever" (cai no chat). Estado de sessão — não persiste.
+  const [heroDismissed, setHeroDismissed] = useState(false);
+  // Card "destravar mais matches" (Etapa 2): dispensável por sessão.
+  const [unlockDismissed, setUnlockDismissed] = useState(false);
 
   const lastRadarRef = useRef<HTMLDivElement>(null);
 
@@ -422,6 +431,16 @@ export default function FrontDoorPage() {
     lastRadarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  // ── Etapa 2: aplicar campos do UnlockCard → persiste + re-roda o radar ───────
+  const handleUnlockApply = useCallback(
+    async (updates: Partial<CompanyProfile>) => {
+      const next = { ...profile, ...updates } as CompanyProfile;
+      await persistProfile(next);
+      await runRadar(next);
+    },
+    [profile, persistProfile, runRadar],
+  );
+
   // ── Anexo (📎) ──────────────────────────────────────────────────────────────
   const handleAttachClick = useCallback((): boolean | void => {
     if (!isAuthed) {
@@ -431,20 +450,48 @@ export default function FrontDoorPage() {
     return false; // logado → deixa o Composer abrir o file picker
   }, [isAuthed]);
 
+  // ── Hero de URL (Etapa 1): a extração vira um diff de revisão ───────────────
+  // "AI drafts, humans decide": não aplica nada — empilha um DiffCard que o
+  // usuário revisa/edita; o aceite (decideDiff) persiste e dispara o radar.
+  const handleExtractResult = useCallback(
+    (extracted: CompanyProfile, lowConfidence: boolean) => {
+      setHeroDismissed(true);
+      const items = diffFromExtracted(profile, extracted);
+      setEntries((prev) => {
+        if (items.length === 0) {
+          return [
+            ...prev,
+            {
+              kind: "msg",
+              role: "assistant",
+              content:
+                "Não consegui extrair dados desse site. Me conta o que sua empresa faz que eu monto o perfil com você.",
+            },
+          ];
+        }
+        const next: TranscriptEntry[] = [...prev];
+        if (lowConfidence) {
+          next.push({
+            kind: "msg",
+            role: "assistant",
+            content:
+              "Achei pouca coisa no site — revise o rascunho abaixo e complemente o que faltar.",
+          });
+        }
+        next.push({ kind: "diff", items, status: "pending", origin: "extract" });
+        return next;
+      });
+    },
+    [profile],
+  );
+
   const handlePickFile = useCallback(
     async (file: File) => {
       const t = toast.loading("Lendo o documento…");
       try {
         const res = await extractProfileFromDocument(file);
-        // Monta um diff (old = perfil atual) só com os campos que vieram preenchidos.
-        const items: ProfileDiffItem[] = (
-          Object.keys(EMPTY_PROFILE) as (keyof CompanyProfile)[]
-        )
-          .filter((f) => {
-            const v = res.profile[f];
-            return Array.isArray(v) ? v.length > 0 : v !== "" && v !== null;
-          })
-          .map((f) => ({ field: f, label: f, old: profile[f], new: res.profile[f] }));
+        // Monta um diff (old = perfil atual) só com os campos preenchidos.
+        const items = diffFromExtracted(profile, res.profile);
         toast.dismiss(t);
         if (items.length === 0) {
           toast.message("Não encontrei dados de perfil no documento.");
@@ -563,6 +610,9 @@ export default function FrontDoorPage() {
   }, [resetConversation]);
 
   const isEmpty = hydrated && entries.length === 0;
+  // Hero de URL na 1ª tela (Etapa 1): só com perfil ainda não-rodável, conversa
+  // vazia e antes de o usuário optar por descrever. Some ao extrair ou pular.
+  const heroActive = isEmpty && !heroDismissed && !isRadarReady(profile);
   const completeness = profileCompleteness(profile);
   const hasRadar = entries.some((e) => e.kind === "radar");
 
@@ -571,6 +621,13 @@ export default function FrontDoorPage() {
   entries.forEach((e, i) => {
     if (e.kind === "radar") lastRadarIndex = i;
   });
+
+  // Gaps de alto impacto sobre o radar mais recente (Etapa 2). Recomputa a cada
+  // mudança de perfil — some sozinho quando os campos são preenchidos.
+  const lastRadar = lastRadarIndex >= 0 ? entries[lastRadarIndex] : null;
+  const lastRadarData = lastRadar?.kind === "radar" ? lastRadar.data : null;
+  const gaps = lastRadarData ? missingHighImpact(profile, lastRadarData) : [];
+  const showUnlock = gaps.length > 0 && !unlockDismissed;
 
   return (
     // A home é a tela principal do chat — o sidebar de conversas vive aqui
@@ -592,7 +649,16 @@ export default function FrontDoorPage() {
       <ChatMessageList className="mx-auto w-full max-w-2xl" deps={[sending, hydrated, briefs]}>
         <Bubble role="assistant" content={WELCOME} />
 
-        {isEmpty && (
+        {heroActive && (
+          <div className="pt-2">
+            <UrlHero
+              onResult={handleExtractResult}
+              onSkip={() => setHeroDismissed(true)}
+            />
+          </div>
+        )}
+
+        {isEmpty && !heroActive && (
           <div className="pt-1">
             <SuggestionChips
               suggestions={SUGGESTIONS}
@@ -642,6 +708,16 @@ export default function FrontDoorPage() {
           </div>
         )}
       </ChatMessageList>
+
+        {showUnlock && (
+          <div className="mx-auto w-full max-w-2xl px-1 pb-2">
+            <UnlockCard
+              gaps={gaps}
+              onApply={handleUnlockApply}
+              onDismiss={() => setUnlockDismissed(true)}
+            />
+          </div>
+        )}
 
         <Composer
           value={input}
