@@ -486,7 +486,7 @@ async def auto_review_checklist(
 
         results = await asyncio.gather(*coros, return_exceptions=True)
 
-    by_label = dict(zip(labels, results))
+    by_label = dict(zip(labels, results, strict=True))
     errors: list[dict] = []
 
     if "compliance" in by_label:
