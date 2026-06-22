@@ -249,6 +249,10 @@ def build_icts(bronze: list[dict], area_map: dict[str, str]) -> list[dict]:
             "themes": themes,
             "themes_proposed": proposed,
             "summary": _summary_from_about(r.get("about", "")),
+            # §6.1.2: ICT cujo arranjo aporta recurso não-reembolsável. Derivado de
+            # source=='embrapii' hoje (Unidade EMBRAPII: ~1/3 do custo); curável por
+            # fonte quando PNIPE/outras entrarem.
+            "brings_cofinancing": r.get("source", "") == "embrapii",
         }
 
         # Dedup: por id idêntico, e por nome normalizado (mesma instituição em

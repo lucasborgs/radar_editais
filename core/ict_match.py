@@ -30,6 +30,7 @@ class PartnerSuggestion:
     themes_match: list[str]          # quais temas casaram
     contact: dict = field(default_factory=dict)
     url: str = ""
+    brings_cofinancing: bool = False  # arranjo aporta recurso não-reembolsável (§6.1.2)
 
 
 # =============================================================================
@@ -62,6 +63,7 @@ def rank_partners(
             themes_match=sorted(match),
             contact=ict.get("contact", {}),
             url=ict.get("url", ""),
+            brings_cofinancing=ict.get("brings_cofinancing", False),
         ))
 
     scored.sort(key=lambda p: (-p.score, -_areas_len(icts, p.id), p.name))

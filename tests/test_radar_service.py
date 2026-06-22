@@ -9,9 +9,12 @@ from __future__ import annotations
 from core.services.radar_service import _apply_cap, merge_radar
 
 
-def _ev(id_, score, otype="edital", title="E", eligible=True):
-    return {"id": id_, "score": score, "opportunity_type": otype, "title": title,
-            "eligible": eligible}
+def _ev(id_, score, otype="edital", title="E", eligible=True, mechanism=None):
+    m = {"id": id_, "score": score, "opportunity_type": otype, "title": title,
+         "eligible": eligible}
+    if mechanism is not None:
+        m["mechanism"] = mechanism
+    return m
 
 
 def _inv(id_, score, name="Fundo"):
@@ -122,6 +125,30 @@ def test_floor_demotes_but_never_drops():
     out = merge_radar([], [_inv("i1", 2.0)])  # único match, bem fraco
     assert [it["id"] for it in out["radar"]] == ["i1"]
     assert out["radar"][0]["tier"] == "fraco"
+
+
+def test_cluster_capital_de_risco_for_investidor_and_investimento_events():
+    """Cluster de display (spec D2): investidor + edital mechanism=investimento
+    caem em "capital de risco"; o resto em "fomento". Só rótulo — não mexe na
+    ordenação (verificada pelos demais testes)."""
+    out = merge_radar(
+        [
+            _ev("finep:743", 8.0, mechanism="investimento"),  # FIP
+            _ev("finep:1", 7.0, mechanism="subvencao"),       # fomento
+            _ev("finep:2", 6.0),                              # sem mechanism → fomento
+        ],
+        [_inv("investidor:kptl", 7.5)],                       # entidade → capital de risco
+    )
+    cluster = {it["id"]: it["cluster"] for it in out["radar"]}
+    assert cluster["finep:743"] == "capital de risco"
+    assert cluster["investidor:kptl"] == "capital de risco"
+    assert cluster["finep:1"] == "fomento"
+    assert cluster["finep:2"] == "fomento"
+
+
+def test_cluster_present_on_every_item():
+    out = merge_radar([_ev("e1", 8.0)], [_inv("i1", 7.0)])
+    assert all("cluster" in it for it in out["radar"])
 
 
 def test_cap_applied_anti_flood_in_merge():

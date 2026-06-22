@@ -20,6 +20,8 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -39,13 +41,21 @@ def _comparison_cases() -> list[dict]:
     return [q for q in g.get("queries", []) if q.get("category") == COMPARISON_CATEGORY]
 
 
+def _require_index() -> dict:
+    # index.json vive em data/knowledge_graph/ (gitignored; gerado em runtime).
+    # Ausente no CI → skip em vez de FileNotFoundError.
+    if not INDEX_PATH.exists():
+        pytest.skip("data/knowledge_graph/index.json ausente (gitignored)")
+    return json.loads(INDEX_PATH.read_text(encoding="utf-8"))
+
+
 def _index_edital_ids() -> set[str]:
-    idx = json.loads(INDEX_PATH.read_text(encoding="utf-8"))
+    idx = _require_index()
     return {str(e["id"]) for e in idx.get("editais", [])}
 
 
 def _index_by_id() -> dict[str, dict]:
-    idx = json.loads(INDEX_PATH.read_text(encoding="utf-8"))
+    idx = _require_index()
     return {str(e["id"]): e for e in idx.get("editais", [])}
 
 

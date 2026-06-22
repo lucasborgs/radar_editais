@@ -213,7 +213,16 @@ def test_list_links_matching_fetches_on_demand(monkeypatch):
 # lookup_cnpj
 # ============================================================================
 
-def test_lookup_cnpj_validates_format():
+def test_lookup_cnpj_gated_off_by_default():
+    # Decisão 2026-06-21: Receita/BrasilAPI desativada por padrão. A tool só
+    # entra na lista com CNPJ_LOOKUP_ENABLED=true.
+    state = ExtractionState()
+    tools = build_profile_tools(state)
+    assert not any(t.name == "lookup_cnpj" for t in tools)
+
+
+def test_lookup_cnpj_validates_format(monkeypatch):
+    monkeypatch.setenv("CNPJ_LOOKUP_ENABLED", "true")
     state = ExtractionState()
     tools = build_profile_tools(state)
     lc = next(t for t in tools if t.name == "lookup_cnpj")
@@ -223,6 +232,7 @@ def test_lookup_cnpj_validates_format():
 
 
 def test_lookup_cnpj_accepts_masked_format(monkeypatch):
+    monkeypatch.setenv("CNPJ_LOOKUP_ENABLED", "true")
     state = ExtractionState()
     tools = build_profile_tools(state)
     lc = next(t for t in tools if t.name == "lookup_cnpj")
@@ -243,6 +253,7 @@ def test_lookup_cnpj_accepts_masked_format(monkeypatch):
 
 
 def test_lookup_cnpj_handles_404(monkeypatch):
+    monkeypatch.setenv("CNPJ_LOOKUP_ENABLED", "true")
     state = ExtractionState()
     tools = build_profile_tools(state)
     lc = next(t for t in tools if t.name == "lookup_cnpj")
@@ -257,6 +268,7 @@ def test_lookup_cnpj_handles_404(monkeypatch):
 
 def test_lookup_cnpj_handles_timeout(monkeypatch):
     from requests import Timeout
+    monkeypatch.setenv("CNPJ_LOOKUP_ENABLED", "true")
     state = ExtractionState()
     tools = build_profile_tools(state)
     lc = next(t for t in tools if t.name == "lookup_cnpj")
