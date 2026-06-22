@@ -90,6 +90,7 @@ wiki_page_synthesized_fields:
   required_certifications: { type: "list[str]", default: [] }
   counterpart_required:    { type: "bool",      default: false }
   key_requirements:        { type: "list[str]", max_items: 5, desc: "requisitos concretos e verificáveis" }
+  eligibility_constraints: { type: "list[obj]", default: [], shape: "{type: enum(region|company_age|revenue|cnae|consortium), description: str, evidence: str|null}", desc: "restrições organizacionais duras tipadas — contexto p/ re-rank soft, nunca gate (§D2)" }
   key_facts:               { type: "list[str]", max_items: 5, desc: "fatos mais relevantes para decisão" }
   proposal_sections:       { type: "list[str]", min_items: 6, max_items: 12, desc: "seções obrigatórias da proposta" }
 ```
@@ -479,7 +480,7 @@ taxonomia perfeita.
 ict_schema:
   artifact: "knowledge_graph/icts.json"
   id_format: "<source>:<slug>"          # ex.: embrapii:inteligencia-artificial-ceia-ufg
-  node_fields: [id, name, kind, source, url, about, address, contact, areas_raw, themes, themes_proposed, summary]
+  node_fields: [id, name, kind, source, url, about, address, contact, areas_raw, themes, themes_proposed, summary, brings_cofinancing]
   required_fields: [id, name, kind, source, themes]
   kinds: [embrapii_unit, laboratorio, instituto, universidade]
   sources: [embrapii, pnipe]
@@ -488,6 +489,7 @@ ict_schema:
     - "O alvo do mapeamento é o vocabulário de temas EMERGENTE do index.json (não há vocab fixo; canonicalize_themes é stub). Mapeamento fino→macro é LLM."
     - "areas_raw: rótulos de expertise crus da fonte (EMBRAPII: action_lines + tech_skills). Display + matching fino futuro."
     - "themes_proposed: áreas que não casaram com nenhum tema de edital — candidatas à expansão do vocabulário (não entram em themes nem na ponte)."
+    - "brings_cofinancing: bool. ICT cujo ARRANJO aporta recurso não-reembolsável ao projeto (Unidade EMBRAPII: ~1/3 do custo do projeto vem do aporte EMBRAPII). É o que dispara o selo 'pode trazer co-financiamento' no complemento do match. Default false; derivado true para source=='embrapii'. Generaliza além do kind (um lab PNIPE não traz). Opcional (não em required_fields) — ICTs antigas sem o campo seguem válidas."
     - "contact: dict {responsavel, email, telefone, site, ...} (campos opcionais)."
     - "icts.json espelha index.json: {icts: [...], total_icts, themes_index, themes_proposed_index, last_updated}."
 ```
@@ -647,6 +649,7 @@ extraction_prompt: |
     "required_certifications": [],
     "counterpart_required": false,
     "key_requirements": ["máx 5 requisitos concretos e objetivos"],
+    "eligibility_constraints": [{{"type": "region|company_age|revenue|cnae|consortium", "description": "restrição em texto curto", "evidence": "trecho verbatim do edital que afirma a restrição"}}],
     "key_facts": ["5 fatos mais relevantes para uma empresa decidir se candidatar"],
     "proposal_sections": [
       "1. Título e identificação do projeto",
@@ -659,6 +662,9 @@ extraction_prompt: |
   - trl_range: inteiros 1-9, null se não mencionado
   - value_range: valores em reais como inteiros, null se não mencionado
   - key_requirements: máx 5 itens, cada um autocontido e verificável
+  - eligibility_constraints: SÓ restrições organizacionais duras explícitas (sede em UF/região,
+    idade/tempo de constituição da empresa, faturamento, CNAE, exigência de consórcio). `evidence`
+    = trecho verbatim do edital. Lista vazia [] se o texto não afirmar nenhuma — não inferir.
   - key_facts: os 5 fatos que uma empresa usaria para decidir se vale candidatar
   - proposal_sections: seções obrigatórias da proposta na ordem exigida pelo edital,
     extraídas das instruções de inscrição e formulários. Se o edital não especificar

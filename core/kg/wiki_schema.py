@@ -47,6 +47,10 @@ MATCH_FIELDS: tuple[str, ...] = (
     "mechanism", "trl_range", "counterpart_required",
     "eligible_entities", "value_range",
     "objective", "key_requirements",
+    # Elegibilidade dura tipada (região/idade/faturamento) — carregada ao índice
+    # para a dimensão soft `_score_elegibilidade_dura` (e durabilidade em prod,
+    # onde o consumo lê o índice quando a wiki page-arquivo não existe).
+    "eligibility_constraints",
 )
 
 

@@ -266,9 +266,9 @@ def _load_git_layers(
             parsed = _parse_playbook_file(_SKILLS_DIR / "source" / src / fname)
             if not parsed:
                 continue
-            l, secs = parsed
-            if l and not src_lente:
-                src_lente = l
+            lente, secs = parsed
+            if lente and not src_lente:
+                src_lente = lente
             for name, body in secs.items():
                 if body:
                     # dentro da camada git_source, global.md + <mech>.md acumulam por seção

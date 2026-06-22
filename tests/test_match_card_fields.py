@@ -44,6 +44,7 @@ def test_promote_match_fields_copies_only_match_fields():
         "value_range": {"min_brl": 0, "max_brl": 1000},
         "objective": "foco em bioeconomia",
         "key_requirements": ["req A", "req B"],
+        "eligibility_constraints": [{"type": "region", "description": "sede no NE", "evidence": "..."}],
         "key_facts": ["NÃO deve ir pro card"],
         "proposal_sections": ["NÃO deve ir pro card"],
     }

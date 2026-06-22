@@ -231,10 +231,15 @@ def _fake_request() -> MagicMock:
 
 def _stub_frontdoor_llm(monkeypatch, answer="resposta", diff=None):
     import backend.routers.frontdoor as fd
-    monkeypatch.setattr(fd.kg_service, "explore", lambda *a, **k: answer)
+    # Pina o caminho default (não-agente), que estes testes exercitam — senão um
+    # AGENT_EXPLORE_DEFAULT_ENABLED=true no ambiente desviaria para o agente.
+    monkeypatch.setenv("AGENT_EXPLORE_DEFAULT_ENABLED", "false")
+    # Caminho default usa explore_turn (resposta + updates numa só chamada) e
+    # diff_from_updates para o diff. Mockamos os dois.
+    monkeypatch.setattr(fd.kg_service, "explore_turn", lambda *a, **k: (answer, {}))
     monkeypatch.setattr(
-        fd.ProfileExtractor, "extract_diff_from_message",
-        lambda self, message, current: diff or [],
+        fd.ProfileExtractor, "diff_from_updates",
+        lambda self, updates, current: diff or [],
     )
 
 

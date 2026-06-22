@@ -20,6 +20,7 @@ Princípios:
 from __future__ import annotations
 
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -296,4 +297,12 @@ def build_profile_tools(state: ExtractionState) -> list[BaseTool]:
             "resumo curto (1-2 frases) do que foi extraído e termine."
         )
 
-    return [fetch_page, list_links_matching, lookup_cnpj, submit_profile]
+    # CNPJ/BrasilAPI (Receita) DESATIVADO por padrão (decisão 2026-06-21): não
+    # depender de API externa frágil — e faturamento nem consta no CNPJ. Reversível
+    # via CNPJ_LOOKUP_ENABLED=true. O EXTRACTOR_AGENT_SYSTEM ainda menciona
+    # lookup_cnpj; se o agente a chamar com o gate fechado, o runtime devolve
+    # erro-string e o modelo segue sem os dados (degradação graciosa).
+    tools = [fetch_page, list_links_matching, submit_profile]
+    if os.getenv("CNPJ_LOOKUP_ENABLED", "false").lower() == "true":
+        tools.insert(2, lookup_cnpj)
+    return tools
