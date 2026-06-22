@@ -1,6 +1,6 @@
 """Tool de planejamento (write_todos) — lista de tarefas viva como âncora anti-drift.
 
-Padrão roubado do deepagents (ver docs/spec_agent_patterns.md): em loops longos
+Padrão deepagents: em loops longos
 o agente perde de vista o objetivo. Uma lista de TODOs que ele mantém e renderiza
 a cada update vira âncora no histórico — o estado atual do plano volta no contexto
 toda vez que ele escreve.

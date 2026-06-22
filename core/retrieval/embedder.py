@@ -2,7 +2,7 @@
 Embeddings — parametrizável por env (default: OpenAI text-embedding-3-large, 1536 dims).
 
 Historicamente embeddings eram OpenAI-only e o modelo era hardcoded (ADR A1/A3).
-O bake-off de modelos (docs/specs/llm-embedding-bakeoff.md) exige trocar o modelo
+O bake-off de modelos exige trocar o modelo
 por env para avaliar substitutos open-weight (Qwen3-Embedding, BGE-M3) sem editar
 código. Os defaults preservam exatamente o comportamento anterior: sem nenhuma env
 setada, isto embeda com text-embedding-3-large no endpoint canônico da OpenAI,

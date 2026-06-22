@@ -1,6 +1,6 @@
 """Engine do DeepResearch — subagente que busca na web e sintetiza COM fonte.
 
-DeepResearch Fase A (ver docs/spec_deepresearch.md). Padrão subagente-como-tool:
+DeepResearch Fase A. Padrão subagente-como-tool:
 `run_deep_research` roda um `run_agent` interno com duas tools (web_search via
 core.web_search; fetch_url para leitura profunda). Devolve `DeepResearchResult`
 estruturado (answer + sources) — a função pura que tanto a tool do Redator

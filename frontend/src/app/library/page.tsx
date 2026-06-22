@@ -1,7 +1,6 @@
 "use client";
 
-// Página "Arquivos" — gerenciador mínimo de biblioteca (spec_frontend_chat_first
-// Fase 4). Substitui a antiga /library rica (996 linhas) pelo padrão de apps de
+// Página "Arquivos" — gerenciador mínimo de biblioteca. Substitui a antiga /library rica (996 linhas) pelo padrão de apps de
 // chat: o upload "de verdade" acontece no composer de escrita (📎,
 // AttachToLibrary); aqui é só um gerente enxuto — listar, visualizar, upload,
 // excluir, arquivar e restaurar.

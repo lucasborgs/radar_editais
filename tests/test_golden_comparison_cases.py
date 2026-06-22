@@ -1,7 +1,7 @@
 """
 Validação ESTRUTURAL dos casos de golden de COMPARAÇÃO FUNDAMENTADA (explore).
 
-Cobre a spec docs/specs/explore-grounded-comparison.md (seção "Validação"):
+Cobre a seção "Validação" do grounding do modo explore:
 o gate de grounding só cobria o writing; estes casos levam a rede de segurança
 para a resposta fundamentada do modo explore (recuperação de trecho para
 comparação multi-edital), reusando o harness `rag` existente.

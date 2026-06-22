@@ -1,6 +1,6 @@
 """Match-por-tese: conecta uma startup deep-tech a INVESTIDORES (Q3).
 
-Motor ISOLADO da entidade `investidor` (spec_multi_quadrante §3.8). NÃO toca o
+Motor ISOLADO da entidade `investidor`. NÃO toca o
 matcher de edital (HybridMatch/KGMatch) — é um caminho paralelo, aditivo. Sem
 GATE (fundo não desqualifica por CNPJ): rankeia por aderência, soft.
 

@@ -1,6 +1,6 @@
 """Testes do playbook loader (core.skills) e da tool load_skill do Redator.
 
-Modelo (docs/specs/skills-by-mechanism.md): skill = competência keyed por
+Modelo: skill = competência keyed por
 `mechanism`, composta em 3 camadas (mechanism base + source/global + source/mech),
 merge POR SEÇÃO, com cada `##` roteando a um consumidor. Regra dura é RAG, não
 playbook.

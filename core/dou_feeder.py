@@ -4,7 +4,7 @@ Gera candidatos de ALTA PRECISÃO para a Descoberta a partir do Diário Oficial 
 União, em vez da busca livre (Tavily). Produz `SearchHit`-equivalentes que entram
 no MESMO `discover_opportunities()` (triagem LLM → extração → web_raw); o DOU é só
 um segundo GERADOR de candidatos, paralelo ao Tavily. Não é um adapter/fonte: o
-texto vai pro bronze `web` e o adapter `web` o chunka (spec_dou_feeder.md).
+texto vai pro bronze `web` e o adapter `web` o chunka.
 
 Fluxo:
   login INLABS (logar.php, email+password → cookie) → baixa o zip da seção do dia
