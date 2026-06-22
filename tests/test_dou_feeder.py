@@ -2,7 +2,7 @@
 
 Tudo offline: o zip do INLABS é sintetizado em memória (1 XML por matéria, schema
 real do INLABS). Login/download não são testados aqui (rede; validados ao vivo
-2026-06-09, spec_dou_feeder.md §2).
+2026-06-09).
 """
 from __future__ import annotations
 

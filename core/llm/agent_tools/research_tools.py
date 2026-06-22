@@ -1,13 +1,13 @@
 """Tool de DeepResearch para agentes (subagente-como-tool).
 
-DeepResearch (ver docs/spec_deepresearch.md). Expõe `deep_research` como uma tool
+DeepResearch. Expõe `deep_research` como uma tool
 que, por dentro, roda um subagente de pesquisa web (core.deep_research) e devolve
 uma resposta sintetizada COM bloco de fontes. Contida num caixote bounded: o crawl
 multi-step fica isolado; o agente chamador recebe string limpa.
 
 Fase A: a tool era stateless e NÃO persistia nada.
 
-Fase B (Item 2, spec_knowledge_evolution): quando `workspace_id` e `db` são
+Fase B: quando `workspace_id` e `db` são
 fornecidos, cada finding é persistido em `research_findings` (verified=false) como
 EFEITO COLATERAL SILENCIOSO — a string devolvida ao agente é a mesma de sempre. O
 humano depois promove findings da fila para a content_library (gate humano). Sem

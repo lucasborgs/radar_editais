@@ -57,7 +57,7 @@ def match_investidores_endpoint(
 ):
     """Perfil da startup → fundos/investidores (Q3) rankeados por aderência:
     especialistas casam por TESE/tema/setor; generalistas por ESTÁGIO. SEM gate —
-    entidade não elimina (spec_multi_quadrante §3.8). Caminho isolado: não toca o
+    entidade não elimina. Caminho isolado: não toca o
     matcher de edital."""
     from core.services.investor_match import match_investidores
     profile = to_py_profile(req.profile)

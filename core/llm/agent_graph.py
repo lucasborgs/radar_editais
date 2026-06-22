@@ -1,6 +1,6 @@
 """Spike Etapa 1 — runtime ReAct sobre LangGraph (StateGraph), atrás de flag.
 
-Prova de fundação da migração (docs/specs/langgraph-migration.md):
+Prova de fundação da migração:
 substitui o loop hand-rolled de `run_agent_async` por um `StateGraph` de 3 nós
 (agent / tools / reflect), traduzindo o estado final de volta para o contrato
 `AgentResult` — sem tocar em nenhum call site.
@@ -392,7 +392,7 @@ async def run_agent_graph_async(
 #   • `request_user_info` como `interrupt()` nativo → human-in-the-loop com
 #     retomada (`Command(resume=...)`) preservando o raciocínio do agente.
 # As tabelas de domínio (writing_sessions/session_turns) seguem AUTORITATIVAS;
-# o checkpoint é efêmero (escopo de turno-run). Ver docs/specs/langgraph-migration.md.
+# o checkpoint é efêmero (escopo de turno-run).
 
 # ---------------------------------------------------------------------------
 # Event loop dedicado (singleton) — isola o checkpointer async dos callers sync

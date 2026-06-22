@@ -4,11 +4,11 @@ Espelha o padrão de `domain/edital_extraction.py` (`Extracted[T]`/`absent` para
 campos de DECISÃO de tese), mas é uma ENTIDADE, não um evento:
   • NÃO tem status/deadline (não flui por core/temporal.py).
   • NÃO tem GATE_FIELDS (fundo não desqualifica por CNPJ — match é alinhamento de
-    tese, soft; ver spec_multi_quadrante §3.8).
+    tese, soft).
   • Identidade própria `investidor:<slug>`, artefato próprio `investidores.json`
     (espelha icts.json), populado por CURADORIA MANUAL (~30-50 fundos).
 
-Materializa `docs/spec_multi_quadrante_schema.md` §4.1. Só o CONTRATO — sem scoring,
+Só o CONTRATO — sem scoring,
 sem chamadas de modelo.
 """
 from __future__ import annotations

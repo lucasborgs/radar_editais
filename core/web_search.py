@@ -1,6 +1,6 @@
 """Port de busca web — abstração para não acoplar o DeepResearch a um provedor.
 
-DeepResearch Fase A (ver docs/spec_deepresearch.md). Backend default: Tavily
+DeepResearch Fase A. Backend default: Tavily
 (API feita para agentes — devolve conteúdo limpo + URLs explícitas). Chamada via
 REST com `requests` (sem SDK extra). Trocar de provedor = novo `_<backend>_search`
 + `WEB_SEARCH_BACKEND`; o resto do sistema não muda.

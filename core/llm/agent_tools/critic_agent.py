@@ -6,10 +6,9 @@ Chamado internamente pela tool `save_draft` (writing_tools.py:276) como
 empresa e as demais seções, e retorna um CriticResult com approved + lista de
 issues específicos.
 
-Item 5 da spec `docs/spec_knowledge_evolution.md`: era 1-shot (um único retrieve
-com draft[:500] como query) e NÃO via o CompanyProfile — não detectava
-elegibilidade incorreta. Agora é um sub-agente com 3 tools e max_steps=3, que
-escolhe a query do retrieve e checa o perfil sob demanda.
+Era 1-shot (um único retrieve com draft[:500] como query) e NÃO via o CompanyProfile
+— não detectava elegibilidade incorreta. Agora é um sub-agente com 3 tools e
+max_steps=3, que escolhe a query do retrieve e checa o perfil sob demanda.
 
 Princípios (preservados do 1-shot):
   • Falha graciosa: erro do sub-agente/LLM → CriticResult(approved=True) com nota
@@ -293,8 +292,7 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
     # confiável a instrução "só contradição, nunca omissão" → falsos-positivos.
     model = os.getenv("OPENAI_MODEL_CRITIC") or os.getenv("OPENAI_MODEL_PRO") or "gpt-4o"
 
-    # Endpoint OpenAI-compat do critic, parametrizável (bake-off,
-    # docs/specs/llm-embedding-bakeoff.md): permite mirar o critic para um provider
+    # Endpoint OpenAI-compat do critic, parametrizável para bake-off: permite mirar o critic para um provider
     # OpenAI-COMPAT arbitrário (DeepSeek, vLLM/local, modelo ZDR pago) SEM editar
     # código, independentemente do endpoint do writing agent. Precedência:
     # CRITIC_OPENAI_* → AGENT_OPENAI_* (resolvido no agent_runtime) → OPENAI

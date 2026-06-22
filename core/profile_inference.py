@@ -6,8 +6,7 @@ diz"; aqui inferimos campos que o site quase nunca declara explicitamente.
 `infer_financiamento` propõe `tipos_financiamento_interesse` (PROPOSTA — humano
 confirma/desmarca no review, "AI drafts, humans decide"). O campo alimenta a
 dimensão *mecanismo* do match (peso 15, `_score_mecanismo`) — por isso a mudança é
-**eval-gated** (`python -m core.eval matching`). Spec:
-docs/specs/onboarding-input-ux.md (Decisão 1).
+**eval-gated** (`python -m core.eval matching`).
 """
 
 from __future__ import annotations
@@ -76,8 +75,7 @@ def infer_financiamento(profile: CompanyProfile) -> list[str]:
     PROPOSTA (humano confirma) — alimenta a dimensão *mecanismo* do match
     (peso 15); por isso é eval-gated. Só há 2 opções, ambas "fomento competitivo
     por mérito", então a heurística é permissiva mas conservadora: sem sinal
-    técnico, não chuta (`[]` → nota neutra no match). Spec: Decisão 1 em
-    docs/specs/onboarding-input-ux.md.
+    técnico, não chuta (`[]` → nota neutra no match).
     """
     if not _has_tech_signal(profile):
         return []

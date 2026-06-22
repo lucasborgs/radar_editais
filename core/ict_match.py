@@ -1,6 +1,6 @@
 """Matchmaking ICT ↔ edital — sugere ICTs parceiras por afinidade temática.
 
-ICTs Fase C, peça 2 (ver docs/spec_ict_phase_c.md). Determinístico, sem LLM: a
+ICTs Fase C, peça 2. Determinístico, sem LLM: a
 ponte é a interseção de macro-temas (`edital.themes ∩ ict.themes`, vocab §5.9),
 construída na Fase A. `rank_partners` é puro (testável com fixtures); os loaders
 têm cache por mtime, espelhando `core.services.kg_match_service`.

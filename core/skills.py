@@ -1,7 +1,7 @@
 """
 Playbook loader — compõe a COMPETÊNCIA de escrita por mecanismo (+ overlay de fonte).
 
-Modelo (ver docs/specs/skills-by-mechanism.md): a skill NÃO é conhecimento, é
+Modelo: a skill NÃO é conhecimento, é
 competência. Regra dura do edital vem do RAG; aqui mora o craft tácito — keyed por
 `mechanism` (instrumento), com overlays de praxe por `source` (agência).
 
