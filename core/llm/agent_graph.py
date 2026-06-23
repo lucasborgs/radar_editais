@@ -32,6 +32,7 @@ from langchain_core.messages import (
     AIMessage,
     AnyMessage,
     HumanMessage,
+    RemoveMessage,
     SystemMessage,
     ToolMessage,
 )
@@ -205,14 +206,55 @@ def _build_graph(
             "documents": state.get("documents", {}),
         }
 
+    def manage_memory(state: AgentState) -> dict:
+        msgs = state["messages"]
+        if not msgs:
+            return {"messages": []}
+
+        last_ai_idx = -1
+        for i in range(len(msgs) - 1, -1, -1):
+            if isinstance(msgs[i], AIMessage):
+                last_ai_idx = i
+                break
+
+        if last_ai_idx < 0:
+            return {"messages": []}
+
+        keep: set[int] = set()
+        for i, m in enumerate(msgs):
+            if isinstance(m, (SystemMessage, HumanMessage)):
+                keep.add(i)
+        for i in range(last_ai_idx, len(msgs)):
+            keep.add(i)
+
+        removes = [
+            RemoveMessage(id=m.id)
+            for i, m in enumerate(msgs)
+            if i not in keep and getattr(m, "id", None)
+        ]
+
+        if not removes:
+            return {"messages": []}
+
+        logger.debug(
+            "manage_memory: pruning %d message(s), keeping %d of %d",
+            len(removes), len(keep), len(msgs),
+        )
+        return {"messages": removes}
+
     g = StateGraph(AgentState)
     g.add_node("agent", agent)
     g.add_node("tools", tools)
     g.add_node("reflect", reflect)
+    g.add_node("manage_memory", manage_memory)
     g.add_edge(START, "agent")
     g.add_conditional_edges("agent", should_continue, {END: END, "tools": "tools"})
-    g.add_conditional_edges("tools", after_tools, {END: END, "reflect": "reflect", "agent": "agent"})
-    g.add_edge("reflect", "agent")
+    g.add_conditional_edges(
+        "tools", after_tools,
+        {END: END, "reflect": "reflect", "agent": "manage_memory"},
+    )
+    g.add_edge("manage_memory", "agent")
+    g.add_edge("reflect", "manage_memory")
     return g.compile(checkpointer=checkpointer)
 
 
