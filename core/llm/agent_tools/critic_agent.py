@@ -116,7 +116,12 @@ Quando terminar, responda com UMA mensagem final contendo APENAS um JSON válido
  "feedback": "diagnóstico geral em 1 frase"}
 Se o rascunho não afirma nada falso nem contraditório: approved=true, issues=[]."""
 
-# Tarefa enviada ao sub-agente (user_message). O rascunho vai inteiro (truncado);
+# Backstop de chars para o rascunho no prompt do Critic.
+# 3 000 era o cap anterior — deixava metade das páginas fora da revisão.
+# 30 000 cobre propostas longas (típicas ~8-12k chars) com margem de segurança.
+_CRITIC_DRAFT_CHAR_CAP = int(os.getenv("CRITIC_DRAFT_CHAR_CAP", "30000"))
+
+# Tarefa enviada ao sub-agente (user_message). O rascunho vai inteiro até o backstop;
 # o resto do substrato chega via tools.
 _CRITIC_TASK = """SEÇÃO SENDO SALVA: {section_title}
 
@@ -292,7 +297,10 @@ def run_critic(
     mode = getattr(session, "mode", "proposal")
     system_prompt = _PITCH_CRITIC_SYSTEM if mode == "pitch" else _CRITIC_SYSTEM
     tools = build_critic_tools(session, section_title)
-    task = _CRITIC_TASK.format(section_title=section_title, draft=draft[:3000])
+    task = _CRITIC_TASK.format(
+        section_title=section_title,
+        draft=draft[:_CRITIC_DRAFT_CHAR_CAP],
+    )
 
     # Força OpenAI gpt-4o (replica a escolha de modelo do critic 1-shot): o critic
     # é um fact-checker de precisão crítica; modelos fracos não seguem de forma

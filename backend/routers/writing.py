@@ -406,10 +406,28 @@ async def writing_checklist_auto_review(
         for s in doc["sections"]
     )
     outline = [s["title"] for s in doc["sections"]]
+
+    # Carrega o playbook de monitoramento para enriquecer o pass de compliance
+    # com as heurísticas e anti-padrões do mecanismo (ex: reembolso vs subvenção).
+    # Falha silenciosa: playbook ausente → compliance roda sem regras adicionais.
+    playbook_monitor = ""
+    try:
+        from core import kg_store
+        from core.kg.edital_id import source_of
+        from core.skills import load_playbook
+        edital_id = doc["edital_id"]
+        wiki = kg_store.load_wiki_page(edital_id)
+        mechanism = str((wiki or {}).get("mechanism", "") or "")
+        source = source_of(edital_id)
+        playbook_monitor = load_playbook(mechanism, source).for_monitor()
+    except Exception:
+        pass
+
     review = await auto_review_checklist(
         proposal=document,
         edital_requirements=build_checklist(doc["edital_id"]),
         outline=outline,
+        playbook_context=playbook_monitor,
     )
     _attach_issue_sections(review, outline)
     return {"session_id": session_id, "review": review}
