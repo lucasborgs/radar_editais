@@ -85,6 +85,15 @@ class WritingTurnResponse(BaseModel):
     compliance_flags: list[dict] = []
 
 
+class WritingGenerateRequest(BaseModel):
+    # Subconjunto explícito de seções a gerar. Ausente (default) → todas as
+    # seções do outline ainda vazias (não clobbera o que já foi redigido).
+    sections: list[str] | None = None
+    profile: CompanyProfileSchema | None = None
+    library_item_ids: list[str] = []
+    model_tier: str | None = None
+
+
 class WritingSectionStartRequest(BaseModel):
     session_id: str
     section_title: str
@@ -200,6 +209,51 @@ async def writing_turn(
         asyncio.to_thread(check_compliance, req.user_message, session.edital_id),
     )
     return {**turn_result, "compliance_flags": compliance_flags}
+
+
+@router.post(
+    "/writing/{session_id}/generate",
+    summary="Gera a proposta completa (batch de todas as seções do outline)",
+)
+@limiter.limit("3/minute")
+async def writing_generate(
+    request: Request,
+    session_id: str,
+    req: WritingGenerateRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """Modo "gerar proposta completa": escreve todas as seções do outline de uma
+    vez (orquestrador determinístico + agente interno por seção).
+
+    Operação LONGA — uma run de agente por seção. Roda em thread para não
+    bloquear o event loop (espelha /writing/turn). Reconstrói a WritingSession a
+    partir do DB (sem cache de instâncias). Retorna as seções geradas/falhas e o
+    documento atualizado.
+    """
+    import asyncio
+
+    from core.llm_router import resolve_model
+
+    workspace_id = get_workspace_id(db, user_id)
+    profile = (
+        to_py_profile(req.profile) if req.profile
+        else profile_from_workspace(db, workspace_id)
+    )
+    library_items = load_library_items(db, workspace_id, req.library_item_ids)
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            session_id=session_id,
+            library_items=library_items,
+            model=resolve_model(req.model_tier),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    return await asyncio.to_thread(session.generate_full_proposal, req.sections)
 
 
 @router.get("/writing/sessions", summary="Lista sessões de escrita do workspace")

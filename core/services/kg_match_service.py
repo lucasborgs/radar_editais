@@ -223,7 +223,7 @@ score deve ser de 0.0 a 10.0. match_dimensions deve ter no máximo 4 dimensões 
 def _make_client():
     """Cria cliente LLM + modelo a partir do ambiente, parametrizável por env.
 
-    Bake-off (docs/specs/llm-embedding-bakeoff.md, tier 3 — gateado por `matching`):
+    Bake-off (tier 3, gateado por `matching`):
     o slot de raciocínio sobre o KG troca de modelo/provider por env, sem editar
     código. Os defaults preservam EXATAMENTE o comportamento anterior: sem env
     setada, gpt-4o-mini no endpoint canônico OpenAI (ou gemini-2.5-flash com

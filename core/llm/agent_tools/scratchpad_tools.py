@@ -1,6 +1,6 @@
 """Scratchpad mínimo (write_note / read_note) — memória de trabalho por execução.
 
-Padrão roubado do deepagents (ver docs/spec_agent_patterns.md): em loops que
+Padrão deepagents: em loops que
 leem muitas páginas com texto truncado (ex.: ProfileExtractor crawlando até 10
 páginas), o agente perde fatos das páginas anteriores quando o contexto enche.
 O scratchpad dá um lugar para ele anotar o que importa e reler antes de concluir.
@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from core.llm.agent_runtime import Tool, tool
+from langchain_core.tools import BaseTool, tool
 
 
 @dataclass
@@ -32,7 +32,7 @@ class Scratchpad:
 
 def build_scratchpad_tools(
     pad: Scratchpad, *, max_notes: int = 20, max_chars: int = 4000,
-) -> list[Tool]:
+) -> list[BaseTool]:
     """Constrói write_note + read_note fechando sobre `pad`.
 
     Args:

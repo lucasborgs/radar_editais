@@ -1,6 +1,6 @@
 """Front-door conversacional (público): turno híbrido sobre o catálogo.
 
-Porta de entrada do produto (spec_frontdoor_ux §5, delta B1). Evolui o
+Porta de entrada do produto. Evolui o
 `/kg-explore`: o agente conversa sobre a base de conhecimento JÁ com o perfil
 parcial no contexto e, num passo SEPARADO, propõe um `profile_diff` estruturado
 (campos do CompanyProfile que a última mensagem preenche/altera). NUNCA roda

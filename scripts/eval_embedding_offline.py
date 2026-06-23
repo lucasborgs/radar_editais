@@ -2,7 +2,7 @@
 """
 Bake-off de embeddings + contextualização — eval OFFLINE do braço dense (numpy).
 
-Filtro barato dos tiers 1-2 (docs/specs/llm-embedding-bakeoff.md): compara braços
+Filtro barato dos tiers 1-2: compara braços
 de retrieval por cosseno puro sobre o corpus golden, SEM re-indexar a coluna
 `edital_chunks.embedding` (vector(1536)) e sem tocar prod.
 
@@ -21,7 +21,7 @@ braço merece o investimento da coluna-sombra/re-index, mas pode dar
 FALSO-NEGATIVO: em prod o rerank (pool top-20) + a fusão (fts_weight) podem
 socorrer um candidato levemente abaixo. Logo "perdeu aqui" ≠ "perde end-to-end".
 Por isso mede recall@20 (=POOL_K, pool do reranker em prod) além de @5. Critério
-de promoção (WIN/CLOSE/REJECT) em docs/specs/llm-embedding-bakeoff.md §1. Quem passa a triagem
+de promoção (WIN/CLOSE/REJECT). Quem passa a triagem
 ainda precisa do `core.eval rag` real (FTS+RRF+rerank) antes de promover.
 
 Métricas (reusa core.rag_eval, mesmas do gate `rag`):

@@ -6,10 +6,9 @@ Chamado internamente pela tool `save_draft` (writing_tools.py:276) como
 empresa e as demais seções, e retorna um CriticResult com approved + lista de
 issues específicos.
 
-Item 5 da spec `docs/spec_knowledge_evolution.md`: era 1-shot (um único retrieve
-com draft[:500] como query) e NÃO via o CompanyProfile — não detectava
-elegibilidade incorreta. Agora é um sub-agente com 3 tools e max_steps=3, que
-escolhe a query do retrieve e checa o perfil sob demanda.
+Era 1-shot (um único retrieve com draft[:500] como query) e NÃO via o CompanyProfile
+— não detectava elegibilidade incorreta. Agora é um sub-agente com 3 tools e
+max_steps=3, que escolhe a query do retrieve e checa o perfil sob demanda.
 
 Princípios (preservados do 1-shot):
   • Falha graciosa: erro do sub-agente/LLM → CriticResult(approved=True) com nota
@@ -181,7 +180,7 @@ def build_critic_tools(session, section_title: str):
     Toda tool falha graciosamente: erro → string de "indisponível", nunca
     propaga exceção pro loop do agente.
     """
-    from core.llm.agent_runtime import tool
+    from langchain_core.tools import tool
 
     @tool
     def read_target_context(query: str) -> str:
@@ -265,7 +264,12 @@ def build_critic_tools(session, section_title: str):
     return [read_target_context, read_company_profile, read_proposal_sections]
 
 
-def run_critic(draft: str, section_title: str, session) -> CriticResult:
+def run_critic(
+    draft: str,
+    section_title: str,
+    session,
+    trace_context: dict | None = None,
+) -> CriticResult:
     """Revisão de um rascunho de seção contra o substrato do gênero, via sub-agente.
 
     `session.mode` decide o substrato da checagem de contradição: edital (chunks
@@ -282,6 +286,8 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         draft: conteúdo markdown do rascunho a revisar
         section_title: título da seção (para contexto no prompt)
         session: instância de WritingSession (acesso a db + scope_edital_ids + perfil)
+        trace_context: contexto Langfuse do turno pai para aninhar o span do
+            sub-agente. Deve ser capturado no call site (antes do thread pool).
     """
     mode = getattr(session, "mode", "proposal")
     system_prompt = _PITCH_CRITIC_SYSTEM if mode == "pitch" else _CRITIC_SYSTEM
@@ -293,8 +299,7 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
     # confiável a instrução "só contradição, nunca omissão" → falsos-positivos.
     model = os.getenv("OPENAI_MODEL_CRITIC") or os.getenv("OPENAI_MODEL_PRO") or "gpt-4o"
 
-    # Endpoint OpenAI-compat do critic, parametrizável (bake-off,
-    # docs/specs/llm-embedding-bakeoff.md): permite mirar o critic para um provider
+    # Endpoint OpenAI-compat do critic, parametrizável para bake-off: permite mirar o critic para um provider
     # OpenAI-COMPAT arbitrário (DeepSeek, vLLM/local, modelo ZDR pago) SEM editar
     # código, independentemente do endpoint do writing agent. Precedência:
     # CRITIC_OPENAI_* → AGENT_OPENAI_* (resolvido no agent_runtime) → OPENAI
@@ -318,6 +323,7 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         temperature=0.05,
         openai_base_url=critic_base_url,
         openai_api_key=critic_api_key,
+        trace_context=trace_context,
     )
 
     session_id = getattr(session, "session_id", "?")

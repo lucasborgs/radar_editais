@@ -474,7 +474,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     seen_now: set[str] = set()
     candidates: list[websearch.SearchHit] = []
 
-    # Gerador DOU (espinha de alta precisão, spec_dou_feeder.md §6) — ANTES do
+    # Gerador DOU (espinha de alta precisão) — ANTES do
     # Tavily e com ORÇAMENTO PRÓPRIO (max_dou_candidates): no 1º shadow-run
     # (2026-06-10) o DOU rendeu 63 candidatos/dia e, contando pro max_cand
     # compartilhado, ZEROU o Tavily — as zonas gap-filler (FAPs, desafios,
@@ -610,7 +610,7 @@ def _page_text(hit: websearch.SearchHit) -> str:
 
 
 if __name__ == "__main__":
-    # CLI do shadow-run (spec_dou_feeder §9): fora do backend/worker, ninguém
+    # CLI do shadow-run: fora do backend/worker, ninguém
     # carregou o .env ainda — sem isto as chaves não chegam e tudo degrada
     # silenciosamente pra no-op.
     from dotenv import load_dotenv

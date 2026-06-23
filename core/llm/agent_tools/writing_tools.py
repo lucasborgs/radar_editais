@@ -24,7 +24,9 @@ import logging
 import os
 from typing import TYPE_CHECKING
 
-from core.llm.agent_runtime import Tool, _cap, tool
+from langchain_core.tools import BaseTool, tool
+
+from core.llm.agent_runtime import _cap
 from core.retrieval.retriever import (
     format_chunks_for_prompt,
     retrieve_chunks,
@@ -48,7 +50,7 @@ SEARCH_EDITAL_CHUNK_CHAR_CAP = int(os.getenv("SEARCH_EDITAL_CHUNK_CHAR_CAP", "15
 SEARCH_EDITAL_CHAR_CAP = int(os.getenv("SEARCH_EDITAL_CHAR_CAP", "8000"))
 
 
-def build_writing_tools(session: WritingSession) -> list[Tool]:
+def build_writing_tools(session: WritingSession) -> list[BaseTool]:
     """Constrói a lista de tools para o agente desta sessão.
 
     Cada tool é uma closure sobre `session`. Mutações em session
@@ -272,8 +274,12 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
 
         # Critic review — só pula se force=True (decisão explícita do usuário).
         if not force:
+            from core import telemetry
             from core.llm.agent_tools.critic_agent import run_critic
-            critic = run_critic(content, target_title, session)
+            # Captura o contexto Langfuse antes de chamar o critic: o contextvar OTel
+            # não é garantido no thread pool do LangGraph para tools síncronas.
+            _trace_ctx = telemetry.current_trace_context()
+            critic = run_critic(content, target_title, session, trace_context=_trace_ctx)
             if not critic.approved:
                 issues_str = "\n".join(f"• {issue}" for issue in critic.issues)
                 return (
@@ -310,7 +316,7 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
                    Deixe vazio para todos os aprendizados disponíveis.
         """
         from core.reflection_service import search_insights_for_tool
-        return search_insights_for_tool(session._db, session.workspace_id)
+        return search_insights_for_tool(session._db, session.workspace_id, query=topic)
 
     @tool
     def request_user_info(field: str, prompt: str) -> str:
@@ -318,9 +324,12 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
         redigir com precisão (ex: CNPJ, valor de contrapartida, nome do
         coordenador, TRL específico de um subprojeto).
 
-        O pedido vai aparecer no UI como prompt destacado. Você PODE continuar
-        redigindo o que conseguir nesse turn e usar [COMPLETAR: ...] como
-        placeholder onde a info iria — o usuário responde no próximo turn.
+        IMPORTANTE: esta tool PAUSA você imediatamente — o turno congela, a
+        pergunta vai ao usuário, e você só CONTINUA quando ele responder (a
+        resposta dele volta como o resultado desta tool, no mesmo raciocínio).
+        Por isso: faça as buscas e escreva o que já consegue ANTES de chamar; e
+        chame request_user_info SOZINHA (não no mesmo passo que save_draft/
+        search_edital), senão essas ações repetem ao retomar.
 
         Use APENAS para info que não dá pra inferir do perfil, library, edital
         ou contexto da conversa. Se a info pode ser estimada, redija com a
@@ -333,11 +342,15 @@ def build_writing_tools(session: WritingSession) -> list[Tool]:
         if not field or not prompt:
             return "Erro: field e prompt são obrigatórios e não-vazios."
 
-        session._pending_user_input = {"field": field, "prompt": prompt}
-        return (
-            f"Pergunta encaminhada ao usuário (campo '{field}'). "
-            "Continue redigindo com [COMPLETAR: ...] como placeholder se for útil."
-        )
+        # interrupt() congela o grafo e devolve {field, prompt} ao caller (a
+        # WritingSession surfaça como pending_user_input). Ao retomar via
+        # Command(resume=<resposta>), interrupt() RETORNA a resposta aqui — que
+        # vira o tool-result que você usa para redigir. Requer grafo compilado
+        # com checkpointer (run_writing_turn). Etapa 3 da migração LangGraph.
+        from langgraph.types import interrupt
+
+        answer = interrupt({"field": field, "prompt": prompt})
+        return f"O usuário respondeu (campo '{field}'): {answer}"
 
     # DeepResearch (Fase A): tool stateless de busca web. Subagente-como-tool —
     # devolve fato COM fonte; NÃO persiste (gate humano → library é a Fase B).

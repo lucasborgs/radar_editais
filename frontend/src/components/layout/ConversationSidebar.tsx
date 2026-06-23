@@ -1,6 +1,6 @@
 "use client";
 
-// Sidebar chat-first (spec_frontend_chat_first.md, Fase 1). Substitui o
+// Sidebar chat-first. Substitui o
 // AppSidebar (navegação de SaaS dashboard) por uma sidebar de app de chat
 // (estilo ChatGPT/Claude): "Nova conversa" no topo, busca client-side,
 // histórico de conversas agrupado por data, e um rodapé discreto com as páginas

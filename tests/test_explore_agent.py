@@ -313,7 +313,7 @@ def test_list_editais_tool_returns_string_with_results():
     svc = KGMatchService()
     tools = build_explore_tools(svc)
     t = next(x for x in tools if x.name == "list_editais")
-    out = t.call({"limit": 3})
+    out = t.invoke({"limit": 3})
     assert isinstance(out, str)
     # Sem assert sobre conteúdo específico — depende do índice em disco —
     # mas deve mencionar quantidade ou ausência.
@@ -326,7 +326,7 @@ def test_list_editais_caps_limit():
     tools = build_explore_tools(svc)
     t = next(x for x in tools if x.name == "list_editais")
     # Não dá pra inspecionar contagem direto; só garante que não levanta erro
-    out = t.call({"limit": 99999})
+    out = t.invoke({"limit": 99999})
     assert isinstance(out, str)
 
 
@@ -334,7 +334,7 @@ def test_get_edital_tool_returns_error_string_for_invalid_id():
     svc = KGMatchService()
     tools = build_explore_tools(svc)
     t = next(x for x in tools if x.name == "get_edital")
-    out = t.call({"edital_id": "id_que_nao_existe_xyz"})
+    out = t.invoke({"edital_id": "id_que_nao_existe_xyz"})
     assert isinstance(out, str)
     assert "Erro" in out or "não encontrado" in out
 
@@ -343,7 +343,7 @@ def test_find_analogues_tool_handles_missing_id():
     svc = KGMatchService()
     tools = build_explore_tools(svc)
     t = next(x for x in tools if x.name == "find_analogues")
-    out = t.call({"edital_id": "id_invalido"})
+    out = t.invoke({"edital_id": "id_invalido"})
     assert isinstance(out, str)
     assert "análogo" in out.lower() or "Nenhum" in out
 
@@ -352,6 +352,6 @@ def test_get_graph_neighbors_tool_handles_missing_node():
     svc = KGMatchService()
     tools = build_explore_tools(svc)
     t = next(x for x in tools if x.name == "get_graph_neighbors")
-    out = t.call({"node_id": "no/que/nao/existe"})
+    out = t.invoke({"node_id": "no/que/nao/existe"})
     assert isinstance(out, str)
     assert "não tem" in out.lower() or "não existe" in out.lower()
