@@ -309,6 +309,27 @@ Lista vazia [] se não houver sinal relevante."""
 
 
 # =============================================================================
+# ERROS
+# =============================================================================
+
+class ProfileIncompleteError(Exception):
+    """Perfil sem os campos mínimos para iniciar uma WritingSession (Fase 2).
+
+    Gate determinístico (sem LLM): barra a CRIAÇÃO de novas sessões quando o
+    CompanyProfile não tem os campos de `CompanyProfile._WRITING_MIN_FIELDS`.
+    Sessões existentes (retomadas por session_id) NÃO passam pelo gate. Carrega
+    `missing_fields` para a API devolvê-los ao front (mesmo padrão de
+    request_user_info)."""
+
+    def __init__(self, missing_fields: list[str]):
+        self.missing_fields = missing_fields
+        super().__init__(
+            "Perfil incompleto para iniciar a escrita; campos faltantes: "
+            + ", ".join(missing_fields)
+        )
+
+
+# =============================================================================
 # WRITING SESSION
 # =============================================================================
 
@@ -357,6 +378,12 @@ class WritingSession:
         else:
             if not edital_id:
                 raise ValueError("É necessário fornecer session_id (retomar) ou edital_id (criar).")
+            # Gate de perfil (Fase 2): só na CRIAÇÃO de sessão, antes de inserir a
+            # row — perfil incompleto não cria sessão órfã. Retomadas (ramo if
+            # acima) não passam pelo gate (sessões existentes não são afetadas).
+            ok, missing = profile.is_complete_for_writing()
+            if not ok:
+                raise ProfileIncompleteError(missing)
             self.edital_id = edital_id
             self.session_id = self._create_in_db(workspace_id, edital_id)
             self.created_at = datetime.utcnow().isoformat()
