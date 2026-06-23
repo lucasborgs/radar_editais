@@ -71,6 +71,7 @@ class AgentState(TypedDict):
     rounds_since_reflect: int
     chars_since_reflect: int
     reflect_pending: bool
+    documents: dict[str, str]
 
 
 # =============================================================================
@@ -144,7 +145,11 @@ def _build_graph(
 
     async def agent(state: AgentState) -> dict:
         resp = await bound.ainvoke(state["messages"])
-        return {"messages": [resp], "llm_calls": state["llm_calls"] + 1}
+        return {
+            "messages": [resp],
+            "llm_calls": state["llm_calls"] + 1,
+            "documents": state.get("documents", {}),
+        }
 
     def should_continue(state: AgentState) -> str:
         last = state["messages"][-1]
@@ -181,6 +186,7 @@ def _build_graph(
             "rounds_since_reflect": rsr,
             "chars_since_reflect": csr,
             "reflect_pending": do_reflect,
+            "documents": state.get("documents", {}),
         }
 
     def after_tools(state: AgentState) -> str:
@@ -196,6 +202,7 @@ def _build_graph(
             "rounds_since_reflect": 0,
             "chars_since_reflect": 0,
             "reflect_pending": False,
+            "documents": state.get("documents", {}),
         }
 
     g = StateGraph(AgentState)
@@ -328,6 +335,7 @@ async def run_agent_graph_async(
         "rounds_since_reflect": 0,
         "chars_since_reflect": 0,
         "reflect_pending": False,
+        "documents": {},
     }
 
     # Import lazy (evita custo de telemetria em testes que não a exercem).
@@ -772,6 +780,7 @@ async def _writing_turn_async(
             "rounds_since_reflect": 0,
             "chars_since_reflect": 0,
             "reflect_pending": False,
+            "documents": {},
         }
 
     from core import telemetry
@@ -956,6 +965,7 @@ def _build_generation_graph(
             "rounds_since_reflect": 0,
             "chars_since_reflect": 0,
             "reflect_pending": False,
+            "documents": {},
         }
         # Propaga os callbacks (handler Langfuse) do run para o agente interno →
         # spans por-seção aninhados sob o span da geração (Etapa 6).
