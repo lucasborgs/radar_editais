@@ -120,6 +120,31 @@ class CompanyProfile:
             and self.tipos_financiamento_interesse
         )
 
+    # Campos mínimos para INICIAR uma WritingSession (Fase 2 — gate determinístico).
+    # Ordem canônica: identificação → classificação dura → descrição. A API
+    # devolve `missing` ao front quando o gate barra (mesmo padrão de
+    # request_user_info). Difere de is_complete() (que mira qualidade do match):
+    # aqui o foco é o mínimo para a escrita arrancar com perfil + elegibilidade.
+    _WRITING_MIN_FIELDS = (
+        "nome", "tipo_entidade", "trl", "tamanho_empresa", "uf", "descricao_atividades",
+    )
+
+    def is_complete_for_writing(self) -> tuple[bool, list[str]]:
+        """Gate (sem LLM) da criação de WritingSession.
+
+        Retorna ``(ok, missing)``: ``ok`` é True quando todos os campos mínimos
+        estão preenchidos; ``missing`` lista os ausentes na ordem canônica de
+        ``_WRITING_MIN_FIELDS`` (vazio quando ok). ``trl`` conta como presente
+        quando ``is not None`` (0 não é um TRL válido, então truthiness basta);
+        os demais são strings e contam quando não-vazias.
+        """
+        def _present(field: str) -> bool:
+            val = getattr(self, field)
+            return val is not None if field == "trl" else bool(val)
+
+        missing = [f for f in self._WRITING_MIN_FIELDS if not _present(f)]
+        return (not missing, missing)
+
     def completion_pct(self) -> int:
         """Retorna percentual de preenchimento do perfil."""
         fields_check = [
