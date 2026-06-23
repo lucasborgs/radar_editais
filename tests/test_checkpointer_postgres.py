@@ -21,13 +21,14 @@ pytestmark = pytest.mark.skipif(
     reason="checkpointer Postgres real — requer DATABASE_URL (integração gated)",
 )
 
-import core.llm.agent_graph as ag  # noqa: E402
 from langchain_core.language_models.chat_models import BaseChatModel  # noqa: E402
 from langchain_core.messages import AIMessage  # noqa: E402
 from langchain_core.outputs import ChatGeneration, ChatResult  # noqa: E402
 from langchain_core.tools import tool  # noqa: E402
 from langgraph.types import interrupt  # noqa: E402
 from pydantic import PrivateAttr  # noqa: E402
+
+import core.llm.agent_graph as ag  # noqa: E402
 
 
 class ScriptedChatModel(BaseChatModel):

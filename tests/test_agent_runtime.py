@@ -17,7 +17,6 @@ sys.path.insert(0, str(ROOT))
 
 from core.llm.agent_runtime import resolve_agent_provider  # noqa: E402
 
-
 # ============================================================================
 # resolve_agent_provider — fallback multi-provider por disponibilidade de key
 # ============================================================================
