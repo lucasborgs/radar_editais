@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 
 from core.kg import kg_store
@@ -82,10 +81,10 @@ _DIMENSION_MAX = {
 
 
 def _make_client(model_override: str | None = None):
-    """Constrói client OpenAI. `model_override` aceita resolução de tier (Fase 4 #24)."""
-    from core.llm.llm_client import make_client
-    model = model_override or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    return make_client(api_key=os.environ["OPENAI_API_KEY"]), model
+    """Resolve (client, model) por LLM_BACKEND. `model_override` aceita resolução
+    de tier (Fase 4 #24) — só vale no backend OpenAI; ollama/gemini têm modelo próprio."""
+    from core.llm.llm_client import make_chat_client
+    return make_chat_client(openai_model=model_override)
 
 
 def _load_edital(edital_id: str) -> dict | None:

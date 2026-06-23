@@ -16,11 +16,10 @@ aguardam palavra final do fundador — rotulagem inicial por auditoria).
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
 from config import ROOT
-from core.eval.harness import Evaluation, Suite, get_input
+from core.eval.harness import Evaluation, Suite, get_input, llm_available
 
 GOLDEN = ROOT / "eval_data" / "golden" / "triage.json"
 
@@ -83,8 +82,8 @@ def eval_fn_guard(*, output, expected_output, **_) -> Evaluation:
 
 
 def _prereqs() -> str | None:
-    if not (os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY")):
-        return "requer OPENAI_API_KEY ou GEMINI_API_KEY (triagem)"
+    if not llm_available():
+        return "requer LLM (triagem): OPENAI/ANTHROPIC key, LLM_BACKEND=ollama/gemini ou *_BASE_URL"
     if not GOLDEN.exists():
         return f"golden ausente: {GOLDEN}"
     return None

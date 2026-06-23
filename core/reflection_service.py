@@ -127,8 +127,8 @@ Responda com JSON:
 
 
 def _make_client():
-    from core.llm.llm_client import make_client
-    return make_client(api_key=os.environ["OPENAI_API_KEY"]), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    from core.llm.llm_client import make_chat_client
+    return make_chat_client()
 
 
 def _project_to_store(

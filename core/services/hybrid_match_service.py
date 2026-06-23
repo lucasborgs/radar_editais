@@ -584,26 +584,13 @@ def _make_client():
     com LLM_BACKEND=gemini), idêntico a hoje.
 
     Envs (todas opcionais):
-        LLM_BACKEND        openai (default) | gemini
+        LLM_BACKEND        openai (default) | gemini | ollama
         OPENAI_MODEL       modelo no backend openai      (default: gpt-4o-mini)
         GEMINI_MODEL       modelo no backend gemini       (default: gemini-2.5-flash)
+        OLLAMA_MODEL       modelo no backend ollama       (default: llama3.2)
     """
-    from core.llm.llm_client import make_client
-    backend = os.getenv("LLM_BACKEND", "openai").lower()
-
-    if backend == "gemini":
-        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY não definida")
-        return make_client(
-            api_key=api_key,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-        ), os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY não definida")
-    return make_client(api_key=api_key), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    from core.llm.llm_client import make_chat_client
+    return make_chat_client()
 
 
 def _editais_summary(results: list[Stage1Result]) -> list[dict]:

@@ -9,11 +9,10 @@ Métrica-chave: `field_accuracy` — acerto por campo declarado no golden.
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
 from config import ROOT
-from core.eval.harness import Evaluation, Suite, get_input
+from core.eval.harness import Evaluation, Suite, get_input, llm_available
 
 GOLDEN = ROOT / "eval_data" / "golden" / "profile_extractor.json"
 
@@ -80,8 +79,8 @@ def eval_low_confidence_guard(*, output, expected_output, **_) -> Evaluation | N
 
 
 def _prereqs() -> str | None:
-    if not os.getenv("OPENAI_API_KEY"):
-        return "requer OPENAI_API_KEY"
+    if not llm_available():
+        return "requer LLM (OPENAI/ANTHROPIC key, LLM_BACKEND=ollama/gemini ou *_BASE_URL)"
     if not GOLDEN.exists():
         return f"golden ausente: {GOLDEN}"
     return None

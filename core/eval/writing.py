@@ -19,7 +19,7 @@ import time
 from typing import Any
 
 from config import ROOT
-from core.eval.harness import Evaluation, Suite, get_input
+from core.eval.harness import Evaluation, Suite, get_input, llm_available
 
 logger = logging.getLogger(__name__)
 
@@ -196,8 +196,8 @@ def _prereqs() -> str | None:
     for var in ("SUPABASE_URL", "SUPABASE_SERVICE_KEY"):
         if not os.getenv(var):
             return f"requer {var} (sessões + retrieval)"
-    if not (os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")):
-        return "requer OPENAI_API_KEY ou ANTHROPIC_API_KEY (agente + juízes)"
+    if not llm_available():
+        return "requer LLM (agente + juízes): OPENAI/ANTHROPIC key, LLM_BACKEND=ollama/gemini ou *_BASE_URL"
     if not os.getenv("EVAL_WORKSPACE_ID"):
         return "requer EVAL_WORKSPACE_ID (workspace de eval para as sessões)"
     if not FIXTURE.exists():

@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 
 from core.kg import kg_store
@@ -82,8 +81,8 @@ def _load_edital_requirements(edital_id: str) -> tuple[list[str], str]:
 
 
 def _make_client():
-    from core.llm.llm_client import make_client
-    return make_client(api_key=os.environ["OPENAI_API_KEY"]), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    from core.llm.llm_client import make_chat_client
+    return make_chat_client()
 
 
 def check_compliance(user_message: str, edital_id: str) -> list[dict]:

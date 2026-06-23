@@ -27,6 +27,21 @@ logger = logging.getLogger(__name__)
 EVAL_RESULTS_DIR = ROOT / "eval_results"
 
 
+def llm_available() -> bool:
+    """Há algum LLM utilizável (juiz/agente/Stage-2) configurado?
+
+    Cobre os endpoints canônicos pagos (OPENAI/ANTHROPIC) E os backends locais ou
+    gratuitos da validação de MVP: LLM_BACKEND=ollama/gemini, ou os endpoints
+    OpenAI-compat AGENT_OPENAI_BASE_URL / EVAL_LLM_BASE_URL. Usado nos `_prereqs`
+    das suítes — antes assumiam OPENAI_API_KEY e davam skip a zero-OpenAI.
+    """
+    if os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY"):
+        return True
+    if os.getenv("LLM_BACKEND", "openai").lower() in ("ollama", "gemini"):
+        return True
+    return bool(os.getenv("AGENT_OPENAI_BASE_URL") or os.getenv("EVAL_LLM_BASE_URL"))
+
+
 class Evaluation(TypedDict, total=False):
     """Um score nomeado de um output. Compatível com a Evaluation do Langfuse."""
     name: str

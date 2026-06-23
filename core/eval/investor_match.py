@@ -11,12 +11,11 @@ Golden: `tests/fixtures/eval_investor_match.json`.
 from __future__ import annotations
 
 import json
-import os
 from functools import lru_cache
 from typing import Any
 
 from config import ROOT
-from core.eval.harness import Evaluation, Suite, get_input
+from core.eval.harness import Evaluation, Suite, get_input, llm_available
 
 FIXTURE = ROOT / "tests" / "fixtures" / "eval_investor_match.json"
 
@@ -118,8 +117,8 @@ def eval_expected_hit(*, output, expected_output, **_) -> Evaluation | None:
 
 
 def _prereqs() -> str | None:
-    if not os.getenv("OPENAI_API_KEY"):
-        return "requer OPENAI_API_KEY (match + juiz da rúbrica)"
+    if not llm_available():
+        return "requer LLM (match + juiz da rúbrica): OPENAI/ANTHROPIC key, LLM_BACKEND=ollama/gemini ou *_BASE_URL"
     if not _funds_by_id():
         return "investidores.json vazio — diretório de fundos ausente"
     if not FIXTURE.exists():

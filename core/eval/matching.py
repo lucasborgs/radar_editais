@@ -8,12 +8,11 @@ vigência determinística) e a checagem `expected_in_top`.
 from __future__ import annotations
 
 import json
-import os
 from functools import lru_cache
 from typing import Any
 
 from config import ROOT
-from core.eval.harness import Evaluation, Suite, get_input
+from core.eval.harness import Evaluation, Suite, get_input, llm_available
 
 FIXTURE = ROOT / "tests" / "fixtures" / "eval_matching.json"
 
@@ -158,8 +157,8 @@ def eval_expected_above(*, output, expected_output, **_) -> Evaluation | None:
 
 
 def _prereqs() -> str | None:
-    if not os.getenv("OPENAI_API_KEY"):
-        return "requer OPENAI_API_KEY (juiz da rúbrica + Stage 2)"
+    if not llm_available():
+        return "requer LLM (juiz da rúbrica + Stage 2): OPENAI/ANTHROPIC key, LLM_BACKEND=ollama/gemini ou *_BASE_URL"
     from core.kg import kg_store
     if not kg_store.load_index().get("editais"):
         return "índice do KG vazio — rode pipeline/build_knowledge_graph"

@@ -31,7 +31,7 @@ def _eval_model() -> str:
     # Régua do juiz. gpt-4o-mini por default (barato); bump explícito para uma
     # régua mais forte via MATCHING_EVAL_MODEL (ex.: gpt-4o). Desacoplado do
     # OPENAI_MODEL_PRO de propósito — o juiz agora é deliberadamente leve.
-    return os.getenv("MATCHING_EVAL_MODEL") or "gpt-4o-mini"
+    return os.getenv("MATCHING_EVAL_MODEL") or os.getenv("EVAL_LLM_MODEL") or "gpt-4o-mini"
 
 
 def _strip_code_fence(raw: str) -> str:
@@ -96,8 +96,12 @@ def judge_match_rubric(profile_context: str, edital_summary: str) -> tuple[int, 
     """Juiz LLM da rúbrica para um par (perfil, edital). Falha → (0, 0, "")."""
     user = f"EMPRESA:\n{profile_context}\n\nEDITAL:\n{edital_summary}"
     try:
-        from core.llm.llm_client import make_client
-        client = make_client(api_key=os.environ["OPENAI_API_KEY"])
+        from core.llm.llm_client import make_eval_client
+        client = make_eval_client()
+        if client is None:
+            raise RuntimeError(
+                "juiz de eval indisponível: configure EVAL_LLM_BASE_URL ou OPENAI_API_KEY"
+            )
         resp = client.chat.completions.create(
             model=_eval_model(),
             messages=[

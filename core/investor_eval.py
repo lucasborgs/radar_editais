@@ -22,7 +22,12 @@ logger = logging.getLogger(__name__)
 
 
 def _eval_model() -> str:
-    return os.getenv("OPENAI_MODEL_EVAL") or os.getenv("OPENAI_MODEL_PRO") or "gpt-4o"
+    return (
+        os.getenv("OPENAI_MODEL_EVAL")
+        or os.getenv("EVAL_LLM_MODEL")
+        or os.getenv("OPENAI_MODEL_PRO")
+        or "gpt-4o"
+    )
 
 
 def _strip_code_fence(raw: str) -> str:
@@ -90,8 +95,12 @@ def judge_thesis_fit(profile_context: str, fund_summary: str) -> tuple[int, int,
     """Juiz LLM da rúbrica para um par (perfil, fundo). Falha → (0,0,0,"")."""
     user = f"STARTUP:\n{profile_context}\n\nFUNDO:\n{fund_summary}"
     try:
-        from core.llm.llm_client import make_client
-        client = make_client(api_key=os.environ["OPENAI_API_KEY"])
+        from core.llm.llm_client import make_eval_client
+        client = make_eval_client()
+        if client is None:
+            raise RuntimeError(
+                "juiz de eval indisponível: configure EVAL_LLM_BASE_URL ou OPENAI_API_KEY"
+            )
         resp = client.chat.completions.create(
             model=_eval_model(),
             messages=[

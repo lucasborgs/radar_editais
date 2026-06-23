@@ -17,7 +17,7 @@ import os
 from typing import Any
 
 from config import ROOT
-from core.eval.harness import Evaluation, Suite, get_input
+from core.eval.harness import Evaluation, Suite, get_input, llm_available
 
 GOLDEN = ROOT / "eval_data" / "golden" / "reranker.json"
 
@@ -84,8 +84,8 @@ def _prereqs() -> str | None:
     backend = os.getenv("RERANK_BACKEND", "cross-encoder").lower()
     if backend in ("off", "none", "disabled", ""):
         return "RERANK_BACKEND=off — reranker desligado"
-    if backend == "llm" and not os.getenv("OPENAI_API_KEY"):
-        return "RERANK_BACKEND=llm requer OPENAI_API_KEY"
+    if backend == "llm" and not llm_available():
+        return "RERANK_BACKEND=llm requer LLM (OPENAI/ANTHROPIC key, LLM_BACKEND=ollama/gemini ou *_BASE_URL)"
     if not GOLDEN.exists():
         return f"golden ausente: {GOLDEN}"
     return None

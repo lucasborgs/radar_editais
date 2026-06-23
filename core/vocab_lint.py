@@ -26,7 +26,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import re
 from datetime import datetime, timezone
 
@@ -228,14 +227,14 @@ def _build_proposal_user(evidence: dict) -> str:
 
 
 def _make_client():
-    """(client, model) tier 'fast'. (None, None) se sem credencial — caller degrada."""
-    from core.llm.llm_client import make_client
+    """(client, model) tier 'fast' por LLM_BACKEND. (None, None) se sem credencial
+    — caller degrada."""
+    from core.llm.llm_client import make_chat_client
     from core.llm_router import resolve_model
     try:
-        client = make_client(api_key=os.environ["OPENAI_API_KEY"])
-    except KeyError:
+        return make_chat_client(openai_model=resolve_model("fast"))
+    except (KeyError, ValueError):
         return None, None
-    return client, resolve_model("fast")
 
 
 def propose(evidence: dict, *, client=None, model: str | None = None) -> dict:

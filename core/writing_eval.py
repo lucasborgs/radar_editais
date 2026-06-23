@@ -30,12 +30,22 @@ logger = logging.getLogger(__name__)
 
 
 def _eval_model() -> str:
-    return os.getenv("WRITING_EVAL_MODEL") or os.getenv("OPENAI_MODEL_PRO") or "gpt-4o"
+    return (
+        os.getenv("WRITING_EVAL_MODEL")
+        or os.getenv("EVAL_LLM_MODEL")
+        or os.getenv("OPENAI_MODEL_PRO")
+        or "gpt-4o"
+    )
 
 
 def _client():
-    from core.llm.llm_client import make_client
-    return make_client(api_key=os.environ["OPENAI_API_KEY"])
+    from core.llm.llm_client import make_eval_client
+    client = make_eval_client()
+    if client is None:
+        raise RuntimeError(
+            "juiz de eval indisponível: configure EVAL_LLM_BASE_URL ou OPENAI_API_KEY"
+        )
+    return client
 
 
 def _strip_code_fence(raw: str) -> str:

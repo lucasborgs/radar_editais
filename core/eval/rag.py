@@ -121,8 +121,18 @@ def eval_faithfulness(*, output, **_) -> Evaluation | None:
 def _prereqs() -> str | None:
     if not (os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY")):
         return "requer SUPABASE_URL+SERVICE_KEY (retrieval em pgvector)"
-    if not os.getenv("OPENAI_API_KEY"):
-        return "requer OPENAI_API_KEY (embeddings do retrieval + faithfulness)"
+    # Embeddings é o único requisito duro (faithfulness é juiz opcional, degrada
+    # a 0.0). Embeddings locais (sentence_transformers) ou endpoint custom não
+    # exigem OPENAI_API_KEY.
+    emb_backend = os.getenv("EMBEDDING_BACKEND", "openai").lower()
+    emb_ok = (
+        emb_backend == "sentence_transformers"
+        or os.getenv("EMBEDDING_BASE_URL")
+        or os.getenv("OPENAI_API_KEY")
+        or os.getenv("EMBEDDING_API_KEY")
+    )
+    if not emb_ok:
+        return "requer embeddings: EMBEDDING_BACKEND=sentence_transformers ou OPENAI_API_KEY/EMBEDDING_API_KEY"
     if not (GOLDEN_DIR / f"{SOURCE}.json").exists():
         return f"golden {SOURCE}.json ausente — rode scripts/generate_golden.py"
     return None

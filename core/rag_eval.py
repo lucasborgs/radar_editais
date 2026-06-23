@@ -26,6 +26,7 @@ Métricas
 from __future__ import annotations
 
 import logging
+import os
 import re
 import statistics
 from collections.abc import Iterable
@@ -210,7 +211,11 @@ def aggregate_runs(
 # se o juiz não mudar. NÃO consulta LLM_BACKEND. Se mudar pra outro modelo,
 # isole numa nova "rodada de calibração" com tag explícita no resultado.
 
-_FAITHFULNESS_MODEL = "gpt-4o-mini"
+def _faithfulness_model() -> str:
+    # Default fixo (gpt-4o-mini) preserva a comparabilidade do juiz. Override por
+    # env para rodar local/gratuito (RAG_EVAL_MODEL específico, ou EVAL_LLM_MODEL
+    # compartilhado entre todas as suítes).
+    return os.getenv("RAG_EVAL_MODEL") or os.getenv("EVAL_LLM_MODEL") or "gpt-4o-mini"
 _FAITHFULNESS_SYSTEM = (
     "Você é um avaliador imparcial de sistemas de busca em editais públicos. "
     "Sua tarefa é decidir se trechos recuperados (retrieved) permitem responder "
@@ -265,21 +270,19 @@ def judge_faithfulness(query: str, retrieved_chunks: list[dict]) -> float:
         return 0.0
 
     try:
-        # Import lazy — eval pode rodar sem openai instalado se faithfulness
-        # for desativado.
-        import os
-
-        from core.llm.llm_client import make_client
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            logger.warning("judge_faithfulness: OPENAI_API_KEY ausente — retornando 0.0")
+        # Import lazy — eval pode rodar sem o client de juiz disponível.
+        from core.llm.llm_client import make_eval_client
+        client = make_eval_client()
+        if client is None:
+            logger.warning(
+                "judge_faithfulness: sem juiz (EVAL_LLM_BASE_URL/OPENAI_API_KEY) — retornando 0.0"
+            )
             return 0.0
-        client = make_client(api_key=api_key)
         prompt = _FAITHFULNESS_PROMPT.format(
             query=query, chunks=_format_chunks_for_judge(retrieved_chunks),
         )
         resp = client.chat.completions.create(
-            model=_FAITHFULNESS_MODEL,
+            model=_faithfulness_model(),
             messages=[
                 {"role": "system", "content": _FAITHFULNESS_SYSTEM},
                 {"role": "user", "content": prompt},
