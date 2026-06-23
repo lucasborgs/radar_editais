@@ -27,7 +27,6 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated, Any
-from typing_extensions import TypedDict
 
 from langchain_core.messages import (
     AIMessage,
@@ -42,6 +41,7 @@ from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
+from typing_extensions import TypedDict
 
 from core.llm.agent_runtime import (
     _MAX_RETRIES,
@@ -615,8 +615,9 @@ async def _init_memory_store():
         )
         return None
 
-    from core.retrieval.embedder import EMBEDDING_DIMENSIONS
     from langgraph.store.postgres.aio import AsyncPostgresStore
+
+    from core.retrieval.embedder import EMBEDDING_DIMENSIONS
 
     # Lê os dims do ENV em call-time (não a constante import-time do embedder): a
     # coluna pgvector fixa os dims no 1º setup() e precisa casar com o que `embed_texts`
