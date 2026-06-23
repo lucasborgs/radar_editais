@@ -343,6 +343,7 @@ def run_subagent(
     temperature: float | None = None,
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
+    trace_context: dict | None = None,
 ) -> AgentResult:
     """Roda um subagente-como-tool: resolve provider, executa `run_agent` e
     degrada graciosamente em caso de erro.
@@ -365,18 +366,22 @@ def run_subagent(
         openai_base_url / openai_api_key: overrides do endpoint OpenAI-compat
             (só usados quando o provider resolvido é "openai"). O critic os passa
             para mirar seu próprio endpoint ZDR/pago (CRITIC_OPENAI_*).
+        trace_context: contexto Langfuse do turno pai ({trace_id, parent_span_id}).
+            Prefira capturar no call site (antes de entrar no thread pool do
+            LangGraph) e passar aqui — o contextvar OTel não cruza fronteiras de
+            thread. Se None, tenta capturar via current_trace_context() como fallback.
 
     Returns:
         AgentResult do loop interno; ou, em falha de resolução/execução,
         AgentResult(final_text="", steps=[], stop_reason="error", usage={}).
     """
     try:
-        # Captura a trace do pai AGORA (mesma thread/contexto do grafo pai): o
-        # run_agent abaixo roda o subgrafo noutra thread/loop, onde o contextvar OTel
-        # do Langfuse não chega → sem isto o critic viraria uma trace-raiz separada.
-        # Passando o trace_context, o agent_run do subagente aninha sob o turno (Et.6).
         from core import telemetry
-        parent_ctx = telemetry.current_trace_context()
+        # Usa o trace_context fornecido pelo chamador (capturado antes de entrar no
+        # thread pool do LangGraph, onde o contextvar OTel ainda está disponível).
+        # Fallback para current_trace_context() quando não fornecido (preserva
+        # comportamento para call sites sem contexto agêntico — ex: scripts CLI).
+        parent_ctx = trace_context if trace_context is not None else telemetry.current_trace_context()
 
         prov, mdl = resolve_agent_provider(
             provider,

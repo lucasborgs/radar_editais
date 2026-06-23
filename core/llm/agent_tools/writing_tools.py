@@ -24,8 +24,9 @@ import logging
 import os
 from typing import TYPE_CHECKING
 
-from core.llm.agent_runtime import _cap
 from langchain_core.tools import BaseTool, tool
+
+from core.llm.agent_runtime import _cap
 from core.retrieval.retriever import (
     format_chunks_for_prompt,
     retrieve_chunks,
@@ -273,8 +274,12 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
 
         # Critic review — só pula se force=True (decisão explícita do usuário).
         if not force:
+            from core import telemetry
             from core.llm.agent_tools.critic_agent import run_critic
-            critic = run_critic(content, target_title, session)
+            # Captura o contexto Langfuse antes de chamar o critic: o contextvar OTel
+            # não é garantido no thread pool do LangGraph para tools síncronas.
+            _trace_ctx = telemetry.current_trace_context()
+            critic = run_critic(content, target_title, session, trace_context=_trace_ctx)
             if not critic.approved:
                 issues_str = "\n".join(f"• {issue}" for issue in critic.issues)
                 return (
