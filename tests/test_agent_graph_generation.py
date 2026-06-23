@@ -6,12 +6,13 @@ persistência real (verify_saved) e agrega o resultado.
 """
 from __future__ import annotations
 
-import core.llm.agent_graph as ag
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.tools import tool
 from pydantic import PrivateAttr
+
+import core.llm.agent_graph as ag
 
 # Estado de persistência dos saves do agente interno (reset por teste).
 SAVED: dict[str, str] = {}

@@ -15,7 +15,6 @@ from core.profile_inference import (
 )
 from domain.user_profile import CompanyProfile
 
-
 # (descrição, kwargs do perfil, esperado)
 _CASES = [
     (
