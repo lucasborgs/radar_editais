@@ -7,7 +7,6 @@ ponto exato → texto final. Cobre também o caveat de re-execução do batch (r
 """
 from __future__ import annotations
 
-import core.llm.agent_graph as ag
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
@@ -15,6 +14,8 @@ from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import interrupt
 from pydantic import PrivateAttr
+
+import core.llm.agent_graph as ag
 
 
 class ScriptedChatModel(BaseChatModel):

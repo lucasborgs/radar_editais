@@ -13,8 +13,9 @@ from __future__ import annotations
 
 import types
 
-import core.llm.agent_graph as ag
 import pytest
+
+import core.llm.agent_graph as ag
 
 # Vocabulário do embed fake: cada dimensão conta ocorrências de uma palavra-chave.
 _VOCAB = ["trl", "contrapartida", "orcamento", "prazo", "equipe", "mercado"]

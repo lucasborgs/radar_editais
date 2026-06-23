@@ -77,7 +77,7 @@ def test_deep_research_tool_formats_with_sources(monkeypatch):
         stop_reason="end_turn",
     )
     monkeypatch.setattr("core.llm.agent_tools.research_tools.run_deep_research",
-                        lambda q: result)
+                        lambda q, **kwargs: result)
     tool = build_research_tools()[0]
     assert tool.name == "deep_research"
     out = tool.invoke({"question": "qualquer"})
@@ -89,7 +89,7 @@ def test_deep_research_tool_formats_with_sources(monkeypatch):
 def test_deep_research_tool_graceful_when_empty(monkeypatch):
     monkeypatch.setattr(
         "core.llm.agent_tools.research_tools.run_deep_research",
-        lambda q: dr.DeepResearchResult(answer="", sources=[], stop_reason="error"),
+        lambda q, **kwargs: dr.DeepResearchResult(answer="", sources=[], stop_reason="error"),
     )
     tool = build_research_tools()[0]
     out = tool.invoke({"question": "x"})

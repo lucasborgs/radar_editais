@@ -25,9 +25,10 @@ import os
 import re
 from typing import TYPE_CHECKING
 
+from langchain_core.tools import BaseTool, tool
+
 from core.kg import kg_store
 from core.llm.agent_runtime import _cap
-from langchain_core.tools import BaseTool, tool
 from core.retrieval.retriever import format_chunks_for_prompt, retrieve_chunks
 
 # Stopwords PT/EN + conectivos que não discriminam tema (não devem casar

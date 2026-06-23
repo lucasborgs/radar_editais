@@ -20,7 +20,6 @@ import core.llm.agent_graph as ag
 from core.llm.agent_graph import run_agent_graph_async
 from core.llm.agent_runtime import TOOL_RESULT_CHAR_CAP
 
-
 # ---------------------------------------------------------------------------
 # Chat model scriptado (zero rede)
 # ---------------------------------------------------------------------------
