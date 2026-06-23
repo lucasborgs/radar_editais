@@ -2,7 +2,7 @@
 
 Cobre:
   (a) helper `_cap` — trunca/marca, passa intacto abaixo do limite, limite ≤0;
-  (b) cap por-chunk em search_edital (via mock de retrieve_chunks).
+  (b) pointer reference em search_edital (via mock de retrieve_chunks).
 
 O cap CENTRAL no loop é testado no grafo (tests/test_agent_graph_golden.py
 ::test_graph_caps_tool_result) — pós-migração LangGraph ele vive no nó `tools`.
@@ -36,7 +36,7 @@ def test_cap_limite_zero_ou_negativo_nao_trunca():
 
 
 # ---------------------------------------------------------------------------
-# (b): cap por-chunk em search_edital
+# (b): pointer reference em search_edital (sem InjectedState, sem DB)
 # ---------------------------------------------------------------------------
 
 class _FakeSession:
@@ -46,13 +46,14 @@ class _FakeSession:
     _db = object()
 
 
-def test_search_edital_cap_por_chunk(monkeypatch):
+def test_search_edital_pointer_reference(monkeypatch):
+    """search_edital retorna APENAS snippet (250 chars), nunca o texto completo."""
     from core.llm.agent_tools import writing_tools
 
     big_chunk_text = "z" * 10_000
     fake_chunks = [
-        {"text": big_chunk_text, "section": "Seção A", "source_file": "edital.pdf",
-         "edital_id": "EDITAL-1"},
+        {"id": "chunk-001", "text": big_chunk_text, "section": "Seção A",
+         "source_file": "edital.pdf", "edital_id": "EDITAL-1", "score": 0.95},
     ]
 
     monkeypatch.setattr(
@@ -64,7 +65,11 @@ def test_search_edital_cap_por_chunk(monkeypatch):
 
     out = search_edital.invoke({"query": "requisitos", "k": 5})
 
-    # O chunk de 10k deve ter sido truncado para ~1500 chars + marcador.
-    assert "z" * writing_tools.SEARCH_EDITAL_CHUNK_CHAR_CAP in out
-    assert "z" * (writing_tools.SEARCH_EDITAL_CHUNK_CHAR_CAP + 100) not in out
-    assert "…[truncado:" in out
+    # O texto de 10k NUNCA aparece na tool-result — só o snippet de 250 chars.
+    assert "z" * 10000 not in out
+    # O snippet é de no máximo 250 chars + marcador "…"
+    assert "z" * 251 not in out
+    # O chunk_id deve aparecer no ponteiro
+    assert "chunk-001" in out
+    # Deve orientar o agente a usar read_exact_chunk para texto completo
+    assert "read_exact_chunk" in out
