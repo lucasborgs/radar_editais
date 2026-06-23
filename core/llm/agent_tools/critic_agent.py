@@ -264,7 +264,12 @@ def build_critic_tools(session, section_title: str):
     return [read_target_context, read_company_profile, read_proposal_sections]
 
 
-def run_critic(draft: str, section_title: str, session) -> CriticResult:
+def run_critic(
+    draft: str,
+    section_title: str,
+    session,
+    trace_context: dict | None = None,
+) -> CriticResult:
     """Revisão de um rascunho de seção contra o substrato do gênero, via sub-agente.
 
     `session.mode` decide o substrato da checagem de contradição: edital (chunks
@@ -281,6 +286,8 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         draft: conteúdo markdown do rascunho a revisar
         section_title: título da seção (para contexto no prompt)
         session: instância de WritingSession (acesso a db + scope_edital_ids + perfil)
+        trace_context: contexto Langfuse do turno pai para aninhar o span do
+            sub-agente. Deve ser capturado no call site (antes do thread pool).
     """
     mode = getattr(session, "mode", "proposal")
     system_prompt = _PITCH_CRITIC_SYSTEM if mode == "pitch" else _CRITIC_SYSTEM
@@ -316,6 +323,7 @@ def run_critic(draft: str, section_title: str, session) -> CriticResult:
         temperature=0.05,
         openai_base_url=critic_base_url,
         openai_api_key=critic_api_key,
+        trace_context=trace_context,
     )
 
     session_id = getattr(session, "session_id", "?")

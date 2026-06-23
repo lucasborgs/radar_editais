@@ -19,8 +19,9 @@ import json
 import logging
 import os
 
-from core.deep_research import run_deep_research
 from langchain_core.tools import BaseTool, tool
+
+from core.deep_research import run_deep_research
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,11 @@ def build_research_tools(workspace_id: str | None = None, db=None) -> list[BaseT
         Args:
             question: a pergunta a pesquisar, específica e autocontida.
         """
-        res = run_deep_research(question)
+        from core import telemetry
+        # Captura o contexto Langfuse antes de chamar o sub-agente: o contextvar OTel
+        # não é garantido no thread pool do LangGraph para tools síncronas.
+        _trace_ctx = telemetry.current_trace_context()
+        res = run_deep_research(question, trace_context=_trace_ctx)
         if not res.answer and not res.sources:
             return (
                 "Não consegui pesquisar agora (busca web indisponível ou sem "
