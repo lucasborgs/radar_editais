@@ -4,6 +4,7 @@ documento, checklist e export."""
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from backend.common import (
@@ -17,6 +18,7 @@ from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient
 from core.services.content_library import get_workspace_id
 from core.services.writing_session import (
+    ProfileIncompleteError,
     WritingSession,
     delete_session,
     get_session_document,
@@ -143,14 +145,24 @@ def writing_start(
     profile = to_py_profile(req.profile)
     library_items = load_library_items(db, workspace_id, req.library_item_ids)
 
-    session = WritingSession(
-        db=db,
-        workspace_id=workspace_id,
-        profile=profile,
-        edital_id=req.edital_id,
-        library_items=library_items,
-        mode=req.mode,  # W-D3: opcional; None → modo derivado do id
-    )
+    # Gate de perfil (Fase 2): perfil sem os campos mínimos não inicia sessão.
+    # Devolve payload estruturado (não um 500) para o front renderizar o
+    # formulário inline / acionar o ProfileAgent — mesmo padrão de
+    # request_user_info. 422 = entidade compreendida mas não-processável.
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            edital_id=req.edital_id,
+            library_items=library_items,
+            mode=req.mode,  # W-D3: opcional; None → modo derivado do id
+        )
+    except ProfileIncompleteError as e:
+        return JSONResponse(
+            status_code=422,
+            content={"error": "profile_incomplete", "missing_fields": e.missing_fields},
+        )
     return session.get_info()
 
 
