@@ -23,11 +23,13 @@ from __future__ import annotations
 import logging
 import os
 import re
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
+
+from langchain_core.tools import BaseTool, tool
 
 from core.kg import kg_store
 from core.llm.agent_runtime import _cap
-from langchain_core.tools import BaseTool, tool
 from core.retrieval.retriever import format_chunks_for_prompt, retrieve_chunks
 
 # Stopwords PT/EN + conectivos que não discriminam tema (não devem casar
@@ -482,3 +484,126 @@ def build_explore_tools(service: KGMatchService) -> list[BaseTool]:
     return [list_editais, get_edital, find_analogues, get_graph_neighbors,
             find_ict_partners, list_icts, list_investidores, oportunidades_por_tema,
             search_edital_trechos]
+
+
+# =============================================================================
+# Memória do ExploreAgent entre sessões (Fase 3A — exploration_log)
+# =============================================================================
+# Diferente das tools acima (stateless, leitura-only sobre o disco), estas
+# precisam de workspace + db AUTENTICADO (RLS por workspace). Só o caminho
+# autenticado do front-door tem isso; o /kg-explore público não registra estas
+# tools nem carrega o bloco de decisões. Escrita idempotente (ON CONFLICT DO
+# UPDATE) — última decisão por (workspace, edital) prevalece.
+
+# Normalização da decisão: o agente pode mandar PT/EN; mapeamos para o domínio
+# canônico do CHECK da tabela ('recommended' | 'discarded'). Variantes fora
+# disto viram erro-como-string (sem escrita) para o agente corrigir.
+_DECISION_CANON = {
+    "recommended": "recommended", "recommend": "recommended",
+    "recomendado": "recommended", "recomendar": "recommended", "recomendou": "recommended",
+    "discarded": "discarded", "discard": "discarded", "reject": "discarded",
+    "rejected": "discarded", "descartado": "discarded", "descartar": "discarded",
+    "descartou": "discarded",
+}
+
+EXPLORATION_DECISIONS_LIMIT = 20
+
+
+def load_recent_exploration_decisions(db, workspace_id: str, limit: int = EXPLORATION_DECISIONS_LIMIT) -> str:
+    """Bloco de decisões anteriores do workspace para o prefixo do system prompt.
+
+    Lê as `limit` decisões mais recentes (decided_at DESC) e as formata como
+    memória do agente. Retorna "" quando não há histórico (ou em falha de DB —
+    a memória é best-effort, nunca derruba o turno). RLS já restringe ao
+    workspace; filtramos por workspace_id também por clareza/defesa.
+    """
+    try:
+        res = (
+            db.table("exploration_log")
+            .select("edital_id, decision, reason, decided_at")
+            .eq("workspace_id", workspace_id)
+            .order("decided_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        rows = res.data or []
+    except Exception as e:
+        logger.warning("load_recent_exploration_decisions falhou (ws=%s): %s", workspace_id, e)
+        return ""
+
+    if not rows:
+        return ""
+
+    lines = [
+        "DECISÕES ANTERIORES DESTE WORKSPACE (sua memória de sessões passadas, "
+        "mais recentes primeiro):",
+    ]
+    for r in rows:
+        date = str(r.get("decided_at") or "")[:10]
+        verb = "recomendou" if r.get("decision") == "recommended" else "descartou"
+        reason = f" — {r['reason']}" if r.get("reason") else ""
+        lines.append(f"  • {date}: {verb} {r.get('edital_id')}{reason}")
+    lines.append(
+        "Use esta memória para manter coerência entre sessões: referencie decisões "
+        "passadas quando relevante e não contradiga uma sem um motivo novo e explícito."
+    )
+    return "\n".join(lines)
+
+
+def build_exploration_log_tools(db, workspace_id: str) -> list[BaseTool]:
+    """Tool de escrita da memória do ExploreAgent (Fase 3A).
+
+    Captura `db` (Supabase autenticado, RLS) e `workspace_id` por closure — duas
+    sessões concorrentes nunca compartilham handle/escopo por engano (mesmo
+    princípio das demais factories). Só deve ser registrada quando há workspace
+    autenticado.
+    """
+
+    @tool
+    def log_exploration_decision(edital_id: str, decision: str, reason: str = "") -> str:
+        """Registra que você RECOMENDOU ou DESCARTOU um edital para este usuário.
+
+        Chame ao concluir que um edital é uma boa oportunidade (decision=
+        "recommended") ou que não serve (decision="discarded"), para LEMBRAR
+        disso em sessões futuras deste mesmo workspace. Revisitar o mesmo edital
+        ATUALIZA a decisão (a última prevalece) — pode rechamar sem medo de
+        duplicar.
+
+        Args:
+            edital_id: id do edital (ex.: "finep:773").
+            decision: "recommended" (recomendou) ou "discarded" (descartou).
+            reason: justificativa curta (1 frase) — aparecerá para você em
+                    sessões futuras como contexto da decisão.
+        """
+        eid = (edital_id or "").strip()
+        if not eid:
+            return "Erro: edital_id vazio. Informe o id do edital (ex.: 'finep:773')."
+        canon = _DECISION_CANON.get((decision or "").strip().lower())
+        if canon is None:
+            return (
+                f"Erro: decision inválida ({decision!r}). Use 'recommended' (recomendou) "
+                "ou 'discarded' (descartou)."
+            )
+        try:
+            db.table("exploration_log").upsert(
+                {
+                    "workspace_id": workspace_id,
+                    "edital_id": eid,
+                    "decision": canon,
+                    "reason": (reason or "").strip() or None,
+                    # Set explícito do timestamp: no caminho de UPDATE (ON CONFLICT)
+                    # o default da coluna não reaplica; passamos now() nos dois casos.
+                    "decided_at": datetime.now(timezone.utc).isoformat(),
+                },
+                on_conflict="workspace_id,edital_id",
+            ).execute()
+        except Exception as e:
+            logger.warning(
+                "log_exploration_decision falhou (ws=%s, edital=%s): %s",
+                workspace_id, eid, e,
+            )
+            return f"Erro ao registrar a decisão sobre {eid}: {e}."
+        verb = "recomendado" if canon == "recommended" else "descartado"
+        return f"Decisão registrada: {eid} marcado como {verb} (lembrarei em sessões futuras)."
+
+    return [log_exploration_decision]
