@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import asyncio
 
+from langchain_core.messages import AIMessage
+
 import core.llm.agent_graph as ag
 import core.llm.agent_runtime as art
 import core.telemetry as telemetry
-from langchain_core.messages import AIMessage
 
 
 class _FakeGraph:

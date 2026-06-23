@@ -26,8 +26,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import requests
-
 from langchain_core.tools import BaseTool, tool
+
 from core.web.fetch import fetch_and_parse as _fetch_and_parse  # camada canônica
 
 logger = logging.getLogger(__name__)
