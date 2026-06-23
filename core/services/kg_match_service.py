@@ -175,6 +175,19 @@ LIMITES
   o critério usado."""
 
 
+# Sufixo de memória (Fase 3A): só anexado ao system quando há workspace
+# autenticado (a tool log_exploration_decision está registrada). Sem workspace
+# (/kg-explore público) este bloco não aparece e a tool não existe.
+EXPLORE_LOG_INSTRUCTION = """
+
+MEMÓRIA ENTRE SESSÕES (log_exploration_decision)
+- Quando você concluir que um edital é uma boa oportunidade para este usuário,
+  registre com log_exploration_decision(edital_id, "recommended", reason). Quando
+  concluir que não serve, registre com decision="discarded" e uma razão curta.
+- Registre só decisões com base — não logue cada edital citado de passagem.
+- Revisitar o mesmo edital atualiza a decisão (a última prevalece); pode rechamar."""
+
+
 # Anthropic Sonnet 4.6 (D1 híbrido). Configurável via env. Sprint 3 herda o
 # default ANTHROPIC_MODEL_AGENT da WritingSession, mas exposto separado para
 # permitir testar modelos diferentes nos 2 agentes.
@@ -663,6 +676,8 @@ class KGMatchService:
         node_id: str | None = None,
         node_type: str | None = None,
         agent_enabled: bool = False,
+        workspace_id: str | None = None,
+        db=None,
     ) -> str:
         """Dispatcher do chat stateless sobre o catálogo.
 
@@ -671,11 +686,16 @@ class KGMatchService:
         original (catálogo inteiro no prompt + 1 LLM call). O caller decide
         o flag — endpoint /explore lê de env / workspace conforme contexto.
 
-        Args iguais aos do path legacy. `agent_enabled` é o único novo.
+        `workspace_id`/`db` (Fase 3A): memória do ExploreAgent entre sessões.
+        Quando AMBOS estão presentes (só no caminho AUTENTICADO do front-door),
+        o agente carrega as decisões anteriores no prefixo do prompt e ganha a
+        tool log_exploration_decision. Ausentes (/kg-explore público, anônimo) →
+        sem memória, comportamento de hoje. Ignorados no caminho legacy.
         """
         if agent_enabled:
             return self._explore_agent(
                 message, history, edital_ids, node_id, node_type,
+                workspace_id=workspace_id, db=db,
             )
         return self._explore_legacy(
             message, history, edital_ids, node_id, node_type,
@@ -832,6 +852,8 @@ class KGMatchService:
         edital_ids: list[str] | None,
         node_id: str | None,
         node_type: str | None,
+        workspace_id: str | None = None,
+        db=None,
     ) -> str:
         """Pipeline agente (Sprint 3 do Cenário B): run_agent + tools cross-dim,
         planejamento e (gated) deep_research — montadas em `_explore_tools`.
@@ -840,6 +862,11 @@ class KGMatchService:
           • Sem catálogo inteiro no prompt — agente busca via list_editais
           • Sem pré-resolução de focus_ids — agente decide via tools
           • Dica de clique no grafo vira message extra (não substitui análise)
+
+        Memória entre sessões (Fase 3A): com `workspace_id`+`db` (caminho
+        autenticado), o agente recebe as últimas decisões do workspace no prefixo
+        ESTÁVEL do prompt (no system, antes do histórico — D6) e a tool
+        log_exploration_decision. Sem eles, opera stateless como antes.
         """
         from core.llm.agent_runtime import resolve_agent_provider, run_agent
 
@@ -861,11 +888,27 @@ class KGMatchService:
         messages.append({"role": "user", "content": message})
 
         tools = self._explore_tools()
+
+        # Memória do ExploreAgent (Fase 3A): só com workspace autenticado + db.
+        # O bloco de decisões vai no SYSTEM (prefixo estável, antes do histórico
+        # da conversa — D6); a tool de escrita é registrada junto.
+        system = EXPLORE_AGENT_SYSTEM
+        if db is not None and workspace_id:
+            from core.llm.agent_tools.explore_tools import (
+                build_exploration_log_tools,
+                load_recent_exploration_decisions,
+            )
+            tools = tools + build_exploration_log_tools(db, workspace_id)
+            system = EXPLORE_AGENT_SYSTEM + EXPLORE_LOG_INSTRUCTION
+            prior = load_recent_exploration_decisions(db, workspace_id)
+            if prior:
+                system = f"{system}\n\n{prior}"
+
         provider, model = resolve_agent_provider(
             "anthropic", ANTHROPIC_MODEL_AGENT_EXPLORE,
         )
         result = run_agent(
-            system=EXPLORE_AGENT_SYSTEM,
+            system=system,
             initial_messages=messages,
             tools=tools,
             model=model,
