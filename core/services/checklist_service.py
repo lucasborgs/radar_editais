@@ -66,7 +66,7 @@ _COMPLIANCE_USER = """DOCUMENTO DA PROPOSTA:
 
 REQUISITOS OBRIGATÓRIOS DO EDITAL:
 {requirements}
-
+{playbook_block}
 Para cada requisito, retorne se está coberto, com evidência do texto e sugestão de melhoria caso necessário.
 Atribua também um score 0-100 representando a aderência global da proposta aos requisitos.
 
@@ -233,17 +233,27 @@ async def _pass_compliance(
     edital_requirements: list[dict],
     client,
     model: str,
+    playbook_context: str = "",
 ) -> dict:
     """Pass 1 — requisitos obrigatórios do edital cobertos?"""
     if not edital_requirements:
         return {"issues": [], "score": 100}
 
     reqs_text = "\n".join(f"- {item['requirement']}" for item in edital_requirements)
+    playbook_block = (
+        f"\nREGRAS DO INSTRUMENTO (heurísticas e anti-padrões do mecanismo):\n{playbook_context}\n"
+        if playbook_context and playbook_context.strip()
+        else ""
+    )
     data = await _call_llm(
         client,
         model,
         _COMPLIANCE_SYSTEM,
-        _COMPLIANCE_USER.format(document=proposal[:6000], requirements=reqs_text),
+        _COMPLIANCE_USER.format(
+            document=proposal[:6000],
+            requirements=reqs_text,
+            playbook_block=playbook_block,
+        ),
         max_tokens=2000,
     )
     issues = data.get("issues") or []
@@ -412,6 +422,7 @@ async def auto_review_checklist(
     edital_requirements: list[dict] | None = None,
     outline: list[str] | None = None,
     force_all_passes: bool = False,
+    playbook_context: str = "",
 ) -> dict:
     """
     Executa as passes de revisão em paralelo via asyncio.gather.
@@ -476,7 +487,7 @@ async def auto_review_checklist(
         coros = []
         labels: list[str] = []
         if run_compliance:
-            coros.append(_pass_compliance(proposal, edital_requirements, client, model))
+            coros.append(_pass_compliance(proposal, edital_requirements, client, model, playbook_context))
             labels.append("compliance")
         coros.append(_pass_quality(proposal, client, model))
         labels.append("quality")
