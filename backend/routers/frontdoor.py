@@ -103,13 +103,27 @@ def frontdoor_turn(
     explore_message = f"{ctx}\n\n{message}" if ctx else message
     current = req.profile.model_dump() if req.profile is not None else {}
 
+    # Workspace para a memória do ExploreAgent (Fase 3A): resolvido cedo e só no
+    # caminho AUTENTICADO. Best-effort — falha aqui não derruba o turno (o explore
+    # cai no modo stateless). Reaproveitado depois na persistência do turno.
+    workspace_id: str | None = None
+    if user_id is not None and db is not None:
+        try:
+            workspace_id = get_workspace_id(db, user_id)
+        except Exception as e:
+            logger.warning("Falha ao resolver workspace_id no front-door: %s", e)
+
     # Resposta + diff de perfil. Caminho 1-shot (default): `explore_turn` devolve
     # ambos numa só chamada LLM (decisão 2026-06-21 — elimina a 2ª passada que o
     # extract_diff_from_message fazia sobre a MESMA mensagem). Caminho agente
     # (LangGraph, flag ON) não extrai inline → mantém a chamada focada separada.
     if agent_enabled:
+        # Memória entre sessões (Fase 3A) só no caminho autenticado: passa
+        # workspace_id+db ao agente. Anônimo → ambos None → agente stateless.
         answer = kg_service.explore(
             explore_message, req.history, [], None, None, agent_enabled=True,
+            workspace_id=workspace_id,
+            db=db if workspace_id else None,
         )
         diff = ProfileExtractor().extract_diff_from_message(message, current)
     else:
@@ -122,9 +136,9 @@ def frontdoor_turn(
 
     # Persistência só no caminho autenticado. db pode ser None mesmo logado em
     # cenários degenerados; guardamos contra isso. Falha NÃO derruba o turno.
-    if user_id is not None and db is not None:
+    # Reusa o workspace_id já resolvido acima (None se a resolução falhou).
+    if user_id is not None and db is not None and workspace_id:
         try:
-            workspace_id = get_workspace_id(db, user_id)
             persisted = persist_frontdoor_turn(
                 db=db,
                 workspace_id=workspace_id,
