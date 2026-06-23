@@ -29,7 +29,6 @@ import json
 import logging
 import os
 import time
-from pathlib import Path
 
 from config import ROOT
 
@@ -244,6 +243,7 @@ def run(edital_ids: list[str] | None = None, *, skip_cache: bool = False,
 
 def main() -> None:
     import argparse
+
     from dotenv import load_dotenv
     load_dotenv()  # credenciais antes dos imports que as leem (CLI standalone)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s",
