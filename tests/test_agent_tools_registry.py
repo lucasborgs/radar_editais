@@ -5,7 +5,7 @@ tools. Este teste garante que toda factory pública `build_*_tools` definida nos
 módulos do pacote está exportada em `__all__` — ou, se for intencionalmente
 mantida fora (ex.: por ciclo de import), listada na allowlist explícita abaixo
 com justificativa. Sem isso, factories novas voltam a "vazar" via late-import e
-o registro mente sobre a superfície real (Finding A, docs/specs/00).
+o registro mente sobre a superfície real (Finding A).
 """
 import importlib
 import inspect

@@ -11,6 +11,43 @@
 
 ## Aberto
 
+### Gate de eval `writing` — memória semântica (Et.5 LangGraph) vs bloco fixo
+
+- **O quê:** rodar o A/B do eval `writing` (grounding/coerência) comparando
+  `WRITING_SEMANTIC_MEMORY=1` (retrieval semântico via Store, Etapa 5) vs `=0` (bloco
+  fixo de 6 insights). Confirma que a injeção query-conditioned **não regride** antes de
+  cortar o bloco fixo de vez. Risco #4 da spec `docs/specs/langgraph-migration.md` (Et.5).
+- **Por que adiado:** custo real de token — premissa MVP [[project_mvp_os_models]]: não
+  queimar OpenAI em validação. O fallback estático cobre regressão-zero até lá, e
+  `WRITING_SEMANTIC_MEMORY=0` reverte sem deploy.
+- **Como rodar barato:** embeddings 100% OS (`.env` já em `embeddinggemma-pt-br`/768, zero
+  token); agente + 2 juízes em `gpt-4o-mini` (centavos) com `--limit` baixo. `core.eval
+  writing`. Baselines (bloco fixo) já salvos em `eval_results/*_writing.json` (20260619_*).
+- **Pré-requisito que invalida a comparação se faltar:** o `EVAL_WORKSPACE_ID`
+  (`3df4167e-3e43-4050-b4a6-bf766c128228`) precisa ter `reflection_insights` **backfilados
+  no Store** (`scripts/backfill_memory_store.py`) — senão os dois braços retornam vazio e o
+  gate não mede nada.
+- **Status:** aberto (2026-06-20). Bloqueia apenas o "cortar o bloco fixo"; a Etapa 5 está
+  mergeável com o fallback ligado.
+
+### Gate de eval + telemetria da Etapa 6 (LangGraph) — validação real
+
+- **O quê:** (a) rodar as 11 suítes de eval real e confirmar não-regressão vs baseline
+  pré-migração (`writing`/`extraction`/`rag` são o núcleo) + re-wire do Experiment Langfuse;
+  (b) com Langfuse real, confirmar que a `CallbackHandler` emite **usage de cache/reasoning**
+  com as keys canônicas (risco #2 da Et.6) e que o trace mostra `turn → agent → tools →
+  critic (aninhado)`.
+- **Por que adiado:** custo de token (suítes reais) + precisa de conta Langfuse com tráfego.
+  Premissa MVP [[project_mvp_os_models]]. O código está fechado e testado sem rede (705 passed);
+  isto é a validação de observabilidade/regressão que exige ambiente real.
+- **Já rodado (2026-06-20):** `writing --limit 1` (caminho real, embeddings OS) →
+  `saved=1/coherent=1/factual_errors=0`. **Pegou e corrigiu** um bug cross-loop latente da
+  Et.3 (subagente herdava o checkpointer do pai; fix `checkpointer=False`). Falta o gate
+  estatístico (N casos) + Langfuse real.
+- **Se a parity de usage falhar:** escrever um callback de usage custom (o `record_usage` em
+  `core/telemetry.py` já tem a lógica de extração como referência).
+- **Status:** aberto (2026-06-20). Não bloqueia o merge do código da migração.
+
 ### Deploy — aplicar migrations 021-024 no Supabase remoto (knowledge-evolution)
 
 - **O quê:** as migrations `021_weight_change_log`, `022_episodic_signal`,

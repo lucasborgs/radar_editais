@@ -28,7 +28,7 @@ def _serialize_extract_result(result: ExtractResult) -> dict:
     Centraliza o dict campo-a-campo do perfil para os três endpoints
     (extract, extract-from-document, extract-from-library).
     """
-    # Decisão 1 (docs/specs/onboarding-input-ux.md): infere mecanismos de
+    # Decisão 1: infere mecanismos de
     # financiamento candidatos quando a extração não os trouxe. PROPOSTA pré-marcada
     # — humano confirma/desmarca no review; eval-gated (dimensão mecanismo, peso 15).
     # Não sobrescreve valor já presente (ex.: vindo de edição manual/library).

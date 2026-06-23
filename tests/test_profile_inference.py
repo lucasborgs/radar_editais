@@ -1,6 +1,6 @@
 """Testes de `infer_financiamento` + wire no serializer de extract.
 
-Cobre a Decisão 1 da spec docs/specs/onboarding-input-ux.md: inferência
+Cobre a Decisão 1: inferência
 determinística de `tipos_financiamento_interesse` (PROPOSTA, eval-gated).
 """
 

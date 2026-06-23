@@ -1,6 +1,6 @@
 """Engine do DeepResearch — subagente que busca na web e sintetiza COM fonte.
 
-DeepResearch Fase A (ver docs/spec_deepresearch.md). Padrão subagente-como-tool:
+DeepResearch Fase A. Padrão subagente-como-tool:
 `run_deep_research` roda um `run_agent` interno com duas tools (web_search via
 core.web_search; fetch_url para leitura profunda). Devolve `DeepResearchResult`
 estruturado (answer + sources) — a função pura que tanto a tool do Redator
@@ -16,8 +16,10 @@ import logging
 import os
 from dataclasses import dataclass, field
 
+from langchain_core.tools import tool
+
 from core import web_search as ws
-from core.llm.agent_runtime import run_subagent, tool
+from core.llm.agent_runtime import run_subagent
 from core.web import fetch as web_fetch
 
 logger = logging.getLogger(__name__)
@@ -64,9 +66,14 @@ def run_deep_research(
     model: str | None = None,
     provider: str = "anthropic",
     max_steps: int = DEEP_RESEARCH_MAX_STEPS,
+    trace_context: dict | None = None,
 ) -> DeepResearchResult:
     """Roda o subagente de pesquisa web sobre `question`. Stateless: nada é
-    persistido (nem KG nem library) — a persistência é o gate humano da Fase B."""
+    persistido (nem KG nem library) — a persistência é o gate humano da Fase B.
+
+    trace_context: contexto Langfuse do turno pai para aninhar o span do
+        sub-agente. Deve ser capturado no call site antes de entrar no thread pool.
+    """
     collected: list[ws.SearchHit] = []
 
     @tool
@@ -110,6 +117,7 @@ def run_deep_research(
         provider=provider,  # type: ignore[arg-type]
         model=model,
         max_steps=max_steps,
+        trace_context=trace_context,
     )
 
     # Fontes = hits consultados, deduplicados por URL (preservando ordem).

@@ -1,6 +1,6 @@
 """Testes do playbook loader (core.skills) e da tool load_skill do Redator.
 
-Modelo (docs/specs/skills-by-mechanism.md): skill = competência keyed por
+Modelo: skill = competência keyed por
 `mechanism`, composta em 3 camadas (mechanism base + source/global + source/mech),
 merge POR SEÇÃO, com cada `##` roteando a um consumidor. Regra dura é RAG, não
 playbook.
@@ -106,7 +106,7 @@ def test_tool_keys_agency_from_edital_id_prefix_not_source_field(monkeypatch):
     tool = _build_load_skill(
         monkeypatch, {"source": "etl_process", "mechanism": "subvencao"},
     )
-    out = tool.call({})
+    out = tool.invoke({})
     assert "PLAYBOOK DE ESCRITA (subvencao · finep)" in out
     assert "Padrões de escrita" in out
     assert "propositivo" in out.lower()  # veio do overlay source/finep/global.md
@@ -116,14 +116,14 @@ def test_tool_keys_agency_from_edital_id_prefix_not_source_field(monkeypatch):
 def test_tool_graceful_when_no_mechanism(monkeypatch):
     """Sem mechanism resolvível → mensagem amigável (fallback genérico vazio)."""
     tool = _build_load_skill(monkeypatch, {"source": "etl_process"})
-    out = tool.call({})
+    out = tool.invoke({})
     assert "Sem playbook de escrita" in out
 
 
 def test_tool_pitch_session_uses_equity(monkeypatch):
     """mode=pitch → mechanism=equity, sem depender de wiki page de edital."""
     tool = _build_load_skill(monkeypatch, None, session=_FakePitchSession())
-    out = tool.call({})
+    out = tool.invoke({})
     assert "PLAYBOOK DE ESCRITA (equity" in out
 
 

@@ -1,8 +1,7 @@
 """Schema tipado de extração de edital — o contrato entre a extração-LLM e o
 scoring determinístico (v2).
 
-Materializa `docs/spec_extraction_schema.md` + a curadoria externa reconciliada
-com o código (ver BACKLOG). Princípios:
+Princípios:
   • campos DECISÃO carregam abstenção (`Extracted[T]` com `state` + `evidence`).
   • campos CONTEXTO são `valor | None` (alimentam Stage 2 / escrita; toleram ruído).
   • `evidence` deve ser SUBSTRING VERBATIM da fonte (âncora de auditoria/anti-alucinação).
@@ -82,7 +81,7 @@ class EditalExtraction(BaseModel):
     # --- proveniência ---
     source: str
     native_id: str
-    # Discriminador do tipo de oportunidade-EVENTO (spec_multi_quadrante §2). Os 3
+    # Discriminador do tipo de oportunidade-EVENTO. Os 3
     # tipos-evento compartilham este schema/pipeline; só os campos opcionais abaixo
     # ramificam. ENTIDADE (investidor) NÃO usa este model — ver domain/investor_entity.
     opportunity_type: str = "edital"   # "edital" | "desafio" | "programa"

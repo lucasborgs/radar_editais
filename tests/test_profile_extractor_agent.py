@@ -59,7 +59,7 @@ def test_fetch_page_returns_text_and_caches(monkeypatch):
         lambda *a, **kw: _mock_response(html=html),
     )
 
-    out = fetch.call({"url": "https://acme.bio"})
+    out = fetch.invoke({"url": "https://acme.bio"})
     assert "ACME Bio" in out
     assert "bioeconomia" in out.lower()
     assert "https://acme.bio" in state.fetched
@@ -80,8 +80,8 @@ def test_fetch_page_serves_from_cache_on_second_call(monkeypatch):
 
     monkeypatch.setattr("core.llm.agent_tools.profile_tools.requests.get", fake_get)
 
-    fetch.call({"url": "https://x.com"})
-    out = fetch.call({"url": "https://x.com"})
+    fetch.invoke({"url": "https://x.com"})
+    out = fetch.invoke({"url": "https://x.com"})
     assert "[cache]" in out
     assert call_count["n"] == 1
 
@@ -95,7 +95,7 @@ def test_fetch_page_handles_http_error(monkeypatch):
         "core.llm.agent_tools.profile_tools.requests.get",
         lambda *a, **kw: _mock_response(status_code=404, html=""),
     )
-    out = fetch.call({"url": "https://nope.com"})
+    out = fetch.invoke({"url": "https://nope.com"})
     assert "404" in out
     assert "Tente outro link" in out
 
@@ -110,7 +110,7 @@ def test_fetch_page_handles_timeout(monkeypatch):
         raise Timeout("slow")
 
     monkeypatch.setattr("core.llm.agent_tools.profile_tools.requests.get", boom)
-    out = fetch.call({"url": "https://slow.com"})
+    out = fetch.invoke({"url": "https://slow.com"})
     assert "Timeout" in out
 
 
@@ -128,7 +128,7 @@ def test_fetch_page_respects_max_pages_limit(monkeypatch):
         "core.llm.agent_tools.profile_tools.requests.get",
         lambda *a, **kw: _mock_response(html="<html><title>nova</title></html>"),
     )
-    out = fetch.call({"url": "https://nova.com"})
+    out = fetch.invoke({"url": "https://nova.com"})
     assert "Limite" in out
     assert "submit_profile" in out
 
@@ -137,7 +137,7 @@ def test_fetch_page_empty_url():
     state = ExtractionState()
     tools = build_profile_tools(state)
     fetch = next(t for t in tools if t.name == "fetch_page")
-    assert "vazia" in fetch.call({"url": ""}).lower()
+    assert "vazia" in fetch.invoke({"url": ""}).lower()
 
 
 # ============================================================================
@@ -158,7 +158,7 @@ def test_list_links_matching_uses_cache(monkeypatch):
     tools = build_profile_tools(state)
     ll = next(t for t in tools if t.name == "list_links_matching")
 
-    out = ll.call({"url": "https://x.com", "pattern": "sobre"})
+    out = ll.invoke({"url": "https://x.com", "pattern": "sobre"})
     assert "Sobre nós" in out
     assert "/sobre" in out
     assert "Produtos" not in out
@@ -176,7 +176,7 @@ def test_list_links_matching_pattern_in_href():
     tools = build_profile_tools(state)
     ll = next(t for t in tools if t.name == "list_links_matching")
 
-    out = ll.call({"url": "https://x.com", "pattern": "about"})
+    out = ll.invoke({"url": "https://x.com", "pattern": "about"})
     assert "Veja mais" in out
 
 
@@ -189,7 +189,7 @@ def test_list_links_matching_no_match():
     tools = build_profile_tools(state)
     ll = next(t for t in tools if t.name == "list_links_matching")
 
-    out = ll.call({"url": "https://x.com", "pattern": "xyz"})
+    out = ll.invoke({"url": "https://x.com", "pattern": "xyz"})
     assert "Nenhum link" in out
 
 
@@ -204,7 +204,7 @@ def test_list_links_matching_fetches_on_demand(monkeypatch):
     tools = build_profile_tools(state)
     ll = next(t for t in tools if t.name == "list_links_matching")
 
-    out = ll.call({"url": "https://x.com", "pattern": "about"})
+    out = ll.invoke({"url": "https://x.com", "pattern": "about"})
     assert "About" in out
     assert "https://x.com" in state.fetched
 
@@ -227,7 +227,7 @@ def test_lookup_cnpj_validates_format(monkeypatch):
     tools = build_profile_tools(state)
     lc = next(t for t in tools if t.name == "lookup_cnpj")
 
-    out = lc.call({"cnpj": "123"})
+    out = lc.invoke({"cnpj": "123"})
     assert "não parece um CNPJ válido" in out
 
 
@@ -247,7 +247,7 @@ def test_lookup_cnpj_accepts_masked_format(monkeypatch):
             },
         ),
     )
-    out = lc.call({"cnpj": "11.222.333/0001-44"})
+    out = lc.invoke({"cnpj": "11.222.333/0001-44"})
     assert "ACME LTDA" in out
     assert "Bioeconomia" in out
 
@@ -262,7 +262,7 @@ def test_lookup_cnpj_handles_404(monkeypatch):
         "core.llm.agent_tools.profile_tools.requests.get",
         lambda *a, **kw: _mock_response(status_code=404, html=""),
     )
-    out = lc.call({"cnpj": "11222333000144"})
+    out = lc.invoke({"cnpj": "11222333000144"})
     assert "não encontrado" in out
 
 
@@ -277,7 +277,7 @@ def test_lookup_cnpj_handles_timeout(monkeypatch):
         "core.llm.agent_tools.profile_tools.requests.get",
         MagicMock(side_effect=Timeout("slow")),
     )
-    out = lc.call({"cnpj": "11222333000144"})
+    out = lc.invoke({"cnpj": "11222333000144"})
     assert "timeout" in out.lower()
 
 
@@ -290,7 +290,7 @@ def test_submit_profile_required_fields():
     tools = build_profile_tools(state)
     sub = next(t for t in tools if t.name == "submit_profile")
 
-    out = sub.call({
+    out = sub.invoke({
         "nome": "", "tipo_entidade": "empresa",
         "one_liner": "x", "descricao_atividades": "y",
     })
@@ -302,7 +302,7 @@ def test_submit_profile_valid_tipo():
     tools = build_profile_tools(state)
     sub = next(t for t in tools if t.name == "submit_profile")
 
-    out = sub.call({
+    out = sub.invoke({
         "nome": "ACME", "tipo_entidade": "xyz",
         "one_liner": "x", "descricao_atividades": "y",
     })
@@ -314,7 +314,7 @@ def test_submit_profile_trl_range():
     tools = build_profile_tools(state)
     sub = next(t for t in tools if t.name == "submit_profile")
 
-    out = sub.call({
+    out = sub.invoke({
         "nome": "X", "tipo_entidade": "startup",
         "one_liner": "x", "descricao_atividades": "y",
         "trl": 15,
@@ -327,7 +327,7 @@ def test_submit_profile_happy_path():
     tools = build_profile_tools(state)
     sub = next(t for t in tools if t.name == "submit_profile")
 
-    out = sub.call({
+    out = sub.invoke({
         "nome": "ACME Bio",
         "tipo_entidade": "startup",
         "one_liner": "Bioeconomia.",
@@ -347,7 +347,7 @@ def test_submit_profile_idempotent_after_first_call():
     tools = build_profile_tools(state)
     sub = next(t for t in tools if t.name == "submit_profile")
 
-    out = sub.call({
+    out = sub.invoke({
         "nome": "Outro", "tipo_entidade": "empresa",
         "one_liner": "x", "descricao_atividades": "y",
     })
@@ -364,7 +364,7 @@ def test_submit_profile_threads_eligibility_fields():
     tools = build_profile_tools(state)
     sub = next(t for t in tools if t.name == "submit_profile")
 
-    out = sub.call({
+    out = sub.invoke({
         "nome": "ACME Bio", "tipo_entidade": "startup",
         "one_liner": "Bioeconomia.", "descricao_atividades": "Produz X.",
         "uf": "sp", "ano_fundacao": 2019, "faturamento_anual": 1_200_000,
@@ -379,7 +379,7 @@ def test_submit_profile_rejects_bad_uf():
     state = ExtractionState()
     tools = build_profile_tools(state)
     sub = next(t for t in tools if t.name == "submit_profile")
-    out = sub.call({
+    out = sub.invoke({
         "nome": "X", "tipo_entidade": "empresa",
         "one_liner": "x", "descricao_atividades": "y", "uf": "São Paulo",
     })
@@ -391,7 +391,7 @@ def test_submit_profile_rejects_bad_ano_fundacao():
     state = ExtractionState()
     tools = build_profile_tools(state)
     sub = next(t for t in tools if t.name == "submit_profile")
-    out = sub.call({
+    out = sub.invoke({
         "nome": "X", "tipo_entidade": "empresa",
         "one_liner": "x", "descricao_atividades": "y", "ano_fundacao": 1500,
     })
@@ -404,7 +404,7 @@ def test_submit_profile_eligibility_fields_optional():
     state = ExtractionState()
     tools = build_profile_tools(state)
     sub = next(t for t in tools if t.name == "submit_profile")
-    out = sub.call({
+    out = sub.invoke({
         "nome": "X", "tipo_entidade": "empresa",
         "one_liner": "x", "descricao_atividades": "y",
     })
@@ -424,7 +424,7 @@ def test_extract_agent_threads_eligibility_into_profile(monkeypatch):
 
     def fake_run_agent(**kw):
         sub = next(t for t in kw["tools"] if t.name == "submit_profile")
-        sub.call({
+        sub.invoke({
             "nome": "ACME Bio", "tipo_entidade": "startup",
             "one_liner": "Bio.", "descricao_atividades": "Produz X.",
             "uf": "MG", "ano_fundacao": 2017, "faturamento_anual": 800_000,
@@ -508,7 +508,7 @@ def test_extract_agent_happy_path(monkeypatch):
         # Simula side effect das tools no state via callback que o agente faria
         tools = kw["tools"]
         sub = next(t for t in tools if t.name == "submit_profile")
-        sub.call({
+        sub.invoke({
             "nome": "ACME Bio",
             "tipo_entidade": "startup",
             "one_liner": "Bioeconomia.",

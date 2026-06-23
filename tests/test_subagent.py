@@ -1,34 +1,46 @@
 """Testes de run_subagent (core/llm/agent_runtime).
 
-Cobre: happy path (monkeypatch _call_anthropic com _make_fake_call),
-degradação (run_agent interno lança → stop_reason="error" sem exceção),
-span_name propagado (f"subagent.{name}" chega na telemetria).
-
-Reusa o padrão _make_fake_call/_LLMStep de tests/test_agent_runtime.py.
+Pós-migração LangGraph: o subagente roda pelo grafo (agent_graph). Cobre:
+  - happy path (chat model scriptado via _build_chat_model);
+  - degradação (run_agent interno lança → stop_reason="error", sem propagar);
+  - degradação sem API key (resolve_agent_provider levanta → error);
+  - span_name propagado (f"subagent.{name}" chega na telemetria).
 """
 from __future__ import annotations
 
+import contextlib
 import sys
-from contextlib import contextmanager
 from pathlib import Path
+
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.tools import tool
+from pydantic import PrivateAttr
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+import core.llm.agent_graph as ag
 import core.llm.agent_runtime as ar
-from core.llm.agent_runtime import _LLMStep, run_subagent, tool
+from core.llm.agent_runtime import run_subagent
 
 
-def _make_fake_call(sequence: list[_LLMStep]):
-    """Stub: devolve sequence[i] na i-ésima invocação (cópia de test_agent_runtime)."""
-    state = {"i": 0}
+class _ScriptedChatModel(BaseChatModel):
+    responses: list
+    _idx: int = PrivateAttr(default=0)
 
-    def call(system, messages, tools_schema, model):
-        step = sequence[state["i"]]
-        state["i"] += 1
-        return step
+    @property
+    def _llm_type(self) -> str:
+        return "scripted"
 
-    return call
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+        msg = self.responses[self._idx]
+        self._idx += 1
+        return ChatResult(generations=[ChatGeneration(message=msg)])
+
+    def bind_tools(self, tools, **kwargs):  # noqa: ANN001
+        return self
 
 
 @tool
@@ -39,24 +51,15 @@ def _noop(x: str) -> str:
 
 def test_run_subagent_happy_path(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-x")
-    fake = _make_fake_call([
-        _LLMStep(
-            stop_reason="end_turn",
-            text="resposta do subagente",
-            tool_uses=[],
-            assistant_message={"role": "assistant", "content": "resposta do subagente"},
-            usage={"input_tokens": 20, "output_tokens": 5},
-        ),
+    scripted = _ScriptedChatModel(responses=[
+        AIMessage(content="resposta do subagente",
+                  usage_metadata={"input_tokens": 20, "output_tokens": 5, "total_tokens": 25}),
     ])
-    monkeypatch.setattr(ar, "_call_anthropic", fake)
+    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: scripted)
 
     res = run_subagent(
-        name="deep_research",
-        system="sys",
-        user_message="pergunta",
-        tools=[_noop],
-        provider="anthropic",
-        model="claude-sonnet-4-6",
+        name="deep_research", system="sys", user_message="pergunta",
+        tools=[_noop], provider="anthropic", model="claude-sonnet-4-6",
     )
     assert res.final_text == "resposta do subagente"
     assert res.stop_reason == "end_turn"
@@ -71,57 +74,41 @@ def test_run_subagent_degrades_on_internal_error(monkeypatch):
 
     monkeypatch.setattr(ar, "run_agent", boom)
 
-    res = run_subagent(
-        name="deep_research",
-        system="sys",
-        user_message="x",
-        tools=[_noop],
-    )
+    res = run_subagent(name="deep_research", system="sys", user_message="x", tools=[_noop])
     assert res.final_text == "" and res.steps == [] and res.stop_reason == "error"
     assert res.usage == {}
 
 
 def test_run_subagent_degrades_when_no_api_key(monkeypatch):
     """Sem nenhuma API key, resolve_agent_provider levanta → degrada, não propaga."""
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    for var in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "AGENT_OPENAI_API_KEY", "AGENT_OPENAI_BASE_URL"):
+        monkeypatch.delenv(var, raising=False)
 
-    res = run_subagent(
-        name="deep_research", system="s", user_message="x", tools=[_noop],
-    )
+    res = run_subagent(name="deep_research", system="s", user_message="x", tools=[_noop])
     assert res.stop_reason == "error"
 
 
 def test_run_subagent_propagates_span_name(monkeypatch):
     """O span raiz vira f'subagent.{name}', distinguindo de agente top-level."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-x")
-    fake = _make_fake_call([
-        _LLMStep(
-            stop_reason="end_turn",
-            text="ok",
-            tool_uses=[],
-            assistant_message={"role": "assistant", "content": "ok"},
-            usage={"input_tokens": 1, "output_tokens": 1},
-        ),
+    scripted = _ScriptedChatModel(responses=[
+        AIMessage(content="ok",
+                  usage_metadata={"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}),
     ])
-    monkeypatch.setattr(ar, "_call_anthropic", fake)
+    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: scripted)
 
     captured: list[str] = []
 
-    @contextmanager
+    @contextlib.contextmanager
     def fake_agent_run(name, **kw):
         captured.append(name)
         yield None
 
-    # run_agent importa telemetry lazy via `from core import telemetry`.
     import core.telemetry as telemetry
     monkeypatch.setattr(telemetry, "agent_run", fake_agent_run)
 
     run_subagent(
-        name="deep_research",
-        system="sys",
-        user_message="x",
-        tools=[_noop],
-        model="claude-sonnet-4-6",
+        name="deep_research", system="sys", user_message="x",
+        tools=[_noop], model="claude-sonnet-4-6",
     )
     assert captured == ["subagent.deep_research"]

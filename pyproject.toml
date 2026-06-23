@@ -14,7 +14,16 @@ dependencies = [
     "python-dotenv>=1.0",
     "openai>=1.0",
     "anthropic>=0.40",               # Sonnet 4.6 para agentes (WritingSession + explore)
-    "langfuse>=2.50",                # observabilidade de agents (spans por step)
+    # Runtime agêntico LangGraph (migração — docs/specs/langgraph-migration.md).
+    # Runtime único desde a Etapa 2 (legado deletado). checkpoint-postgres: durabilidade
+    # da WritingSession + interrupt/resume de request_user_info (Etapa 3) sobre DATABASE_URL.
+    "langgraph>=1.2",
+    "langgraph-checkpoint-postgres>=2",
+    "langchain-core>=1.4",
+    "langchain-anthropic>=1.4",
+    "langchain-openai>=1.3",
+    "langchain>=1.0",                # meta-pacote exigido pelo langfuse.langchain.CallbackHandler (Etapa 6)
+    "langfuse>=2.50",                # observabilidade de agents (spans nativos via CallbackHandler)
     "requests>=2.31",
     "supabase>=2.4",
     "PyJWT>=2.8",

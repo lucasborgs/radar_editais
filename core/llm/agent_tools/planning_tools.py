@@ -1,6 +1,6 @@
 """Tool de planejamento (write_todos) — lista de tarefas viva como âncora anti-drift.
 
-Padrão roubado do deepagents (ver docs/spec_agent_patterns.md): em loops longos
+Padrão deepagents: em loops longos
 o agente perde de vista o objetivo. Uma lista de TODOs que ele mantém e renderiza
 a cada update vira âncora no histórico — o estado atual do plano volta no contexto
 toda vez que ele escreve.
@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from core.llm.agent_runtime import Tool, tool
+from langchain_core.tools import BaseTool, tool
 
 # Status válidos e seus marcadores de render. A ordem define a iconografia.
 _STATUS_MARKER = {
@@ -58,7 +58,7 @@ def _render(todos: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def build_planning_tools(state: PlanState) -> list[Tool]:
+def build_planning_tools(state: PlanState) -> list[BaseTool]:
     """Constrói a tool de planejamento fechando sobre `state`.
 
     Cada execução (turno do writing, extração de perfil) cria seu próprio

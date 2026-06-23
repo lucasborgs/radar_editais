@@ -1,18 +1,24 @@
-"""Telemetria Langfuse para agent_runtime e serviços LLM.
+"""Telemetria Langfuse para o runtime agêntico (LangGraph) e serviços LLM.
 
-Três níveis de span (mapeados a tipos semânticos do Langfuse 4.x):
-  • agent_run        — invocação inteira de um agente (raiz da trace)
-  • llm_generation   — uma chamada LLM dentro do loop do agente (1 step)
-  • tool_call        — execução de uma tool (1 step)
+Desde a Etapa 6 da migração LangGraph, os spans por-step (chamadas LLM e tools)
+vêm da `langfuse.langchain.CallbackHandler` NATIVA — passada no `config` de cada
+invocação do grafo (`make_callback_handler`), com timing real e usage automático.
+Este módulo mantém:
+  • agent_run            — span-raiz nomeado (as_type=agent) que ancora o trace e
+                           sob o qual o handler aninha os spans do grafo;
+  • make_callback_handler — factory da CallbackHandler (None se desabilitado);
+  • current_trace_context — captura o parent para aninhar runs cross-thread (o
+                           subagente/critic roda noutra thread → contextvar não cruza);
+  • record_usage         — extrai usage de respostas CRUAS de SDK (fallback/legado;
+                           o handler cobre o caminho do grafo).
 
-Quando LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY não estão definidas, os
-context managers viram no-op silencioso — dev local sem conta Langfuse
-não paga overhead nem quebra. Em prod, basta setar as duas vars que toda
-trace do agent runtime passa a ser exportada.
+Quando LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY não estão definidas, tudo vira no-op
+silencioso — dev local sem conta Langfuse não paga overhead nem quebra. Em prod,
+basta setar as duas vars que toda trace do runtime passa a ser exportada.
 
 Custo (perf): client Langfuse usa OpenTelemetry batch exporter — chamadas
 não-bloqueantes. Falhas de rede pro Langfuse jamais derrubam request do
-usuário (try/except em cada span, fallback debug log).
+usuário (try/except em cada span/factory, fallback debug log).
 """
 from __future__ import annotations
 
@@ -62,11 +68,19 @@ def agent_run(
     *,
     input: Any = None,
     metadata: dict | None = None,
+    trace_context: dict | None = None,
 ):
     """Span raiz de uma invocação de agente (as_type=agent).
 
-    Use em volta de `run_agent(...)` — abre o trace e fecha quando o agente
-    termina (com ou sem exceção). No-op quando Langfuse não está habilitado.
+    Use em volta da invocação do grafo — abre o trace, define o span como o
+    observation corrente (a `CallbackHandler` de `make_callback_handler` aninha os
+    spans nativos do LangGraph por baixo dele) e fecha quando o agente termina (com
+    ou sem exceção). No-op quando Langfuse não está habilitado.
+
+    `trace_context` (Etapa 6): ao receber `{"trace_id", "parent_span_id"}` de um run
+    pai (capturado por `current_trace_context`), enraíza este span sob aquele parent
+    REMOTO — é assim que o subagente (critic), que roda noutra thread/loop, aninha sob
+    o turno da WritingSession (o contextvar OTel não cruza a fronteira de thread).
     """
     if not is_enabled():
         yield None
@@ -77,11 +91,53 @@ def agent_run(
             as_type="agent",
             input=input,
             metadata=metadata or {},
+            trace_context=trace_context or None,
         ) as span:
             yield span
     except Exception as e:
         logger.debug("agent_run span '%s' falhou: %s", name, e)
         yield None
+
+
+def current_trace_context() -> dict | None:
+    """Captura o contexto da trace corrente (`{"trace_id", "parent_span_id"}`) para
+    propagar a um run que roda noutra thread/loop (subagente). None se desabilitado
+    ou sem observation ativo. Espelha o `TraceContext` do Langfuse v4."""
+    if not is_enabled():
+        return None
+    try:
+        trace_id = _client.get_current_trace_id()
+        if not trace_id:
+            return None
+        ctx: dict = {"trace_id": trace_id}
+        obs_id = _client.get_current_observation_id()
+        if obs_id:
+            ctx["parent_span_id"] = obs_id
+        return ctx
+    except Exception as e:  # noqa: BLE001
+        logger.debug("current_trace_context falhou: %s", e)
+        return None
+
+
+def make_callback_handler(trace_context: dict | None = None):
+    """Factory da `langfuse.langchain.CallbackHandler` (Etapa 6) — passada no
+    `config={"callbacks": [...]}` de cada invocação do grafo. Gera spans nativos
+    (chain/llm/tool) com timing real e usage automático, aninhados sob o observation
+    corrente (o `agent_run`). None se Langfuse desabilitado → grafo roda sem overhead.
+
+    `trace_context` raramente é necessário aqui: o aninhamento já vem do observation
+    corrente via contextvar. Fica disponível para casos cross-thread onde o handler
+    precise apontar o parent remoto explicitamente.
+    """
+    if not is_enabled():
+        return None
+    try:
+        from langfuse.langchain import CallbackHandler
+
+        return CallbackHandler(trace_context=trace_context or None)
+    except Exception as e:  # noqa: BLE001 — telemetria nunca derruba a request
+        logger.debug("make_callback_handler falhou: %s", e)
+        return None
 
 
 def record_usage(span: Any, response: Any) -> None:
@@ -146,62 +202,6 @@ def record_usage(span: Any, response: Any) -> None:
         span.update(usage_details=details)
     except Exception as e:  # pragma: no cover - guard defensivo
         logger.debug("record_usage falhou (ignorado): %s", e)
-
-
-@contextmanager
-def llm_generation(
-    name: str,
-    *,
-    model: str,
-    input: Any = None,
-    metadata: dict | None = None,
-):
-    """Span de uma chamada LLM dentro do loop do agente (as_type=generation).
-
-    Captura input (messages), model e usage_details. Para registrar o usage
-    após a chamada, use `record_usage(span, response)` com a resposta crua do
-    SDK (OpenAI ou Anthropic) — ele extrai input/output (+ cache/reasoning) no
-    formato que o Langfuse usa pra precificar.
-    """
-    if not is_enabled():
-        yield None
-        return
-    try:
-        with _client.start_as_current_observation(
-            name=name,
-            as_type="generation",
-            model=model,
-            input=input,
-            metadata=metadata or {},
-        ) as span:
-            yield span
-    except Exception as e:
-        logger.debug("llm_generation span '%s' falhou: %s", name, e)
-        yield None
-
-
-@contextmanager
-def tool_call(
-    name: str,
-    *,
-    input: Any = None,
-    metadata: dict | None = None,
-):
-    """Span de uma execução de tool dentro do loop do agente (as_type=tool)."""
-    if not is_enabled():
-        yield None
-        return
-    try:
-        with _client.start_as_current_observation(
-            name=name,
-            as_type="tool",
-            input=input,
-            metadata=metadata or {},
-        ) as span:
-            yield span
-    except Exception as e:
-        logger.debug("tool_call span '%s' falhou: %s", name, e)
-        yield None
 
 
 def flush() -> None:

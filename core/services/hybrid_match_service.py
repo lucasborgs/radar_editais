@@ -577,7 +577,7 @@ dimensões em 1 frase cada:
 def _make_client():
     """Cliente + modelo do raciocínio do match (Stage 2), parametrizável por env.
 
-    Bake-off (docs/specs/llm-embedding-bakeoff.md, tier 3 — gateado por `matching`):
+    Bake-off (tier 3, gateado por `matching`):
     o slot de raciocínio precisa trocar de modelo/provider por env, sem editar
     código. Os defaults preservam EXATAMENTE o comportamento anterior: sem env
     setada, isto usa gpt-4o-mini no endpoint canônico OpenAI (ou gemini-2.5-flash
