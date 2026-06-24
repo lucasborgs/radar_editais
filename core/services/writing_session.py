@@ -436,9 +436,9 @@ class WritingSession:
         )
 
     def _resolve_edital_scope(self) -> list[str]:
-        """edital primário + análogos via KGMatchService.resolve_scope.
+        """edital primário + análogos via GraphService.resolve_scope.
 
-        Lazy import porque KGMatchService carrega o índice JSON; não vale
+        Lazy import porque GraphService carrega o índice JSON; não vale
         puxar no boot do módulo. Cap em 3 análogos para não inflar o
         retrieval (chunks dos análogos rotulados via format_chunks_for_prompt).
         """
@@ -447,8 +447,8 @@ class WritingSession:
         if self.mode == "pitch":
             return [self.edital_id]
         try:
-            from core.services.kg_match_service import KGMatchService
-            return KGMatchService().resolve_scope(
+            from core.services.graph_service import GraphService
+            return GraphService().resolve_scope(
                 edital_id=self.edital_id, max_analogues=3,
             )
         except Exception as e:

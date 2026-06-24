@@ -59,9 +59,9 @@ def match_investidores_endpoint(
     especialistas casam por TESE/tema/setor; generalistas por ESTÁGIO. SEM gate —
     entidade não elimina. Caminho isolado: não toca o
     matcher de edital."""
-    from core.services.investor_match import match_investidores
+    from core.services.entity_matcher import EntityMatcher, catalog_investidores
     profile = to_py_profile(req.profile)
-    return {"matches": match_investidores(profile, top_k=req.top_k)}
+    return {"matches": EntityMatcher(catalog_investidores).match(profile, top_k=req.top_k)}
 
 
 @router.post("/match/programas", summary="Rankeamento de programas recorrentes por estágio/aderência")
@@ -73,9 +73,9 @@ def match_programas_endpoint(
     capacitação) rankeados por aderência: ESTÁGIO + elegibilidade + tema/setor
     (quando o programa tem tese). SEM gate — entidade não elimina. Caminho isolado:
     não toca o matcher de edital nem o de investidor."""
-    from core.services.programa_match import match_programas
+    from core.services.entity_matcher import EntityMatcher, catalog_programas
     profile = to_py_profile(req.profile)
-    return {"matches": match_programas(profile, top_k=req.top_k)}
+    return {"matches": EntityMatcher(catalog_programas).match(profile, top_k=req.top_k)}
 
 
 @router.post("/match/radar", summary="Radar unificado (L2): eventos + investidores + programas num ranking só")

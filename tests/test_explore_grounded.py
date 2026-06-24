@@ -2,7 +2,7 @@
 
 Estratégia: monkeypatch em `explore_tools.retrieve_chunks` — a tool NÃO depende
 de DB/Supabase nestes testes; só verificamos a orquestração (loop por edital,
-rótulos, degradação, caps). Instanciamos KGMatchService() real (lê o índice em
+rótulos, degradação, caps). Instanciamos ExploreAgent() real (lê o índice em
 disco), mas a tool só usa o service para `service` ser válido; a recuperação é
 mockada.
 
@@ -25,12 +25,13 @@ sys.path.insert(0, str(ROOT))
 
 import core.llm.agent_tools.explore_tools as explore_tools  # noqa: E402
 from core.llm.agent_tools import build_explore_tools  # noqa: E402
-from core.services.kg_match_service import KGMatchService  # noqa: E402
+from core.services.explore_agent import ExploreAgent  # noqa: E402
+from core.services.graph_service import GraphService  # noqa: E402
 
 
 def _get_tool(svc=None):
-    svc = svc or KGMatchService()
-    tools = build_explore_tools(svc)
+    svc = svc or ExploreAgent()
+    tools = build_explore_tools(svc, GraphService())
     return next(t for t in tools if t.name == "search_edital_trechos")
 
 
@@ -53,8 +54,8 @@ def _fake_chunk(eid: str, text: str = "texto literal do edital"):
 # ---------------------------------------------------------------------------
 
 def test_tool_is_registered():
-    svc = KGMatchService()
-    names = {t.name for t in build_explore_tools(svc)}
+    svc = ExploreAgent()
+    names = {t.name for t in build_explore_tools(svc, GraphService())}
     assert "search_edital_trechos" in names
 
 
