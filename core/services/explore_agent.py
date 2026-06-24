@@ -1,10 +1,12 @@
 """
 ExploreAgent — Chat exploratório sobre o catálogo + matching Karpathy-style.
 
-LLM-heavy: usa gpt-4o-mini (default, configurável por env) para conversar sobre
-o catálogo e ranquear editais por perfil. Extraído de KGMatchService (Fase 1 da
-spec match-evolution.md).
+3 rotas internas (classificador determinístico):
+  - factual: GraphService + readers, zero LLM (perguntas de catálogo)
+  - reasoning: 1 LLM call (conceitual)
+  - agent: multi-step com tools (precisa de dados + raciocínio)
 
+Extraído de KGMatchService (Fase 1 da spec match-evolution.md).
 Sem métodos de grafo — use GraphService para leitura do vault.
 """
 from __future__ import annotations
@@ -68,33 +70,6 @@ EXPLORE_USER_PROMPT = """CATÁLOGO DE EDITAIS:
 {details_block}
 PERGUNTA DO VISITANTE:
 {message}"""
-
-EXPLORE_PROFILE_EXTRACTION_INSTRUCTION = """
-
-———
-ALÉM de responder, EXTRAIA atualizações do perfil da empresa a partir da ÚLTIMA mensagem do visitante.
-Responda SEMPRE com UM objeto JSON válido (sem markdown em volta) com DUAS chaves:
-{
-  "answer": "<sua resposta ao visitante, em markdown>",
-  "profile_updates": { <só os campos que a ÚLTIMA mensagem preenche/altera; {} se nenhum> }
-}
-Chaves possíveis em profile_updates (use exatamente estas; NUNCA use null — omita o campo):
-- nome (string)
-- tipo_entidade ("empresa" | "startup" | "universidade" | "ICT")
-- one_liner (string, 1 frase)
-- solution_summary (string)
-- descricao_atividades (string)
-- tamanho_empresa ("MEI" | "ME" | "EPP" | "MEDIO" | "GRANDE")
-- trl (int 1-9)
-- uf (sigla de 2 letras, ex.: "SP")
-- ano_fundacao (int)
-- faturamento_anual (number, R$)
-- tipos_financiamento_interesse (array de strings)
-- estagio ("pre-seed" | "seed" | "serie-a")
-- mrr_arr (number, R$)
-- round_alvo_brl (number, R$)
-Inclua um campo SOMENTE se a última mensagem trouxer essa informação de fato. Se for só uma
-pergunta sem fato sobre a empresa, devolva "profile_updates": {}."""
 
 EXPLORE_AGENT_SYSTEM = """Você é o assistente do Radar de Editais, uma plataforma que conecta empresas
 a oportunidades de fomento e parceria no Brasil. O grafo de conhecimento cobre
@@ -443,18 +418,32 @@ class ExploreAgent:
         edital_ids: list[str] | None = None,
         node_id: str | None = None,
         node_type: str | None = None,
-        agent_enabled: bool = False,
+        has_profile: bool = False,
         workspace_id: str | None = None,
         db=None,
     ) -> str:
-        """Dispatcher do chat stateless sobre o catálogo."""
-        if agent_enabled:
-            return self._explore_agent(
-                message, history, edital_ids, node_id, node_type,
-                workspace_id=workspace_id, db=db,
-            )
-        return self._explore_legacy(
+        """Dispatcher: classifica intenção e roteia para a rota adequada.
+
+        - factual: GraphService + readers, zero LLM
+        - reasoning: 1 LLM call (_explore_legacy)
+        - agent: multi-step com tools (_explore_agent)
+        """
+        intent = self._classify_intent(
+            message, has_profile=has_profile, has_edital_ids=bool(edital_ids),
+        )
+        # Factual: tenta sem LLM, fallback → reasoning
+        if intent == "factual":
+            answer = self._factual_route(message, history, edital_ids, node_id, node_type)
+            if answer is not None:
+                return answer
+            intent = "reasoning"
+
+        if intent == "reasoning":
+            return self._explore_legacy(message, history, edital_ids, node_id, node_type)
+
+        return self._explore_agent(
             message, history, edital_ids, node_id, node_type,
+            workspace_id=workspace_id, db=db,
         )
 
     def _build_legacy_messages(
@@ -521,43 +510,6 @@ class ExploreAgent:
         except Exception as e:
             logger.error("Erro LLM no explore: %s", e)
             return "Desculpe, não consegui processar agora. Tente novamente em instantes."
-
-    def explore_turn(
-        self,
-        message: str,
-        history: list[dict] | None = None,
-        edital_ids: list[str] | None = None,
-        node_id: str | None = None,
-        node_type: str | None = None,
-    ) -> tuple[str, dict]:
-        """Explore legacy + extração de `profile_updates` na MESMA chamada LLM."""
-        system = EXPLORE_SYSTEM_PROMPT + EXPLORE_PROFILE_EXTRACTION_INSTRUCTION
-        messages = self._build_legacy_messages(
-            message, history, edital_ids, node_id, node_type, system=system,
-        )
-        try:
-            response = self._client.chat.completions.create(
-                model=self._model,
-                messages=messages,
-                temperature=0.3,
-                max_tokens=1400,
-                response_format={"type": "json_object"},
-            )
-            raw = (response.choices[0].message.content or "").strip()
-            data = json.loads(raw)
-            answer = (data.get("answer") or "").strip()
-            if not answer:
-                raise ValueError("explore_turn: JSON sem 'answer' útil")
-            updates = data.get("profile_updates")
-            return answer, updates if isinstance(updates, dict) else {}
-        except Exception as e:
-            logger.warning(
-                "explore_turn: extração unificada falhou (%s) — fallback texto puro", e,
-            )
-            return (
-                self._explore_legacy(message, history, edital_ids, node_id, node_type),
-                {},
-            )
 
     def _explore_tools(self) -> list:
         """Tools do agente de explore: leitura cross-dim + planejamento, e
@@ -656,6 +608,183 @@ class ExploreAgent:
                 f"Considere usar get_edital ou find_analogues nesses IDs.]"
             )
         return "\n".join(parts)
+
+    # ------------------------------------------------------------------
+    # Classificador de intenção
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _classify_intent(
+        message: str,
+        *,
+        has_profile: bool = False,
+        has_edital_ids: bool = False,
+    ) -> str:
+        """Classifica a mensagem em 'factual', 'reasoning' ou 'agent'.
+
+        Conservador: só rotorna 'factual' quando é inequívoco que a
+        pergunta pode ser respondida sem LLM. Todo o resto vai para
+        LLM (reasoning = 1 call, agent = multi-step).
+        """
+        msg = message.strip().lower()
+
+        # Perfil presente → precisa cruzar perfil com catálogo → agente
+        if has_profile:
+            return "agent"
+
+        # Tem IDs de edital (clique no grafo) + pergunta simples → factual
+        if has_edital_ids:
+            if re.match(
+                r"^(mostra|exibe|abre|detalhes?\s+(do|sobre)|volta|abrir)\b",
+                msg,
+            ):
+                return "factual"
+            return "agent"
+
+        # Pergunta sobre entidade do grafo sem ser edital (ICT, investidor)
+        if re.search(r"\b(icts?|institui[çc]ão|fundo|investidor|embrapii|sebrae)\b", msg):
+            return "agent"
+
+        # Precisa de dados + raciocínio → agente multi-step
+        if re.search(
+            r"\b(compare|melhor|recomende|qual combina|pra mim|"
+            r"minha empresa|sugira|ajuda|recomendação|"
+            r"oportunidade|indica|viável|vale a pena)\b",
+            msg,
+        ):
+            return "agent"
+
+        # Pergunta factual pura
+        if re.match(
+            r"^(quais?|quantos?|lista|mostra|exibe|tem|existe|"
+            r"abertos?|aberta|filtra|busca)\b",
+            msg,
+        ):
+            return "factual"
+
+        # Pergunta conceitual → 1 LLM call basta
+        if re.match(
+            r"^(o que é|como funciona|explique|qual a diferença|"
+            r"defina|o que significa|qual o conceito)",
+            msg,
+        ):
+            return "reasoning"
+
+        # Fallback conservador: reasoning (1 call, barato)
+        return "reasoning"
+
+    # ------------------------------------------------------------------
+    # Factual route
+    # ------------------------------------------------------------------
+
+    def _factual_route(
+        self,
+        message: str,
+        history: list[dict] | None = None,
+        edital_ids: list[str] | None = None,
+        node_id: str | None = None,
+        node_type: str | None = None,
+    ) -> str | None:
+        """Tenta responder sem LLM. Retorna markdown ou None (fallback)."""
+        msg = message.strip().lower()
+        self._load_index()
+
+        # --- (1) "mostra edital 589" / "detalhes do finep:589" -----------
+        for eid in re.findall(
+            r"(?:edital\s+)?([a-z]+:\d[\w-]+|\b\d{3,5}\b)", msg,
+        ):
+            known = {str(e["id"]) for e in self._index.get("editais", [])}
+            # Tenta match exato; se falhar, busca por sufixo numérico
+            candidates = [eid] if eid in known else [
+                k for k in known if k.split(":")[-1] == eid
+            ]
+            for cid in candidates:
+                card = self.get_edital_by_id(cid)
+                if card:
+                    return self._format_edital_card(card)
+
+        # --- (2) "quantos editais?" ------------------------------------
+        if re.match(r"^quantos?\b", msg):
+            stats = self.get_stats()
+            return (
+                f"**{stats['total_editais']} editais** no catálogo · "
+                f"{stats['by_status'].get('ABERTA', 0)} abertos · "
+                f"{stats['n_themes']} temas · {stats['n_fontes']} fontes"
+            )
+
+        # --- (3) "editais de saúde" / "filtra tema X" ------------------
+        tema = None
+        tm = re.search(r"(?:de|sobre|tema|área|em)\s+([a-zà-ú\s]+?)(?:\s*$|\.)", msg)
+        if tm:
+            candidate = tm.group(1).strip()
+            if len(candidate) >= 3:
+                tema = candidate
+
+        status_filter = None
+        if re.search(r"\babertos?\b", msg):
+            status_filter = "ABERTA"
+        if re.search(r"\b(encerrados?|fechados?)\b", msg):
+            status_filter = "ENCERRADA"
+
+        results = self.list_editais(status=status_filter, tema=tema, limit=20)
+
+        if results:
+            label_parts = []
+            if status_filter:
+                label_parts.append(status_filter.capitalize())
+            if tema:
+                label_parts.append(tema.capitalize())
+            label = " · ".join(label_parts) if label_parts else "Editais"
+            return self._format_edital_table(results, label)
+        elif tema or status_filter:
+            # Tema específico sem resultado: fallback para LLM
+            return None
+
+        # --- (4) fallback: não entendeu o padrão -----------------------
+        return None
+
+    # ------------------------------------------------------------------
+    # Formatadores (factual route)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _format_edital_card(card: dict) -> str:
+        title = card.get("title", card.get("id", ""))
+        lines = [f"### {title}"]
+        lines.append(f"**ID:** {card.get('id', '?')}")
+        lines.append(f"**Status:** {card.get('status', '?')}")
+        if card.get("deadline"):
+            lines.append(f"**Prazo:** {card['deadline']}")
+        if card.get("mechanism"):
+            lines.append(f"**Mecanismo:** {card['mechanism']}")
+        if card.get("eligible_entities"):
+            lines.append(f"**Elegíveis:** {', '.join(card['eligible_entities'])}")
+        vr = card.get("value_range") or {}
+        if vr.get("min_brl") or vr.get("max_brl"):
+            lines.append(f"**Valor:** R${vr.get('min_brl', '?')} – R${vr.get('max_brl', '?')}")
+        if card.get("objective"):
+            lines.append("")
+            lines.append(card["objective"])
+        for i, req in enumerate((card.get("key_requirements") or [])[:5], 1):
+            lines.append(f"{i}. {req}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _format_edital_table(editais: list[dict], label: str) -> str:
+        if not editais:
+            return ""
+        lines = [f"**{label}** ({len(editais)})", ""]
+        lines.append("| ID | Título | Status | Prazo |")
+        lines.append("|---|---|---|---|")
+        for e in editais[:20]:
+            eid = e.get("id", "?")
+            title = (e.get("title") or "?")[:50]
+            status = e.get("status", "?")
+            deadline = e.get("deadline", "?")
+            lines.append(f"| {eid} | {title} | {status} | {deadline} |")
+        if len(editais) > 20:
+            lines.append(f"\n*Mostrando 20 de {len(editais)} resultados*")
+        return "\n".join(lines)
 
     def _parse_matches(self, raw: str) -> list[dict]:
         """Extrai lista de matches do JSON retornado pela LLM."""

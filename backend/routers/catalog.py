@@ -20,7 +20,7 @@ def get_stats():
     return wiki_matcher.get_stats()
 
 
-@router.get("/editais", summary="Lista editais FINEP com filtros opcionais")
+@router.get("/editais", summary="Lista editais com filtros opcionais")
 def list_editais(
     status: str | None = Query(None, description="ABERTA | ENCERRADA | Desconhecido"),
     tema: str | None = Query(None, description="Filtro por tema (substring)"),

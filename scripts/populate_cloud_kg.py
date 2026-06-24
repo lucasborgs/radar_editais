@@ -1,4 +1,4 @@
-"""Popula o `kg_artifacts` do Supabase Cloud com os editais FINEP+FAPESP (limpo).
+"""Popula o `kg_artifacts` do Supabase Cloud com os editais (FINEP, FAPESP) — rebuild limpo.
 
 Pós-migração: o push de schema não levou dado. Este driver rebuilda o índice a
 partir do BRONZE existente (sem re-scrape) EXCLUINDO o discovery web (respeita o

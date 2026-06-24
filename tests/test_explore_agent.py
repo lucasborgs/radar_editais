@@ -64,46 +64,107 @@ def test_build_explore_hint_caps_at_3_ids():
 
 
 # ============================================================================
-# explore() dispatcher
+# _classify_intent
 # ============================================================================
 
-def test_explore_dispatches_to_agent_when_flag_true(monkeypatch):
+def test_classify_intent_factual():
+    assert ExploreAgent._classify_intent("quais editais estão abertos") == "factual"
+    assert ExploreAgent._classify_intent("mostra o edital 589") == "factual"
+    assert ExploreAgent._classify_intent("quantos editais existem") == "factual"
+    assert ExploreAgent._classify_intent("lista editais de saúde") == "factual"
+    assert ExploreAgent._classify_intent("tem editais abertos") == "factual"
+
+
+def test_classify_intent_reasoning():
+    r = ExploreAgent._classify_intent("o que é subvenção")
+    assert r == "reasoning"
+    r = ExploreAgent._classify_intent("como funciona o FNDCT")
+    assert r == "reasoning"
+    r = ExploreAgent._classify_intent("qual a diferença entre subvenção e reembolsável")
+    assert r == "reasoning"
+
+
+def test_classify_intent_agent():
+    assert ExploreAgent._classify_intent(
+        "qual edital combina com minha startup", has_profile=True,
+    ) == "agent"
+    assert ExploreAgent._classify_intent(
+        "existe ICT que faça parceria em agro",
+    ) == "agent"
+    assert ExploreAgent._classify_intent(
+        "recomende um edital pra minha empresa",
+    ) == "agent"
+
+
+def test_classify_intent_fallback_reasoning():
+    """Pergunta ambígua sem padrão claro → reasoning (1 call, barato)."""
+    assert ExploreAgent._classify_intent("editais") == "reasoning"
+    assert ExploreAgent._classify_intent("quero saber mais") == "reasoning"
+
+
+def test_classify_intent_with_edital_ids():
+    """Com IDs de edital (clique), pergunta simples → factual."""
+    assert ExploreAgent._classify_intent(
+        "mostra detalhes do edital", has_edital_ids=True,
+    ) == "factual"
+    """Com IDs + pergunta aberta → agent (precisa de contexto)."""
+    assert ExploreAgent._classify_intent(
+        "o que você acha desse edital", has_edital_ids=True,
+    ) == "agent"
+
+
+# ============================================================================
+# explore() dispatcher (3 rotas)
+# ============================================================================
+
+def test_explore_dispatches_to_factual(monkeypatch):
     svc = ExploreAgent()
-    called = {"agent": False, "legacy": False}
-
-    def fake_agent(self, *a, **kw):
-        called["agent"] = True
-        return "agent response"
-
-    def fake_legacy(self, *a, **kw):
-        called["legacy"] = True
-        return "legacy response"
-
-    monkeypatch.setattr(ExploreAgent, "_explore_agent", fake_agent)
-    monkeypatch.setattr(ExploreAgent, "_explore_legacy", fake_legacy)
-
-    out = svc.explore("oi", agent_enabled=True)
-    assert called["agent"] is True
-    assert called["legacy"] is False
-    assert out == "agent response"
+    monkeypatch.setattr(ExploreAgent, "_classify_intent",
+                        lambda *a, **kw: "factual")
+    out = svc._factual_route = lambda *a, **kw: "resposta factual"
+    monkeypatch.setattr(ExploreAgent, "_factual_route",
+                        lambda *a, **kw: "resposta factual")
+    monkeypatch.setattr(ExploreAgent, "_explore_legacy",
+                        lambda *a, **kw: AssertionError("não deve chamar"))
+    monkeypatch.setattr(ExploreAgent, "_explore_agent",
+                        lambda *a, **kw: AssertionError("não deve chamar"))
+    assert svc.explore("quais estão abertos") == "resposta factual"
 
 
-def test_explore_dispatches_to_legacy_by_default(monkeypatch):
+def test_explore_dispatches_to_reasoning(monkeypatch):
     svc = ExploreAgent()
-    called = {"agent": False, "legacy": False}
+    monkeypatch.setattr(ExploreAgent, "_classify_intent",
+                        lambda *a, **kw: "reasoning")
+    monkeypatch.setattr(ExploreAgent, "_explore_legacy",
+                        lambda *a, **kw: "resposta reasoning")
+    monkeypatch.setattr(ExploreAgent, "_explore_agent",
+                        lambda *a, **kw: AssertionError("não deve chamar"))
+    assert svc.explore("o que é subvenção") == "resposta reasoning"
 
-    monkeypatch.setattr(
-        ExploreAgent, "_explore_agent",
-        lambda self, *a, **kw: called.__setitem__("agent", True) or "x",
-    )
-    monkeypatch.setattr(
-        ExploreAgent, "_explore_legacy",
-        lambda self, *a, **kw: called.__setitem__("legacy", True) or "y",
-    )
 
-    svc.explore("oi")  # agent_enabled default False
-    assert called["agent"] is False
-    assert called["legacy"] is True
+def test_explore_dispatches_to_agent(monkeypatch):
+    svc = ExploreAgent()
+    monkeypatch.setattr(ExploreAgent, "_classify_intent",
+                        lambda *a, **kw: "agent")
+    monkeypatch.setattr(ExploreAgent, "_explore_agent",
+                        lambda *a, **kw: "resposta agent")
+    monkeypatch.setattr(ExploreAgent, "_explore_legacy",
+                        lambda *a, **kw: AssertionError("não deve chamar"))
+    assert svc.explore("qual combina com minha startup", has_profile=True) == "resposta agent"
+
+
+def test_explore_factual_fallback_to_reasoning(monkeypatch):
+    """Factual route retorna None → fallback para reasoning."""
+    svc = ExploreAgent()
+    monkeypatch.setattr(ExploreAgent, "_classify_intent",
+                        lambda *a, **kw: "factual")
+    monkeypatch.setattr(ExploreAgent, "_factual_route",
+                        lambda *a, **kw: None)
+    monkeypatch.setattr(ExploreAgent, "_explore_legacy",
+                        lambda *a, **kw: "fallback reasoning")
+    monkeypatch.setattr(ExploreAgent, "_explore_agent",
+                        lambda *a, **kw: AssertionError("não deve chamar"))
+    assert svc.explore("editais de nanotecnologia") == "fallback reasoning"
 
 
 # ============================================================================

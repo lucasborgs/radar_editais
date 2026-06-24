@@ -3,7 +3,7 @@ One-shot: prefixa IDs existentes com `{source}:` e move wiki pages para
 subfolder por fonte, conforme Épico B do plano multi-fonte (Fase 1).
 
 Pré-Fase 1 estado:
-  - knowledge_graph/wiki/{id}.json                (flat, FINEP only)
+  - knowledge_graph/wiki/{id}.json                (flat, fonte única)
   - knowledge_graph/index.json                    entries com id="782"
   - knowledge_graph/index_historico.json          idem
   - DB: writing_sessions/edital_chunks/... com edital_id="782"

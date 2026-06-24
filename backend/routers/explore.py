@@ -33,7 +33,6 @@ class ExploreRequest(BaseModel):
     edital_ids: list[str] = []
     node_id: str | None = None
     node_type: str | None = None
-    agent_enabled: bool = False
 
 
 def _profile_context_block(profile: CompanyProfileSchema | None) -> str:
@@ -96,9 +95,12 @@ def explore(
 ):
     """Conversa stateless sobre o catálogo. Aceita perfil parcial opcional.
 
-    - Anônimo (sem JWT): rate 3/min, sem perfil → explore() sem extração.
-    - Autenticado (com JWT): rate 10/min, com perfil → explore_turn() com
-      extração de profile_updates na mesma chamada LLM (D9).
+    ExploreAgent classifica internamente a intenção (factual/reasoning/agent)
+    e roteia para a rota adequada. Com perfil presente, a resposta é enriquecida
+    com extração de profile_updates via ProfileExtractor.
+
+    - Anônimo (sem JWT): rate 3/min, sem extração de perfil.
+    - Autenticado (com JWT): rate 10/min, com extração de perfil.
 
     O histórico é mantido pelo cliente e reenviado a cada turno.
     """
@@ -110,27 +112,13 @@ def explore(
     explore_message = f"{ctx}\n\n{message}" if ctx else message
     current = req.profile.model_dump() if req.profile is not None else {}
 
-    # Caminho agente: explore() + extração focada separada (como frontdoor hoje).
-    if req.agent_enabled:
-        answer = explore_agent.explore(
-            explore_message, req.history, req.edital_ids, req.node_id,
-            req.node_type, agent_enabled=True,
-        )
-        diff = ProfileExtractor().extract_diff_from_message(message, current)
-        return {"answer": answer, "profile_diff": diff or None}
-
-    # Caminho 1-shot: explore_turn devolve resposta + profile_updates.
-    if req.profile is not None:
-        answer, profile_updates = explore_agent.explore_turn(
-            explore_message, req.history, req.edital_ids, req.node_id,
-            req.node_type,
-        )
-        diff = ProfileExtractor().diff_from_updates(profile_updates, current)
-        return {"answer": answer, "profile_diff": diff or None}
-
-    # Sem perfil: explore() sem extração (como kg-explore hoje).
     answer = explore_agent.explore(
         explore_message, req.history, req.edital_ids, req.node_id,
-        req.node_type, agent_enabled=False,
+        req.node_type, has_profile=req.profile is not None,
     )
-    return {"answer": answer}
+
+    result = {"answer": answer}
+    if req.profile is not None:
+        diff = ProfileExtractor().extract_diff_from_message(message, current)
+        result["profile_diff"] = diff or None
+    return result
