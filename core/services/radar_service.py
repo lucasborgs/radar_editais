@@ -222,14 +222,14 @@ def build_radar(
         logger.warning("radar: match de eventos falhou: %s", e)
         events = []
     try:
-        from core.services.investor_match import match_investidores
-        entities = match_investidores(profile, top_k=top_k) or []
+        from core.services.entity_matcher import EntityMatcher, catalog_investidores
+        entities = EntityMatcher(catalog_investidores).match(profile, top_k=top_k) or []
     except Exception as e:
         logger.warning("radar: match de entidades falhou: %s", e)
         entities = []
     try:
-        from core.services.programa_match import match_programas
-        programas = match_programas(profile, top_k=top_k) or []
+        from core.services.entity_matcher import EntityMatcher, catalog_programas
+        programas = EntityMatcher(catalog_programas).match(profile, top_k=top_k) or []
     except Exception as e:
         logger.warning("radar: match de programas falhou: %s", e)
         programas = []

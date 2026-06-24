@@ -68,7 +68,8 @@ def _theme_match(needle: str, themes: list[str]) -> bool:
     return any(nt in tt or tt in nt for nt in ntoks for tt in ttoks)
 
 if TYPE_CHECKING:
-    from core.services.kg_match_service import KGMatchService
+    from core.services.explore_agent import ExploreAgent
+    from core.services.graph_service import GraphService
 
 logger = logging.getLogger(__name__)
 
@@ -80,11 +81,12 @@ EXPLORE_TRECHOS_CHAR_CAP = int(os.getenv("EXPLORE_TRECHOS_CHAR_CAP", "6000"))  #
 MAX_EDITAIS = 5  # teto de editais por chamada (orçamento de contexto)
 
 
-def build_explore_tools(service: KGMatchService) -> list[BaseTool]:
-    """Constrói as 4 tools do agente de explore.
+def build_explore_tools(explore_agent: ExploreAgent, graph_service: GraphService) -> list[BaseTool]:
+    """Constrói as 9 tools do agente de explore.
 
-    `service` precisa estar inicializado (com índice carregado). O agente é
-    stateless por turno, mas o service é reusável entre turns/usuários.
+    `explore_agent` fornece list_editais/get_edital/get_stats/matching.
+    `graph_service` fornece navegação do grafo (find_analogues, neighbors).
+    Ambos são stateless e reusáveis entre turns/usuários.
     """
 
     @tool
@@ -112,7 +114,7 @@ def build_explore_tools(service: KGMatchService) -> list[BaseTool]:
         try:
             # Filtro de tema robusto (token bidirecional) no lado da tool — não
             # delega o `tema` ao service (substring-direto, frágil p/ frase).
-            editais = service.list_editais(status=status or None, limit=200)
+            editais = explore_agent.list_editais(status=status or None, limit=200)
             if tema:
                 editais = [e for e in editais if _theme_match(tema, e.get("themes", []))]
             editais = editais[:limit]
@@ -149,7 +151,7 @@ def build_explore_tools(service: KGMatchService) -> list[BaseTool]:
             edital_id: identificador do edital (string numérica)
         """
         try:
-            card = service.get_edital_by_id(edital_id)
+            card = explore_agent.get_edital_by_id(edital_id)
         except Exception as e:
             return f"Erro ao buscar edital {edital_id}: {e}."
 
@@ -206,7 +208,7 @@ def build_explore_tools(service: KGMatchService) -> list[BaseTool]:
             edital_id: identificador do edital de referência
         """
         try:
-            analogue_ids = service._find_analogue_ids(edital_id)
+            analogue_ids = graph_service.find_analogue_ids(edital_id)
         except Exception as e:
             return f"Erro ao buscar análogos de {edital_id}: {e}."
 
@@ -219,7 +221,7 @@ def build_explore_tools(service: KGMatchService) -> list[BaseTool]:
 
         lines = [f"Análogos do edital {edital_id} (até 10):"]
         for aid in analogue_ids[:10]:
-            card = service.get_edital_by_id(aid)
+            card = explore_agent.get_edital_by_id(aid)
             title = card.get("title", "(sem título)") if card else "(detalhes ausentes)"
             status = card.get("status", "?") if card else "?"
             lines.append(f"  ID:{aid} | {title[:65]} | {status}")
@@ -238,7 +240,7 @@ def build_explore_tools(service: KGMatchService) -> list[BaseTool]:
             node_id: identificador do nó no grafo (formato "radar-editais/<folder>/<slug>")
         """
         try:
-            edital_ids = service._edital_ids_for_node(node_id)
+            edital_ids = graph_service.edital_ids_for_node(node_id)
         except Exception as e:
             return f"Erro ao buscar vizinhos de {node_id}: {e}."
 
@@ -250,7 +252,7 @@ def build_explore_tools(service: KGMatchService) -> list[BaseTool]:
 
         lines = [f"Editais ligados a '{node_id}' ({len(edital_ids)}):"]
         for eid in edital_ids[:15]:
-            card = service.get_edital_by_id(eid)
+            card = explore_agent.get_edital_by_id(eid)
             title = card.get("title", "(sem título)") if card else "(detalhes ausentes)"
             status = card.get("status", "?") if card else "?"
             lines.append(f"  ID:{eid} | {title[:65]} | {status}")
@@ -386,7 +388,7 @@ def build_explore_tools(service: KGMatchService) -> list[BaseTool]:
         out: list[str] = [f"Panorama de oportunidades em '{tema}':"]
         # Eventos (editais/desafios/programas) — filtro de tema robusto na tool.
         try:
-            abertos = service.list_editais(status="ABERTA", limit=200)
+            abertos = explore_agent.list_editais(status="ABERTA", limit=200)
             editais = [e for e in abertos if _theme_match(tema, e.get("themes", []))]
         except Exception:
             editais = []

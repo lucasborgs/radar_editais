@@ -1,12 +1,11 @@
 """
-KGMatchService — Matching Karpathy-style.
+ExploreAgent — Chat exploratório sobre o catálogo + matching Karpathy-style.
 
-A LLM lê o índice completo de editais FINEP (data/knowledge_graph/index.json)
-junto com o perfil da empresa e retorna os editais mais relevantes com
-justificativa por dimensão. Para o top-3, enriquece com dados do card
-(data/knowledge_graph/cards/{id}.json) quando disponível.
+LLM-heavy: usa gpt-4o-mini (default, configurável por env) para conversar sobre
+o catálogo e ranquear editais por perfil. Extraído de KGMatchService (Fase 1 da
+spec match-evolution.md).
 
-Sem embeddings, sem ChromaDB — apenas raciocínio LLM sobre índice estruturado.
+Sem métodos de grafo — use GraphService para leitura do vault.
 """
 from __future__ import annotations
 
@@ -15,9 +14,8 @@ import logging
 import os
 import re
 
-from config import OBSIDIAN_VAULT_DIR
 from core.kg import kg_store
-from core.kg.edital_id import id_to_slug, slug_to_id
+from core.services.graph_service import GraphService
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -27,9 +25,9 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 MATCH_SYSTEM_PROMPT = """Você é um especialista em fomento à inovação no Brasil com profundo
-conhecimento das chamadas públicas FINEP, FNDCT e programas de CT&I.
+conhecimento das chamadas públicas de fomento à inovação (FINEP, FAPESP, FAPESC, web) e programas de CT&I.
 
-Sua tarefa é analisar o perfil de uma empresa e identificar os editais FINEP mais relevantes
+Sua tarefa é analisar o perfil de uma empresa e identificar os editais mais relevantes
 para ela a partir de um catálogo estruturado.
 
 Critérios de avaliação (use todos):
@@ -43,7 +41,7 @@ Critérios de avaliação (use todos):
 Responda APENAS com JSON válido. Sem markdown, sem texto fora do JSON."""
 
 EXPLORE_SYSTEM_PROMPT = """Você é o assistente do Radar de Editais, uma plataforma que conecta
-empresas a oportunidades de fomento público no Brasil (FINEP, FNDCT, CT&I).
+empresas a oportunidades de fomento público no Brasil (FINEP, FAPESP, FAPESC, web).
 
 Você conversa com um visitante que pode ainda não ter preenchido o perfil da empresa.
 Seu papel é mostrar o potencial da plataforma respondendo perguntas sobre o catálogo de
@@ -65,19 +63,12 @@ Diretrizes:
   ao catálogo.
 - Seja conciso. Use listas curtas quando listar editais."""
 
-EXPLORE_USER_PROMPT = """CATÁLOGO DE EDITAIS FINEP:
+EXPLORE_USER_PROMPT = """CATÁLOGO DE EDITAIS:
 {index_json}
 {details_block}
 PERGUNTA DO VISITANTE:
 {message}"""
 
-
-# Extração de perfil ACOPLADA ao turno do front-door (decisão 2026-06-21): em vez
-# de uma 2ª chamada LLM (extract_diff_from_message) sobre a mesma mensagem, o MESMO
-# turno do explore devolve resposta + profile_updates num único JSON. Anexado ao
-# EXPLORE_SYSTEM_PROMPT só no caminho `explore_turn`. As chaves espelham
-# _DIFF_FIELD_LABELS de core.profile_extractor (o _build_diff filtra desconhecidos).
-# NB: esta string nunca passa por .format() — chaves literais com 1 par de {}.
 EXPLORE_PROFILE_EXTRACTION_INSTRUCTION = """
 
 ———
@@ -105,11 +96,6 @@ Chaves possíveis em profile_updates (use exatamente estas; NUNCA use null — o
 Inclua um campo SOMENTE se a última mensagem trouxer essa informação de fato. Se for só uma
 pergunta sem fato sobre a empresa, devolva "profile_updates": {}."""
 
-
-# Sistema prompt do modo agente (Sprint 3 do Cenário B). Substitui o
-# EXPLORE_SYSTEM_PROMPT quando agent_enabled=True. As ferramentas de leitura são
-# registradas via core.llm.agent_tools.build_explore_tools (8 tools cross-dim) e
-# a de planejamento via build_planning_tools (write_todos) — ver _explore_agent.
 EXPLORE_AGENT_SYSTEM = """Você é o assistente do Radar de Editais, uma plataforma que conecta empresas
 a oportunidades de fomento e parceria no Brasil. O grafo de conhecimento cobre
 QUATRO dimensões: editais/desafios/programas (eventos de fomento), ICTs
@@ -175,35 +161,16 @@ LIMITES
   o critério usado."""
 
 
-# Sufixo de memória (Fase 3A): só anexado ao system quando há workspace
-# autenticado (a tool log_exploration_decision está registrada). Sem workspace
-# (/kg-explore público) este bloco não aparece e a tool não existe.
-EXPLORE_LOG_INSTRUCTION = """
-
-MEMÓRIA ENTRE SESSÕES (log_exploration_decision)
-- Quando você concluir que um edital é uma boa oportunidade para este usuário,
-  registre com log_exploration_decision(edital_id, "recommended", reason). Quando
-  concluir que não serve, registre com decision="discarded" e uma razão curta.
-- Registre só decisões com base — não logue cada edital citado de passagem.
-- Revisitar o mesmo edital atualiza a decisão (a última prevalece); pode rechamar."""
-
-
-# Anthropic Sonnet 4.6 (D1 híbrido). Configurável via env. Sprint 3 herda o
-# default ANTHROPIC_MODEL_AGENT da WritingSession, mas exposto separado para
-# permitir testar modelos diferentes nos 2 agentes.
 ANTHROPIC_MODEL_AGENT_EXPLORE = os.getenv(
     "ANTHROPIC_MODEL_AGENT_EXPLORE",
     os.getenv("ANTHROPIC_MODEL_AGENT", "claude-sonnet-4-6"),
 )
-# 10 (era 6): planejamento (write_todos) + perguntas multi-parte cross-dim
-# consomem mais passos — write_todos em si gasta um, e cada dimensão pode pedir
-# uma tool. Configurável via env.
 EXPLORE_AGENT_MAX_STEPS = int(os.getenv("EXPLORE_AGENT_MAX_STEPS", "10"))
 
 MATCH_USER_PROMPT = """PERFIL DA EMPRESA:
 {profile_context}
 
-CATÁLOGO DE EDITAIS FINEP:
+CATÁLOGO DE EDITAIS:
 {index_json}
 
 Retorne os {top_k} editais mais relevantes para esta empresa no formato JSON abaixo.
@@ -284,13 +251,14 @@ def _make_client():
 # SERVIÇO
 # =============================================================================
 
-class KGMatchService:
-    """Matching de empresa↔editais via LLM sobre o índice FINEP."""
+class ExploreAgent:
+    """Chat exploratório sobre o catálogo + matching Karpathy-style. LLM-heavy."""
 
     def __init__(self):
         self._index: dict = {}
         self._client = None
         self._model = ""
+        self._graph_service = GraphService()
         self._load_index()
 
     # ------------------------------------------------------------------
@@ -370,12 +338,7 @@ class KGMatchService:
         profile: CompanyProfile,
         top_k: int = 10,
     ) -> list[dict]:
-        """Retorna top_k editais mais relevantes para o perfil da empresa.
-
-        Fluxo:
-        1. LLM lê índice completo + perfil → lista rankeada
-        2. Para o top-3 com card disponível → enriquece com key_requirements
-        """
+        """Retorna top_k editais mais relevantes para o perfil da empresa."""
         self._ensure_client()
 
         index_str = self._get_index_for_prompt()
@@ -404,121 +367,14 @@ class KGMatchService:
 
         matches = self._parse_matches(raw)
 
-        # Enriquece top-3 com dados do card
-        for match in matches[:3]:
-            card = self.get_edital_by_id(match["id"])
+        for match_ in matches[:3]:
+            card = self.get_edital_by_id(match_["id"])
             if card and card.get("key_requirements"):
-                match["key_requirements"] = card["key_requirements"]
+                match_["key_requirements"] = card["key_requirements"]
             if card and card.get("objective"):
-                match["objective"] = card["objective"]
+                match_["objective"] = card["objective"]
 
         return matches
-
-    # ------------------------------------------------------------------
-    # Grafo (Dashboard — Obsidian-style)
-    # ------------------------------------------------------------------
-
-    _WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]")
-    _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---", re.DOTALL)
-
-    def _parse_frontmatter(self, text: str) -> dict:
-        """Parse mínimo do YAML frontmatter — só os escalares que usamos."""
-        m = self._FRONTMATTER_RE.match(text)
-        if not m:
-            return {}
-        fm: dict = {}
-        for line in m.group(1).splitlines():
-            if ":" not in line or line.lstrip().startswith("-"):
-                continue
-            key, _, val = line.partition(":")
-            val = val.strip().strip('"').strip("'")
-            if val:
-                fm[key.strip()] = val
-        return fm
-
-    def _folder_type_map(self) -> dict[str, str]:
-        """folder (plural, no vault) → tipo de nó (chave do schema §6.1).
-
-        Derivado de wiki_schema.node_types() — schema autoritativo, sem
-        duplicação. `home` (folder="") é tratado à parte.
-        """
-        from core.kg import wiki_schema
-        return {
-            v["folder"]: k
-            for k, v in wiki_schema.node_types().items()
-            if v.get("folder")
-        }
-
-    def _node_type_for_parts(self, parts: tuple[str, ...]) -> str | None:
-        """parts = node_id.split('/'). Retorna tipo ou None (fora do schema)."""
-        if len(parts) < 3:
-            return "home" if parts[-1] == "HOME" else None
-        return self._folder_type_map().get(parts[1])
-
-    def get_graph(self) -> dict:
-        """Constrói o grafo a partir do vault Obsidian unificado no projeto.
-
-        Faz parse das notas .md: frontmatter (título/status) + wikilinks
-        `[[target|alias]]` viram arestas. Os tipos de nó vêm de
-        wiki_schema.node_types() (WIKI.md §6.1) — notas/links de pastas que
-        não são tipo de nó (ex.: dimensões rebaixadas a tag, §6.1.1) são
-        ignorados, mesmo que existam no vault como artefato stale. Arestas são
-        não-direcionadas e dedupadas (edital↔tema aparece nos dois sentidos).
-        """
-        vault = OBSIDIAN_VAULT_DIR
-        if not vault.exists():
-            logger.warning("Vault Obsidian não encontrado: %s", vault)
-            return {"nodes": [], "links": []}
-
-        nodes: dict[str, dict] = {}
-        edges: set[tuple[str, str]] = set()
-
-        for path in sorted(vault.rglob("*.md")):
-            rel = path.relative_to(vault).with_suffix("")
-            node_id = "/".join(rel.parts)
-            ntype = self._node_type_for_parts(rel.parts)
-            if ntype is None:  # pasta fora do schema (tag rebaixada / stray)
-                continue
-
-            text = path.read_text(encoding="utf-8")
-            fm = self._parse_frontmatter(text)
-            label = "FINEP" if ntype == "home" else (fm.get("title") or path.stem)
-            node: dict = {
-                "id": node_id,
-                "type": ntype,
-                "label": label,
-            }
-            if ntype == "edital":
-                # edital_id é o id real prefixado (`finep:589`), lido do
-                # frontmatter — o nome do arquivo é colon-free (`finep-589`)
-                # porque o Obsidian proíbe `:`. O frontend usa este edital_id
-                # para chamar o explore/get_edital, que espera o id prefixado.
-                node["edital_id"] = fm.get("chamada_id") or path.stem
-                node["status"] = fm.get("status", "Desconhecido")
-            nodes[node_id] = node
-
-            for target, _alias in self._WIKILINK_RE.findall(text):
-                target = target.strip()
-                if target.endswith("/"):  # link de pasta (nav HOME) — sem aresta
-                    continue
-                if self._node_type_for_parts(tuple(target.split("/"))) is None:
-                    continue  # alvo fora do schema (ex.: nó rebaixado a tag)
-                a, b = sorted((node_id, target))
-                edges.add((a, b))
-
-        # Garante nó pra qualquer alvo de wikilink sem arquivo próprio.
-        for a, b in edges:
-            for nid in (a, b):
-                if nid not in nodes:
-                    seg = tuple(nid.split("/"))
-                    nodes[nid] = {
-                        "id": nid,
-                        "type": self._node_type_for_parts(seg) or "outro",
-                        "label": seg[-1],
-                    }
-
-        links = [{"source": a, "target": b} for a, b in sorted(edges)]
-        return {"nodes": list(nodes.values()), "links": links}
 
     # ------------------------------------------------------------------
     # Explore (Dashboard — chat sem perfil)
@@ -527,11 +383,7 @@ class KGMatchService:
     def _resolve_focus_ids(
         self, message: str, explicit_ids: list[str] | None
     ) -> list[str]:
-        """IDs de editais em foco: os explícitos (clique) + os citados no texto.
-
-        Só conta números que correspondem a IDs reais do índice — evita falsos
-        positivos com anos (2024) ou quantidades. Cap em 3 pra controlar prompt.
-        """
+        """IDs de editais em foco: os explícitos (clique) + os citados no texto."""
         self._load_index()
         known = {str(e["id"]) for e in self._index.get("editais", [])}
         ordered: list[str] = []
@@ -584,90 +436,6 @@ class KGMatchService:
             return ""
         return "\nDETALHES DOS EDITAIS EM FOCO:" + "\n".join(blocks) + "\n"
 
-    def _edital_ids_for_node(self, node_id: str) -> list[str]:
-        """Extrai IDs de editais ligados ao nó via wikilinks no MD do vault."""
-        path = OBSIDIAN_VAULT_DIR / f"{node_id}.md"
-        if not path.exists():
-            return []
-        text = path.read_text(encoding="utf-8")
-        ids = []
-        for target, _ in self._WIKILINK_RE.findall(text):
-            parts = target.strip().split("/")
-            if len(parts) >= 2 and parts[-2] == "editais":
-                # O wikilink aponta para o slug colon-free (`finep-589`);
-                # devolvemos o id real prefixado (`finep:589`) que o resto do
-                # sistema (retrieve_chunks, get_edital_by_id) espera.
-                ids.append(slug_to_id(parts[-1]))
-        return ids
-
-    def _find_analogue_ids(self, edital_id: str) -> list[str]:
-        """Traversal reverso: edital → temas/publicos/subprogramas → editais análogos.
-
-        Lê a wiki page do edital no vault, segue wikilinks para nós não-edital, e
-        coleta os editais ligados a cada um. Retorna os IDs análogos (sem o
-        próprio edital_id), preservando ordem de descoberta.
-        """
-        edital_path = OBSIDIAN_VAULT_DIR / f"radar-editais/editais/{id_to_slug(edital_id)}.md"
-        if not edital_path.exists():
-            return []
-
-        text = edital_path.read_text(encoding="utf-8")
-        folder_type = self._folder_type_map()
-
-        neighbour_nodes: list[str] = []
-        for target, _ in self._WIKILINK_RE.findall(text):
-            target = target.strip()
-            if target.endswith("/"):
-                continue
-            parts = target.split("/")
-            if len(parts) < 3:
-                continue
-            folder = parts[1]
-            if folder == "editais" or folder not in folder_type:
-                continue
-            neighbour_nodes.append(target)
-
-        seen: set[str] = {str(edital_id)}
-        analogues: list[str] = []
-        for node_id in neighbour_nodes:
-            for eid in self._edital_ids_for_node(node_id):
-                if eid not in seen:
-                    seen.add(eid)
-                    analogues.append(eid)
-        return analogues
-
-    def resolve_scope(
-        self,
-        edital_id: str | None = None,
-        node_id: str | None = None,
-        node_type: str | None = None,
-        max_analogues: int = 3,
-    ) -> list[str]:
-        """Resolve trigger → list[edital_ids], com o ID primário primeiro.
-
-        Regras:
-          - node_type ∈ {tema, publico, subprograma, fonte, ...}: retorna os IDs
-            que o nó liga via wikilinks (`_edital_ids_for_node`)
-          - node_type == "edital" ou edital_id (sessão): retorna [primary] +
-            análogos (até max_analogues) via traversal reverso
-          - Sem trigger algum: retorna todos os edital_ids do índice
-        """
-        if node_id and node_type and node_type not in ("edital", "home", None):
-            return self._edital_ids_for_node(node_id)
-
-        primary = edital_id
-        if node_id and node_type == "edital":
-            # node_id termina no slug colon-free (`.../editais/finep-589`);
-            # converte de volta ao id real prefixado para casar com chunks/cards.
-            primary = slug_to_id(node_id.split("/")[-1])
-
-        if primary:
-            analogues = self._find_analogue_ids(primary)[:max_analogues]
-            return [primary] + analogues
-
-        self._load_index()
-        return [str(e["id"]) for e in self._index.get("editais", [])]
-
     def explore(
         self,
         message: str,
@@ -679,19 +447,7 @@ class KGMatchService:
         workspace_id: str | None = None,
         db=None,
     ) -> str:
-        """Dispatcher do chat stateless sobre o catálogo.
-
-        Quando `agent_enabled=True` (rollout do Sprint 3 do Cenário B), roda
-        o agente Anthropic com 4 tools. Caso contrário, mantém o pipeline
-        original (catálogo inteiro no prompt + 1 LLM call). O caller decide
-        o flag — endpoint /explore lê de env / workspace conforme contexto.
-
-        `workspace_id`/`db` (Fase 3A): memória do ExploreAgent entre sessões.
-        Quando AMBOS estão presentes (só no caminho AUTENTICADO do front-door),
-        o agente carrega as decisões anteriores no prefixo do prompt e ganha a
-        tool log_exploration_decision. Ausentes (/kg-explore público, anônimo) →
-        sem memória, comportamento de hoje. Ignorados no caminho legacy.
-        """
+        """Dispatcher do chat stateless sobre o catálogo."""
         if agent_enabled:
             return self._explore_agent(
                 message, history, edital_ids, node_id, node_type,
@@ -711,23 +467,14 @@ class KGMatchService:
         *,
         system: str = EXPLORE_SYSTEM_PROMPT,
     ) -> list[dict]:
-        """Monta as mensagens do explore legacy (catálogo + detalhes + histórico).
-
-        Extraído de `_explore_legacy` para ser reaproveitado por `explore_turn`
-        (front-door), que injeta um `system` aumentado com extração de perfil.
-        """
+        """Monta as mensagens do explore legacy (catálogo + detalhes + histórico)."""
         self._ensure_client()
         index_str = self._get_index_for_prompt()
 
-        # Resolve escopo via resolve_scope: clique em nó-edital agora também
-        # traz análogos (mesmo tema/publico) — antes o clique em edital trazia
-        # só ele próprio. Para nós tema/publico, mantém comportamento (wikilinks
-        # diretos). Sem clique, scope_ids fica None e caímos no comportamento
-        # antigo (focus vem de `edital_ids` passado + detecção no texto).
         scope_ids: list[str] | None = None
         if node_id and node_type:
             primary = (edital_ids[0] if edital_ids and node_type == "edital" else None)
-            scope_ids = self.resolve_scope(
+            scope_ids = self._graph_service.resolve_scope(
                 edital_id=primary, node_id=node_id, node_type=node_type,
             )
 
@@ -783,19 +530,7 @@ class KGMatchService:
         node_id: str | None = None,
         node_type: str | None = None,
     ) -> tuple[str, dict]:
-        """Explore legacy + extração de `profile_updates` na MESMA chamada LLM.
-
-        Front-door (decisão 2026-06-21): elimina a 2ª passada de LLM que o
-        `extract_diff_from_message` fazia sobre a mesma mensagem. Uma única
-        completion devolve, em JSON, a resposta ao visitante E os campos do
-        CompanyProfile que a última mensagem preenche/altera. Retorna
-        `(answer, profile_updates)`; `profile_updates` é {} quando não há fato
-        novo — o modelo decide ("gate" emergente, sem regex nem 2ª chamada).
-
-        Degrada com segurança: qualquer falha de JSON/LLM cai no `_explore_legacy`
-        de texto puro (resposta preservada) com updates vazios — o diff daquele
-        turno se perde, mas é recuperável no próximo (o perfil persiste).
-        """
+        """Explore legacy + extração de `profile_updates` na MESMA chamada LLM."""
         system = EXPLORE_SYSTEM_PROMPT + EXPLORE_PROFILE_EXTRACTION_INSTRUCTION
         messages = self._build_legacy_messages(
             message, history, edital_ids, node_id, node_type, system=system,
@@ -826,22 +561,13 @@ class KGMatchService:
 
     def _explore_tools(self) -> list:
         """Tools do agente de explore: leitura cross-dim + planejamento, e
-        opcionalmente deep_research (subagente web).
-
-        PlanState próprio por turno (stateless entre chamadas), igual ao writing.
-        `deep_research` fica atrás de EXPLORE_DEEP_RESEARCH_ENABLED (default off):
-        o explore é endpoint PÚBLICO/não-auth e o crawl multi-step é vetor de
-        custo — liga-se conscientemente.
-        """
+        opcionalmente deep_research (subagente web)."""
         from core.llm.agent_tools import build_explore_tools
         from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
 
-        tools = build_explore_tools(self) + build_planning_tools(PlanState())
+        tools = build_explore_tools(self, self._graph_service) + build_planning_tools(PlanState())
         if os.getenv("EXPLORE_DEEP_RESEARCH_ENABLED", "false").lower() == "true":
             from core.llm.agent_tools.research_tools import build_research_tools
-            # Stateless de propósito: o explore é endpoint PÚBLICO/não-auth — não há
-            # workspace_id nem db autenticado neste escopo. Sem onde (e sem permissão
-            # RLS para) persistir findings, então mantém a Fase A aqui.
             tools = tools + build_research_tools()
         return tools
 
@@ -856,21 +582,10 @@ class KGMatchService:
         db=None,
     ) -> str:
         """Pipeline agente (Sprint 3 do Cenário B): run_agent + tools cross-dim,
-        planejamento e (gated) deep_research — montadas em `_explore_tools`.
-
-        Diferenças vs legacy:
-          • Sem catálogo inteiro no prompt — agente busca via list_editais
-          • Sem pré-resolução de focus_ids — agente decide via tools
-          • Dica de clique no grafo vira message extra (não substitui análise)
-
-        Memória entre sessões (Fase 3A): com `workspace_id`+`db` (caminho
-        autenticado), o agente recebe as últimas decisões do workspace no prefixo
-        ESTÁVEL do prompt (no system, antes do histórico — D6) e a tool
-        log_exploration_decision. Sem eles, opera stateless como antes.
-        """
+        planejamento e (gated) deep_research — montadas em `_explore_tools`."""
         from core.llm.agent_runtime import resolve_agent_provider, run_agent
 
-        self._load_index()  # garante índice carregado (não usa self._client)
+        self._load_index()
 
         messages: list[dict] = []
         for turn in (history or [])[-8:]:
@@ -879,8 +594,6 @@ class KGMatchService:
             if role in ("user", "assistant") and content:
                 messages.append({"role": role, "content": content})
 
-        # Dica de contexto: clique no grafo vira hint pro agente decidir o que
-        # consultar. Sem clique, esta linha não é adicionada.
         hint = self._build_explore_hint(edital_ids, node_id, node_type)
         if hint:
             messages.append({"role": "user", "content": hint})
@@ -928,11 +641,7 @@ class KGMatchService:
         node_id: str | None,
         node_type: str | None,
     ) -> str:
-        """Constrói hint textual do clique no grafo para o agente.
-
-        O agente decide se vai usar (chamar get_edital, get_graph_neighbors,
-        etc.) ou ignorar caso a pergunta seja sobre outro tópico.
-        """
+        """Constrói hint textual do clique no grafo para o agente."""
         parts: list[str] = []
         if node_id and node_type:
             parts.append(
@@ -950,7 +659,6 @@ class KGMatchService:
 
     def _parse_matches(self, raw: str) -> list[dict]:
         """Extrai lista de matches do JSON retornado pela LLM."""
-        # Remove possível markdown
         if "```" in raw:
             parts = raw.split("```")
             for part in parts:
@@ -967,7 +675,6 @@ class KGMatchService:
             if isinstance(matches, list):
                 return matches
         except json.JSONDecodeError:
-            # Tenta extrair JSON com regex
             m = re.search(r'"matches"\s*:\s*(\[.*?\])', raw, re.DOTALL)
             if m:
                 try:

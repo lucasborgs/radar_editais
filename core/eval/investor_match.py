@@ -74,9 +74,9 @@ def load_data() -> list[dict]:
 
 def task(*, item: Any, **_) -> dict:
     inp = get_input(item)
-    from core.services.investor_match import match_investidores
+    from core.services.entity_matcher import EntityMatcher, catalog_investidores
     profile = _build_profile(inp["profile"])
-    matches = match_investidores(profile, top_k=inp.get("top_k", 5))
+    matches = EntityMatcher(catalog_investidores).match(profile, top_k=inp.get("top_k", 5))
     return {
         "result_ids": [m.get("id") for m in matches],
         "profile_context": profile.to_context(),
