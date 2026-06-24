@@ -15,15 +15,18 @@ from openai import AsyncOpenAI, OpenAI
 
 LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+LLM_BASE_URL = os.getenv("LLM_BASE_URL")
 
 
 def make_client(**kwargs) -> OpenAI:
     kwargs.setdefault("timeout", LLM_TIMEOUT_SECONDS)
     kwargs.setdefault("max_retries", LLM_MAX_RETRIES)
+    kwargs.setdefault("base_url", LLM_BASE_URL)
     return OpenAI(**kwargs)
 
 
 def make_async_client(**kwargs) -> AsyncOpenAI:
     kwargs.setdefault("timeout", LLM_TIMEOUT_SECONDS)
     kwargs.setdefault("max_retries", LLM_MAX_RETRIES)
+    kwargs.setdefault("base_url", LLM_BASE_URL)
     return AsyncOpenAI(**kwargs)
