@@ -213,7 +213,7 @@ def _make_client():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY não definida")
-    return make_client(api_key=api_key, max_retries=6), os.getenv("OPENAI_MODEL_PRO", "gpt-4o")
+    return make_client(api_key=api_key, max_retries=6), os.getenv("OPENAI_MODEL_PRO", "gpt-4o-mini")
 
 
 def extract_edital(source: str, native_id: str, raw: str, *, model: str | None = None) -> EditalExtraction:

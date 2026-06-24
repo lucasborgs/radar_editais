@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def _eval_model() -> str:
-    return os.getenv("OPENAI_MODEL_EVAL") or os.getenv("OPENAI_MODEL_PRO") or "gpt-4o"
+    return os.getenv("OPENAI_MODEL_EVAL") or os.getenv("OPENAI_MODEL_PRO") or "gpt-4o-mini"
 
 
 def _strip_code_fence(raw: str) -> str:

@@ -54,6 +54,7 @@ def _make_session() -> WritingSession:
     s._temporal_block = ""
     s.mode = "proposal"
     s._pitch_target_context = ""
+    s._programa_context = ""
     s._pending_user_input = None
     s.backend = "anthropic"
     s.model = "claude-sonnet-4-6"

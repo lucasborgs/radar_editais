@@ -305,7 +305,7 @@ def run_critic(
     # Força OpenAI gpt-4o (replica a escolha de modelo do critic 1-shot): o critic
     # é um fact-checker de precisão crítica; modelos fracos não seguem de forma
     # confiável a instrução "só contradição, nunca omissão" → falsos-positivos.
-    model = os.getenv("OPENAI_MODEL_CRITIC") or os.getenv("OPENAI_MODEL_PRO") or "gpt-4o"
+    model = os.getenv("OPENAI_MODEL_CRITIC") or os.getenv("OPENAI_MODEL_PRO") or "gpt-4o-mini"
 
     # Endpoint OpenAI-compat do critic, parametrizável para bake-off: permite mirar o critic para um provider
     # OpenAI-COMPAT arbitrário (DeepSeek, vLLM/local, modelo ZDR pago) SEM editar
