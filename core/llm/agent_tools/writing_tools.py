@@ -22,16 +22,13 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING
+from typing import Annotated, TYPE_CHECKING
 
 from langchain_core.tools import BaseTool, tool
+from langgraph.prebuilt import InjectedState
 
 from core.llm.agent_runtime import _cap
-from core.retrieval.retriever import (
-    format_chunks_for_prompt,
-    retrieve_chunks,
-    retrieve_library_items,
-)
+from core.retrieval.retriever import retrieve_chunks, retrieve_library_items
 
 if TYPE_CHECKING:
     from core.services.writing_session import WritingSession
@@ -44,9 +41,6 @@ logger = logging.getLogger(__name__)
 # Cap total de read_full_proposal: proposta inteira é cara; acima disso, o aviso
 # orienta o modelo a usar read_section para detalhe pontual.
 READ_FULL_PROPOSAL_CHAR_CAP = int(os.getenv("READ_FULL_PROPOSAL_CHAR_CAP", "8000"))
-# Cap por chunk em search_edital: cada trecho do edital é truncado antes de
-# concatenar (k chunks somam rápido). Cap total da tool-result fica no env abaixo.
-SEARCH_EDITAL_CHUNK_CHAR_CAP = int(os.getenv("SEARCH_EDITAL_CHUNK_CHAR_CAP", "1500"))
 SEARCH_EDITAL_CHAR_CAP = int(os.getenv("SEARCH_EDITAL_CHAR_CAP", "8000"))
 
 
@@ -84,7 +78,11 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                          getattr(session, "edital_id", "?"), e)
 
     @tool
-    def search_edital(query: str, k: int = 5) -> str:
+    def search_edital(
+        query: str,
+        k: int = 5,
+        documents: Annotated[dict[str, str] | None, InjectedState("documents")] = None,
+    ) -> str:
         """Busca dados da oportunidade-alvo.
 
         Em proposta de edital: trechos relevantes do edital atual e dos análogos
@@ -95,12 +93,18 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
 
         NÃO use para ler a proposta/pitch que o usuário está escrevendo (use
         read_section ou read_full_proposal para isso).
+
+        Retorna APENAS um resumo de cada trecho com chunk_id. Para ler o texto
+        completo, use a ferramenta read_exact_chunk com o chunk_id exibido.
         """
         # Pitch (entidade): o substrato é o nó do fundo, não chunks de edital.
         if getattr(session, "mode", "proposal") == "pitch":
             return session._pitch_target_context or (
                 "Nenhum dado do fundo-alvo disponível. Prossiga com o perfil da startup."
             )
+
+        _docs = documents if documents is not None else {}
+
         try:
             chunks = retrieve_chunks(
                 session._db,
@@ -113,20 +117,38 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                     "Nenhum trecho relevante encontrado para essa query. "
                     "Tente reformular ou prossiga com o que já tem."
                 )
-            # Cap por chunk: cada trecho é truncado antes da concatenação
-            # (k chunks inteiros somam rápido). Cap total na sequência.
+
+            # Salva o texto completo no state["documents"] e constrói o sumário
+            # com ponteiros — o texto denso não vai para o ToolMessage.
+            primary = session._scope_edital_ids[0] if session._scope_edital_ids else None
+            pointer_parts: list[str] = []
             for c in chunks:
+                chunk_id = str(c.get("id", ""))
                 txt = c.get("text", "")
-                if txt:
-                    c["text"] = _cap(
-                        txt, SEARCH_EDITAL_CHUNK_CHAR_CAP,
-                        tool_name="search_edital[chunk]",
-                    )
-            formatted = format_chunks_for_prompt(
-                chunks, edital_ids=session._scope_edital_ids,
+                if chunk_id and txt:
+                    _docs[chunk_id] = txt
+
+                section = c.get("section") or "sem seção"
+                source = c.get("source_file") or "fonte desconhecida"
+                score = c.get("score") or 0.0
+                chunk_edital = c.get("edital_id")
+                is_analogue = primary is not None and chunk_edital and chunk_edital != primary
+
+                label = f"Análogo {chunk_edital} — {section}" if is_analogue else section
+                snippet = (txt[:250] + "…") if len(txt) > 250 else txt
+                pointer_parts.append(
+                    f"[{chunk_id}] {label} ({source}, score={score:.3f})\n"
+                    f"  {snippet}"
+                )
+
+            summary = (
+                f"Foram encontrados {len(chunks)} trecho(s) relevante(s). "
+                f"Para ler o texto COMPLETO de qualquer trecho, "
+                f"use a ferramenta read_exact_chunk passando o chunk_id exato.\n\n"
+                + "\n\n".join(pointer_parts)
             )
             return _cap(
-                formatted, SEARCH_EDITAL_CHAR_CAP, tool_name="search_edital",
+                summary, SEARCH_EDITAL_CHAR_CAP, tool_name="search_edital",
             )
         except Exception as e:
             logger.warning("[%s] search_edital falhou: %s", session.session_id, e)
@@ -134,6 +156,31 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                 f"Erro ao buscar no edital: {e}. "
                 "Continue com o que sabe do perfil e do histórico."
             )
+
+    @tool
+    def read_exact_chunk(
+        chunk_id: str,
+        documents: Annotated[dict[str, str] | None, InjectedState("documents")] = None,
+    ) -> str:
+        """Lê o texto COMPLETO de um trecho do edital previamente referenciado.
+
+        Use APENAS quando precisar do texto literal e completo de um chunk cujo
+        resumo foi exibido por search_edital. Recebe o `chunk_id` exato mostrado
+        no resultado da busca — não invente ou modifique o ID.
+
+        Args:
+            chunk_id: identificador exato exibido entre colchetes no resultado
+                      de search_edital, ex.: "abc123-def456"
+        """
+        _docs = documents if documents is not None else {}
+        content = _docs.get(chunk_id)
+        if content is None:
+            return (
+                f"Chunk '{chunk_id}' não encontrado no cache da sessão. "
+                "Faça uma nova busca com search_edital para obter referências "
+                "atualizadas."
+            )
+        return content
 
     @tool
     def search_library(query: str, k: int = 3) -> str:
@@ -234,13 +281,11 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
     def save_draft(section_title: str, content: str, force: bool = False) -> str:
         """Salva um rascunho completo de uma seção da proposta.
 
-        Por padrão, passa por revisão automática (critic) antes de salvar.
-        Se o critic encontrar problemas, descreve os problemas sem salvar —
-        corrija e chame save_draft novamente, ou use force=True para salvar
-        ignorando a revisão (decisão explícita do usuário).
-
         Use APENAS quando o conteúdo está fechado e pronto para persistir.
         Use o título EXATO da seção (do outline).
+
+        Por padrão passa pelo critic automático. force=True ignora o critic
+        (útil em geração em lote ou bypass explícito).
 
         Args:
             section_title: título exato da seção conforme o outline
@@ -385,6 +430,7 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
 
     return [
         search_edital,
+        read_exact_chunk,
         load_skill,
         search_library,
         read_section,

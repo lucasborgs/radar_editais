@@ -1,6 +1,6 @@
-"""Testes do path agente de KGMatchService.explore (Sprint 3 do Cenário B).
+"""Testes do path agente de ExploreAgent.explore (Sprint 3 do Cenário B).
 
-Estratégia: instanciamos `KGMatchService()` real (lê o índice JSON de
+Estratégia: instanciamos `ExploreAgent()` real (lê o índice JSON de
 knowledge_graph/index.json, que existe no repo) mas stubbamos `run_agent` para
 não bater na API Anthropic.
 
@@ -9,7 +9,7 @@ Cobre:
   - _build_explore_hint pra clique no grafo
   - _explore_agent error path
   - tools de explore_tools (list_editais, get_edital, find_analogues,
-    get_graph_neighbors) — wrappers leves sobre KGMatchService já testado
+    get_graph_neighbors) — wrappers leves sobre ExploreAgent já testado
 """
 from __future__ import annotations
 
@@ -21,33 +21,34 @@ sys.path.insert(0, str(ROOT))
 
 from core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
 from core.llm.agent_tools import build_explore_tools  # noqa: E402
-from core.services.kg_match_service import KGMatchService  # noqa: E402
+from core.services.explore_agent import ExploreAgent  # noqa: E402
+from core.services.graph_service import GraphService  # noqa: E402
 
 # ============================================================================
 # _build_explore_hint
 # ============================================================================
 
 def test_build_explore_hint_empty_when_no_click():
-    assert KGMatchService._build_explore_hint(None, None, None) == ""
-    assert KGMatchService._build_explore_hint([], None, None) == ""
+    assert ExploreAgent._build_explore_hint(None, None, None) == ""
+    assert ExploreAgent._build_explore_hint([], None, None) == ""
 
 
 def test_build_explore_hint_node_only():
-    h = KGMatchService._build_explore_hint(None, "radar-editais/temas/bio", "tema")
+    h = ExploreAgent._build_explore_hint(None, "radar-editais/temas/bio", "tema")
     assert "radar-editais/temas/bio" in h
     assert "tipo=tema" in h
     assert "get_graph_neighbors" in h
 
 
 def test_build_explore_hint_edital_ids_only():
-    h = KGMatchService._build_explore_hint(["finep:589", "finep:613"], None, None)
+    h = ExploreAgent._build_explore_hint(["finep:589", "finep:613"], None, None)
     assert "finep:589" in h
     assert "finep:613" in h
     assert "get_edital" in h or "find_analogues" in h
 
 
 def test_build_explore_hint_node_and_ids():
-    h = KGMatchService._build_explore_hint(
+    h = ExploreAgent._build_explore_hint(
         ["finep:589"], "radar-editais/temas/bio", "tema",
     )
     assert "radar-editais/temas/bio" in h
@@ -57,7 +58,7 @@ def test_build_explore_hint_node_and_ids():
 def test_build_explore_hint_caps_at_3_ids():
     """Mais que 3 IDs no clique não inunda o prompt."""
     ids = [f"finep:{i}" for i in range(10)]
-    h = KGMatchService._build_explore_hint(ids, None, None)
+    h = ExploreAgent._build_explore_hint(ids, None, None)
     assert "finep:0" in h
     assert "finep:9" not in h  # cap em 3
 
@@ -67,7 +68,7 @@ def test_build_explore_hint_caps_at_3_ids():
 # ============================================================================
 
 def test_explore_dispatches_to_agent_when_flag_true(monkeypatch):
-    svc = KGMatchService()
+    svc = ExploreAgent()
     called = {"agent": False, "legacy": False}
 
     def fake_agent(self, *a, **kw):
@@ -78,8 +79,8 @@ def test_explore_dispatches_to_agent_when_flag_true(monkeypatch):
         called["legacy"] = True
         return "legacy response"
 
-    monkeypatch.setattr(KGMatchService, "_explore_agent", fake_agent)
-    monkeypatch.setattr(KGMatchService, "_explore_legacy", fake_legacy)
+    monkeypatch.setattr(ExploreAgent, "_explore_agent", fake_agent)
+    monkeypatch.setattr(ExploreAgent, "_explore_legacy", fake_legacy)
 
     out = svc.explore("oi", agent_enabled=True)
     assert called["agent"] is True
@@ -88,15 +89,15 @@ def test_explore_dispatches_to_agent_when_flag_true(monkeypatch):
 
 
 def test_explore_dispatches_to_legacy_by_default(monkeypatch):
-    svc = KGMatchService()
+    svc = ExploreAgent()
     called = {"agent": False, "legacy": False}
 
     monkeypatch.setattr(
-        KGMatchService, "_explore_agent",
+        ExploreAgent, "_explore_agent",
         lambda self, *a, **kw: called.__setitem__("agent", True) or "x",
     )
     monkeypatch.setattr(
-        KGMatchService, "_explore_legacy",
+        ExploreAgent, "_explore_legacy",
         lambda self, *a, **kw: called.__setitem__("legacy", True) or "y",
     )
 
@@ -110,7 +111,7 @@ def test_explore_dispatches_to_legacy_by_default(monkeypatch):
 # ============================================================================
 
 def test_explore_agent_happy_path(monkeypatch):
-    svc = KGMatchService()
+    svc = ExploreAgent()
 
     fake_result = AgentResult(
         final_text="Resposta do agente.",
@@ -129,7 +130,7 @@ def test_explore_agent_happy_path(monkeypatch):
 
 def test_explore_agent_with_hint_passes_to_messages(monkeypatch):
     """Quando há clique, hint vai como user message antes da pergunta."""
-    svc = KGMatchService()
+    svc = ExploreAgent()
     captured: dict = {}
 
     fake_result = AgentResult(
@@ -158,7 +159,7 @@ def test_explore_agent_with_hint_passes_to_messages(monkeypatch):
 
 def test_explore_agent_passes_history_window(monkeypatch):
     """Apenas os últimos 8 turnos vão pro agente (igual ao legacy)."""
-    svc = KGMatchService()
+    svc = ExploreAgent()
     captured: dict = {}
 
     fake_result = AgentResult(
@@ -191,7 +192,7 @@ def test_explore_agent_passes_history_window(monkeypatch):
 def test_explore_agent_includes_planning_tool(monkeypatch):
     """O agente de explore ganha write_todos (Opção A) além das 8 tools de
     leitura — habilita planejamento multi-etapa no chat de Descoberta."""
-    svc = KGMatchService()
+    svc = ExploreAgent()
     captured: dict = {}
 
     fake_result = AgentResult(
@@ -215,7 +216,7 @@ def test_explore_agent_includes_planning_tool(monkeypatch):
 
 
 def test_explore_agent_error_returns_friendly_message(monkeypatch):
-    svc = KGMatchService()
+    svc = ExploreAgent()
     fake_result = AgentResult(
         final_text="", steps=[], stop_reason="error",
         usage={"input_tokens": 0, "output_tokens": 0},
@@ -227,7 +228,7 @@ def test_explore_agent_error_returns_friendly_message(monkeypatch):
 
 
 def test_explore_agent_empty_final_text_falls_back(monkeypatch):
-    svc = KGMatchService()
+    svc = ExploreAgent()
     fake_result = AgentResult(
         final_text="", steps=[], stop_reason="end_turn",
         usage={"input_tokens": 0, "output_tokens": 0},
@@ -243,8 +244,8 @@ def test_explore_agent_empty_final_text_falls_back(monkeypatch):
 # ============================================================================
 
 def test_explore_tools_count_and_names():
-    svc = KGMatchService()
-    tools = build_explore_tools(svc)
+    svc = ExploreAgent()
+    tools = build_explore_tools(svc, GraphService())
     names = [t.name for t in tools]
     assert set(names) == {
         "list_editais", "get_edital", "find_analogues", "get_graph_neighbors",
@@ -259,7 +260,7 @@ def test_explore_tools_count_and_names():
 def test_explore_tools_deep_research_gated(monkeypatch):
     """deep_research só entra no toolset com EXPLORE_DEEP_RESEARCH_ENABLED=true
     (explore é endpoint público; o crawl web é vetor de custo)."""
-    svc = KGMatchService()
+    svc = ExploreAgent()
 
     monkeypatch.delenv("EXPLORE_DEEP_RESEARCH_ENABLED", raising=False)
     off = {t.name for t in svc._explore_tools()}
@@ -275,8 +276,8 @@ def test_explore_tools_deep_research_gated(monkeypatch):
 def test_oportunidades_por_tema_is_cross_dimensional():
     """O panorama cobre as três frentes (eventos + ICTs + investidores) num só
     retorno — robusto mesmo se alguma dimensão estiver vazia no ambiente."""
-    svc = KGMatchService()
-    tools = {t.name: t for t in build_explore_tools(svc)}
+    svc = ExploreAgent()
+    tools = {t.name: t for t in build_explore_tools(svc, GraphService())}
     fn = getattr(tools["oportunidades_por_tema"], "func", tools["oportunidades_por_tema"])
     out = fn(tema="agro")
     assert isinstance(out, str)
@@ -310,8 +311,8 @@ def test_theme_match_rejects_unrelated():
 
 
 def test_list_editais_tool_returns_string_with_results():
-    svc = KGMatchService()
-    tools = build_explore_tools(svc)
+    svc = ExploreAgent()
+    tools = build_explore_tools(svc, GraphService())
     t = next(x for x in tools if x.name == "list_editais")
     out = t.invoke({"limit": 3})
     assert isinstance(out, str)
@@ -322,8 +323,8 @@ def test_list_editais_tool_returns_string_with_results():
 
 def test_list_editais_caps_limit():
     """Limit > 50 é cortado para 50 (proteção contra prompt blowup)."""
-    svc = KGMatchService()
-    tools = build_explore_tools(svc)
+    svc = ExploreAgent()
+    tools = build_explore_tools(svc, GraphService())
     t = next(x for x in tools if x.name == "list_editais")
     # Não dá pra inspecionar contagem direto; só garante que não levanta erro
     out = t.invoke({"limit": 99999})
@@ -331,8 +332,8 @@ def test_list_editais_caps_limit():
 
 
 def test_get_edital_tool_returns_error_string_for_invalid_id():
-    svc = KGMatchService()
-    tools = build_explore_tools(svc)
+    svc = ExploreAgent()
+    tools = build_explore_tools(svc, GraphService())
     t = next(x for x in tools if x.name == "get_edital")
     out = t.invoke({"edital_id": "id_que_nao_existe_xyz"})
     assert isinstance(out, str)
@@ -340,8 +341,8 @@ def test_get_edital_tool_returns_error_string_for_invalid_id():
 
 
 def test_find_analogues_tool_handles_missing_id():
-    svc = KGMatchService()
-    tools = build_explore_tools(svc)
+    svc = ExploreAgent()
+    tools = build_explore_tools(svc, GraphService())
     t = next(x for x in tools if x.name == "find_analogues")
     out = t.invoke({"edital_id": "id_invalido"})
     assert isinstance(out, str)
@@ -349,8 +350,8 @@ def test_find_analogues_tool_handles_missing_id():
 
 
 def test_get_graph_neighbors_tool_handles_missing_node():
-    svc = KGMatchService()
-    tools = build_explore_tools(svc)
+    svc = ExploreAgent()
+    tools = build_explore_tools(svc, GraphService())
     t = next(x for x in tools if x.name == "get_graph_neighbors")
     out = t.invoke({"node_id": "no/que/nao/existe"})
     assert isinstance(out, str)

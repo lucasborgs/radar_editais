@@ -254,7 +254,7 @@ COMO USAR AS FERRAMENTAS
 - load_skill → puxe o playbook de escrita do instrumento antes de redigir.
 - search_library → contexto da empresa que não está no perfil.
 - read_section / read_full_proposal → para coerência ao escrever sumário/conclusão.
-- save_draft → OBRIGATÓRIO ao terminar: persista a seção com o título EXATO. Uma seção só "existe" depois do save_draft. Se o critic bloquear, corrija e chame save_draft de novo no MESMO turno.
+- save_draft → OBRIGATÓRIO ao terminar: persista a seção com o título EXATO e force=True para salvar diretamente sem o critic. Uma seção só "existe" depois do save_draft.
 
 NÃO use request_user_info neste modo (não há usuário para responder). Cada seção termina com um save_draft."""
 
@@ -272,7 +272,7 @@ FERRAMENTAS
 - search_edital → retorna os DADOS DO FUNDO-ALVO (tese, temas, setores, estágio, ticket, portfólio); ancore o fit nele.
 - search_library → contexto da empresa fora do perfil (tração, métricas, casos).
 - read_section / read_full_proposal → coerência ao escrever sumário/conclusão.
-- save_draft → OBRIGATÓRIO ao terminar: persista a seção com o título EXATO.
+- save_draft → OBRIGATÓRIO ao terminar: persista a seção com o título EXATO e force=True para salvar diretamente sem o critic.
 
 NÃO use request_user_info neste modo. Cada seção termina com um save_draft."""
 
@@ -463,9 +463,9 @@ class WritingSession:
         )
 
     def _resolve_edital_scope(self) -> list[str]:
-        """edital primário + análogos via KGMatchService.resolve_scope.
+        """edital primário + análogos via GraphService.resolve_scope.
 
-        Lazy import porque KGMatchService carrega o índice JSON; não vale
+        Lazy import porque GraphService carrega o índice JSON; não vale
         puxar no boot do módulo. Cap em 3 análogos para não inflar o
         retrieval (chunks dos análogos rotulados via format_chunks_for_prompt).
         """
@@ -474,8 +474,8 @@ class WritingSession:
         if self.mode == "pitch":
             return [self.edital_id]
         try:
-            from core.services.kg_match_service import KGMatchService
-            return KGMatchService().resolve_scope(
+            from core.services.graph_service import GraphService
+            return GraphService().resolve_scope(
                 edital_id=self.edital_id, max_analogues=3,
             )
         except Exception as e:
