@@ -205,11 +205,16 @@ def _extract_id_web(chamada: dict) -> str:
     return chamada.get("url_hash", "")
 
 
+def _extract_id_fapesc(chamada: dict) -> str:
+    return chamada.get("native_id", "")
+
+
 # Função-dispatcher: extrai o `native_id` de acordo com a fonte. Adicionar
 # fonte = registrar a função aqui (paralelo ao SCRAPER_REGISTRY).
 _ID_EXTRACTORS = {
     "finep": _extract_id_finep,
     "fapesp": _extract_id_fapesp,
+    "fapesc": _extract_id_fapesc,
     "web": _extract_id_web,
 }
 
@@ -316,9 +321,34 @@ def _normalize_web(ch: dict) -> dict:
     }
 
 
+def _normalize_fapesc(ch: dict) -> dict:
+    """Normaliza um item bronze FAPESC → entry parcial.
+    Schema bronze: native_id, titulo, url, data_limite (BR dd/mm/yyyy ou None),
+    status, modalidades, areas, texto_cru. Detalhes: wikis/fapesc.md §3.
+    """
+    deadline_str = ch.get("data_limite") or ""
+    raw_status = ch.get("status") or "Desconhecido"
+    themes_raw = _split_multi(ch.get("areas"))
+    return {
+        "title":         ch.get("titulo", ""),
+        "status":        wiki_schema.normalize_status(raw_status, deadline_str),
+        "deadline":      deadline_str,
+        "pub_date":      "",
+        "pub_year":      wiki_schema.parse_pub_year(""),
+        "link":          ch.get("url", ""),
+        "themes":        canonicalize_themes(themes_raw),
+        "themes_raw":    themes_raw,
+        "publico_alvo":  [],
+        "fonte_recurso": ["FAPESC"],
+        "subprogramas":  [],
+        "modalidade":    ch.get("modalidades"),
+    }
+
+
 _NORMALIZERS = {
     "finep": _normalize_finep,
     "fapesp": _normalize_fapesp,
+    "fapesc": _normalize_fapesc,
     "web": _normalize_web,
 }
 

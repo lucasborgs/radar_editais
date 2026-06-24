@@ -107,10 +107,30 @@ o risco #1, gated por um leak test cross-workspace com Postgres real.
 ```mermaid
 flowchart TB
   subgraph GRAPH["agent_graph.py — StateGraph ReAct"]
-    AGENT["agent"] --> TOOLS["tools (ToolNode)"]
-    TOOLS --> AGENT
-    AGENT --> REFLECT["reflect"]
+    A["agent"] -->|tool_calls| T["tools (ToolNode)"]
+    A -->|no tool_calls| E(["END"])
+    T -->|continue| M["manage_memory<br/>🗑️ RemoveMessage GC"]
+    T -.->|reflect_pending| R["reflect"]
+    T -->|max_steps| E
+    R --> M
+    M --> A
   end
+
+  subgraph STATE["🔄 Pointer Reference — InjectedState('documents')"]
+    DOC["state['documents']<br/>dict[chunk_id → full_text]"]
+    SE["search_edital"] -->|writes text| DOC
+    RE["read_exact_chunk"] -->|reads text| DOC
+  end
+
+  subgraph BYP["🚀 save_draft — Critic bypass"]
+    SD["save_draft(title, content, force)"] -->|"force=True (batch)"| P["set_section_content ✓"]
+    SD -->|"force=False"| C["run_critic (subagent)"]
+    C -->|approved| P
+    C -->|rejected| FIX["issues → model revises"]
+  end
+
+  STATE -.->|carried by all nodes| GRAPH
+  BYP -.->|tool| T
 
   GRAPH --> CKPT["AsyncPostgresSaver<br/>checkpointer durável<br/>interrupt() → request_user_info"]
   GRAPH --> STORE["PostgresStore<br/>memória cross-session<br/>(projeção read-only dos reflection_insights)"]
@@ -120,9 +140,6 @@ flowchart TB
   STORE --> ISO
   classDef risk fill:#fde,stroke:#c33,stroke-width:1px;
 ```
-
-> Sub-agentes (Critic, Research) = subgrafo efêmero invocado por dentro de uma
-> tool, não nó do grafo pai.
 
 ---
 
