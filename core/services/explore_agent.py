@@ -25,9 +25,9 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 MATCH_SYSTEM_PROMPT = """Você é um especialista em fomento à inovação no Brasil com profundo
-conhecimento das chamadas públicas FINEP, FNDCT e programas de CT&I.
+conhecimento das chamadas públicas de fomento à inovação (FINEP, FAPESP, FAPESC, web) e programas de CT&I.
 
-Sua tarefa é analisar o perfil de uma empresa e identificar os editais FINEP mais relevantes
+Sua tarefa é analisar o perfil de uma empresa e identificar os editais mais relevantes
 para ela a partir de um catálogo estruturado.
 
 Critérios de avaliação (use todos):
@@ -41,7 +41,7 @@ Critérios de avaliação (use todos):
 Responda APENAS com JSON válido. Sem markdown, sem texto fora do JSON."""
 
 EXPLORE_SYSTEM_PROMPT = """Você é o assistente do Radar de Editais, uma plataforma que conecta
-empresas a oportunidades de fomento público no Brasil (FINEP, FNDCT, CT&I).
+empresas a oportunidades de fomento público no Brasil (FINEP, FAPESP, FAPESC, web).
 
 Você conversa com um visitante que pode ainda não ter preenchido o perfil da empresa.
 Seu papel é mostrar o potencial da plataforma respondendo perguntas sobre o catálogo de
@@ -63,7 +63,7 @@ Diretrizes:
   ao catálogo.
 - Seja conciso. Use listas curtas quando listar editais."""
 
-EXPLORE_USER_PROMPT = """CATÁLOGO DE EDITAIS FINEP:
+EXPLORE_USER_PROMPT = """CATÁLOGO DE EDITAIS:
 {index_json}
 {details_block}
 PERGUNTA DO VISITANTE:
@@ -169,7 +169,7 @@ EXPLORE_AGENT_MAX_STEPS = int(os.getenv("EXPLORE_AGENT_MAX_STEPS", "10"))
 MATCH_USER_PROMPT = """PERFIL DA EMPRESA:
 {profile_context}
 
-CATÁLOGO DE EDITAIS FINEP:
+CATÁLOGO DE EDITAIS:
 {index_json}
 
 Retorne os {top_k} editais mais relevantes para esta empresa no formato JSON abaixo.
