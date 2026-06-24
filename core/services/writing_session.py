@@ -418,6 +418,13 @@ class WritingSession:
             self._build_pitch_target_context() if self.mode == "pitch" else ""
         )
 
+        # Contexto de programa (programas.json): estrutura similar ao pitch mas
+        # para proposta (não outbound). Disponível para programa: ids mesmo fora
+        # do pitch mode. Vazio se não for programa ou se falhar o load.
+        self._programa_context = (
+            self._build_programa_context() if self.edital_id.startswith("programa:") else ""
+        )
+
         # Ids dos items anexados explicitamente — guardados pra dedup contra
         # o retrieval automático da biblioteca em turn() (normalizados lower).
         self._library_item_ids: set[str] = set()
@@ -792,6 +799,55 @@ class WritingSession:
             lines.append(f"Site: {fund['site']}")
         return "FUNDO-ALVO (use para ancorar o fit; não invente tese):\n" + "\n".join(lines)
 
+    def _build_programa_context(self) -> str:
+        """Bloco de contexto do programa-alvo (context-stuffing de programas.json).
+
+        Carrega o nó de `programas.json` por id (`programa:<slug>`) e o serializa
+        em texto pro prompt — descrição, operador, benefício, ticket, elegibilidade.
+        Vazio (com aviso) se o programa não for achado; a sessão não quebra.
+        """
+        from core import kg_store
+        try:
+            progs = {p["id"]: p for p in kg_store.load_programas()}
+        except Exception as e:
+            logger.warning("[%s] load_programas falhou: %s", self.session_id, e)
+            return ""
+        prog = progs.get(self.edital_id)
+        if not prog:
+            logger.warning(
+                "[%s] programa %s não encontrado em programas.json — proposta sem nó-alvo",
+                self.session_id, self.edital_id,
+            )
+            return ""
+
+        lines = [f"PROGRAMA-ALVO: {prog.get('name', self.edital_id)}"]
+        if prog.get("operador"):
+            lines.append(f"Operador: {prog['operador']}")
+        if prog.get("tipo"):
+            lines.append(f"Tipo: {prog['tipo']}")
+        if prog.get("descricao"):
+            lines.append(f"Descrição: {prog['descricao']}")
+        if prog.get("formato"):
+            lines.append(f"Formato: {prog['formato']}")
+        if prog.get("cadencia"):
+            lines.append(f"Cadência: {prog['cadencia']}")
+        if prog.get("beneficio"):
+            lines.append(f"Benefício: {prog['beneficio']}")
+        ticket = prog.get("ticket_range")
+        if ticket:
+            lo, hi = ticket.get("min_brl"), ticket.get("max_brl")
+            if lo or hi:
+                lines.append(f"Ticket (BRL): {lo or '?'}–{hi or '?'}")
+        if prog.get("estagio_alvo"):
+            lines.append(f"Estágio alvo: {', '.join(prog['estagio_alvo'])}")
+        if prog.get("elegibilidade"):
+            lines.append(f"Elegibilidade: {prog['elegibilidade']}")
+        if prog.get("site"):
+            lines.append(f"Site: {prog['site']}")
+        if prog.get("faq_url"):
+            lines.append(f"FAQ: {prog['faq_url']}")
+        return "PROGRAMA-ALVO (dados do programa de fomento — use para ancorar a proposta):\n" + "\n".join(lines)
+
     # ------------------------------------------------------------------
     # API pública
     # ------------------------------------------------------------------
@@ -1075,6 +1131,8 @@ class WritingSession:
         ]
         if self._pitch_target_context:
             messages.append({"role": "user", "content": self._pitch_target_context})
+        if self._programa_context:
+            messages.append({"role": "user", "content": self._programa_context})
         if self._temporal_block:
             messages.append({"role": "user", "content": self._temporal_block})
         if self._library_context:
@@ -1236,6 +1294,8 @@ class WritingSession:
         ]
         if self._pitch_target_context:
             messages.append({"role": "user", "content": self._pitch_target_context})
+        if self._programa_context:
+            messages.append({"role": "user", "content": self._programa_context})
         if self._temporal_block:
             messages.append({"role": "user", "content": self._temporal_block})
         if self._library_context:
@@ -1347,6 +1407,9 @@ class WritingSession:
 
         if context_text:
             messages.append({"role": "user", "content": context_text})
+
+        if self._programa_context:
+            messages.append({"role": "user", "content": self._programa_context})
 
         messages.append({
             "role": "user",

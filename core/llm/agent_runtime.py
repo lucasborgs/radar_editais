@@ -25,7 +25,7 @@ Padrão de uso:
         system="Você é um redator de propostas...",
         initial_messages=[{"role": "user", "content": user_message}],
         tools=[search_edital, save_draft, ...],
-        model="gpt-4o", provider="openai", max_steps=8,
+        model="gpt-4o-mini", provider="openai", max_steps=8,
     )
     result.final_text  # resposta do modelo ao usuário
     result.steps       # lista de TraceStep (llm + tool intercalados)
@@ -160,7 +160,7 @@ def resolve_agent_provider(
         preferred: provider desejado pelo call site.
         model: modelo desejado para o provider preferido.
         openai_model: modelo a usar se cair para OpenAI. Default: env
-            OPENAI_MODEL_AGENT → OPENAI_MODEL_PRO → "gpt-4o" (tool-loops
+            OPENAI_MODEL_AGENT → OPENAI_MODEL_PRO → "gpt-4o-mini" (tool-loops
             pedem um modelo capaz, não o mini).
         anthropic_model: modelo a usar se cair para Anthropic. Default: env
             ANTHROPIC_MODEL_AGENT → "claude-sonnet-4-6".
@@ -189,7 +189,7 @@ def resolve_agent_provider(
                 openai_model
                 or os.getenv("OPENAI_MODEL_AGENT")
                 or os.getenv("OPENAI_MODEL_PRO")
-                or "gpt-4o"
+                or "gpt-4o-mini"
             )
         else:
             fb_model = (

@@ -72,7 +72,7 @@ def _make_client(role: str):
         if role == "triage":
             model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         else:
-            model = os.getenv("OPENAI_MODEL_PRO", "gpt-4o")
+            model = os.getenv("OPENAI_MODEL_PRO", "gpt-4o-mini")
         return client, model
     except KeyError:
         return None, None
