@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Radar Editais API",
-    description="Plataforma de matching e escrita de propostas para editais FINEP",
+    description="Plataforma de matching e escrita de propostas para editais de fomento (FINEP, FAPESP, FAPESC, web)",
     version="2.0.0",
 )
 

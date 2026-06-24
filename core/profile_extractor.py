@@ -379,7 +379,7 @@ class ProfileExtractor:
     ) -> list[dict]:
         """Monta o `profile_diff` a partir de updates JÁ extraídos por outra via.
 
-        Usado pelo explore unificado (`ExploreAgent.explore_turn`), que devolve
+        Usado pelo router /explore quando profile está presente, que devolve
         os campos alterados na MESMA chamada da resposta — então aqui NÃO há LLM,
         só o shaping determinístico de `_build_diff` (filtra campos desconhecidos,
         vazios e os que não mudam vs. o perfil atual). Espelha o pós-processamento

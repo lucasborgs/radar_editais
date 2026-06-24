@@ -463,27 +463,9 @@ class WritingSession:
         )
 
     def _resolve_edital_scope(self) -> list[str]:
-        """edital primário + análogos via GraphService.resolve_scope.
-
-        Lazy import porque GraphService carrega o índice JSON; não vale
-        puxar no boot do módulo. Cap em 3 análogos para não inflar o
-        retrieval (chunks dos análogos rotulados via format_chunks_for_prompt).
-        """
-        # Pitch (entidade): sem análogos de edital — o substrato é o nó do fundo,
-        # injetado como contexto, não chunks. Devolve só o próprio id.
-        if self.mode == "pitch":
-            return [self.edital_id]
-        try:
-            from core.services.graph_service import GraphService
-            return GraphService().resolve_scope(
-                edital_id=self.edital_id, max_analogues=3,
-            )
-        except Exception as e:
-            logger.warning(
-                "[%s] resolve_scope falhou (edital=%s): %s — sessão segue só com primário",
-                self.session_id, self.edital_id, e,
-            )
-            return [self.edital_id]
+        """Apenas o edital primário. Análogos pertencem à fase de descoberta
+        (ExploreAgent), não à escrita (spec explore-routing.md Fase 1)."""
+        return [self.edital_id]
 
     # ------------------------------------------------------------------
     # Acesso lazy ao texto completo dos PDFs (fallback)

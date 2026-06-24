@@ -30,7 +30,7 @@ class RadarRequest(BaseModel):
 @limiter.limit("10/minute")
 def match_editais(request: Request, req: MatchRequest, user_id: CurrentUserId, db: DbClient):
     """
-    Recebe um perfil de empresa e retorna editais FINEP rankeados por relevância.
+    Recebe um perfil de empresa e retorna editais de fomento rankeados por relevância.
     A LLM lê o catálogo completo e justifica cada recomendação por dimensão.
 
     O workspace_id do usuário é derivado do JWT e plumbado para o matcher
