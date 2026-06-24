@@ -10,8 +10,9 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from core.services.content_library import get_item
+from core.services.explore_agent import ExploreAgent
+from core.services.graph_service import GraphService
 from core.services.hybrid_match_service import HybridMatchService
-from core.services.kg_match_service import KGMatchService
 from domain.user_profile import CompanyProfile as PyCompanyProfile
 
 # =============================================================================
@@ -19,7 +20,8 @@ from domain.user_profile import CompanyProfile as PyCompanyProfile
 # =============================================================================
 
 wiki_matcher = HybridMatchService()
-kg_service = KGMatchService()
+graph_service = GraphService()
+explore_agent = ExploreAgent()
 
 
 # =============================================================================

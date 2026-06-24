@@ -1,5 +1,5 @@
 """
-Testes de `KGMatchService.resolve_scope` — trigger → list[edital_ids].
+Testes de `GraphService.resolve_scope` — trigger → list[edital_ids].
 
 Usam o vault REAL do projeto (`obsidian_vault/radar-editais/`): a lógica é
 traversal de wikilinks em .md. Para não quebrar a cada novo scrape, os asserts
@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from config import OBSIDIAN_VAULT_DIR  # noqa: E402
 from core.kg.edital_id import slug_to_id  # noqa: E402
-from core.services.kg_match_service import KGMatchService  # noqa: E402
+from core.services.graph_service import GraphService  # noqa: E402
 
 _WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]")
 _TEMAS_DIR = OBSIDIAN_VAULT_DIR / "radar-editais" / "temas"
@@ -65,7 +65,7 @@ def test_resolve_scope_node_tema():
     picked = _pick_tema(min_editais=1)
     assert picked is not None, "vault sem temas — rode build_kg + export_to_obsidian"
     node_id, expected = picked
-    result = KGMatchService().resolve_scope(node_id=node_id, node_type="tema")
+    result = GraphService().resolve_scope(node_id=node_id, node_type="tema")
     assert result == expected
     assert all(_is_prefixed(e) for e in result), f"esperado ids prefixados, veio {result}"
 
@@ -76,7 +76,7 @@ def test_resolve_scope_edital_node_includes_analogues():
     assert picked is not None, "vault sem tema com >=2 editais"
     _, cluster = picked
     primary = cluster[0]
-    result = KGMatchService().resolve_scope(
+    result = GraphService().resolve_scope(
         node_id=f"radar-editais/editais/{primary.replace(':', '-')}",
         node_type="edital",
         max_analogues=3,
@@ -93,7 +93,7 @@ def test_resolve_scope_edital_id_session():
     picked = _pick_tema(min_editais=2)
     assert picked is not None
     primary = picked[1][0]
-    svc = KGMatchService()
+    svc = GraphService()
     via_session = svc.resolve_scope(edital_id=primary)
     via_node = svc.resolve_scope(
         node_id=f"radar-editais/editais/{primary.replace(':', '-')}",
@@ -104,7 +104,7 @@ def test_resolve_scope_edital_id_session():
 
 def test_resolve_scope_edital_sem_vault_page():
     """ID inexistente no vault não deve crashar — só retorna o próprio ID."""
-    result = KGMatchService().resolve_scope(edital_id="finep:9999")
+    result = GraphService().resolve_scope(edital_id="finep:9999")
     assert result == ["finep:9999"]
 
 
@@ -114,7 +114,7 @@ def test_resolve_scope_free_trigger():
     if not kg_store.load_index().get("editais"):
         import pytest
         pytest.skip("requer knowledge_graph/index.json gerado (ausente em CI limpo)")
-    result = KGMatchService().resolve_scope()
+    result = GraphService().resolve_scope()
     assert len(result) > 0
     assert all(isinstance(eid, str) for eid in result)
 
@@ -124,6 +124,6 @@ def test_resolve_scope_max_analogues_cap():
     picked = _pick_tema(min_editais=2)
     assert picked is not None
     primary = picked[1][0]
-    result = KGMatchService().resolve_scope(edital_id=primary, max_analogues=3)
+    result = GraphService().resolve_scope(edital_id=primary, max_analogues=3)
     assert result[0] == primary
     assert len(result) <= 4
