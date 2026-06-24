@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 def _eval_model() -> str:
-    return os.getenv("WRITING_EVAL_MODEL") or os.getenv("OPENAI_MODEL_PRO") or "gpt-4o"
+    return os.getenv("WRITING_EVAL_MODEL") or os.getenv("OPENAI_MODEL_PRO") or "gpt-4o-mini"
 
 
 def _client():
