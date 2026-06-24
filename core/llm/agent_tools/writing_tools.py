@@ -281,13 +281,11 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
     def save_draft(section_title: str, content: str, force: bool = False) -> str:
         """Salva um rascunho completo de uma seção da proposta.
 
-        Por padrão, passa por revisão automática (critic) antes de salvar.
-        Se o critic encontrar problemas, descreve os problemas sem salvar —
-        corrija e chame save_draft novamente, ou use force=True para salvar
-        ignorando a revisão (decisão explícita do usuário).
-
         Use APENAS quando o conteúdo está fechado e pronto para persistir.
         Use o título EXATO da seção (do outline).
+
+        Por padrão passa pelo critic automático. force=True ignora o critic
+        (útil em geração em lote ou bypass explícito).
 
         Args:
             section_title: título exato da seção conforme o outline
