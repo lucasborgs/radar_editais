@@ -65,28 +65,31 @@ flowchart TB
     RERANK --> TOPK["top-k chunks"]
   end
 
-  subgraph MATCH["Matching dual"]
+  subgraph MATCH["Matching"]
     direction TB
     subgraph HM["HybridMatchService"]
       S1["Stage 1 determinístico (Pandas)<br/>elegibilidade·temático·TRL·mecanismo<br/>·contrapartida·elig. dura (região/idade/receita)"]
       S1 --> S2["Stage 2 LLM · gpt-4o-mini<br/>pesos: matching_weights (cache TTL 60s)"]
     end
-    KGM["KGMatchService<br/>LLM raciocina no grafo, SEM embeddings<br/>gpt-4o-mini / gemini-2.5-flash"]
-    INV["investor_match · LLM"]
+    subgraph EM["EntityMatcher · Karpathy-style<br/>catálogo inteiro no prompt, 1 LLM call"]
+      INV["catalog_investidores<br/>tese/estágio/setor · gpt-4o-mini"]
+      PROG["catalog_programas<br/>estágio/elegibilidade/tema · gpt-4o-mini"]
+    end
     ICT["ict_match.rank_partners · determinístico"]
   end
 
   Q --> RET
   Q --> MATCH
   HM --> RADAR
-  KGM --> RADAR
   INV --> RADAR
+  PROG --> RADAR
   ICT --> RADAR
   RADAR["radar_service.merge_radar<br/>RRF + entity_floor · multi-quadrante<br/>evento / entidade / programa"]
 
   TOPK --> WS
-  KGM --> WS
+  GS -.->|resolve_scope| WS
   subgraph WRITE["Escrita · runtime agêntico"]
+    GS["GraphService · leitura do vault Obsidian<br/>sem LLM, cache LRU por mtime"]
     WS["WritingSession → LangGraph (agent_graph)<br/>RAG via retrieve_chunks"]
     WS --> CKL["ChecklistService · 3 passes paralelos<br/>compliance · qualidade · completude"]
   end
