@@ -63,7 +63,7 @@ class GraphService:
 
             text = path.read_text(encoding="utf-8")
             fm = self._parse_frontmatter(text)
-            label = "FINEP" if ntype == "home" else (fm.get("title") or path.stem)
+            label = "Radar de Editais" if ntype == "home" else (fm.get("title") or path.stem)
             node: dict = {
                 "id": node_id,
                 "type": ntype,
