@@ -37,7 +37,7 @@ def _tier_map() -> dict[ModelTier, str]:
     OPENAI_MODEL_AUTO  (default: gpt-4o-mini, mesmo do fast)
     """
     fast = os.getenv("OPENAI_MODEL_FAST", "gpt-4o-mini")
-    pro = os.getenv("OPENAI_MODEL_PRO", "gpt-4o")
+    pro = os.getenv("OPENAI_MODEL_PRO", "gpt-4o-mini")
     auto = os.getenv("OPENAI_MODEL_AUTO", fast)
     return {"fast": fast, "pro": pro, "auto": auto}
 

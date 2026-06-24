@@ -138,6 +138,10 @@ def writing_start(
         from core.kg import kg_store
         if req.edital_id not in {i["id"] for i in kg_store.load_investidores()}:
             raise HTTPException(status_code=404, detail=f"Fundo '{req.edital_id}' não encontrado")
+    elif req.edital_id.startswith("programa:"):
+        from core.kg import kg_store
+        if req.edital_id not in {p["id"] for p in kg_store.load_programas()}:
+            raise HTTPException(status_code=404, detail=f"Programa '{req.edital_id}' não encontrado")
     elif wiki_matcher.get_edital_by_id(req.edital_id) is None:
         raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
 
