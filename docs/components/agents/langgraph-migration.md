@@ -1,7 +1,13 @@
 # Spec — Migração do runtime agêntico para LangGraph
 
-**Status:** rascunho de design (2026-06-19) · **Owner:** Lucas
+**Status:** ✅ implementada e em produção (design original 2026-06-19) · **Owner:** Lucas
 **Janela:** pré-lançamento, sem usuários reais — momento ideal para migração arquitetural.
+
+> **Atualização (pós-2026-06-19):** o path legacy foi posteriormente **removido**
+> (loop hand-rolled deletado — pyproject: "Runtime único desde a Etapa 2, legado
+> deletado"). LangGraph é o runtime **único**. As menções a `AGENT_RUNTIME=legacy`
+> e a "rollback para o loop antigo" abaixo são **históricas** — essa flag e esse
+> caminho não existem mais no código.
 
 ## Por que migrar
 

@@ -60,7 +60,7 @@ flowchart TB
     DENSE["Dense · pgvector"]
     SPARSE["Sparse · BM25 (rank_bm25)"]
     HYDE --> DENSE
-    DENSE --> RRF["RRF merge · fts_weight=0.3"]
+    DENSE --> RRF["RRF merge · fts_weight=0.5"]
     SPARSE --> RRF
     RRF --> BOOST["primary_boost 1.5 + metadata_boost"]
     BOOST --> RERANK["rerank · cross-encoder mmarco-mMiniLMv2<br/>fallback gpt-4o-mini / RRF puro"]
@@ -108,7 +108,7 @@ flowchart TB
   subgraph WRITE["Escrita · runtime agêntico"]
     WS["WritingSession → LangGraph (agent_graph)<br/>RAG via retrieve_chunks<br/>scope = [edital_id]"]
     WS -->|"turn_count=0 + sections vazias"| FT["_first_turn_with_generation()<br/>batch 8 seções + descrição do usuário<br/>retorna draft completo de uma vez"]
-    FT -.->|"background"| CKL["ChecklistService · 3 passes paralelos<br/>compliance · qualidade · completude<br/>polling: GET /{id}/compliance"]
+    FT -.->|"background"| CKL["ChecklistService · 3 passes paralelos<br/>compliance · qualidade · completude<br/>compliance_flags inline na resposta de /writing/turn"]
     WS -->|"turnos seguintes"| CKL
     WS -->|"save_draft (force=False)"| SCOP["scope_classifier.py · GPT-4o-mini<br/>classifica correção: cosmética vs. conceitual<br/>se conceitual → ripple_suggestion"]
     SCOP -->|"depth≤1 (D9)"| WS
@@ -117,12 +117,12 @@ flowchart TB
 
 ---
 
-## 3. Runtime agêntico (alvo) — LangGraph
+## 3. Runtime agêntico — LangGraph
 
 `StateGraph` ReAct com checkpointer Postgres durável, `interrupt()` nativo para
 human-in-the-loop, memória cross-session via Store, e telemetria nativa. O
-isolamento multi-tenant migra de RLS para `thread_id`/namespace por workspace —
-o risco #1, gated por um leak test cross-workspace com Postgres real.
+isolamento multi-tenant usa `thread_id`/namespace por workspace (migrou de RLS) —
+o risco #1, ainda gated por um leak test cross-workspace com Postgres real (não rodado).
 
 ```mermaid
 flowchart TB
@@ -198,7 +198,7 @@ flowchart LR
 |---|---|
 | Fallback determinístico antes do LLM | HybridMatch Stage 1 Pandas → Stage 2; rerank degrada p/ RRF puro |
 | Modelo por tradeoff explícito | `llm_router` fast/pro/auto; produtores em free-tier (gemini), agregado em gpt-4o-mini |
-| RAG não-ingênuo | BM25+dense via RRF com `fts_weight=0.3` justificado pelo corpus; contextual retrieval; dedup por source; HyDE ativo por default com fallback silencioso |
+| RAG não-ingênuo | BM25+dense via RRF com `fts_weight=0.5` justificado pelo corpus; contextual retrieval; dedup por source; HyDE ativo por default com fallback silencioso |
 | Mede antes de mergear | 11 suítes no registry, gate de commit, Langfuse Experiments |
 | Abstração de troca | `kg_store.py` como seam único; embedder/reranker/LLM parametrizáveis por env |
-| Human-in-the-loop durável (alvo) | LangGraph `interrupt()` + checkpointer Postgres; isolamento via namespace por workspace |
+| Human-in-the-loop durável | LangGraph `interrupt()` + checkpointer Postgres; isolamento via namespace por workspace |
