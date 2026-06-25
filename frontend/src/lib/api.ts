@@ -815,6 +815,68 @@ export const promoteResearchFinding = (id: string, token: string) =>
     token,
   );
 
+// ── Discovered opportunities (torneira web, gate humano) ────
+
+export interface DiscoveredOpportunity {
+  id: string;
+  url: string;
+  title: string | null;
+  agency: string | null;
+  fonte: string | null;
+  descricao: string | null;
+  prazo_envio: string | null;
+  publico_alvo: string | null;
+  tema: string | null;
+  opportunity_type: string | null;
+  status: string;
+  extraction_quality: "high" | "low" | null;
+  edital_link: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  promoted_web_source_id: string | null;
+}
+
+export const getDiscoveredOpportunities = (token: string, includeReviewed?: boolean) =>
+  apiFetch<{ opportunities: DiscoveredOpportunity[] }>(
+    `/discovered-opportunities${includeReviewed ? "?include_reviewed=true" : ""}`,
+    undefined,
+    token,
+  );
+
+export const promoteDiscoveredOpportunity = (
+  id: string,
+  editalLink?: string | null,
+  token?: string,
+) =>
+  apiFetch<{ promoted: boolean; url: string; web_source_id?: string; edital_processed?: { url_hash: string; n_chars: number } }>(
+    `/discovered-opportunities/${id}/promote`,
+    {
+      method: "POST",
+      body: JSON.stringify({ edital_link: editalLink || null }),
+    },
+    token,
+  );
+
+export const rejectDiscoveredOpportunity = (id: string, reason?: string, token?: string) =>
+  apiFetch<{ rejected: boolean }>(
+    `/discovered-opportunities/${id}/reject`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason: reason || null }),
+    },
+    token,
+  );
+
+export const updateDiscoveredEditalLink = (id: string, editalLink: string, token: string) =>
+  apiFetch<{ updated: boolean; edital_link: string }>(
+    `/discovered-opportunities/${id}/edital-link`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ edital_link: editalLink }),
+    },
+    token,
+  );
+
 // ── Profile drift (Gap 4) ─────────────────────────────────
 
 export interface ProfileDriftSignal {
