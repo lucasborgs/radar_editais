@@ -1,22 +1,18 @@
-"""Spike Etapa 1 — runtime ReAct sobre LangGraph (StateGraph), atrás de flag.
+"""Runtime ReAct sobre LangGraph (StateGraph) — runtime único em produção.
 
-Prova de fundação da migração:
-substitui o loop hand-rolled de `run_agent_async` por um `StateGraph` de 3 nós
-(agent / tools / reflect), traduzindo o estado final de volta para o contrato
-`AgentResult` — sem tocar em nenhum call site.
+`run_agent_async` delega inteiramente a este grafo de 3 nós (agent / tools /
+reflect), traduzindo o estado final de volta para o contrato `AgentResult` sem
+tocar em nenhum call site. O loop hand-rolled legado foi removido (migração
+concluída — ver docs/components/agents/langgraph-migration.md).
 
-Dispatch: `run_agent_async` delega aqui quando `AGENT_RUNTIME=langgraph`. O
-default (`legacy`) mantém 100% o loop atual.
-
-Decisões fechadas (Etapa 1):
+Decisões fechadas:
   • Cap de iterações = contador `llm_calls` em state (paridade exata com
     `for ... range(max_steps)`), NÃO `recursion_limit`. Este vira só backstop.
   • Reflexão = nó dedicado condicional entre `tools` e `agent` (visível no trace),
     não `pre_model_hook` (que só existe no prebuilt do qual saímos).
 
-Fora de escopo do spike (etapas seguintes): telemetria via callback (Etapa 6),
-checkpointer (Etapa 3), troca de `@tool` p/ LangChain (Etapa 2 — aqui usamos o
-bridge `Tool → StructuredTool`).
+Em produção: telemetria via `langfuse.langchain.CallbackHandler`, checkpointer
+`AsyncPostgresSaver` durável (interrupt/resume), e tools LangChain nativas.
 """
 from __future__ import annotations
 
@@ -314,7 +310,7 @@ def _messages_to_agent_result(messages: list[AnyMessage], stop_reason: StopReaso
 
 
 # =============================================================================
-# Entry point (delegado pela facade quando AGENT_RUNTIME=langgraph)
+# Entry point (delegado pela facade run_agent_async)
 # =============================================================================
 
 def _to_lc_messages(initial: list[dict[str, Any]]) -> list[AnyMessage]:

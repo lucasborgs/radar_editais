@@ -432,7 +432,7 @@ Não confirmados como mortos (podem ter callers via scripts/CLI), mas sem import
 | `get_supabase()` | `core/db.py` | Alias deprecated para `get_supabase_service()` |
 | `load_finep_bronze` | `pipeline/build_knowledge_graph.py:98` | Marcado explicitamente como "alias depreciado — mantido por compat" |
 | Docstring `core/llm/__init__.py` | linha 2 | Diz "runtime Anthropic (agent_runtime)" — desatualizado; runtime hoje é LangGraph |
-| Flag `AGENT_RUNTIME=legacy` | Mencionado em docstring de `agent_graph.py` | Não existe mais no código — o path legacy foi removido |
+| Flag `AGENT_RUNTIME=legacy` | Só em changelog histórico (`langgraph-migration.md`) | Não existe mais no código — o path legacy foi removido (docstrings/comentários já limpos) |
 
 ---
 
