@@ -35,6 +35,7 @@ import re
 from typing import Any
 
 from core.retrieval.embedder import embed_query
+from core.retrieval.hyde import generate_hyde_doc
 from supabase import Client
 
 logger = logging.getLogger(__name__)
@@ -291,6 +292,7 @@ def retrieve_chunks(
     k_candidates: int = DEFAULT_RERANK_CANDIDATES,
     metadata_boost: float = DEFAULT_METADATA_BOOST,
     sparse: str = "bm25",
+    hyde: bool = True,
 ) -> list[dict]:
     """Hybrid retrieval over edital_chunks para um ou mais editais.
 
@@ -344,6 +346,11 @@ def retrieve_chunks(
             o `ts_rank` do Postgres não tem. "fts" mantém o caminho legado
             (tsvector + `ts_rank` no banco). A fusão RRF e `fts_weight` são
             idênticos nos dois casos; só muda quem produz a lista sparse.
+        hyde: se True (default), gera um pseudo-doc hipotético via LLM (HyDE)
+            e embeda esse trecho no lugar da query crua. O pseudo-doc usa
+            vocabulário formal de edital, aproximando a query do corpus no
+            espaço de embedding. Fallback silencioso: se o LLM falhar/timeout,
+            usa a query original. Setar False para desativar (query crua).
 
     Tuning do default
     -----------------
@@ -371,7 +378,17 @@ def retrieve_chunks(
     fts_weight = max(0.0, min(1.0, fts_weight))
     dense_weight = 1.0 - fts_weight
 
-    # 1. Embed the query (sync, blocking ~100ms — acceptable in a turn).
+    # 1. HyDE: substitui a query por um pseudo-doc gerado por LLM quando
+    #    hyde=True. O pseudo-doc (estilo edital formal) fica mais próximo
+    #    do corpus no espaço de embedding do que a pergunta crua do usuário.
+    #    Fallback silencioso: se generate_hyde_doc retornar "", mantém a
+    #    query original (timeout, erro de API, etc.).
+    if hyde and query_vec is None:
+        hyde_query = generate_hyde_doc(query)
+        if hyde_query:
+            query = hyde_query
+
+    # 2. Embed the query (sync, blocking ~100ms — acceptable in a turn).
     #    Reusa o vetor pré-computado quando o caller já embedou (mesmo turno).
     if query_vec is None:
         query_vec = embed_query(query)

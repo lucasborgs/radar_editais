@@ -155,6 +155,12 @@ edital_chunks (pgvector + tsvector)
 - **Boosts**: `primary_boost=1.5` (edital primário), `metadata_boost=1.2` (intent detection regex)
 - **Rerank**: `core.reranker.rerank_scores()` sobre top-20 (degradação graciosa)
 - **Dedup**: máx 2 chunks por `source_file`
+- **HyDE (Hypothetical Document Embeddings)**: gera um pseudo-trecho de edital via
+  LLM e embeda *esse trecho* no lugar da query crua (Gao et al., 2022). Atua
+  exclusivamente no braço dense (query-side), antes do embedding. **Ativado por
+  default** (`hyde=True`). Fallback silencioso: se o LLM falhar/timeout, usa a
+  query original. Modelo/config independentes: `HYDE_MODEL` (default `gpt-4o-mini`),
+  `HYDE_BASE_URL`, `HYDE_API_KEY`, `HYDE_TIMEOUT_SECONDS`.
 
 RAG é **exclusivo da WritingSession** — matching usa embeddings de summary-level separados.
 
@@ -390,7 +396,6 @@ Estes estão definidos em `frontend/src/lib/api.ts` mas **não são chamados em 
 | Arquivo | Evidência | Ação sugerida |
 |---------|-----------|---------------|
 | `pipeline/parsers/docling_blocks.py` | Único caller: `scripts/bench_parsing.py` (benchmark offline). Não está em nenhum caminho de ingestão. | Mover para `scripts/` ou remover |
-| `core/retrieval/hyde.py` | Único caller: `scripts/bench_query_expansion.py` (benchmark offline). Não importado por runtime. | Mover para `scripts/` ou remover |
 | `frontend/src/components/KnowledgeGraph.tsx` | Não importado em nenhuma página/componente. Era o grafo do dashboard antigo. | Remover |
 | `frontend/src/components/writing/DocumentCanvas.tsx` | Não importado em nenhuma página. Torna `ChecklistPanel.tsx` transitivamente morto. | Remover |
 | `frontend/src/components/writing/AttachToLibrary.tsx` | Não importado (apenas em comentário em `/library`). | Remover |
@@ -469,6 +474,10 @@ Além dos services em `core/services/`, existem módulos flat em `core/` com pap
 | `OLLAMA_MODEL` | Modelo local quando `LLM_BACKEND=ollama` |
 | `KG_STORE_BACKEND` | `file` (dev) ou `postgres` (prod) |
 | `RETRIEVAL_EMBEDDING_COLUMN` | Coluna pgvector usada no retrieval (`embedding_gemma` padrão) |
+| `HYDE_MODEL` | Modelo de chat para HyDE (`gpt-4o-mini` padrão) |
+| `HYDE_BASE_URL` | Endpoint OpenAI-compat para HyDE (ex.: Ollama local) |
+| `HYDE_API_KEY` | Key do provider HyDE (fallback: `OPENAI_API_KEY`) |
+| `HYDE_TIMEOUT_SECONDS` | Timeout curto para HyDE (`10` padrão — está no caminho crítico do turno) |
 | `AGENT_EXPLORE_DEFAULT_ENABLED` | Liga modo explore multi-turn no KGMatchService |
 | `DEEP_RESEARCH_ENABLED` | Liga subagente de pesquisa profunda no KGMatch |
 | `DISCOVERY_DOU_ENABLED` | Liga scraper do Diário Oficial |
