@@ -121,7 +121,7 @@ def test_explore_dispatches_to_factual(monkeypatch):
     svc = ExploreAgent()
     monkeypatch.setattr(ExploreAgent, "_classify_intent",
                         lambda *a, **kw: "factual")
-    out = svc._factual_route = lambda *a, **kw: "resposta factual"
+    svc._factual_route = lambda *a, **kw: "resposta factual"
     monkeypatch.setattr(ExploreAgent, "_factual_route",
                         lambda *a, **kw: "resposta factual")
     monkeypatch.setattr(ExploreAgent, "_explore_legacy",
