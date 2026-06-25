@@ -73,8 +73,8 @@ def classify_correction_scope(
 
     # Seleciona a matriz de dependência conforme o modo
     from core.services.writing_session import (
-        PROPOSAL_DEPENDENCY_MATRIX,
         PITCH_DEPENDENCY_MATRIX,
+        PROPOSAL_DEPENDENCY_MATRIX,
     )
     matrix = (
         PITCH_DEPENDENCY_MATRIX if session.mode == "pitch"

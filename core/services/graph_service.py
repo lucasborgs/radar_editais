@@ -6,7 +6,6 @@ match-evolution.md). Usa cache em memória com invalidação por mtime.
 """
 from __future__ import annotations
 
-import functools
 import logging
 import re
 from pathlib import Path
@@ -26,6 +25,8 @@ class GraphService:
 
     def __init__(self, vault: Path = OBSIDIAN_VAULT_DIR):
         self.vault = vault
+        self._graph_cache: dict | None = None
+        self._graph_cache_mtime: int = 0
 
     # ------------------------------------------------------------------
     # Cache do grafo
@@ -43,8 +44,7 @@ class GraphService:
         except OSError:
             return 0
 
-    @functools.lru_cache(maxsize=1)
-    def _build_graph(self, _mtime_key: int) -> dict:
+    def _build_graph(self) -> dict:
         """Constructs the graph from the vault. Cached by mtime hash."""
         vault = self.vault
         if not vault.exists():
@@ -98,7 +98,11 @@ class GraphService:
 
     def get_graph(self) -> dict:
         """Nós + arestas do knowledge graph. Cache em memória invalidado por mtime."""
-        return self._build_graph(self._vault_mtime_hash(self.vault))
+        mtime = self._vault_mtime_hash(self.vault)
+        if self._graph_cache is None or mtime != self._graph_cache_mtime:
+            self._graph_cache = self._build_graph()
+            self._graph_cache_mtime = mtime
+        return self._graph_cache
 
     # ------------------------------------------------------------------
     # Parsing helpers

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Annotated, TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 from langchain_core.tools import BaseTool, tool
 from langgraph.prebuilt import InjectedState

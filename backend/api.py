@@ -35,8 +35,8 @@ from backend.routers.brief import router as brief_router
 from backend.routers.catalog import router as catalog_router
 from backend.routers.conversations import router as conversations_router
 from backend.routers.discovered import router as discovered_router
-from backend.routers.files import router as files_router
 from backend.routers.explore import router as explore_router
+from backend.routers.files import router as files_router
 from backend.routers.graph import router as graph_router
 from backend.routers.matching import router as matching_router
 from backend.routers.playbooks import router as playbooks_router

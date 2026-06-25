@@ -1388,7 +1388,8 @@ class WritingSession:
         """Executa o checklist em background e armazena o resultado no DB."""
         try:
             from core.services.checklist_service import (
-                auto_review_checklist, build_checklist,
+                auto_review_checklist,
+                build_checklist,
             )
             requirements = build_checklist(self.edital_id)
             if not requirements:

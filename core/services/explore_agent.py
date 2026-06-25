@@ -71,6 +71,15 @@ EXPLORE_USER_PROMPT = """CATÁLOGO DE EDITAIS:
 PERGUNTA DO VISITANTE:
 {message}"""
 
+EXPLORE_LOG_INSTRUCTION = """
+
+MEMÓRIA ENTRE SESSÕES (log_exploration_decision)
+- Quando você concluir que um edital é uma boa oportunidade para este usuário,
+  registre com log_exploration_decision(edital_id, "recommended", reason). Quando
+  concluir que não serve, registre com decision="discarded" e uma razão curta.
+- Registre só decisões com base — não logue cada edital citado de passagem.
+- Revisitar o mesmo edital atualiza a decisão (a última prevalece); pode rechamar."""
+
 EXPLORE_AGENT_SYSTEM = """Você é o assistente do Radar de Editais, uma plataforma que conecta empresas
 a oportunidades de fomento e parceria no Brasil. O grafo de conhecimento cobre
 QUATRO dimensões: editais/desafios/programas (eventos de fomento), ICTs
