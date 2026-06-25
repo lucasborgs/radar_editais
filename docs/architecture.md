@@ -53,11 +53,13 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-  Q["Query / CompanyProfile"]
+  Q["Query / CompanyProfile<br/>(localStorage)"]
 
   subgraph RET["Retrieval · retriever.py"]
+    HYDE["HyDE · gera pseudo-doc via LLM<br/>hyde=True (default)"]
     DENSE["Dense · pgvector"]
     SPARSE["Sparse · BM25 (rank_bm25)"]
+    HYDE --> DENSE
     DENSE --> RRF["RRF merge · fts_weight=0.3"]
     SPARSE --> RRF
     RRF --> BOOST["primary_boost 1.5 + metadata_boost"]
@@ -86,12 +88,30 @@ flowchart TB
   ICT --> RADAR
   RADAR["radar_service.merge_radar<br/>RRF + entity_floor · multi-quadrante<br/>evento / entidade / programa"]
 
-  TOPK --> WS
-  GS -.->|resolve_scope| WS
-  subgraph WRITE["Escrita · runtime agêntico"]
+  TOPK -.->|"RAG · retrieve_chunks"| WS
+
+  subgraph EXPLORE["Descoberta · ExploreAgent"]
     GS["GraphService · leitura do vault Obsidian<br/>sem LLM, cache LRU por mtime"]
-    WS["WritingSession → LangGraph (agent_graph)<br/>RAG via retrieve_chunks"]
-    WS --> CKL["ChecklistService · 3 passes paralelos<br/>compliance · qualidade · completude"]
+    EA["ExploreAgent · 3 rotas<br/>factual → reasoning → agent"]
+    GS -->|scope + factual| EA
+  end
+
+  subgraph FRONT["⚡ Frontend · estado local"]
+    FE["profile_diff → DiffCard<br/>✓ Aceitar → isRadarReady()<br/>acumula perfil no localStorage"]
+  end
+
+  EA -.->|"responde + profile_diff"| FRONT
+  FRONT -.->|"isRadarReady()"| Q
+
+  RADAR -.->|"RadarItem[].edital_id<br/>usuário clica 'Começar proposta'"| WS
+
+  subgraph WRITE["Escrita · runtime agêntico"]
+    WS["WritingSession → LangGraph (agent_graph)<br/>RAG via retrieve_chunks<br/>scope = [edital_id]"]
+    WS -->|"turn_count=0 + sections vazias"| FT["_first_turn_with_generation()<br/>batch 8 seções + descrição do usuário<br/>retorna draft completo de uma vez"]
+    FT -.->|"background"| CKL["ChecklistService · 3 passes paralelos<br/>compliance · qualidade · completude<br/>polling: GET /{id}/compliance"]
+    WS -->|"turnos seguintes"| CKL
+    WS -->|"save_draft (force=False)"| SCOP["scope_classifier.py · GPT-4o-mini<br/>classifica correção: cosmética vs. conceitual<br/>se conceitual → ripple_suggestion"]
+    SCOP -->|"depth≤1 (D9)"| WS
   end
 ```
 
@@ -122,11 +142,12 @@ flowchart TB
     RE["read_exact_chunk"] -->|reads text| DOC
   end
 
-  subgraph BYP["🚀 save_draft — Critic bypass"]
+  subgraph BYP["🚀 save_draft — Critic bypass + Scope classifier"]
     SD["save_draft(title, content, force)"] -->|"force=True (batch)"| P["set_section_content ✓"]
     SD -->|"force=False"| C["run_critic (subagent)"]
-    C -->|approved| P
+    C -->|approved| SC["scope_classifier (GPT-4o-mini)<br/>cosmético? → segue<br/>conceitual? → ripple_suggestion"]
     C -->|rejected| FIX["issues → model revises"]
+    SC --> P
   end
 
   STATE -.->|carried by all nodes| GRAPH
@@ -177,7 +198,7 @@ flowchart LR
 |---|---|
 | Fallback determinístico antes do LLM | HybridMatch Stage 1 Pandas → Stage 2; rerank degrada p/ RRF puro |
 | Modelo por tradeoff explícito | `llm_router` fast/pro/auto; produtores em free-tier (gemini), agregado em gpt-4o-mini |
-| RAG não-ingênuo | BM25+dense via RRF com `fts_weight=0.3` justificado pelo corpus; contextual retrieval; dedup por source |
+| RAG não-ingênuo | BM25+dense via RRF com `fts_weight=0.3` justificado pelo corpus; contextual retrieval; dedup por source; HyDE ativo por default com fallback silencioso |
 | Mede antes de mergear | 11 suítes no registry, gate de commit, Langfuse Experiments |
 | Abstração de troca | `kg_store.py` como seam único; embedder/reranker/LLM parametrizáveis por env |
 | Human-in-the-loop durável (alvo) | LangGraph `interrupt()` + checkpointer Postgres; isolamento via namespace por workspace |
