@@ -335,9 +335,24 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                     "save_draft com force=True para salvar mesmo assim."
                 )
 
+        # Captura conteúdo ANTIGO antes de sobrescrever (para o scope classifier)
+        old_content = session._doc_sections.get(target_title, "")
+
         try:
             session.set_section_content(target_title, content)
             suffix = "" if force else " (aprovado pelo critic)"
+
+            # Scope classifier: só em modo conversacional, após critic aprovar,
+            # e NÃO durante ripple ativo (D9 depth limit = 1).
+            if not force and not getattr(session, '_ripple_active', False):
+                from core.llm.agent_tools.scope_classifier import classify_correction_scope
+                scope = classify_correction_scope(old_content, content, target_title, session)
+                if scope and scope.get("type") == "conceptual":
+                    session._ripple_suggestion = {
+                        "source_section": target_title,
+                        "affected_sections": scope.get("changed_elements", []),
+                    }
+
             return (
                 f"Rascunho salvo em '{target_title}' ({len(content)} chars){suffix}. "
                 "Continue a conversa ou prossiga para a próxima seção."

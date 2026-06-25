@@ -309,6 +309,42 @@ Lista vazia [] se não houver sinal relevante."""
 
 
 # =============================================================================
+# MATRIZES DE DEPENDÊNCIA ENTRE SEÇÕES (static, zero LLM)
+# =============================================================================
+# Usadas pelo classificador de escopo (scope_classifier) para determinar quais
+# seções são impactadas quando uma seção conceitual é alterada. A ordem segue
+# o outline padrão — outlines gerados por LLM podem ter nomes diferentes e
+# cair no fallback da matriz estática.
+
+PROPOSAL_DEPENDENCY_MATRIX: dict[str, list[str]] = {
+    "1. Identificação da empresa":         [],
+    "2. Objeto do projeto":               ["3. Justificativa e relevância",
+                                            "4. Objetivos",
+                                            "5. Metodologia e plano de trabalho",
+                                            "6. Equipe técnica",
+                                            "7. Cronograma", "8. Orçamento"],
+    "3. Justificativa e relevância":      ["4. Objetivos"],
+    "4. Objetivos":                       ["5. Metodologia e plano de trabalho",
+                                            "7. Cronograma"],
+    "5. Metodologia e plano de trabalho": ["7. Cronograma", "8. Orçamento"],
+    "6. Equipe técnica":                  ["8. Orçamento"],
+    "7. Cronograma":                      [],
+    "8. Orçamento":                       [],
+}
+
+PITCH_DEPENDENCY_MATRIX: dict[str, list[str]] = {
+    "1. Problema":                        ["2. Solução e diferencial tecnológico"],
+    "2. Solução e diferencial tecnológico": ["3. Mercado (TAM/SAM/SOM)",
+                                              "5. Time", "6. Fit com a tese do fundo"],
+    "3. Mercado (TAM/SAM/SOM)":           ["4. Tração", "7. Ask e uso dos recursos"],
+    "4. Tração":                          ["7. Ask e uso dos recursos"],
+    "5. Time":                            [],
+    "6. Fit com a tese do fundo":         ["7. Ask e uso dos recursos"],
+    "7. Ask e uso dos recursos":          [],
+}
+
+
+# =============================================================================
 # ERROS
 # =============================================================================
 
@@ -369,6 +405,14 @@ class WritingSession:
         # usuário; consumido (esvaziado) na primeira mensagem do próximo turn.
         # Persistido em writing_sessions.pending_user_input.
         self._pending_user_input: dict | None = None
+        # First-turn batch generation: descrição do projeto enviada pelo usuário
+        # no primeiro turno. Injetada no prompt de geração.
+        self._project_description: str | None = None
+        # Ripple correction: quando o classificador de escopo detecta uma mudança
+        # conceitual, armazena a sugestão de ripple para o próximo turno.
+        self._ripple_suggestion: dict | None = None
+        # Flag true durante ripple ativo — bloqueia re-classificação (depth=1).
+        self._ripple_active: bool = False
 
         if session_id:
             # Retomar sessão existente — carrega tudo do Postgres.
@@ -888,7 +932,18 @@ class WritingSession:
         aposentado (Front 1): não há mais branching por feature flag. Se o
         agente falhar (stop_reason=error), retorna erro amigável — sem cair
         em legacy.
+
+        First-turn especial (D1): se turn_count==0 e seções vazias, desvia
+        para geração em lote com a descrição do usuário como contexto extra.
         """
+        # First-turn detection: nenhum turno anterior, seções vazias, e
+        # NÃO há pending_user_input (que indicaria um interrupt aguardando
+        # resposta, não um primeiro turno).
+        pending = self._pending_user_input
+        if self._turn_count == 0 and not isinstance(pending, dict) \
+               and self._all_sections_empty():
+            return self._first_turn_with_generation(user_message)
+
         self._turn_count += 1
         user_turn_index = self._turn_count
         logger.info("[%s] Turno %d", self.session_id, self._turn_count)
@@ -898,7 +953,6 @@ class WritingSession:
         # Se o pendente carrega thread_id, é um interrupt() em aberto (Etapa 3) →
         # esta mensagem é a RESPOSTA e retomamos o grafo no ponto da pausa, em vez
         # de iniciar um turno fresco.
-        pending = self._pending_user_input
         had_pending = isinstance(pending, dict)
         resume_ctx = pending if (had_pending and pending.get("thread_id")) else None
         self._pending_user_input = None
@@ -1026,10 +1080,13 @@ class WritingSession:
                 "success":            True,
                 "error":              None,
                 "tool_trace":         tool_trace,
+                "ripple_suggestion":  self._ripple_suggestion,
             }
 
         # Turno completou (fresh sem interrupt OU resume que fechou a pergunta).
         assistant_text = result.final_text or ""
+        ripple = self._ripple_suggestion
+        self._ripple_suggestion = None  # consumido
         self._history.append({"role": "user",      "content": user_message})
         self._history.append({"role": "assistant", "content": assistant_text})
         self._persist_turn(user_turn_index, "user", user_message, section_hint)
@@ -1047,13 +1104,15 @@ class WritingSession:
             "success":            True,
             "error":              None,
             "tool_trace":         tool_trace,
+            "ripple_suggestion":  ripple,
         }
 
     # ------------------------------------------------------------------
     # Geração de proposta completa (batch)
     # ------------------------------------------------------------------
 
-    def generate_full_proposal(self, sections: list[str] | None = None) -> dict:
+    def generate_full_proposal(self, sections: list[str] | None = None,
+                                record_turn: bool = True) -> dict:
         """Modo "gerar proposta completa": escreve TODAS as seções do outline de
         uma vez (batch). Um orquestrador determinístico (sem LLM) enfileira as
         seções e roda, por seção, o agente interno de escrita (mesmo toolset do
@@ -1064,6 +1123,9 @@ class WritingSession:
         outline AINDA VAZIAS — não clobbera trabalho já redigido e serve de
         mecanismo de retomada: uma re-chamada após geração parcial (ex.: crash
         no meio do lote) só pega o que ainda falta.
+
+        `record_turn`: False quando chamado do first-turn flow (o turno é
+        registrado pelo caller com a mensagem real do usuário).
 
         request_user_info é REMOVIDA do toolset aqui: não há usuário no loop para
         responder a um interrupt() durante o batch (e o agente interno roda sem
@@ -1107,7 +1169,8 @@ class WritingSession:
         )
 
         # Registra a ação no transcript (best-effort) para a conversa refletir o lote.
-        self._record_generation_turn(outcome)
+        if record_turn:
+            self._record_generation_turn(outcome)
 
         return {
             "session_id": self.session_id,
@@ -1129,6 +1192,11 @@ class WritingSession:
         messages: list[dict] = [
             {"role": "user", "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
         ]
+        if self._project_description:
+            messages.append({
+                "role": "user",
+                "content": f"DESCRIÇÃO DO PROJETO PELO USUÁRIO:\n{self._project_description}",
+            })
         if self._pitch_target_context:
             messages.append({"role": "user", "content": self._pitch_target_context})
         if self._programa_context:
@@ -1197,6 +1265,159 @@ class WritingSession:
         except Exception as e:
             logger.warning(
                 "[%s] _record_generation_turn falhou: %s", self.session_id, e,
+            )
+
+    # ------------------------------------------------------------------
+    # First-turn batch generation (NotebookLM-style)
+    # ------------------------------------------------------------------
+
+    def _all_sections_empty(self) -> bool:
+        """True se nenhuma seção do outline tem conteúdo substancial."""
+        return all(
+            not self._doc_sections.get(t, "").strip()
+            for t in self._proposal_outline
+        )
+
+    def _is_vague_description(self, message: str) -> bool:
+        """Gate de densidade: descrição muito vaga aborta first-turn generation
+        e cai no modo conversacional normal."""
+        text = message.strip()
+        if len(text) < 50:
+            return True
+        keywords = [
+            "projeto", "sistema", "tecnologia", "solução", "plataforma",
+            "aplicativo", "software", "ferramenta", "produto", "processo",
+            "desenvolvimento", "implementação", "pesquisa", "inovação",
+            "criar", "construir", "desenvolver", "implementar",
+        ]
+        return not any(kw in text.lower() for kw in keywords)
+
+    def _first_turn_with_generation(self, user_message: str) -> dict:
+        """Processa o primeiro turno com geração em lote.
+
+        Se a descrição do usuário for muito vaga, cai no modo conversacional
+        normal (o agente fará perguntas para extrair escopo).
+        """
+        if self._is_vague_description(user_message):
+            logger.info(
+                "[%s] First-turn: descrição vaga (%d chars) → modo conversacional",
+                self.session_id, len(user_message),
+            )
+            return self._turn_agent(user_message, None, 1)
+
+        logger.info(
+            "[%s] First-turn: gerando proposta completa a partir da descrição (%d chars)",
+            self.session_id, len(user_message),
+        )
+
+        self._project_description = user_message
+
+        # Batch generation (sync, sem registrar turno genérico)
+        outcome = self.generate_full_proposal(record_turn=False)
+
+        # Agenda checklist em background (não bloqueia a resposta)
+        self._schedule_checklist_async()
+
+        # Registra turno com a mensagem real do usuário
+        self._record_first_turn(user_message, outcome)
+
+        return {
+            "session_id": self.session_id,
+            "assistant_message": self._first_turn_summary(outcome),
+            "draft_content": None,
+            "sections_done": outcome.get("sections_done", []),
+            "failed_sections": outcome.get("failed_sections", []),
+            "turn_number": 1,
+            "success": True,
+        }
+
+    def _first_turn_summary(self, outcome: dict) -> str:
+        """Mensagem do assistente para o primeiro turno."""
+        done = outcome.get("sections_done", [])
+        failed = outcome.get("failed_sections", [])
+        parts: list[str] = []
+        if done:
+            parts.append(
+                f"Pronto! Gerei o rascunho completo com base na sua descrição. "
+                f"{len(done)} seção(ões) escrita(s): {', '.join(done)}."
+            )
+        if failed:
+            parts.append(
+                f"{len(failed)} seção(ões) precisei de ajuda: {', '.join(failed)}. "
+                "Podemos trabalhar nelas no chat."
+            )
+        if not parts:
+            parts.append("Não consegui gerar nenhuma seção. Pode descrever melhor o projeto?")
+        parts.append(
+            "Revise cada seção e me diga o que ajustar — tom, escopo, "
+            "informações que faltam. Estou aqui para refinar."
+        )
+        return " ".join(parts)
+
+    def _record_first_turn(self, user_message: str, outcome: dict) -> None:
+        """Persiste o par (user, assistant) do primeiro turno no transcript."""
+        try:
+            self._turn_count += 1
+            idx = self._turn_count
+            assistant_msg = self._first_turn_summary(outcome)
+
+            self._history.append({"role": "user", "content": user_message})
+            self._history.append({"role": "assistant", "content": assistant_msg})
+            self._persist_turn(idx, "user", user_message, None)
+            self._persist_turn(idx, "assistant", assistant_msg, None)
+        except Exception as e:
+            logger.warning(
+                "[%s] _record_first_turn falhou: %s", self.session_id, e,
+            )
+
+    def _schedule_checklist_async(self) -> None:
+        """Agenda a execução do checklist auto-review em background.
+
+        Resultado disponível via GET /writing/{session_id}/compliance."""
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self._run_checklist_async())
+        except RuntimeError:
+            logger.debug(
+                "[%s] Sem event loop para checklist background",
+                self.session_id,
+            )
+
+    async def _run_checklist_async(self) -> None:
+        """Executa o checklist em background e armazena o resultado no DB."""
+        try:
+            from core.services.checklist_service import (
+                auto_review_checklist, build_checklist,
+            )
+            requirements = build_checklist(self.edital_id)
+            if not requirements:
+                return
+
+            proposal_text = "\n\n".join(
+                f"# {t}\n{self._doc_sections.get(t, '')}"
+                for t in self._proposal_outline
+                if self._doc_sections.get(t, "").strip()
+            )
+
+            review = await auto_review_checklist(
+                proposal=proposal_text,
+                edital_requirements=requirements,
+                outline=self._proposal_outline,
+                playbook_context="",
+            )
+
+            # Persiste resultado em writing_sessions.compliance_result
+            self._db.table("writing_sessions").update({
+                "compliance_result": review,
+            }).eq("id", self.session_id).execute()
+
+            logger.info(
+                "[%s] Compliance background concluído", self.session_id,
+            )
+        except Exception as e:
+            logger.warning(
+                "[%s] Compliance background falhou: %s", self.session_id, e,
             )
 
     @staticmethod

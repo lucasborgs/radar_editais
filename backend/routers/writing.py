@@ -85,6 +85,11 @@ class WritingTurnResponse(BaseModel):
     pending_user_input: PendingUserInput | None = None
     tool_trace: list[ToolTraceEntry] | None = None
     compliance_flags: list[dict] = []
+    # First-turn generation (Parte A)
+    sections_done: list[str] = []
+    failed_sections: list[str] = []
+    # Ripple correction suggestion (Parte B)
+    ripple_suggestion: dict | None = None
 
 
 class WritingGenerateRequest(BaseModel):
@@ -447,6 +452,42 @@ async def writing_checklist_auto_review(
     )
     _attach_issue_sections(review, outline)
     return {"session_id": session_id, "review": review}
+
+
+@router.get(
+    "/writing/{session_id}/compliance",
+    summary="Retorna resultado do compliance check (background)",
+)
+def writing_compliance(
+    session_id: str,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """Retorna o resultado do compliance auto-review executado em background
+    após o primeiro turno.
+
+    Status possíveis:
+      - "pending": ainda sendo processado
+      - "ready": resultado disponível em `review`
+      - "unavailable": sessão não encontrada ou sem requisitos
+    """
+    workspace_id = get_workspace_id(db, user_id)
+    result = (
+        db.table("writing_sessions")
+        .select("compliance_result")
+        .eq("id", session_id)
+        .eq("workspace_id", workspace_id)
+        .maybe_single()
+        .execute()
+    )
+    row = result.data if result else None
+    if not row:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+
+    review = row.get("compliance_result")
+    if not review:
+        return {"session_id": session_id, "status": "pending", "review": None}
+    return {"session_id": session_id, "status": "ready", "review": review}
 
 
 def _attach_issue_sections(review: dict, outline: list[str]) -> None:
