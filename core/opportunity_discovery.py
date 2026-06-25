@@ -437,6 +437,7 @@ def _stage_records(records: list[dict]) -> int:
         "opportunity_type": r.get("opportunity_type"),
         "raw": r,
         "status": "pending",
+        "extraction_quality": "high" if len(r.get("texto_cru") or "") >= 500 else "low",
     } for r in records]
     try:
         (db.table("discovered_opportunities")
