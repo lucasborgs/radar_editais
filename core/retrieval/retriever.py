@@ -42,9 +42,12 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TOP_K = 5
 DEFAULT_FTS_WEIGHT = 0.5    # ver "Tuning do default" no docstring de `retrieve_chunks`
-# Coluna de embedding a usar no braço dense. "embedding_gemma" (768d, embeddinggemma-pt-br)
-# é o default após promoção do bake-off (2026-06-16). Trocar por env para fallback OpenAI.
-RETRIEVAL_EMBEDDING_COLUMN = os.environ.get("RETRIEVAL_EMBEDDING_COLUMN", "embedding_gemma")
+# Coluna de embedding usada no braço dense — FONTE ÚNICA compartilhada com o
+# ingest (core.tasks.chunk_edital_task importa esta constante), para que gravação
+# e leitura nunca divirjam (a divergência foi a raiz do landmine de 2026-06-26).
+# Default "embedding" (1536d, OpenAI text-embedding-3-*). O braço gemma (768d) foi
+# removido. Trocável por env para futuros bake-offs.
+RETRIEVAL_EMBEDDING_COLUMN = os.environ.get("RETRIEVAL_EMBEDDING_COLUMN", "embedding")
 DEFAULT_MAX_PER_SOURCE = 2  # diversidade: nº máx de chunks do mesmo PDF no top-K
 DEFAULT_RERANK_CANDIDATES = 20  # tamanho do pool reordenado pelo reranker (Front 4)
 DEFAULT_METADATA_BOOST = 1.2    # boost de chunks cujas flags de metadata casam com a query
@@ -287,7 +290,6 @@ def retrieve_chunks(
     fts_weight: float = DEFAULT_FTS_WEIGHT,
     max_per_source: int = DEFAULT_MAX_PER_SOURCE,
     query_vec: list[float] | None = None,
-    primary_boost: float = 1.5,
     rerank: bool = True,
     k_candidates: int = DEFAULT_RERANK_CANDIDATES,
     metadata_boost: float = DEFAULT_METADATA_BOOST,
@@ -317,15 +319,9 @@ def retrieve_chunks(
         query_vec: embedding pré-computado da query. Se fornecido, pula a
             chamada `embed_query` (reuso entre edital RAG + biblioteca no
             mesmo turno). Se None, embeda internamente (callers standalone).
-        primary_boost: multiplicador aplicado ao score RRF de chunks vindos
-            do `edital_ids[0]` (o primário). Default 1.5: análogos têm sinal
-            valioso (paráfrases, exemplos de regras parecidas) mas NÃO devem
-            dominar o top-K — o foco do turno é o edital primário. Use 1.0
-            pra desativar o boost.
         rerank: se True (default), reordena um pool de `k_candidates` chunks
             (top-RRF) por relevância à query usando `core.reranker` antes do
-            corte top-k. O `primary_boost` é reaplicado sobre o score do
-            reranker (escala [0,1]) e o dedup `max_per_source` é preservado.
+            corte top-k. O dedup `max_per_source` é preservado.
             Degrada graciosamente: se o backend de rerank falhar/estiver
             ausente, mantém a ordenação RRF pura.
         k_candidates: tamanho do pool levado ao reranker (over-fetch). Só tem
@@ -336,10 +332,10 @@ def retrieve_chunks(
             ("qual o prazo?" → contem_data). Boost suave, não filtro: a
             detecção é regex e erra; multiplicar só reordena, nunca exclui.
             Aplicado SÓ no estágio RRF (molda o pool que vai ao reranker e a
-            ordenação de fallback) — não é reaplicado pós-rerank como o
-            primary_boost, porque o cross-encoder já vê o texto do chunk e
-            julgar relevância à query é exatamente o trabalho dele; reaplicar
-            contaria o sinal duas vezes. Use 1.0 pra desativar.
+            ordenação de fallback) — não é reaplicado pós-rerank, porque o
+            cross-encoder já vê o texto do chunk e julgar relevância à query é
+            exatamente o trabalho dele; reaplicar contaria o sinal duas vezes.
+            Use 1.0 pra desativar.
         sparse: ranker do braço sparse. "bm25" (default) usa BM25 Okapi em
             Python (`rank_bm25`) sobre todos os chunks dos editais em memória —
             saturação de frequência (k1) e normalização por comprimento (b) que
@@ -496,34 +492,22 @@ def retrieve_chunks(
     if not scores:
         return []
 
-    # 3a. Boost dos chunks do edital primário. Análogos contribuem com sinal
-    #     útil (regras parecidas, paráfrases) mas não devem dominar o top-K
-    #     — o turno está focado no edital primário. Multiplicar o score RRF
-    #     em vez de filtrar mantém os análogos visíveis quando não há
-    #     concorrência forte do primário (corpus do primário pobre, p.ex.).
-    primary_id = edital_ids[0]
-    if primary_boost != 1.0:
-        scores = {
-            _id: (score * primary_boost if by_id[_id].get("edital_id") == primary_id else score)
-            for _id, score in scores.items()
-        }
-
-    # 3b. Boost por flags de metadata: query pedindo prazo/valor/elegibilidade/
+    # 3. Boost por flags de metadata: query pedindo prazo/valor/elegibilidade/
     #     critérios sobe chunks que comprovadamente contêm esse tipo de conteúdo
     #     (flags do chunker). Ver docstring de `metadata_boost`.
     scores = _apply_metadata_boost(
         scores, by_id, _detect_query_flags(query), metadata_boost
     )
 
-    # 4. Ordenação por RRF score (com primary_boost já aplicado).
+    # 4. Ordenação por RRF score.
     ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
 
     # 4a. Rerank (Front 4): reordena o pool top-RRF por relevância à query.
-    #     Over-fetch modesto (k_candidates) → rerank → reaplica primary_boost
-    #     sobre o score [0,1] do reranker. Degradação graciosa: rerank_scores
-    #     devolve None se o backend estiver ausente/falhar e mantemos o RRF.
+    #     Over-fetch modesto (k_candidates) → rerank. Degradação graciosa:
+    #     rerank_scores devolve None se o backend estiver ausente/falhar e
+    #     mantemos o RRF.
     if rerank and len(ranked) > 1:
-        ranked = _apply_rerank(ranked, by_id, query, edital_ids[0], primary_boost, k_candidates)
+        ranked = _apply_rerank(ranked, by_id, query, k_candidates)
 
     # 5. Corte top-k com dedup por source_file pra diversidade.
     return _dedup_by_source(ranked, by_id, k, max_per_source)
@@ -533,16 +517,12 @@ def _apply_rerank(
     ranked: list[tuple[str, float]],
     by_id: dict[str, dict],
     query: str,
-    primary_id: str,
-    primary_boost: float,
     k_candidates: int,
 ) -> list[tuple[str, float]]:
     """Reordena o pool top-`k_candidates` por relevância à query (Front 4).
 
     Mantém a cauda (além de k_candidates) na ordem RRF original — só o pool
-    relevante é reordenado. O score do reranker (∈[0,1]) recebe `primary_boost`
-    para chunks do edital primário, preservando a semântica de não deixar
-    análogos dominarem. Se o reranker indisponível (None), devolve `ranked`
+    relevante é reordenado. Se o reranker indisponível (None), devolve `ranked`
     intacto.
     """
     from core.reranker import rerank_scores
@@ -555,10 +535,9 @@ def _apply_rerank(
     if rr is None:
         return ranked
 
-    rescored: list[tuple[str, float]] = []
-    for (cid, _rrf), rscore in zip(pool, rr, strict=False):
-        boost = primary_boost if by_id[cid].get("edital_id") == primary_id else 1.0
-        rescored.append((cid, rscore * boost))
+    rescored: list[tuple[str, float]] = [
+        (cid, rscore) for (cid, _rrf), rscore in zip(pool, rr, strict=False)
+    ]
     rescored.sort(key=lambda kv: kv[1], reverse=True)
     # A cauda (não reordenada) vai depois — só vira top-k se o pool não encher.
     return rescored + tail
