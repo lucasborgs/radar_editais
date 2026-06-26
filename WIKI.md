@@ -643,6 +643,8 @@ extraction_prompt: |
   {{
     "objective": "síntese em 2-3 frases do que este edital financia e para quem",
     "mechanism": "subvencao|reembolsavel|investimento|misto|null",
+    "themes": ["tecnologias digitais e conectividade"],
+    "publico_alvo": ["startups", "empresas"],
     "eligible_entities": ["empresas", "startups", "ICTs"],
     "value_range": {{"min_brl": null, "max_brl": null}},
     "trl_range": {{"min": null, "max": null}},
@@ -659,6 +661,14 @@ extraction_prompt: |
 
   Regras:
   - mechanism: classifique pelo mecanismo financeiro principal
+  - themes: use APENAS os temas canônicos abaixo ([] se nenhum se aplicar):
+    "agro - bioeconomia e alimentos", "energia e transição sustentável",
+    "espaço - defesa e segurança", "materiais, química e manufatura avançada",
+    "mobilidade e logística", "saúde e ciências da vida",
+    "tecnologias digitais e conectividade"
+  - publico_alvo: use APENAS os valores canônicos abaixo ([] se não determinável):
+    "empresas", "startups", "ICTs", "instituições de pesquisa",
+    "universidades", "cooperativas", "gestores de FIP"
   - trl_range: inteiros 1-9, null se não mencionado
   - value_range: valores em reais como inteiros, null se não mencionado
   - key_requirements: máx 5 itens, cada um autocontido e verificável
