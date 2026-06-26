@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
@@ -13,6 +15,8 @@ from backend.common import (
 from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient
 from core.services.content_library import get_workspace_id
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["brief"])
 
@@ -43,4 +47,15 @@ def opportunity_brief(
         to_py_profile(req.profile) if req.profile
         else profile_from_workspace(db, workspace_id)
     )
+
+    # Prefetch lazy do chunking (ver docs/specs/lazy-chunking.md): ao engajar um
+    # edital, dispara o chunk_edital sob demanda (best-effort, nunca quebra a
+    # rota). investidor:/programa: não têm chunks → não enfileira.
+    if not req.edital_id.startswith(("investidor:", "programa:")):
+        try:
+            from core.tasks import app
+            app.configure_task("chunk_edital").defer(edital_id=req.edital_id)
+        except Exception as e:
+            logger.warning("falha ao enfileirar chunk_edital para %s: %s", req.edital_id, e)
+
     return generate_brief(db, workspace_id, profile, req.edital_id, model_tier=req.model_tier)

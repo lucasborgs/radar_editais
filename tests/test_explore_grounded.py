@@ -130,7 +130,7 @@ def test_no_chunks_degrades_per_edital(monkeypatch):
     t = _get_tool()
     out = t.func(edital_ids=["finep:1"], query="contrapartida")
     assert "### finep:1" in out
-    assert "sem trecho relevante" in out
+    assert "não foi indexado" in out
 
 
 def test_mixed_chunks_and_empty(monkeypatch):
@@ -141,7 +141,7 @@ def test_mixed_chunks_and_empty(monkeypatch):
     t = _get_tool()
     out = t.func(edital_ids=["a", "b"], query="x")
     assert "### a" in out and "texto literal" in out
-    assert "### b" in out and "sem trecho relevante" in out
+    assert "### b" in out and "não foi indexado" in out
 
 
 # ---------------------------------------------------------------------------

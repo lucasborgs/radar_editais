@@ -463,7 +463,19 @@ def build_explore_tools(explore_agent: ExploreAgent, graph_service: GraphService
                 blocos.append(f"### {eid}\n(erro ao recuperar: {e})")
                 continue
             if not chunks:
-                blocos.append(f"### {eid}\n(sem trecho relevante p/ a query)")
+                # Lista vazia = nenhum chunk recuperado. Com lazy chunking, o
+                # caso comum é o edital ainda NÃO ter sido indexado (só é
+                # chunkado sob demanda, quando alguém o seleciona para escrever)
+                # — distinto de erro real, que cai no except acima. Degradamos
+                # graciosamente apontando o overview da wiki em vez de sumir
+                # silenciosamente.
+                blocos.append(
+                    f"### {eid}\n"
+                    f"O edital {eid} ainda não foi indexado para busca em "
+                    "trechos (isso acontece sob demanda quando alguém o "
+                    "seleciona para escrever). Use a wiki page (get_edital / "
+                    "list_icts conforme o caso) para o conteúdo de visão geral."
+                )
                 continue
             # Cap por trecho: cada chunk é truncado antes da concatenação
             # (k chunks inteiros somam rápido). Cap total na sequência.
