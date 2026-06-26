@@ -36,7 +36,8 @@ from procrastinate import App, PsycopgConnector  # noqa: E402
 from core.db import get_supabase_service  # noqa: E402
 from core.logging_config import setup_logging  # noqa: E402
 from core.retrieval.chunker import chunk_from_blocks  # noqa: E402
-from core.retrieval.embedder import embed_texts  # noqa: E402
+from core.retrieval.embedder import EMBEDDING_MODEL, embed_texts  # noqa: E402
+from core.retrieval.retriever import RETRIEVAL_EMBEDDING_COLUMN  # noqa: E402
 from core.services.content_library import enrich_content  # noqa: E402
 from core.structurer import build_or_load_structured_doc  # noqa: E402
 from pipeline.adapters.base import get_adapter  # noqa: E402
@@ -433,7 +434,7 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
             "section": c.get("section"),
             "source_file": c.get("source_file"),
             "page_range": c.get("page_range"),
-            "embedding_gemma": emb,
+            RETRIEVAL_EMBEDDING_COLUMN: emb,
             # SEM content_hash aqui — o marcador de conclusão é gravado no
             # chunk 0 só depois do último batch (ver abaixo).
             "metadata": c.get("metadata") or {},
@@ -484,8 +485,8 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
     )
 
     logger.info(
-        "chunk_edital_task: edital=%s indexado com %d chunks (text-embedding-3-large)",
-        edital_id, len(rows),
+        "chunk_edital_task: edital=%s indexado com %d chunks (%s → coluna %s)",
+        edital_id, len(rows), EMBEDDING_MODEL, RETRIEVAL_EMBEDDING_COLUMN,
     )
 
 
@@ -502,14 +503,15 @@ def _insert_chunks_psycopg(rows: list[dict]) -> None:
 
     with psycopg.connect(dsn, autocommit=True) as conn, conn.cursor() as cur:
         for r in rows:
-            emb = r["embedding_gemma"]
+            emb = r[RETRIEVAL_EMBEDDING_COLUMN]
             # pgvector textual literal — '[v1,v2,...]'.
             vec_literal = "[" + ",".join(f"{x:.7f}" for x in emb) + "]"
             meta_literal = json.dumps(r.get("metadata") or {})
+            # {RETRIEVAL_EMBEDDING_COLUMN} é valor de código (env interna), não input.
             cur.execute(
-                """
+                f"""
                 INSERT INTO public.edital_chunks
-                    (edital_id, chunk_index, text, section, source_file, page_range, embedding_gemma, metadata)
+                    (edital_id, chunk_index, text, section, source_file, page_range, {RETRIEVAL_EMBEDDING_COLUMN}, metadata)
                 VALUES (%s, %s, %s, %s, %s, %s, %s::vector, %s::jsonb)
                 """,
                 (
