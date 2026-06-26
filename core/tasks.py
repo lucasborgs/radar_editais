@@ -557,8 +557,6 @@ async def run_daily_etl_task(timestamp: int) -> None:
     logger.info("run_daily_etl_task: iniciando (timestamp=%s)", timestamp)
 
     # Import tardio para evitar custo no boot do worker
-    from core.kg.edital_id import make_id  # noqa: PLC0415
-    from pipeline.build_knowledge_graph import _ID_EXTRACTORS  # noqa: PLC0415
     from pipeline.extractors import SCRAPER_REGISTRY
 
     total_new = 0
@@ -577,29 +575,10 @@ async def run_daily_etl_task(timestamp: int) -> None:
                 "run_daily_etl_task: %s — %d resultados", display_name, new_count,
             )
 
-            # Enfileira chunk_edital_task para cada edital.
-            # O native_id é extraído pelo extrator da fonte (o mesmo que o
-            # build_knowledge_graph usa): FINEP vem de `chamada_id`/link, FAPESP
-            # da URL. Antes usávamos `item.get("chamada_id") or item.get("id")`,
-            # que era None para FAPESP — e os editais FAPESP nunca eram chunkados.
-            extract_id = _ID_EXTRACTORS.get(source)
-            for item in (results or []):
-                native_id = (
-                    extract_id(item) if extract_id
-                    else (item.get("chamada_id") or item.get("id"))
-                )
-                if not native_id:
-                    continue
-                edital_id = make_id(source, str(native_id))
-                try:
-                    await app.configure_task("chunk_edital").defer_async(
-                        edital_id=edital_id,
-                    )
-                except Exception as enqueue_err:
-                    logger.warning(
-                        "Falha ao enfileirar chunk_edital para %s/%s: %s",
-                        display_name, edital_id, enqueue_err,
-                    )
+            # Chunking é LAZY (spec docs/specs/lazy-chunking.md): o ETL NÃO chunka
+            # mais todo edital scraped. Os chunks (RAG fino) nascem sob demanda
+            # quando o usuário engaja o edital (prefetch no brief / writing-start).
+            # O cron segue só scrape + build KG (tier grosso: navegação/match).
 
         except PipelineError as e:
             await asyncio.to_thread(

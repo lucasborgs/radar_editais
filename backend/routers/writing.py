@@ -3,6 +3,8 @@ documento, checklist e export."""
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -24,6 +26,8 @@ from core.services.writing_session import (
     get_session_document,
     list_sessions,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["writing"])
 
@@ -149,6 +153,15 @@ def writing_start(
             raise HTTPException(status_code=404, detail=f"Programa '{req.edital_id}' não encontrado")
     elif wiki_matcher.get_edital_by_id(req.edital_id) is None:
         raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
+    else:
+        # Prefetch lazy do chunking (ver docs/specs/lazy-chunking.md): só para
+        # editais de verdade (investidor:/programa: não têm chunks). Best-effort,
+        # nunca quebra a rota.
+        try:
+            from core.tasks import app
+            app.configure_task("chunk_edital").defer(edital_id=req.edital_id)
+        except Exception as e:
+            logger.warning("falha ao enfileirar chunk_edital para %s: %s", req.edital_id, e)
 
     workspace_id = get_workspace_id(db, user_id)
     profile = to_py_profile(req.profile)
