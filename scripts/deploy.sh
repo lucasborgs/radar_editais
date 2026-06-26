@@ -76,11 +76,16 @@ ENV — referência (Railway dashboard/CLI; NÃO versionar valores)
      SUPABASE_ANON_KEY  SUPABASE_SERVICE_KEY  SUPABASE_JWT_SECRET
   CONFIG          (web + worker):
      LLM_BACKEND=openai   OPENAI_MODEL=gpt-4o-mini   KG_STORE_BACKEND=postgres
+     EMBEDDING_MODEL=text-embedding-3-small   RETRIEVAL_EMBEDDING_COLUMN=embedding
   CONFIG          (web only):
      FRONTEND_URL=<vercel>          # CORS
      RERANK_BACKEND=off             # RRF puro p/ beta (~400ms). cross-encoder NÃO
                                     # está na imagem (extra [rerank]); =llm rerankeia
                                     # via API mas custa ~3s/retrieval.
+  MONITORING      (web + worker — código pronto em telemetry.py/logging_config.py; só setar):
+     LANGFUSE_PUBLIC_KEY  LANGFUSE_SECRET_KEY   # traces LLM + custo (cloud.langfuse.com, free tier)
+     SENTRY_DSN  ENV=production                 # error tracking (sentry.io, free tier)
+     LOG_FORMAT=json                            # logs estruturados p/ o coletor do Railway
   OPCIONAIS:
      TAVILY_API_KEY                 # discovery/deep_research (degrada sem)
      CONTEXTUAL_RETRIEVAL=true      # default; relevante no reindex (passo 6a)

@@ -66,7 +66,7 @@ def test_apply_rerank_reorders_by_relevance(monkeypatch):
         "core.reranker.rerank_scores",
         lambda q, texts, backend=None: [0.1, 0.9],
     )
-    out = _apply_rerank(ranked, by_id, "query", "finep:1", 1.0, 20)
+    out = _apply_rerank(ranked, by_id, "query", 20)
     assert [cid for cid, _ in out] == ["c2", "c1"]
 
 
@@ -74,24 +74,8 @@ def test_apply_rerank_none_keeps_rrf_order(monkeypatch):
     by_id = _by_id([("c1", "finep:1", "x"), ("c2", "finep:1", "y")])
     ranked = [("c1", 0.9), ("c2", 0.8)]
     monkeypatch.setattr("core.reranker.rerank_scores", lambda q, texts, backend=None: None)
-    out = _apply_rerank(ranked, by_id, "query", "finep:1", 1.0, 20)
+    out = _apply_rerank(ranked, by_id, "query", 20)
     assert out == ranked
-
-
-def test_apply_rerank_primary_boost_favors_primary(monkeypatch):
-    by_id = _by_id([
-        ("c1", "finep:2", "análogo relevante"),   # análogo
-        ("c2", "finep:1", "primário menos relevante"),  # primário
-    ])
-    ranked = [("c1", 0.9), ("c2", 0.5)]
-    # Reranker dá quase empate; boost no primário deve virar a ordem.
-    monkeypatch.setattr(
-        "core.reranker.rerank_scores",
-        lambda q, texts, backend=None: [0.6, 0.5],
-    )
-    out = _apply_rerank(ranked, by_id, "query", "finep:1", 1.5, 20)
-    # c2 (primário) = 0.5 * 1.5 = 0.75 > c1 (análogo) = 0.6 * 1.0
-    assert out[0][0] == "c2"
 
 
 def test_apply_rerank_tail_preserved(monkeypatch):
@@ -102,5 +86,5 @@ def test_apply_rerank_tail_preserved(monkeypatch):
         "core.reranker.rerank_scores",
         lambda q, texts, backend=None: [0.2, 0.9],  # inverte c0,c1
     )
-    out = _apply_rerank(ranked, by_id, "query", "finep:1", 1.0, 2)
+    out = _apply_rerank(ranked, by_id, "query", 2)
     assert [cid for cid, _ in out] == ["c1", "c0", "c2", "c3", "c4"]

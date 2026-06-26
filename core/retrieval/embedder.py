@@ -1,16 +1,17 @@
 """
-Embeddings — parametrizável por env (default: OpenAI text-embedding-3-large, 1536 dims).
+Embeddings — parametrizável por env (default: OpenAI text-embedding-3-small, 1536 dims).
 
 Historicamente embeddings eram OpenAI-only e o modelo era hardcoded (ADR A1/A3).
 O bake-off de modelos exige trocar o modelo
 por env para avaliar substitutos open-weight (Qwen3-Embedding, BGE-M3) sem editar
-código. Os defaults preservam exatamente o comportamento anterior: sem nenhuma env
-setada, isto embeda com text-embedding-3-large no endpoint canônico da OpenAI,
+código. Default mudou de text-embedding-3-large → -small em 2026-06-26 (custo;
+ambos 1536d, mesma coluna `vector(1536)`, troca reversível por env). Sem nenhuma
+env setada, isto embeda com text-embedding-3-small no endpoint canônico da OpenAI,
 dim 1536.
 
 Envs (todas opcionais):
     EMBEDDING_BACKEND     "openai" (default) ou "sentence_transformers" (HF in-process)
-    EMBEDDING_MODEL       nome do modelo            (default: text-embedding-3-large)
+    EMBEDDING_MODEL       nome do modelo            (default: text-embedding-3-small)
     EMBEDDING_DIMENSIONS  dimensão do vetor         (default: 1536)
     EMBEDDING_BASE_URL    endpoint OpenAI-compat    (default: canônico OpenAI)
     EMBEDDING_API_KEY     key do provider           (default: OPENAI_API_KEY)
@@ -46,7 +47,7 @@ logger = logging.getLogger(__name__)
 # Lidas no import. CLIs de eval chamam load_dotenv() antes dos imports, então as
 # envs já estão no ambiente quando este módulo carrega.
 EMBEDDING_BACKEND = os.environ.get("EMBEDDING_BACKEND", "openai").lower()
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-large")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
 EMBEDDING_DIMENSIONS = int(os.environ.get("EMBEDDING_DIMENSIONS", "1536"))
 EMBEDDING_BASE_URL = os.environ.get("EMBEDDING_BASE_URL") or None
 _BATCH_LIMIT = 2048  # OpenAI per-call input limit
