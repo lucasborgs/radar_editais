@@ -288,16 +288,26 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
     (silver vazio) → retorna [] e o caller limpa as linhas antigas, conforme
     o contrato §11.4 ("falha LLM → B não indexa").
     """
+    from core.kg import source_docs  # noqa: PLC0415
     from core.kg.edital_id import native_id_of, source_of  # noqa: PLC0415
 
     source = source_of(edital_id)
     native = native_id_of(edital_id)
 
-    adapter = get_adapter(source)
-    documents = adapter.to_documents(native)
+    # Documento Canônico DURÁVEL-primeiro (robustez contra o disco efêmero do
+    # worker — spec docs/specs/durable-source-docs.md). O disco vira só
+    # cache/fallback. Se o durável faltar mas o disco tiver o bronze (ex.: logo
+    # após scrape, ou edital pré-feature), backfilla o durável (self-healing).
+    documents = source_docs.load(edital_id)
+    if not documents:
+        adapter = get_adapter(source)
+        documents = adapter.to_documents(native)
+        if documents:
+            source_docs.save(edital_id, source, documents)
     if not documents:
         logger.warning(
-            "chunk_edital_task: adapter não retornou conteúdo p/ edital=%s",
+            "chunk_edital_task: sem conteúdo-fonte p/ edital=%s "
+            "(durável vazio e disco sem bronze — redeploy efêmero?)",
             edital_id,
         )
         return []
@@ -617,6 +627,17 @@ async def run_daily_etl_task(timestamp: int) -> None:
         logger.info("run_daily_etl_task: índice reconstruído (vigentes + histórico)")
     except Exception as e:
         logger.error("run_daily_etl_task: falha ao reconstruir índice: %s", e)
+
+    # 1b) Persiste o Documento Canônico durável (§12.3) enquanto o bronze
+    #     recém-scraped está no disco. O FS do worker é EFÊMERO: sem isto, o
+    #     próximo redeploy apaga o bronze e o chunk_edital (lazy) produz 0 chunks.
+    #     Barato (extração já é eager; sem LLM). Spec: docs/specs/durable-source-docs.md.
+    try:
+        from core.kg.source_docs import persist_all_current  # noqa: PLC0415
+        n_docs = await asyncio.to_thread(persist_all_current)
+        logger.info("run_daily_etl_task: %d documentos-fonte persistidos (durável)", n_docs)
+    except Exception as e:
+        logger.error("run_daily_etl_task: falha ao persistir documentos-fonte: %s", e)
 
     # 2) Síntese de wiki pages. O etl_process tem cache próprio por hash de
     #    (metadata + silver) — só chama o LLM para editais que mudaram, então
