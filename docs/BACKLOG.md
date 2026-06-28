@@ -11,6 +11,36 @@
 
 ## Aberto
 
+### Filtragem por público-alvo — editais fora da persona (startups) entram no radar
+
+- **O quê:** o radar ingere chamadas FINEP que **não são para o público-alvo**
+  (startups/empresas) — ex.: seleção de GESTOR de um FIP, carta convite para agentes
+  operacionais que repassam recursos, desafio não-startup. O gate de público existe
+  (`core/pme_filter.py` + elegibilidade no `core/services/hybrid_match_service.py`, que
+  cruza `publico_alvo`), mas **não tem dado para trabalhar**.
+- **Causa-raiz (evidência 2026-06-28, triage dos 5 editais `n_pdfs:0` do deploy durável):**
+  o `publico_alvo` vem **vazio (`[]`)** da API Liferay para esses tipos não-clássicos
+  (finep:613 / 972778 / 958302 / 986129) — e a canonicalização §5.5 em
+  `build_knowledge_graph._normalize_publico` derruba fragmentos fora do vocab → `[]`. Num
+  caso vem **errado** (finep:968467 taggeado `['Startups','ICTs']`, mas o edital não é para
+  startup). Filtro com input vazio/errado não exclui nada.
+- **Por que importa:** polui match/radar com oportunidades irrelevantes para a persona
+  (ruído no topo). A mesma cegueira atinge potencialmente editais que DEVERIAM entrar
+  (público vazio → o gate não consegue classificar).
+- **Por que é difícil:** o sinal não está estruturado na fonte — exige extração de
+  elegibilidade/público mais rica que a taxonomia da API. Conecta direto a
+  [[project_eligibility_constraints]] / extração v2: o produtor de `eligibility_constraints`
+  (Fase 3 do extrator) é o lugar para capturar "gestor de FIP / carta convite / não-startup".
+- **Sub-gap secundário (captura de PDF):** 4 dos 5 TÊM PDF na página, mas `extract_pdf_urls`
+  (campo `documentos` da API) retornou vazio → `n_pdfs:0`. Moot para esses (descartáveis),
+  mas a mesma falha poderia esconder PDFs de editais relevantes nesses formatos. Ponto:
+  `pipeline/extractors/finep_api.py::extract_pdf_urls`.
+- **Ponto de entrada:** `core/pme_filter.py` (gate atual) · `hybrid_match_service.py`
+  (elegibilidade) · `pipeline/build_knowledge_graph.py::_normalize_publico` (+ §5.5 vocab) ·
+  extração de elegibilidade ([[project_eligibility_constraints]]).
+- **Status:** aberto (2026-06-28). Surgiu do deploy do Documento Canônico durável; não
+  bloqueia (os 5 são descartáveis). Ver [[project_durable_source_docs]].
+
 ### Gate de eval `writing` — memória semântica (Et.5 LangGraph) vs bloco fixo
 
 - **O quê:** rodar o A/B do eval `writing` (grounding/coerência) comparando
