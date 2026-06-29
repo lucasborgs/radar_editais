@@ -577,12 +577,24 @@ class ExploreAgent:
         tools = self._explore_tools()
         system = EXPLORE_AGENT_SYSTEM
 
-        # Match cross-domínio (hipergrado): só quando há PERFIL. A tool extrai os
-        # nós da empresa do perfil (cacheado por hash) e rankeia editais por
-        # afinidade de conteúdo. Independe de workspace/db (perfil vem do request).
+        # Match cross-domínio (hipergrado): só quando há PERFIL. COM workspace
+        # autenticado, reusa os nós duráveis do hipergrado da empresa (mais ricos,
+        # sem re-extrair). SEM workspace (explore público stateless), a tool extrai
+        # os nós do perfil do request (cacheado por hash) como antes. Em ambos os
+        # casos rankeia editais por afinidade de conteúdo.
         if profile_text:
             from core.llm.agent_tools.match_tools import build_match_tools
-            tools = tools + build_match_tools(profile_text)
+            company_nodes = None
+            if workspace_id and db is not None:
+                try:
+                    from core.services.company_corpus import load_company_hypergraph
+                    record = load_company_hypergraph(db, workspace_id)
+                    if record:
+                        company_nodes = record.get("nodes") or None
+                except Exception:  # noqa: BLE001 — fallback à extração efêmera, não derruba o explore
+                    logger.debug("falha ao carregar hipergrado durável da empresa", exc_info=True)
+                    company_nodes = None
+            tools = tools + build_match_tools(profile_text, company_nodes=company_nodes)
             system = system + EXPLORE_MATCH_INSTRUCTION
 
         # Memória do ExploreAgent (Fase 3A): só com workspace autenticado + db.

@@ -43,9 +43,16 @@ def _format_matches(matches: list) -> str:
     return "\n".join(lines)
 
 
-def build_match_tools(profile_text: str) -> list[BaseTool]:
+def build_match_tools(
+    profile_text: str, *, company_nodes: list[dict] | None = None,
+) -> list[BaseTool]:
     """Tool de match para o caminho COM perfil. `profile_text` (o bloco de perfil
-    formatado) é capturado por closure — duas sessões nunca compartilham perfil."""
+    formatado) é capturado por closure — duas sessões nunca compartilham perfil.
+
+    `company_nodes` (opcional): nós-empresa já materializados. Quando vêm do
+    hipergrado durável da empresa (workspace autenticado), evitam re-extrair (poupa
+    1 LLM call) e são mais ricos que a extração efêmera one-shot do perfil. Ausente
+    (explore público stateless) → fallback para `_company_nodes(profile_text)`."""
 
     @tool
     def find_matching_editais(threshold: float = 0.55, top_k: int = 8) -> str:
@@ -64,7 +71,9 @@ def build_match_tools(profile_text: str) -> list[BaseTool]:
             top_k: máximo de editais a retornar (default 8).
         """
         try:
-            nodes = _company_nodes(profile_text)
+            # Nós duráveis do hipergrado da empresa têm prioridade; sem eles,
+            # cai na extração efêmera (1 LLM call, cacheada por hash do perfil).
+            nodes = company_nodes or _company_nodes(profile_text)
         except Exception as e:  # noqa: BLE001 — erro-como-string (padrão das tools)
             return f"Erro ao analisar o perfil: {e}."
         if not nodes:

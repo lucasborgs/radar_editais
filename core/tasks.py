@@ -176,6 +176,35 @@ async def embed_content_task(item_id: str) -> None:
     logger.info("embed_content_task: item_id=%s embedded (1536d)", item_id)
 
 
+@app.task(name="build_company_hypergraph", queue="default")
+async def build_company_hypergraph_task(workspace_id: str) -> None:
+    """(Re)constrói o hipergrado durável da empresa a partir do corpus já no DB.
+
+    Orquestra corpus → extração → completude → persistência via
+    `core.services.company_corpus.build_company_hypergraph` (Sprint 2). Essa
+    chamada é SÍncrona e bloqueia (1 LLM call + embeddings), então a envolvemos
+    em `asyncio.to_thread` para não travar o event loop do worker.
+
+    Roda contra o cliente service-role (sem request context) — a fronteira de
+    tenant é o próprio `workspace_id`. Exceções propagam para o retry/backoff
+    do procrastinate, como nas demais tasks.
+    """
+    from core.services.company_corpus import build_company_hypergraph
+
+    db = get_supabase_service()
+
+    logger.info("build_company_hypergraph_task: workspace_id=%s iniciando", workspace_id)
+    result = await asyncio.to_thread(build_company_hypergraph, db, workspace_id)
+    logger.info(
+        "build_company_hypergraph_task: workspace_id=%s concluído "
+        "(nós=%d, docs=%d, completude=%.2f)",
+        workspace_id,
+        len(result["nodes"]),
+        result["n_docs"],
+        result["completude"],
+    )
+
+
 # =============================================================================
 # Reflection (Fase 2 #17)
 # =============================================================================
