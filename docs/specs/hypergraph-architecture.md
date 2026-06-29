@@ -402,3 +402,31 @@ def completude_score(n_nos: int, n_docs: int) -> float:
 | Threshold cosine das arestas sintéticas | Threshold alto → poucos matches; baixo → ruído | Calibrar empiricamente com 10-20 pares empresa/edital anotados antes de produção |
 | Reconstrução de arestas sintéticas | Quando edital ou empresa atualiza, `synthetic_edges.json` fica stale | Invalidar e reconstruir arestas do workspace afetado; armazenar hash do hipergrado como chave de cache |
 | Investidor com poucos nós | Corpus ralo → poucas arestas sintéticas → match fraco | Enriquecer corpus (portfólio + tese) antes de incluir no grafo |
+
+---
+
+## Itens para discussão PÓS-sprints (ativar o ativo N-ário)
+
+Levantados em 2026-06-29: após as Sprints 0-1, o hipergrado é consumido só pelo
+match e só pelos **nós** — as **hiperarestas** (o diferencial do modelo N-ário)
+ainda não têm uso. Estes itens são o destino do hipergrado, mas ficam para
+**DISCUSSÃO APÓS as sprints mapeadas** — não desviam o foco de finalizar
+Sprint 1/F3 → Sprint 2 → Sprint 3.
+
+1. **Match — viabilidade de percorrer hiperarestas nativas.** Hoje
+   `find_matching_editais` casa por cosseno de tema e agrupa por `file_key`
+   (proveniência), ignorando as `edges`. Discutir: **viabilidade e dificuldade**
+   de percorrer as hiperarestas nativas (`exige`, `aplica_em`, `viabiliza`…) para
+   uma justificativa estrutural ("este edital `exige` TRL 6", "Tecnologia X
+   `aplica_em` Aplicação Y") em vez de só "casou por tema". Avaliar
+   custo/complexidade vs. ganho de explicabilidade.
+
+2. **WritingSession — ensemble hipergrado × RAG.** A spec mantém o Writing no RAG
+   (§ fluxo). Discutir um **ensemble**, não substituição: o **hipergrafo garante a
+   CONEXÃO** (estrutura — requisitos, exclusões, parcerias, relações
+   tema/tecnologia/aplicação) e o **RAG garante a EXATIDÃO** (texto literal do
+   edital). Como combinar as duas fontes no contexto do agente de escrita sem
+   redundância nem conflito?
+
+Ambos pressupõem Sprints 0-3 concluídas (extração + match + ExploreAgent lendo o
+grafo direto). Ver a memória do projeto sobre hiperarestas subaproveitadas.
