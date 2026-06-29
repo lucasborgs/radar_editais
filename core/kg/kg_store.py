@@ -235,6 +235,80 @@ def save_wiki_pages(pages: dict[str, dict]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Hypergraphs (subgrafo N-ário por edital — Hyper-Extract)
+# ---------------------------------------------------------------------------
+# Paralelo EXATO das wiki pages acima, mesmo motivo: em modo file são arquivos
+# POR-EDITAL (KNOWLEDGE_GRAPH_DIR/hypergraphs/{file_key}.json, file_key =
+# "{source}__{native}"), mas o FS do worker no Railway é EFÊMERO — todo redeploy
+# perderia os subgrafos. Em postgres vivem num único blob kg_artifacts
+# key='hypergraphs' = {file_key: {source_hash, nodes, edges}}, durável.
+_HYPERGRAPH_KEY = "hypergraphs"
+_HYPERGRAPHS_DIR = KNOWLEDGE_GRAPH_DIR / "hypergraphs"
+
+
+def _load_hypergraph_blob_pg() -> dict:
+    """Blob {file_key: hypergraph} do Postgres, cacheado (TTL). {} se ausente."""
+    now = time.monotonic()
+    with _lock:
+        cached = _pg_cache.get(_HYPERGRAPH_KEY)
+        if cached is not None and (now - cached[0]) < _PG_TTL:
+            return cached[1]
+    try:
+        from core.db import get_supabase_service
+        resp = (
+            get_supabase_service()
+            .table(_TABLE).select("blob").eq("key", _HYPERGRAPH_KEY).limit(1).execute()
+        )
+    except Exception as e:
+        logger.warning("kg_store[postgres]: falha ao ler blob hypergraphs: %s", e)
+        return {}
+    rows = resp.data or []
+    blob = rows[0]["blob"] if rows else {}
+    with _lock:
+        _pg_cache[_HYPERGRAPH_KEY] = (now, blob)
+    return blob
+
+
+def load_hypergraph(file_key: str) -> dict | None:
+    """Hypergraph (subgrafo N-ário) de um edital — None se ausente.
+
+    postgres → do blob `hypergraphs`; file → arquivo por-edital. Em postgres, se
+    faltar no blob, cai pro arquivo (cobre transição/dev). Retorna o dict
+    {source_hash, nodes, edges}. Single source para os consumidores no request-path.
+    """
+    if os.getenv("KG_STORE_BACKEND", "file").lower() == "postgres":
+        graph = _load_hypergraph_blob_pg().get(file_key)
+        if graph is not None:
+            return graph
+    path = _HYPERGRAPHS_DIR / f"{file_key}.json"
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.warning("kg_store: falha ao ler hypergraph %s: %s", file_key, e)
+    return None
+
+
+def save_hypergraphs(graphs: dict[str, dict]) -> None:
+    """MERGE de {file_key: hypergraph} no blob `hypergraphs` do Postgres (se configurado).
+
+    Os arquivos por-edital são escritos pelo produtor (Hyper-Extract); aqui só
+    persistimos o blob durável p/ prod. MERGE (não substitui) para que runs
+    parciais não apaguem os demais subgrafos. No-op sem Supabase (modo file puro).
+    """
+    if not graphs or not _pg_configured():
+        return
+    from core.db import get_supabase_service
+    merged = {**_load_hypergraph_blob_pg(), **graphs}
+    get_supabase_service().table(_TABLE).upsert(
+        {"key": _HYPERGRAPH_KEY, "blob": merged}, on_conflict="key"
+    ).execute()
+    with _lock:
+        _pg_cache[_HYPERGRAPH_KEY] = (time.monotonic(), merged)
+    logger.info("kg_store: %d hypergraphs publicados (blob total=%d)", len(graphs), len(merged))
+
+
+# ---------------------------------------------------------------------------
 # Escrita (ETL)
 # ---------------------------------------------------------------------------
 
