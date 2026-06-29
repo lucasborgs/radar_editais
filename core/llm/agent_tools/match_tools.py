@@ -48,7 +48,7 @@ def build_match_tools(profile_text: str) -> list[BaseTool]:
     formatado) é capturado por closure — duas sessões nunca compartilham perfil."""
 
     @tool
-    def find_matching_editais(threshold: float = 0.6, top_k: int = 8) -> str:
+    def find_matching_editais(threshold: float = 0.55, top_k: int = 8) -> str:
         """Encontra editais que casam com o PERFIL DA EMPRESA por afinidade de
         conteúdo (tema/tecnologia/aplicação) no hipergrado — match cross-domínio.
 

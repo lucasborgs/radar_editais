@@ -29,10 +29,16 @@ logger = logging.getLogger(__name__)
 # dos textos. Evita re-embeddar 4.6k nós a cada match/iteração de threshold.
 _EMB_CACHE = HYPERGRAPHS_DIR.parent / "graph" / "ecosystem_embeddings.npz"
 
-# Threshold do cosseno p/ materializar uma aresta sintética. PROVISÓRIO: 0.60 vem
-# do teste iFlorestal (matches de conteúdo vivem em ~0.55-0.73; 0.80 era calibrado
-# p/ o ruído estrutural removido). Calibrar formalmente com 10-20 pares anotados.
-SYNTHETIC_EDGE_THRESHOLD = 0.60
+# Threshold do cosseno p/ materializar uma aresta sintética. Calibrado contra o
+# golden de afinidade (eval_data/golden/matching.json, suíte `matching`): recall@8 é
+# plano de 0.45 a 0.60 (os positivos vivem em ~0.65-0.74), então o threshold é só um
+# corte de cauda. 0.55 deixa mais arestas p/ o marginsum agregar (ver abaixo).
+SYNTHETIC_EDGE_THRESHOLD = 0.55
+
+# Piso no score AGREGADO (marginsum) p/ um edital entrar no resultado. Editais que
+# casam só por uma aresta fraca de boilerplate ficam abaixo e somem (corta ruído sem
+# matar recall: golden recall@8=0.88 estável até 0.30, despenca em 0.40).
+MIN_AGGREGATE_SCORE = 0.30
 
 # Tipos que contam como AFINIDADE (sinal de match cross-domínio). Mecanismo e
 # Requisito ficam de FORA de propósito: são estruturais (todo edital tem
@@ -161,13 +167,14 @@ def build_synthetic_edges(
 @dataclass
 class EditalMatch:
     """Um edital que casa com a empresa, com as arestas-justificativa e as
-    propriedades de display (do nó Edital). Sem score sintético — só o cosseno."""
+    propriedades de display (do nó Edital)."""
 
     file_key: str          # finep__589
     source: str            # finep
     edital_id: str         # 589 (nativo)
     name: str              # título da chamada
-    score: float           # melhor afinidade (max cosseno entre as arestas)
+    score: float           # melhor afinidade (max cosseno entre as arestas) — display
+    affinity: float        # score agregado (marginsum) — a chave de RANKING
     n_paths: int           # nº de arestas de conteúdo que conectam
     prazo: str | None
     status: str | None
@@ -179,16 +186,22 @@ def find_matching_editais(
     company_nodes: list[dict],
     *,
     threshold: float = SYNTHETIC_EDGE_THRESHOLD,
+    min_aggregate: float = MIN_AGGREGATE_SCORE,
     top_k: int = 10,
     max_paths: int = 5,
     ecosystem: list[tuple[str, dict]] | None = None,
 ) -> list[EditalMatch]:
     """Match por PATH SEARCH: empresa → aresta sintética → Edital.
 
-    Agrupa as arestas sintéticas por edital de origem, rankeia por melhor afinidade
-    (max cosseno) e anexa as arestas como justificativa nativa + as props de display
-    do nó Edital. Catálogos (ICT/inv/prog) ficam fora (não têm '__' no file_key) —
-    são oferta-entidade, não chamada. Sem LLM, sem score sintético."""
+    Agrupa as arestas sintéticas por edital e rankeia por EVIDÊNCIA AGREGADA, não pela
+    melhor aresta: `affinity = Σ(cosseno − threshold)` sobre as arestas (marginsum). Um
+    edital tematicamente DENSO (várias afinidades reais) vence o spike único de um nó
+    boilerplate genérico — o max-cosseno deixava «defesa»↔«PROPOSTA»=0.71 soterrar o
+    match real. Editais abaixo de `min_aggregate` somem (corta ruído sem matar recall).
+    Calibrado na suíte `matching`: recall@8 0.80→0.88, ruído 4.2→3.6. Sem LLM.
+
+    Catálogos (ICT/inv/prog) ficam fora (não têm '__' no file_key) — são oferta-
+    entidade, não chamada."""
     eco = ecosystem if ecosystem is not None else load_ecosystem_nodes()
     edges = build_synthetic_edges(company_nodes, threshold=threshold, ecosystem=eco)
     edital_node = {fk: n for fk, n in eco if n.get("type") == "Edital"}
@@ -201,16 +214,20 @@ def find_matching_editais(
     matches: list[EditalMatch] = []
     for fk, es in by_file.items():
         es.sort(key=lambda x: x.score, reverse=True)
+        affinity = sum(e.score - threshold for e in es)  # marginsum
+        if affinity < min_aggregate:
+            continue
         node = edital_node[fk]
         source, _, native = fk.partition("__")
         matches.append(
             EditalMatch(
                 file_key=fk, source=source, edital_id=native,
-                name=node.get("name", ""), score=es[0].score, n_paths=len(es),
-                prazo=node.get("prazo"), status=node.get("status"), valor=node.get("valor"),
-                paths=es[:max_paths],
+                name=node.get("name", ""), score=es[0].score, affinity=affinity,
+                n_paths=len(es), prazo=node.get("prazo"), status=node.get("status"),
+                valor=node.get("valor"), paths=es[:max_paths],
             )
         )
-    matches.sort(key=lambda m: m.score, reverse=True)
-    logger.info("find_matching_editais: %d editais (threshold=%.2f)", len(matches), threshold)
+    matches.sort(key=lambda m: m.affinity, reverse=True)
+    logger.info("find_matching_editais: %d editais (threshold=%.2f, min_agg=%.2f)",
+                len(matches), threshold, min_aggregate)
     return matches[:top_k]
