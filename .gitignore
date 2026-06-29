@@ -71,3 +71,8 @@ supabase/.temp/
 *.bak
 data/knowledge_graph/.discovery_ledger.json
 .eligibility_cache.json
+
+# Hipergrado — artefatos derivados (durabilidade via kg_store/PG, não git)
+data/knowledge_graph/hypergraphs/
+data/knowledge_graph/graph/
+data/hyper_extract_output*/

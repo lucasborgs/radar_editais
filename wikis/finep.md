@@ -79,7 +79,8 @@ skip_keywords:
   - apresentacao
   - resultado
   - oficio
-  - telas_fap
+  - telas
+  - guia
   - orientacoes_para_apresentacao
   - orientacoes_para_despesas
   - relatorio_parcial
@@ -88,6 +89,8 @@ skip_keywords:
 ```
 
 > **`agravo`** descarta peças judiciais (ex.: `Decisão_TRF1_-Agravo_de_instrumento.pdf`) que o portal anexa à chamada — conteúdo não-normativo e ruído no RAG. `faq` e `tabela_com_requisitos` foram REMOVIDOS da lista: medição com golden de proveniência independente (NotebookLM, 2026-06-15) mostrou que o FAQ oficial é o alvo de retrieval mais alinhado a perguntas de fundador (estilo P&R), e descartá-lo derrubava o recall. A skip-list filtra o **não-normativo-e-inútil**, não o **não-normativo-mas-útil-pra-RAG**.
+>
+> **`telas`/`guia`** descartam screenshots do sistema FAP (`Telas_do_FAP.pdf`) e guias de preenchimento (`Guia_Rápido.pdf`) — auxiliares de UI, não-normativos. **Forma de escrita:** keywords são substring **sem acento e sem gap de token** — `telas` (não `telas_fap`, que não casa `Telas_do_FAP`) e termos sem acento (o filename é acentuado; o match no adapter é exato e não-dobrado, então `declaracao` só pega `Declaração` se o consumidor dobrar acento — ver `core/retrieval/hyper_extractor._deaccent`).
 
 ---
 
