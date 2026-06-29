@@ -80,6 +80,17 @@ MEMÓRIA ENTRE SESSÕES (log_exploration_decision)
 - Registre só decisões com base — não logue cada edital citado de passagem.
 - Revisitar o mesmo edital atualiza a decisão (a última prevalece); pode rechamar."""
 
+
+EXPLORE_MATCH_INSTRUCTION = """
+
+MATCH COM O PERFIL (find_matching_editais)
+- Este usuário TEM perfil preenchido. Quando ele pedir oportunidades para a
+  empresa ("quais editais servem para mim?", "o que tem para a gente?"), ou logo
+  ao abrir uma conversa com perfil, chame find_matching_editais e apresente os
+  editais com a justificativa de cada match (o que da empresa casou com o quê).
+- É afinidade temática (conteúdo), NÃO elegibilidade dura: apresente como ponto de
+  partida e deixe a decisão com o usuário. Use get_edital para aprofundar um match."""
+
 EXPLORE_AGENT_SYSTEM = """Você é o assistente do Radar de Editais, uma plataforma que conecta empresas
 a oportunidades de fomento e parceria no Brasil. O grafo de conhecimento cobre
 QUATRO dimensões: editais/desafios/programas (eventos de fomento), ICTs
@@ -428,6 +439,7 @@ class ExploreAgent:
         node_id: str | None = None,
         node_type: str | None = None,
         has_profile: bool = False,
+        profile_text: str | None = None,
         workspace_id: str | None = None,
         db=None,
     ) -> str:
@@ -452,7 +464,7 @@ class ExploreAgent:
 
         return self._explore_agent(
             message, history, edital_ids, node_id, node_type,
-            workspace_id=workspace_id, db=db,
+            profile_text=profile_text, workspace_id=workspace_id, db=db,
         )
 
     def _build_legacy_messages(
@@ -539,6 +551,7 @@ class ExploreAgent:
         edital_ids: list[str] | None,
         node_id: str | None,
         node_type: str | None,
+        profile_text: str | None = None,
         workspace_id: str | None = None,
         db=None,
     ) -> str:
@@ -562,18 +575,26 @@ class ExploreAgent:
         messages.append({"role": "user", "content": message})
 
         tools = self._explore_tools()
+        system = EXPLORE_AGENT_SYSTEM
+
+        # Match cross-domínio (hipergrado): só quando há PERFIL. A tool extrai os
+        # nós da empresa do perfil (cacheado por hash) e rankeia editais por
+        # afinidade de conteúdo. Independe de workspace/db (perfil vem do request).
+        if profile_text:
+            from core.llm.agent_tools.match_tools import build_match_tools
+            tools = tools + build_match_tools(profile_text)
+            system = system + EXPLORE_MATCH_INSTRUCTION
 
         # Memória do ExploreAgent (Fase 3A): só com workspace autenticado + db.
         # O bloco de decisões vai no SYSTEM (prefixo estável, antes do histórico
         # da conversa — D6); a tool de escrita é registrada junto.
-        system = EXPLORE_AGENT_SYSTEM
         if db is not None and workspace_id:
             from core.llm.agent_tools.explore_tools import (
                 build_exploration_log_tools,
                 load_recent_exploration_decisions,
             )
             tools = tools + build_exploration_log_tools(db, workspace_id)
-            system = EXPLORE_AGENT_SYSTEM + EXPLORE_LOG_INSTRUCTION
+            system = system + EXPLORE_LOG_INSTRUCTION
             prior = load_recent_exploration_decisions(db, workspace_id)
             if prior:
                 system = f"{system}\n\n{prior}"

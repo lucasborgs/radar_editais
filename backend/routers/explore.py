@@ -115,6 +115,7 @@ def explore(
     answer = explore_agent.explore(
         explore_message, req.history, req.edital_ids, req.node_id,
         req.node_type, has_profile=req.profile is not None,
+        profile_text=ctx or None,
     )
 
     result = {"answer": answer}
