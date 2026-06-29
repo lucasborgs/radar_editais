@@ -16,7 +16,7 @@ import os
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import List, Literal
+from typing import Literal
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -40,11 +40,11 @@ EDITAL_DIRS = [
 
 def load_silver(path: Path, max_chars: int = MAX_CHARS) -> tuple[str, str]:
     """Reconstrói (nome, texto) de um arquivo silver JSONL."""
-    lines = [json.loads(l) for l in open(path) if l.strip()]
+    lines = [json.loads(ln) for ln in open(path) if ln.strip()]
     if not lines:
         return path.stem, ""
     name = lines[0].get("doc", path.stem)
-    text = "\n".join(l["text"] for l in lines if l.get("text", "").strip())
+    text = "\n".join(ln["text"] for ln in lines if ln.get("text", "").strip())
     return name, text[:max_chars]
 
 
@@ -154,7 +154,7 @@ class HyperEdge(BaseModel):
             "aplica_para, seleciona_via, vigencia_em, parceria_com, destina_a"
         )
     )
-    members: List[str] = Field(
+    members: list[str] = Field(
         description="Nomes de todas as entidades participantes desta relação (mínimo 2)"
     )
     description: str = Field(description="Descrição da relação hypergráfica")
@@ -311,13 +311,13 @@ def main():
 
     if nodes:
         type_counts = Counter(getattr(n, "type", "?") for n in nodes)
-        print(f"\nTipos de nó:")
+        print("\nTipos de nó:")
         for t, c in type_counts.most_common():
             print(f"  {t:15s} {c:3d}")
 
     if edges:
         edge_counts = Counter(getattr(e, "type", "?") for e in edges)
-        print(f"\nTipos de aresta:")
+        print("\nTipos de aresta:")
         for t, c in edge_counts.most_common():
             print(f"  {t:20s} {c:3d}")
 

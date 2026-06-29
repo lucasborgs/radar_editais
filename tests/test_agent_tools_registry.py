@@ -20,6 +20,11 @@ INTERNAL_ALLOWLIST: dict[str, str] = {
     # consumido só por run_critic dentro de critic_agent.py — não é um toolset
     # público anexável a um agente, então fica fora de __all__.
     "build_critic_tools": "uso interno de run_critic (critic_agent.py)",
+    # Tool de match do hipergrado: lazy-importada por explore_agent SÓ quando há
+    # perfil (evita carregar hypergraph_match/numpy no import do pacote) e tem
+    # assinatura própria (profile_text, *, company_nodes). 1 consumidor — fica fora
+    # de __all__ de propósito, como build_critic_tools.
+    "build_match_tools": "lazy-import de explore_agent (custo de import); assinatura própria",
 }
 
 
