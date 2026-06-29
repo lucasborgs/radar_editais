@@ -2,6 +2,29 @@
 
 Status: **aprovada** · 2026-06-28 · escopo: substituir match por schema fixo por match baseado em hipergrafos N-ários extraídos via Hyper-Extract; eliminar wiki_pages e todo o pipeline ETL de síntese LLM; match como tool do ExploreAgent via path search puro
 
+> **Atualização pós-implementação (2026-06-29):** Sprints 0, 1 (F1+F2+F3) e 2 (backend mínimo) implementados (PR #47). A implementação **divergiu da spec em pontos-chave** — ver a seção [Previsto → Realizado](#previsto--realizado) abaixo. O texto original abaixo dela é o **plano**; a seção registra o que de fato foi feito e por quê.
+
+---
+
+## Previsto → Realizado
+
+Registro das divergências entre o plano e a implementação, com justificativa. As linhas marcadas **PENDENTE** continuam como planejado (ainda não feitas).
+
+| Área | Previsto (plano) | Realizado | Por quê divergiu |
+|---|---|---|---|
+| **Ranking do match** | path search empresa→aresta→edital, ordenado pela melhor aresta; threshold 0.80 → 0.60 | **marginsum**: `affinity = Σ(cosseno − threshold)` sobre as arestas do edital + piso `min_aggregate`; threshold de aresta **0.55** | O gate F3 mostrou que rankear pela MELHOR aresta deixa nós **boilerplate** do eco («PROPOSTA»/«prototipagem») soterrarem o match temático real (empresa de IA não achava editais de IA). Agregar evidência (somar margens) faz o edital tematicamente denso vencer o spike único. recall@8 **0.80→0.88**, ruído controle 6→3. |
+| **Especificidade (IDF)** | "peso por especificidade (IDF)" como mitigação dos temas amplos | **IDF testado e REPROVADO**; o problema foi resolvido pelo marginsum | No corpus de 32 editais a document-frequency não separa: «PROPOSTA» (idf 1.10) ≈ «Aprendizado de Máquina» (1.01) — boilerplate é parafraseado diferente por edital, não acumula df. IDF-weight até **piorou** o recall (0.80→0.70). Mean-centering = só reescala. |
+| **Afinidade vs elegibilidade** | o subgrafo passado ao agente inclui `Requisito`/`Exclusão`; o agente raciocina elegibilidade JUNTO com ressonância, sem estágio separado | o match usa **só** `Tema`/`Tecnologia`/`Aplicação` (`AFFINITY_TYPES`); elegibilidade dura é **2ª camada SEPARADA**, no [backlog](../BACKLOG.md) | `Mecanismo`/`Requisito` casam com cosseno altíssimo (estrutural — todo edital tem «subvenção»/«TRL») e afogam o sinal de conteúdo. Elegibilidade dura (TRL/porte/região/exclusão) mora nas **hiperarestas nativas**, não nos nós — é filtro, não afinidade. Ler as arestas não melhora o ranking de afinidade; é capacidade nova (obj 1 pós-sprints). |
+| **Embeddings/arestas do eco** | embed por nó em build-time; `rebuild_synthetic_edges → graph/synthetic_edges.json` persistido | cosseno numpy **on-demand**; embeddings do eco cacheados em `graph/ecosystem_embeddings.npz` (hash dos textos); **sem** `synthetic_edges.json` | Sem FAISS (contorna o finding do `_CanonicalEmbeddings`). As arestas sintéticas são efêmeras/recomputáveis (mudam com threshold e com o perfil) — persistir não compensa; cachear os embeddings do eco já torna iterar grátis. |
+| **Storage do eco** | grafo no kg_store/Postgres | `load_ecosystem_nodes()` lê do **disco** (`HYPERGRAPHS_DIR`) | **PENDENTE** — migrar p/ kg_store (disco do Railway é efêmero). Débito conhecido. |
+| **Gate / golden** | "calibrar threshold com 10-20 pares anotados" | golden de **afinidade** (`eval_data/golden/matching.json`): 8 empresas sintéticas × editais relevantes (juiz LLM independente + curadoria humana), guarda-chuva = neutro, **nós congelados** (`frozen_nodes`) → gate determinístico, sem LLM de extração | O golden mede AFINIDADE (não elegibilidade, que é camada à parte). Congelar os nós isola o MOTOR da variância de extração (a extração tem suíte própria). Suíte `matching` em `core/eval` (regra: não criar harness paralelo). |
+| **Company corpus (Sprint 2)** | task re-scrapeia o site + parseia documentos | **mínimo**: corpus = só o que já está no DB (`workspaces.profile` + `content_items`), **sem** re-scrape | Fatia escolhida ("durable backend mínimo"). Re-scrape do site + banner de UI são fatias adicionais (não neste PR). |
+| **Storage lado-empresa** | (implícito no kg_store) | módulo dedicado `core/services/company_corpus.py` + tabela `company_hypergraphs` | Dado **per-tenant** (vizinho de `content_library`, com RLS), não ecossistema-global — não pertence ao kg_store. |
+| **Remoção do legado** | Sprint 1/3 removem `hybrid_match_service`, `radar_service`, `GraphService`, `wiki_schema`, `index.json`, `search_edital_trechos` | **NÃO removidos** | **PENDENTE/arriscado** — ainda wirados em produção (`routers/matching.py`, `routers/graph.py`, `explore_agent`, `frontend/api.ts`). Remover cru quebra a prod; exige migrar frontend/endpoints para o match novo antes. Sprint 3 adiada. |
+| **`get_node_neighborhood`** | tool da Sprint 3 (ExploreAgent lê `hypergraphs/{id}.json` direto) | **PENDENTE** (Sprint 3, parte aditiva — segura) | Adiada com a Sprint 3. |
+
+**Mantido conforme o plano:** schema Hyper-Extract de produção (12 nós / 10 arestas, `Aplicação` central); `find_matching_editais` como tool do ExploreAgent com chamada automática quando há perfil; nós da empresa pelo MESMO extractor/embedder do eco (canvas único); `completude_score` (fórmula da spec); Obsidian só visualização.
+
 ---
 
 ## Motivação
