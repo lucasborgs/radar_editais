@@ -543,6 +543,40 @@ def _insert_chunks_psycopg(rows: list[dict]) -> None:
 # Para ativar mais fontes: implemente um BaseScraper concreto e registre em SCRAPER_REGISTRY.
 
 
+def _build_all_silver() -> int:
+    """Materializa o silver (structurer) de todos os editais vigentes, durable-first.
+
+    Passo EXPLÍCITO do pipeline. Antes o silver nascia como EFEITO COLATERAL do
+    etl_process (síntese de wiki) — que a migração hipergrado vai remover. Aqui o
+    silver vira dependência própria do hipergrado E do RAG, não da wiki. Sem LLM.
+    Enumera pelo índice (como persist_all_current); tolerante a falha por-edital.
+    """
+    from core.kg import kg_store, source_docs  # noqa: PLC0415
+    from core.kg.edital_id import native_id_of, source_of  # noqa: PLC0415
+    from pipeline.adapters.base import get_adapter  # noqa: PLC0415
+
+    # NOTA: enumera via índice (kg_store.load_index) — um de ~10 consumidores
+    # (persist_all_current, hybrid_match_service, explore_agent, opportunity_discovery,
+    # eval/matching…). Quando a migração hipergrado remover o índice + build_knowledge_graph,
+    # a enumeração de TODOS migra p/ bronze juntos (refactor coordenado). NÃO decouplar
+    # só este consumidor — seria divergir do resto e inventar infra que ainda não existe.
+    editais = kg_store.load_index().get("editais", [])
+    n = 0
+    for e in editais:
+        eid = e.get("id")
+        if not eid:
+            continue
+        try:
+            source = source_of(eid)
+            native = native_id_of(eid)
+            docs = source_docs.load(eid) or get_adapter(source).to_documents(native)
+            if docs and build_or_load_structured_doc(source, native, docs):
+                n += 1
+        except Exception:
+            logger.warning("_build_all_silver: falha em %s", eid, exc_info=True)
+    return n
+
+
 @app.periodic(cron="0 3 * * *")
 @app.task(name="run_daily_etl", queue="etl")
 async def run_daily_etl_task(timestamp: int) -> None:
@@ -638,6 +672,31 @@ async def run_daily_etl_task(timestamp: int) -> None:
         logger.info("run_daily_etl_task: %d documentos-fonte persistidos (durável)", n_docs)
     except Exception as e:
         logger.error("run_daily_etl_task: falha ao persistir documentos-fonte: %s", e)
+
+    # 1c) Silver EXPLÍCITO: materializa data/silver/structured_docs/*.jsonl de
+    #     todos os editais vigentes (structurer, durable-first). Antes isto era
+    #     EFEITO COLATERAL do etl_process (síntese de wiki) — que a migração
+    #     hipergrado remove. Passo próprio aqui DESACOPLA o silver da wiki:
+    #     hipergrado (1d) e RAG dependem do silver, não da wiki. Sem LLM.
+    try:
+        n_silver = await asyncio.to_thread(_build_all_silver)
+        logger.info("run_daily_etl_task: silver materializado p/ %d editais", n_silver)
+    except Exception as e:
+        logger.error("run_daily_etl_task: falha ao materializar silver: %s", e)
+
+    # 1d) Hipergrado por edital + catálogos (arquitetura hipergrado, Sprint 0).
+    #     Depende do silver de 1c — NÃO da wiki. Roda EM PARALELO à wiki (nada
+    #     removido ainda). Skip por hash: só re-extrai o que mudou. Precisa de
+    #     OPENAI_API_KEY.
+    if os.getenv("OPENAI_API_KEY"):
+        try:
+            from core.retrieval.hyper_extractor import build_all_hypergraphs  # noqa: PLC0415
+            counts = await asyncio.to_thread(build_all_hypergraphs)
+            logger.info("run_daily_etl_task: hipergrado — %s", counts)
+        except Exception as e:
+            logger.error("run_daily_etl_task: falha ao construir hipergrado: %s", e)
+    else:
+        logger.warning("run_daily_etl_task: sem OPENAI_API_KEY — hipergrado pulado")
 
     # 2) Síntese de wiki pages. O etl_process tem cache próprio por hash de
     #    (metadata + silver) — só chama o LLM para editais que mudaram, então

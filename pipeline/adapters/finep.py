@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # Esta constante é só FALLBACK defensivo se o doc estiver ausente/ilegível.
 _SKIP_KEYWORDS_FALLBACK = [
     "minuta", "declaracao", "carta_de_manifestacao",
-    "apresentacao", "resultado", "oficio", "telas_fap",
+    "apresentacao", "resultado", "oficio", "telas", "guia",
     "orientacoes_para_apresentacao",
     "orientacoes_para_despesas", "relatorio_parcial", "ebook", "agravo",
 ]
