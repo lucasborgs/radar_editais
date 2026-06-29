@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 
 import numpy as np
@@ -155,3 +156,61 @@ def build_synthetic_edges(
         len(edges), threshold, sorted(affinity_types) or "todos", len(company_nodes), len(eco),
     )
     return edges
+
+
+@dataclass
+class EditalMatch:
+    """Um edital que casa com a empresa, com as arestas-justificativa e as
+    propriedades de display (do nó Edital). Sem score sintético — só o cosseno."""
+
+    file_key: str          # finep__589
+    source: str            # finep
+    edital_id: str         # 589 (nativo)
+    name: str              # título da chamada
+    score: float           # melhor afinidade (max cosseno entre as arestas)
+    n_paths: int           # nº de arestas de conteúdo que conectam
+    prazo: str | None
+    status: str | None
+    valor: str | None
+    paths: list[SyntheticEdge]  # arestas-justificativa, ordenadas por score desc
+
+
+def find_matching_editais(
+    company_nodes: list[dict],
+    *,
+    threshold: float = SYNTHETIC_EDGE_THRESHOLD,
+    top_k: int = 10,
+    max_paths: int = 5,
+    ecosystem: list[tuple[str, dict]] | None = None,
+) -> list[EditalMatch]:
+    """Match por PATH SEARCH: empresa → aresta sintética → Edital.
+
+    Agrupa as arestas sintéticas por edital de origem, rankeia por melhor afinidade
+    (max cosseno) e anexa as arestas como justificativa nativa + as props de display
+    do nó Edital. Catálogos (ICT/inv/prog) ficam fora (não têm '__' no file_key) —
+    são oferta-entidade, não chamada. Sem LLM, sem score sintético."""
+    eco = ecosystem if ecosystem is not None else load_ecosystem_nodes()
+    edges = build_synthetic_edges(company_nodes, threshold=threshold, ecosystem=eco)
+    edital_node = {fk: n for fk, n in eco if n.get("type") == "Edital"}
+
+    by_file: dict[str, list[SyntheticEdge]] = defaultdict(list)
+    for e in edges:
+        if "__" in e.file_key and e.file_key in edital_node:
+            by_file[e.file_key].append(e)
+
+    matches: list[EditalMatch] = []
+    for fk, es in by_file.items():
+        es.sort(key=lambda x: x.score, reverse=True)
+        node = edital_node[fk]
+        source, _, native = fk.partition("__")
+        matches.append(
+            EditalMatch(
+                file_key=fk, source=source, edital_id=native,
+                name=node.get("name", ""), score=es[0].score, n_paths=len(es),
+                prazo=node.get("prazo"), status=node.get("status"), valor=node.get("valor"),
+                paths=es[:max_paths],
+            )
+        )
+    matches.sort(key=lambda m: m.score, reverse=True)
+    logger.info("find_matching_editais: %d editais (threshold=%.2f)", len(matches), threshold)
+    return matches[:top_k]
