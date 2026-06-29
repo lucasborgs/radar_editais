@@ -1,0 +1,701 @@
+{
+  "_criterion": "Afinidade de CONTEÚDO (Tema/Tecnologia/Aplicação batem). Elegibilidade dura (mecanismo/região/porte/TRL) é camada SEPARADA, fora deste golden. Ver core/services/hypergraph_match.py (AFFINITY_TYPES).",
+  "_how_built": "8 perfis sintéticos spanning o corpus (30 editais). Candidatos por juiz LLM independente (1 call/empresa, cards no prompt), curados à mão. Guarda-chuva (editais que listam muitos setores) = neutro: não conta como acerto nem como ruído.",
+  "neutral": [
+    "finep__612",
+    "finep__745",
+    "finep__768",
+    "finep__776"
+  ],
+  "profiles": {
+    "iflorestal": {
+      "nome": "iFlorestal Tecnologia",
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "ME",
+      "capital_social": 200000,
+      "trl": 5,
+      "one_liner": "Plataforma de monitoramento florestal por sensoriamento remoto e IA para rastreabilidade de cadeias produtivas da bioeconomia.",
+      "solution_summary": "Combina imagens de satélite, dados de campo e modelos de visão computacional para detectar desmatamento, estimar biomassa e certificar origem de produtos florestais não-madeireiros.",
+      "descricao_atividades": "Desenvolvimento de software de geoprocessamento e IA aplicada à bioeconomia, manejo florestal sustentável e rastreabilidade de cadeias produtivas sustentáveis."
+    },
+    "fintech_saas": {
+      "nome": "PagAgil",
+      "tipo_entidade": "startup",
+      "tamanho_empresa": "ME",
+      "trl": 7,
+      "one_liner": "Gateway de pagamentos e conciliação financeira para e-commerce.",
+      "solution_summary": "Infraestrutura de pagamentos com antifraude por machine learning.",
+      "descricao_atividades": "Software financeiro B2B; integração com adquirentes e bancos.",
+      "tipos_financiamento_interesse": [
+        "credito_reembolsavel"
+      ]
+    },
+    "ia_digital_mg": {
+      "nome": "NeuralMinas Tecnologia",
+      "tipo_entidade": "startup",
+      "tamanho_empresa": "ME",
+      "uf": "MG",
+      "trl": 4,
+      "one_liner": "Plataforma de IA generativa e conectividade para indústria 4.0.",
+      "solution_summary": "Modelos de IA aplicada e tecnologias digitais para automação industrial e análise de dados em tempo real; infraestrutura de software e modelos nacionais.",
+      "descricao_atividades": "Desenvolvimento de software de inteligência artificial e tecnologias digitais; soluções de conectividade para chão de fábrica em Minas Gerais."
+    },
+    "biofarma_saude": {
+      "nome": "BioSano Biotecnologia",
+      "tipo_entidade": "startup",
+      "tamanho_empresa": "ME",
+      "trl": 4,
+      "one_liner": "Biotecnologia para desenvolvimento de insumos farmacêuticos ativos (IFAs) e biofármacos para o SUS.",
+      "solution_summary": "Plataforma de bioprocessos para produção de fármacos e insumos farmacêuticos ativos nacionais, reduzindo dependência de importação no complexo econômico-industrial da saúde.",
+      "descricao_atividades": "Pesquisa e desenvolvimento em biotecnologia aplicada à saúde humana, biofármacos, IFAs e ecossistema de inovação em saúde ligado ao SUS."
+    },
+    "agritech_maquinas": {
+      "nome": "AgroMaq Sistemas",
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "EPP",
+      "trl": 6,
+      "one_liner": "Máquinas e equipamentos agrícolas de baixo custo para agricultura familiar.",
+      "solution_summary": "Tratores e implementos autopropelidos com automação embarcada e pacote tecnológico de baixo custo voltado ao pequeno produtor rural e a sistemas agroalimentares sustentáveis.",
+      "descricao_atividades": "Fabricação de máquinas e equipamentos agrícolas, mecanização para agricultura familiar e cadeias socioprodutivas."
+    },
+    "energia_hidrogenio": {
+      "nome": "HidroVerde Energia",
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "EPP",
+      "trl": 5,
+      "one_liner": "Hidrogênio de baixa emissão e armazenamento de energia para a transição energética.",
+      "solution_summary": "Eletrolisadores e sistemas de armazenamento de energia para geração de eletricidade de baixo carbono, hidrogênio verde e eletromobilidade.",
+      "descricao_atividades": "Desenvolvimento de tecnologias de energia renovável, armazenamento, hidrogênio de baixa emissão e descarbonização industrial."
+    },
+    "semicondutores": {
+      "nome": "SiliconBR Microeletrônica",
+      "tipo_entidade": "startup",
+      "tamanho_empresa": "ME",
+      "trl": 3,
+      "one_liner": "Design e fabricação de semicondutores e circuitos integrados nacionais.",
+      "solution_summary": "Projeto (design) de semicondutores, encapsulamento e fabricação front-end de circuitos integrados para a indústria de microeletrônica brasileira.",
+      "descricao_atividades": "Pesquisa e desenvolvimento em design de semicondutores, microeletrônica e fabricação de chips."
+    },
+    "defesa_robotica": {
+      "nome": "DefTech Sistemas Não Tripulados",
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "EPP",
+      "trl": 6,
+      "one_liner": "Sistemas não tripulados e robótica para defesa nacional.",
+      "solution_summary": "Drones e plataformas robóticas autônomas com tecnologias para defesa nacional, sistemas não tripulados e robótica aplicada.",
+      "descricao_atividades": "Desenvolvimento de robótica, veículos autônomos e tecnologias de defesa e segurança."
+    }
+  },
+  "frozen_nodes": {
+    "iflorestal": [
+      {
+        "name": "iFlorestal Tecnologia",
+        "type": "Entidade",
+        "description": "empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "bioeconomia",
+        "type": "Tema",
+        "description": "domínio em que a empresa atua",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "IA",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "monitoramento",
+        "type": "Aplicação",
+        "description": "caso de uso concreto da empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "subvenção",
+        "type": "Mecanismo",
+        "description": "modalidade de financiamento que a empresa busca",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "TRL 5",
+        "type": "Requisito",
+        "description": "característica de elegibilidade que a empresa atende",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      }
+    ],
+    "fintech_saas": [
+      {
+        "name": "PagAgil",
+        "type": "Entidade",
+        "description": "startup",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "e-commerce",
+        "type": "Tema",
+        "description": "domínio em que a empresa atua",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "machine learning",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "gateway de pagamentos",
+        "type": "Aplicação",
+        "description": "caso de uso concreto da empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "credito_reembolsavel",
+        "type": "Mecanismo",
+        "description": "modalidade de financiamento que a empresa busca",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "TRL 7",
+        "type": "Requisito",
+        "description": "característica de elegibilidade que a empresa atende",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      }
+    ],
+    "ia_digital_mg": [
+      {
+        "name": "NeuralMinas Tecnologia",
+        "type": "Entidade",
+        "description": "startup",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "indústria 4.0",
+        "type": "Tema",
+        "description": "domínio em que a empresa atua",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "IA generativa",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "automação industrial",
+        "type": "Aplicação",
+        "description": "caso de uso concreto da empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "análise de dados em tempo real",
+        "type": "Aplicação",
+        "description": "caso de uso concreto da empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "subvenção",
+        "type": "Mecanismo",
+        "description": "modalidade de financiamento que a empresa busca",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "TRL 4",
+        "type": "Requisito",
+        "description": "característica de elegibilidade que a empresa atende",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      }
+    ],
+    "biofarma_saude": [
+      {
+        "name": "BioSano Biotecnologia",
+        "type": "Entidade",
+        "description": "startup",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "saúde",
+        "type": "Tema",
+        "description": "domínio em que a empresa atua",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "biotecnologia",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "desenvolvimento de insumos farmacêuticos ativos",
+        "type": "Aplicação",
+        "description": "caso de uso concreto da empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "subvenção",
+        "type": "Mecanismo",
+        "description": "modalidade de financiamento que a empresa busca",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "TRL 4",
+        "type": "Requisito",
+        "description": "característica de elegibilidade que a empresa atende",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      }
+    ],
+    "agritech_maquinas": [
+      {
+        "name": "AgroMaq Sistemas",
+        "type": "Entidade",
+        "description": "empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "agricultura familiar",
+        "type": "Tema",
+        "description": "domínio em que a empresa atua",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "máquinas e equipamentos agrícolas",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "mecanização",
+        "type": "Aplicação",
+        "description": "operação aplicada a um objeto",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "subvenção",
+        "type": "Mecanismo",
+        "description": "modalidade de financiamento que a empresa busca",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "TRL 6",
+        "type": "Requisito",
+        "description": "característica de elegibilidade que a empresa atende",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      }
+    ],
+    "energia_hidrogenio": [
+      {
+        "name": "HidroVerde Energia",
+        "type": "Entidade",
+        "description": "empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "energia renovável",
+        "type": "Tema",
+        "description": "domínio em que a empresa atua",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "armazenamento de energia",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "hidrogênio de baixa emissão",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "eletromobilidade",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "armazenamento",
+        "type": "Aplicação",
+        "description": "CASO DE USO concreto da empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "descarbonização industrial",
+        "type": "Aplicação",
+        "description": "CASO DE USO concreto da empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "subvenção",
+        "type": "Mecanismo",
+        "description": "modalidade de financiamento que a empresa BUSCA",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "TRL 5",
+        "type": "Requisito",
+        "description": "característica de elegibilidade que a empresa ATENDE",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      }
+    ],
+    "semicondutores": [
+      {
+        "name": "SiliconBR Microeletrônica",
+        "type": "Entidade",
+        "description": "startup",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "microeletrônica",
+        "type": "Tema",
+        "description": "domínio em que a empresa atua",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "semicondutores",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "circuitos integrados",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "design de semicondutores",
+        "type": "Aplicação",
+        "description": "caso de uso concreto da empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "fabricação de chips",
+        "type": "Aplicação",
+        "description": "caso de uso concreto da empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "subvenção",
+        "type": "Mecanismo",
+        "description": "modalidade de financiamento que a empresa busca",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "TRL 3",
+        "type": "Requisito",
+        "description": "característica de elegibilidade que a empresa atende",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      }
+    ],
+    "defesa_robotica": [
+      {
+        "name": "DefTech Sistemas Não Tripulados",
+        "type": "Entidade",
+        "description": "empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "defesa nacional",
+        "type": "Tema",
+        "description": "domínio em que a empresa atua",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "drones",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "plataformas robóticas autônomas",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "robótica",
+        "type": "Tecnologia",
+        "description": "capacidade técnica que a empresa domina",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "desenvolvimento de robótica",
+        "type": "Aplicação",
+        "description": "caso de uso concreto da empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "veículos autônomos",
+        "type": "Aplicação",
+        "description": "caso de uso concreto da empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "tecnologias de defesa e segurança",
+        "type": "Aplicação",
+        "description": "caso de uso concreto da empresa",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "subvenção",
+        "type": "Mecanismo",
+        "description": "modalidade de financiamento que a empresa busca",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "EPP",
+        "type": "Requisito",
+        "description": "característica de elegibilidade que a empresa atende",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      },
+      {
+        "name": "TRL 6",
+        "type": "Requisito",
+        "description": "característica de elegibilidade que a empresa atende",
+        "prazo": null,
+        "status": null,
+        "valor": null,
+        "fonte": null
+      }
+    ]
+  },
+  "cases": [
+    {
+      "company": "iflorestal",
+      "relevant": [
+        "finep__762",
+        "finep__782",
+        "finep__783"
+      ]
+    },
+    {
+      "company": "ia_digital_mg",
+      "relevant": [
+        "finep__779",
+        "finep__784",
+        "fapesp__18203"
+      ]
+    },
+    {
+      "company": "biofarma_saude",
+      "relevant": [
+        "finep__773",
+        "finep__781",
+        "finep__757",
+        "finep__774"
+      ]
+    },
+    {
+      "company": "agritech_maquinas",
+      "relevant": [
+        "finep__739",
+        "finep__769",
+        "finep__783",
+        "finep__774"
+      ]
+    },
+    {
+      "company": "energia_hidrogenio",
+      "relevant": [
+        "finep__760",
+        "finep__772",
+        "finep__771",
+        "finep__782"
+      ]
+    },
+    {
+      "company": "semicondutores",
+      "relevant": [
+        "finep__780",
+        "fapesp__18203"
+      ]
+    },
+    {
+      "company": "defesa_robotica",
+      "relevant": [
+        "finep__775",
+        "finep__774"
+      ]
+    },
+    {
+      "company": "fintech_saas",
+      "relevant": []
+    }
+  ]
+}

@@ -11,6 +11,32 @@
 
 ## Aberto
 
+### Match por hipergrado — 2ª camada (elegibilidade dura) via hiperarestas nativas
+
+- **O quê:** o match cross-domínio (`core/services/hypergraph_match.py`) responde só
+  *"é relevante pro meu tema?"* — **afinidade**, por cosseno sobre os NÓS (Tema/Tec/
+  Aplicação). Falta a 2ª pergunta: *"eu posso? / isso me desqualifica?"* — **elegibilidade
+  dura**. Esse sinal não está nos nós: mora nas **hiperarestas nativas** do KG
+  (`Edital —exige→ TRL/porte/região`, `Edital —exclui→ setor`), que o match **ignora**
+  hoje ([[project_hyperedges_underused]]).
+- **Por que importa:** sem isso, (a) um match temático forte mas **inelegível** (TRL/
+  porte/região fora) sobe igual; (b) **exclusões** não reprovam — empresa de tabaco casa
+  «tabaco»↔«tabaco» com cosseno alto e o match a *aprova*, quando a aresta `exclui` deveria
+  reprovar. Nó-cosseno não tem sinal negativo nem condição numérica.
+- **Decisão de design já tomada:** o golden de matching cravou *"critério = afinidade;
+  elegibilidade é camada SEPARADA"* (eval_data/golden/matching.json) — **essa camada
+  separada são literalmente as arestas**. Logo NÃO é otimização do ranking de afinidade
+  (esse está coberto sem elas); é **capacidade nova** (filtro duro + exclusões + explicação
+  encadeada do `get_node_neighborhood`).
+- **Por que adiado:** é o "obj 1" da discussão PÓS-sprints da spec
+  (`docs/specs/hypergraph-architecture.md`). Sprints 1–3 entregam o eixo afinidade primeiro.
+- **Ponto de entrada:** `hypergraph_match.find_matching_editais` (hoje lê só nós via
+  `load_ecosystem_nodes`) — precisaria ler as `edges` dos subgrafos e cruzar requisitos/
+  exclusões com o `CompanyProfile` (TRL/porte/UF). Casa com [[project_eligibility_constraints]]
+  (o produtor de `eligibility_constraints` é a fonte estruturada equivalente).
+- **Status:** aberto (2026-06-29). Reforçado a pedido após F3 (Sprint 1). Não bloqueia
+  as sprints; é a evolução natural quando o eixo afinidade estabilizar.
+
 ### Filtragem por público-alvo — editais fora da persona (startups) entram no radar
 
 - **O quê:** o radar ingere chamadas FINEP que **não são para o público-alvo**
