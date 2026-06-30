@@ -6,7 +6,7 @@
 
 import type { CompanyProfile } from "./profile";
 import { EMPTY_PROFILE } from "./profile";
-import type { ConversationEntry, ProfileDiffItem, RadarResponse } from "@/lib/api";
+import type { ConversationEntry, ProfileDiffItem } from "@/lib/api";
 
 export type ChatRole = "user" | "assistant";
 
@@ -36,20 +36,12 @@ export interface DiffEntry {
   entryId?: number;
 }
 
-export interface RadarEntry {
-  kind: "radar";
-  data: RadarResponse;
-  ts: number;
-  // Id da row em session_turns quando persistida (logado).
-  entryId?: number;
-}
-
 export interface GateEntry {
   kind: "gate";
   action: GateAction;
 }
 
-export type TranscriptEntry = MsgEntry | DiffEntry | RadarEntry | GateEntry;
+export type TranscriptEntry = MsgEntry | DiffEntry | GateEntry;
 
 // ── Persistência (sessionStorage v2) ──────────────────────────────────────────
 export const HISTORY_KEY = "frontdoor_history";
@@ -94,16 +86,6 @@ export function migrateHistory(raw: unknown): TranscriptEntry[] {
           });
         }
         break;
-      case "radar":
-        if (e.data && typeof e.data === "object") {
-          out.push({
-            kind: "radar",
-            data: e.data as RadarResponse,
-            ts: typeof e.ts === "number" ? e.ts : Date.now(),
-            entryId: typeof e.entryId === "number" ? e.entryId : undefined,
-          });
-        }
-        break;
       case "gate":
         if (e.action === "anexo" || e.action === "brief" || e.action === "proposta") {
           out.push({ kind: "gate", action: e.action });
@@ -138,18 +120,6 @@ export function entriesFromServer(entries: ConversationEntry[]): TranscriptEntry
             items: p.items as DiffEntry["items"],
             status: (p.status as DiffStatus) ?? "pending",
             origin: p.origin as DiffEntry["origin"],
-            entryId: e.id,
-          });
-        }
-        break;
-      }
-      case "radar": {
-        const p = (e.payload ?? {}) as Record<string, unknown>;
-        if (p.data && typeof p.data === "object") {
-          out.push({
-            kind: "radar",
-            data: p.data as RadarResponse,
-            ts: typeof p.ts === "number" ? p.ts : Date.now(),
             entryId: e.id,
           });
         }
@@ -278,14 +248,10 @@ export interface ProfileGap {
   why: string; // o que destrava
 }
 
-// Lacunas de maior alavanca, ordenadas por impacto, dado o perfil + o radar atual.
-// `capital_social` é CONDICIONAL: só com porte pequeno (MEI/ME) e algum evento no
-// radar — proxy do "edital exige contrapartida" (o flag por-edital não vem no
-// payload do radar; simplificação sancionada na spec). Retorna no máx. 3 itens.
-export function missingHighImpact(
-  profile: CompanyProfile,
-  radar: RadarResponse | null,
-): ProfileGap[] {
+// Lacunas de maior alavanca, ordenadas por impacto, dado o perfil. Profile-only
+// (pós-Sprint 3 o radar legacy saiu): `capital_social` é pedido para porte
+// pequeno (MEI/ME) — proxy do "edital pode exigir contrapartida". Máx. 3 itens.
+export function missingHighImpact(profile: CompanyProfile): ProfileGap[] {
   const gaps: ProfileGap[] = [];
 
   if (profile.tipos_financiamento_interesse.length === 0) {
@@ -303,8 +269,7 @@ export function missingHighImpact(
     });
   }
   const small = profile.tamanho_empresa === "MEI" || profile.tamanho_empresa === "ME";
-  const hasEvento = !!radar?.radar.some((i) => i.kind_class === "evento");
-  if (profile.capital_social === null && small && hasEvento) {
+  if (profile.capital_social === null && small) {
     gaps.push({
       field: "capital_social",
       prompt: "Qual o capital social da empresa (R$)?",

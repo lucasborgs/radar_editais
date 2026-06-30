@@ -13,7 +13,6 @@ global durável. A "sobreposição" é o conjunto de arestas sintéticas, não u
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
@@ -39,6 +38,14 @@ SYNTHETIC_EDGE_THRESHOLD = 0.55
 # casam só por uma aresta fraca de boilerplate ficam abaixo e somem (corta ruído sem
 # matar recall: golden recall@8=0.88 estável até 0.30, despenca em 0.40).
 MIN_AGGREGATE_SCORE = 0.30
+
+# Piso AGREGADO p/ ENTIDADES (find_matching_entities). Mais baixo que o de editais
+# de propósito: um Programa/Investidor casa pelo CAMINHO DIRETO (1 aresta à própria
+# descrição — programas não têm nós de conteúdo no arquivo), então o piso de editais
+# (0.30 ≈ exige cosseno ≥ 0.85 numa aresta só) os mataria. 0.05 deixa passar o
+# direto razoável (cosseno ≥ 0.60) e ainda discrimina. PROVISÓRIO — sem golden de
+# entidade ainda (ver [[project-hypergraph-sprint3]]).
+MIN_AGGREGATE_ENTITY = 0.05
 
 # Tipos que contam como AFINIDADE (sinal de match cross-domínio). Mecanismo e
 # Requisito ficam de FORA de propósito: são estruturais (todo edital tem
@@ -71,20 +78,17 @@ def _node_text(node: dict) -> str:
 
 
 def load_ecosystem_nodes() -> list[tuple[str, dict]]:
-    """Carrega `(file_key, node)` de todos os subgrafos do ecossistema.
+    """Carrega `(file_key, node)` de todos os subgrafos do ecossistema via kg_store.
 
-    F1: lê do disco (HYPERGRAPHS_DIR). TODO: migrar p/ kg_store (PG) ao ir pra prod
-    — disco do Railway é efêmero (mesmo débito do cache de extração)."""
-    out: list[tuple[str, dict]] = []
-    for p in sorted(HYPERGRAPHS_DIR.glob("*.json")):
-        try:
-            data = json.loads(p.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001 — JSON corrompido não derruba o match
-            logger.warning("load_ecosystem_nodes: JSON inválido %s", p)
-            continue
-        for n in data.get("nodes", []):
-            out.append((p.stem, n))
-    return out
+    postgres-aware: lê o blob do PG em prod (disco do Railway é efêmero) e cai pro
+    disco em dev — MESMA fonte que `_entity_attribution` usa (`load_all_hypergraphs`),
+    para os dois lados do match de entidade não divergirem (disco vazio ↔ PG cheio)."""
+    from core.kg import kg_store
+    return [
+        (fk, n)
+        for fk, g in kg_store.load_all_hypergraphs().items()
+        for n in g.get("nodes", [])
+    ]
 
 
 def _cosine_matrix(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -118,35 +122,39 @@ def build_synthetic_edges(
     *,
     threshold: float = SYNTHETIC_EDGE_THRESHOLD,
     affinity_types: frozenset = AFFINITY_TYPES,
+    dst_types: frozenset | None = None,
     ecosystem: list[tuple[str, dict]] | None = None,
 ) -> list[SyntheticEdge]:
     """Arestas sintéticas empresa↔ecossistema por cosseno ≥ threshold.
 
-    Só liga nós cujo tipo está em `affinity_types` (conteúdo) — Mecanismo/Requisito
-    são elegibilidade, não afinidade (ver AFFINITY_TYPES). `affinity_types=frozenset()`
-    desativa o filtro. Mesmo espaço de embedding dos dois lados (mesmo embedder); sem
-    LLM, sem score além do cosseno. Embeda o eco COMPLETO (cache) e filtra por máscara,
-    para reusar o cache independentemente do filtro de tipo."""
+    Filtra a EMPRESA por `affinity_types` (conteúdo) e o ECOSSISTEMA por `dst_types`
+    (default = `affinity_types`, simétrico — o caso do match de editais). Tipos
+    assimétricos servem ao match de ENTIDADES: empresa=conteúdo, eco=conteúdo+entidade
+    (ver find_matching_entities). `frozenset()` em qualquer lado desativa aquele filtro.
+    Mecanismo/Requisito ficam de fora do conteúdo (são elegibilidade, ver AFFINITY_TYPES).
+    Mesmo espaço de embedding dos dois lados; sem LLM, sem score além do cosseno. Embeda
+    o eco COMPLETO (cache) e filtra por máscara, para reusar o cache entre filtros."""
     if not company_nodes:
         return []
     eco = ecosystem if ecosystem is not None else load_ecosystem_nodes()
     if not eco:
         logger.warning("build_synthetic_edges: ecossistema vazio")
         return []
+    dst_filter = affinity_types if dst_types is None else dst_types
 
     comp_emb = np.asarray(embed_texts([_node_text(n) for n in company_nodes]), dtype=np.float32)
     eco_emb = embed_ecosystem(eco)  # completo, cacheado por hash dos textos
     sims = _cosine_matrix(comp_emb, eco_emb)
 
-    def _ok(node: dict) -> bool:
-        return not affinity_types or node.get("type") in affinity_types
+    def _ok(node: dict, types: frozenset) -> bool:
+        return not types or node.get("type") in types
 
     edges: list[SyntheticEdge] = []
     for i, cn in enumerate(company_nodes):
-        if not _ok(cn):
+        if not _ok(cn, affinity_types):
             continue
         for j, (fk, en) in enumerate(eco):
-            if not _ok(en):
+            if not _ok(en, dst_filter):
                 continue
             s = float(sims[i, j])
             if s >= threshold:
@@ -229,5 +237,148 @@ def find_matching_editais(
         )
     matches.sort(key=lambda m: m.affinity, reverse=True)
     logger.info("find_matching_editais: %d editais (threshold=%.2f, min_agg=%.2f)",
+                len(matches), threshold, min_aggregate)
+    return matches[:top_k]
+
+
+# =============================================================================
+# Match de ENTIDADES (investidor / programa / ICT) — irmão do match de editais
+# =============================================================================
+# Mesma OFERTA, agrupamento diferente: editais são 1-arquivo-cada (group by
+# file_key); entidades coabitam um arquivo de catálogo (group by NÓ). Unifica o
+# que o RadarService fundia (HybridMatch + EntityMatcher + ict_match) num motor só.
+
+# Tipos de nó que SÃO uma entidade-oferta (não conteúdo).
+ENTITY_TYPES = frozenset({"Investidor", "Programa", "ICT"})
+
+# Arquivos de catálogo no ecossistema (file_key SEM '__' — não são editais).
+CATALOG_FILES = frozenset({"investidores", "programas", "ict"})
+
+
+@dataclass
+class EntityMatch:
+    """Uma entidade (investidor/programa/ICT) que casa com a empresa por afinidade."""
+
+    file_key: str               # investidores | programas | ict
+    kind: str                   # Investidor | Programa | ICT
+    name: str
+    description: str | None
+    score: float                # melhor cosseno — display
+    affinity: float             # marginsum — chave de RANKING
+    n_paths: int
+    paths: list[SyntheticEdge]  # arestas-justificativa, ordenadas por score desc
+
+
+def _entity_attribution(
+    graphs: dict[str, dict],
+) -> tuple[dict[str, dict[str, list[tuple[str, str]]]], dict[str, dict[str, tuple[str, str, str | None]]]]:
+    """Pré-computa, por arquivo de catálogo:
+      • attribution: nome-de-nó-de-conteúdo(lower) → [(kind, nome_canônico)] donos,
+        derivado das arestas nativas (uma ICT `viabiliza`/`abrange_tema` um Tema);
+      • entity_index: nome-de-entidade(lower) → (kind, nome_canônico, descrição),
+        para o caminho direto (Programa casa pela própria descrição).
+    """
+    attribution: dict[str, dict[str, list[tuple[str, str]]]] = {}
+    entity_index: dict[str, dict[str, tuple[str, str, str | None]]] = {}
+    for fk in CATALOG_FILES:
+        g = graphs.get(fk)
+        if not g:
+            continue
+        type_by: dict[str, str] = {}
+        name_by: dict[str, str] = {}
+        ent_idx: dict[str, tuple[str, str, str | None]] = {}
+        for n in g.get("nodes", []):
+            nm = (n.get("name") or "").strip().lower()
+            if not nm:
+                continue
+            t = n.get("type") or ""
+            type_by[nm] = t
+            name_by[nm] = n.get("name") or nm
+            if t in ENTITY_TYPES:
+                ent_idx[nm] = (t, n.get("name") or nm, n.get("description"))
+        attr: dict[str, list[tuple[str, str]]] = defaultdict(list)
+        for e in g.get("edges", []):
+            members = [(x or "").strip().lower() for x in e.get("members", [])]
+            ents = [(type_by[x], name_by[x]) for x in members if type_by.get(x) in ENTITY_TYPES]
+            for a in (x for x in members if type_by.get(x) in AFFINITY_TYPES):
+                for ent in ents:
+                    if ent not in attr[a]:
+                        attr[a].append(ent)
+        attribution[fk] = attr
+        entity_index[fk] = ent_idx
+    return attribution, entity_index
+
+
+def find_matching_entities(
+    company_nodes: list[dict],
+    *,
+    threshold: float = SYNTHETIC_EDGE_THRESHOLD,
+    min_aggregate: float = MIN_AGGREGATE_ENTITY,
+    top_k: int = 10,
+    max_paths: int = 5,
+    kinds: frozenset = ENTITY_TYPES,
+    ecosystem: list[tuple[str, dict]] | None = None,
+    graphs: dict[str, dict] | None = None,
+) -> list[EntityMatch]:
+    """Match empresa → INVESTIDOR/PROGRAMA/ICT. Irmão de `find_matching_editais`.
+
+    Mesmo motor (build_synthetic_edges + marginsum), agrupando por NÓ de catálogo.
+    Caminho duplo conforme o catálogo (ver `_entity_attribution`):
+      • aresta a um nó de CONTEÚDO (Tema/Tec/Aplic de ict/investidores) → atribui à(s)
+        entidade(s) dona(s) via arestas nativas — é como a ICT casa (desc é pobre);
+      • aresta a um nó-ENTIDADE direto (descrição rica do Programa/Investidor) → atribui
+        a ele — programas não têm temas no arquivo, casam pela descrição.
+    Sem LLM no loop. `min_aggregate` usa MIN_AGGREGATE_ENTITY (mais baixo — provisório,
+    sem golden de entidade; EntityMatcher legacy nunca foi gate duro)."""
+    from core.kg import kg_store
+
+    # eco e atribuição saem do MESMO load_all_hypergraphs (postgres-aware) — nunca
+    # misturar disco↔PG (senão em prod o eco vem vazio e a atribuição não, e o match
+    # de entidade devolve nada).
+    graphs = graphs if graphs is not None else kg_store.load_all_hypergraphs()
+    eco = ecosystem if ecosystem is not None else [
+        (fk, n) for fk, g in graphs.items() for n in g.get("nodes", [])
+    ]
+    # dst inclui ENTIDADE além de conteúdo → cobre o caminho direto (programas).
+    edges = build_synthetic_edges(
+        company_nodes, threshold=threshold,
+        dst_types=AFFINITY_TYPES | ENTITY_TYPES, ecosystem=eco,
+    )
+    attribution, entity_index = _entity_attribution(graphs)
+
+    by_entity: dict[tuple[str, str], list[SyntheticEdge]] = defaultdict(list)
+    meta: dict[tuple[str, str], tuple[str, str | None]] = {}
+    for e in edges:
+        if e.file_key not in CATALOG_FILES:
+            continue
+        dst_lower = e.dst.strip().lower()
+        if e.dst_type in ENTITY_TYPES:
+            owners = [(e.dst_type, e.dst)]                              # direto
+        else:
+            owners = attribution.get(e.file_key, {}).get(dst_lower, [])  # via aresta
+        for kind, name in owners:
+            if kind not in kinds:
+                continue
+            key = (e.file_key, name)
+            by_entity[key].append(e)
+            if key not in meta:
+                ei = entity_index.get(e.file_key, {}).get(name.strip().lower())
+                meta[key] = (kind, ei[2] if ei else None)
+
+    matches: list[EntityMatch] = []
+    for (fk, name), es in by_entity.items():
+        es.sort(key=lambda x: x.score, reverse=True)
+        affinity = sum(x.score - threshold for x in es)  # marginsum
+        if affinity < min_aggregate:
+            continue
+        kind, desc = meta[(fk, name)]
+        matches.append(
+            EntityMatch(
+                file_key=fk, kind=kind, name=name, description=desc,
+                score=es[0].score, affinity=affinity, n_paths=len(es), paths=es[:max_paths],
+            )
+        )
+    matches.sort(key=lambda m: m.affinity, reverse=True)
+    logger.info("find_matching_entities: %d entidades (threshold=%.2f, min_agg=%.2f)",
                 len(matches), threshold, min_aggregate)
     return matches[:top_k]

@@ -31,14 +31,11 @@ from backend.auth_routes import router as auth_router
 from backend.library_routes import router as library_router
 from backend.rate_limit import limiter
 from backend.routers.applications import router as applications_router
-from backend.routers.brief import router as brief_router
 from backend.routers.catalog import router as catalog_router
 from backend.routers.conversations import router as conversations_router
 from backend.routers.discovered import router as discovered_router
 from backend.routers.explore import router as explore_router
 from backend.routers.files import router as files_router
-from backend.routers.graph import router as graph_router
-from backend.routers.matching import router as matching_router
 from backend.routers.playbooks import router as playbooks_router
 from backend.routers.profile import router as profile_router
 from backend.routers.research import router as research_router
@@ -154,11 +151,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(auth_router)
 app.include_router(library_router)
 app.include_router(catalog_router)
-app.include_router(graph_router)
 app.include_router(explore_router)
-app.include_router(matching_router)
 app.include_router(applications_router)
-app.include_router(brief_router)
 app.include_router(writing_router)
 app.include_router(conversations_router)
 app.include_router(files_router)

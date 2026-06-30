@@ -444,30 +444,9 @@ def synthesize_patterns(db: Client, workspace_id: str) -> dict:
         _project_to_store(
             workspace_id, deleted=superseded.data, inserted=inserted_rows,
         )
-
-        if (
-            weight_suggestions
-            and suggestions_carrier_idx is not None
-            and suggestions_carrier_idx < len(inserted_rows)
-        ):
-            carrier_id = inserted_rows[suggestions_carrier_idx].get("id")
-            if carrier_id:
-                try:
-                    from core.weight_approval import auto_apply_suggestions
-                    auto_applied = auto_apply_suggestions(
-                        db, workspace_id, carrier_id, weight_suggestions,
-                        outcomes_considered=len(level1), confidence=confidence,
-                    )
-                except Exception as e:  # auto-apply nunca derruba a síntese
-                    logger.warning(
-                        "synthesize_patterns: auto_apply falhou (ws=%s): %s",
-                        workspace_id, e,
-                    )
-            else:
-                logger.warning(
-                    "synthesize_patterns: insert não retornou id do carrier — "
-                    "auto-apply pulado (ws=%s)", workspace_id,
-                )
+        # (Pós-Sprint 3: o auto-apply dos pesos de matching saiu com o
+        # weight_approval/HybridMatch. weight_suggestions ainda é sintetizado e
+        # devolvido como insight, mas não há mais pesos para aplicar.)
 
     return {
         "level1_considered": len(level1),

@@ -391,21 +391,23 @@ def _deaccent(s: str) -> str:
     )
 
 
-def _doc_skip_keywords(source: str) -> list[str]:
-    """Skip-list autoritativa de docs-formulário de `wikis/<fonte>.md`, deaccentuada.
+_YAML_BLOCK_RE = re.compile(r"```yaml\n(.*?)```", re.DOTALL)
 
-    Reusa a fonte única `wiki_schema.skip_keywords` (declaração/modelo/carta/
-    apresentação/orientações…) mas aplica com dobra de acento — a lista é sem
-    acento e os nomes de arquivo são acentuados, então o match exato do adapter
-    nunca casa (bug latente que também vaza pro RAG/descoberta).
-    TODO migração: quando `wiki_schema` for removido, relocar este reader; os
-    keywords vivem em `wikis/<fonte>.md` e sobrevivem."""
-    try:
-        from core.kg import wiki_schema
-        kws = wiki_schema.skip_keywords(source) or []
-    except Exception:  # noqa: BLE001 — fonte indisponível → sem skip (degrada ok)
-        kws = []
-    return [_deaccent(k) for k in kws]
+
+def _doc_skip_keywords(source: str) -> list[str]:
+    """Skip-list autoritativa de docs-formulário de `wikis/<fonte>.md`, deaccentuada."""
+    import yaml
+
+    from config import ROOT
+    md_path = ROOT / "wikis" / f"{source}.md"
+    if not md_path.exists():
+        return []
+    text = md_path.read_text(encoding="utf-8")
+    for match in _YAML_BLOCK_RE.finditer(text):
+        block = yaml.safe_load(match.group(1))
+        if isinstance(block, dict) and "skip_keywords" in block:
+            return [_deaccent(k) for k in block["skip_keywords"]]
+    return []
 
 
 def load_silver(path: Path, max_chars: int = HYPER_EXTRACT_MAX_CHARS) -> tuple[str, str]:

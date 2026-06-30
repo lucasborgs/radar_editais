@@ -4,17 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "089b1d07bcbfc4d1",
+        "id": "8c6a54e234b1d214",
         "type": "tabs",
         "children": [
           {
-            "id": "f3a9250d625e0747",
+            "id": "9a6e28bfc6e47efd",
             "type": "leaf",
             "state": {
-              "type": "graph",
+              "type": "empty",
               "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "icon": "lucide-file",
+              "title": "New tab"
             }
           }
         ]
@@ -177,8 +177,10 @@
       "bases:Create new base": false
     }
   },
-  "active": "f3a9250d625e0747",
+  "active": "9a6e28bfc6e47efd",
   "lastOpenFiles": [
+    "radar-editais/editais/web-ba26ff22d7b4.md",
+    "radar-editais/editais/finep-777.md",
     "radar-editais/fontes/web.md",
     "radar-editais/programas/web-03cd8ee34924.md",
     "radar-editais/desafios/web-5006e32bb444.md",

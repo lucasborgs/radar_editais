@@ -20,7 +20,7 @@ import logging
 import os
 import re
 
-from core.kg import kg_store
+from core.kg import hypergraph_catalog
 
 # Importado no nível do módulo (em vez de dentro de auto_review_checklist) para
 # que os testes possam monkeypatchar `make_async_client`. O SDK OpenAI é uma
@@ -190,10 +190,10 @@ def build_checklist(edital_id: str) -> list[dict]:
     items: list[dict] = []
     seen: set[str] = set()
 
-    wiki_page = kg_store.load_wiki_page(edital_id)
-    if wiki_page:
-        try:
-            for req in wiki_page.get("key_requirements", []):
+    try:
+        card = hypergraph_catalog.get_edital(edital_id)
+        if card:
+            for req in card.get("key_requirements", []):
                 if req and req not in seen:
                     seen.add(req)
                     items.append({
@@ -203,8 +203,8 @@ def build_checklist(edital_id: str) -> list[dict]:
                         "status": "pending",
                         "source": "key_requirements",
                     })
-        except Exception as e:
-            logger.warning("Erro ao ler wiki page %s: %s", edital_id, e)
+    except Exception as e:
+        logger.warning("Erro ao ler hypergraph card %s: %s", edital_id, e)
 
     return items
 

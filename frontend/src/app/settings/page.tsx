@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { MatchingWeightsSection } from "@/components/MatchingWeightsSection";
 import { getMe, getMyPreferences, updateMyPreferences } from "@/lib/api";
 
 function Toggle({
@@ -172,14 +171,6 @@ export default function SettingsPage() {
               {error}
             </div>
           )}
-        </section>
-
-        {/* Matching weights section (Gap 2) */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-content-secondary font-sans">
-            Pesos de matching
-          </h2>
-          <MatchingWeightsSection token={token} />
         </section>
       </div>
 

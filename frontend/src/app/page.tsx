@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { ChatBubble } from "@/components/chat/ChatBubble";
@@ -12,26 +12,19 @@ import { StatusBar } from "@/components/frontdoor/StatusBar";
 import { SuggestionChips } from "@/components/frontdoor/SuggestionChips";
 import { Composer } from "@/components/frontdoor/Composer";
 import { DiffCard } from "@/components/frontdoor/DiffCard";
-import { RadarCard } from "@/components/frontdoor/RadarCard";
 import { GateCard } from "@/components/frontdoor/GateCard";
 import { UrlHero } from "@/components/frontdoor/UrlHero";
 import { UnlockCard } from "@/components/frontdoor/UnlockCard";
 import {
   frontdoorTurn,
-  getRadar,
   getMe,
   saveProfile,
-  getOpportunityBrief,
   extractProfileFromDocument,
   getConversation,
-  appendConversationEntry,
   updateConversationEntry,
   type ProfileDiffItem,
-  type OpportunityBrief,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { resolveWorkspaceSession } from "@/lib/workspace";
-import { useRouter } from "next/navigation";
 import {
   CompanyProfile,
   EMPTY_PROFILE,
@@ -103,15 +96,12 @@ function Bubble({ role, content }: { role: "user" | "assistant"; content: string
 export default function FrontDoorPage() {
   const { session, getToken, signOut } = useAuth();
   const isAuthed = !!session;
-  const router = useRouter();
 
   const [profile, setProfile] = useState<CompanyProfile>(EMPTY_PROFILE);
   const [entries, setEntries] = useState<TranscriptEntry[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [hydrated, setHydrated] = useState(false);
-  // Briefs gerados, chaveados por edital_id (para render inline no RadarCard).
-  const [briefs, setBriefs] = useState<Record<string, OpportunityBrief>>({});
   // Conversa persistida no servidor (logado, spec chat-first fase 2). null =
   // ainda sem binding (anônimo, ou logado antes do 1º turno).
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -122,8 +112,6 @@ export default function FrontDoorPage() {
   const [heroDismissed, setHeroDismissed] = useState(false);
   // Card "destravar mais matches" (Etapa 2): dispensável por sessão.
   const [unlockDismissed, setUnlockDismissed] = useState(false);
-
-  const lastRadarRef = useRef<HTMLDivElement>(null);
 
   // Liga o estado local à conversa do servidor (e sobrevive a F5 na mesma aba).
   // Binding novo (1º turno) avisa o sidebar para recarregar a lista.
@@ -276,38 +264,34 @@ export default function FrontDoorPage() {
     };
   }, [hydrated, isAuthed, getToken]);
 
-  // ── Disparo do radar (após perfil completo) ─────────────────────────────────
-  const runRadar = useCallback(
+  // ── Match no chat (após perfil completo) ────────────────────────────────────
+  // Pós-Sprint 3 o radar legacy saiu: o match emerge pelo CHAT. Disparamos um
+  // turno automático e o ExploreAgent narra os editais + parceiros via as tools
+  // find_matching_editais / find_matching_entities (hipergrado, prosa com
+  // justificativa). O turno é persistido pelo próprio /frontdoor/turn (logado).
+  const runMatch = useCallback(
     async (p: CompanyProfile) => {
+      if (sending) return; // evita 2 turnos de match concorrentes (double-fire)
+      setSending(true);
       try {
-        const data = await getRadar(p, 10);
-        const entry: TranscriptEntry = { kind: "radar", data, ts: Date.now() };
-        setEntries((prev) => [...prev, entry]);
-        // Logado com conversa persistida: espelha o card no servidor (POST
-        // /conversations/{id}/entries). Falha não bloqueia a UX — a conversa
-        // vale mais que o histórico (spec fase 2).
-        if (isAuthed && sessionId) {
-          try {
-            const token = await getToken();
-            if (token) {
-              const saved = await appendConversationEntry(
-                sessionId,
-                { entry_kind: "radar", payload: { data, ts: entry.ts } },
-                token,
-              );
-              setEntries((prev) =>
-                prev.map((e) => (e === entry ? { ...e, entryId: saved.id } : e)),
-              );
-            }
-          } catch (err) {
-            console.warn("Falha ao persistir card de radar:", err);
-          }
-        }
+        const { answer, session_id } = await frontdoorTurn(
+          "Quais editais e parceiros (ICTs, investidores, programas) combinam com o meu perfil? Liste os mais relevantes com a justificativa de cada match.",
+          toApiHistory(entries),
+          p.nome ? p : null,
+          sessionId,
+        );
+        if (session_id) bindSession(session_id);
+        setEntries((prev) => [
+          ...prev,
+          { kind: "msg", role: "assistant", content: answer },
+        ]);
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Não consegui rodar o radar.");
+        toast.error(e instanceof Error ? e.message : "Não consegui buscar oportunidades.");
+      } finally {
+        setSending(false);
       }
     },
-    [isAuthed, sessionId, getToken],
+    [entries, sessionId, bindSession, sending],
   );
 
   // ── Turno de conversa ───────────────────────────────────────────────────────
@@ -406,9 +390,10 @@ export default function FrontDoorPage() {
       const next = applyDiff(profile, finalItems ?? entry.items);
       await persistProfile(next);
 
-      // Aceite é o trigger do radar (D4) — se o perfil ficou rodável.
+      // Aceite é o trigger do match — se o perfil ficou rodável, o agente narra
+      // as oportunidades no chat (pós-Sprint 3, sem radar legacy).
       if (isRadarReady(next)) {
-        await runRadar(next);
+        await runMatch(next);
       } else {
         const msg = missingForRadar(next);
         if (msg) {
@@ -416,7 +401,7 @@ export default function FrontDoorPage() {
         }
       }
     },
-    [entries, profile, persistProfile, runRadar, isAuthed, sessionId, getToken],
+    [entries, profile, persistProfile, runMatch, isAuthed, sessionId, getToken],
   );
 
   // ── Barra de status: editar perfil (diff manual com todos os campos) ────────
@@ -427,18 +412,14 @@ export default function FrontDoorPage() {
     ]);
   }, [profile]);
 
-  const handleSeeRadar = useCallback(() => {
-    lastRadarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
-
-  // ── Etapa 2: aplicar campos do UnlockCard → persiste + re-roda o radar ───────
+  // ── Etapa 2: aplicar campos do UnlockCard → persiste + re-roda o match ───────
   const handleUnlockApply = useCallback(
     async (updates: Partial<CompanyProfile>) => {
       const next = { ...profile, ...updates } as CompanyProfile;
       await persistProfile(next);
-      await runRadar(next);
+      await runMatch(next);
     },
-    [profile, persistProfile, runRadar],
+    [profile, persistProfile, runMatch],
   );
 
   // ── Anexo (📎) ──────────────────────────────────────────────────────────────
@@ -509,59 +490,6 @@ export default function FrontDoorPage() {
     [profile],
   );
 
-  // ── Brief GO/NO-GO (logado) / gate (anônimo) ────────────────────────────────
-  const handleBrief = useCallback(
-    async (editalId: string) => {
-      if (!isAuthed) {
-        setEntries((prev) => [...prev, { kind: "gate", action: "brief" }]);
-        return;
-      }
-      try {
-        const brief = await getOpportunityBrief(editalId, profile.nome ? profile : null);
-        setBriefs((prev) => ({ ...prev, [editalId]: brief }));
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Não consegui gerar o brief.");
-      }
-    },
-    [isAuthed, profile],
-  );
-
-  // ── Começar proposta / Escrever pitch: logado → cria sessão e abre o
-  // workspace; anônimo → gate. O pitch usa mode='pitch' (id `investidor:`).
-  const openWorkspace = useCallback(
-    async (editalId: string, mode?: "proposal" | "pitch") => {
-      if (!isAuthed) {
-        setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
-        return;
-      }
-      const t = toast.loading(mode === "pitch" ? "Abrindo pitch…" : "Abrindo proposta…");
-      try {
-        const token = await getToken();
-        if (!token) {
-          setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
-          return;
-        }
-        const sessionId = await resolveWorkspaceSession(editalId, profile, token, mode);
-        router.push(`/workspace/${sessionId}`);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Não foi possível abrir o workspace.");
-      } finally {
-        toast.dismiss(t);
-      }
-    },
-    [isAuthed, getToken, profile, router],
-  );
-
-  const handleProposta = useCallback(
-    (editalId: string) => void openWorkspace(editalId, "proposal"),
-    [openWorkspace],
-  );
-
-  const handlePitch = useCallback(
-    (investidorId: string) => void openWorkspace(investidorId, "pitch"),
-    [openWorkspace],
-  );
-
   // Zera transcript local + binding com o servidor. A conversa persistida NÃO
   // é apagada (continua no histórico do sidebar) — só desligamos dela.
   const resetConversation = useCallback(() => {
@@ -573,7 +501,6 @@ export default function FrontDoorPage() {
     }
     setEntries([]);
     setInput("");
-    setBriefs({});
     setSessionId(null);
     setResumeId(null);
     // Derruba um eventual ?c= da URL sem remontar a página.
@@ -614,19 +541,10 @@ export default function FrontDoorPage() {
   // vazia e antes de o usuário optar por descrever. Some ao extrair ou pular.
   const heroActive = isEmpty && !heroDismissed && !isRadarReady(profile);
   const completeness = profileCompleteness(profile);
-  const hasRadar = entries.some((e) => e.kind === "radar");
 
-  // Índice do último card de radar (para ancorar o ref de "ver radar atual").
-  let lastRadarIndex = -1;
-  entries.forEach((e, i) => {
-    if (e.kind === "radar") lastRadarIndex = i;
-  });
-
-  // Gaps de alto impacto sobre o radar mais recente (Etapa 2). Recomputa a cada
-  // mudança de perfil — some sozinho quando os campos são preenchidos.
-  const lastRadar = lastRadarIndex >= 0 ? entries[lastRadarIndex] : null;
-  const lastRadarData = lastRadar?.kind === "radar" ? lastRadar.data : null;
-  const gaps = lastRadarData ? missingHighImpact(profile, lastRadarData) : [];
+  // Gaps de alto impacto (Etapa 2). Profile-only pós-Sprint 3 (o radar saiu): só
+  // nudge quando o perfil já é rodável. Some sozinho quando os campos são preenchidos.
+  const gaps = isRadarReady(profile) ? missingHighImpact(profile) : [];
   const showUnlock = gaps.length > 0 && !unlockDismissed;
 
   return (
@@ -641,12 +559,10 @@ export default function FrontDoorPage() {
         <FrontDoorHeader isAuthed={isAuthed} onReset={handleReset} onSignOut={signOut} />
       <StatusBar
         completeness={completeness}
-        hasRadar={hasRadar}
-        onSeeRadar={handleSeeRadar}
         onEditProfile={handleEditProfile}
       />
 
-      <ChatMessageList className="mx-auto w-full max-w-2xl" deps={[sending, hydrated, briefs]}>
+      <ChatMessageList className="mx-auto w-full max-w-2xl" deps={[sending, hydrated]}>
         <Bubble role="assistant" content={WELCOME} />
 
         {heroActive && (
@@ -682,18 +598,6 @@ export default function FrontDoorPage() {
                   onAccept={(finalItems) => void decideDiff(i, true, finalItems)}
                   onDismiss={() => void decideDiff(i, false)}
                 />
-              );
-            case "radar":
-              return (
-                <div key={i} ref={i === lastRadarIndex ? lastRadarRef : undefined}>
-                  <RadarCard
-                    data={entry.data}
-                    briefs={briefs}
-                    onBrief={handleBrief}
-                    onProposta={handleProposta}
-                    onPitch={handlePitch}
-                  />
-                </div>
               );
             case "gate":
               return <GateCard key={i} action={entry.action} />;

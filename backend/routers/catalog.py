@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.common import wiki_matcher
+from core.kg import hypergraph_catalog
 
 router = APIRouter(tags=["catalog"])
 
@@ -15,9 +15,9 @@ def root():
     return {"message": "Radar Editais API v2", "docs": "/docs"}
 
 
-@router.get("/stats", summary="Estatísticas do catálogo FINEP")
+@router.get("/stats", summary="Estatísticas do catálogo de editais")
 def get_stats():
-    return wiki_matcher.get_stats()
+    return hypergraph_catalog.get_stats()
 
 
 @router.get("/editais", summary="Lista editais com filtros opcionais")
@@ -26,12 +26,12 @@ def list_editais(
     tema: str | None = Query(None, description="Filtro por tema (substring)"),
     limit: int = Query(200, ge=1, le=500),
 ):
-    return wiki_matcher.list_editais(status=status, tema=tema, limit=limit)
+    return hypergraph_catalog.list_editais(status=status, tema=tema, limit=limit)
 
 
 @router.get("/editais/{edital_id}", summary="Card completo de um edital")
 def get_edital(edital_id: str):
-    edital = wiki_matcher.get_edital_by_id(edital_id)
+    edital = hypergraph_catalog.get_edital(edital_id)
     if edital is None:
         raise HTTPException(status_code=404, detail=f"Edital '{edital_id}' não encontrado")
     return edital
@@ -49,18 +49,6 @@ def list_commands():
     from core.skills import available_skills
     return {
         "commands": [
-            {
-                "name": "match",
-                "endpoint": "POST /match",
-                "description": "Rankeia editais para o perfil da empresa",
-                "args": ["top_k?"],
-            },
-            {
-                "name": "brief",
-                "endpoint": "POST /opportunity/brief",
-                "description": "Brief de Oportunidade (decision matrix + GO/NO-GO) para um edital",
-                "args": ["edital_id"],
-            },
             {
                 "name": "draft",
                 "endpoint": "POST /writing/start",
