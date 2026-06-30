@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 
 from config import ROOT
 from core.kg import kg_store
-from core.kg import wiki_schema as ws
+from core.kg import schema as ws
 from domain.vocabulary import canonicalize_themes
 
 logger = logging.getLogger(__name__)

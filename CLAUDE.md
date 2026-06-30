@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Schema autoritativo
 
-Regras de criação de wiki pages, nós/links do grafo, vocabulários, workflows de ingestão e manutenção vivem em [WIKI.md](WIKI.md) (global) e [wikis/](wikis/)`<fonte>.md` (por fonte). O código lê o schema via [core/kg/wiki_schema.py](core/kg/wiki_schema.py). **Mudanças em regras → edite os docs, não o código.** O validador [tests/test_wiki_schema_consistency.py](tests/test_wiki_schema_consistency.py) garante que doc e código não divergem.
+Regras de vocabulários, workflows de ingestão e manutenção vivem em [WIKI.md](WIKI.md) (global) e [wikis/](wikis/)`<fonte>.md` (por fonte). O código lê os blocos YAML via [core/kg/schema.py](core/kg/schema.py). **Mudanças em regras → edite os docs, não o código.**
+
+**Nota:** `wiki_schema.py` foi removido (substituído por `schema.py`). O pipeline legacy `build_knowledge_graph` → `index.json` + `etl_process` → `wiki/*.json` foi removido — todo o catálogo e match vêm dos hipergrados em `data/knowledge_graph/hypergraphs/`.
 
 ## Project Overview
 
@@ -44,11 +46,10 @@ cd frontend && npx tsc --noEmit         # TypeScript check (use this, NOT npm ru
 
 ### Data pipeline
 ```bash
-python pipeline/build_knowledge_graph.py   # bronze → índice + wiki pages (todas as fontes)
 python -m core.opportunity_discovery       # torneira web (DOU com DISCOVERY_DOU_ENABLED=1)
 ```
 Em prod, scrapers e Descoberta rodam pelos crons do worker (`run_daily_etl`
-03:00 UTC, `discover_opportunities` 04:00 UTC — core/tasks.py).
+03:00 UTC, `discover_opportunities` 04:00 UTC — core/tasks.py). O pipeline de build (hyper_extractor + embed) roda em lote via `scripts/run_all.py`.
 
 Discovery web não escreve diretamente no KG — vai para staging com gate humano (`/discovered-opportunities` na UI).
 
@@ -116,6 +117,12 @@ Bronze (FINEP/FAPESP/FAPESC raw via adapters por fonte)
   → pipeline/build_knowledge_graph.py  (consolida index + wiki/*.json)
     → produtores LLM build-time: eligibility_constraints, mechanism, enrichment
 
+─── LEGADO (removido): o pipeline acima foi substituído pelo hypergrado ───
+
+Bronze → pipeline/hyper_extractor.py  (hipergrafos N-ários: 12 nós/10 arestas)
+  → core/retrieval/embedder.py        (embed dos nós por Edital/Tema/Tecnologia/Aplicação)
+  → data/knowledge_graph/hypergraphs/{id}.json
+
 Edital chunks (para RAG na WritingSession):
   → procrastinate task `chunk_edital` (core/tasks.py)
   → core/retrieval/chunker.py    chunking estrutural por Art./§
@@ -123,7 +130,7 @@ Edital chunks (para RAG na WritingSession):
   → core/retrieval/embedder.py   OpenAI text-embedding-3-large
   → tabela edital_chunks (pgvector + tsvector)
 ```
-Paths em `config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, KG_WIKI_DIR).
+Paths em `config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, HYPERGRAPHS_DIR).
 
 ### Package layout
 ```
@@ -144,14 +151,12 @@ pipeline/      ETL FINEP (extractors/, etl_process, build_knowledge_graph, healt
 scripts/       CLI: run_all, reindex_edital, dev, deploy
 skills/        playbooks de mecanismo (subvencao, credito, equity) — lidos pelo WritingAgent
 supabase/      migrations/*.sql + config.toml (local CLI)
-data/          bronze/ (raw imutável), silver/ (derivado), knowledge_graph/ (index.json + wiki/)
+data/          bronze/ (raw imutável), silver/ (derivado), knowledge_graph/ (hypergraphs/)
 ```
 
 ### Core services
-- **HybridMatchService** (`core/services/hybrid_match_service.py`) — Stage 1 determinístico Pandas (elegibilidade dura: região/receita/porte, TRL, mecanismo) + Stage 2 LLM. Pesos lidos de `matching_weights` com cache TTL 60s.
-- **RadarService** (`core/services/radar_service.py`) — agrega HybridMatch + EntityMatcher (investidores + programas) via RRF + entity_floor. Multi-quadrante: evento / entidade / programa.
-- **EntityMatcher** (`core/services/entity_matcher.py`) — catálogo inteiro no prompt, 1 LLM call (Karpathy-style). Separa `catalog_investidores` e `catalog_programas`.
-- **ExploreAgent** (`core/services/explore_agent.py`) — 3 rotas: factual → reasoning → agent. Lê GraphService (vault Obsidian, cache LRU por mtime, sem LLM). Retorna string; o `profile_diff` é extraído pelo router (`backend/routers/explore.py`) via `ProfileExtractor`.
+- **HypergraphMatch** (`core/services/hybrid_match_service.py`) — match por marginsum sobre cosseno entre nós do perfil empresa e nós Tema/Tecnologia/Aplicação dos hipergrados. Threshold 0.55, piso `min_aggregate`. Sem estágio LLM no match core.
+- **ExploreAgent** (`core/services/explore_agent.py`) — 3 rotas: factual → reasoning → agent. Lê hipergrados via `resolve_graph_nodes` + `neighborhood`. Retorna string; o `profile_diff` é extraído pelo router (`backend/routers/explore.py`) via `ProfileExtractor`.
 - **WritingSession** (`core/services/writing_session.py`) — runtime LangGraph (`agent_graph.py`) com checkpointer Postgres durável. RAG via `retrieve_chunks`. Primeiro turno: batch de 8 seções de uma vez (`_first_turn_with_generation`). `save_draft(force=False)` passa pelo Critic (subagente) + scope_classifier antes de persistir.
 - **ChecklistService** (`core/services/checklist_service.py`) — 3 passes paralelos via asyncio.gather: compliance + qualidade + completude.
 - **ContentLibrary** (`core/services/content_library.py`) — CRUD + enrich_content via LLM. Soft-delete via `archived_at`.
@@ -201,4 +206,4 @@ Cada tier tem sua própria env var (ver seção LLM backend acima). Trocar um ti
 `sentence-transformers` não está nas deps padrão (evita torch em prod). Para usar `RERANK_BACKEND=cross-encoder`, instalar `pip install -e ".[rerank]"`. Em prod, usar `RERANK_BACKEND=llm` (gpt-4o-mini) ou deixar sem rerank (RRF puro).
 
 ### Discovery staging
-`core/opportunity_discovery.py` escreve em staging (tabela `discovered_opportunities`), não no KG. O gate humano em `/discovered-opportunities` promove/rejeita antes de tocar `build_knowledge_graph.py`.
+`core/opportunity_discovery.py` escreve em staging (tabela `discovered_opportunities`), não no KG. O gate humano em `/discovered-opportunities` promove/rejeita antes de tocar o pipeline de build.

@@ -584,12 +584,16 @@ def _build_all_silver() -> int:
     from core.kg.edital_id import native_id_of, source_of  # noqa: PLC0415
     from pipeline.adapters.base import get_adapter  # noqa: PLC0415
 
-    # NOTA: enumera via índice (kg_store.load_index) — um de ~10 consumidores
-    # (persist_all_current, hybrid_match_service, explore_agent, opportunity_discovery,
-    # eval/matching…). Quando a migração hipergrado remover o índice + build_knowledge_graph,
-    # a enumeração de TODOS migra p/ bronze juntos (refactor coordenado). NÃO decouplar
-    # só este consumidor — seria divergir do resto e inventar infra que ainda não existe.
-    editais = kg_store.load_index().get("editais", [])
+    # NOTA: enumera via load_all_hypergraphs (hipergrado) — migração coordenada.
+    # source_docs.persist_all_current migrou junto no mesmo PR (Phase 3).
+    # Quando o índice + build_knowledge_graph forem removidos, TODOS os consumidores
+    # restantes (hybrid_match_service, explore_agent, eval/matching…) migram juntos.
+    editais = []
+    for fk in kg_store.load_all_hypergraphs():
+        if "__" not in fk:
+            continue
+        source, _, native = fk.partition("__")
+        editais.append({"id": f"{source}:{native}"})
     n = 0
     for e in editais:
         eid = e.get("id")

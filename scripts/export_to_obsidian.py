@@ -30,7 +30,7 @@ import json
 from pathlib import Path
 
 from config import FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, OBSIDIAN_VAULT_DIR
-from core.kg import wiki_schema
+from core.kg import schema as wiki_schema
 from core.kg.edital_id import id_to_slug, source_of
 
 # Multi-fonte (§12 WIKI.md): o export consome o índice unificado (todas as fontes)

@@ -4,7 +4,7 @@ Filtro determinístico PME — decide se uma chamada serve PME/startup
 
 Aplicado em L1 (Source Adapter) antes de baixar PDFs. Rejeitados não viram
 wiki page (nem mínima); bronze é preservado para audit. Regras autoritativas
-em `wikis/_pme_filter.md`; leitor em `core.kg.wiki_schema.pme_filter_rules()`.
+em `wikis/_pme_filter.md`; leitor em `core.kg.schema.pme_filter_rules()`.
 
 Função pura: recebe `metadata` (dict agnóstico à fonte), retorna decisão.
 Sem I/O, sem LLM, sem efeito colateral.
@@ -15,7 +15,7 @@ import re
 import unicodedata
 from typing import Literal
 
-from core.kg import wiki_schema
+from core.kg import schema
 
 Decision = Literal["accept", "reject", "unclear"]
 
@@ -86,7 +86,7 @@ def relevance_with_reason(metadata: dict) -> tuple[Decision, str]:
     Retorna `(decision, reason)` onde reason é uma string curta listando
     o sinal que disparou. Útil pro épico F (dashboard de rejeitados).
     """
-    rules = wiki_schema.pme_filter_rules()
+    rules = schema.pme_filter_rules()
     programas = rules.get("programas_pme_canonicos") or {}
     publicos = rules.get("publicos_pme_canonicos") or []
     exclusores = rules.get("exclusores_academicos") or []

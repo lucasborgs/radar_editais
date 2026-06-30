@@ -30,7 +30,7 @@ from datetime import datetime, timedelta, timezone
 from config import BRONZE_DIR
 from core import web_search as websearch
 from core.kg import kg_store
-from core.kg import wiki_schema as ws
+from core.kg import schema as ws
 from core.web_identity import normalize_web_url, web_url_hash
 
 logger = logging.getLogger(__name__)

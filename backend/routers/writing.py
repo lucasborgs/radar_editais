@@ -14,10 +14,10 @@ from backend.common import (
     load_library_items,
     profile_from_workspace,
     to_py_profile,
-    wiki_matcher,
 )
 from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient
+from core.kg import hypergraph_catalog
 from core.services.content_library import get_workspace_id
 from core.services.writing_session import (
     ProfileIncompleteError,
@@ -151,7 +151,7 @@ def writing_start(
         from core.kg import kg_store
         if req.edital_id not in {p["id"] for p in kg_store.load_programas()}:
             raise HTTPException(status_code=404, detail=f"Programa '{req.edital_id}' não encontrado")
-    elif wiki_matcher.get_edital_by_id(req.edital_id) is None:
+    elif hypergraph_catalog.get_edital(req.edital_id) is None:
         raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
     else:
         # Prefetch lazy do chunking (ver docs/specs/lazy-chunking.md): só para
@@ -334,7 +334,7 @@ def _attach_target_titles(sessions: list[dict]) -> None:
 
     for eid in ids - investor_ids:
         try:
-            card = wiki_matcher.get_edital_by_id(eid)
+            card = hypergraph_catalog.get_edital(eid)
             if card and card.get("title"):
                 titles[eid] = card["title"]
         except Exception:
@@ -446,12 +446,11 @@ async def writing_checklist_auto_review(
     # Falha silenciosa: playbook ausente → compliance roda sem regras adicionais.
     playbook_monitor = ""
     try:
-        from core import kg_store
         from core.kg.edital_id import source_of
         from core.skills import load_playbook
         edital_id = doc["edital_id"]
-        wiki = kg_store.load_wiki_page(edital_id)
-        mechanism = str((wiki or {}).get("mechanism", "") or "")
+        card = hypergraph_catalog.get_edital(edital_id) or {}
+        mechanism = str(card.get("mechanism", "") or "")
         source = source_of(edital_id)
         playbook_monitor = load_playbook(mechanism, source).for_monitor()
     except Exception:

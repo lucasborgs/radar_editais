@@ -115,7 +115,12 @@ def persist_all_current() -> int:
     from core.kg.edital_id import native_id_of, source_of
     from pipeline.adapters.base import get_adapter
 
-    editais = kg_store.load_index().get("editais", [])
+    editais = []
+    for fk in kg_store.load_all_hypergraphs():
+        if "__" not in fk:
+            continue
+        source, _, native = fk.partition("__")
+        editais.append({"id": f"{source}:{native}"})
     n_ok = 0
     for e in editais:
         edital_id = e.get("id")

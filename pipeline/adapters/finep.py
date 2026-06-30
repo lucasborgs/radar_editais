@@ -40,8 +40,8 @@ _SKIP_KEYWORDS_FALLBACK = [
 
 def _skip_keywords() -> list[str]:
     """Skip-list autoritativa do doc (wikis/finep.md §4.2); fallback à constante."""
-    from core.kg import wiki_schema  # import tardio: evita ciclo no import do pipeline
-    return wiki_schema.skip_keywords("finep") or _SKIP_KEYWORDS_FALLBACK
+    from core.kg import schema  # import tardio: evita ciclo no import do pipeline
+    return schema.skip_keywords("finep") or _SKIP_KEYWORDS_FALLBACK
 
 _FAQ_VERSION_RE = re.compile(r"vers[aã]o[_\s\-]*(\d+)")
 _FAQ_DATE_RE = re.compile(r"(\d{2})[_\s\-]?(\d{2})[_\s\-]?(\d{4})")

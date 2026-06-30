@@ -9,21 +9,24 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from core.kg import temporal
+from core.kg import kg_store, temporal
 
 
-def _patch_index(monkeypatch, editais: list[dict], reference_date: str = "2026-05-31"):
-    monkeypatch.setattr(
-        temporal, "_load_index",
-        lambda: {"reference_date": reference_date, "editais": editais},
-    )
-    # Sem fallback de wiki page nos testes — o índice é a fonte.
-    monkeypatch.setattr(temporal, "wiki_page_path", lambda eid: _NoFile())
-
-
-class _NoFile:
-    def exists(self) -> bool:
-        return False
+def _patch_hypergraph(monkeypatch, editais: list[dict]):
+    graphs = {}
+    for e in editais:
+        eid = e.get("id", "")
+        source, _, native = eid.partition(":")
+        graphs[f"{source}__{native}"] = {
+            "nodes": [{
+                "type": "Edital",
+                "edital_id": eid,
+                "prazo": e.get("deadline"),
+                "status": e.get("status"),
+            }],
+            "edges": [],
+        }
+    monkeypatch.setattr(kg_store, "load_all_hypergraphs", lambda: graphs)
 
 
 def _fmt(d: date) -> str:
@@ -32,7 +35,7 @@ def _fmt(d: date) -> str:
 
 def test_future_deadline_has_positive_days(monkeypatch):
     futuro = date.today() + timedelta(days=40)
-    _patch_index(monkeypatch, [
+    _patch_hypergraph(monkeypatch, [
         {"id": "finep:1", "status": "ABERTA", "deadline": _fmt(futuro)},
     ])
     ctx = temporal.temporal_context("finep:1")
@@ -46,7 +49,7 @@ def test_future_deadline_has_positive_days(monkeypatch):
 
 def test_short_deadline_flags_urgency(monkeypatch):
     curto = date.today() + timedelta(days=5)
-    _patch_index(monkeypatch, [
+    _patch_hypergraph(monkeypatch, [
         {"id": "finep:2", "status": "ABERTA", "deadline": _fmt(curto)},
     ])
     block = temporal.render_temporal_block("finep:2")
@@ -56,7 +59,7 @@ def test_short_deadline_flags_urgency(monkeypatch):
 
 def test_expired_deadline_warns(monkeypatch):
     passado = date.today() - timedelta(days=3)
-    _patch_index(monkeypatch, [
+    _patch_hypergraph(monkeypatch, [
         {"id": "finep:3", "status": "ABERTA", "deadline": _fmt(passado)},
     ])
     ctx = temporal.temporal_context("finep:3")
@@ -68,7 +71,7 @@ def test_expired_deadline_warns(monkeypatch):
 
 
 def test_continuous_flow_no_deadline(monkeypatch):
-    _patch_index(monkeypatch, [
+    _patch_hypergraph(monkeypatch, [
         {"id": "finep:4", "status": "ABERTA", "deadline": None},
     ])
     ctx = temporal.temporal_context("finep:4")
@@ -80,17 +83,17 @@ def test_continuous_flow_no_deadline(monkeypatch):
 
 
 def test_unknown_edital_returns_empty_block(monkeypatch):
-    _patch_index(monkeypatch, [])
+    _patch_hypergraph(monkeypatch, [])
     assert temporal.temporal_context("finep:404") is None
     assert temporal.render_temporal_block("finep:404") == ""
 
 
 def test_today_is_actual_today_not_reference_date(monkeypatch):
-    """"hoje" é date.today(), não o reference_date do índice (que pode estar stale)."""
+    """"hoje" é date.today(), não uma data fixa do índice."""
     futuro = date.today() + timedelta(days=10)
-    _patch_index(monkeypatch, [
+    _patch_hypergraph(monkeypatch, [
         {"id": "finep:5", "status": "ABERTA", "deadline": _fmt(futuro)},
-    ], reference_date="2020-01-01")
+    ])
     block = temporal.render_temporal_block("finep:5")
     assert f"hoje é {date.today().isoformat()}" in block
 

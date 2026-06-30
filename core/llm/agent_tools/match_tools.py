@@ -43,6 +43,19 @@ def _format_matches(matches: list) -> str:
     return "\n".join(lines)
 
 
+def _format_entity_matches(matches: list) -> str:
+    if not matches:
+        return "Nenhum investidor/programa/ICT com afinidade suficiente ao perfil."
+    lines = [f"{len(matches)} entidades (investidor/programa/ICT) com afinidade ao perfil:"]
+    for m in matches:
+        desc = f" — {m.description[:80]}" if m.description else ""
+        lines.append(f"\n• [{m.kind}] {m.name[:70]}{desc}")
+        for p in m.paths[:3]:
+            lines.append(f"    porquê: «{p.src}» ↔ «{p.dst}» ({p.dst_type}, {p.score:.2f})")
+    lines.append("\n(Afinidade temática — parceria/capital em potencial, não elegibilidade dura.)")
+    return "\n".join(lines)
+
+
 def build_match_tools(
     profile_text: str, *, company_nodes: list[dict] | None = None,
 ) -> list[BaseTool]:
@@ -66,7 +79,7 @@ def build_match_tools(
         ponto de partida, não veredito.
 
         Args:
-            threshold: corte de similaridade (0.0-1.0; default 0.6). Menor = mais
+            threshold: corte de similaridade (0.0-1.0; default 0.55). Menor = mais
                        editais e mais ruído.
             top_k: máximo de editais a retornar (default 8).
         """
@@ -94,4 +107,50 @@ def build_match_tools(
             )
         return _format_matches(matches)
 
-    return [find_matching_editais]
+    @tool
+    def find_matching_entities(kind: str = "", threshold: float = 0.55, top_k: int = 8) -> str:
+        """Encontra INVESTIDORES, PROGRAMAS e ICTs (institutos de C&T) que casam com o
+        PERFIL DA EMPRESA por afinidade de conteúdo no hipergrado — mesmo motor do match
+        de editais, agrupando por entidade.
+
+        Use quando o usuário quer PARCERIA, CAPITAL ou PROGRAMAS, não editais ("que
+        fundos investiriam na gente?", "quais ICTs para parceria de P&D?", "tem programa
+        de aceleração para nós?"). Cada match traz a justificativa (o que da empresa casou
+        com o quê da entidade). É afinidade temática (parceria/capital em potencial), não
+        elegibilidade dura — apresente como ponto de partida.
+
+        Args:
+            kind: filtra o tipo — "investidor" (fundos), "programa", "ict" (instituto) ou
+                  "" (todos, ranqueados juntos). USE o filtro quando a pergunta é sobre um
+                  tipo só: ICTs têm temas mais específicos e afogam investidores no ranking
+                  misto, então "que fundos?" sem filtro vem fraco.
+            threshold: corte de similaridade (0.0-1.0; default 0.55). Investidores vivem em
+                       cosseno mais baixo — para fundos, 0.45-0.50 surfaça mais.
+            top_k: máximo de entidades a retornar (default 8).
+        """
+        kind_map = {
+            "investidor": "Investidor", "investidores": "Investidor", "investor": "Investidor",
+            "fundo": "Investidor", "fundos": "Investidor",
+            "programa": "Programa", "programas": "Programa",
+            "ict": "ICT", "icts": "ICT", "instituto": "ICT",
+        }
+        k = (kind or "").strip().lower()
+        kinds = frozenset({kind_map[k]}) if k in kind_map else hypergraph_match.ENTITY_TYPES
+        try:
+            nodes = company_nodes or _company_nodes(profile_text)
+        except Exception as e:  # noqa: BLE001 — erro-como-string (padrão das tools)
+            return f"Erro ao analisar o perfil: {e}."
+        if not nodes:
+            return (
+                "Perfil insuficiente para o match — peça ao usuário o que a empresa "
+                "faz, suas tecnologias e setor de atuação."
+            )
+        try:
+            matches = hypergraph_match.find_matching_entities(
+                nodes, threshold=float(threshold), top_k=int(top_k), kinds=kinds,
+            )
+        except Exception as e:  # noqa: BLE001
+            return f"Erro no match de entidades: {e}."
+        return _format_entity_matches(matches)
+
+    return [find_matching_editais, find_matching_entities]

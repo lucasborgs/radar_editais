@@ -2,7 +2,7 @@
 
 Status: **aprovada** · 2026-06-28 · escopo: substituir match por schema fixo por match baseado em hipergrafos N-ários extraídos via Hyper-Extract; eliminar wiki_pages e todo o pipeline ETL de síntese LLM; match como tool do ExploreAgent via path search puro
 
-> **Atualização pós-implementação (2026-06-29):** Sprints 0, 1 (F1+F2+F3) e 2 (backend mínimo) implementados (PR #47). A implementação **divergiu da spec em pontos-chave** — ver a seção [Previsto → Realizado](#previsto--realizado) abaixo. O texto original abaixo dela é o **plano**; a seção registra o que de fato foi feito e por quê.
+> **Atualização pós-implementação (2026-06-30 — fechamento):** Sprints 0, 1, 2 e 3 implementados. A implementação **divergiu da spec em pontos-chave** — ver a seção [Previsto → Realizado](#previsto--realizado) abaixo. O texto original abaixo dela é o **plano**; a seção registra o que de fato foi feito e por quê.
 
 ---
 
@@ -20,8 +20,8 @@ Registro das divergências entre o plano e a implementação, com justificativa.
 | **Gate / golden** | "calibrar threshold com 10-20 pares anotados" | golden de **afinidade** (`eval_data/golden/matching.json`): 8 empresas sintéticas × editais relevantes (juiz LLM independente + curadoria humana), guarda-chuva = neutro, **nós congelados** (`frozen_nodes`) → gate determinístico, sem LLM de extração | O golden mede AFINIDADE (não elegibilidade, que é camada à parte). Congelar os nós isola o MOTOR da variância de extração (a extração tem suíte própria). Suíte `matching` em `core/eval` (regra: não criar harness paralelo). |
 | **Company corpus (Sprint 2)** | task re-scrapeia o site + parseia documentos | **mínimo**: corpus = só o que já está no DB (`workspaces.profile` + `content_items`), **sem** re-scrape | Fatia escolhida ("durable backend mínimo"). Re-scrape do site + banner de UI são fatias adicionais (não neste PR). |
 | **Storage lado-empresa** | (implícito no kg_store) | módulo dedicado `core/services/company_corpus.py` + tabela `company_hypergraphs` | Dado **per-tenant** (vizinho de `content_library`, com RLS), não ecossistema-global — não pertence ao kg_store. |
-| **Remoção do legado** | Sprint 1/3 removem `hybrid_match_service`, `radar_service`, `GraphService`, `wiki_schema`, `index.json`, `search_edital_trechos` | **NÃO removidos** | **PENDENTE/arriscado** — ainda wirados em produção (`routers/matching.py`, `routers/graph.py`, `explore_agent`, `frontend/api.ts`). Remover cru quebra a prod; exige migrar frontend/endpoints para o match novo antes. Sprint 3 adiada. |
-| **`get_node_neighborhood`** | tool da Sprint 3 (ExploreAgent lê `hypergraphs/{id}.json` direto) | **PENDENTE** (Sprint 3, parte aditiva — segura) | Adiada com a Sprint 3. |
+| **Remoção do legado** | Sprint 1/3 removem `hybrid_match_service`, `radar_service`, `GraphService`, `wiki_schema`, `index.json`, `search_edital_trechos` | **Concluído.** Python removido, artefatos de dados removidos do disco. Todos os 5 consumidores runtime migrados para `hypergraph_catalog.get_edital()`. | A remoção completa só foi possível após migrar consumidores de wiki_page (writing_session, compliance, checklist, writing_tools, writing_router) para hypergraph + LLM fallback. |
+| **`get_node_neighborhood`** | tool da Sprint 3 (ExploreAgent lê `hypergraphs/{id}.json` direto) | **Implementado** em `core/llm/agent_tools/explore_tools.py` (`resolve_graph_nodes` + `neighborhood`). Testado via `tests/test_get_node_neighborhood.py`. | — |
 
 **Mantido conforme o plano:** schema Hyper-Extract de produção (12 nós / 10 arestas, `Aplicação` central); `find_matching_editais` como tool do ExploreAgent com chamada automática quando há perfil; nós da empresa pelo MESMO extractor/embedder do eco (canvas único); `completude_score` (fórmula da spec); Obsidian só visualização.
 
@@ -404,14 +404,14 @@ def completude_score(n_nos: int, n_docs: int) -> float:
 
 ### Sprint 3 — ExploreAgent + cleanup (3 dias)
 
-- [ ] Adicionar tool `get_node_neighborhood()` ao ExploreAgent (lê `hypergraphs/{id}.json` diretamente)
-- [ ] Remover tool `search_edital_trechos` + referência no `EXPLORE_AGENT_SYSTEM`
-- [ ] Remover `GraphService` (Obsidian = visualização apenas)
-- [ ] Remover wiki_page do contexto do ExploreAgent
-- [ ] Remover `data/knowledge_graph/wiki/` e `index.json`
-- [ ] Remover cards `kind="radar"` + `BriefView` + `MatchingWeightsSection` no frontend
-- [ ] Remover `core/kg/wiki_schema.py`
-- [ ] Avaliar latência do primeiro turno da WritingSession (sem impacto esperado — já usa RAG)
+- [x] Adicionar tool `get_node_neighborhood()` ao ExploreAgent (lê `hypergraphs/{id}.json` diretamente)
+- [x] Remover tool `search_edital_trechos` + referência no `EXPLORE_AGENT_SYSTEM`
+- [x] Remover `GraphService` (Obsidian = visualização apenas)
+- [x] Remover wiki_page do contexto do ExploreAgent
+- [x] ~Remover `data/knowledge_graph/wiki/` e `index.json`~ **Concluído** — todos os consumidores runtime migrados; arquivos removidos do disco. Dev scripts (export_to_obsidian) tratam ausência graciosamente.
+- [x] Remover cards `kind="radar"` + `BriefView` + `MatchingWeightsSection` no frontend
+- [x] Remover `core/kg/wiki_schema.py` → substituído por `core/kg/schema.py`
+- [x] Avaliar latência do primeiro turno da WritingSession (sem impacto esperado — já usa RAG)
 
 ---
 

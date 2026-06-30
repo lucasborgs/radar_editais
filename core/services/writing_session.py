@@ -41,7 +41,6 @@ from pathlib import Path
 import requests
 
 from config import FINEP_PDFS_DIR
-from core.kg.edital_id import wiki_page_path
 from core.reflection_service import load_active_insights
 from core.retrieval.retriever import (
     format_chunks_for_prompt,
@@ -495,10 +494,7 @@ class WritingSession:
             if self.mode == "pitch":
                 self._proposal_outline = self._default_pitch_outline()
             else:
-                self._proposal_outline = (
-                    self._load_outline_from_wiki(self.edital_id)
-                    or self._generate_outline()
-                )
+                self._proposal_outline = self._generate_outline()
             self._save_outline()
 
         # Escopo de RAG: edital primário + análogos (mesmo tema/publico no
@@ -716,19 +712,6 @@ class WritingSession:
     # ------------------------------------------------------------------
     # Outline da proposta
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def _load_outline_from_wiki(edital_id: str) -> list[str]:
-        """Lê proposal_sections da wiki page — zero custo de LLM."""
-        wiki_file = wiki_page_path(edital_id)
-        if not wiki_file.exists():
-            return []
-        try:
-            wiki_page = json.loads(wiki_file.read_text(encoding="utf-8"))
-            sections = wiki_page.get("proposal_sections", [])
-            return [str(s) for s in sections] if sections else []
-        except Exception:
-            return []
 
     def _generate_outline(self) -> list[str]:
         """Gera o outline das seções da proposta via LLM (1 chamada por sessão)."""

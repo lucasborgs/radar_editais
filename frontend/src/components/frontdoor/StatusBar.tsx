@@ -3,18 +3,13 @@
 import { cn } from "@/lib/utils";
 
 // Barra de status sob o header (spec §3): completude do perfil em % com barra
-// visual + atalhos. "ver radar atual ↓" só aparece se houver radar no transcript
-// (rola até o último card). "editar perfil" abre o card de diff em modo edição
-// com TODOS os campos atuais. É a mitigação do risco "ranking se perde no scroll".
+// visual + atalho. "editar perfil" abre o card de diff em modo edição com TODOS
+// os campos atuais.
 export function StatusBar({
   completeness,
-  hasRadar,
-  onSeeRadar,
   onEditProfile,
 }: {
   completeness: number;
-  hasRadar: boolean;
-  onSeeRadar: () => void;
   onEditProfile: () => void;
 }) {
   return (
@@ -34,15 +29,6 @@ export function StatusBar({
         </span>
 
         <div className="ml-auto flex items-center gap-3">
-          {hasRadar && (
-            <button
-              type="button"
-              onClick={onSeeRadar}
-              className="text-xs font-sans text-primary transition-opacity hover:opacity-80"
-            >
-              ver radar atual ↓
-            </button>
-          )}
           <button
             type="button"
             onClick={onEditProfile}

@@ -1,12 +1,8 @@
 """core/kg_store.py — fonte única dos artefatos do knowledge graph.
 
 Centraliza leitura/escrita dos blobs do grafo (`index.json`,
-`index_historico.json`, `icts.json`). Antes, 5 módulos do request-path
-(`hybrid_match`, `kg_match`, `temporal`, `opportunity_discovery`, `ict_match`)
-faziam `json.load` direto do disco — o que prendia matching e descoberta a
-arquivos locais que NUNCA chegam à imagem de produção (estão no `.gitignore`
-e não são copiados no Dockerfile). Trocar a origem dos dados agora é mudar
-AQUI, não em cada call-site.
+`index_historico.json`, `icts.json`). Todos os consumidores lêem via
+esta camada, nunca diretamente do disco.
 
 Backends de LEITURA (env `KG_STORE_BACKEND`):
   • "file" (default)  — lê `data/knowledge_graph/*.json`. Dev + ETL local.
@@ -49,7 +45,6 @@ _FILES: dict[str, str] = {
     # Estado operacional do pipeline (não-artefato do grafo, mas mesmo seam):
     # em prod o FS do worker é EFÊMERO — sem durabilidade aqui, cada redeploy
     # re-sintetiza toda wiki (rate limit) e a Descoberta re-tria URLs já vistas.
-    "etl_process_cache": "wiki/.etl_process_cache.json",
     "discovery_ledger": ".discovery_ledger.json",
 }
 
@@ -160,78 +155,7 @@ def load_programas() -> list[dict]:
     return load("programas", default={}).get("programas", [])
 
 
-# ---------------------------------------------------------------------------
-# Wiki pages (síntese completa por edital)
-# ---------------------------------------------------------------------------
-# Tratadas À PARTE do _FILES singleton: em modo file são arquivos POR-EDITAL
-# (KG_WIKI_DIR/{source}/{native}.json), não um arquivo único. Em postgres vivem
-# num único blob kg_artifacts key='wiki' = {edital_id: page}. Isto fecha o Tier 2
-# do débito data-plane: os leitores (HybridMatch/checklist/compliance/brief/KGMatch)
-# passam a ler daqui, não do arquivo (que não existe na imagem de prod).
-_WIKI_KEY = "wiki"
 
-
-def _load_wiki_blob_pg() -> dict:
-    """Blob {edital_id: wiki_page} do Postgres, cacheado (TTL). {} se ausente."""
-    now = time.monotonic()
-    with _lock:
-        cached = _pg_cache.get(_WIKI_KEY)
-        if cached is not None and (now - cached[0]) < _PG_TTL:
-            return cached[1]
-    try:
-        from core.db import get_supabase_service
-        resp = (
-            get_supabase_service()
-            .table(_TABLE).select("blob").eq("key", _WIKI_KEY).limit(1).execute()
-        )
-    except Exception as e:
-        logger.warning("kg_store[postgres]: falha ao ler blob wiki: %s", e)
-        return {}
-    rows = resp.data or []
-    blob = rows[0]["blob"] if rows else {}
-    with _lock:
-        _pg_cache[_WIKI_KEY] = (now, blob)
-    return blob
-
-
-def load_wiki_page(edital_id: str) -> dict | None:
-    """Wiki page (síntese completa) de um edital — None se ausente.
-
-    postgres → do blob `wiki`; file → arquivo por-edital. Em postgres, se faltar
-    no blob, cai pro arquivo (cobre transição/dev). Single source para todos os
-    consumidores de wiki page no request-path.
-    """
-    from core.kg.edital_id import wiki_page_path  # lazy: evita ciclo de import
-    if os.getenv("KG_STORE_BACKEND", "file").lower() == "postgres":
-        page = _load_wiki_blob_pg().get(edital_id)
-        if page is not None:
-            return page
-    path = wiki_page_path(edital_id)
-    if path.exists():
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except Exception as e:
-            logger.warning("kg_store: falha ao ler wiki page %s: %s", edital_id, e)
-    return None
-
-
-def save_wiki_pages(pages: dict[str, dict]) -> None:
-    """MERGE de {edital_id: page} no blob `wiki` do Postgres (se configurado).
-
-    Os arquivos por-edital são escritos pelo `etl_process`; aqui só persistimos o
-    blob durável p/ prod. MERGE (não substitui) para que runs parciais (ex.: só
-    vigentes) não apaguem as páginas das demais. No-op sem Supabase (modo file puro).
-    """
-    if not pages or not _pg_configured():
-        return
-    from core.db import get_supabase_service
-    merged = {**_load_wiki_blob_pg(), **pages}
-    get_supabase_service().table(_TABLE).upsert(
-        {"key": _WIKI_KEY, "blob": merged}, on_conflict="key"
-    ).execute()
-    with _lock:
-        _pg_cache[_WIKI_KEY] = (time.monotonic(), merged)
-    logger.info("kg_store: %d wiki pages publicadas (blob total=%d)", len(pages), len(merged))
 
 
 # ---------------------------------------------------------------------------
@@ -306,6 +230,27 @@ def save_hypergraphs(graphs: dict[str, dict]) -> None:
     with _lock:
         _pg_cache[_HYPERGRAPH_KEY] = (time.monotonic(), merged)
     logger.info("kg_store: %d hypergraphs publicados (blob total=%d)", len(graphs), len(merged))
+
+
+def load_all_hypergraphs() -> dict[str, dict]:
+    """Todos os subgrafos do ecossistema como {file_key: hypergraph}.
+
+    postgres → blob `hypergraphs`, completado pelos arquivos locais ausentes
+    (mesma transição de `load_hypergraph`); file → arquivos por-edital no disco.
+    Single source para os consumidores que varrem o grafo inteiro (vizinhança,
+    catálogo, match). Não cacheia além do TTL do blob PG.
+    """
+    out: dict[str, dict] = {}
+    if os.getenv("KG_STORE_BACKEND", "file").lower() == "postgres":
+        out.update(_load_hypergraph_blob_pg())
+    for p in sorted(_HYPERGRAPHS_DIR.glob("*.json")):
+        if p.stem in out:
+            continue
+        try:
+            out[p.stem] = json.loads(p.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.warning("kg_store: falha ao ler hypergraph %s: %s", p.stem, e)
+    return out
 
 
 # ---------------------------------------------------------------------------

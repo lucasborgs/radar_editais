@@ -69,11 +69,11 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
         except Exception:
             _skill_source = ""
         try:
-            from core.kg import kg_store
-            _wiki = kg_store.load_wiki_page(session.edital_id)
-            if _wiki:
-                _skill_mechanism = str(_wiki.get("mechanism", "") or "")
-        except Exception as e:  # nunca quebra a construção do toolset
+            from core.kg import hypergraph_catalog
+            card = hypergraph_catalog.get_edital(session.edital_id)
+            if card:
+                _skill_mechanism = str(card.get("mechanism", "") or "")
+        except Exception as e:
             logger.debug("load_skill: falha ao resolver mechanism de %s: %s",
                          getattr(session, "edital_id", "?"), e)
 
