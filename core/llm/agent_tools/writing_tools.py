@@ -99,7 +99,7 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
         """
         # Pitch (entidade): o substrato é o nó do fundo, não chunks de edital.
         if getattr(session, "mode", "proposal") == "pitch":
-            return session._pitch_target_context or (
+            return session._source_card_context or (
                 "Nenhum dado do fundo-alvo disponível. Prossiga com o perfil da startup."
             )
 

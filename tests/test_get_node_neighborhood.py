@@ -89,3 +89,57 @@ def test_depth2_expands_to_second_hop():
     d2 = neighborhood(GRAPHS, "Inteligência Artificial", depth=2)
     assert "exige" not in d1
     assert "exige" in d2
+
+
+# ── cross-source ──────────────────────────────────────────────────────────────
+
+CROSS_GRAPHS = {
+    "finep__589": {
+        "nodes": [
+            {"name": "Chamada FINEP-CDTI", "type": "Edital", "prazo": "30.06.2026", "status": "aberto", "edital_id": "589"},
+            {"name": "Inteligência Artificial", "type": "Tecnologia", "description": "IA embarcada"},
+            {"name": "Inovação Tecnológica", "type": "Tema"},
+        ],
+        "edges": [
+            {"type": "abrange_tema", "members": ["chamada finep-cdti", "inovação tecnológica", "inteligência artificial"]},
+        ],
+    },
+    "ict": {
+        "nodes": [
+            {"name": "Instituto X", "type": "ICT", "description": "P&D em IA"},
+            {"name": "Inteligência Artificial", "type": "Tecnologia", "description": "IA geral"},
+            {"name": "Robótica", "type": "Tecnologia"},
+        ],
+        "edges": [
+            {"type": "abrange_tema", "members": ["instituto x", "inteligência artificial"]},
+            {"type": "abrange_tema", "members": ["instituto x", "robótica"]},
+        ],
+    },
+}
+
+
+def test_build_entity_index():
+    from core.llm.agent_tools.explore_tools import build_entity_index, resolve_entity
+    idx = build_entity_index(CROSS_GRAPHS)
+    # (type, name) → [(file_key, node)]
+    res = resolve_entity(idx, "Inteligência Artificial", "Tecnologia")
+    fks = {fk for fk, _ in res}
+    assert "finep__589" in fks
+    assert "ict" in fks
+
+
+def test_cross_source_edital_to_ict():
+    from core.llm.agent_tools.explore_tools import build_entity_index
+    idx = build_entity_index(CROSS_GRAPHS)
+    # Edital → BFS → IA → cross_source → ICT
+    out = neighborhood(CROSS_GRAPHS, "Chamada FINEP-CDTI", depth=1,
+                       cross_source=True, entity_index=idx)
+    assert "[Tecnologia] em ict" in out
+    assert "Instituto X (ICT)" in out
+
+
+def test_cross_source_default_off():
+    # Sem cross_source, query a partir do edital não alcança ICTs
+    out = neighborhood(CROSS_GRAPHS, "Chamada FINEP-CDTI", depth=1,
+                       cross_source=False)
+    assert "[Tecnologia] em ict" not in out

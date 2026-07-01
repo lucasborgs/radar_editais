@@ -135,7 +135,7 @@ def test_run_critic_subagent_pitch_target_is_fund_node(monkeypatch):
 
     s = _StubSession(["1. Time", "2. Fit com a tese do fundo"], {})
     s.mode = "pitch"
-    s._pitch_target_context = (
+    s._source_card_context = (
         "FUNDO-ALVO: KPTL\nTese: deep-tech early-stage.\nEstágio alvo: seed"
     )
 

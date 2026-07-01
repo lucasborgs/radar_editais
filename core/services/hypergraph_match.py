@@ -172,6 +172,13 @@ def build_synthetic_edges(
     return edges
 
 
+# Damping da expansão via catálogo (ICT/investidor/programa). Um edital que
+# casa com a empresa por temas diretos (Tema/Tecnologia/Aplicacao) recebe
+# score sem desconto. Um edital que só casa via ICT parceira (empresa → tema
+# da ICT em ict.json → edital parceiro da ICT) recebe score * damping.
+CATALOG_EXPANSION_DAMPING = 0.30
+
+
 @dataclass
 class EditalMatch:
     """Um edital que casa com a empresa, com as arestas-justificativa e as
@@ -207,6 +214,150 @@ class EditalMatch:
         }
 
 
+def _expand_match_via_catalog(
+    matches: list[EditalMatch],
+    company_nodes: list[dict],
+    graphs: dict[str, dict],
+    *,
+    threshold: float = SYNTHETIC_EDGE_THRESHOLD,
+    damping: float = CATALOG_EXPANSION_DAMPING,
+    max_paths: int = 5,
+) -> list[EditalMatch]:
+    """Expande matches de editais via catálogo de ICTs (ADDITIVO ao match direto).
+
+    Para cada edital já matchado, identifica suas ICTs parceiras (arestas
+    `parceria_com`). Consulta o catálogo `ict.json` para descobrir que temas/
+    tecnologias/aplicações essas ICTs dominam. Se a empresa casa com esses temas
+    (por cosseno), adiciona paths de expansão com score * damping.
+
+    Fiel ao Hyper-Extract: cada subgrafo é independente; a conexão entre edital
+    e ICT vem da aresta `parceria_com` no subgrafo do edital, e a conexão ICT→tema
+    vem das arestas nativas em `ict.json`. A "ponte" é a entidade compartilhada
+    (o nome da ICT), resolvida pelo índice global de entidades.
+
+    Uso: `matches = _expand_match_via_catalog(matches, company_nodes, graphs)`
+    após `find_matching_editais`. Os matches originais mantêm score; a expansão
+    adiciona paths com damping."""
+    if not company_nodes or not matches:
+        return matches
+
+    ict_graph = graphs.get("ict")
+    if not ict_graph:
+        return matches
+
+    # Índice de nós do catálogo ICT: name_lower → node
+    ict_idx = {
+        (n.get("name") or "").strip().lower(): n
+        for n in ict_graph.get("nodes", [])
+        if n.get("name")
+    }
+
+    # Índice de arestas do catálogo ICT: nome ICT(lower) → [(tipo_aresta, [membros])]
+    ict_edges_by_entity: dict[str, list[tuple[str, list[str]]]] = defaultdict(list)
+    for e in ict_graph.get("edges", []):
+        et = e.get("type", "")
+        members = [(m or "").strip().lower() for m in e.get("members", [])]
+        for m in members:
+            if m in ict_idx and ict_idx[m].get("type") == "ICT":
+                ict_edges_by_entity[m].append((et, members))
+
+    # Embed da empresa (só nós de afinidade) para comparar com temas do catálogo
+    comp_affinity = [n for n in company_nodes if n.get("type") in AFFINITY_TYPES]
+    if not comp_affinity:
+        return matches
+    comp_emb = np.asarray(
+        [embed_texts([_node_text(n)])[0] for n in comp_affinity], dtype=np.float32
+    )
+    comp_emb = comp_emb / (np.linalg.norm(comp_emb, axis=1, keepdims=True) + 1e-9)
+
+    new_paths: dict[str, list[SyntheticEdge]] = defaultdict(list)
+
+    for mt in matches:
+        graph = graphs.get(mt.file_key)
+        if not graph:
+            continue
+        # ICTs parceiras deste edital (arestas `parceria_com` no subgrafo)
+        ict_partners: set[str] = set()
+        for e in graph.get("edges", []):
+            if e.get("type") != "parceria_com":
+                continue
+            members = [(m or "").strip().lower() for m in e.get("members", [])]
+            # O nó Edital é um dos members; os outros são ICTs/Investidores
+            for m in members:
+                node_type = ""
+                for n in graph.get("nodes", []):
+                    if (n.get("name") or "").strip().lower() == m:
+                        node_type = n.get("type", "")
+                        break
+                if node_type == "ICT":
+                    ict_partners.add(m)
+
+        if not ict_partners:
+            continue
+
+        # Para cada ICT parceira, buscar temas no catálogo ict.json
+        for ict_name in ict_partners:
+            related_edges = ict_edges_by_entity.get(ict_name, [])
+            for et, e_members in related_edges:
+                # Tipos de aresta que conectam ICT a conteúdo temático
+                if et not in {"abrange_tema", "viabiliza", "aplica_em"}:
+                    continue
+                # Os outros membros da aresta (que não são a ICT)
+                for m in e_members:
+                    if m == ict_name:
+                        continue
+                    m_node = ict_idx.get(m)
+                    if not m_node:
+                        continue
+                    m_type = m_node.get("type", "")
+                    if m_type not in AFFINITY_TYPES:
+                        continue
+                    # Embed do tema e cosseno com empresa
+                    m_emb = np.asarray(
+                        embed_texts([_node_text(m_node)]), dtype=np.float32
+                    )
+                    m_emb = m_emb / (np.linalg.norm(m_emb) + 1e-9)
+                    sims = comp_emb @ m_emb.T  # (C × 1)
+                    best = float(sims.max())
+                    if best >= threshold:
+                        new_paths[mt.file_key].append(
+                            SyntheticEdge(
+                                src=comp_affinity[int(sims.argmax())].get("name", ""),
+                                dst=m_node.get("name", ""),
+                                file_key="ict",
+                                src_type=comp_affinity[int(sims.argmax())].get("type", ""),
+                                dst_type=m_type,
+                                score=best * damping,
+                            )
+                        )
+
+    # Adiciona paths de expansão aos matches existentes
+    for mt in matches:
+        extra = new_paths.get(mt.file_key, [])
+        if extra:
+            extra.sort(key=lambda x: x.score, reverse=True)
+            # Atualiza paths (preserva os originais + expansão)
+            seen_dst: set[str] = set()
+            merged = list(mt.paths)
+            for p in extra:
+                if p.dst not in seen_dst:
+                    seen_dst.add(p.dst)
+                    merged.append(p)
+            merged.sort(key=lambda x: x.score, reverse=True)
+            mt.paths = merged[:max_paths]
+            # Recalcula affinity com expansão (marginsum com damping)
+            mt.affinity = sum(x.score - threshold for x in merged)
+            mt.n_paths = len(merged)
+
+    matches.sort(key=lambda m: m.affinity, reverse=True)
+    logger.info(
+        "expand_match_via_catalog: %d editais expandidos (damping=%.2f)",
+        sum(1 for m in matches if new_paths.get(m.file_key)),
+        damping,
+    )
+    return matches
+
+
 def find_matching_editais(
     company_nodes: list[dict],
     *,
@@ -215,6 +366,7 @@ def find_matching_editais(
     top_k: int = 10,
     max_paths: int = 5,
     ecosystem: list[tuple[str, dict]] | None = None,
+    catalog_expansion: bool = False,
 ) -> list[EditalMatch]:
     """Match por PATH SEARCH: empresa → aresta sintética → Edital.
 
@@ -225,8 +377,12 @@ def find_matching_editais(
     match real. Editais abaixo de `min_aggregate` somem (corta ruído sem matar recall).
     Calibrado na suíte `matching`: recall@8 0.80→0.88, ruído 4.2→3.6. Sem LLM.
 
-    Catálogos (ICT/inv/prog) ficam fora (não têm '__' no file_key) — são oferta-
-    entidade, não chamada."""
+    Quando `catalog_expansion=True`, após o match geométrico, expande via catálogo
+    de ICTs (ADDITIVO): identifica ICTs parceiras dos editais, consulta `ict.json`
+    para temas que elas dominam, e adiciona paths com damping. Empresa → tema da
+    ICT → edital parceiro da ICT.
+
+    Catálogos (ICT/inv/prog) ficam fora do match direto (não têm '__' no file_key)."""
     eco = ecosystem if ecosystem is not None else load_ecosystem_nodes()
     edges = build_synthetic_edges(company_nodes, threshold=threshold, ecosystem=eco)
     edital_node = {fk: n for fk, n in eco if n.get("type") == "Edital"}
@@ -253,8 +409,18 @@ def find_matching_editais(
             )
         )
     matches.sort(key=lambda m: m.affinity, reverse=True)
-    logger.info("find_matching_editais: %d editais (threshold=%.2f, min_agg=%.2f)",
-                len(matches), threshold, min_aggregate)
+
+    if catalog_expansion:
+        from core.kg import kg_store
+        graphs = kg_store.load_all_hypergraphs()
+        matches = _expand_match_via_catalog(
+            matches, company_nodes, graphs,
+            threshold=threshold,
+            max_paths=max_paths,
+        )
+
+    logger.info("find_matching_editais: %d editais (threshold=%.2f, min_agg=%.2f, catalog_expansion=%s)",
+                len(matches), threshold, min_aggregate, catalog_expansion)
     return matches[:top_k]
 
 
