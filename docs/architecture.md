@@ -9,10 +9,10 @@ que modelo faz o quê, e como isso é medido — não o CRUD/auth/frontend.
 
 ---
 
-## 1. Data plane — medallion ETL → Knowledge Graph → chunks
+## 1. Data plane — Bronze → Hipergrafo → Chunks
 
 Multi-fonte com adapters por fonte; a descoberta web é uma "torneira" que passa
-por gate humano antes de tocar o grafo. Produtores LLM rodam em build-time.
+por gate humano antes de tocar o grafo.
 
 ```mermaid
 flowchart TB
@@ -23,33 +23,27 @@ flowchart TB
     WEB["Web / Descoberta<br/>core.opportunity_discovery"]
   end
 
-  WEB -->|"torneira"| STAGING["Staging + gate humano<br/>(discovery não escreve no KG)"]
-  STAGING --> ADP
-  FINEP --> ADP
-  FAPESP --> ADP
-  FAPESC --> ADP
+  WEB -->|"torneira"| STAGING["Staging + gate humano<br/>discovery não escreve no KG"]
+  STAGING --> NORM
+  FINEP --> NORM
+  FAPESP --> NORM
+  FAPESC --> NORM
 
-  ADP["_NORMALIZERS por fonte<br/>build_knowledge_graph.py"] --> SILVER["Silver · etl_process.py"]
-  SILVER --> KGB["build_knowledge_graph<br/>consolida index + wiki"]
+  NORM["Normalizers por fonte (adapter pattern)"] --> HEX["hyper_extractor.py<br/>extração N-ária: 12 nós / 10 arestas<br/>2+ chamadas LLM estruturadas por edital<br/>(nós → arestas → merge dedup)"]
+  HEX --> HG[("Hipergrados individuais<br/>data/knowledge_graph/hypergraphs/{id}.json")]
 
-  KGB --> PROD
-  subgraph PROD["Produtores LLM (build-time)"]
-    ELIG["eligibility_constraints<br/>gemini-2.5-flash / gpt-4o-mini"]
-    MECH["mechanism / trl / objective<br/>infer + síntese"]
-    ENR["enrichment (summary/themes)"]
-  end
+  HG --> EMB["embedder.py<br/>text-embedding-3-small (1536d)<br/>embeds nós Edital/Tema/Tecnologia/Aplicação"]
+  EMB --> CACHE[("ecosystem_embeddings.npz<br/>cacheados por hash do texto")]
 
-  PROD --> KG[("KG: index.json + wiki/*.json<br/>seam = core/kg/kg_store.py")]
-
-  KG --> CHK["chunk_edital · chunker.py (Art./§)"]
+  HG --> CHK["chunk_edital · chunker.py (Art./§)"]
   CHK --> CTX["Contextual Retrieval<br/>core/contextual_retrieval.py"]
-  CTX --> EMB["embedder.py<br/>text-embedding-3-large (1536d)"]
-  EMB --> VEC[("edital_chunks<br/>pgvector + tsvector/BM25")]
+  CTX --> CHKEMB["embedder.py<br/>text-embedding-3-large (1536d)"]
+  CHKEMB --> VEC[("edital_chunks<br/>pgvector + tsvector/BM25<br/>para RAG na escrita")]
 ```
 
 ---
 
-## 2. AI core (query time) — retrieval + matching dual + escrita
+## 2. AI core (query time) — retrieval + matching + escrita
 
 ```mermaid
 flowchart TB
@@ -67,33 +61,23 @@ flowchart TB
     RERANK --> TOPK["top-k chunks"]
   end
 
-  subgraph MATCH["Matching"]
-    direction TB
-    subgraph HM["HybridMatchService"]
-      S1["Stage 1 determinístico (Pandas)<br/>elegibilidade·temático·TRL·mecanismo<br/>·contrapartida·elig. dura (região/idade/receita)"]
-      S1 --> S2["Stage 2 LLM · gpt-4o-mini<br/>pesos: matching_weights (cache TTL 60s)"]
-    end
-    subgraph EM["EntityMatcher · Karpathy-style<br/>catálogo inteiro no prompt, 1 LLM call"]
-      INV["catalog_investidores<br/>tese/estágio/setor · gpt-4o-mini"]
-      PROG["catalog_programas<br/>estágio/elegibilidade/tema · gpt-4o-mini"]
-    end
-    ICT["ict_match.rank_partners · determinístico"]
+  subgraph MATCH["Matching · HypergraphMatch"]
+    DIR["Empresa → embed perfil<br/>mesmo embedder do ecossistema"]
+    ECO["Ecossistema → ecosystem_embeddings.npz<br/>(nós Tema/Tecnologia/Aplicação<br/>de todos os hipergrados)"]
+    DIR --> COS["cosseno numpy on-demand<br/>nós empresa × nós ecossistema"]
+    ECO --> COS
+    COS --> MARGIN["marginsum por edital<br/>Σ(max(cosseno) − threshold)<br/>threshold 0.55 · piso min_aggregate"]
+    MARGIN --> RANK["ranking por afinidade<br/>sem estágio LLM no match core"]
   end
 
   Q --> RET
   Q --> MATCH
-  HM --> RADAR
-  INV --> RADAR
-  PROG --> RADAR
-  ICT --> RADAR
-  RADAR["radar_service.merge_radar<br/>RRF + entity_floor · multi-quadrante<br/>evento / entidade / programa"]
 
   TOPK -.->|"RAG · retrieve_chunks"| WS
 
   subgraph EXPLORE["Descoberta · ExploreAgent"]
-    GS["GraphService · leitura do vault Obsidian<br/>sem LLM, cache LRU por mtime"]
     EA["ExploreAgent · 3 rotas<br/>factual → reasoning → agent"]
-    GS -->|scope + factual| EA
+    EA --> TOOLS["tools:<br/>resolve_graph_nodes<br/>neighborhood<br/>(lê hipergrados direto)"]
   end
 
   subgraph FRONT["⚡ Frontend · estado local"]
@@ -103,7 +87,7 @@ flowchart TB
   EA -.->|"responde + profile_diff"| FRONT
   FRONT -.->|"isRadarReady()"| Q
 
-  RADAR -.->|"RadarItem[].edital_id<br/>usuário clica 'Começar proposta'"| WS
+  MATCH -.->|"edital_id<br/>usuário clica 'Começar proposta'"| WS
 
   subgraph WRITE["Escrita · runtime agêntico"]
     WS["WritingSession → LangGraph (agent_graph)<br/>RAG via retrieve_chunks<br/>scope = [edital_id]"]
@@ -170,7 +154,7 @@ flowchart TB
 flowchart LR
   subgraph EVAL["Harness unificado · core/eval"]
     REG["registry.py · 11 SUITES"]
-    REG --> S["matching · rag · writing · extraction<br/>investor_match · opportunity_type · triage<br/>profile_extractor · reranker · structurer · compliance_monitor"]
+    REG --> S["matching · rag · writing · extraction<br/>profile_extractor · reranker · structurer · compliance_monitor · focus_group"]
     S --> H["Suite.task roda pipeline REAL<br/>evaluators reusam core/*_eval.py"]
     H --> OUT{"LANGFUSE_* setado?"}
     OUT -->|sim| LF["Langfuse Experiment<br/>scores comparáveis entre commits"]
@@ -196,7 +180,7 @@ flowchart LR
 
 | Sinal | Onde |
 |---|---|
-| Fallback determinístico antes do LLM | HybridMatch Stage 1 Pandas → Stage 2; rerank degrada p/ RRF puro |
+| Similaridade puramente geométrica no match | HypergraphMatch: marginsum sobre cosseno numpy — sem LLM, sem pesos heurísticos, sem Pandas |
 | Modelo por tradeoff explícito | `llm_router` fast/pro/auto; produtores em free-tier (gemini), agregado em gpt-4o-mini |
 | RAG não-ingênuo | BM25+dense via RRF com `fts_weight=0.5` justificado pelo corpus; contextual retrieval; dedup por source; HyDE ativo por default com fallback silencioso |
 | Mede antes de mergear | 11 suítes no registry, gate de commit, Langfuse Experiments |

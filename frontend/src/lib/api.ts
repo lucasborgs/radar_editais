@@ -140,9 +140,10 @@ export interface KGChatMessage {
   content: string;
 }
 
-// ── Front-door (turno conversacional, público) ─────────────
-// POST /frontdoor/turn (backend/routers/frontdoor.py): resposta sobre a base +
+// ── Explore (turno conversacional exploratório) ────────────
+// POST /explore (backend/routers/explore.py): resposta sobre a base +
 // proposta de diff de perfil. O front aplica o diff só após aceite (D4).
+// Autenticado: persiste a conversa (kind='frontdoor') e devolve session_id.
 
 export interface ProfileDiffItem {
   field: keyof CompanyProfile;
@@ -151,12 +152,32 @@ export interface ProfileDiffItem {
   new: unknown;
 }
 
-// Ids das entradas persistidas num turno logado (backend/routers/frontdoor.py:
-// persist_frontdoor_turn). `diff` é o que o front usa (PATCH no aceite/descarte).
+// Ids das entradas persistidas num turno logado via
+// persist_frontdoor_turn. `diff` é o que o front usa (PATCH no aceite/descarte).
 export interface FrontdoorEntryIds {
   user: number | null;
   assistant: number | null;
   diff?: number | null;
+}
+
+export interface MatchedEditalPath {
+  src: string;
+  dst: string;
+  dst_type: string;
+  score: number;
+}
+
+export interface MatchedEdital {
+  source: string;
+  edital_id: string;
+  name: string;
+  score: number;
+  affinity: number;
+  n_paths: number;
+  status: string | null;
+  prazo: string | null;
+  valor: string | null;
+  paths: MatchedEditalPath[];
 }
 
 export const frontdoorTurn = (
@@ -165,15 +186,13 @@ export const frontdoorTurn = (
   profile: Partial<CompanyProfile> | null,
   sessionId?: string | null,
 ) =>
-  // O JWT vai automático pelo apiFetch quando há sessão Supabase — o endpoint
-  // tem auth opcional: anônimo segue público, logado persiste e devolve
-  // session_id/entry_ids (spec chat-first, fase 2).
   apiFetch<{
     answer: string;
     profile_diff: ProfileDiffItem[] | null;
+    matched_editais?: MatchedEdital[];
     session_id?: string;
     entry_ids?: FrontdoorEntryIds;
-  }>("/frontdoor/turn", {
+  }>("/explore", {
     method: "POST",
     body: JSON.stringify({
       message,

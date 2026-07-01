@@ -92,6 +92,8 @@ class WritingTurnResponse(BaseModel):
     # First-turn generation (Parte A)
     sections_done: list[str] = []
     failed_sections: list[str] = []
+    # Sinaliza que um draft completo foi gerado neste turno
+    draft_ready: bool = False
     # Ripple correction suggestion (Parte B)
     ripple_suggestion: dict | None = None
 
@@ -154,14 +156,23 @@ def writing_start(
     elif hypergraph_catalog.get_edital(req.edital_id) is None:
         raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
     else:
-        # Prefetch lazy do chunking (ver docs/specs/lazy-chunking.md): só para
-        # editais de verdade (investidor:/programa: não têm chunks). Best-effort,
-        # nunca quebra a rota.
+        # Chunking inline (síncrono): verifica se já existem chunks no banco;
+        # se não, roda o pipeline completo (PDF → Documento Canônico → silver →
+        # chunk → contextual retrieval → embed → upsert). Leva ~1min na primeira
+        # vez; idempotente (re-chunking só força com force=True).
         try:
-            from core.tasks import app
-            app.configure_task("chunk_edital").defer(edital_id=req.edital_id)
+            from core.db import get_supabase_service
+            svc = get_supabase_service()
+            existing = svc.table("edital_chunks").select("id", count="exact").eq(
+                "edital_id", req.edital_id,
+            ).limit(1).execute()
+            if existing.count == 0:
+                import asyncio
+
+                from core.tasks import chunk_edital_task
+                asyncio.run(chunk_edital_task(req.edital_id))
         except Exception as e:
-            logger.warning("falha ao enfileirar chunk_edital para %s: %s", req.edital_id, e)
+            logger.warning("falha ao chunkear %s inline: %s", req.edital_id, e)
 
     workspace_id = get_workspace_id(db, user_id)
     profile = to_py_profile(req.profile)
@@ -242,7 +253,9 @@ async def writing_turn(
         asyncio.to_thread(session.turn, req.user_message, req.section_hint),
         asyncio.to_thread(check_compliance, req.user_message, session.edital_id),
     )
-    return {**turn_result, "compliance_flags": compliance_flags}
+    sections_done = turn_result.get("sections_done", [])
+    return {**turn_result, "compliance_flags": compliance_flags,
+            "draft_ready": bool(sections_done)}
 
 
 @router.post(

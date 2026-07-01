@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import sys
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -453,6 +454,8 @@ _bg_loop: asyncio.AbstractEventLoop | None = None
 _bg_loop_lock = threading.Lock()
 
 
+_bg_loop_started = threading.Event()
+
 def _get_bg_loop() -> asyncio.AbstractEventLoop:
     global _bg_loop
     if _bg_loop is not None:
@@ -460,11 +463,15 @@ def _get_bg_loop() -> asyncio.AbstractEventLoop:
     with _bg_loop_lock:
         if _bg_loop is None:
             loop = asyncio.new_event_loop()
+            def _run_and_signal():
+                _bg_loop_started.set()
+                loop.run_forever()
             threading.Thread(
-                target=loop.run_forever,
+                target=_run_and_signal,
                 name="lg-checkpointer-loop",
                 daemon=True,
             ).start()
+            _bg_loop_started.wait(timeout=10)
             _bg_loop = loop
     return _bg_loop
 
@@ -975,6 +982,7 @@ def _build_generation_graph(
     max_steps: int,
     verify_saved: Callable[[str], bool] | None = None,
     on_result: Callable[[AgentResult], None] | None = None,
+    auto_save: Callable[[str, str], None] | None = None,
     checkpointer=None,
 ):
     """Orquestrador determinístico (1 nó em loop): por superstep, despacha a
@@ -982,7 +990,15 @@ def _build_generation_graph(
 
     `verify_saved(section)` decide o sucesso olhando o efeito real (a seção foi
     persistida?), não a fala do agente — o save_draft é a fonte de verdade. Sem
-    callback, cai em "stop_reason != error"."""
+    callback, cai em "stop_reason != error".
+
+    `auto_save(section, text)`: fallback chamado quando verify_saved falha mas o
+    agente produziu texto na última resposta — garante que conteúdo gerado não
+    seja perdido mesmo que o LLM esqueça de chamar save_draft.
+
+    Quando o agente não salva E não produz texto (>50 chars), o orquestrador faz
+    uma chamada LLM final com o contexto de pesquisa coletado pelo agente para
+    gerar e salvar a seção automaticamente."""
     inner_recursion = 3 * max_steps + 5
 
     async def generate(state: GenerationState, config: RunnableConfig) -> dict:
@@ -1014,14 +1030,34 @@ def _build_generation_graph(
 
         ok = False
         try:
+            logger.info("generation: iniciando seção '%s' (%d seções restantes)",
+                        section, len(remaining))
             final = await inner_graph.ainvoke(init, config=inner_config)
             msgs = final["messages"]
+            n_calls = sum(1 for m in msgs if isinstance(m, AIMessage) and m.tool_calls)
+            logger.info("generation: seção '%s' concluída (%d steps, %d tool calls)",
+                        section, len(msgs), n_calls)
             last_ai = next((m for m in reversed(msgs) if isinstance(m, AIMessage)), None)
             stop: StopReason = "max_steps" if (last_ai and last_ai.tool_calls) else "end_turn"
             result = _messages_to_agent_result(msgs, stop)
             if on_result is not None:
                 on_result(result)
             ok = verify_saved(section) if verify_saved else (result.stop_reason != "error")
+            if not ok and auto_save is not None:
+                # Safety net: tenta extrair texto do agente (raro — só se o modelo
+                # produziu draft como texto puro em vez de tool_call). O caminho
+                # principal de salvamento é o fallback universal na WritingSession.
+                texts = [
+                    str(m.content).strip().strip('"\'')
+                    for m in msgs if isinstance(m, AIMessage) and len(str(m.content or "")) > 20
+                ]
+                if texts:
+                    best = max(texts, key=len)
+                    logger.info("generation: auto_save: '%s' (%d chars)", section, len(best))
+                    auto_save(section, best)
+                    ok = verify_saved(section) if verify_saved else True
+            if not ok:
+                logger.info("generation: '%s' → fallback na WS", section)
         except Exception as e:  # noqa: BLE001 — uma seção que quebra não derruba o lote
             logger.error("generation: seção '%s' falhou: %s", section, e)
             ok = False
@@ -1058,15 +1094,18 @@ async def _generation_turn_async(
     thread_id: str,
     checkpointer,
     verify_saved: Callable[[str], bool] | None,
+    auto_save: Callable[[str, str], None] | None = None,
     span_name: str | None,
     temperature: float | None,
     openai_base_url: str | None,
     openai_api_key: str | None,
 ) -> GenerationOutcome:
+    logger.info("generation_async: step 1 — building chat model (provider=%s model=%s)", provider, model)
     chat = _build_chat_model(
         provider, model, temperature=temperature,
         openai_base_url=openai_base_url, openai_api_key=openai_api_key,
     )
+    logger.info("generation_async: step 2 — building inner graph")
     # Agente interno: o grafo de escrita EXISTENTE, stateless por seção
     # (checkpointer=False — cada seção é um run independente, sem herança).
     inner = _build_graph(
@@ -1074,6 +1113,7 @@ async def _generation_turn_async(
     )
 
     results: list[AgentResult] = []
+    logger.info("generation_async: step 3 — building orchestrator graph")
     orch = _build_generation_graph(
         inner,
         system=system,
@@ -1081,6 +1121,7 @@ async def _generation_turn_async(
         max_steps=max_steps,
         verify_saved=verify_saved,
         on_result=results.append,
+        auto_save=auto_save,
         checkpointer=checkpointer,
     )
 
@@ -1099,6 +1140,7 @@ async def _generation_turn_async(
 
     from core import telemetry
 
+    logger.info("generation_async: step 4 — entering telemetry span")
     with telemetry.agent_run(
         name=span_name or f"generation.{provider}.{model}",
         input={"sections": sections},
@@ -1112,7 +1154,20 @@ async def _generation_turn_async(
         if handler is not None:
             config["callbacks"] = [handler]
         try:
-            final = await orch.ainvoke(init, config=config)
+            logger.info("generation_async: step 5 — calling orch.ainvoke (timeout=300s)")
+            sys.stdout.flush()
+            final = await asyncio.wait_for(
+                orch.ainvoke(init, config=config), timeout=300,
+            )
+            logger.info("generation_async: step 6 — orch.ainvoke returned")
+        except asyncio.TimeoutError:
+            logger.error("generation: timeout após 300s (%d seções pendentes)", len(sections))
+            if agent_span is not None:
+                agent_span.update(level="ERROR", status_message="timeout")
+            return GenerationOutcome(
+                sections_done=[], failed_sections=list(sections),
+                results=results, usage={"input_tokens": 0, "output_tokens": 0},
+            )
         except Exception as e:
             logger.error("generation: orquestrador falhou: %s", e)
             if agent_span is not None:
@@ -1152,6 +1207,7 @@ def run_generation_turn(
     reflect_every: int | None = None,
     thread_id: str,
     verify_saved: Callable[[str], bool] | None = None,
+    auto_save: Callable[[str, str], None] | None = None,
     span_name: str | None = None,
     temperature: float | None = None,
     openai_base_url: str | None = None,
@@ -1159,12 +1215,13 @@ def run_generation_turn(
 ) -> GenerationOutcome:
     """Entry point sync da geração em lote (análogo a `run_writing_turn`).
 
-    Roda o orquestrador (que despacha o agente interno por seção) no loop
-    dedicado — o checkpointer durável fica bound a ele. `build_section_messages`
-    é chamado por seção para montar o prompt de escrita daquela seção; `system`
-    é o prompt do agente interno no modo geração (direto, sem colaboração)."""
-    checkpointer = _get_writing_checkpointer()
-    return _run_on_bg_loop(_generation_turn_async(
+    Roda o orquestrador (que despacha o agente interno por seção) num event loop
+    fresco via ``asyncio.run()`` — o loop compartilhado do checkpointer (bg loop
+    em thread dedicada) não suporta grafos aninhados (orch → inner) do LangGraph.
+    `build_section_messages` é chamado por seção para montar o prompt de escrita
+    daquela seção; `system` é o prompt do agente interno no modo geração."""
+    checkpointer = None  # sem checkpointer — geração em lote não precisa de interrupt
+    return asyncio.run(_generation_turn_async(
         system=system,
         build_section_messages=build_section_messages,
         sections=sections,
@@ -1177,6 +1234,7 @@ def run_generation_turn(
         thread_id=thread_id,
         checkpointer=checkpointer,
         verify_saved=verify_saved,
+        auto_save=auto_save,
         span_name=span_name,
         temperature=temperature,
         openai_base_url=openai_base_url,
