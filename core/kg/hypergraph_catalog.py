@@ -15,12 +15,65 @@ from __future__ import annotations
 
 import datetime
 import logging
+import re
+import unicodedata
 
 from core.kg import kg_store
 
 logger = logging.getLogger(__name__)
 
 _DEADLINE_FORMATS = ("%d.%m.%Y", "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d.%m.%y", "%d/%m/%y")
+
+
+def _deburr(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+_FONTE_CANONICAL: dict[str, str] = {
+    "finep": "FINEP",
+    "financiadoradeestudoseprojetos": "FINEP",
+    "financiadoradeestudoseprojetosfinep": "FINEP",
+    "finepfndct": "FINEP",
+    "mctifinepfndct": "FINEP",
+    "fnep": "FINEP",
+    "fnct": "FINEP",
+    "fndctfundossetoriais": "FNDCT",
+    "fundonacionaldedesenvolvimentocientificoetecnologico": "FNDCT",
+    "fundonacionaldedesenvolvimentocientificoetecnologicofndct": "FNDCT",
+    "fundonacionaldedesenvolvimentocientificoetecnologicofndctsubvencaoeconomica": "FNDCT",
+    "fndct": "FNDCT",
+    "fapesp": "FAPESP",
+    "fapesc": "FAPESC",
+    "funcitec": "FAPESC",
+    "bndes": "BNDES",
+    "sistemabndes": "BNDES",
+    "bancodenacionaldedesenvolvimentoeconomicoesocial": "BNDES",
+    "bancodenacionaldedesenvolvimentoeconomicoesocialbndes": "BNDES",
+    "bndespar": "BNDES",
+    "cnpq": "CNPq",
+    "capes": "CAPES",
+    "sebrae": "Sebrae",
+    "anp": "ANP",
+    "anvisa": "ANVISA",
+    "bb": "Banco do Brasil",
+    "bancodobrasil": "Banco do Brasil",
+    "bnb": "Banco do Nordeste",
+    "bancodonordeste": "Banco do Nordeste",
+    "bancodonordestedobrasilsa": "Banco do Nordeste",
+    "embrapii": "EMBRAPII",
+    "mcti": "MCTI",
+    "ministeriodacienciaetecnologiaeinovacao": "MCTI",
+    "ministeriodacienciaetecnologiaeinnovacoes": "MCTI",
+    "ministeriodacienciaetecnologiaeinnovacao": "MCTI",
+    "mdic": "MDIC",
+}
+
+
+def _normalize_source_name(raw: str) -> str:
+    """Normaliza um nome de fonte para o canônico, ou retorna o original."""
+    key = _deburr(raw)
+    return _FONTE_CANONICAL.get(key, raw)
 
 
 def _parse_deadline(raw: str | None) -> datetime.date | None:
@@ -62,7 +115,13 @@ def edital_card(file_key: str, graph: dict, *, full: bool = False) -> dict | Non
     if edital is None:
         return None
     source, _, native = file_key.partition("__")
-    fonte = [edital["fonte"]] if edital.get("fonte") else _names(nodes, "Fonte")
+    raw_fonte = [edital["fonte"]] if edital.get("fonte") else _names(nodes, "Fonte")
+    fonte = sorted(set(
+        _normalize_source_name(f)
+        for item in raw_fonte
+        for f in item.split(",")
+        if f.strip()
+    ))
 
     card: dict = {
         "id": f"{source}:{native}",
@@ -70,7 +129,9 @@ def edital_card(file_key: str, graph: dict, *, full: bool = False) -> dict | Non
         "title": edital.get("name", ""),
         "status": _status(edital),
         "deadline": edital.get("prazo") or "",
-        "themes": _names(nodes, "Tema", "Tecnologia"),
+        "themes": _names(nodes, "Tema"),
+        "technologies": _names(nodes, "Tecnologia"),
+        "programs": _names(nodes, "Programa"),
         "publico_alvo": _names(nodes, "Entidade"),
         "fonte_recurso": fonte,
         "opportunity_type": "edital",
@@ -106,7 +167,12 @@ def list_editais(
         cards = [c for c in cards if c["status"].upper() == status.upper()]
     if tema:
         tl = tema.lower()
-        cards = [c for c in cards if any(tl in t.lower() for t in c["themes"])]
+        cards = [
+            c for c in cards
+            if any(tl in t.lower() for t in c.get("themes", []))
+            or any(tl in t.lower() for t in c.get("technologies", []))
+            or any(tl in t.lower() for t in c.get("programs", []))
+        ]
     # Abertos primeiro, depois por título (ordenação estável e previsível).
     cards.sort(key=lambda c: (c["status"] != "ABERTA", c["title"].lower()))
     return cards[:limit]

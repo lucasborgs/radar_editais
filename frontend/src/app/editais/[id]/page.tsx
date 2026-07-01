@@ -175,15 +175,31 @@ export default function EditalDetailPage() {
         </Section>
       )}
 
-      {/* Themes & audiences */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 mb-4">
-        <div className="bg-surface rounded-xl border border-border p-5">
+      {/* Themes & technologies & programs & audiences */}
+      <div className="flex flex-wrap gap-4 mb-4">
+        <div className="min-w-[250px] flex-1 bg-surface rounded-xl border border-border p-5">
           <h2 className="font-heading text-sm font-bold text-content-primary mb-3 pb-2 border-b border-border">
             Temas
           </h2>
           <TagList tags={edital.themes} />
         </div>
-        <div className="bg-surface rounded-xl border border-border p-5">
+        {edital.technologies?.length > 0 && (
+          <div className="min-w-[250px] flex-1 bg-surface rounded-xl border border-border p-5">
+            <h2 className="font-heading text-sm font-bold text-content-primary mb-3 pb-2 border-b border-border">
+              Tecnologias
+            </h2>
+            <TagList tags={edital.technologies} />
+          </div>
+        )}
+        {edital.programs?.length > 0 && (
+          <div className="min-w-[250px] flex-1 bg-surface rounded-xl border border-border p-5">
+            <h2 className="font-heading text-sm font-bold text-content-primary mb-3 pb-2 border-b border-border">
+              Programas
+            </h2>
+            <TagList tags={edital.programs} />
+          </div>
+        )}
+        <div className="min-w-[250px] flex-1 bg-surface rounded-xl border border-border p-5">
           <h2 className="font-heading text-sm font-bold text-content-primary mb-3 pb-2 border-b border-border">
             Público-alvo
           </h2>

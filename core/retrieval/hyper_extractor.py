@@ -186,8 +186,11 @@ TIPOS DE ENTIDADE (cada entidade recebe exatamente um):
   classificação, diagnóstico, detecção, previsão, monitoramento, otimização)
   aplicada a um objeto. Extraia só quando o texto descreve um caso de uso concreto.
 - Mecanismo: modalidade de apoio citada (subvenção, crédito reembolsável,
-  investimento, bolsa). Modalidades de bolsa (mestrado, doutorado, iniciação
-  científica) são Mecanismo — NUNCA Edital.
+  investimento, bolsa, prêmio). NÃO extraia como Mecanismo: leis, decretos,
+  anexos, regulamentos, portarias, certificações, valores monetários, guias,
+  termos de compromisso/outorga, sistemas nem procedimentos administrativos.
+  Modalidades de bolsa (mestrado, doutorado, iniciação científica) são
+  Mecanismo — NUNCA Edital.
 - Requisito: condição de elegibilidade citada (TRL, porte, receita, idade da
   empresa, região, certificação) ou prazo exigido
 - Exclusão: entidade ou atividade explicitamente vedada pelo texto
@@ -342,6 +345,158 @@ def _build_llm():
 
 def _norm(s: str) -> str:
     return s.lower().strip()
+
+
+def _normalize_mecanismo_nodes(
+    nodes: list[dict], edges: list[dict]
+) -> tuple[list[dict], list[dict]]:
+    """Renomeia nós Mecanismo para slugs canônicos + remove ruído.
+
+    Mapeia os 155+ nomes variantes que o LLM produz (ex.: "Subvenção Econômica
+    Direta", "Financiamento Reembolsável Descentralizado 1") para os 7 slugs
+    canônicos de `skills._CANONICAL_MECHANISMS`, usando a mesma lógica de
+    deburr + sinônimos. Nós sem correspondência são removidos (ruído: anexos,
+    leis, decretos). Arestas que referenciam nós removidos também são podadas.
+    """
+    from core.skills import _CANONICAL_MECHANISMS, _MECHANISM_SYNONYMS, _deburr
+
+    _display: dict[str, str] = {
+        "subvencao": "Subvenção",
+        "credito": "Crédito",
+        "bolsa": "Bolsa",
+        "matching": "Matching",
+        "equity": "Investimento",
+        "premio": "Prêmio",
+        "outro": "Outro",
+    }
+
+    token_map: dict[str, str] = {}
+    for c in _CANONICAL_MECHANISMS:
+        token_map[c] = _display[c]
+    for syn, canon in _MECHANISM_SYNONYMS.items():
+        token_map[syn] = _display[canon]
+
+    removed_names: set[str] = set()
+    kept: list[dict] = []
+    for n in nodes:
+        if n.get("type") != "Mecanismo":
+            kept.append(n)
+            continue
+        name = n.get("name", "")
+        key = _deburr(name)
+        # Try exact, then synonym
+        canon_key = None
+        if key in _CANONICAL_MECHANISMS:
+            canon_key = key
+        elif key in _MECHANISM_SYNONYMS:
+            canon_key = _MECHANISM_SYNONYMS[key]
+        if canon_key:
+            n["name"] = _display.get(canon_key, name)
+            kept.append(n)
+        else:
+            removed_names.add(_norm(name))
+
+    # Podar arestas que referenciam nós removidos
+    kept_edges: list[dict] = []
+    for e in edges:
+        members = e.get("members", [])
+        if any(_norm(m) in removed_names for m in members):
+            continue
+        kept_edges.append(e)
+
+    # Colapsar duplicatas após renomeação
+    seen: set[str] = set()
+    final: list[dict] = []
+    for n in kept:
+        nk = _norm(n.get("name", ""))
+        if n.get("type") == "Mecanismo" and nk in seen:
+            continue
+        seen.add(nk)
+        final.append(n)
+
+    return final, kept_edges
+
+
+def _normalize_fonte_nodes(
+    nodes: list[dict], edges: list[dict]
+) -> tuple[list[dict], list[dict]]:
+    _fonte_canonical: dict[str, str] = {
+        "finep": "FINEP",
+        "financiadoradeestudoseprojetos": "FINEP",
+        "financiadoradeestudoseprojetosfinep": "FINEP",
+        "finepfndct": "FINEP",
+        "mctifinepfndct": "FINEP",
+        "fnep": "FINEP",
+        "fnct": "FINEP",
+        "fndctfundossetoriais": "FNDCT",
+        "fundonacionaldedesenvolvimentocientificoetecnologico": "FNDCT",
+        "fundonacionaldedesenvolvimentocientificoetecnologicofndct": "FNDCT",
+        "fundonacionaldedesenvolvimentocientificoetecnologicofndctsubvencaoeconomica": "FNDCT",
+        "fndct": "FNDCT",
+        "fapesp": "FAPESP",
+        "fapesc": "FAPESC",
+        "funcitec": "FAPESC",
+        "bndes": "BNDES",
+        "sistemabndes": "BNDES",
+        "bancodenacionaldedesenvolvimentoeconomicoesocial": "BNDES",
+        "bancodenacionaldedesenvolvimentoeconomicoesocialbndes": "BNDES",
+        "bndespar": "BNDES",
+        "cnpq": "CNPq",
+        "capes": "CAPES",
+        "sebrae": "Sebrae",
+        "anp": "ANP",
+        "anvisa": "ANVISA",
+        "bb": "Banco do Brasil",
+        "bancodobrasil": "Banco do Brasil",
+        "bnb": "Banco do Nordeste",
+        "bancodonordeste": "Banco do Nordeste",
+        "bancodonordestedobrasilsa": "Banco do Nordeste",
+        "embrapii": "EMBRAPII",
+        "faps": "FAPs",
+        "fundacoesdeamparoapesquisafaps": "FAPs",
+        "fundacoesdeamparoapesquisaestaduais": "FAPs",
+        "fundacaodeamparoapesquisa": "FAPs",
+        "mcti": "MCTI",
+        "ministeriodacienciaetecnologiaeinovacao": "MCTI",
+        "ministeriodacienciaetecnologiaeinnovacoes": "MCTI",
+        "ministeriodacienciaetecnologiaeinnovacao": "MCTI",
+        "mdic": "MDIC",
+    }
+
+    from core.skills import _deburr
+
+    removed_names: set[str] = set()
+    kept: list[dict] = []
+    for n in nodes:
+        if n.get("type") != "Fonte":
+            kept.append(n)
+            continue
+        name = n.get("name", "")
+        key = _deburr(name)
+        canon = _fonte_canonical.get(key)
+        if canon:
+            n["name"] = canon
+            kept.append(n)
+        else:
+            removed_names.add(_norm(name))
+
+    kept_edges: list[dict] = []
+    for e in edges:
+        members = e.get("members", [])
+        if any(_norm(m) in removed_names for m in members):
+            continue
+        kept_edges.append(e)
+
+    seen: set[str] = set()
+    final: list[dict] = []
+    for n in kept:
+        nk = _norm(n.get("name", ""))
+        if n.get("type") == "Fonte" and nk in seen:
+            continue
+        seen.add(nk)
+        final.append(n)
+
+    return final, kept_edges
 
 
 def _node_key(n: HyperNode) -> str:
@@ -621,6 +776,14 @@ def run_hyper_extract(
     edges = [e.model_dump() for e in data.edges]
     # Colapsa os fragmentos de Edital num nó canônico (1 arquivo = 1 edital).
     nodes, edges = _collapse_editais(nodes, edges, title=title, edital_id=edital_id)
+
+    # Normaliza nós Mecanismo para o vocabulário canônico (subvenção/credito/…)
+    # e remove ruído (anexos, leis, decretos classificados como Mecanismo).
+    nodes, edges = _normalize_mecanismo_nodes(nodes, edges)
+
+    # Normaliza nós Fonte para nomes canônicos (FINEP, FAPESP, …) e remove
+    # ruído (países, leis, classificações incorretas como Fonte).
+    nodes, edges = _normalize_fonte_nodes(nodes, edges)
 
     written: Path | None = None
     if write:
