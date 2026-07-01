@@ -28,6 +28,7 @@ from pathlib import Path
 from config import OBSIDIAN_VAULT_DIR
 from core.kg import hypergraph_catalog
 from core.kg.kg_store import load_all_hypergraphs
+from core.llm.agent_tools.explore_tools import build_entity_index
 
 # =============================================================================
 # UTILIDADES
@@ -51,6 +52,29 @@ def _safe_yaml(text: str) -> str:
 
 def _status_emoji(status: str) -> str:
     return {"ABERTA": "🟢", "ENCERRADA": "🔴", "Desconhecido": "⚪"}.get(status, "⚪")
+
+
+def _edge_neighbors(
+    ename: str,
+    occurrences: list[tuple[str, dict]],
+    all_graphs: dict[str, dict],
+) -> set[str]:
+    """Nomes (case original) dos outros membros de arestas onde `ename` (já
+    lowercase, vindo do entity_idx) de fato participa, nos grafos onde a
+    entidade ocorre. Ignora arestas em que `ename` não é membro."""
+    neighbors: set[str] = set()
+    for fk, _node in occurrences:
+        g = all_graphs.get(fk)
+        if not g:
+            continue
+        for edge in g.get("edges", []):
+            members = [m for m in edge.get("members", []) if isinstance(m, str) and m.strip()]
+            if ename not in {m.lower() for m in members}:
+                continue
+            for m in members:
+                if m.lower() != ename:
+                    neighbors.add(m)
+    return neighbors
 
 
 # =============================================================================
@@ -162,6 +186,8 @@ def _edital_note(card: dict, full: dict | None, subfolder: str) -> str:
 def _tema_note(label: str, editais: list[dict], subfolder: str) -> str:
     lines = ["---"]
     lines.append(f'title: "{_safe_yaml(label)}"')
+    lines.append("tags:")
+    lines.append("  - tema")
     lines.append("---\n")
     lines.append(f"# 🏷️ Tema: {label}\n")
     lines.append(f"**{len(editais)} editais** relacionados.\n")
@@ -177,6 +203,8 @@ def _tema_note(label: str, editais: list[dict], subfolder: str) -> str:
 def _tecnologia_note(label: str, editais: list[dict], subfolder: str) -> str:
     lines = ["---"]
     lines.append(f'title: "{_safe_yaml(label)}"')
+    lines.append("tags:")
+    lines.append("  - tecnologia")
     lines.append("---\n")
     lines.append(f"# 🔧 Tecnologia: {label}\n")
     lines.append(f"**{len(editais)} editais** relacionados.\n")
@@ -192,6 +220,8 @@ def _tecnologia_note(label: str, editais: list[dict], subfolder: str) -> str:
 def _mecanismo_note(label: str, editais: list[dict], subfolder: str) -> str:
     lines = ["---"]
     lines.append(f'title: "{_safe_yaml(label)}"')
+    lines.append("tags:")
+    lines.append("  - mecanismo")
     lines.append("---\n")
     lines.append(f"# 💰 Mecanismo: {label}\n")
     lines.append(f"**{len(editais)} editais** com este mecanismo.\n")
@@ -207,6 +237,8 @@ def _mecanismo_note(label: str, editais: list[dict], subfolder: str) -> str:
 def _fonte_note(label: str, editais: list[dict], subfolder: str) -> str:
     lines = ["---"]
     lines.append(f'title: "{_safe_yaml(label)}"')
+    lines.append("tags:")
+    lines.append("  - fonte-recurso")
     lines.append("---\n")
     lines.append(f"# 💰 Fonte: {label}\n")
     lines.append(f"**{len(editais)} editais** financiados.\n")
@@ -222,6 +254,8 @@ def _fonte_note(label: str, editais: list[dict], subfolder: str) -> str:
 def _programa_note(label: str, editais: list[dict], subfolder: str) -> str:
     lines = ["---"]
     lines.append(f'title: "{_safe_yaml(label)}"')
+    lines.append("tags:")
+    lines.append("  - programa")
     lines.append("---\n")
     lines.append(f"# 📋 Programa: {label}\n")
     lines.append(f"**{len(editais)} editais** vinculados.\n")
@@ -237,6 +271,8 @@ def _programa_note(label: str, editais: list[dict], subfolder: str) -> str:
 def _ict_note(label: str, editais: list[dict], subfolder: str) -> str:
     lines = ["---"]
     lines.append(f'title: "{_safe_yaml(label)}"')
+    lines.append("tags:")
+    lines.append("  - ict")
     lines.append("---\n")
     lines.append(f"# 🔬 ICT: {label}\n")
     lines.append(f"**{len(editais)} editais** com participação.\n")
@@ -252,6 +288,8 @@ def _ict_note(label: str, editais: list[dict], subfolder: str) -> str:
 def _investidor_note(label: str, editais: list[dict], subfolder: str) -> str:
     lines = ["---"]
     lines.append(f'title: "{_safe_yaml(label)}"')
+    lines.append("tags:")
+    lines.append("  - investidor")
     lines.append("---\n")
     lines.append(f"# 💼 Investidor: {label}\n")
     lines.append(f"**{len(editais)} editais** com participação.\n")
@@ -371,6 +409,35 @@ def run(vault_path: Path, subfolder: str = "radar-editais") -> None:
             elif nt == "Investidor" and nm:
                 investidores.setdefault(nm, []).append(c)
 
+    # ── Catálogo — nós de todos os tipos não cobertos por editais ──
+    def _ensure_node(name: str, nt: str, cat_index: dict, all_index: dict):
+        """Adiciona nó ao índice correto se ainda não existir."""
+        index_map = {
+            "ICT": ("icts", icts),
+            "Investidor": ("investidores", investidores),
+            "Programa": ("programas", programas),
+            "Tema": ("temas", temas),
+            "Tecnologia": ("tecnologias", tecnologias),
+            "Mecanismo": ("mecanismos", mecanismos),
+            "Fonte": ("fontes", fontes),
+            "Aplicação": None,  # não exportado ainda
+        }
+        entry = index_map.get(nt)
+        if entry is None:
+            return
+        _dir, idx = entry
+        if name not in idx:
+            idx[name] = []
+
+    for fk, g in all_graphs.items():
+        if fk.startswith(("finep__", "fapesp__", "fapesc__")):
+            continue  # já processado via editais
+        for node in g.get("nodes", []):
+            nm = (node.get("name") or "").strip()
+            nt = node.get("type")
+            if nm and nt:
+                _ensure_node(nm, nt, None, None)
+
     # Cria pastas
     pastas = {"editais", "temas", "tecnologias", "mecanismos", "fontes",
               "programas", "icts", "investidores"}
@@ -432,6 +499,80 @@ def run(vault_path: Path, subfolder: str = "radar-editais") -> None:
         content = _investidor_note(label, editais_list, subfolder)
         (base / "investidores" / f"{_slugify(label)}.md").write_text(content, encoding="utf-8")
     print(f"  investidores: {len(investidores)} notas → {base}/investidores/")
+
+    # ── Wikilinks cross-source: entidades mesmo nome, tipo diferente ──
+    t_dir = {"tema": "temas", "tecnologia": "tecnologias", "mecanismo": "mecanismos",
+             "fonte": "fontes", "programa": "programas", "ict": "icts",
+             "investidor": "investidores", "edital": "editais"}
+    vault_path: dict[tuple[str, str], Path] = {}
+    for cat_list, cat_dir in [(temas, "temas"), (tecnologias, "tecnologias"),
+                               (mecanismos, "mecanismos"), (fontes, "fontes"),
+                               (programas, "programas"), (icts, "icts"),
+                               (investidores, "investidores")]:
+        t_lower = {v: k for k, v in t_dir.items()}[cat_dir]
+        for label in cat_list:
+            vault_path[(t_lower, label.lower())] = base / cat_dir / f"{_slugify(label)}.md"
+
+    entity_idx = build_entity_index(all_graphs)
+    by_name: dict[str, list[dict]] = {}
+    for (etype, ename) in entity_idx:
+        if etype not in t_dir:
+            continue
+        fp = vault_path.get((etype, ename.lower()))
+        if fp and fp.exists():
+            by_name.setdefault(ename.lower(), []).append({"type": etype, "path": fp})
+
+    xlinks = 0
+    for _ename_lower, entries in by_name.items():
+        if len(entries) < 2:
+            continue
+        for entry in entries:
+            others = [e for e in entries if e["type"] != entry["type"]]
+            if not others:
+                continue
+            content = entry["path"].read_text(encoding="utf-8")
+            if "## Conexões cross-source" in content:
+                continue
+            links = []
+            for other in sorted(others, key=lambda x: x["type"]):
+                rel = other["path"].relative_to(base)
+                links.append(f"  - [[{rel.with_suffix('')}|{other['type']}]]")
+            content += "\n## Conexões cross-source\n" + "\n".join(links) + "\n"
+            entry["path"].write_text(content, encoding="utf-8")
+            xlinks += 1
+
+    # ── Wikilinks via arestas ── qualquer entidade com nota própria (edital ou
+    # catálogo puro, ex. investidores/ICTs curados via hypergraphs/*.json) pode
+    # ganhar links a partir das arestas do(s) grafo(s) onde aparece — sem isso,
+    # investidor/ICT sem participação em edital fica órfão do tema que financia.
+    edge_links = 0
+    name_to_path: dict[str, Path] = {}
+    for (_etype, ename), fp in vault_path.items():
+        name_to_path.setdefault(ename.lower(), fp)
+    for (etype, ename), occurrences in entity_idx.items():
+        fp = vault_path.get((etype, ename.lower()))
+        if not fp or not fp.exists():
+            continue
+        content = fp.read_text(encoding="utf-8")
+        if "## Conexões via arestas" in content:
+            continue
+        neighbors = _edge_neighbors(ename, occurrences, all_graphs)
+        if not neighbors:
+            continue
+        nlinks = []
+        for n in sorted(neighbors, key=str.lower):
+            nfp = name_to_path.get(n.lower())
+            if nfp:
+                rel = nfp.relative_to(base)
+                nlinks.append(f"  - [[{rel.with_suffix('')}]]")
+        if nlinks:
+            content += "\n## Conexões via arestas\n" + "\n".join(nlinks) + "\n"
+            fp.write_text(content, encoding="utf-8")
+            edge_links += 1
+
+    total_xlinks = xlinks + edge_links
+    if total_xlinks:
+        print(f"  wikilinks cross-source: {total_xlinks} notas atualizadas")
 
     # HOME
     stats = hypergraph_catalog.get_stats()
