@@ -134,6 +134,8 @@ DIRETRIZES DE REDAÇÃO
   para dentro da proposta. A proposta é texto corrido; as citações são sua
   referência interna, não conteúdo do documento final.
 
+VOCÊ TEM ACESSO AO CARD DO EDITAL nas mensagens abaixo (CARD DO EDITAL:) — ele contém objetivo, requisitos, exclusões, mecanismo, temas, tecnologias, público-alvo e entidades elegíveis. Leia-o antes de qualquer tool call; use search_edital apenas para complementar o que não estiver no card.
+
 COMO USAR AS FERRAMENTAS
 - search_edital → antes de afirmar qualquer requisito formal (prazo, TRL, valor,
   mecanismo, contrapartida, elegibilidade). Não cite o edital de memória. Mas
@@ -240,11 +242,14 @@ GENERATION_WRITER_SYSTEM = """Você é um especialista em redação de propostas
 
 Você recebe UMA seção por vez e deve pesquisar o edital para fundamentá-la. NÃO há conversa com o usuário — ele revisará depois.
 
+VOCÊ TEM ACESSO AO CARD DO EDITAL nas mensagens abaixo (CARD DO EDITAL:). Ele contém objetivo, requisitos, exclusões, mecanismo, temas, tecnologias, público-alvo e entidades elegíveis. USE-O como referência primária — busca search_edital apenas para complementar.
+
 COMO TRABALHAR
-1. Faça NO MÁXIMO 1 busca com search_edital para levantar dados da oportunidade.
-2. Opcionalmente use load_skill para o playbook de escrita do instrumento.
-3. Escreva a seção completa e bem estruturada em Markdown na sua resposta final.
-4. O sistema salvará automaticamente o conteúdo que você produziu.
+1. Leia o CARD DO EDITAL antes de qualquer tool call.
+2. Faça NO MÁXIMO 1 busca com search_edital para dados não cobertos pelo card.
+3. Opcionalmente use load_skill para o playbook de escrita do instrumento.
+4. Escreva a seção completa e bem estruturada em Markdown na sua resposta final.
+5. O sistema salvará automaticamente o conteúdo que você produziu.
 
 DIRETRIZES
 - Seja propositivo ("faremos", não "poderíamos") e específico.
@@ -448,6 +453,12 @@ class WritingSession:
         else:
             from core.kg.temporal import render_temporal_block
             self._temporal_block = render_temporal_block(self.edital_id)
+
+        # Card do edital (edital_card com full=True): injetado como contexto
+        # estático para que o agente conheça requisitos, exclusões, mecanismo,
+        # público-alvo e temas ANTES de chamar search_edital. Vazio (aviso) se o
+        # card não carregar — a sessão não quebra.
+        self._edital_card_context = self._build_edital_card_context()
 
         # Substrato do pitch (context-stuffing do nó do fundo): tese + portfólio +
         # estágio/setor/ticket. Pequeno (~1 entry) → stuffing bate retrieval. Vazio
@@ -774,6 +785,54 @@ class WritingSession:
             PITCH_GENERATION_WRITER_SYSTEM if self.mode == "pitch"
             else GENERATION_WRITER_SYSTEM
         )
+
+    def _build_edital_card_context(self) -> str:
+        """Bloco de contexto do card do edital (dados do hipergrado).
+
+        Carrega o card via `hypergraph_catalog.get_edital()` com `full=True` e
+        serializa os campos úteis para o agente (objetivo, mecanismo, requisitos,
+        exclusões, público-alvo, temas, tecnologias, programas). Vazio (com aviso)
+        se o card não for achado; a sessão não quebra — opera só com RAG.
+        """
+        if self.mode == "pitch":
+            return ""
+        try:
+            from core.kg import hypergraph_catalog
+            card = hypergraph_catalog.get_edital(self.edital_id)
+            if not card:
+                logger.warning("[%s] card não encontrado para %s",
+                               self.session_id, self.edital_id)
+                return ""
+        except Exception as e:
+            logger.warning("[%s] falha ao carregar card: %s", self.session_id, e)
+            return ""
+
+        lines = ["CARD DO EDITAL:"]
+        if card.get("objective"):
+            lines.append(f"Objetivo: {card['objective']}")
+        if card.get("mechanism"):
+            lines.append(f"Mecanismo: {card['mechanism']}")
+        if card.get("themes"):
+            lines.append(f"Temas: {', '.join(card['themes'])}")
+        if card.get("technologies"):
+            lines.append(f"Tecnologias: {', '.join(card['technologies'])}")
+        if card.get("programs"):
+            lines.append(f"Programas: {', '.join(card['programs'])}")
+        if card.get("publico_alvo"):
+            lines.append(f"Público-alvo: {', '.join(card['publico_alvo'])}")
+        if card.get("eligible_entities"):
+            lines.append(f"Entidades elegíveis: {', '.join(card['eligible_entities'])}")
+        if card.get("key_requirements"):
+            lines.append("Requisitos principais:")
+            for r in card["key_requirements"]:
+                if r:
+                    lines.append(f"- {r}")
+        if card.get("exclusoes"):
+            lines.append("Exclusões:")
+            for e in card["exclusoes"]:
+                if e:
+                    lines.append(f"- {e}")
+        return "\n".join(lines)
 
     def _build_pitch_target_context(self) -> str:
         """Bloco de contexto do fundo-alvo (context-stuffing do nó do KG).
@@ -1295,6 +1354,8 @@ class WritingSession:
                 "role": "user",
                 "content": f"DESCRIÇÃO DO PROJETO PELO USUÁRIO:\n{self._project_description}",
             })
+        if self._edital_card_context:
+            messages.append({"role": "user", "content": self._edital_card_context})
         if self._pitch_target_context:
             messages.append({"role": "user", "content": self._pitch_target_context})
         if self._programa_context:
@@ -1643,6 +1704,8 @@ class WritingSession:
         messages: list[dict] = [
             {"role": "user", "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
         ]
+        if self._edital_card_context:
+            messages.append({"role": "user", "content": self._edital_card_context})
         if self._pitch_target_context:
             messages.append({"role": "user", "content": self._pitch_target_context})
         if self._programa_context:
