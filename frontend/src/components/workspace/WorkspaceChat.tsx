@@ -33,8 +33,9 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
   onAnswerPending: (answer: string) => void;
   onUndoSection: (title: string) => void;
   token: string | null;
+  fullWidth?: boolean; // quando true, ocupa toda a largura disponível (chat-first)
 }>(function WorkspaceChat(
-  { messages, input, onInput, onSend, working, pending, onAnswerPending, onUndoSection, token },
+  { messages, input, onInput, onSend, working, pending, onAnswerPending, onUndoSection, token, fullWidth },
   ref,
 ) {
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -54,7 +55,7 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
   }, [messages, working]);
 
   return (
-    <div className="w-[26rem] shrink-0 border-l border-border bg-app-bg flex flex-col min-w-0">
+    <div className={cn(fullWidth ? "w-full" : "w-[26rem] shrink-0", "border-l border-border bg-app-bg flex flex-col min-w-0")}>
       <div className="h-9 shrink-0 px-3 flex items-center border-b border-border bg-white">
         <span className="text-[10px] font-semibold text-content-secondary font-sans uppercase tracking-wide">
           Agente

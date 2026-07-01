@@ -18,8 +18,12 @@ from slowapi.util import get_remote_address
 
 from backend.common import CompanyProfileSchema, explore_agent
 from backend.rate_limit import limiter
-from core.auth import OptionalUserId
+from core.auth import OptionalDbClient, OptionalUserId
+from core.llm.agent_tools.match_tools import _company_nodes
 from core.profile_extractor import ProfileExtractor
+from core.services.content_library import get_workspace_id
+from core.services.hypergraph_match import find_matching_editais
+from core.services.writing_session import persist_frontdoor_turn
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +37,7 @@ class ExploreRequest(BaseModel):
     edital_ids: list[str] = []
     node_id: str | None = None
     node_type: str | None = None
+    session_id: str | None = None
 
 
 def _profile_context_block(profile: CompanyProfileSchema | None) -> str:
@@ -92,17 +97,20 @@ def explore(
     request: Request,
     req: ExploreRequest,
     user_id: OptionalUserId,
+    db: OptionalDbClient,
 ):
-    """Conversa stateless sobre o catálogo. Aceita perfil parcial opcional.
+    """Conversa exploratória sobre o catálogo + extração de perfil.
 
     ExploreAgent classifica internamente a intenção (factual/reasoning/agent)
     e roteia para a rota adequada. Com perfil presente, a resposta é enriquecida
     com extração de profile_updates via ProfileExtractor.
 
-    - Anônimo (sem JWT): rate 3/min, sem extração de perfil.
-    - Autenticado (com JWT): rate 10/min, com extração de perfil.
+    - Anônimo (sem JWT): rate 3/min, sem extração de perfil, sem persistência.
+    - Autenticado (com JWT): rate 10/min, com extração e persistência da
+      conversa nas tabelas writing_sessions/session_turns (kind='frontdoor').
 
-    O histórico é mantido pelo cliente e reenviado a cada turno.
+    O histórico é enviado pelo cliente a cada turno; a persistência permite
+    retomar a conversa pelo sidebar (/conversations).
     """
     message = req.message.strip()
     if not message:
@@ -118,8 +126,35 @@ def explore(
         profile_text=ctx or None,
     )
 
-    result = {"answer": answer}
+    result: dict = {"answer": answer}
+    diff = None
     if req.profile is not None:
         diff = ProfileExtractor().extract_diff_from_message(message, current)
         result["profile_diff"] = diff or None
+
+    # Structured match data: converte profile → nós → find_matching_editais →
+    # dicts serializáveis. Roda independente do agente (que também faz match
+    # internamente, mas só devolve texto). Custo: só cosseno, sem LLM extra
+    # quando o perfil já foi extraído (cache de _company_nodes por hash).
+    if req.profile is not None and ctx:
+        try:
+            company_nodes = _company_nodes(ctx)
+            if company_nodes:
+                matches = find_matching_editais(company_nodes, top_k=8)
+                result["matched_editais"] = [m.to_dict() for m in matches]
+        except Exception as e:
+            logger.warning("explore: falha ao extrair matched_editais: %s", e)
+
+    if user_id and db:
+        try:
+            workspace_id = get_workspace_id(db, user_id)
+            profile_diff_list = diff if diff else None
+            persisted = persist_frontdoor_turn(
+                db, workspace_id, message, answer, profile_diff_list, req.session_id,
+            )
+            result["session_id"] = persisted["session_id"]
+            result["entry_ids"] = persisted["entry_ids"]
+        except Exception as e:
+            logger.warning("explore: falha ao persistir turno: %s", e)
+
     return result

@@ -189,6 +189,23 @@ class EditalMatch:
     valor: str | None
     paths: list[SyntheticEdge]  # arestas-justificativa, ordenadas por score desc
 
+    def to_dict(self) -> dict:
+        return {
+            "source": self.source,
+            "edital_id": self.edital_id,
+            "name": self.name,
+            "score": self.score,
+            "affinity": self.affinity,
+            "n_paths": self.n_paths,
+            "status": self.status,
+            "prazo": self.prazo,
+            "valor": self.valor,
+            "paths": [
+                {"src": p.src, "dst": p.dst, "dst_type": p.dst_type, "score": p.score}
+                for p in self.paths
+            ],
+        }
+
 
 def find_matching_editais(
     company_nodes: list[dict],

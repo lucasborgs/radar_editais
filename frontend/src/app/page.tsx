@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { ChatBubble } from "@/components/chat/ChatBubble";
@@ -13,16 +14,19 @@ import { SuggestionChips } from "@/components/frontdoor/SuggestionChips";
 import { Composer } from "@/components/frontdoor/Composer";
 import { DiffCard } from "@/components/frontdoor/DiffCard";
 import { GateCard } from "@/components/frontdoor/GateCard";
+import { MatchedEditalCard } from "@/components/frontdoor/MatchedEditalCard";
 import { UrlHero } from "@/components/frontdoor/UrlHero";
 import { UnlockCard } from "@/components/frontdoor/UnlockCard";
 import {
   frontdoorTurn,
   getMe,
   saveProfile,
+  startWritingSession,
   extractProfileFromDocument,
   getConversation,
   updateConversationEntry,
   type ProfileDiffItem,
+  type MatchedEdital,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
@@ -96,6 +100,7 @@ function Bubble({ role, content }: { role: "user" | "assistant"; content: string
 export default function FrontDoorPage() {
   const { session, getToken, signOut } = useAuth();
   const isAuthed = !!session;
+  const router = useRouter();
 
   const [profile, setProfile] = useState<CompanyProfile>(EMPTY_PROFILE);
   const [entries, setEntries] = useState<TranscriptEntry[]>([]);
@@ -112,6 +117,9 @@ export default function FrontDoorPage() {
   const [heroDismissed, setHeroDismissed] = useState(false);
   // Card "destravar mais matches" (Etapa 2): dispensável por sessão.
   const [unlockDismissed, setUnlockDismissed] = useState(false);
+  // Editais estruturados vindos do match no último turno (renderizados como
+  // cards entre as bolhas). Resetado a cada novo turno do usuário.
+  const [matchedEditais, setMatchedEditais] = useState<MatchedEdital[]>([]);
 
   // Liga o estado local à conversa do servidor (e sobrevive a F5 na mesma aba).
   // Binding novo (1º turno) avisa o sidebar para recarregar a lista.
@@ -268,7 +276,7 @@ export default function FrontDoorPage() {
   // Pós-Sprint 3 o radar legacy saiu: o match emerge pelo CHAT. Disparamos um
   // turno automático e o ExploreAgent narra os editais + parceiros via as tools
   // find_matching_editais / find_matching_entities (hipergrado, prosa com
-  // justificativa). O turno é persistido pelo próprio /frontdoor/turn (logado).
+  // justificativa). O turno é persistido pelo POST /explore quando autenticado.
   const runMatch = useCallback(
     async (p: CompanyProfile) => {
       if (sending) return; // evita 2 turnos de match concorrentes (double-fire)
@@ -304,10 +312,11 @@ export default function FrontDoorPage() {
       const withUser = [...entries, userEntry];
       setEntries(withUser);
       setInput("");
+      setMatchedEditais([]);
       setSending(true);
 
       try {
-        const { answer, profile_diff, session_id, entry_ids } = await frontdoorTurn(
+        const { answer, profile_diff, matched_editais, session_id, entry_ids } = await frontdoorTurn(
           trimmed,
           toApiHistory(withUser),
           profile.nome ? profile : null,
@@ -316,6 +325,7 @@ export default function FrontDoorPage() {
         // Logado: o backend persistiu o turno e devolveu o binding da conversa
         // (1º turno cria; seguintes reusam). Anônimo: session_id ausente.
         if (session_id) bindSession(session_id);
+        setMatchedEditais(matched_editais ?? []);
         setEntries((prev) => {
           const next: TranscriptEntry[] = [
             ...prev,
@@ -420,6 +430,31 @@ export default function FrontDoorPage() {
       await runMatch(next);
     },
     [profile, persistProfile, runMatch],
+  );
+
+  // Botão "Escrever proposta →" no MatchedEditalCard. Autenticado → inicia a
+  // writing session e navega; anônimo → gate de login.
+  const handleStartWriting = useCallback(
+    async (source: string, editalId: string) => {
+      if (!isAuthed) {
+        setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
+        return;
+      }
+      try {
+        const token = await getToken();
+        if (!token) {
+          setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
+          return;
+        }
+        const res = await startWritingSession(`${source}:${editalId}`, profile, undefined);
+        if (res.session_id) {
+          router.push(`/workspace/${res.session_id}`);
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Não consegui iniciar a proposta.");
+      }
+    },
+    [isAuthed, profile, getToken, router],
   );
 
   // ── Anexo (📎) ──────────────────────────────────────────────────────────────
@@ -605,6 +640,23 @@ export default function FrontDoorPage() {
               return null;
           }
         })}
+
+        {matchedEditais.length > 0 && (
+          <div className="flex flex-col gap-2 pt-1 pb-2">
+            <p className="text-xs font-medium text-content-secondary px-4">
+              Oportunidades com afinidade
+            </p>
+            <div className="flex flex-col gap-2">
+              {matchedEditais.map((m, i) => (
+                <MatchedEditalCard
+                  key={`${m.source}/${m.edital_id}`}
+                  edital={m}
+                  onStartWriting={handleStartWriting}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {sending && (
           <div className="flex items-start">
