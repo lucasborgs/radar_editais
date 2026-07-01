@@ -143,19 +143,20 @@ def writing_start(
     Retorna session_id, títulos das seções e contexto da sessão.
     """
     # Alvo de escrita: evento (edital/desafio/programa, no índice) OU entidade
-    # (investidor:<slug>, em investidores.json → pitch outbound). Valida na fonte
-    # certa por namespace do id; a WritingSession deriva o mode do mesmo id.
+    # (investidor:<slug>/programa:<slug>, em JSON curado → modo derivado do id).
+    # Fundos/programas não encontrados no JSON curado prosseguem sem dados do nó
+    # (WritingSession tolera contexto vazio — os builders retornam "" graciosamente).
     if req.edital_id.startswith("investidor:"):
         from core.kg import kg_store
         if req.edital_id not in {i["id"] for i in kg_store.load_investidores()}:
-            raise HTTPException(status_code=404, detail=f"Fundo '{req.edital_id}' não encontrado")
+            logger.warning("writing/start: fundo '%s' não encontrado em investidores.json — sessão prossegue sem dados do fundo", req.edital_id)
     elif req.edital_id.startswith("programa:"):
         from core.kg import kg_store
         if req.edital_id not in {p["id"] for p in kg_store.load_programas()}:
-            raise HTTPException(status_code=404, detail=f"Programa '{req.edital_id}' não encontrado")
-    elif hypergraph_catalog.get_edital(req.edital_id) is None:
-        raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
+            logger.warning("writing/start: programa '%s' não encontrado em programas.json — sessão prossegue sem dados do programa", req.edital_id)
     else:
+        if hypergraph_catalog.get_edital(req.edital_id) is None:
+            raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
         # Chunking inline (síncrono): verifica se já existem chunks no banco;
         # se não, roda o pipeline completo (PDF → Documento Canônico → silver →
         # chunk → contextual retrieval → embed → upsert). Leva ~1min na primeira

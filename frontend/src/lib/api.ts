@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "./constants";
 import { createSupabaseClient } from "./supabase";
 import type { EditalEntry, EditalCard, DashboardStats } from "@/types/edital";
+import type { OpportunityEntry } from "@/types/oportunidade";
 import type { CompanyProfile } from "@/types/profile";
 import type {
   WritingStartResponse,
@@ -135,6 +136,19 @@ export const getEditalById = (id: string) =>
 export const getDashboardStats = () =>
   apiFetch<DashboardStats>("/stats");
 
+export interface OpportunitiesFilters {
+  tipo?: string;
+  limit?: number;
+}
+
+export const getOpportunities = (filters?: OpportunitiesFilters) => {
+  const params = new URLSearchParams();
+  if (filters?.tipo) params.set("tipo", filters.tipo);
+  if (filters?.limit) params.set("limit", String(filters.limit));
+  const qs = params.toString();
+  return apiFetch<OpportunityEntry[]>(`/opportunities${qs ? `?${qs}` : ""}`);
+};
+
 export interface KGChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -180,6 +194,18 @@ export interface MatchedEdital {
   paths: MatchedEditalPath[];
 }
 
+export interface MatchedEntity {
+  file_key: string;
+  kind: "Investidor" | "Programa" | "ICT";
+  name: string;
+  description: string | null;
+  score: number;
+  affinity: number;
+  n_paths: number;
+  paths: MatchedEditalPath[];
+  entity_id?: string;
+}
+
 export const frontdoorTurn = (
   message: string,
   history: KGChatMessage[],
@@ -190,6 +216,7 @@ export const frontdoorTurn = (
     answer: string;
     profile_diff: ProfileDiffItem[] | null;
     matched_editais?: MatchedEdital[];
+    matched_entities?: MatchedEntity[];
     session_id?: string;
     entry_ids?: FrontdoorEntryIds;
   }>("/explore", {
@@ -466,7 +493,7 @@ export interface ConversationSummary {
 export interface ConversationEntry {
   id: number; // session_turns.id
   turn_index: number;
-  entry_kind: "msg" | "diff" | "radar";
+  entry_kind: "msg" | "diff" | "radar" | "profile_incomplete";
   role: "user" | "assistant";
   content: string; // entry_kind=msg
   payload: Record<string, unknown> | null; // entry_kind=diff|radar

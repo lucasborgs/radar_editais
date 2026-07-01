@@ -24,6 +24,13 @@ logger = logging.getLogger(__name__)
 
 _DEADLINE_FORMATS = ("%d.%m.%Y", "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d.%m.%y", "%d/%m/%y")
 
+_PT_MONTHS: dict[str, int] = {
+    "janeiro": 1, "fevereiro": 2, "março": 3, "abril": 4,
+    "maio": 5, "junho": 6, "julho": 7, "agosto": 8,
+    "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12,
+}
+_PT_DATE_RE = re.compile(r"(\d{1,2})\s+de\s+([a-zç]+)\s+de\s+(\d{4})", re.I)
+
 
 def _deburr(s: str) -> str:
     s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
@@ -85,6 +92,15 @@ def _parse_deadline(raw: str | None) -> datetime.date | None:
             return datetime.datetime.strptime(s, fmt).date()
         except ValueError:
             continue
+    m = _PT_DATE_RE.match(s)
+    if m:
+        day, month_pt, year = m.groups()
+        month = _PT_MONTHS.get(month_pt.lower())
+        if month:
+            try:
+                return datetime.date(int(year), month, int(day))
+            except ValueError:
+                pass
     return None
 
 
@@ -222,12 +238,18 @@ def get_stats() -> dict:
         by_status[c["status"]] = by_status.get(c["status"], 0) + 1
         themes.update(c["themes"])
         fontes.update(c["fonte_recurso"])
+    all_graphs = kg_store.load_all_hypergraphs()
+    n_programas = len(list_entity_catalog("programas", graphs=all_graphs, limit=999))
+    n_investidores = len(list_entity_catalog("investidores", graphs=all_graphs, limit=999))
     return {
         "total_editais": total,
         "last_updated": "",
         "by_status": by_status,
         "n_themes": len(themes),
         "n_fontes": len(fontes),
+        "n_programas": n_programas,
+        "n_investidores": n_investidores,
+        "total_oportunidades": total + n_programas + n_investidores,
     }
 
 
@@ -317,3 +339,45 @@ def list_entity_catalog(
         if len(out) >= limit:
             break
     return out
+
+
+def list_opportunities(
+    tipo: str | None = None, limit: int = 200,
+) -> list[dict]:
+    """Merge editais + programas + investidores com campo type discriminator."""
+    result: list[dict] = []
+    graphs = kg_store.load_all_hypergraphs()
+
+    if tipo is None or tipo == "edital":
+        for c in list_editais(limit=limit):
+            result.append({
+                "id": c["id"],
+                "title": c["title"],
+                "type": "edital",
+                "themes": c.get("themes", []),
+                "status": c.get("status", "Desconhecido"),
+                "deadline": c.get("deadline", ""),
+                "fonte_recurso": c.get("fonte_recurso", []),
+            })
+
+    if tipo is None or tipo == "programa":
+        for e in list_entity_catalog("programas", graphs=graphs, limit=limit):
+            result.append({
+                "id": f"programa:{e['id']}",
+                "title": e["name"],
+                "type": "programa",
+                "themes": e.get("themes", []),
+                "description": e.get("description", ""),
+            })
+
+    if tipo is None or tipo == "investidor":
+        for e in list_entity_catalog("investidores", graphs=graphs, limit=limit):
+            result.append({
+                "id": f"investidor:{e['id']}",
+                "title": e["name"],
+                "type": "investidor",
+                "themes": e.get("themes", []),
+                "description": e.get("description", ""),
+            })
+
+    return result[:limit]

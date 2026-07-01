@@ -77,7 +77,7 @@ const ICON_PATHS = {
 const UTILITY_ITEMS: { href: string; label: string; d: string }[] = [
   { href: "/perfil", label: "Perfil", d: ICON_PATHS.profile },
   { href: "/pipeline", label: "Pipeline", d: ICON_PATHS.pipeline },
-  { href: "/editais", label: "Editais", d: ICON_PATHS.editais },
+  { href: "/oportunidades", label: "Oportunidades", d: ICON_PATHS.editais },
   { href: "/library", label: "Arquivos", d: ICON_PATHS.files },
   { href: "/discovered", label: "Descobertas", d: ICON_PATHS.discovered },
   { href: "/settings", label: "Configurações", d: ICON_PATHS.settings },

@@ -14,7 +14,9 @@ import { SuggestionChips } from "@/components/frontdoor/SuggestionChips";
 import { Composer } from "@/components/frontdoor/Composer";
 import { DiffCard } from "@/components/frontdoor/DiffCard";
 import { GateCard } from "@/components/frontdoor/GateCard";
+import { ProfileIncompleteCard } from "@/components/frontdoor/ProfileIncompleteCard";
 import { MatchedEditalCard } from "@/components/frontdoor/MatchedEditalCard";
+import { MatchedEntityCard } from "@/components/frontdoor/MatchedEntityCard";
 import { UrlHero } from "@/components/frontdoor/UrlHero";
 import { UnlockCard } from "@/components/frontdoor/UnlockCard";
 import {
@@ -27,6 +29,7 @@ import {
   updateConversationEntry,
   type ProfileDiffItem,
   type MatchedEdital,
+  type MatchedEntity,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
@@ -46,6 +49,7 @@ import {
   entriesFromServer,
   profileCompleteness,
   isRadarReady,
+  isCompleteForWriting,
   missingForRadar,
   missingHighImpact,
   type TranscriptEntry,
@@ -120,6 +124,7 @@ export default function FrontDoorPage() {
   // Editais estruturados vindos do match no último turno (renderizados como
   // cards entre as bolhas). Resetado a cada novo turno do usuário.
   const [matchedEditais, setMatchedEditais] = useState<MatchedEdital[]>([]);
+  const [matchedEntities, setMatchedEntities] = useState<MatchedEntity[]>([]);
 
   // Liga o estado local à conversa do servidor (e sobrevive a F5 na mesma aba).
   // Binding novo (1º turno) avisa o sidebar para recarregar a lista.
@@ -313,10 +318,11 @@ export default function FrontDoorPage() {
       setEntries(withUser);
       setInput("");
       setMatchedEditais([]);
+      setMatchedEntities([]);
       setSending(true);
 
       try {
-        const { answer, profile_diff, matched_editais, session_id, entry_ids } = await frontdoorTurn(
+        const { answer, profile_diff, matched_editais, matched_entities, session_id, entry_ids } = await frontdoorTurn(
           trimmed,
           toApiHistory(withUser),
           profile.nome ? profile : null,
@@ -326,6 +332,7 @@ export default function FrontDoorPage() {
         // (1º turno cria; seguintes reusam). Anônimo: session_id ausente.
         if (session_id) bindSession(session_id);
         setMatchedEditais(matched_editais ?? []);
+        setMatchedEntities(matched_entities ?? []);
         setEntries((prev) => {
           const next: TranscriptEntry[] = [
             ...prev,
@@ -432,10 +439,16 @@ export default function FrontDoorPage() {
     [profile, persistProfile, runMatch],
   );
 
-  // Botão "Escrever proposta →" no MatchedEditalCard. Autenticado → inicia a
-  // writing session e navega; anônimo → gate de login.
+  // Botão "Escrever proposta →" no MatchedEditalCard. Perfil incompleto →
+  // ProfileIncompleteCard; autenticado → inicia a writing session e navega;
+  // anônimo → gate de login.
   const handleStartWriting = useCallback(
     async (source: string, editalId: string) => {
+      const { ok, missing } = isCompleteForWriting(profile);
+      if (!ok) {
+        setEntries((prev) => [...prev, { kind: "profile_incomplete", missingFields: missing }]);
+        return;
+      }
       if (!isAuthed) {
         setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
         return;
@@ -452,6 +465,35 @@ export default function FrontDoorPage() {
         }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Não consegui iniciar a proposta.");
+      }
+    },
+    [isAuthed, profile, getToken, router],
+  );
+
+  // Botão "Escrever pitch/proposta →" no MatchedEntityCard.
+  const handleStartWritingEntity = useCallback(
+    async (entityId: string, mode: "proposal" | "pitch") => {
+      const { ok, missing } = isCompleteForWriting(profile);
+      if (!ok) {
+        setEntries((prev) => [...prev, { kind: "profile_incomplete", missingFields: missing }]);
+        return;
+      }
+      if (!isAuthed) {
+        setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
+        return;
+      }
+      try {
+        const token = await getToken();
+        if (!token) {
+          setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
+          return;
+        }
+        const res = await startWritingSession(entityId, profile, mode);
+        if (res.session_id) {
+          router.push(`/workspace/${res.session_id}`);
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Não consegui iniciar.");
       }
     },
     [isAuthed, profile, getToken, router],
@@ -636,6 +678,8 @@ export default function FrontDoorPage() {
               );
             case "gate":
               return <GateCard key={i} action={entry.action} />;
+            case "profile_incomplete":
+              return <ProfileIncompleteCard key={i} missingFields={entry.missingFields} />;
             default:
               return null;
           }
@@ -644,7 +688,7 @@ export default function FrontDoorPage() {
         {matchedEditais.length > 0 && (
           <div className="flex flex-col gap-2 pt-1 pb-2">
             <p className="text-xs font-medium text-content-secondary px-4">
-              Oportunidades com afinidade
+              Editais com afinidade
             </p>
             <div className="flex flex-col gap-2">
               {matchedEditais.map((m, i) => (
@@ -652,6 +696,23 @@ export default function FrontDoorPage() {
                   key={`${m.source}/${m.edital_id}`}
                   edital={m}
                   onStartWriting={handleStartWriting}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {matchedEntities.length > 0 && (
+          <div className="flex flex-col gap-2 pt-1 pb-2">
+            <p className="text-xs font-medium text-content-secondary px-4">
+              Investidores, Programas e ICTs com afinidade
+            </p>
+            <div className="flex flex-col gap-2">
+              {matchedEntities.map((m, i) => (
+                <MatchedEntityCard
+                  key={`${m.kind}/${m.name}`}
+                  entity={m}
+                  onStartWriting={handleStartWritingEntity}
                 />
               ))}
             </div>

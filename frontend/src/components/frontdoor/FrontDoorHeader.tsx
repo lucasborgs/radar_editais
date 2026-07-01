@@ -17,7 +17,7 @@ const AUTHED_LINKS = [
   { href: "/library", label: "Biblioteca" },
   { href: "/sessions", label: "Sessões" },
   { href: "/pipeline", label: "Pipeline" },
-  { href: "/editais", label: "Editais" },
+  { href: "/oportunidades", label: "Oportunidades" },
   { href: "/discovered", label: "Descobertas" },
   { href: "/settings", label: "Configurações" },
 ];

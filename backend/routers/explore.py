@@ -10,6 +10,7 @@ Per spec match-evolution.md Fase 2.
 from __future__ import annotations
 
 import logging
+import re
 
 import jwt
 from fastapi import APIRouter, HTTPException, Request
@@ -22,7 +23,10 @@ from core.auth import OptionalDbClient, OptionalUserId
 from core.llm.agent_tools.match_tools import _company_nodes
 from core.profile_extractor import ProfileExtractor
 from core.services.content_library import get_workspace_id
-from core.services.hypergraph_match import find_matching_editais
+from core.services.hypergraph_match import (
+    find_matching_editais,
+    find_matching_entities,
+)
 from core.services.writing_session import persist_frontdoor_turn
 
 logger = logging.getLogger(__name__)
@@ -132,16 +136,33 @@ def explore(
         diff = ProfileExtractor().extract_diff_from_message(message, current)
         result["profile_diff"] = diff or None
 
-    # Structured match data: converte profile → nós → find_matching_editais →
-    # dicts serializáveis. Roda independente do agente (que também faz match
+    # Structured match data: converte profile → nós → find_matching_editais +
+    # find_matching_entities. Roda independente do agente (que também faz match
     # internamente, mas só devolve texto). Custo: só cosseno, sem LLM extra
     # quando o perfil já foi extraído (cache de _company_nodes por hash).
     if req.profile is not None and ctx:
         try:
             company_nodes = _company_nodes(ctx)
             if company_nodes:
-                matches = find_matching_editais(company_nodes, top_k=8)
-                result["matched_editais"] = [m.to_dict() for m in matches]
+                editais = find_matching_editais(company_nodes, top_k=8)
+                result["matched_editais"] = [m.to_dict() for m in editais]
+                entities = find_matching_entities(company_nodes, top_k=8)
+                entity_dicts = [e.to_dict() for e in entities]
+                # Enriquece com entity_id p/ writing session (Investidor/Programa)
+                if entity_dicts:
+                    from core.kg import kg_store
+                    inv_by_name = {i["name"].lower(): i["id"] for i in kg_store.load_investidores()}
+                    prog_by_name = {p["name"].lower(): p["id"] for p in kg_store.load_programas()}
+                    for ed in entity_dicts:
+                        key = ed["name"].strip().lower()
+                        if ed["kind"] == "Investidor":
+                            ed["entity_id"] = inv_by_name.get(key)
+                        elif ed["kind"] == "Programa":
+                            ed["entity_id"] = prog_by_name.get(key)
+                        if ed.get("entity_id") is None and ed["kind"] in ("Investidor", "Programa"):
+                            slug = re.sub(r'[^a-z0-9]+', '-', key).strip('-')
+                            ed["entity_id"] = f"{ed['kind'].lower()}:{slug}"
+                result["matched_entities"] = entity_dicts
         except Exception as e:
             logger.warning("explore: falha ao extrair matched_editais: %s", e)
 

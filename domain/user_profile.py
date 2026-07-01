@@ -45,9 +45,10 @@ class CompanyProfile:
 
     # ── Intenção de financiamento ──────────────────────────────────────────
     tipos_financiamento_interesse: list[str] = field(default_factory=list)
-    # Valores: "subvencao_nao_reembolsavel" | "pesquisa_colaborativa"
+    # Valores: "subvencao_nao_reembolsavel" | "pesquisa_colaborativa" | "capital_risco"
     # (escopo reduzido — spec mechanism-scope-decisions: credito_reembolsavel D1,
-    #  investimento_direto D2 e matching_embrapii D3 saíram do eixo selecionável)
+    #  investimento_direto D2 e matching_embrapii D3 saíram do eixo selecionável;
+    #  capital_risco adicionado em 2026-07 reativando o eixo de investidor via perfil)
 
     # ── Perfil para capital privado / desafios (Q3/Q4) — opcionais ──────────
     # Não quebram o match de edital; alimentam o match de investidor (tese) e a

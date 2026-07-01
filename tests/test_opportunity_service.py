@@ -15,7 +15,6 @@ import pytest
 
 from core.services.opportunity_service import OpportunityService
 
-
 # ===========================================================================
 # Fixtures
 # ===========================================================================

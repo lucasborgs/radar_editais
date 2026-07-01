@@ -20,6 +20,14 @@ def get_stats():
     return hypergraph_catalog.get_stats()
 
 
+@router.get("/opportunities", summary="Lista todas as oportunidades (editais + programas + investidores)")
+def list_opportunities(
+    tipo: str | None = Query(None, description="Filtro por tipo: edital | programa | investidor"),
+    limit: int = Query(200, ge=1, le=500),
+):
+    return hypergraph_catalog.list_opportunities(tipo=tipo, limit=limit)
+
+
 @router.get("/editais", summary="Lista editais com filtros opcionais")
 def list_editais(
     status: str | None = Query(None, description="ABERTA | ENCERRADA | Desconhecido"),

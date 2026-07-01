@@ -41,7 +41,12 @@ export interface GateEntry {
   action: GateAction;
 }
 
-export type TranscriptEntry = MsgEntry | DiffEntry | GateEntry;
+export interface ProfileIncompleteEntry {
+  kind: "profile_incomplete";
+  missingFields: string[];
+}
+
+export type TranscriptEntry = MsgEntry | DiffEntry | GateEntry | ProfileIncompleteEntry;
 
 // ── Persistência (sessionStorage v2) ──────────────────────────────────────────
 export const HISTORY_KEY = "frontdoor_history";
@@ -91,6 +96,11 @@ export function migrateHistory(raw: unknown): TranscriptEntry[] {
           out.push({ kind: "gate", action: e.action });
         }
         break;
+      case "profile_incomplete":
+        if (Array.isArray(e.missingFields)) {
+          out.push({ kind: "profile_incomplete", missingFields: e.missingFields as string[] });
+        }
+        break;
       default:
         break;
     }
@@ -122,6 +132,13 @@ export function entriesFromServer(entries: ConversationEntry[]): TranscriptEntry
             origin: p.origin as DiffEntry["origin"],
             entryId: e.id,
           });
+        }
+        break;
+      }
+      case "profile_incomplete": {
+        const p = (e.payload ?? {}) as Record<string, unknown>;
+        if (Array.isArray(p.missingFields)) {
+          out.push({ kind: "profile_incomplete", missingFields: p.missingFields as string[] });
         }
         break;
       }
@@ -167,6 +184,23 @@ export function profileCompleteness(profile: CompanyProfile): number {
 // Perfil "rodável" pelo radar: o backend exige nome + descricao_atividades (422).
 export function isRadarReady(profile: CompanyProfile): boolean {
   return !!profile.nome.trim() && !!profile.descricao_atividades.trim();
+}
+
+const WRITING_MIN_FIELDS: (keyof CompanyProfile)[] = [
+  "nome", "tipo_entidade", "trl", "tamanho_empresa", "uf", "descricao_atividades",
+];
+
+export function isCompleteForWriting(profile: CompanyProfile): { ok: boolean; missing: string[] } {
+  const missing: string[] = [];
+  for (const field of WRITING_MIN_FIELDS) {
+    const val = profile[field];
+    if (field === "trl") {
+      if (val === null || val === undefined) missing.push(field);
+    } else {
+      if (val === "" || val === null || val === undefined) missing.push(field);
+    }
+  }
+  return { ok: missing.length === 0, missing };
 }
 
 // Aplica os items de um diff (com `new` final) sobre um perfil, devolvendo um
