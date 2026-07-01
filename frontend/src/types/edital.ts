@@ -98,4 +98,7 @@ export interface DashboardStats {
   by_status: Record<string, number>;
   n_themes: number;
   n_fontes: number;
+  n_programas: number;
+  n_investidores: number;
+  total_oportunidades: number;
 }

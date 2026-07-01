@@ -451,6 +451,21 @@ class EntityMatch:
     n_paths: int
     paths: list[SyntheticEdge]  # arestas-justificativa, ordenadas por score desc
 
+    def to_dict(self) -> dict:
+        return {
+            "file_key": self.file_key,
+            "kind": self.kind,
+            "name": self.name,
+            "description": self.description,
+            "score": self.score,
+            "affinity": self.affinity,
+            "n_paths": self.n_paths,
+            "paths": [
+                {"src": p.src, "dst": p.dst, "dst_type": p.dst_type, "score": p.score}
+                for p in self.paths
+            ],
+        }
+
 
 def _entity_attribution(
     graphs: dict[str, dict],

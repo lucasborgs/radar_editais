@@ -39,9 +39,10 @@ const INVESTOR_FIELDS: ReadonlySet<keyof CompanyProfile> = new Set<keyof Company
   "tracao_resumo",
 ]);
 
-// Trilha de investidor "ligada" por default se QUALQUER campo Q3/Q4 já tem valor
-// (decisão travada D2: flag derivada; o switch é o atalho manual).
+// Trilha de investidor "ligada" por default se "Capital de risco" está selecionado
+// OU se qualquer campo Q3/Q4 já tem valor (decisão travada D2: flag derivada).
 function deriveInvestorTrack(profile: CompanyProfile): boolean {
+  if (profile.tipos_financiamento_interesse.includes("capital_risco")) return true;
   return Array.from(INVESTOR_FIELDS).some((f) => {
     const v = profile[f];
     return v !== "" && v !== null && v !== undefined;
@@ -218,7 +219,18 @@ export default function PerfilPage() {
   }, [isAuthed, getToken]);
 
   const setField = useCallback((field: keyof CompanyProfile, raw: unknown) => {
-    setProfile((prev) => ({ ...prev, [field]: coerceFieldValue(field, raw) }));
+    setProfile((prev) => {
+      const next = { ...prev, [field]: coerceFieldValue(field, raw) };
+      // Preencheu campo de investidor → auto-adiciona "Capital de risco"
+      if (INVESTOR_FIELDS.has(field)) {
+        const v = next[field];
+        const filled = v !== "" && v !== null && v !== undefined;
+        if (filled && !next.tipos_financiamento_interesse.includes("capital_risco")) {
+          next.tipos_financiamento_interesse = [...next.tipos_financiamento_interesse, "capital_risco"];
+        }
+      }
+      return next;
+    });
     setDirty(true);
   }, []);
 
