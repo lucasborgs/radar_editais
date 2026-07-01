@@ -172,7 +172,7 @@ def test_explore_agent_includes_planning_tool(monkeypatch):
     names = {t.name for t in captured["tools"]}
     assert "write_todos" in names
     # as de leitura continuam presentes
-    assert {"list_editais", "oportunidades_por_tema", "list_icts", "get_node_neighborhood"} <= names
+    assert {"list_editais", "explore_opportunity", "list_icts", "get_node_neighborhood"} <= names
     assert captured["max_steps"] >= 8  # espaço pra planejamento + multi-task
 
 
@@ -209,10 +209,8 @@ def test_explore_tools_count_and_names():
     names = [t.name for t in tools]
     assert set(names) == {
         "list_editais", "get_edital",
-        # Leitura nativa do hipergrado (Sprint 3 Fase A)
         "get_node_neighborhood",
-        # Cross-dimensionais (Fase 2 — chat de Descoberta sobre todas as dimensões)
-        "list_icts", "list_investidores", "oportunidades_por_tema",
+        "list_icts", "list_investidores", "explore_opportunity",
     }
 
 
@@ -232,11 +230,11 @@ def test_explore_tools_deep_research_gated(monkeypatch):
     assert "deep_research" in on
 
 
-def test_oportunidades_por_tema_is_cross_dimensional():
+def test_explore_opportunity_is_cross_dimensional():
     """O panorama cobre as três frentes (eventos + ICTs + investidores) num só
     retorno — robusto mesmo se alguma dimensão estiver vazia no ambiente."""
     tools = {t.name: t for t in build_explore_tools()}
-    fn = getattr(tools["oportunidades_por_tema"], "func", tools["oportunidades_por_tema"])
+    fn = getattr(tools["explore_opportunity"], "func", tools["explore_opportunity"])
     out = fn(tema="agro")
     assert isinstance(out, str)
     assert "Editais" in out and "ICTs" in out and "Investidores" in out

@@ -148,6 +148,8 @@ def edital_card(file_key: str, graph: dict, *, full: bool = False) -> dict | Non
             "aplicacoes": _names(nodes, "Aplicação"),
             "exclusoes": _names(nodes, "Exclusão"),
             "value": edital.get("valor"),
+            "icts": _names(nodes, "ICT"),
+            "investidores": _names(nodes, "Investidor"),
         })
     return card
 
@@ -227,3 +229,91 @@ def get_stats() -> dict:
         "n_themes": len(themes),
         "n_fontes": len(fontes),
     }
+
+
+def _theme_match(needle: str, themes: list[str]) -> bool:
+    """Casa uma query de tema contra uma lista de temas. Token-bidirecional."""
+    if not (needle or "").strip():
+        return True
+    blob = " ".join(t or "" for t in themes).lower()
+    n = needle.strip().lower()
+    if n in blob:
+        return True
+    ntoks = [t for t in re.findall(r"\w+", n) if len(t) >= 4 and t not in {
+        "de", "da", "do", "das", "dos", "e", "em", "no", "na", "nos", "nas",
+        "para", "por", "com", "sem", "ou", "the", "of", "for", "and", "que",
+        "uma", "um", "sobre", "como",
+    }]
+    ttoks = [t for t in re.findall(r"\w+", blob) if len(t) >= 4]
+    return any(nt in tt or tt in nt for nt in ntoks for tt in ttoks)
+
+
+_CATALOG_TYPE_MAP: dict[str, str] = {
+    "ict": "ICT",
+    "investidores": "Investidor",
+    "programas": "Programa",
+}
+
+
+def list_entity_catalog(
+    catalog_key: str, *,
+    tema: str = "",
+    limit: int = 50,
+    graphs: dict[str, dict] | None = None,
+) -> list[dict]:
+    """Lista entidades de um catálogo (ict, investidores, programas) filtrando
+    por tema. Lê do catalog hypergraph (ex.: `ict.json`). Retorna dicts com
+    `id`, `name`, `description`, `themes` e `type` — compatível com o que
+    `list_icts`/`list_investidores` esperam.
+
+    Fonte única para tools e consumers: substitui o acesso direto a
+    `kg_store.load_icts()` / `.load_investidores()` / `.load_programas()`."""
+    wanted_type = _CATALOG_TYPE_MAP.get(catalog_key)
+    if wanted_type is None:
+        return []
+    if graphs is None:
+        graphs = kg_store.load_all_hypergraphs()
+    g = graphs.get(catalog_key)
+    if not g:
+        return []
+    nodes = g.get("nodes", [])
+    edges = g.get("edges", [])
+
+    node_by_lower: dict[str, dict] = {}
+    for n in nodes:
+        nm = (n.get("name") or "").strip().lower()
+        if nm:
+            node_by_lower[nm] = n
+
+    # Índice de arestas: name_lower → temas conectados via arestas nativas
+    edge_themes: dict[str, set[str]] = {}
+    for e in edges:
+        members = [(m or "").strip().lower() for m in e.get("members", [])]
+        thematic = [
+            n["name"] for m in members
+            if (n := node_by_lower.get(m)) and n.get("type") in ("Tema", "Tecnologia", "Aplicação")
+        ]
+        for m in members:
+            nd = node_by_lower.get(m)
+            if nd and nd.get("type") == wanted_type:
+                edge_themes.setdefault(m, set()).update(thematic)
+
+    out: list[dict] = []
+    for n in nodes:
+        if n.get("type") != wanted_type:
+            continue
+        nm = n.get("name", "")
+        nm_lower = nm.strip().lower()
+        themes_list = sorted(edge_themes.get(nm_lower, set()))
+        if tema and not _theme_match(tema, themes_list):
+            continue
+        out.append({
+            "id": nm_lower,
+            "name": nm,
+            "description": n.get("description") or "",
+            "themes": themes_list,
+            "type": wanted_type,
+        })
+        if len(out) >= limit:
+            break
+    return out

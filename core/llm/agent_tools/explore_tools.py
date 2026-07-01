@@ -65,6 +65,42 @@ def _theme_match(needle: str, themes: list[str]) -> bool:
 
 
 # =============================================================================
+# Entity resolution cross-source (resolução de entidade entre subgrafos)
+# =============================================================================
+# Cada subgrafo é um KA independente. Uma mesma entidade real (ex.: "UFSC")
+# pode aparecer em múltiplos subgrafos como nós separados. Esta camada
+# permite navegar entre subgrafos via nome + tipo como chave composta:
+#   resolve_entity(index, "UFSC", "ICT") → todos os nós ICT "UFSC" no grafo
+# Fiel ao Hyper-Extract: cada KA preserva sua identidade; a conexão é
+# resolvida em tempo de query por matching de (type, name).
+
+def build_entity_index(graphs: dict[str, dict]) -> dict[tuple[str, str], list[tuple[str, dict]]]:
+    """Índice global (type, name_lower) → [(file_key, node)] para resolução cross-source.
+
+    Varre todos os subgrafos e indexa cada nó por (type, name_lower). Permite
+    descobrir em quais subgrafos uma entidade aparece e navegar entre KAs."""
+    idx: dict[tuple[str, str], list[tuple[str, dict]]] = {}
+    for fk, g in graphs.items():
+        for n in g.get("nodes", []):
+            nm = (n.get("name") or "").strip().lower()
+            tp = (n.get("type") or "").strip().lower()
+            if nm and tp:
+                key = (tp, nm)
+                idx.setdefault(key, []).append((fk, n))
+    return idx
+
+
+def resolve_entity(
+    idx: dict[tuple[str, str], list[tuple[str, dict]]],
+    name: str, type_: str,
+) -> list[tuple[str, dict]]:
+    """Resolve (type, name) no índice global. Retorna [(file_key, node)] de todos
+    os subgrafos onde esta entidade aparece. Vazio se não encontrada."""
+    key = (type_.strip().lower(), name.strip().lower())
+    return idx.get(key, [])
+
+
+# =============================================================================
 # Leitura nativa do hipergrado (get_node_neighborhood) — funções puras
 # =============================================================================
 # Separadas da tool (que só carrega o grafo via kg_store e delega) para serem
@@ -134,11 +170,67 @@ def resolve_graph_nodes(
     return out[:cap]
 
 
+def _bfs_subgraph(
+    graph: dict, idx: dict[str, dict], seed_name: str, depth: int, max_edges: int,
+) -> tuple[list[dict], set[str]]:
+    """BFS de arestas em UM subgrafo a partir de `seed_name`.
+
+    Retorna (collected_edges, visited_node_names) — visited_node_names são
+    os nomes de TODOS os nós alcançados durante a BFS (incluindo o seed),
+    para continuar BFS em outros subgrafos (cross-source)."""
+    seed = seed_name.strip().lower()
+    frontier = {seed}
+    visited = set(frontier)
+    seen_edges: set[int] = set()
+    edges = graph.get("edges", [])
+    collected: list[dict] = []
+    for _ in range(depth):
+        nxt: set[str] = set()
+        for i, e in enumerate(edges):
+            if i in seen_edges:
+                continue
+            mem = [(m or "").strip().lower() for m in e.get("members", [])]
+            if frontier.intersection(mem):
+                seen_edges.add(i)
+                collected.append(e)
+                nxt.update(m for m in mem if m not in visited)
+        visited |= nxt
+        frontier = nxt
+        if not frontier:
+            break
+    return collected[:max_edges], visited
+
+
+def _format_edges(
+    collected: list[dict], idx: dict[str, dict],
+) -> list[str]:
+    """Formata arestas coletadas para display."""
+    lines: list[str] = []
+    if collected:
+        lines.append(f"  relações ({len(collected)}):")
+        for e in collected:
+            members = ", ".join(_member_label(idx, m) for m in e.get("members", []))
+            desc = (e.get("description") or "")[:120]
+            lines.append(
+                f"    • {e.get('type', '?')}: {members}" + (f" — {desc}" if desc else "")
+            )
+    else:
+        lines.append("  (sem relações nativas neste subgrafo)")
+    return lines
+
+
 def neighborhood(
-    graphs: dict[str, dict], node_name: str, depth: int = 1, *, max_edges: int = 25,
+    graphs: dict[str, dict], node_name: str, depth: int = 1, *,
+    max_edges: int = 25, cross_source: bool = False,
+    entity_index: dict[tuple[str, str], list[tuple[str, dict]]] | None = None,
 ) -> str:
     """Vizinhança N-ária de um nó: props de display + arestas nativas (BFS até
-    `depth` saltos no subgrafo) + vizinhos rotulados por tipo. String para a tool."""
+    `depth` saltos) + vizinhos rotulados por tipo. String para a tool.
+
+    Quando `cross_source=True`, a BFS atravessa subgrafos: após esgotar as arestas
+    no subgrafo atual, resolve a entidade em outros subgrafos (via `entity_index`)
+    e continua a BFS neles. O índice é construído automaticamente se não fornecido.
+    """
     depth = max(1, min(int(depth), 2))
     targets = resolve_graph_nodes(graphs, node_name)
     if not targets:
@@ -147,15 +239,28 @@ def neighborhood(
             "(ex.: '589') ou um tema/tecnologia."
         )
 
+    if cross_source:
+        eidx = entity_index if entity_index is not None else build_entity_index(graphs)
+    else:
+        eidx = None
+
     blocks: list[str] = []
+    visited_graph_nodes: set[tuple[str, str]] = set()
+
     for fk, node in targets:
         graph = graphs.get(fk, {})
         idx = _node_index(graph)
         src = fk.split("__")[0]
         native = fk.split("__")[-1]
+        node_type = node.get("type", "?")
 
-        lines = [f"### {node.get('name', '')} [{node.get('type', '?')}] · fonte={src}"]
-        if node.get("type") == "Edital":
+        gk = (fk, (node.get("name") or "").strip().lower())
+        if gk in visited_graph_nodes:
+            continue
+        visited_graph_nodes.add(gk)
+
+        lines = [f"### {node.get('name', '')} [{node_type}] · fonte={src}"]
+        if node_type == "Edital":
             disp = []
             if node.get("prazo"):
                 disp.append(f"prazo {node['prazo']}")
@@ -168,37 +273,50 @@ def neighborhood(
         if node.get("description"):
             lines.append(f"  {node['description'][:200]}")
 
-        # BFS de arestas até `depth` saltos a partir do nó-semente no subgrafo.
-        frontier = {(node.get("name") or "").strip().lower()}
-        visited = set(frontier)
-        seen_edges: set[int] = set()
-        edges = graph.get("edges", [])
-        collected: list[dict] = []
-        for _ in range(depth):
-            nxt: set[str] = set()
-            for i, e in enumerate(edges):
-                if i in seen_edges:
-                    continue
-                mem = [(m or "").strip().lower() for m in e.get("members", [])]
-                if frontier.intersection(mem):
-                    seen_edges.add(i)
-                    collected.append(e)
-                    nxt.update(m for m in mem if m not in visited)
-            visited |= nxt
-            frontier = nxt
-            if not frontier:
-                break
+        # BFS no subgrafo atual
+        collected, visited = _bfs_subgraph(
+            graph, idx, node.get("name", ""), depth, max_edges,
+        )
+        lines.extend(_format_edges(collected, idx))
 
-        if collected:
-            lines.append(f"  relações ({len(collected)}):")
-            for e in collected[:max_edges]:
-                members = ", ".join(_member_label(idx, m) for m in e.get("members", []))
-                desc = (e.get("description") or "")[:120]
-                lines.append(
-                    f"    • {e.get('type', '?')}: {members}" + (f" — {desc}" if desc else "")
-                )
-        else:
-            lines.append("  (sem relações nativas neste subgrafo)")
+        # BFS cross-source: para cada nó alcançado na BFS, busca em outros
+        # subgrafos e continua a BFS neles. Usa `visited` (todos os nós
+        # visitados, não só a frontier) para maximizar conexões cross-source.
+        if cross_source and eidx is not None and visited:
+            cross_seen: set[tuple[str, str]] = set()
+            # Monta (type, name_lower) dos nós visitados no subgrafo atual
+            visited_types: dict[str, str] = {}
+            for vn in visited:
+                vn_node = idx.get(vn)
+                if vn_node:
+                    visited_types[vn] = vn_node.get("type", "")
+
+            for vn, vn_type in visited_types.items():
+                if not vn_type:
+                    continue
+                other_key = (vn_type.strip().lower(), vn)
+                for other_fk, other_node in eidx.get(other_key, []):
+                    if other_fk == fk:
+                        continue  # já processamos este subgrafo
+                    ogk = (other_fk, vn)
+                    if ogk in visited_graph_nodes or ogk in cross_seen:
+                        continue
+                    cross_seen.add(ogk)
+                    other_graph = graphs.get(other_fk, {})
+                    other_idx = _node_index(other_graph)
+                    other_src = other_fk.split("__")[0]
+                    olines = [
+                        f"  ↳ [{vn_type}] em {other_fk} (fonte={other_src}):",
+                    ]
+                    o_collected, _ = _bfs_subgraph(
+                        other_graph, other_idx, other_node.get("name", ""),
+                        depth, max_edges,
+                    )
+                    olines.extend(
+                        line.replace("  ", "    ") for line in _format_edges(o_collected, other_idx)
+                    )
+                    lines.extend(olines)
+
         blocks.append("\n".join(lines))
 
     return "\n\n".join(blocks)
@@ -337,15 +455,15 @@ def build_explore_tools() -> list[BaseTool]:
         """
         limit = max(1, min(int(limit), 50))
         try:
-            icts = [i for i in kg_store.load_icts() if _theme_match(tema, i.get("themes", []))]
+            icts = hypergraph_catalog.list_entity_catalog("ict", tema=tema, limit=limit)
         except Exception as e:
             return f"Erro ao listar ICTs: {e}."
         if not icts:
             return f"Nenhuma ICT encontrada{f' para tema={tema!r}' if tema else ''}."
         lines = [f"Encontradas {len(icts)} ICTs (mostrando até {limit}):"]
         for i in icts[:limit]:
-            contact = (i.get("contact") or {}).get("email") or i.get("url", "")
             themes = ", ".join(i.get("themes", [])[:3])[:60]
+            contact = i.get("description", "")[:60]
             lines.append(f"  {i.get('name', i['id'])[:55]} | temas:{themes} | {contact}")
         return "\n".join(lines)
 
@@ -364,75 +482,77 @@ def build_explore_tools() -> list[BaseTool]:
         """
         limit = max(1, min(int(limit), 50))
         try:
-            invs = [
-                v for v in kg_store.load_investidores()
-                if _theme_match(tema, v.get("tese_themes", []) + v.get("setores", []))
-            ]
+            invs = hypergraph_catalog.list_entity_catalog("investidores", tema=tema, limit=limit)
         except Exception as e:
             return f"Erro ao listar investidores: {e}."
         if not invs:
             return f"Nenhum investidor encontrado{f' para tema={tema!r}' if tema else ''}."
         lines = [f"Encontrados {len(invs)} investidores (mostrando até {limit}):"]
         for v in invs[:limit]:
-            estagio = ", ".join(v.get("estagio_alvo", [])[:3])
             lines.append(
-                f"  {v.get('name', v['id'])[:45]} | tese:{(v.get('tese') or '')[:70]} "
-                f"| estágio:{estagio} | {v.get('site', '')}"
+                f"  {v.get('name', v['id'])[:45]} | temas:{', '.join(v.get('themes', [])[:3])[:60]}"
             )
         return "\n".join(lines)
 
     @tool
-    def oportunidades_por_tema(tema: str) -> str:
-        """Panorama CROSS-DIMENSIONAL de um tema/setor: junta editais/desafios
-        abertos, ICTs parceiras e investidores com tese no tema — as quatro
-        dimensões do grafo num só lugar.
+    def explore_opportunity(tema: str, top_k: int = 15) -> str:
+        """Panorama completo de oportunidades num tema: editais, ICTs,
+        investidores e programas — tudo que o ecossistema tem para o tema.
+        Inclui travessia cross-source entre subgrafos (edital → ICT → temas
+        → outros editais) e, se houver perfil da empresa, match por afinidade.
 
-        Use para perguntas amplas de descoberta, ex.: "quais oportunidades em
-        agronegócio?", "o que existe para deep tech em saúde?". Depois, aprofunde
-        com get_edital, list_icts ou list_investidores conforme o interesse.
+        Use como PRIMEIRA chamada para QUALQUER pergunta ampla de descoberta:
+        "quais oportunidades em agronegócio?", "o que existe para IA em saúde?",
+        "quero desenvolver um trocador de calor". Depois, aprofunde com
+        get_edital, get_node_neighborhood, list_icts ou list_investidores.
 
         Args:
-            tema: palavra-chave ou tema; casa por token e tolera frase natural
-                  (ex.: "agro", "saúde", "IA em saúde", "IA no agronegócio")
+            tema: palavra-chave ou tema (casa por token, tolera frase natural)
+            top_k: máximo de resultados por categoria (default 15)
         """
+        top_k = max(1, min(int(top_k), 30))
+        try:
+            from core.services.opportunity_service import OpportunityService
+            svc = OpportunityService()
+            result = svc.explore(tema, top_k=top_k)
+        except Exception as e:
+            return f"Erro ao explorar oportunidades: {e}."
+
         out: list[str] = [f"Panorama de oportunidades em '{tema}':"]
-        # Eventos (editais/desafios/programas) — filtro de tema robusto na tool.
-        try:
-            abertos = hypergraph_catalog.list_editais(status="ABERTA", limit=500)
-            editais = [e for e in abertos if _theme_match(tema, e.get("themes", []))]
-        except Exception:
-            editais = []
-        out.append(f"\n📋 Editais/desafios abertos ({len(editais)}):")
+
+        editais = result.get("editais", [])
+        out.append(f"\n📋 Editais/desafios ({len(editais)}):")
         for e in editais[:10]:
-            out.append(f"  ID:{e['id']} | {e['title'][:60]} | prazo:{e.get('deadline', '?')}")
+            title = e.get("title", e.get("name", ""))
+            out.append(f"  ID:{e.get('id', '?')} | {title[:60]} | prazo:{e.get('deadline', '?')}")
         if not editais:
-            out.append("  (nenhum aberto com esse tema)")
-        # Entidades
-        try:
-            icts = [i for i in kg_store.load_icts() if _theme_match(tema, i.get("themes", []))]
-        except Exception:
-            icts = []
+            out.append("  (nenhum edital com esse tema)")
+
+        icts = result.get("icts", [])
         out.append(f"\n🔬 ICTs parceiras ({len(icts)}):")
         for i in icts[:8]:
-            out.append(f"  {i.get('name', i['id'])[:55]}")
+            out.append(f"  {i.get('name', i.get('id', ''))[:55]}")
         if not icts:
-            out.append("  (nenhuma no tema)")
-        try:
-            invs = [
-                v for v in kg_store.load_investidores()
-                if _theme_match(tema, v.get("tese_themes", []) + v.get("setores", []))
-            ]
-        except Exception:
-            invs = []
-        out.append(f"\n💸 Investidores com tese no tema ({len(invs)}):")
-        for v in invs[:8]:
-            out.append(f"  {v.get('name', v['id'])[:45]} | estágio:{', '.join(v.get('estagio_alvo', [])[:2])}")
-        if not invs:
-            out.append("  (nenhum no tema)")
+            out.append("  (nenhuma ICT no tema)")
+
+        investidores = result.get("investidores", [])
+        out.append(f"\n💸 Investidores com tese no tema ({len(investidores)}):")
+        for v in investidores[:8]:
+            out.append(f"  {v.get('name', v.get('id', ''))[:45]}")
+        if not investidores:
+            out.append("  (nenhum investidor no tema)")
+
+        programas = result.get("programas", [])
+        out.append(f"\n📋 Programas ({len(programas)}):")
+        for p in programas[:5]:
+            out.append(f"  {p.get('name', p.get('id', ''))[:55]}")
+        if not programas:
+            out.append("  (nenhum programa no tema)")
+
         return "\n".join(out)
 
     @tool
-    def get_node_neighborhood(node_name: str, depth: int = 1) -> str:
+    def get_node_neighborhood(node_name: str, depth: int = 1, cross_source: bool = False) -> str:
         """Lê o hipergrado N-ário direto: a vizinhança de um nó (edital, tema,
         tecnologia, aplicação, requisito, ICT, programa...).
 
@@ -443,20 +563,29 @@ def build_explore_tools() -> list[BaseTool]:
         nome ou pelo id do edital e devolve props + as relações N-árias em que ele
         participa, com os vizinhos rotulados por tipo.
 
+        Quando `cross_source=True`, a BFS atravessa subgrafos: após esgotar as
+        arestas no subgrafo do edital, busca a mesma entidade em outros subgrafos
+        (catálogos de ICT, programas, investidores) e continua a BFS neles. Útil
+        para perguntas como "quais ICTs são parceiras deste edital e que temas elas
+        dominam?" ou "que outros editais tocam os mesmos temas desta ICT?".
+
         Args:
             node_name: nome do nó ou id do edital (ex.: "FINEP 589", "589",
                        "espectroscopia NIR", "bioeconomia").
             depth: 1 = arestas diretas (default). 2 = inclui vizinhos-dos-vizinhos
                    (mais contexto, mais ruído).
+            cross_source: se True, atravessa subgrafos via resolução de entidade
+                          (default False).
         """
         try:
             graphs = kg_store.load_all_hypergraphs()
         except Exception as e:
             return f"Erro ao carregar o hipergrado: {e}."
-        return neighborhood(graphs, node_name, depth=depth)
+        eidx = build_entity_index(graphs) if cross_source else None
+        return neighborhood(graphs, node_name, depth=depth, cross_source=cross_source, entity_index=eidx)
 
-    return [list_editais, get_edital, get_node_neighborhood,
-            list_icts, list_investidores, oportunidades_por_tema]
+    return [explore_opportunity, list_editais, get_edital, get_node_neighborhood,
+            list_icts, list_investidores]
 
 
 # =============================================================================

@@ -350,13 +350,14 @@ def _norm(s: str) -> str:
 def _normalize_mecanismo_nodes(
     nodes: list[dict], edges: list[dict]
 ) -> tuple[list[dict], list[dict]]:
-    """Renomeia nós Mecanismo para slugs canônicos + remove ruído.
+    """Renomeia nós Mecanismo para slugs canônicos + preserva originais.
 
     Mapeia os 155+ nomes variantes que o LLM produz (ex.: "Subvenção Econômica
     Direta", "Financiamento Reembolsável Descentralizado 1") para os 7 slugs
     canônicos de `skills._CANONICAL_MECHANISMS`, usando a mesma lógica de
-    deburr + sinônimos. Nós sem correspondência são removidos (ruído: anexos,
-    leis, decretos). Arestas que referenciam nós removidos também são podadas.
+    deburr + sinônimos. Nós sem correspondência são PRESERVADOS com o nome
+    original — o LLM já os classificou como Mecanismo, e descartar nomes
+    desconhecidos eliminaria variações válidas não mapeadas.
     """
     from core.skills import _CANONICAL_MECHANISMS, _MECHANISM_SYNONYMS, _deburr
 
@@ -376,7 +377,6 @@ def _normalize_mecanismo_nodes(
     for syn, canon in _MECHANISM_SYNONYMS.items():
         token_map[syn] = _display[canon]
 
-    removed_names: set[str] = set()
     kept: list[dict] = []
     for n in nodes:
         if n.get("type") != "Mecanismo":
@@ -384,7 +384,6 @@ def _normalize_mecanismo_nodes(
             continue
         name = n.get("name", "")
         key = _deburr(name)
-        # Try exact, then synonym
         canon_key = None
         if key in _CANONICAL_MECHANISMS:
             canon_key = key
@@ -392,17 +391,7 @@ def _normalize_mecanismo_nodes(
             canon_key = _MECHANISM_SYNONYMS[key]
         if canon_key:
             n["name"] = _display.get(canon_key, name)
-            kept.append(n)
-        else:
-            removed_names.add(_norm(name))
-
-    # Podar arestas que referenciam nós removidos
-    kept_edges: list[dict] = []
-    for e in edges:
-        members = e.get("members", [])
-        if any(_norm(m) in removed_names for m in members):
-            continue
-        kept_edges.append(e)
+        kept.append(n)
 
     # Colapsar duplicatas após renomeação
     seen: set[str] = set()
@@ -414,58 +403,23 @@ def _normalize_mecanismo_nodes(
         seen.add(nk)
         final.append(n)
 
-    return final, kept_edges
+    return final, edges
 
 
 def _normalize_fonte_nodes(
     nodes: list[dict], edges: list[dict]
 ) -> tuple[list[dict], list[dict]]:
-    _fonte_canonical: dict[str, str] = {
-        "finep": "FINEP",
-        "financiadoradeestudoseprojetos": "FINEP",
-        "financiadoradeestudoseprojetosfinep": "FINEP",
-        "finepfndct": "FINEP",
-        "mctifinepfndct": "FINEP",
-        "fnep": "FINEP",
-        "fnct": "FINEP",
-        "fndctfundossetoriais": "FNDCT",
-        "fundonacionaldedesenvolvimentocientificoetecnologico": "FNDCT",
-        "fundonacionaldedesenvolvimentocientificoetecnologicofndct": "FNDCT",
-        "fundonacionaldedesenvolvimentocientificoetecnologicofndctsubvencaoeconomica": "FNDCT",
-        "fndct": "FNDCT",
-        "fapesp": "FAPESP",
-        "fapesc": "FAPESC",
-        "funcitec": "FAPESC",
-        "bndes": "BNDES",
-        "sistemabndes": "BNDES",
-        "bancodenacionaldedesenvolvimentoeconomicoesocial": "BNDES",
-        "bancodenacionaldedesenvolvimentoeconomicoesocialbndes": "BNDES",
-        "bndespar": "BNDES",
-        "cnpq": "CNPq",
-        "capes": "CAPES",
-        "sebrae": "Sebrae",
-        "anp": "ANP",
-        "anvisa": "ANVISA",
-        "bb": "Banco do Brasil",
-        "bancodobrasil": "Banco do Brasil",
-        "bnb": "Banco do Nordeste",
-        "bancodonordeste": "Banco do Nordeste",
-        "bancodonordestedobrasilsa": "Banco do Nordeste",
-        "embrapii": "EMBRAPII",
-        "faps": "FAPs",
-        "fundacoesdeamparoapesquisafaps": "FAPs",
-        "fundacoesdeamparoapesquisaestaduais": "FAPs",
-        "fundacaodeamparoapesquisa": "FAPs",
-        "mcti": "MCTI",
-        "ministeriodacienciaetecnologiaeinovacao": "MCTI",
-        "ministeriodacienciaetecnologiaeinnovacoes": "MCTI",
-        "ministeriodacienciaetecnologiaeinnovacao": "MCTI",
-        "mdic": "MDIC",
-    }
+    """Normaliza nós Fonte para nomes canônicos + preserva originais.
 
+    Usa o dicionário canônico de `hypergraph_catalog._FONTE_CANONICAL` (fonte
+    única de verdade). Nós conhecidos são renomeados para o canônico; nós SEM
+    mapeamento são PRESERVADOS com o nome original — o LLM já os classificou
+    como Fonte, e descartar nomes desconhecidos eliminaria fontes válidas como
+    FAPERJ, FAPEMIG, FAPESB que ainda não foram adicionadas ao dicionário.
+    """
+    from core.kg.hypergraph_catalog import _FONTE_CANONICAL
     from core.skills import _deburr
 
-    removed_names: set[str] = set()
     kept: list[dict] = []
     for n in nodes:
         if n.get("type") != "Fonte":
@@ -473,20 +427,12 @@ def _normalize_fonte_nodes(
             continue
         name = n.get("name", "")
         key = _deburr(name)
-        canon = _fonte_canonical.get(key)
+        canon = _FONTE_CANONICAL.get(key)
         if canon:
             n["name"] = canon
-            kept.append(n)
-        else:
-            removed_names.add(_norm(name))
+        kept.append(n)
 
-    kept_edges: list[dict] = []
-    for e in edges:
-        members = e.get("members", [])
-        if any(_norm(m) in removed_names for m in members):
-            continue
-        kept_edges.append(e)
-
+    # Colapsar duplicatas após renomeação
     seen: set[str] = set()
     final: list[dict] = []
     for n in kept:
@@ -496,7 +442,7 @@ def _normalize_fonte_nodes(
         seen.add(nk)
         final.append(n)
 
-    return final, kept_edges
+    return final, edges
 
 
 def _node_key(n: HyperNode) -> str:

@@ -207,3 +207,24 @@ Cada tier tem sua própria env var (ver seção LLM backend acima). Trocar um ti
 
 ### Discovery staging
 `core/opportunity_discovery.py` escreve em staging (tabela `discovered_opportunities`), não no KG. O gate humano em `/discovered-opportunities` promove/rejeita antes de tocar o pipeline de build.
+
+### Travessia cross-source entre hipergrados
+Fiel ao Hyper-Extract: cada subgrafo (edital, catálogo) é um KA independente. A conexão entre eles é resolvida em tempo de query por matching de `(type, name)` — não há merge físico.
+
+**Camada de resolução de entidade** (`explore_tools.py`):
+- `build_entity_index(graphs)` → índice global `(type, name_lower) → [(file_key, node)]`
+- `resolve_entity(idx, name, type)` → busca no índice
+
+**Multi-source BFS** (`neighborhood()` com `cross_source=True`):
+- BFS normal dentro do subgrafo atual
+- Para cada nó visitado, busca o mesmo `(type, name)` em outros subgrafos
+- Continua BFS neles (mesmo depth), evitando ciclos via `visited_graph_nodes`
+- Flag `cross_source=False` (default) = comportamento idêntico ao anterior
+
+**Expansão de match via catálogo** (`hypergraph_match.py`):
+- `_expand_match_via_catalog()`: pós-processo ADDITIVO ao `find_matching_editais`
+- Para cada edital matchado, identifica ICTs parceiras (aresta `parceria_com`)
+- Consulta `ict.json` para temas que essas ICTs dominam (arestas `abrange_tema`/`viabiliza`)
+- Se empresa casa com esses temas (cosseno), adiciona paths com `CATALOG_EXPANSION_DAMPING=0.30`
+- Ativado via flag `catalog_expansion=True` em `find_matching_editais`
+- Consumidores existentes (WritingSession, checklist, catalog, etc.) não são afetados
