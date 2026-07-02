@@ -42,31 +42,35 @@
   - Eval de escrita como gate da **remoção do legacy de match** (spec robustez).
 - **Status:** regra ativa (2026-07-02). Sem entregável próprio — dissolve no fluxo.
 
-### Hardening pré-beta — PR3/PR5/PR6 pendentes (PR1/PR2/PR4 integrados)
+### Hardening pré-beta — spec COMPLETA (6/6 PRs na branch); falta push/merge
 
 - **O quê:** a spec `docs/specs/hardening-pre-beta.md` tem 6 PRs. Estado em 2026-07-02
-  (consolidados na branch `feat/hardening-pre-beta`, commit efe99024c):
+  (todos consolidados na branch `feat/hardening-pre-beta`, HEAD 4953ed5ca):
   - **PR1** (segurança P0 — SSRF/caps/DEMO_MODE/rate-limit/delimitadores): ✅ integrado.
   - **PR2** (prompt caching — temporal no tail + `cache_control` dormente em OpenAI):
     ✅ integrado (merge de `feat/prompt-caching`; conflito semântico com o fix de
     outline reconciliado em `test_prompt_caching.py`).
   - **PR4** (retry nas tasks + fix ledger discovery + alerta e-mail): ✅ integrado
     (merge de `feat/resilience-email`).
-  - **PR3** (geração batch paralela — `asyncio.gather`+Semaphore, F4): ❌ **não feito**.
-  - **PR5** (observabilidade de custo — `llm_span` nas chamadas 1-shot, F11): ❌ **não feito**.
-  - **PR6** (purge de checkpoints F9 + `truncated` F10 + cache no match F12): ❌ **não feito**.
-- **Por que importa:** só o PR1 era P0/bloqueia beta; PR3/5/6 são P1/P2 (latência/custo/
-  higiene) — não bloqueiam o lançamento, mas são a metade não-feita da spec.
-- **Gates:** eval `writing` antes de mergear PR3 (interpretar com cautela — `pct_grounded`
-  é ruidoso, ver Frente 2 de `pre-beta-verification.md`; gate real = "sem crash + salva");
-  eval `matching` no PR6.3.
-- **Ponto de entrada:** prompt de handoff pronto (dado ao Lucas 2026-07-02). Facts
-  F4/F9/F10/F11/F12; decisões: concorrência=4, retenção purge=30d.
+  - **PR3** (geração batch paralela — `asyncio.gather`+Semaphore, F4): ✅ commit
+    665dc33ea. `GENERATION_CONCURRENCY` (default 4); contrato `GenerationOutcome`
+    idêntico; timeout de 300s agora preserva seções já concluídas.
+  - **PR5** (observabilidade de custo — `llm_span` nas chamadas 1-shot, F11): ✅ commit
+    0cee1dd50. 6 call sites instrumentados com workspace/session como metadata.
+  - **PR6** (purge de checkpoints F9 + `truncated` F10 + cache no match F12): ✅ commit
+    4953ed5ca. Task `purge_agent_checkpoints` (dom 06:00 UTC, `CHECKPOINT_RETENTION_DAYS`
+    default 30); `truncated` em /writing/turn e /explore com aviso na UI; memo
+    `_ecosystem_snapshot` + cache in-process dos embeddings da empresa.
+- **Gates rodados (2026-07-02):** eval `writing` sem crash, `mean_saved=1.0`
+  (`pct_grounded` 0.38 — dentro da banda de ruído 0.06–0.43 das runs do dia, ver
+  Frente 2 de `pre-beta-verification.md`); eval `matching` 0.881/3.625 idêntico ao
+  baseline; ruff + 629 pytest + `tsc --noEmit` verdes.
+- **Falta:** push + merge da branch na main (decisão do Lucas — testa local primeiro).
 - **Débito lateral:** edição não-commitada na worktree `feat/resilience-email`
   (`core/tasks.py` remove `build_knowledge_graph` legado do cron de ETL — alinha com o
   CLAUDE.md mas o código ainda o chama). Patch salvo no scratchpad da sessão; decidir
   integrar ou descartar.
-- **Status:** aberto (2026-07-02) — PR1/PR2/PR4 prontos; PR3/PR5/PR6 pendentes.
+- **Status:** implementação FECHADA (2026-07-02) — aberto só o push/merge.
 
 ### Match por hipergrado — 2ª camada (elegibilidade dura) via hiperarestas nativas
 
