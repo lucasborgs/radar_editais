@@ -6,7 +6,7 @@
 
 import type { CompanyProfile } from "./profile";
 import { EMPTY_PROFILE } from "./profile";
-import type { ConversationEntry, ProfileDiffItem } from "@/lib/api";
+import type { ConversationEntry, MatchedEdital, MatchedEntity, ProfileDiffItem } from "@/lib/api";
 
 export type ChatRole = "user" | "assistant";
 
@@ -46,7 +46,22 @@ export interface ProfileIncompleteEntry {
   missingFields: string[];
 }
 
-export type TranscriptEntry = MsgEntry | DiffEntry | GateEntry | ProfileIncompleteEntry;
+// Cards de match (editais/entidades com afinidade ao perfil) inline no
+// transcript — entry_kind='radar' já reservado pela migration 020, nunca
+// tinha sido escrito. Persiste igual msg/diff (sessionStorage +, logado,
+// session_turns) — sobrevive a trocar de aba/fechar o browser.
+export interface RadarEntry {
+  kind: "radar";
+  matchedEditais: MatchedEdital[];
+  matchedEntities: MatchedEntity[];
+}
+
+export type TranscriptEntry =
+  | MsgEntry
+  | DiffEntry
+  | GateEntry
+  | ProfileIncompleteEntry
+  | RadarEntry;
 
 // ── Persistência (sessionStorage v2) ──────────────────────────────────────────
 export const HISTORY_KEY = "frontdoor_history";
@@ -101,6 +116,15 @@ export function migrateHistory(raw: unknown): TranscriptEntry[] {
           out.push({ kind: "profile_incomplete", missingFields: e.missingFields as string[] });
         }
         break;
+      case "radar":
+        if (Array.isArray(e.matchedEditais) || Array.isArray(e.matchedEntities)) {
+          out.push({
+            kind: "radar",
+            matchedEditais: (e.matchedEditais as MatchedEdital[]) ?? [],
+            matchedEntities: (e.matchedEntities as MatchedEntity[]) ?? [],
+          });
+        }
+        break;
       default:
         break;
     }
@@ -139,6 +163,17 @@ export function entriesFromServer(entries: ConversationEntry[]): TranscriptEntry
         const p = (e.payload ?? {}) as Record<string, unknown>;
         if (Array.isArray(p.missingFields)) {
           out.push({ kind: "profile_incomplete", missingFields: p.missingFields as string[] });
+        }
+        break;
+      }
+      case "radar": {
+        const p = (e.payload ?? {}) as Record<string, unknown>;
+        if (Array.isArray(p.matched_editais) || Array.isArray(p.matched_entities)) {
+          out.push({
+            kind: "radar",
+            matchedEditais: (p.matched_editais as MatchedEdital[]) ?? [],
+            matchedEntities: (p.matched_entities as MatchedEntity[]) ?? [],
+          });
         }
         break;
       }

@@ -173,6 +173,8 @@ def explore(
             profile_diff_list = diff if diff else None
             persisted = persist_frontdoor_turn(
                 db, workspace_id, message, answer, profile_diff_list, req.session_id,
+                matched_editais=result.get("matched_editais"),
+                matched_entities=result.get("matched_entities"),
             )
             result["session_id"] = persisted["session_id"]
             result["entry_ids"] = persisted["entry_ids"]

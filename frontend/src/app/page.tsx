@@ -28,8 +28,6 @@ import {
   getConversation,
   updateConversationEntry,
   type ProfileDiffItem,
-  type MatchedEdital,
-  type MatchedEntity,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
@@ -121,10 +119,6 @@ export default function FrontDoorPage() {
   const [heroDismissed, setHeroDismissed] = useState(false);
   // Card "destravar mais matches" (Etapa 2): dispensável por sessão.
   const [unlockDismissed, setUnlockDismissed] = useState(false);
-  // Editais estruturados vindos do match no último turno (renderizados como
-  // cards entre as bolhas). Resetado a cada novo turno do usuário.
-  const [matchedEditais, setMatchedEditais] = useState<MatchedEdital[]>([]);
-  const [matchedEntities, setMatchedEntities] = useState<MatchedEntity[]>([]);
 
   // Liga o estado local à conversa do servidor (e sobrevive a F5 na mesma aba).
   // Binding novo (1º turno) avisa o sidebar para recarregar a lista.
@@ -317,8 +311,6 @@ export default function FrontDoorPage() {
       const withUser = [...entries, userEntry];
       setEntries(withUser);
       setInput("");
-      setMatchedEditais([]);
-      setMatchedEntities([]);
       setSending(true);
 
       try {
@@ -331,13 +323,18 @@ export default function FrontDoorPage() {
         // Logado: o backend persistiu o turno e devolveu o binding da conversa
         // (1º turno cria; seguintes reusam). Anônimo: session_id ausente.
         if (session_id) bindSession(session_id);
-        setMatchedEditais(matched_editais ?? []);
-        setMatchedEntities(matched_entities ?? []);
         setEntries((prev) => {
           const next: TranscriptEntry[] = [
             ...prev,
             { kind: "msg", role: "assistant", content: answer },
           ];
+          if ((matched_editais?.length ?? 0) > 0 || (matched_entities?.length ?? 0) > 0) {
+            next.push({
+              kind: "radar",
+              matchedEditais: matched_editais ?? [],
+              matchedEntities: matched_entities ?? [],
+            });
+          }
           if (profile_diff && profile_diff.length > 0) {
             next.push({
               kind: "diff",
@@ -680,44 +677,47 @@ export default function FrontDoorPage() {
               return <GateCard key={i} action={entry.action} />;
             case "profile_incomplete":
               return <ProfileIncompleteCard key={i} missingFields={entry.missingFields} />;
+            case "radar":
+              return (
+                <div key={i} className="flex flex-col gap-2 pt-1 pb-2">
+                  {entry.matchedEditais.length > 0 && (
+                    <>
+                      <p className="text-xs font-medium text-content-secondary px-4">
+                        Editais com afinidade
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {entry.matchedEditais.map((m) => (
+                          <MatchedEditalCard
+                            key={`${m.source}/${m.edital_id}`}
+                            edital={m}
+                            onStartWriting={handleStartWriting}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {entry.matchedEntities.length > 0 && (
+                    <>
+                      <p className="text-xs font-medium text-content-secondary px-4">
+                        Investidores, Programas e ICTs com afinidade
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {entry.matchedEntities.map((m) => (
+                          <MatchedEntityCard
+                            key={`${m.kind}/${m.name}`}
+                            entity={m}
+                            onStartWriting={handleStartWritingEntity}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
             default:
               return null;
           }
         })}
-
-        {matchedEditais.length > 0 && (
-          <div className="flex flex-col gap-2 pt-1 pb-2">
-            <p className="text-xs font-medium text-content-secondary px-4">
-              Editais com afinidade
-            </p>
-            <div className="flex flex-col gap-2">
-              {matchedEditais.map((m, i) => (
-                <MatchedEditalCard
-                  key={`${m.source}/${m.edital_id}`}
-                  edital={m}
-                  onStartWriting={handleStartWriting}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {matchedEntities.length > 0 && (
-          <div className="flex flex-col gap-2 pt-1 pb-2">
-            <p className="text-xs font-medium text-content-secondary px-4">
-              Investidores, Programas e ICTs com afinidade
-            </p>
-            <div className="flex flex-col gap-2">
-              {matchedEntities.map((m, i) => (
-                <MatchedEntityCard
-                  key={`${m.kind}/${m.name}`}
-                  entity={m}
-                  onStartWriting={handleStartWritingEntity}
-                />
-              ))}
-            </div>
-          </div>
-        )}
 
         {sending && (
           <div className="flex items-start">

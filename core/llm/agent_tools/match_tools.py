@@ -31,7 +31,16 @@ def _company_nodes(profile_text: str) -> list[dict]:
     return _NODES_CACHE[h]
 
 
-def _format_matches(matches: list) -> str:
+_BRIEF_HINT = (
+    " Cards com o detalhe completo (status, prazo, valor, justificativa) já "
+    "aparecem na tela — NÃO repita isso na resposta, comente em no máximo 2 frases."
+)
+
+
+def _format_matches(matches: list, *, brief: bool = False) -> str:
+    if brief:
+        names = "; ".join(f"{m.source}/{m.edital_id} — {m.name[:60]}" for m in matches)
+        return f"{len(matches)} editais com afinidade ao perfil: {names}.{_BRIEF_HINT}"
     lines = [f"{len(matches)} editais com afinidade ao perfil (match por conteúdo, mais fortes primeiro):"]
     for m in matches:
         disp = [x for x in (m.status, f"prazo {m.prazo}" if m.prazo else "", m.valor) if x]
@@ -43,9 +52,12 @@ def _format_matches(matches: list) -> str:
     return "\n".join(lines)
 
 
-def _format_entity_matches(matches: list) -> str:
+def _format_entity_matches(matches: list, *, brief: bool = False) -> str:
     if not matches:
         return "Nenhum investidor/programa/ICT com afinidade suficiente ao perfil."
+    if brief:
+        names = "; ".join(f"[{m.kind}] {m.name[:50]}" for m in matches)
+        return f"{len(matches)} entidades com afinidade ao perfil: {names}.{_BRIEF_HINT}"
     lines = [f"{len(matches)} entidades (investidor/programa/ICT) com afinidade ao perfil:"]
     for m in matches:
         desc = f" — {m.description[:80]}" if m.description else ""
@@ -57,7 +69,7 @@ def _format_entity_matches(matches: list) -> str:
 
 
 def build_match_tools(
-    profile_text: str, *, company_nodes: list[dict] | None = None,
+    profile_text: str, *, company_nodes: list[dict] | None = None, brief: bool = False,
 ) -> list[BaseTool]:
     """Tool de match para o caminho COM perfil. `profile_text` (o bloco de perfil
     formatado) é capturado por closure — duas sessões nunca compartilham perfil.
@@ -65,7 +77,14 @@ def build_match_tools(
     `company_nodes` (opcional): nós-empresa já materializados. Quando vêm do
     hipergrado durável da empresa (workspace autenticado), evitam re-extrair (poupa
     1 LLM call) e são mais ricos que a extração efêmera one-shot do perfil. Ausente
-    (explore público stateless) → fallback para `_company_nodes(profile_text)`."""
+    (explore público stateless) → fallback para `_company_nodes(profile_text)`.
+
+    `brief`: True quando o caller já renderiza os resultados como cards em UI
+    (ExploreAgent) — pedir "não repita" via prompt sozinho não é confiável (o
+    modelo re-lista de qualquer jeito, testado ao vivo); em vez disso o RESULTADO
+    da tool não carrega status/prazo/valor/justificativa, só nome+id — o texto
+    do agente fica curto porque ele literalmente não tem o detalhe pra repetir.
+    False (default, WritingSession) mantém o resultado rico — não há card lá."""
 
     @tool
     def find_matching_editais(threshold: float = 0.55, top_k: int = 8) -> str:
@@ -105,7 +124,7 @@ def build_match_tools(
                 "Nenhum edital com afinidade suficiente ao perfil. Tente um threshold "
                 "menor ou refine o perfil (mais detalhe sobre o que a empresa faz)."
             )
-        return _format_matches(matches)
+        return _format_matches(matches, brief=brief)
 
     @tool
     def find_matching_entities(kind: str = "", threshold: float = 0.55, top_k: int = 8) -> str:
@@ -151,6 +170,6 @@ def build_match_tools(
             )
         except Exception as e:  # noqa: BLE001
             return f"Erro no match de entidades: {e}."
-        return _format_entity_matches(matches)
+        return _format_entity_matches(matches, brief=brief)
 
     return [find_matching_editais, find_matching_entities]
