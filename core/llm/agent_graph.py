@@ -42,9 +42,11 @@ from langgraph.prebuilt import ToolNode
 from typing_extensions import TypedDict
 
 from core.llm.agent_runtime import (
+    _FINALIZE_PROMPT,
     _MAX_RETRIES,
     _PLAN_TOOL_NAMES,
     _REFLECT_CHAR_THRESHOLD,
+    _REFLECT_FOLLOWUP_PROMPT,
     _REFLECT_PROMPT,
     _TIMEOUT,
     TOOL_RESULT_CHAR_CAP,
@@ -149,9 +151,32 @@ def _build_graph(
             "documents": state.get("documents", {}),
         }
 
+    async def agent_final(state: AgentState) -> dict:
+        # SEM tools vinculadas (`model`, não `bound`) — garante que a resposta não
+        # tenha tool_calls, então essa rodada sempre encerra o turno de verdade.
+        resp = await model.ainvoke(state["messages"])
+        return {
+            "messages": [resp],
+            "llm_calls": state["llm_calls"] + 1,
+            "documents": state.get("documents", {}),
+        }
+
     def should_continue(state: AgentState) -> str:
         last = state["messages"][-1]
         if not getattr(last, "tool_calls", None):
+            # A reflexão (`reflect` node) é uma nota INTERNA, não uma resposta ao
+            # usuário. Se o modelo respondeu ao _REFLECT_PROMPT sem chamar tool,
+            # essa nota vazaria como se fosse a resposta final — força mais uma
+            # rodada em vez de encerrar aqui (bug real: "Aprendi que X, preciso Y"
+            # aparecendo no chat em vez de uma resposta de verdade).
+            msgs = state["messages"]
+            just_reflected = (
+                len(msgs) >= 2
+                and isinstance(msgs[-2], HumanMessage)
+                and msgs[-2].content == _REFLECT_PROMPT
+            )
+            if just_reflected and state["llm_calls"] < max_steps:
+                return "reflect_followup"
             return END  # fim natural do turno
         return "tools"
 
@@ -190,8 +215,11 @@ def _build_graph(
     def after_tools(state: AgentState) -> str:
         # Cap pós-tools (paridade com o legado: as tools da última rodada SÃO
         # executadas — já rodaram no nó `tools` — e só então o teto corta).
+        # Vai para `finalize` (não END direto): sem isso o turno termina no
+        # ToolMessage da última tool, sem o modelo nunca escrever uma resposta —
+        # texto vazio pro usuário (bug real, achado ao validar o fix de reflect).
         if state["llm_calls"] >= max_steps:
-            return END
+            return "finalize"
         return "reflect" if state.get("reflect_pending") else "agent"
 
     def reflect(state: AgentState) -> dict:
@@ -200,6 +228,18 @@ def _build_graph(
             "rounds_since_reflect": 0,
             "chars_since_reflect": 0,
             "reflect_pending": False,
+            "documents": state.get("documents", {}),
+        }
+
+    def reflect_followup(state: AgentState) -> dict:
+        return {
+            "messages": [HumanMessage(content=_REFLECT_FOLLOWUP_PROMPT)],
+            "documents": state.get("documents", {}),
+        }
+
+    def finalize(state: AgentState) -> dict:
+        return {
+            "messages": [HumanMessage(content=_FINALIZE_PROMPT)],
             "documents": state.get("documents", {}),
         }
 
@@ -241,17 +281,26 @@ def _build_graph(
 
     g = StateGraph(AgentState)
     g.add_node("agent", agent)
+    g.add_node("agent_final", agent_final)
     g.add_node("tools", tools)
     g.add_node("reflect", reflect)
+    g.add_node("reflect_followup", reflect_followup)
+    g.add_node("finalize", finalize)
     g.add_node("manage_memory", manage_memory)
     g.add_edge(START, "agent")
-    g.add_conditional_edges("agent", should_continue, {END: END, "tools": "tools"})
+    g.add_conditional_edges(
+        "agent", should_continue,
+        {END: END, "tools": "tools", "reflect_followup": "reflect_followup"},
+    )
     g.add_conditional_edges(
         "tools", after_tools,
-        {END: END, "reflect": "reflect", "agent": "manage_memory"},
+        {"finalize": "finalize", "reflect": "reflect", "agent": "manage_memory"},
     )
     g.add_edge("manage_memory", "agent")
     g.add_edge("reflect", "manage_memory")
+    g.add_edge("reflect_followup", "agent")
+    g.add_edge("finalize", "agent_final")
+    g.add_edge("agent_final", END)
     return g.compile(checkpointer=checkpointer)
 
 
@@ -308,6 +357,19 @@ def _messages_to_agent_result(messages: list[AnyMessage], stop_reason: StopReaso
         stop_reason=stop_reason,
         usage={"input_tokens": total_in, "output_tokens": total_out},
     )
+
+
+def _derive_stop_reason(final_state: dict, max_steps: int) -> StopReason:
+    """max_steps se o loop foi cortado — via tool_calls pendentes (backstop antigo)
+    OU via a rodada forçada de `finalize` (llm_calls > max_steps: só acontece
+    quando `after_tools` desviou pro finalize por ter estourado o teto)."""
+    msgs = final_state["messages"]
+    last_ai = next((m for m in reversed(msgs) if isinstance(m, AIMessage)), None)
+    if last_ai and last_ai.tool_calls:
+        return "max_steps"
+    if final_state.get("llm_calls", 0) > max_steps:
+        return "max_steps"
+    return "end_turn"
 
 
 # =============================================================================
@@ -410,8 +472,7 @@ async def run_agent_graph_async(
             return AgentResult(final_text="", steps=[], stop_reason="error", usage={})
 
         msgs = final["messages"]
-        last_ai = next((m for m in reversed(msgs) if isinstance(m, AIMessage)), None)
-        stop: StopReason = "max_steps" if (last_ai and last_ai.tool_calls) else "end_turn"
+        stop = _derive_stop_reason(final, max_steps)
         result = _messages_to_agent_result(msgs, stop)
 
         if agent_span is not None:
@@ -874,8 +935,7 @@ async def _writing_turn_async(
             intr_payload = v if isinstance(v, dict) else {"prompt": str(v)}
             stop: StopReason = "end_turn"
         else:
-            last_ai = next((m for m in reversed(msgs) if isinstance(m, AIMessage)), None)
-            stop = "max_steps" if (last_ai and last_ai.tool_calls) else "end_turn"
+            stop = _derive_stop_reason(final, max_steps)
 
         result = _messages_to_agent_result(delta, stop)
 
@@ -1037,8 +1097,7 @@ def _build_generation_graph(
             n_calls = sum(1 for m in msgs if isinstance(m, AIMessage) and m.tool_calls)
             logger.info("generation: seção '%s' concluída (%d steps, %d tool calls)",
                         section, len(msgs), n_calls)
-            last_ai = next((m for m in reversed(msgs) if isinstance(m, AIMessage)), None)
-            stop: StopReason = "max_steps" if (last_ai and last_ai.tool_calls) else "end_turn"
+            stop = _derive_stop_reason(final, max_steps)
             result = _messages_to_agent_result(msgs, stop)
             if on_result is not None:
                 on_result(result)
