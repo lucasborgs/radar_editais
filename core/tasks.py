@@ -31,10 +31,11 @@ import json  # noqa: E402
 import logging  # noqa: E402
 import os  # noqa: E402
 
-from procrastinate import App, PsycopgConnector  # noqa: E402
+from procrastinate import App, PsycopgConnector, RetryStrategy  # noqa: E402
 
 from core.db import get_supabase_service  # noqa: E402
 from core.logging_config import setup_logging  # noqa: E402
+from core.notify import send_alert  # noqa: E402
 from core.retrieval.chunker import chunk_from_blocks  # noqa: E402
 from core.retrieval.embedder import EMBEDDING_MODEL, embed_texts  # noqa: E402
 from core.retrieval.retriever import RETRIEVAL_EMBEDDING_COLUMN  # noqa: E402
@@ -69,8 +70,16 @@ def _build_app() -> App:
 
 app = _build_app()
 
+# Retry com backoff exponencial para as tasks UNITÁRIAS e idempotentes (spec
+# hardening-pre-beta 4.1). O default do procrastinate é SEM retry — sem isto,
+# uma falha transiente (timeout de LLM/DB) matava o job de vez. Espera 4^1=4s
+# e 4^2=16s entre as 3 tentativas. Os wrappers de cron (run_daily_etl,
+# discover_opportunities, synthesize_patterns_cron) NÃO têm retry de propósito:
+# cron re-roda no dia seguinte e a falha vira alerta por e-mail (core/notify).
+UNIT_TASK_RETRY = RetryStrategy(max_attempts=3, exponential_wait=4)
 
-@app.task(name="enrich_content", queue="default")
+
+@app.task(name="enrich_content", queue="default", retry=UNIT_TASK_RETRY)
 async def enrich_content_task(item_id: str) -> None:
     """Enrich a content_items row via LLM and persist summary / key_facts / themes.
 
@@ -80,9 +89,9 @@ async def enrich_content_task(item_id: str) -> None:
 
     If the row no longer exists (e.g. user deleted it before the worker picked
     the job up), we log and return without raising — there's nothing to do and
-    a retry won't change the outcome. Errors raised by `enrich_content` itself
-    are allowed to propagate so procrastinate can apply its retry/backoff
-    policy.
+    a retry won't change the outcome. Erros levantados pelo próprio
+    `enrich_content` propagam e o procrastinate re-tenta com backoff
+    exponencial (retry=UNIT_TASK_RETRY no decorator desta task).
     """
     db = get_supabase_service()
 
@@ -130,7 +139,7 @@ async def enrich_content_task(item_id: str) -> None:
     await app.configure_task("embed_content").defer_async(item_id=item_id)
 
 
-@app.task(name="embed_content", queue="default")
+@app.task(name="embed_content", queue="default", retry=UNIT_TASK_RETRY)
 async def embed_content_task(item_id: str) -> None:
     """Gera embedding text-embedding-3-large (1536d) para um content_item.
 
@@ -176,7 +185,7 @@ async def embed_content_task(item_id: str) -> None:
     logger.info("embed_content_task: item_id=%s embedded (1536d)", item_id)
 
 
-@app.task(name="build_company_hypergraph", queue="default")
+@app.task(name="build_company_hypergraph", queue="default", retry=UNIT_TASK_RETRY)
 async def build_company_hypergraph_task(workspace_id: str) -> None:
     """(Re)constrói o hipergrado durável da empresa a partir do corpus já no DB.
 
@@ -186,8 +195,9 @@ async def build_company_hypergraph_task(workspace_id: str) -> None:
     em `asyncio.to_thread` para não travar o event loop do worker.
 
     Roda contra o cliente service-role (sem request context) — a fronteira de
-    tenant é o próprio `workspace_id`. Exceções propagam para o retry/backoff
-    do procrastinate, como nas demais tasks.
+    tenant é o próprio `workspace_id`. Exceções propagam e o procrastinate
+    re-tenta com backoff exponencial (retry=UNIT_TASK_RETRY, como nas demais
+    tasks unitárias).
     """
     from core.services.company_corpus import build_company_hypergraph
 
@@ -209,7 +219,7 @@ async def build_company_hypergraph_task(workspace_id: str) -> None:
 # Reflection (Fase 2 #17)
 # =============================================================================
 
-@app.task(name="reflect_workspace", queue="default")
+@app.task(name="reflect_workspace", queue="default", retry=UNIT_TASK_RETRY)
 async def reflect_workspace_task(workspace_id: str) -> None:
     """Gera reflexão sobre outcomes do workspace e persiste em reflection_insights.
 
@@ -235,7 +245,7 @@ async def reflect_workspace_task(workspace_id: str) -> None:
     )
 
 
-@app.task(name="synthesize_patterns", queue="default")
+@app.task(name="synthesize_patterns", queue="default", retry=UNIT_TASK_RETRY)
 async def synthesize_patterns_task(workspace_id: str) -> None:
     """Sintetiza padrões (level 2) a partir do corpus de observações (level 1).
 
@@ -398,7 +408,7 @@ def _index_is_current(db, edital_id: str, content_hash: str, n_chunks: int) -> b
         return False
 
 
-@app.task(name="chunk_edital", queue="default")
+@app.task(name="chunk_edital", queue="default", retry=UNIT_TASK_RETRY)
 async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
     """Index one edital: PDFs → chunks → embeddings → upsert into edital_chunks.
 
@@ -415,8 +425,8 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
 
     Error handling:
       - Extraction failure on one PDF logs and is skipped (the others proceed).
-      - Embedding/DB failures propagate so procrastinate can retry with
-        exponential backoff (configured at the worker level).
+      - Falhas de embedding/DB propagam e o procrastinate re-tenta com backoff
+        exponencial (retry=UNIT_TASK_RETRY no decorator desta task).
     """
     db = get_supabase_service()
 
@@ -615,6 +625,31 @@ def _build_all_silver() -> int:
 async def run_daily_etl_task(timestamp: int) -> None:
     """Cron diário (3am UTC): roda scrapers ativos e dispara chunking.
 
+    Wrapper fino de `_run_daily_etl` com o contrato de alerta (spec
+    hardening-pre-beta 4.3): falha TOTAL do cron → 1 e-mail de alerta +
+    re-raise (o job consta como failed no procrastinate). O cron NÃO tem
+    retry= de propósito — re-roda no dia seguinte; o alerta é o mecanismo
+    de visibilidade. Falhas de ETAPA (parciais) são agregadas e alertadas
+    dentro de `_run_daily_etl` — máx. 1 e-mail por run em qualquer caminho.
+
+    O argumento `timestamp` vem do procrastinate periodic e representa o
+    instante agendado da execução (UNIX epoch).
+    """
+    try:
+        await _run_daily_etl(timestamp)
+    except Exception as e:
+        # send_alert nunca levanta (contrato de core/notify) — o alerta não
+        # pode mascarar nem substituir a falha original.
+        send_alert(
+            "[radar] run_daily_etl: falha total do cron",
+            f"run_daily_etl (timestamp={timestamp}) abortou com exceção:\n\n{e!r}",
+        )
+        raise
+
+
+async def _run_daily_etl(timestamp: int) -> None:
+    """Corpo do ETL diário (ver run_daily_etl_task para o contrato de alerta).
+
     Para cada fonte em pipeline.extractors.SCRAPER_REGISTRY:
       1. Roda o scraper (captura novos editais em data/bronze/)
       2. Falhas tipadas (TimeoutError, ParseError, etc.) viram rows em
@@ -622,8 +657,9 @@ async def run_daily_etl_task(timestamp: int) -> None:
       3. Para cada edital novo detectado, enfileira chunk_edital_task
          (não roda inline — workers picam de outra fila)
 
-    O argumento `timestamp` vem do procrastinate periodic e representa o
-    instante agendado da execução (UNIX epoch).
+    Falhas de scraper/etapa não derrubam a run (cada bloco tem try/except
+    próprio), mas são acumuladas em `step_errors` e viram UM e-mail agregado
+    ao final (spec hardening-pre-beta 4.3).
     """
     from core.pipeline_errors import (
         PipelineError,
@@ -635,6 +671,10 @@ async def run_daily_etl_task(timestamp: int) -> None:
 
     # Import tardio para evitar custo no boot do worker
     from pipeline.extractors import SCRAPER_REGISTRY
+
+    # Falhas parciais da run (scraper por fonte + etapas pós-scraping).
+    # Não derrubam a run; viram 1 e-mail AGREGADO ao final.
+    step_errors: list[str] = []
 
     total_new = 0
     for source_key, cfg in SCRAPER_REGISTRY.items():
@@ -665,6 +705,7 @@ async def run_daily_etl_task(timestamp: int) -> None:
             )
             logger.warning("run_daily_etl_task: %s falhou (%s): %s",
                           display_name, e.category, e)
+            step_errors.append(f"scraper {display_name} [{e.category}]: {e}")
         except Exception as raw_err:
             # Genérico: tenta classificar (HTTPError → ParseError/Timeout, etc.)
             typed = classify_requests_error(raw_err)
@@ -676,6 +717,9 @@ async def run_daily_etl_task(timestamp: int) -> None:
             logger.warning(
                 "run_daily_etl_task: %s falhou (classificado como %s): %s",
                 display_name, typed.category, raw_err,
+            )
+            step_errors.append(
+                f"scraper {display_name} [{typed.category}]: {raw_err}"
             )
 
     # -------------------------------------------------------------------
@@ -694,6 +738,7 @@ async def run_daily_etl_task(timestamp: int) -> None:
         logger.info("run_daily_etl_task: índice reconstruído (vigentes + histórico)")
     except Exception as e:
         logger.error("run_daily_etl_task: falha ao reconstruir índice: %s", e)
+        step_errors.append(f"reconstrução do índice: {e}")
 
     # 1b) Persiste o Documento Canônico durável (§12.3) enquanto o bronze
     #     recém-scraped está no disco. O FS do worker é EFÊMERO: sem isto, o
@@ -705,6 +750,7 @@ async def run_daily_etl_task(timestamp: int) -> None:
         logger.info("run_daily_etl_task: %d documentos-fonte persistidos (durável)", n_docs)
     except Exception as e:
         logger.error("run_daily_etl_task: falha ao persistir documentos-fonte: %s", e)
+        step_errors.append(f"persistência do Documento Canônico: {e}")
 
     # 1c) Silver EXPLÍCITO: materializa data/silver/structured_docs/*.jsonl de
     #     todos os editais vigentes (structurer, durable-first). Antes isto era
@@ -716,6 +762,7 @@ async def run_daily_etl_task(timestamp: int) -> None:
         logger.info("run_daily_etl_task: silver materializado p/ %d editais", n_silver)
     except Exception as e:
         logger.error("run_daily_etl_task: falha ao materializar silver: %s", e)
+        step_errors.append(f"materialização do silver: {e}")
 
     # 1d) Hipergrado por edital + catálogos (arquitetura hipergrado, Sprint 0).
     #     Depende do silver de 1c — NÃO da wiki. Roda EM PARALELO à wiki (nada
@@ -728,6 +775,7 @@ async def run_daily_etl_task(timestamp: int) -> None:
             logger.info("run_daily_etl_task: hipergrado — %s", counts)
         except Exception as e:
             logger.error("run_daily_etl_task: falha ao construir hipergrado: %s", e)
+            step_errors.append(f"construção do hipergrado: {e}")
     else:
         logger.warning("run_daily_etl_task: sem OPENAI_API_KEY — hipergrado pulado")
 
@@ -748,6 +796,7 @@ async def run_daily_etl_task(timestamp: int) -> None:
             logger.info("run_daily_etl_task: wiki pages sintetizadas (backend=%s)", wiki_backend)
         except Exception as e:
             logger.error("run_daily_etl_task: falha na síntese de wiki pages: %s", e)
+            step_errors.append(f"síntese de wiki pages: {e}")
     else:
         logger.warning(
             "run_daily_etl_task: sem API key p/ WIKI_SYNTH_BACKEND=%s — síntese de wiki pulada",
@@ -767,6 +816,7 @@ async def run_daily_etl_task(timestamp: int) -> None:
         logger.info("run_daily_etl_task: vault Obsidian / grafo regenerado")
     except Exception as e:
         logger.error("run_daily_etl_task: falha ao regenerar grafo Obsidian: %s", e)
+        step_errors.append(f"regeneração do grafo Obsidian: {e}")
 
     # 4) Alerta de fonte parada: bronze de alguma fonte registrada sem arquivo
     #    novo há mais que o threshold (scraper quebrado retornando vazio, cron
@@ -780,10 +830,27 @@ async def run_daily_etl_task(timestamp: int) -> None:
                     "run_daily_etl_task: fonte %s estagnada — bronze mais "
                     "recente tem %.1f dias", r["source"], r["age_days"],
                 )
+                step_errors.append(
+                    f"fonte {r['source']} estagnada (bronze mais recente tem "
+                    f"{r['age_days']:.1f} dias)"
+                )
     except Exception as e:
         logger.warning("run_daily_etl_task: check de frescor das fontes falhou: %s", e)
+        step_errors.append(f"check de frescor das fontes: {e}")
 
     logger.info("run_daily_etl_task: concluído (total=%d novos)", total_new)
+
+    # Alerta AGREGADO das falhas parciais (spec hardening-pre-beta 4.3): a run
+    # concluiu, mas alguma(s) etapa(s) falhou(aram). UM e-mail com o resumo —
+    # sem spam por etapa. A falha total (exceção não capturada) é alertada no
+    # wrapper run_daily_etl_task, nunca nos dois caminhos ao mesmo tempo.
+    if step_errors:
+        send_alert(
+            f"[radar] run_daily_etl: {len(step_errors)} falha(s) de etapa",
+            "A run diária do ETL concluiu com falhas parciais "
+            f"(timestamp={timestamp}, {total_new} editais novos):\n\n"
+            + "\n".join(f"- {err}" for err in step_errors),
+        )
 
 
 # =============================================================================
@@ -805,12 +872,25 @@ async def discover_opportunities_task(timestamp: int) -> None:
     Chunking e entrada no KG só acontecem após promoção — ver promote_discovered_opportunity.
 
     `timestamp` vem do procrastinate periodic (instante agendado, UNIX epoch).
+
+    Falha total → 1 e-mail de alerta + re-raise (spec hardening-pre-beta 4.3).
+    Sem retry= de propósito: o cron re-roda no dia seguinte.
     """
     from core.opportunity_discovery import discover_opportunities  # noqa: PLC0415
 
     logger.info("discover_opportunities_task: iniciando (timestamp=%s)", timestamp)
 
-    records = await asyncio.to_thread(discover_opportunities, write=True)
+    try:
+        records = await asyncio.to_thread(discover_opportunities, write=True)
+    except Exception as e:
+        # send_alert nunca levanta (contrato de core/notify) — o alerta não
+        # pode mascarar nem substituir a falha original.
+        send_alert(
+            "[radar] discover_opportunities: falha total do cron",
+            f"discover_opportunities (timestamp={timestamp}) abortou com "
+            f"exceção:\n\n{e!r}",
+        )
+        raise
     logger.info(
         "discover_opportunities_task: %d oportunidades → staging (aguardam gate humano)",
         len(records),
