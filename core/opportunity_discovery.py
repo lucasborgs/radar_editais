@@ -129,8 +129,14 @@ _TRIAGE_SYSTEM = (
 )
 
 
-def _triage(hit: websearch.SearchHit, client, model) -> dict:
-    """Classifica um resultado de busca. Falha → descarta (is_opportunity=False)."""
+def _triage(hit: websearch.SearchHit, client, model) -> dict | None:
+    """Classifica um resultado de busca. None em FALHA (transiente).
+
+    Falha de triagem (timeout/5xx do LLM, JSON malformado) NÃO é rejeição: o
+    caller pula a URL SEM gravar no ledger e ela volta na próxima rodada (spec
+    hardening-pre-beta 4.2). Antes, a falha virava `is_opportunity=False` e a
+    URL entrava no cache negativo por 30 dias — o bug do cache de rejeição.
+    """
     try:
         data = _json_from_llm(
             client, model, _TRIAGE_SYSTEM,
@@ -143,9 +149,9 @@ def _triage(hit: websearch.SearchHit, client, model) -> dict:
                 "agency": (data.get("agency") or "").strip(),
                 "reason": (data.get("reason") or "").strip()}
     except Exception as e:
-        logger.warning("triagem falhou (%s): %s", hit.url, e)
-        return {"is_opportunity": False, "is_hub": False, "agency": "",
-                "reason": "triagem falhou"}
+        logger.warning("triagem falhou (%s): %s — URL será re-triada na "
+                       "próxima rodada (não entra no ledger)", hit.url, e)
+        return None
 
 
 def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, model) -> dict | None:
@@ -553,6 +559,12 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
             logger.debug("descoberta: cache negativo pula triagem de %s", h.url)
             continue
         verdict = _triage(h, tri_client, tri_model)
+        if verdict is None:
+            # Falha TRANSIENTE de triagem (timeout/5xx/JSON malformado): pula a
+            # URL SEM tocar o ledger — nem cache negativo, nem dedup positivo.
+            # Ela volta na próxima rodada. Rejeição REAL (o LLM respondeu
+            # is_opportunity=false) segue o caminho normal abaixo.
+            continue
         # Hub de inovação aberta (só depth 0): em vez de descartar, faz fan-out
         # raso — cada desafio-filho vira candidato normal (passa por triagem +
         # extração e classifica opportunity_type=desafio na extração).
@@ -580,6 +592,10 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         rec = _extract(h, page_text, agency, ext_client, ext_model)
         if rec:
             records.append(rec)
+        # rec=None (falha de extração) NÃO toca o ledger: não entra no cache
+        # negativo (só a triagem grava rejeição) nem no dedup positivo (o
+        # _save_ledger abaixo só soma URLs de `records`) — a URL volta na
+        # próxima rodada. Simétrico ao tratamento de falha do _triage acima.
 
     logger.info("descoberta: %d triagens puladas pelo cache negativo (TTL %dd)",
                 triage_skipped, reject_ttl_days)
