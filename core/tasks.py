@@ -817,3 +817,44 @@ async def discover_opportunities_task(timestamp: int) -> None:
     )
 
     logger.info("discover_opportunities_task: concluído")
+
+
+# ============================================================================
+# Warm-up do corpus RAG — eager chunking (reversão operacional do lazy/PR #44)
+# ============================================================================
+# Racional (adendo eager na spec hardening-pre-beta): o catálogo é pequeno
+# (~30 editais) e o gate de content_hash do chunk_edital torna re-runs quase
+# gratuitos — só editais novos/alterados pagam LLM. Manter o corpus inteiro
+# indexado elimina o cold-start bloqueante do POST /writing/start no primeiro
+# engajamento de um edital. O ensure-at-start segue como rede de segurança
+# (vira no-op com o índice quente). Backfill manual: scripts/backfill_chunks.py.
+
+
+@app.periodic(cron="0 5 * * *")
+@app.task(name="warm_edital_chunks", queue="etl")
+async def warm_edital_chunks_task(timestamp: int) -> None:
+    """Cron diário (05:00 UTC, depois do ETL 03:00 e da descoberta 04:00):
+    enfileira `chunk_edital` para TODO edital do catálogo.
+
+    Defere 1 job por edital em vez de rodar inline: o worker aplica o
+    paralelismo dele e uma falha isolada não afeta os demais. `timestamp`
+    vem do procrastinate periodic (UNIX epoch).
+    """
+    from core.kg.hypergraph_catalog import list_editais  # noqa: PLC0415
+
+    cards = list_editais(limit=1000)
+    queued = 0
+    for card in cards:
+        try:
+            await app.configure_task("chunk_edital").defer_async(
+                edital_id=card["id"],
+            )
+            queued += 1
+        except Exception as e:
+            logger.warning(
+                "warm_edital_chunks: falha ao enfileirar %s: %s", card.get("id"), e,
+            )
+    logger.info(
+        "warm_edital_chunks: %d/%d editais enfileirados (timestamp=%s)",
+        queued, len(cards), timestamp,
+    )
