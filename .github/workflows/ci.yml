@@ -38,6 +38,54 @@ jobs:
       - name: Run tests
         run: pytest -q
 
+  tenant-isolation:
+    name: Tenant isolation leak-test (Supabase)
+    runs-on: ubuntu-latest
+    # Gate de segurança P0 (docs/security/tenant-isolation.md). Sobe o Supabase
+    # local e roda a suíte adversarial das 4 superfícies. Job SEPARADO do backend:
+    # um hiccup do Docker/Supabase não bloqueia a suíte principal — mas um LEAK
+    # real (ou a regressão do procrastinate, migration 034) reprova aqui.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase (aplica migrations, inclui 034)
+        run: supabase start
+
+      - name: Exporta env do Supabase local
+        run: |
+          eval "$(supabase status -o env | sed 's/^/LOCAL_/')"
+          {
+            echo "SUPABASE_URL=$LOCAL_API_URL"
+            echo "SUPABASE_ANON_KEY=$LOCAL_ANON_KEY"
+            echo "SUPABASE_SERVICE_KEY=$LOCAL_SERVICE_ROLE_KEY"
+            echo "SUPABASE_JWT_SECRET=$LOCAL_JWT_SECRET"
+            echo "DATABASE_URL=$LOCAL_DB_URL"
+          } >> "$GITHUB_ENV"
+
+      - name: Setup checkpointer/store (S3 — tolera falha; o store-test pula sem ele)
+        run: python scripts/setup_checkpointer.py || echo "store setup falhou; S3 store-test vai pular"
+        continue-on-error: true
+
+      - name: Run tenant isolation suite
+        run: pytest tests/test_tenant_isolation.py -v
+
   frontend:
     name: Frontend (Next.js)
     runs-on: ubuntu-latest

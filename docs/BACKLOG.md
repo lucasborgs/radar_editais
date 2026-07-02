@@ -11,6 +11,37 @@
 
 ## Aberto
 
+### 🔴 P0 DEPLOY — `supabase db push` (migration 034 fecha leak da fila procrastinate)
+
+- **O quê:** a [migration 034](../supabase/migrations/034_procrastinate_lockdown.sql)
+  (RLS + REVOKE nas tabelas/funções `procrastinate*`) foi aplicada e verificada só no
+  Supabase **local**. O leak-test apontado ao **remoto** ainda REPROVA
+  (`tests/test_tenant_isolation.py::...::test_procrastinate_surface_negada`) — ou seja,
+  **em produção a anon key ainda lê `procrastinate_jobs.args` (workspace_id/payloads
+  cross-tenant) e deleta/enfileira jobs**. Junto sobem 032/033 (pendentes no ledger remoto).
+- **Por que importa:** é o furo P0 da Frente 1 do leak-test pré-beta — vazamento
+  cross-tenant + controle de fila por chamador anônimo. Bloqueia o beta externo.
+- **Onde está specado:** `docs/security/tenant-isolation.md` (seção "FURO P0"),
+  `docs/specs/pre-beta-verification.md` (Frente 1).
+- **Ponto de entrada:** `supabase db push` (ou runbook Railway/deploy.sh). Depois,
+  rodar o leak-test contra staging com `TENANT_ISOLATION_ALLOW_REMOTE=1` p/ confirmar verde.
+- **Status:** aberto (2026-07-02) — fix pronto e testado local; falta só o push ao remoto.
+
+### Regra de operação — branch retomada com gate de eval pendente roda o gate ANTES de código novo
+
+- **O quê:** disciplina de processo (Frente 3 do `pre-beta-verification.md`), não
+  workstream. Ao retomar uma branch que tem gate de eval pendente, **rodar o gate antes
+  de escrever código novo nela** — evita empilhar trabalho sobre uma base cuja qualidade
+  nunca foi medida.
+- **Pendências conhecidas (2026-07-02):**
+  - `feat/elig-constraints-producer` (PR2+PR3 WIP de [[project_eligibility_constraints]]):
+    **3 gates NÃO rodados** (matching/produtor/golden). Localmente só existe
+    `feat/elig-constraints-schema` (PR1 mergeado) — a branch do produtor está no remoto/stash.
+  - agentic-evolution F2/F3A (PRs #36/#37, [[project_agentic_evolution_phases]]): gates de
+    env não rodados.
+  - Eval de escrita como gate da **remoção do legacy de match** (spec robustez).
+- **Status:** regra ativa (2026-07-02). Sem entregável próprio — dissolve no fluxo.
+
 ### Match por hipergrado — 2ª camada (elegibilidade dura) via hiperarestas nativas
 
 - **O quê:** o match cross-domínio (`core/services/hypergraph_match.py`) responde só
