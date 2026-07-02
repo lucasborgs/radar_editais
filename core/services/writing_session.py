@@ -1202,9 +1202,10 @@ class WritingSession:
     def generate_full_proposal(self, sections: list[str] | None = None,
                                 record_turn: bool = True) -> dict:
         """Modo "gerar proposta completa": escreve TODAS as seções do outline de
-        uma vez (batch). Um orquestrador determinístico despacha o agente interno
-        por seção com um toolset simplificado (sem read_exact_chunk / read_section /
-        read_full_proposal / request_user_info) e max_steps=6 para evitar loops.
+        uma vez (batch). As seções rodam em PARALELO (asyncio.gather, concorrência
+        GENERATION_CONCURRENCY=4) — o agente interno é despachado por seção com um
+        toolset simplificado (sem read_exact_chunk / read_section /
+        read_full_proposal / request_user_info) e max_steps baixo para evitar loops.
         `auto_save` fallback garante que conteúdo gerado não se perca mesmo que o
         agente não chame save_draft.
 
@@ -1254,7 +1255,6 @@ class WritingSession:
             system=self._generation_system(),
             build_section_messages=self._build_generation_section_messages,
             sections=targets,
-            outline=self._proposal_outline,
             tools=tools, model=model, provider=provider,
             max_steps=2, reflect_every=0, temperature=0.3,
             thread_id=thread_id,
