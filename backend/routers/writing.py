@@ -477,6 +477,8 @@ async def writing_checklist_auto_review(
         edital_requirements=build_checklist(doc["edital_id"]),
         outline=outline,
         playbook_context=playbook_monitor,
+        workspace_id=workspace_id,
+        session_id=session_id,
     )
     _attach_issue_sections(review, outline)
     return {"session_id": session_id, "review": review}

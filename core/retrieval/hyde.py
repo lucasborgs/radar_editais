@@ -48,6 +48,7 @@ def generate_hyde_doc(query: str) -> str:
     if not query or not query.strip():
         return ""
     try:
+        from core import telemetry
         from core.llm.llm_client import make_client
 
         api_key = os.environ.get("HYDE_API_KEY") or os.environ.get("OPENAI_API_KEY")
@@ -59,14 +60,18 @@ def generate_hyde_doc(query: str) -> str:
             return ""
         client = make_client(api_key=api_key, **kwargs)
 
-        response = client.chat.completions.create(
-            model=HYDE_MODEL,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": query},
-            ],
-            temperature=0.3,
-        )
+        with telemetry.llm_span(
+            "rag.hyde", model=HYDE_MODEL, input=query[:500],
+        ) as span:
+            response = client.chat.completions.create(
+                model=HYDE_MODEL,
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": query},
+                ],
+                temperature=0.3,
+            )
+            telemetry.record_usage(span, response)
         return (response.choices[0].message.content or "").strip()
     except Exception as e:
         logger.warning("generate_hyde_doc falhou para query=%r: %s", query, e)
