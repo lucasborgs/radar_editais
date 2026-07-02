@@ -1716,6 +1716,16 @@ class WritingSession:
             messages.append({"role": "user", "content": self._temporal_block})
         if self._library_context:
             messages.append({"role": "user", "content": self._library_context})
+        if self._proposal_outline:
+            outline_str = "\n".join(f"- {t}" for t in self._proposal_outline)
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"OUTLINE COMPLETO DA PROPOSTA (para save_draft/read_section — "
+                    f"use o título EXATO como está aqui, não invente outra estrutura):"
+                    f"\n{outline_str}"
+                ),
+            })
         if self._history_summary:
             messages.append({"role": "user", "content": self._history_summary})
 

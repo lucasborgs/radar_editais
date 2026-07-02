@@ -394,11 +394,16 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
 
         try:
             session.set_section_content(target_title, content)
-            suffix = "" if force else " (aprovado pelo critic)"
+        except Exception as e:
+            logger.warning("[%s] save_draft falhou: %s", session.session_id, e)
+            return f"Erro ao salvar rascunho: {e}"
 
-            # Scope classifier: só em modo conversacional, após critic aprovar,
-            # e NÃO durante ripple ativo (D9 depth limit = 1).
-            if not force and not getattr(session, '_ripple_active', False):
+        suffix = "" if force else " (aprovado pelo critic)"
+
+        # Scope classifier: best-effort (heurística de ripple), NÃO deve mascarar
+        # um save que já teve sucesso — se falhar (ex.: rede), loga e segue.
+        if not force and not getattr(session, '_ripple_active', False):
+            try:
                 from core.llm.agent_tools.scope_classifier import classify_correction_scope
                 scope = classify_correction_scope(old_content, content, target_title, session)
                 if scope and scope.get("type") == "conceptual":
@@ -406,14 +411,16 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                         "source_section": target_title,
                         "affected_sections": scope.get("changed_elements", []),
                     }
+            except Exception as e:
+                logger.warning(
+                    "[%s] scope classifier falhou (save já persistido): %s",
+                    session.session_id, e,
+                )
 
-            return (
-                f"Rascunho salvo em '{target_title}' ({len(content)} chars){suffix}. "
-                "Continue a conversa ou prossiga para a próxima seção."
-            )
-        except Exception as e:
-            logger.warning("[%s] save_draft falhou: %s", session.session_id, e)
-            return f"Erro ao salvar rascunho: {e}"
+        return (
+            f"Rascunho salvo em '{target_title}' ({len(content)} chars){suffix}. "
+            "Continue a conversa ou prossiga para a próxima seção."
+        )
 
     @tool
     def recall_company_learnings(topic: str = "") -> str:
