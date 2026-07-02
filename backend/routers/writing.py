@@ -98,6 +98,9 @@ class WritingTurnResponse(BaseModel):
     draft_ready: bool = False
     # Ripple correction suggestion (Parte B)
     ripple_suggestion: dict | None = None
+    # PR6.2 (F10): turno cortado no teto de passos do agente (stop_reason ==
+    # "max_steps") — o front mostra aviso discreto ("continue a conversa").
+    truncated: bool = False
 
 
 class WritingGenerateRequest(BaseModel):

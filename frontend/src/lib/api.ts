@@ -214,6 +214,7 @@ export const frontdoorTurn = (
 ) =>
   apiFetch<{
     answer: string;
+    truncated?: boolean; // PR6.2: resposta cortada no teto de passos do agente
     profile_diff: ProfileDiffItem[] | null;
     matched_editais?: MatchedEdital[];
     matched_entities?: MatchedEntity[];

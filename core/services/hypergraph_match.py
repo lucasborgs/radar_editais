@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
+import time
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -98,11 +100,12 @@ def _cosine_matrix(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return a @ b.T
 
 
-def embed_ecosystem(eco: list[tuple[str, dict]]) -> np.ndarray:
-    """Embeddings dos nós do ecossistema, cacheados em disco por hash dos textos.
-    Re-embeda só quando o corpus muda (ETL). Custa LLM só no cache-miss."""
-    texts = [_node_text(n) for _, n in eco]
-    h = hashlib.sha256("\n".join(texts).encode("utf-8")).hexdigest()
+def _texts_hash(texts: list[str]) -> str:
+    return hashlib.sha256("\n".join(texts).encode("utf-8")).hexdigest()
+
+
+def _embed_ecosystem_texts(texts: list[str], h: str) -> np.ndarray:
+    """Corpo do cache em disco (.npz por hash) — ver `embed_ecosystem`."""
     if _EMB_CACHE.exists():
         try:
             z = np.load(_EMB_CACHE)
@@ -113,8 +116,84 @@ def embed_ecosystem(eco: list[tuple[str, dict]]) -> np.ndarray:
     emb = np.asarray(embed_texts(texts), dtype=np.float32)
     _EMB_CACHE.parent.mkdir(parents=True, exist_ok=True)
     np.savez(_EMB_CACHE, emb=emb, texts_hash=np.array(h))
-    logger.info("embed_ecosystem: %d nós embedados e cacheados → %s", len(eco), _EMB_CACHE)
+    logger.info("embed_ecosystem: %d nós embedados e cacheados → %s", len(texts), _EMB_CACHE)
     return emb
+
+
+def embed_ecosystem(eco: list[tuple[str, dict]]) -> np.ndarray:
+    """Embeddings dos nós do ecossistema, cacheados em disco por hash dos textos.
+    Re-embeda só quando o corpus muda (ETL). Custa LLM só no cache-miss."""
+    texts = [_node_text(n) for _, n in eco]
+    return _embed_ecosystem_texts(texts, _texts_hash(texts))
+
+
+# ---------------------------------------------------------------------------
+# Caches de request (PR6.3 / F12)
+# ---------------------------------------------------------------------------
+
+# Cache in-process dos embeddings dos nós-EMPRESA por hash dos textos — simétrico
+# ao .npz do ecossistema, mas em memória (o perfil é pequeno e recorrente entre
+# requests do mesmo usuário). Cap FIFO simples contra crescimento sem limite.
+_COMPANY_EMB_CACHE: dict[str, np.ndarray] = {}
+_COMPANY_EMB_CACHE_MAX = 128
+
+
+def _embed_company_nodes(company_nodes: list[dict]) -> np.ndarray:
+    texts = [_node_text(n) for n in company_nodes]
+    h = _texts_hash(texts)
+    hit = _COMPANY_EMB_CACHE.get(h)
+    if hit is not None:
+        return hit
+    emb = np.asarray(embed_texts(texts), dtype=np.float32)
+    if len(_COMPANY_EMB_CACHE) >= _COMPANY_EMB_CACHE_MAX:
+        _COMPANY_EMB_CACHE.pop(next(iter(_COMPANY_EMB_CACHE)))
+    _COMPANY_EMB_CACHE[h] = emb
+    return emb
+
+
+# Memo de módulo para o snapshot do ecossistema: (graphs, eco_nodes, eco_emb).
+# O kg_store tem TTL (60s) no blob PG, mas cada `load_all_hypergraphs` REMONTA o
+# dict (em file-mode re-parseia os JSONs) e cada `embed_ecosystem` recomputa o
+# hash e relê o .npz. O memo congela a montagem inteira pelo mesmo TTL e só
+# re-embeda quando o hash dos textos muda (ETL). graphs/eco/emb saem do MESMO
+# snapshot — o match de entidades exige eco e atribuição consistentes (disco↔PG).
+# Escrita lock-free: atribuição de tupla é atômica; corrida no miss só duplica
+# trabalho, nunca corrompe.
+_ECO_MEMO_TTL = float(os.getenv("KG_STORE_TTL", "60"))
+_eco_memo: tuple[float, str, dict[str, dict], list[tuple[str, dict]], np.ndarray] | None = None
+
+
+def _ecosystem_snapshot() -> tuple[dict[str, dict], list[tuple[str, dict]], np.ndarray]:
+    """(graphs, eco_nodes, eco_emb) memoizado no módulo — ver comentário acima."""
+    global _eco_memo
+    now = time.monotonic()
+    memo = _eco_memo
+    if memo is not None and (now - memo[0]) < _ECO_MEMO_TTL:
+        return memo[2], memo[3], memo[4]
+    from core.kg import kg_store
+    graphs = kg_store.load_all_hypergraphs()
+    eco = [(fk, n) for fk, g in graphs.items() for n in g.get("nodes", [])]
+    if not eco:
+        # Sem memo de vazio: ambiente ainda populando (backfill) tenta de novo
+        # no próximo request em vez de servir vazio por um TTL inteiro.
+        return graphs, [], np.empty((0, 0), dtype=np.float32)
+    texts = [_node_text(n) for _, n in eco]
+    h = _texts_hash(texts)
+    if memo is not None and memo[1] == h:
+        emb = memo[4]  # corpus idêntico — reusa sem tocar disco/API
+    else:
+        emb = _embed_ecosystem_texts(texts, h)
+    _eco_memo = (now, h, graphs, eco, emb)
+    return graphs, eco, emb
+
+
+def _eco_embeddings_for(eco: list[tuple[str, dict]]) -> np.ndarray:
+    """Embeddings para um `eco` explícito: reusa o memo quando é o MESMO objeto
+    do snapshot (identidade); senão cai no cache em disco (`embed_ecosystem`)."""
+    memo = _eco_memo
+    if memo is not None and eco is memo[3]:
+        return memo[4]
+    return embed_ecosystem(eco)
 
 
 def build_synthetic_edges(
@@ -136,14 +215,19 @@ def build_synthetic_edges(
     o eco COMPLETO (cache) e filtra por máscara, para reusar o cache entre filtros."""
     if not company_nodes:
         return []
-    eco = ecosystem if ecosystem is not None else load_ecosystem_nodes()
+    if ecosystem is not None:
+        eco = ecosystem
+        eco_emb: np.ndarray | None = None  # resolvido abaixo, após o guard de vazio
+    else:
+        _, eco, eco_emb = _ecosystem_snapshot()
     if not eco:
         logger.warning("build_synthetic_edges: ecossistema vazio")
         return []
     dst_filter = affinity_types if dst_types is None else dst_types
 
-    comp_emb = np.asarray(embed_texts([_node_text(n) for n in company_nodes]), dtype=np.float32)
-    eco_emb = embed_ecosystem(eco)  # completo, cacheado por hash dos textos
+    comp_emb = _embed_company_nodes(company_nodes)  # cache in-process por hash
+    if eco_emb is None:
+        eco_emb = _eco_embeddings_for(eco)  # memo (identidade) ou .npz por hash
     sims = _cosine_matrix(comp_emb, eco_emb)
 
     def _ok(node: dict, types: frozenset) -> bool:
@@ -383,7 +467,9 @@ def find_matching_editais(
     ICT → edital parceiro da ICT.
 
     Catálogos (ICT/inv/prog) ficam fora do match direto (não têm '__' no file_key)."""
-    eco = ecosystem if ecosystem is not None else load_ecosystem_nodes()
+    # eco do snapshot memoizado (PR6.3): build_synthetic_edges reconhece o objeto
+    # por identidade e reusa os embeddings sem re-hash/reload.
+    eco = ecosystem if ecosystem is not None else _ecosystem_snapshot()[1]
     edges = build_synthetic_edges(company_nodes, threshold=threshold, ecosystem=eco)
     edital_node = {fk: n for fk, n in eco if n.get("type") == "Edital"}
 
@@ -528,15 +614,18 @@ def find_matching_entities(
         a ele — programas não têm temas no arquivo, casam pela descrição.
     Sem LLM no loop. `min_aggregate` usa MIN_AGGREGATE_ENTITY (mais baixo — provisório,
     sem golden de entidade; EntityMatcher legacy nunca foi gate duro)."""
-    from core.kg import kg_store
-
-    # eco e atribuição saem do MESMO load_all_hypergraphs (postgres-aware) — nunca
-    # misturar disco↔PG (senão em prod o eco vem vazio e a atribuição não, e o match
-    # de entidade devolve nada).
-    graphs = graphs if graphs is not None else kg_store.load_all_hypergraphs()
-    eco = ecosystem if ecosystem is not None else [
-        (fk, n) for fk, g in graphs.items() for n in g.get("nodes", [])
-    ]
+    # eco e atribuição saem do MESMO snapshot (postgres-aware) — nunca misturar
+    # disco↔PG (senão em prod o eco vem vazio e a atribuição não, e o match de
+    # entidade devolve nada). O snapshot memoizado (PR6.3) garante isso de graça.
+    if graphs is None and ecosystem is None:
+        graphs, eco, _ = _ecosystem_snapshot()
+    else:
+        if graphs is None:
+            from core.kg import kg_store
+            graphs = kg_store.load_all_hypergraphs()
+        eco = ecosystem if ecosystem is not None else [
+            (fk, n) for fk, g in graphs.items() for n in g.get("nodes", [])
+        ]
     # dst inclui ENTIDADE além de conteúdo → cobre o caminho direto (programas).
     edges = build_synthetic_edges(
         company_nodes, threshold=threshold,

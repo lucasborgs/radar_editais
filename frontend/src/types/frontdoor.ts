@@ -20,6 +20,8 @@ export interface MsgEntry {
   kind: "msg";
   role: ChatRole;
   content: string;
+  // PR6.2: resposta interrompida no teto de passos do agente (aviso discreto).
+  truncated?: boolean;
 }
 
 export interface DiffEntry {

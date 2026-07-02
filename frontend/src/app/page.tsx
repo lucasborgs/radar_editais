@@ -83,10 +83,28 @@ function loadHistory(): TranscriptEntry[] {
 }
 
 // ── Bolha ─────────────────────────────────────────────────────────────────────
-function Bubble({ role, content }: { role: "user" | "assistant"; content: string }) {
+function Bubble({
+  role,
+  content,
+  truncated,
+}: {
+  role: "user" | "assistant";
+  content: string;
+  truncated?: boolean;
+}) {
   const isUser = role === "user";
   return (
-    <ChatBubble role={role}>
+    <ChatBubble
+      role={role}
+      footer={
+        // Aviso discreto de truncamento (PR6.2): resposta cortada no teto de passos.
+        !isUser && truncated ? (
+          <p className="px-1 mt-1 text-[11px] italic text-content-secondary font-sans">
+            Resposta interrompida no limite de passos — continue a conversa para eu retomar.
+          </p>
+        ) : undefined
+      }
+    >
       {isUser ? (
         <span className="whitespace-pre-wrap">{content}</span>
       ) : (
@@ -281,7 +299,7 @@ export default function FrontDoorPage() {
       if (sending) return; // evita 2 turnos de match concorrentes (double-fire)
       setSending(true);
       try {
-        const { answer, session_id } = await frontdoorTurn(
+        const { answer, truncated, session_id } = await frontdoorTurn(
           "Quais editais e parceiros (ICTs, investidores, programas) combinam com o meu perfil? Liste os mais relevantes com a justificativa de cada match.",
           toApiHistory(entries),
           p.nome ? p : null,
@@ -290,7 +308,7 @@ export default function FrontDoorPage() {
         if (session_id) bindSession(session_id);
         setEntries((prev) => [
           ...prev,
-          { kind: "msg", role: "assistant", content: answer },
+          { kind: "msg", role: "assistant", content: answer, truncated: truncated || undefined },
         ]);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Não consegui buscar oportunidades.");
@@ -314,7 +332,7 @@ export default function FrontDoorPage() {
       setSending(true);
 
       try {
-        const { answer, profile_diff, matched_editais, matched_entities, session_id, entry_ids } = await frontdoorTurn(
+        const { answer, truncated, profile_diff, matched_editais, matched_entities, session_id, entry_ids } = await frontdoorTurn(
           trimmed,
           toApiHistory(withUser),
           profile.nome ? profile : null,
@@ -326,7 +344,7 @@ export default function FrontDoorPage() {
         setEntries((prev) => {
           const next: TranscriptEntry[] = [
             ...prev,
-            { kind: "msg", role: "assistant", content: answer },
+            { kind: "msg", role: "assistant", content: answer, truncated: truncated || undefined },
           ];
           if ((matched_editais?.length ?? 0) > 0 || (matched_entities?.length ?? 0) > 0) {
             next.push({
@@ -661,7 +679,14 @@ export default function FrontDoorPage() {
         {entries.map((entry, i) => {
           switch (entry.kind) {
             case "msg":
-              return <Bubble key={i} role={entry.role} content={entry.content} />;
+              return (
+                <Bubble
+                  key={i}
+                  role={entry.role}
+                  content={entry.content}
+                  truncated={entry.truncated}
+                />
+              );
             case "diff":
               return (
                 <DiffCard

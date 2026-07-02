@@ -140,6 +140,28 @@ class ExploreAgent:
         db=None,
     ) -> str:
         """Roteia todo pedido para o agente multi-step (rota única pós-Sprint 3)."""
+        answer, _meta = self.explore_with_meta(
+            message, history, edital_ids, node_id, node_type,
+            has_profile=has_profile, profile_text=profile_text,
+            workspace_id=workspace_id, db=db,
+        )
+        return answer
+
+    def explore_with_meta(
+        self,
+        message: str,
+        history: list[dict] | None = None,
+        edital_ids: list[str] | None = None,
+        node_id: str | None = None,
+        node_type: str | None = None,
+        has_profile: bool = False,
+        profile_text: str | None = None,
+        workspace_id: str | None = None,
+        db=None,
+    ) -> tuple[str, dict]:
+        """Como `explore`, mas devolve também metadados do run: `stop_reason` e
+        `truncated` (= cortado no teto de passos, PR6.2/F10) — o router expõe
+        `truncated` no response para o front avisar o usuário."""
         return self._explore_agent(
             message, history, edital_ids, node_id, node_type,
             profile_text=profile_text, workspace_id=workspace_id, db=db,
@@ -167,9 +189,10 @@ class ExploreAgent:
         profile_text: str | None = None,
         workspace_id: str | None = None,
         db=None,
-    ) -> str:
+    ) -> tuple[str, dict]:
         """Pipeline agente: run_agent + tools de leitura do hipergrado,
-        planejamento e (gated) deep_research — montadas em `_explore_tools`."""
+        planejamento e (gated) deep_research — montadas em `_explore_tools`.
+        Retorna `(answer, meta)`; meta carrega stop_reason/truncated."""
         from core.llm.agent_runtime import resolve_agent_provider, run_agent
 
         messages: list[dict] = []
@@ -241,11 +264,18 @@ class ExploreAgent:
             max_steps=EXPLORE_AGENT_MAX_STEPS,
         )
 
+        meta = {
+            "stop_reason": result.stop_reason,
+            "truncated": result.stop_reason == "max_steps",
+        }
         if result.stop_reason == "error":
             logger.error("explore agent: stop_reason=error após %d steps", len(result.steps))
-            return "Desculpe, não consegui processar agora. Tente novamente em instantes."
+            return (
+                "Desculpe, não consegui processar agora. Tente novamente em instantes.",
+                meta,
+            )
 
-        return result.final_text or "Não consegui formular uma resposta agora."
+        return result.final_text or "Não consegui formular uma resposta agora.", meta
 
     @staticmethod
     def _build_explore_hint(

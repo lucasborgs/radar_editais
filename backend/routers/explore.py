@@ -125,13 +125,14 @@ def explore(
     explore_message = f"{ctx}\n\n{message}" if ctx else message
     current = req.profile.model_dump() if req.profile is not None else {}
 
-    answer = explore_agent.explore(
+    answer, explore_meta = explore_agent.explore_with_meta(
         explore_message, req.history, req.edital_ids, req.node_id,
         req.node_type, has_profile=req.profile is not None,
         profile_text=ctx or None,
     )
 
-    result: dict = {"answer": answer}
+    # PR6.2 (F10): truncamento no teto de passos deixa de ser invisível na UI.
+    result: dict = {"answer": answer, "truncated": explore_meta["truncated"]}
     diff = None
     if req.profile is not None:
         diff = ProfileExtractor().extract_diff_from_message(message, current)

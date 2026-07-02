@@ -59,6 +59,8 @@ export interface WritingTurnResponse {
   failed_sections?: string[];
   // True quando um draft completo foi gerado neste turno
   draft_ready?: boolean;
+  // PR6.2: turno cortado no teto de passos do agente — mostrar aviso discreto.
+  truncated?: boolean;
 }
 
 export interface SectionStartResponse {

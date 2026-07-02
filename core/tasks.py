@@ -309,6 +309,80 @@ async def synthesize_patterns_cron(timestamp: int) -> None:
 
 
 # =============================================================================
+# Higiene do runtime agêntico — purge de checkpoints LangGraph (hardening PR6.1)
+# =============================================================================
+
+def _purge_stale_checkpoints(retention_days: int) -> dict[str, int]:
+    """Deleta do schema agent_memory os threads de checkpoint cujo ÚLTIMO
+    checkpoint é mais antigo que `retention_days`. Síncrono — rodar via to_thread.
+
+    O timestamp vem do próprio checkpoint (JSONB, key `ts`, ISO-8601): o schema
+    do AsyncPostgresSaver não tem coluna de data. O thread_id é
+    {workspace_id}:{session_id}:{turn} — cada turno é um thread permanente que
+    só é relido em resume de interrupt DENTRO do próprio turno, então threads
+    velhos são lixo puro (F9: nada mais deletava esses rows).
+    """
+    import psycopg
+
+    dsn = os.environ.get("DATABASE_URL")
+    if not dsn:
+        raise RuntimeError("purge_checkpoints: DATABASE_URL não configurada")
+
+    counts: dict[str, int] = {"threads": 0}
+    with psycopg.connect(dsn, autocommit=True) as conn, conn.cursor() as cur:
+        try:
+            cur.execute(
+                """
+                SELECT thread_id
+                FROM agent_memory.checkpoints
+                GROUP BY thread_id
+                HAVING max((checkpoint->>'ts')::timestamptz)
+                       < now() - make_interval(days => %s)
+                """,
+                (retention_days,),
+            )
+        except psycopg.errors.UndefinedTable:
+            # Ambiente fresco: o setup() do Saver ainda não criou as tabelas.
+            logger.info("purge_checkpoints: agent_memory.checkpoints não existe — no-op")
+            return counts
+        stale = [row[0] for row in cur.fetchall()]
+        if not stale:
+            return counts
+        counts["threads"] = len(stale)
+        # Ordem filho→pai (writes/blobs antes de checkpoints) por clareza; não há
+        # FK entre elas no schema do langgraph, mas mantém o invariante "nunca
+        # existe write/blob órfão de checkpoint" mesmo num crash no meio.
+        for table in ("checkpoint_writes", "checkpoint_blobs", "checkpoints"):
+            cur.execute(
+                f"DELETE FROM agent_memory.{table} WHERE thread_id = ANY(%s)",  # noqa: S608 — nome de tabela é literal do código
+                (stale,),
+            )
+            counts[table] = cur.rowcount
+    return counts
+
+
+@app.periodic(cron="0 6 * * 0")
+@app.task(name="purge_agent_checkpoints", queue="default")
+async def purge_agent_checkpoints(timestamp: int) -> None:
+    """Cron semanal (domingo 06:00 UTC): purga do schema agent_memory os threads
+    de checkpoint mais antigos que CHECKPOINT_RETENTION_DAYS (default 30).
+
+    Sem retry de propósito (padrão dos wrappers de cron): falha re-roda na
+    semana seguinte. Sem DATABASE_URL (dev/teste com InMemorySaver) é no-op.
+    `timestamp` vem do procrastinate periodic (UNIX epoch).
+    """
+    if not os.environ.get("DATABASE_URL"):
+        logger.info("purge_agent_checkpoints: DATABASE_URL ausente — no-op")
+        return
+    retention = int(os.getenv("CHECKPOINT_RETENTION_DAYS", "30"))
+    counts = await asyncio.to_thread(_purge_stale_checkpoints, retention)
+    logger.info(
+        "purge_agent_checkpoints: %d threads purgados (retention=%dd, timestamp=%s): %s",
+        counts.get("threads", 0), retention, timestamp, counts,
+    )
+
+
+# =============================================================================
 # RAG indexing
 # =============================================================================
 

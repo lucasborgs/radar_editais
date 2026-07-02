@@ -1169,6 +1169,7 @@ class WritingSession:
                 "error":              None,
                 "tool_trace":         tool_trace,
                 "ripple_suggestion":  self._ripple_suggestion,
+                "truncated":          False,  # interrupt = pausa deliberada, não teto
             }
 
         # Turno completou (fresh sem interrupt OU resume que fechou a pergunta).
@@ -1193,6 +1194,9 @@ class WritingSession:
             "error":              None,
             "tool_trace":         tool_trace,
             "ripple_suggestion":  ripple,
+            # PR6.2 (F10): turno cortado no teto de passos deixa de ser invisível
+            # — o front mostra aviso discreto ("continue a conversa").
+            "truncated":          result.stop_reason == "max_steps",
         }
 
     # ------------------------------------------------------------------
