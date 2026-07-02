@@ -1340,10 +1340,11 @@ class WritingSession:
         """Mensagens iniciais do agente interno para UMA seção no modo geração.
 
         Espelha o prefixo estável de `_build_agent_initial_messages` (perfil,
-        alvo, temporal, biblioteca) — idêntico entre seções para preservar prompt
+        alvo, biblioteca, outline) — idêntico entre seções para preservar prompt
         caching — e fecha com um comando DIRETO de escrita da seção. Sem histórico
         de conversa (não há diálogo no batch); com consciência do outline completo
-        para coerência entre seções.
+        para coerência entre seções. O bloco temporal fica no tail dinâmico (muda
+        diariamente — `hoje é {today}`/days_remaining — e invalidaria o prefixo).
         """
         messages: list[dict] = [
             {"role": "user", "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
@@ -1357,8 +1358,6 @@ class WritingSession:
             messages.append({"role": "user", "content": self._source_card_context})
         if self._programa_context:
             messages.append({"role": "user", "content": self._programa_context})
-        if self._temporal_block:
-            messages.append({"role": "user", "content": self._temporal_block})
         if self._library_context:
             messages.append({"role": "user", "content": self._library_context})
 
@@ -1367,6 +1366,10 @@ class WritingSession:
             "role": "user",
             "content": f"OUTLINE COMPLETO DA PROPOSTA (para coerência entre seções):\n{outline_str}",
         })
+
+        # Tail dinâmico: temporal depois do prefixo estável (PR2 §2.1).
+        if self._temporal_block:
+            messages.append({"role": "user", "content": self._temporal_block})
 
         messages.append({
             "role": "user",
@@ -1694,9 +1697,15 @@ class WritingSession:
 
         A ordem espelha `_build_messages` (legacy), com 2 diferenças:
           • Sem RAG / sem retrieval auto de library: o agente busca via tools
-          • Prefixo estável (perfil + library_anexada + summary + history) antes
-            da mensagem para preservar prompt caching; insights (Etapa 5) ficam no
-            tail dinâmico por serem query-conditioned.
+          • Prefixo estável (perfil + card + programa + library_anexada + summary
+            + history) antes da mensagem para preservar prompt caching; insights
+            (Etapa 5) e o bloco temporal (PR2 §2.1 — muda diariamente, `hoje é
+            {today}`/days_remaining) ficam no tail dinâmico.
+
+        Breakpoints de cache (PR2 §2.2): `cache_hint: True` marca a última mensagem
+        do prefixo estável e a mensagem do usuário atual; o consumidor
+        (`agent_graph._to_lc_messages`) consome a flag SEMPRE e só a converte em
+        `cache_control` quando provider == "anthropic".
         """
         messages: list[dict] = [
             {"role": "user", "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
@@ -1705,19 +1714,29 @@ class WritingSession:
             messages.append({"role": "user", "content": self._source_card_context})
         if self._programa_context:
             messages.append({"role": "user", "content": self._programa_context})
-        if self._temporal_block:
-            messages.append({"role": "user", "content": self._temporal_block})
         if self._library_context:
             messages.append({"role": "user", "content": self._library_context})
         if self._history_summary:
             messages.append({"role": "user", "content": self._history_summary})
 
+        # Breakpoint 2 (PR2 §2.2): fim do prefixo estável entre turnos — a última
+        # mensagem entre perfil/card/programa/library/summary. O history vem depois
+        # (append-mostly): o cache incremental da Anthropic reaproveita o maior
+        # prefixo comum entre turnos a partir daqui.
+        messages[-1]["cache_hint"] = True
+
         messages.extend(self._history)
 
-        # Insights query-conditioned (Etapa 5): posicionados no TAIL dinâmico (junto
-        # de mentions/section, que já variam por turno) para preservar o prompt
-        # caching do prefixo estável (perfil/library/summary/history) — a busca
-        # semântica muda o bloco a cada turno e quebraria o cache se viesse antes.
+        # Tail dinâmico — tudo daqui pra baixo varia por turno e ficaria caro no
+        # prefixo:
+        #   • temporal (PR2 §2.1): muda diariamente (days_remaining) — correto,
+        #     mas invalidaria o prefixo inteiro se viesse antes;
+        #   • insights query-conditioned (Etapa 5): a busca semântica muda o bloco
+        #     a cada turno;
+        #   • mentions/section: já variam por turno.
+        if self._temporal_block:
+            messages.append({"role": "user", "content": self._temporal_block})
+
         reflection_block = self._build_reflection_context_for_turn(user_message, section_hint)
         if reflection_block:
             messages.append({"role": "user", "content": reflection_block})
@@ -1727,7 +1746,9 @@ class WritingSession:
         if section_hint:
             messages.append({"role": "user", "content": f"[Seção ativa: {section_hint}]"})
 
-        messages.append({"role": "user", "content": user_message})
+        # Breakpoint 3 (PR2 §2.2): mensagem do usuário atual — faz as iterações
+        # 2..N do mesmo turno ReAct lerem TODO o prefixo do cache (TTL 5 min).
+        messages.append({"role": "user", "content": user_message, "cache_hint": True})
         return messages
 
     def _persist_turn(
