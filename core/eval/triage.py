@@ -54,6 +54,11 @@ def task(*, item: Any, **_) -> dict:
     hit = SearchHit(title=inp["title"], url=inp["url"], snippet=inp["snippet"],
                     content=inp["content"], agency=inp.get("agency", ""))
     verdict = _triage(hit, client, model)
+    if verdict is None:
+        # Contrato novo do _triage (hardening-pre-beta 4.2): None = falha
+        # TRANSIENTE (não é rejeição). No eval vira erro de execução — não
+        # conta como falso negativo fantasma.
+        return {"error": "triagem falhou (transiente)"}
     return {"is_opportunity": verdict["is_opportunity"],
             "agency": verdict["agency"]}
 
