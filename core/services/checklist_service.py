@@ -213,17 +213,29 @@ def build_checklist(edital_id: str) -> list[dict]:
 # Passes (async, rodam em paralelo)
 # ---------------------------------------------------------------------------
 
-async def _call_llm(client, model: str, system: str, user: str, max_tokens: int = 2000) -> dict:
-    """Chama o LLM e parseia o JSON da resposta."""
-    response = await client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        temperature=0.1,
-        max_tokens=max_tokens,
-    )
+async def _call_llm(
+    client,
+    model: str,
+    system: str,
+    user: str,
+    max_tokens: int = 2000,
+    span_name: str = "checklist.pass",
+    span_meta: dict | None = None,
+) -> dict:
+    """Chama o LLM e parseia o JSON da resposta. 1 span Langfuse por pass."""
+    from core import telemetry
+
+    with telemetry.llm_span(span_name, model=model, metadata=span_meta) as span:
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            temperature=0.1,
+            max_tokens=max_tokens,
+        )
+        telemetry.record_usage(span, response)
     raw = _strip_code_fence(response.choices[0].message.content or "")
     return json.loads(raw)
 
@@ -234,6 +246,7 @@ async def _pass_compliance(
     client,
     model: str,
     playbook_context: str = "",
+    span_meta: dict | None = None,
 ) -> dict:
     """Pass 1 — requisitos obrigatórios do edital cobertos?"""
     if not edital_requirements:
@@ -255,6 +268,8 @@ async def _pass_compliance(
             playbook_block=playbook_block,
         ),
         max_tokens=2000,
+        span_name="checklist.compliance",
+        span_meta=span_meta,
     )
     issues = data.get("issues") or []
     if not isinstance(issues, list):
@@ -266,7 +281,9 @@ async def _pass_compliance(
     return {"issues": issues, "score": max(0, min(100, score))}
 
 
-async def _pass_quality(proposal: str, client, model: str) -> dict:
+async def _pass_quality(
+    proposal: str, client, model: str, span_meta: dict | None = None,
+) -> dict:
     """Pass 2 — qualidade narrativa: clareza, coerência, persuasão, tom."""
     if not proposal.strip():
         return {"issues": [], "overall_score": 0}
@@ -277,6 +294,8 @@ async def _pass_quality(proposal: str, client, model: str) -> dict:
         _QUALITY_SYSTEM,
         _QUALITY_USER.format(document=proposal[:6000]),
         max_tokens=2000,
+        span_name="checklist.quality",
+        span_meta=span_meta,
     )
     issues = data.get("issues") or []
     if not isinstance(issues, list):
@@ -293,6 +312,7 @@ async def _pass_completeness(
     outline: list[str],
     client,
     model: str,
+    span_meta: dict | None = None,
 ) -> dict:
     """Pass 3 — completude das seções."""
     if not outline:
@@ -305,6 +325,8 @@ async def _pass_completeness(
         _COMPLETENESS_SYSTEM,
         _COMPLETENESS_USER.format(document=proposal[:6000], outline=outline_text),
         max_tokens=2000,
+        span_name="checklist.completeness",
+        span_meta=span_meta,
     )
     sections = data.get("sections") or []
     if not isinstance(sections, list):
@@ -423,6 +445,8 @@ async def auto_review_checklist(
     outline: list[str] | None = None,
     force_all_passes: bool = False,
     playbook_context: str = "",
+    workspace_id: str | None = None,
+    session_id: str | None = None,
 ) -> dict:
     """
     Executa as passes de revisão em paralelo via asyncio.gather.
@@ -481,18 +505,30 @@ async def auto_review_checklist(
     if base_url:
         client_kwargs["base_url"] = base_url
 
+    # Metadata dos spans de custo (PR5): quem pagou esta revisão.
+    span_meta = {
+        k: v for k, v in
+        (("workspace_id", workspace_id), ("session_id", session_id))
+        if v
+    } or None
+
     # Monta só os passes elegíveis; mantém o mapeamento posição→nome para
     # reatribuir os resultados na ordem certa após o gather.
     async with make_async_client(**client_kwargs) as client:
         coros = []
         labels: list[str] = []
         if run_compliance:
-            coros.append(_pass_compliance(proposal, edital_requirements, client, model, playbook_context))
+            coros.append(_pass_compliance(
+                proposal, edital_requirements, client, model, playbook_context,
+                span_meta=span_meta,
+            ))
             labels.append("compliance")
-        coros.append(_pass_quality(proposal, client, model))
+        coros.append(_pass_quality(proposal, client, model, span_meta=span_meta))
         labels.append("quality")
         if run_completeness:
-            coros.append(_pass_completeness(proposal, outline, client, model))
+            coros.append(_pass_completeness(
+                proposal, outline, client, model, span_meta=span_meta,
+            ))
             labels.append("completeness")
 
         results = await asyncio.gather(*coros, return_exceptions=True)

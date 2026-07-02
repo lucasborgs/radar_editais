@@ -77,7 +77,8 @@ def llm_calls(monkeypatch):
     """
     calls: list[str] = []
 
-    async def fake_call_llm(client, model, system, user, max_tokens=2000):
+    async def fake_call_llm(client, model, system, user, max_tokens=2000,
+                            span_name="checklist.pass", span_meta=None):
         if system is cs._COMPLIANCE_SYSTEM:
             calls.append("compliance")
             return {
@@ -330,7 +331,8 @@ def test_empty_proposal_short_circuits_without_llm(llm_calls):
 # ---------------------------------------------------------------------------
 
 def test_pass_failure_is_captured_as_error(monkeypatch):
-    async def boom_call_llm(client, model, system, user, max_tokens=2000):
+    async def boom_call_llm(client, model, system, user, max_tokens=2000,
+                            span_name="checklist.pass", span_meta=None):
         if system is cs._QUALITY_SYSTEM:
             raise RuntimeError("llm down")
         if system is cs._COMPLETENESS_SYSTEM:

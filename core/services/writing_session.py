@@ -1603,6 +1603,8 @@ class WritingSession:
                 edital_requirements=requirements,
                 outline=self._proposal_outline,
                 playbook_context="",
+                workspace_id=self.workspace_id,
+                session_id=self.session_id,
             )
 
             # Persiste resultado em writing_sessions.compliance_result
@@ -2222,14 +2224,22 @@ class WritingSession:
         if not OPENAI_API_KEY:
             return False, "OPENAI_API_KEY não configurada", "CONFIG_ERROR"
         try:
+            from core import telemetry
             from core.llm.llm_client import make_client
             client = make_client(api_key=OPENAI_API_KEY)
-            response = client.chat.completions.create(
+            with telemetry.llm_span(
+                "writing.call_openai",
                 model=self.model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
+                metadata={"workspace_id": self.workspace_id,
+                          "session_id": self.session_id},
+            ) as span:
+                response = client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                telemetry.record_usage(span, response)
             return True, response.choices[0].message.content, None
         except ImportError:
             return False, "Biblioteca openai não instalada", "DEPENDENCY_ERROR"

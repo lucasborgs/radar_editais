@@ -99,6 +99,64 @@ def agent_run(
         yield None
 
 
+@contextmanager
+def llm_span(
+    name: str,
+    *,
+    model: str | None = None,
+    input: Any = None,
+    metadata: dict | None = None,
+):
+    """Span de generation para chamadas LLM 1-shot FORA do grafo (spec PR5).
+
+    Cobre os call sites sem telemetria (F11): _call_openai da WritingSession,
+    reflection_service, checklist_service, HyDE, contextual retrieval (1 span por
+    batch) e scope_classifier. Com `model` + usage (via `record_usage` ou
+    `span.update(usage_details=...)`), o Langfuse precifica a chamada → custo por
+    sessão/workspace vem do metadata propagado pelo caller.
+
+    Uso:
+        with telemetry.llm_span("hyde", model=model, metadata={...}) as span:
+            response = client.chat.completions.create(...)
+            telemetry.record_usage(span, response)
+
+    Contratos: no-op (yield None) sem Langfuse; falha de telemetria nunca derruba
+    a chamada; exceção do CALLER propaga intacta (o span fecha marcado com erro).
+    """
+    if not is_enabled():
+        yield None
+        return
+    cm = None
+    span = None
+    try:
+        cm = _client.start_as_current_observation(
+            name=name,
+            as_type="generation",
+            input=input,
+            metadata=metadata or {},
+        )
+        span = cm.__enter__()
+        if model is not None:
+            span.update(model=model)
+    except Exception as e:
+        logger.debug("llm_span '%s' falhou ao abrir: %s", name, e)
+        cm, span = None, None
+    try:
+        yield span
+    except BaseException as e:
+        if cm is not None:
+            try:
+                cm.__exit__(type(e), e, e.__traceback__)
+            except Exception:
+                logger.debug("llm_span '%s' falhou ao fechar com erro", name)
+        raise
+    if cm is not None:
+        try:
+            cm.__exit__(None, None, None)
+        except Exception as e:
+            logger.debug("llm_span '%s' falhou ao fechar: %s", name, e)
+
+
 def current_trace_context() -> dict | None:
     """Captura o contexto da trace corrente (`{"trace_id", "parent_span_id"}`) para
     propagar a um run que roda noutra thread/loop (subagente). None se desabilitado

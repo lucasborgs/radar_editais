@@ -71,6 +71,7 @@ def contextualize_chunks(chunks: list[dict]) -> list[str]:
         return texts
 
     doc = "\n\n".join(texts)[:_DOC_CHARS]
+    usages: list = []  # usage por chunk (append thread-safe sob o GIL)
 
     def _ctx(text: str) -> str:
         body = text.strip()
@@ -82,11 +83,30 @@ def contextualize_chunks(chunks: list[dict]) -> list[str]:
                 messages=[{"role": "user",
                            "content": _PROMPT.format(doc=doc, chunk=body[:_CHUNK_CHARS])}],
             )
+            if getattr(r, "usage", None) is not None:
+                usages.append(r.usage)
             ctx = (r.choices[0].message.content or "").strip()
             return f"{ctx}\n\n{body}" if ctx else text
         except Exception as e:  # noqa: BLE001
             logger.debug("contextual_retrieval: chunk falhou (%s) — embed cru", e)
             return text
 
-    with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as ex:
-        return list(ex.map(_ctx, texts))
+    from core import telemetry
+
+    # 1 span por BATCH (não por chunk — spec PR5): usage agregado do lote.
+    with telemetry.llm_span(
+        "rag.contextual_retrieval_batch",
+        model=_MODEL,
+        metadata={"n_chunks": len(texts)},
+    ) as span:
+        with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as ex:
+            out = list(ex.map(_ctx, texts))
+        if span is not None:
+            try:
+                span.update(usage_details={
+                    "input": sum(getattr(u, "prompt_tokens", 0) or 0 for u in usages),
+                    "output": sum(getattr(u, "completion_tokens", 0) or 0 for u in usages),
+                })
+            except Exception as e:  # noqa: BLE001 — telemetria nunca quebra o ingest
+                logger.debug("contextual_retrieval: usage span falhou (%s)", e)
+    return out

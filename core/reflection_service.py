@@ -221,15 +221,23 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
     user_msg = _REFLECT_USER.format(outcomes=_format_outcomes_for_prompt(outcomes))
 
     try:
-        response = client.chat.completions.create(
+        from core import telemetry
+        with telemetry.llm_span(
+            "reflection.reflect_workspace",
             model=model,
-            messages=[
-                {"role": "system", "content": _REFLECT_SYSTEM},
-                {"role": "user", "content": user_msg},
-            ],
-            temperature=0.2,
-            max_tokens=2000,
-        )
+            metadata={"workspace_id": workspace_id,
+                      "n_outcomes": len(outcomes)},
+        ) as span:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": _REFLECT_SYSTEM},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0.2,
+                max_tokens=2000,
+            )
+            telemetry.record_usage(span, response)
         raw = response.choices[0].message.content.strip()
         if "```" in raw:
             raw = re.sub(r"```(?:json)?", "", raw).strip()
@@ -363,15 +371,23 @@ def synthesize_patterns(db: Client, workspace_id: str) -> dict:
     user_msg = _SYNTHESIZE_USER.format(observations=_format_level1_for_prompt(level1))
 
     try:
-        response = client.chat.completions.create(
+        from core import telemetry
+        with telemetry.llm_span(
+            "reflection.synthesize_patterns",
             model=model,
-            messages=[
-                {"role": "system", "content": _SYNTHESIZE_SYSTEM},
-                {"role": "user", "content": user_msg},
-            ],
-            temperature=0.2,
-            max_tokens=2000,
-        )
+            metadata={"workspace_id": workspace_id,
+                      "n_level1": len(level1)},
+        ) as span:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": _SYNTHESIZE_SYSTEM},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0.2,
+                max_tokens=2000,
+            )
+            telemetry.record_usage(span, response)
         raw = response.choices[0].message.content.strip()
         if "```" in raw:
             raw = re.sub(r"```(?:json)?", "", raw).strip()

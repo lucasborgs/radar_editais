@@ -95,19 +95,28 @@ def classify_correction_scope(
     )
 
     try:
+        from core import telemetry
         from core.llm.llm_client import make_client
         client = make_client()
         model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        response = client.chat.completions.create(
+        with telemetry.llm_span(
+            "writing.scope_classifier",
             model=model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            temperature=0.0,
-            max_tokens=300,
-            response_format={"type": "json_object"},
-        )
+            metadata={"workspace_id": session.workspace_id,
+                      "session_id": session.session_id,
+                      "section": section_title},
+        ) as span:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                temperature=0.0,
+                max_tokens=300,
+                response_format={"type": "json_object"},
+            )
+            telemetry.record_usage(span, response)
         text = response.choices[0].message.content
         if not text:
             return None
