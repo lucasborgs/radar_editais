@@ -201,14 +201,36 @@ def test_agent_builder_marks_two_breakpoints(monkeypatch):
 
 
 def test_agent_builder_breakpoint_falls_back_to_profile(monkeypatch):
-    """Sem card/programa/library/summary, o breakpoint 2 cai no perfil (1ª msg)."""
+    """Sem card/programa/library/outline/summary, o breakpoint 2 cai no perfil
+    (1ª msg). Nota: o outline entrou no prefixo estável depois do PR2 (fix de
+    2026-07-02, ced080386) — quando presente, ELE é a última msg estável e leva o
+    breakpoint (coberto por test_agent_builder_marks_two_breakpoints via summary).
+    Aqui esvaziamos o outline para exercitar de fato o caso degenerado só-perfil."""
     monkeypatch.setenv("WRITING_SEMANTIC_MEMORY", "0")
     s = _make_session()
+    s._proposal_outline = []  # só-perfil: sem outline no prefixo estável
 
     msgs = s._build_agent_initial_messages("oi", None, "")
 
     assert msgs[0].get("cache_hint") is True
     assert "PERFIL DA EMPRESA" in msgs[0]["content"]
+
+
+def test_agent_builder_breakpoint_on_outline_when_no_summary(monkeypatch):
+    """Interação PR2 × fix de outline (ced080386): com outline presente e SEM
+    summary, o outline é a última msg estável → leva o breakpoint 2 (não o perfil).
+    Trava a regressão que a integração das branches expôs."""
+    monkeypatch.setenv("WRITING_SEMANTIC_MEMORY", "0")
+    s = _make_session()  # _make_session já seta _proposal_outline; sem summary
+    s._history_summary = ""
+
+    msgs = s._build_agent_initial_messages("oi", None, "")
+
+    hinted = [m for m in msgs if m.get("cache_hint")]
+    assert len(hinted) == 2
+    assert "OUTLINE COMPLETO" in hinted[0]["content"]
+    assert hinted[1]["content"] == "oi"
+    assert msgs[0].get("cache_hint") is None  # perfil não é o breakpoint aqui
 
 
 def test_temporal_in_tail_of_generation_builder():
