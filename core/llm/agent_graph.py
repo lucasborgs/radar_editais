@@ -376,10 +376,34 @@ def _derive_stop_reason(final_state: dict, max_steps: int) -> StopReason:
 # Entry point (delegado pela facade run_agent_async)
 # =============================================================================
 
-def _to_lc_messages(initial: list[dict[str, Any]]) -> list[AnyMessage]:
+def _as_cached_content(content: Any) -> list[dict[str, Any]]:
+    """Converte texto simples no formato de blocos da Anthropic com um breakpoint
+    de cache efêmero: `[{"type": "text", "text": ..., "cache_control": {...}}]`.
+
+    O TTL padrão do ephemeral (5 min) cobre um turno ReAct inteiro com folga; as
+    iterações 2..N do mesmo turno leem o prefixo do cache em vez de reenviá-lo a
+    preço cheio. langchain-anthropic aceita content em blocos com cache_control e
+    o repassa verbatim à API. O texto permanece byte-a-byte idêntico."""
+    return [{"type": "text", "text": str(content),
+             "cache_control": {"type": "ephemeral"}}]
+
+
+def _to_lc_messages(
+    initial: list[dict[str, Any]], *, provider: Provider | None = None,
+) -> list[AnyMessage]:
+    """Converte os dicts do produtor (writing_session/explore) em mensagens LangChain.
+
+    A flag `"cache_hint"` (marcada pelo produtor nos breakpoints de cache) é SEMPRE
+    consumida aqui e NUNCA vaza para a API. Só quando `provider == "anthropic"` ela
+    vira um `cache_control` ephemeral no content da mensagem — nos demais providers
+    (OpenAI, que já faz prefix caching automático) o comportamento é byte-a-byte
+    idêntico ao anterior: a flag é ignorada e o content vai como string."""
     out: list[AnyMessage] = []
     for m in initial:
         role, content = m.get("role"), m.get("content", "")
+        cache_hint = bool(m.pop("cache_hint", False))
+        if provider == "anthropic" and cache_hint:
+            content = _as_cached_content(content)
         if role == "assistant":
             out.append(AIMessage(content=content))
         elif role == "system":
@@ -387,6 +411,15 @@ def _to_lc_messages(initial: list[dict[str, Any]]) -> list[AnyMessage]:
         else:
             out.append(HumanMessage(content=content))
     return out
+
+
+def _build_system_message(system: str, provider: Provider | None) -> SystemMessage:
+    """SystemMessage top-level. No caminho Anthropic recebe um breakpoint de cache
+    (o system é estável por sessão — 1º dos 3 breakpoints do turno). Nos demais
+    providers vai como string simples (idêntico ao anterior)."""
+    if provider == "anthropic":
+        return SystemMessage(content=_as_cached_content(system))
+    return SystemMessage(content=system)
 
 
 async def run_agent_graph_async(
@@ -430,7 +463,10 @@ async def run_agent_graph_async(
     )
 
     init: AgentState = {
-        "messages": [SystemMessage(content=system), *_to_lc_messages(initial_messages)],
+        "messages": [
+            _build_system_message(system, provider),
+            *_to_lc_messages(initial_messages, provider=provider),
+        ],
         "llm_calls": 0,
         "tool_rounds": 0,
         "rounds_since_reflect": 0,
@@ -880,7 +916,10 @@ async def _writing_turn_async(
         payload: Any = Command(resume=resume)
     else:
         payload = {
-            "messages": [SystemMessage(content=system), *_to_lc_messages(initial_messages)],
+            "messages": [
+                _build_system_message(system, provider),
+                *_to_lc_messages(initial_messages, provider=provider),
+            ],
             "llm_calls": 0,
             "tool_rounds": 0,
             "rounds_since_reflect": 0,
@@ -1069,6 +1108,9 @@ def _build_generation_graph(
         done = list(state["sections_done"])
         failed = list(state["failed_sections"])
 
+        # Sem provider aqui (= sem cache_control): o batch de geração usa OpenAI
+        # por default (prefix caching automático) — no-op deliberado (spec PR2).
+        # `_to_lc_messages` ainda consome eventual `cache_hint` defensivamente.
         init: AgentState = {
             "messages": [
                 SystemMessage(content=system),
