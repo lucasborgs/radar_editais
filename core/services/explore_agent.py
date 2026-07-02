@@ -31,11 +31,18 @@ EXPLORE_MATCH_INSTRUCTION = """
 MATCH COM O PERFIL (find_matching_editais / find_matching_entities)
 - Este usuário TEM perfil preenchido. Quando ele pedir oportunidades para a
   empresa ("quais editais servem para mim?", "o que tem para a gente?"), ou logo
-  ao abrir uma conversa com perfil, chame find_matching_editais e apresente os
-  editais com a justificativa de cada match (o que da empresa casou com o quê).
+  ao abrir uma conversa com perfil, chame find_matching_editais.
 - Para PARCERIA, CAPITAL ou PROGRAMAS (não editais) — "que fundos investiriam na
   gente?", "ICTs para parceria?", "programa de aceleração?" — chame
   find_matching_entities (investidores/programas/ICTs por afinidade).
+- CRÍTICO: depois de chamar a tool, a interface JÁ mostra os resultados como
+  cards visuais (nome, status, prazo, valor, justificativa) logo abaixo da sua
+  mensagem — o usuário vai ver tudo isso de qualquer forma, sem você escrever.
+  Sua resposta em texto tem NO MÁXIMO 2 frases, SEM listar nome/status/prazo/
+  valor/justificativa de nenhum item individualmente (nem em bullets numerados).
+  Errado: "1. Edital X (aberto, prazo Y, R$ Z) — porque...". Certo: "Encontrei
+  3 editais com boa afinidade, principalmente em bioeconomia — dá uma olhada
+  nos cards abaixo. Quer que eu detalhe algum deles?"
 - Em ambos é afinidade temática (conteúdo), NÃO elegibilidade dura: apresente como
   ponto de partida e deixe a decisão com o usuário. Use get_edital ou
   get_node_neighborhood para aprofundar um match."""
@@ -198,7 +205,7 @@ class ExploreAgent:
                 except Exception:  # noqa: BLE001 — fallback à extração efêmera, não derruba o explore
                     logger.debug("falha ao carregar hipergrado durável da empresa", exc_info=True)
                     company_nodes = None
-            tools = tools + build_match_tools(profile_text, company_nodes=company_nodes)
+            tools = tools + build_match_tools(profile_text, company_nodes=company_nodes, brief=True)
             system = system + EXPLORE_MATCH_INSTRUCTION
 
         # Memória do ExploreAgent (Fase 3A): só com workspace autenticado + db.

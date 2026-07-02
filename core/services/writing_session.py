@@ -2521,6 +2521,8 @@ def persist_frontdoor_turn(
     assistant_message: str,
     profile_diff: list[dict] | None,
     session_id: str | None = None,
+    matched_editais: list[dict] | None = None,
+    matched_entities: list[dict] | None = None,
 ) -> dict:
     """Persiste um turno do front door (usuário logado) e devolve session_id +
     ids das entradas criadas.
@@ -2528,7 +2530,10 @@ def persist_frontdoor_turn(
     Cria a conversa (kind='frontdoor') no primeiro turno; reusa a existente nos
     seguintes. Grava: turno do usuário (msg) + resposta do assistente (msg) +,
     se houver diff, a proposta como entrada `diff` (payload={items, status,
-    origin}). O id do diff volta para o front fazer o PATCH no aceite/descarte.
+    origin}) +, se houver match, os cards como entrada `radar` (payload=
+    {matched_editais, matched_entities}) — mesmo entry_kind já reservado pela
+    migration 020 (nunca tinha sido escrito). O id do diff volta para o front
+    fazer o PATCH no aceite/descarte.
 
     Levanta em falha de DB — o caller (router) decide engolir o erro (a conversa
     vale mais que o histórico). NÃO é best-effort por dentro de propósito: assim
@@ -2581,13 +2586,33 @@ def persist_frontdoor_turn(
         .execute()
     )
     entry_ids["assistant"] = assistant_row.data[0]["id"] if assistant_row.data else None
+    next_index = base_index + 2
+
+    if matched_editais or matched_entities:
+        radar_row = (
+            db.table("session_turns")
+            .insert({
+                "session_id": session_id,
+                "turn_index": next_index,
+                "role": "assistant",
+                "content": "",
+                "entry_kind": "radar",
+                "payload": {
+                    "matched_editais": matched_editais or [],
+                    "matched_entities": matched_entities or [],
+                },
+            })
+            .execute()
+        )
+        entry_ids["radar"] = radar_row.data[0]["id"] if radar_row.data else None
+        next_index += 1
 
     if profile_diff:
         diff_row = (
             db.table("session_turns")
             .insert({
                 "session_id": session_id,
-                "turn_index": base_index + 2,
+                "turn_index": next_index,
                 "role": "assistant",
                 "content": "",
                 "entry_kind": "diff",
