@@ -69,6 +69,13 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
               <pre className="whitespace-pre-wrap font-sans text-inherit">{msg.content}</pre>
             </ChatBubble>
 
+            {/* aviso discreto de truncamento (PR6.2): resposta cortada no teto de passos */}
+            {msg.role === "assistant" && msg.truncated && (
+              <p className="px-1 text-[11px] italic text-content-secondary font-sans">
+                Resposta interrompida no limite de passos — continue a conversa para o agente retomar.
+              </p>
+            )}
+
             {/* avisos de compliance (âmbar) */}
             {msg.role === "assistant" && (msg.complianceFlags?.length ?? 0) > 0 && (
               <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 font-sans">

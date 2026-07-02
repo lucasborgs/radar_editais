@@ -64,8 +64,23 @@ def test_build_explore_hint_caps_at_3_ids():
 
 def test_explore_routes_to_agent(monkeypatch):
     svc = ExploreAgent()
-    monkeypatch.setattr(ExploreAgent, "_explore_agent", lambda *a, **kw: "resposta agente")
+    monkeypatch.setattr(
+        ExploreAgent, "_explore_agent",
+        lambda *a, **kw: ("resposta agente", {"stop_reason": "end_turn", "truncated": False}),
+    )
     assert svc.explore("qualquer pergunta") == "resposta agente"
+
+
+def test_explore_with_meta_exposes_truncated(monkeypatch):
+    """PR6.2 (F10): o router lê `truncated` do meta para avisar a UI."""
+    svc = ExploreAgent()
+    monkeypatch.setattr(
+        ExploreAgent, "_explore_agent",
+        lambda *a, **kw: ("resposta", {"stop_reason": "max_steps", "truncated": True}),
+    )
+    answer, meta = svc.explore_with_meta("qualquer pergunta")
+    assert answer == "resposta"
+    assert meta["truncated"] is True
 
 
 # ============================================================================
@@ -86,8 +101,24 @@ def test_explore_agent_happy_path(monkeypatch):
     )
     monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
-    out = svc._explore_agent("oi", None, None, None, None)
+    out, meta = svc._explore_agent("oi", None, None, None, None)
     assert out == "Resposta do agente."
+    assert meta == {"stop_reason": "end_turn", "truncated": False}
+
+
+def test_explore_agent_max_steps_marks_truncated(monkeypatch):
+    """stop_reason=max_steps → meta.truncated=True (PR6.2/F10) e a resposta
+    parcial é entregue mesmo assim (comportamento 'entrega avisando')."""
+    svc = ExploreAgent()
+    fake_result = AgentResult(
+        final_text="resposta parcial", steps=[], stop_reason="max_steps",
+        usage={"input_tokens": 0, "output_tokens": 0},
+    )
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
+
+    out, meta = svc._explore_agent("oi", None, None, None, None)
+    assert out == "resposta parcial"
+    assert meta["truncated"] is True
 
 
 def test_explore_agent_with_hint_passes_to_messages(monkeypatch):
@@ -184,7 +215,7 @@ def test_explore_agent_error_returns_friendly_message(monkeypatch):
     )
     monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
-    out = svc._explore_agent("oi", None, None, None, None)
+    out, _meta = svc._explore_agent("oi", None, None, None, None)
     assert "não consegui processar" in out.lower()
 
 
@@ -196,7 +227,7 @@ def test_explore_agent_empty_final_text_falls_back(monkeypatch):
     )
     monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
-    out = svc._explore_agent("oi", None, None, None, None)
+    out, _meta = svc._explore_agent("oi", None, None, None, None)
     assert "não consegui" in out.lower() or out  # algo útil, não vazio
 
 

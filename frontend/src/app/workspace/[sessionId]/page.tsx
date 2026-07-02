@@ -265,6 +265,7 @@ export default function WorkspacePage() {
             editedSections: editedSections.length > 0 ? editedSections : undefined,
             complianceFlags:
               (res.compliance_flags?.length ?? 0) > 0 ? res.compliance_flags : undefined,
+            truncated: res.truncated || undefined,
           },
         ]);
 
