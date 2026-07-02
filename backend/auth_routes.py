@@ -5,9 +5,10 @@ Magic link e verificação de token são tratados diretamente pelo Supabase Auth
 (frontend usa @supabase/supabase-js). O backend apenas gerencia o workspace/perfil.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient
 
 router = APIRouter(prefix="", tags=["auth"])
@@ -157,7 +158,8 @@ def update_preferences(
 
 
 @router.post("/me/reflect", summary="Dispara ReflectionService on-demand (Fase 2 #17)")
-def trigger_reflection(user_id: CurrentUserId, db: DbClient):
+@limiter.limit("10/minute")
+def trigger_reflection(request: Request, user_id: CurrentUserId, db: DbClient):
     """Roda síntese de outcomes do workspace e persiste em reflection_insights.
 
     Inline (não via fila procrastinate) para retornar o resultado imediatamente

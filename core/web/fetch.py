@@ -29,10 +29,10 @@ import os
 import time
 from typing import Any
 
-import requests
 from bs4 import BeautifulSoup
 
 from core import web_search as _ws
+from core.net_guard import safe_get
 from core.web_search import SearchHit, WebSearchError  # re-export p/ chamadores
 
 logger = logging.getLogger(__name__)
@@ -91,8 +91,9 @@ def fetch_and_parse(url: str) -> dict[str, Any]:
     """HTTP GET + extração de texto limpo e lista de (texto, href).
 
     Retorna {"text", "title", "links"}. `text` truncado em PAGE_CHAR_LIMIT.
-    Levanta exceção em falha (requests.*) — o chamador (tool) captura e converte
-    em string-erro. Cacheado por TTL: um hit não faz I/O de rede.
+    Levanta exceção em falha (requests.* ou ValueError do anti-SSRF) — o chamador
+    (tool) captura e converte em string-erro. Cacheado por TTL: um hit não faz
+    I/O de rede.
 
     A limpeza de HTML é idêntica à antiga profile_tools._fetch_and_parse.
     """
@@ -100,7 +101,7 @@ def fetch_and_parse(url: str) -> dict[str, Any]:
     if cached is not None:
         return cached
 
-    resp = requests.get(
+    resp = safe_get(
         url,
         headers={"User-Agent": _USER_AGENT},
         timeout=_HTTP_TIMEOUT,

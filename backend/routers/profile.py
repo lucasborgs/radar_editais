@@ -121,7 +121,10 @@ async def extract_profile_from_document(
     "/profile/extract-from-library/{item_id}",
     summary="Extrai perfil a partir do texto de um item da library",
 )
-def extract_profile_from_library(item_id: str, user_id: CurrentUserId, db: DbClient):
+@limiter.limit("3/minute")
+def extract_profile_from_library(
+    item_id: str, request: Request, user_id: CurrentUserId, db: DbClient,
+):
     """Extrai CompanyProfile sugerido a partir do content de um library_item.
 
     Autenticado. Aceita qualquer item de texto (tipicamente uma proposta antiga).

@@ -145,7 +145,9 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                 f"Foram encontrados {len(chunks)} trecho(s) relevante(s). "
                 f"Para ler o texto COMPLETO de qualquer trecho, "
                 f"use a ferramenta read_exact_chunk passando o chunk_id exato.\n\n"
+                "<dados_externos>\n"
                 + "\n\n".join(pointer_parts)
+                + "\n</dados_externos>"
             )
             return _cap(
                 summary, SEARCH_EDITAL_CHAR_CAP, tool_name="search_edital",
@@ -180,7 +182,7 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                 "Faça uma nova busca com search_edital para obter referências "
                 "atualizadas."
             )
-        return content
+        return f"<dados_externos>\n{content}\n</dados_externos>"
 
     @tool
     def search_library(query: str, k: int = 3) -> str:
