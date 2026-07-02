@@ -14,7 +14,7 @@ import re
 
 import jwt
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from slowapi.util import get_remote_address
 
 from backend.common import CompanyProfileSchema, explore_agent
@@ -35,8 +35,9 @@ router = APIRouter(tags=["explore"])
 
 
 class ExploreRequest(BaseModel):
-    message: str
-    history: list[dict] = []
+    # Caps (PR1.2 hardening-pre-beta): endpoint aceita anônimo — cap agressivo.
+    message: str = Field(max_length=4_000)
+    history: list[dict] = Field(default_factory=list, max_length=50)
     profile: CompanyProfileSchema | None = None
     edital_ids: list[str] = []
     node_id: str | None = None

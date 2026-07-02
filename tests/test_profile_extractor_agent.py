@@ -2,7 +2,8 @@
 
 Cobre:
   - tools (fetch_page, list_links_matching, lookup_cnpj, submit_profile) com
-    requests.get mockado
+    o transporte HTTP mockado (safe_get da camada web canônica; lookup_cnpj
+    ainda usa requests.get direto)
   - dispatcher extract() → _extract_agent vs _extract_legacy
   - _extract_agent: happy path (submit), no-submit (low_confidence), exception
 """
@@ -55,7 +56,7 @@ def test_fetch_page_returns_text_and_caches(monkeypatch):
 
     html = "<html><head><title>ACME Bio</title></head><body><p>Empresa de bioeconomia.</p></body></html>"
     monkeypatch.setattr(
-        "core.llm.agent_tools.profile_tools.requests.get",
+        "core.web.fetch.safe_get",
         lambda *a, **kw: _mock_response(html=html),
     )
 
@@ -78,7 +79,7 @@ def test_fetch_page_serves_from_cache_on_second_call(monkeypatch):
         call_count["n"] += 1
         return _mock_response(html=html)
 
-    monkeypatch.setattr("core.llm.agent_tools.profile_tools.requests.get", fake_get)
+    monkeypatch.setattr("core.web.fetch.safe_get", fake_get)
 
     fetch.invoke({"url": "https://x.com"})
     out = fetch.invoke({"url": "https://x.com"})
@@ -92,7 +93,7 @@ def test_fetch_page_handles_http_error(monkeypatch):
     fetch = next(t for t in tools if t.name == "fetch_page")
 
     monkeypatch.setattr(
-        "core.llm.agent_tools.profile_tools.requests.get",
+        "core.web.fetch.safe_get",
         lambda *a, **kw: _mock_response(status_code=404, html=""),
     )
     out = fetch.invoke({"url": "https://nope.com"})
@@ -109,7 +110,7 @@ def test_fetch_page_handles_timeout(monkeypatch):
     def boom(*a, **kw):
         raise Timeout("slow")
 
-    monkeypatch.setattr("core.llm.agent_tools.profile_tools.requests.get", boom)
+    monkeypatch.setattr("core.web.fetch.safe_get", boom)
     out = fetch.invoke({"url": "https://slow.com"})
     assert "Timeout" in out
 
@@ -125,7 +126,7 @@ def test_fetch_page_respects_max_pages_limit(monkeypatch):
 
     # 11ª URL nova é bloqueada
     monkeypatch.setattr(
-        "core.llm.agent_tools.profile_tools.requests.get",
+        "core.web.fetch.safe_get",
         lambda *a, **kw: _mock_response(html="<html><title>nova</title></html>"),
     )
     out = fetch.invoke({"url": "https://nova.com"})
@@ -198,7 +199,7 @@ def test_list_links_matching_fetches_on_demand(monkeypatch):
     state = ExtractionState()
     html = '<html><body><a href="/about">About</a></body></html>'
     monkeypatch.setattr(
-        "core.llm.agent_tools.profile_tools.requests.get",
+        "core.web.fetch.safe_get",
         lambda *a, **kw: _mock_response(html=html),
     )
     tools = build_profile_tools(state)

@@ -7,7 +7,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.common import (
     CompanyProfileSchema,
@@ -52,8 +52,10 @@ class WritingStartRequest(BaseModel):
 
 class WritingTurnRequest(BaseModel):
     session_id: str
-    user_message: str
-    section_hint: str | None = None
+    # Caps (PR1.2 hardening-pre-beta): o rate limit é por minuto; o cap limita
+    # o custo LLM de UM request.
+    user_message: str = Field(max_length=16_000)
+    section_hint: str | None = Field(default=None, max_length=200)
     profile: CompanyProfileSchema | None = None
     library_item_ids: list[str] = []
     model_tier: str | None = None  # Fase 4 #24: 'fast' | 'auto' | 'pro'

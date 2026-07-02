@@ -25,13 +25,13 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 
-import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from config import BRONZE_DIR
 from core.auth import CurrentUserId
 from core.db import get_supabase_service
+from core.net_guard import safe_get, safe_head
 from core.web_identity import normalize_web_url, web_url_hash
 
 logger = logging.getLogger(__name__)
@@ -58,8 +58,8 @@ def _is_pdf_url(url: str) -> bool:
     if url_lower.endswith(".pdf"):
         return True
     try:
-        resp = requests.head(url, allow_redirects=True, timeout=10,
-                             headers={"User-Agent": "Mozilla/5.0"})
+        resp = safe_head(url, timeout=10,
+                         headers={"User-Agent": "Mozilla/5.0"})
         ct = resp.headers.get("content-type", "")
         return "application/pdf" in ct or "pdf" in ct
     except Exception:
@@ -67,8 +67,8 @@ def _is_pdf_url(url: str) -> bool:
 
 
 def _download_pdf(url: str) -> bytes:
-    resp = requests.get(url, timeout=_PDF_TIMEOUT,
-                        headers={"User-Agent": "Mozilla/5.0"})
+    resp = safe_get(url, timeout=_PDF_TIMEOUT,
+                    headers={"User-Agent": "Mozilla/5.0"})
     resp.raise_for_status()
     return resp.content
 

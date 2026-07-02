@@ -45,6 +45,26 @@ from core.logging_config import request_id_var, setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
+
+def _guard_demo_mode() -> None:
+    """PR1.3 (hardening-pre-beta): DEMO_MODE bypassa auth+RLS via service-role.
+
+    Em produção multiusuário isso colapsa todos os usuários num único workspace
+    sem login — recusa o boot, salvo override deliberado.
+    """
+    demo = os.getenv("DEMO_MODE", "").strip().lower() in ("1", "true", "yes", "on")
+    env = (os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("ENVIRONMENT") or "").strip().lower()
+    allow = os.getenv("DEMO_MODE_ALLOW_PROD", "").strip().lower() in ("1", "true", "yes", "on")
+    if demo and env == "production" and not allow:
+        raise RuntimeError(
+            "DEMO_MODE=1 em produção bypassa auth+RLS (todos os usuários viram o "
+            "mesmo workspace). Desligue DEMO_MODE ou sete DEMO_MODE_ALLOW_PROD=1 "
+            "para forçar deliberadamente."
+        )
+
+
+_guard_demo_mode()
+
 # =============================================================================
 # APP + CORS
 # =============================================================================
