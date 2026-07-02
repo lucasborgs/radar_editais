@@ -235,6 +235,20 @@ PR1 (bloqueia beta) → PR2 + PR4 (independentes, paralelos) → PR3 → PR5 →
 Gates: ruff+pytest em todos; eval `writing` antes do merge de PR2 e PR3;
 eval `matching` no PR6.3.
 
+## Adendo pós-implementação (2026-07-02)
+
+O ambiente real (dev e prod) roda **100% OpenAI (gpt-4o-mini), sem
+ANTHROPIC_API_KEY**. Consequências para o PR2:
+- Os breakpoints `cache_control` ficam **dormentes** (só ativam com
+  provider=anthropic) — risco zero, benefício futuro se uma chave aparecer.
+- O ganho ATIVO é a §2.1: com o bloco temporal fora do prefixo, o prefix
+  caching **automático da OpenAI** (50% de desconto, prompts ≥1024 tokens)
+  volta a acertar o prefixo estável nas iterações do loop ReAct.
+- Gate de eval `writing` DISPENSADO para este PR (única mudança comportamental
+  no OpenAI = posição do temporal, coberta por unit tests + teste manual).
+  Criar `EVAL_WORKSPACE_ID` fica como backlog — baseline para futuras mudanças
+  de prompt (a var nem estava documentada no .env.example).
+
 ## Decisões fechadas (respostas do Lucas, 2026-07-01)
 
 1. Caps do PR1.2: **16k writing / 4k explore confirmados** — colagem de documento
