@@ -183,7 +183,14 @@ class ExploreAgent:
         if hint:
             messages.append({"role": "user", "content": hint})
 
-        messages.append({"role": "user", "content": message})
+        # Breakpoint de cache (PR2 §2.2): marca a mensagem do usuário atual — as
+        # iterações 2..N do mesmo turno ReAct leem todo o prefixo (system+history+
+        # hint) do cache. O system ganha o próprio breakpoint no consumidor
+        # (`agent_graph._build_system_message`). Não há bloco de perfil como
+        # mensagem aqui: o perfil vai na closure das match tools, não no prompt.
+        # A flag é consumida em `_to_lc_messages` e só vira `cache_control` com
+        # provider == "anthropic"; nos demais é ignorada (no-op).
+        messages.append({"role": "user", "content": message, "cache_hint": True})
 
         tools = self._explore_tools()
         system = EXPLORE_AGENT_SYSTEM
