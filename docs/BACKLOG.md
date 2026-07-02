@@ -42,6 +42,32 @@
   - Eval de escrita como gate da **remoção do legacy de match** (spec robustez).
 - **Status:** regra ativa (2026-07-02). Sem entregável próprio — dissolve no fluxo.
 
+### Hardening pré-beta — PR3/PR5/PR6 pendentes (PR1/PR2/PR4 integrados)
+
+- **O quê:** a spec `docs/specs/hardening-pre-beta.md` tem 6 PRs. Estado em 2026-07-02
+  (consolidados na branch `feat/hardening-pre-beta`, commit efe99024c):
+  - **PR1** (segurança P0 — SSRF/caps/DEMO_MODE/rate-limit/delimitadores): ✅ integrado.
+  - **PR2** (prompt caching — temporal no tail + `cache_control` dormente em OpenAI):
+    ✅ integrado (merge de `feat/prompt-caching`; conflito semântico com o fix de
+    outline reconciliado em `test_prompt_caching.py`).
+  - **PR4** (retry nas tasks + fix ledger discovery + alerta e-mail): ✅ integrado
+    (merge de `feat/resilience-email`).
+  - **PR3** (geração batch paralela — `asyncio.gather`+Semaphore, F4): ❌ **não feito**.
+  - **PR5** (observabilidade de custo — `llm_span` nas chamadas 1-shot, F11): ❌ **não feito**.
+  - **PR6** (purge de checkpoints F9 + `truncated` F10 + cache no match F12): ❌ **não feito**.
+- **Por que importa:** só o PR1 era P0/bloqueia beta; PR3/5/6 são P1/P2 (latência/custo/
+  higiene) — não bloqueiam o lançamento, mas são a metade não-feita da spec.
+- **Gates:** eval `writing` antes de mergear PR3 (interpretar com cautela — `pct_grounded`
+  é ruidoso, ver Frente 2 de `pre-beta-verification.md`; gate real = "sem crash + salva");
+  eval `matching` no PR6.3.
+- **Ponto de entrada:** prompt de handoff pronto (dado ao Lucas 2026-07-02). Facts
+  F4/F9/F10/F11/F12; decisões: concorrência=4, retenção purge=30d.
+- **Débito lateral:** edição não-commitada na worktree `feat/resilience-email`
+  (`core/tasks.py` remove `build_knowledge_graph` legado do cron de ETL — alinha com o
+  CLAUDE.md mas o código ainda o chama). Patch salvo no scratchpad da sessão; decidir
+  integrar ou descartar.
+- **Status:** aberto (2026-07-02) — PR1/PR2/PR4 prontos; PR3/PR5/PR6 pendentes.
+
 ### Match por hipergrado — 2ª camada (elegibilidade dura) via hiperarestas nativas
 
 - **O quê:** o match cross-domínio (`core/services/hypergraph_match.py`) responde só
