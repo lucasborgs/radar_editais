@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useIsAdmin } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 /**
@@ -13,12 +14,13 @@ import { cn } from "@/lib/utils";
  *   antiga sai do fluxo do front-door (D7/§6). "Começar de novo" limpa o
  *   transcript local em ambos os casos.
  */
-const AUTHED_LINKS = [
+const AUTHED_LINKS: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/library", label: "Biblioteca" },
   { href: "/sessions", label: "Sessões" },
   { href: "/pipeline", label: "Pipeline" },
-  { href: "/editais", label: "Editais" },
-  { href: "/discovered", label: "Descobertas" },
+  { href: "/oportunidades", label: "Oportunidades" },
+  // Fila da Descoberta é ferramenta do operador (ADMIN_EMAILS), não do cliente.
+  { href: "/discovered", label: "Descobertas", adminOnly: true },
   { href: "/settings", label: "Configurações" },
 ];
 
@@ -33,6 +35,8 @@ export function FrontDoorHeader({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isAdmin = useIsAdmin();
+  const links = AUTHED_LINKS.filter((l) => !l.adminOnly || isAdmin);
 
   // Fecha o menu ao clicar fora.
   useEffect(() => {
@@ -90,7 +94,7 @@ export function FrontDoorHeader({
                 className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-border bg-surface py-1 shadow-lg"
               >
                 {isAuthed &&
-                  AUTHED_LINKS.map((l) => (
+                  links.map((l) => (
                     <Link
                       key={l.href}
                       href={l.href}

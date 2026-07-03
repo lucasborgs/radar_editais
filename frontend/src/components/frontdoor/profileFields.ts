@@ -21,6 +21,7 @@ const UFS = [
 const FINANCIAMENTO_OPTIONS = [
   { value: "subvencao_nao_reembolsavel", label: "Subvenção (não reembolsável)" },
   { value: "pesquisa_colaborativa", label: "Pesquisa colaborativa" },
+  { value: "capital_risco", label: "Capital de risco" },
 ];
 
 // Spec por campo. Campos sem entrada caem no default `text`.

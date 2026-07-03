@@ -221,15 +221,23 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
     user_msg = _REFLECT_USER.format(outcomes=_format_outcomes_for_prompt(outcomes))
 
     try:
-        response = client.chat.completions.create(
+        from core import telemetry
+        with telemetry.llm_span(
+            "reflection.reflect_workspace",
             model=model,
-            messages=[
-                {"role": "system", "content": _REFLECT_SYSTEM},
-                {"role": "user", "content": user_msg},
-            ],
-            temperature=0.2,
-            max_tokens=2000,
-        )
+            metadata={"workspace_id": workspace_id,
+                      "n_outcomes": len(outcomes)},
+        ) as span:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": _REFLECT_SYSTEM},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0.2,
+                max_tokens=2000,
+            )
+            telemetry.record_usage(span, response)
         raw = response.choices[0].message.content.strip()
         if "```" in raw:
             raw = re.sub(r"```(?:json)?", "", raw).strip()
@@ -363,15 +371,23 @@ def synthesize_patterns(db: Client, workspace_id: str) -> dict:
     user_msg = _SYNTHESIZE_USER.format(observations=_format_level1_for_prompt(level1))
 
     try:
-        response = client.chat.completions.create(
+        from core import telemetry
+        with telemetry.llm_span(
+            "reflection.synthesize_patterns",
             model=model,
-            messages=[
-                {"role": "system", "content": _SYNTHESIZE_SYSTEM},
-                {"role": "user", "content": user_msg},
-            ],
-            temperature=0.2,
-            max_tokens=2000,
-        )
+            metadata={"workspace_id": workspace_id,
+                      "n_level1": len(level1)},
+        ) as span:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": _SYNTHESIZE_SYSTEM},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0.2,
+                max_tokens=2000,
+            )
+            telemetry.record_usage(span, response)
         raw = response.choices[0].message.content.strip()
         if "```" in raw:
             raw = re.sub(r"```(?:json)?", "", raw).strip()
@@ -444,30 +460,9 @@ def synthesize_patterns(db: Client, workspace_id: str) -> dict:
         _project_to_store(
             workspace_id, deleted=superseded.data, inserted=inserted_rows,
         )
-
-        if (
-            weight_suggestions
-            and suggestions_carrier_idx is not None
-            and suggestions_carrier_idx < len(inserted_rows)
-        ):
-            carrier_id = inserted_rows[suggestions_carrier_idx].get("id")
-            if carrier_id:
-                try:
-                    from core.weight_approval import auto_apply_suggestions
-                    auto_applied = auto_apply_suggestions(
-                        db, workspace_id, carrier_id, weight_suggestions,
-                        outcomes_considered=len(level1), confidence=confidence,
-                    )
-                except Exception as e:  # auto-apply nunca derruba a síntese
-                    logger.warning(
-                        "synthesize_patterns: auto_apply falhou (ws=%s): %s",
-                        workspace_id, e,
-                    )
-            else:
-                logger.warning(
-                    "synthesize_patterns: insert não retornou id do carrier — "
-                    "auto-apply pulado (ws=%s)", workspace_id,
-                )
+        # (Pós-Sprint 3: o auto-apply dos pesos de matching saiu com o
+        # weight_approval/HybridMatch. weight_suggestions ainda é sintetizado e
+        # devolvido como insight, mas não há mais pesos para aplicar.)
 
     return {
         "level1_considered": len(level1),

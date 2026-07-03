@@ -1,47 +1,42 @@
-"""Suíte de avaliação do matching (topo do funil).
+"""Suíte de avaliação do matching — agora sobre o HIPERGRADO (Sprint 1 F3).
 
-Reposiciona `scripts/eval_matching.py` no harness unificado SEM reescrever o
-julgamento: `task` roda o HybridMatch real; os `evaluators` reaproveitam a
-rúbrica de `core.matching_eval` (fit temático + elegibilidade via juiz LLM,
-vigência determinística) e a checagem `expected_in_top`.
+Roda `find_matching_editais` (match cross-domínio geométrico) por empresa contra o
+golden de AFINIDADE DE CONTEÚDO em `eval_data/golden/matching.json`. Mede:
+
+  recall@k  — quantos positivos do golden aparecem no top-k (sinal: o nicho da
+              empresa é encontrado?). `None` p/ empresas-controle (sem positivos).
+  noise     — matches no top-k que NÃO são positivos NEM neutros (guarda-chuva) =
+              falso-positivo. fintech (controle) deve ter ruído baixo.
+
+Critério = afinidade (Tema/Tec/Aplicação); elegibilidade dura é camada SEPARADA, fora
+deste golden (ver core/services/hypergraph_match.AFFINITY_TYPES). Gate p/ remover o
+HybridMatch legado + calibrar o threshold. NÃO há LLM no julgamento — o match é
+geométrico; a única LLM é a extração one-shot dos nós da empresa.
 """
 from __future__ import annotations
 
 import json
-import os
 from functools import lru_cache
 from typing import Any
 
 from config import ROOT
 from core.eval.harness import Evaluation, Suite, get_input
 
-FIXTURE = ROOT / "tests" / "fixtures" / "eval_matching.json"
+GOLDEN = ROOT / "eval_data" / "golden" / "matching.json"
+TOP_K = 8  # o produto exibe ~8 (find_matching_editais/tool default)
 
 
 @lru_cache(maxsize=1)
-def _service():
-    from core.services.hybrid_match_service import HybridMatchService
-    return HybridMatchService()
+def _golden() -> dict:
+    return json.loads(GOLDEN.read_text(encoding="utf-8"))
 
 
-def _build_profile(raw: dict):
+def _extract_nodes(profile_raw: dict) -> list[dict]:
+    from core.retrieval.hyper_extractor import run_hyper_extract_company
     from domain.user_profile import CompanyProfile
     allowed = set(CompanyProfile.__dataclass_fields__.keys())
-    return CompanyProfile(**{k: v for k, v in raw.items() if k in allowed})
-
-
-def _edital_summary(svc, edital_id: str) -> str:
-    card = svc.get_edital_by_id(edital_id) or {}
-    parts = [f"id: {edital_id}", f"título: {card.get('title', '')}"]
-    for key, label in (("objective", "objetivo"), ("mechanism", "mecanismo"),
-                       ("trl_range", "TRL"), ("deadline", "deadline")):
-        if card.get(key):
-            parts.append(f"{label}: {card[key]}")
-    if card.get("themes"):
-        parts.append(f"temas: {', '.join(card.get('themes') or [])}")
-    if card.get("eligible_entities"):
-        parts.append(f"público-alvo: {', '.join(card.get('eligible_entities') or [])}")
-    return "\n".join(parts)
+    prof = CompanyProfile(**{k: v for k, v in profile_raw.items() if k in allowed})
+    return run_hyper_extract_company(prof.to_context(), company_id="eval").nodes
 
 
 # ---------------------------------------------------------------------------
@@ -49,128 +44,76 @@ def _edital_summary(svc, edital_id: str) -> str:
 # ---------------------------------------------------------------------------
 
 def load_data() -> list[dict]:
-    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    profiles = data["profiles"]
+    g = _golden()
+    profiles, neutral = g["profiles"], g["neutral"]
+    frozen = g.get("frozen_nodes", {})
     items = []
-    for case in data["cases"]:
-        raw = profiles.get(case["profile"])
+    for case in g["cases"]:
+        company = case["company"]
+        raw = profiles.get(company)
         if raw is None:
             continue
         items.append({
-            "input": {"profile": raw, "top_k": 5},
-            "expected_output": {
-                "expected_top": case.get("expected_top", []),
-                "expected_top_n": case.get("expected_top_n", 3),
-                "expected_above": case.get("expected_above", {}),
-            },
-            "metadata": {"case_id": case["id"], "profile_name": case["profile"]},
+            # `nodes` congelados (extraídos 1x) tornam o gate DETERMINÍSTICO e sem LLM:
+            # isola o MOTOR da variação de extração (que tem suíte própria). Ausentes →
+            # task re-extrai. Re-congelar = rodar scripts/freeze_matching_nodes ou editar.
+            "input": {"profile": raw, "nodes": frozen.get(company), "top_k": TOP_K},
+            "expected_output": {"relevant": case["relevant"], "neutral": neutral},
+            "metadata": {"case_id": company},
         })
     return items
 
 
 def task(*, item: Any, **_) -> dict:
+    from core.services import hypergraph_match
     inp = get_input(item)
-    svc = _service()
-    profile = _build_profile(inp["profile"])
-    matches = svc.match(profile, top_k=inp.get("top_k", 5))
-
-    from core.kg.temporal import temporal_context
-    enriched = []
-    for m in matches:
-        eid = m["id"]
-        ctx = temporal_context(eid)
-        enriched.append({
-            "id": eid,
-            "score": m.get("score"),
-            "eligible": m.get("eligible", True),
-            "vigente": not (ctx.expired if ctx else False),
-            "summary": _edital_summary(svc, eid),
-        })
+    nodes = inp.get("nodes") or _extract_nodes(inp["profile"])
+    if not nodes:
+        return {"error": "perfil não gerou nós", "ranked": []}
+    matches = hypergraph_match.find_matching_editais(nodes, top_k=inp.get("top_k", TOP_K))
     return {
-        "result_ids": [m["id"] for m in matches],
-        "profile_context": profile.to_context(),
-        "matches": enriched,
+        "ranked": [m.file_key for m in matches],
+        "matches": [{"file_key": m.file_key, "score": round(m.score, 3),
+                     "name": m.name[:60], "n_paths": m.n_paths} for m in matches],
     }
 
 
-def eval_rubric_precision(*, output, **_) -> list[Evaluation]:
-    """Rúbrica por match (juiz LLM) → precisão@K + violações de vigência/elegibilidade."""
-    if not isinstance(output, dict) or "error" in output:
-        return [{"name": "precision_at_3", "value": 0.0,
-                 "comment": (output or {}).get("error", "output inválido")}]
-
-    from core.matching_eval import RubricVerdict, judge_match_rubric, precision_at_k
-
-    pctx = output.get("profile_context", "")
-    verdicts: list[RubricVerdict] = []
-    n_expired = n_ineligible = 0
-    for m in output.get("matches", []):
-        if not m["vigente"]:
-            n_expired += 1
-        if m["eligible"] is False:
-            n_ineligible += 1
-        fit, elig, rationale = judge_match_rubric(pctx, m["summary"])
-        verdicts.append(RubricVerdict(
-            fit_tematico=fit, elegibilidade=elig, vigente=m["vigente"], rationale=rationale,
-        ))
-    return [
-        {"name": "precision_at_3", "value": round(precision_at_k(verdicts, 3), 3)},
-        {"name": "precision_at_5", "value": round(precision_at_k(verdicts, 5), 3)},
-        {"name": "expired_in_topk", "value": n_expired,
-         "comment": "VIGÊNCIA VIOLADA" if n_expired else ""},
-        {"name": "ineligible_in_topk", "value": n_ineligible},
-    ]
-
-
-def eval_expected_hit(*, output, expected_output, **_) -> Evaluation | None:
-    """Os editais esperados aparecem no top-N? (None quando o caso não declara expected.)"""
-    expected = (expected_output or {}).get("expected_top", [])
-    if not expected:
+def eval_recall(*, output, expected_output, **_) -> Evaluation | None:
+    """recall@k = positivos do golden presentes no top-k. None p/ controle (sem positivos)."""
+    relevant = set((expected_output or {}).get("relevant", []))
+    if not relevant:
         return None
-    from core.matching_eval import expected_in_top
-    n = (expected_output or {}).get("expected_top_n", 3)
-    ids = output.get("result_ids", []) if isinstance(output, dict) else []
-    hit = all(expected_in_top(ids, e, n) for e in expected)
-    return {"name": "expected_hit", "value": hit, "comment": f"esperados={expected}"}
+    ranked = set(output.get("ranked", [])) if isinstance(output, dict) else set()
+    hit = relevant & ranked
+    miss = sorted(relevant - ranked)
+    return {"name": "recall_at_k", "value": round(len(hit) / len(relevant), 3),
+            "comment": f"miss={miss}" if miss else "todos no top-k"}
 
 
-def eval_expected_above(*, output, expected_output, **_) -> Evaluation | None:
-    """Ordenação relativa: `a` rankeia ACIMA de `b`? (prova da elegibilidade dura.)
-
-    Gate-ável SÓ quando ambos os ids estão no resultado. `b` ausente do ranking
-    conta como satisfeito (caiu abaixo de tudo → trivialmente abaixo de `a`).
-    `a` ausente = violação (não subiu). None quando o caso não declara o par.
-    """
-    pairs = (expected_output or {}).get("expected_above", {})
-    if not pairs:
-        return None
-    ids = output.get("result_ids", []) if isinstance(output, dict) else []
-    pos = {eid: i for i, eid in enumerate(ids)}
-    ok = True
-    for above, below in pairs.items():
-        ia = pos.get(above)
-        ib = pos.get(below)
-        if ia is None:                      # o esperado-acima nem entrou → falha
-            ok = False
-        elif ib is not None and ia >= ib:   # ambos presentes mas ordem invertida
-            ok = False
-    return {"name": "expected_above", "value": ok, "comment": f"pares={pairs}"}
+def eval_noise(*, output, expected_output, **_) -> Evaluation:
+    """Falso-positivo: matches no top-k fora de positivos E de neutros (guarda-chuva)."""
+    exp = expected_output or {}
+    relevant, neutral = set(exp.get("relevant", [])), set(exp.get("neutral", []))
+    ranked = output.get("ranked", []) if isinstance(output, dict) else []
+    noise = [fk for fk in ranked if fk not in relevant and fk not in neutral]
+    return {"name": "noise", "value": len(noise), "comment": f"fp={noise}" if noise else ""}
 
 
 def _prereqs() -> str | None:
+    import os
     if not os.getenv("OPENAI_API_KEY"):
-        return "requer OPENAI_API_KEY (juiz da rúbrica + Stage 2)"
-    from core.kg import kg_store
-    if not kg_store.load_index().get("editais"):
-        return "índice do KG vazio — rode pipeline/build_knowledge_graph"
+        return "requer OPENAI_API_KEY (embedding dos nós; nós congelados → sem extração)"
+    from core.retrieval.hyper_extractor import HYPERGRAPHS_DIR
+    if not any(HYPERGRAPHS_DIR.glob("*__*.json")):
+        return "hipergrados do ecossistema ausentes — rode o extractor de produção"
     return None
 
 
 SUITE = Suite(
     name="matching",
-    description="Precisão@K do HybridMatch via rúbrica LLM + vigência/elegibilidade.",
+    description="recall@k do match por hipergrado (afinidade de conteúdo) + ruído, vs golden curado.",
     load_data=load_data,
     task=task,
-    evaluators=[eval_rubric_precision, eval_expected_hit, eval_expected_above],
+    evaluators=[eval_recall, eval_noise],
     prereqs=_prereqs,
 )

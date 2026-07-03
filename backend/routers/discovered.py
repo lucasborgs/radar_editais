@@ -10,10 +10,11 @@ insuficiente (ex.: SPA sem conteúdo server-side), o revisor humano pode colar
 o link direto do PDF do edital. O sistema baixa o PDF, extrai o texto, salva
 no bronze web e dispara o chunking imediatamente.
 
-GLOBAL (não workspace-scoped): a torneira é cron de sistema. Auth = qualquer
-usuário logado (gate via CurrentUserId). As escritas tocam `web_sources` (RLS
-service-role-only), então usamos o cliente service-role — o gate de auth é o
-CurrentUserId, não o RLS.
+GLOBAL (não workspace-scoped): a torneira é cron de sistema. Auth = OPERADOR
+apenas (gate via AdminUserId / ADMIN_EMAILS — decisão de produto 2026-07-03: a
+Descoberta é ferramenta de quem gerencia o sistema, não do cliente final). As
+escritas tocam `web_sources` (RLS service-role-only), então usamos o cliente
+service-role — o gate de auth é o AdminUserId, não o RLS.
 
 Wiring em backend/api.py:
     from backend.routers.discovered import router as discovered_router
@@ -25,13 +26,13 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 
-import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from config import BRONZE_DIR
-from core.auth import CurrentUserId
+from core.auth import AdminUserId
 from core.db import get_supabase_service
+from core.net_guard import safe_get, safe_head
 from core.web_identity import normalize_web_url, web_url_hash
 
 logger = logging.getLogger(__name__)
@@ -58,8 +59,8 @@ def _is_pdf_url(url: str) -> bool:
     if url_lower.endswith(".pdf"):
         return True
     try:
-        resp = requests.head(url, allow_redirects=True, timeout=10,
-                             headers={"User-Agent": "Mozilla/5.0"})
+        resp = safe_head(url, timeout=10,
+                         headers={"User-Agent": "Mozilla/5.0"})
         ct = resp.headers.get("content-type", "")
         return "application/pdf" in ct or "pdf" in ct
     except Exception:
@@ -67,8 +68,8 @@ def _is_pdf_url(url: str) -> bool:
 
 
 def _download_pdf(url: str) -> bytes:
-    resp = requests.get(url, timeout=_PDF_TIMEOUT,
-                        headers={"User-Agent": "Mozilla/5.0"})
+    resp = safe_get(url, timeout=_PDF_TIMEOUT,
+                    headers={"User-Agent": "Mozilla/5.0"})
     resp.raise_for_status()
     return resp.content
 
@@ -147,7 +148,7 @@ def _process_edital_pdf(edital_link: str, opp: dict) -> dict:
 
 
 @router.get("", summary="Fila de oportunidades descobertas")
-def list_discovered(user_id: CurrentUserId, include_reviewed: bool = False):
+def list_discovered(user_id: AdminUserId, include_reviewed: bool = False):
     """Lista a fila. Default: só `pending` e dentro do TTL de 30 dias.
     `include_reviewed=true` traz também promovidos/rejeitados (sem filtro de TTL),
     mais recentes primeiro."""
@@ -168,7 +169,7 @@ class PromoteBody(BaseModel):
 
 @router.post("/{opp_id}/promote", status_code=201,
              summary="Promove um achado: URL vira fonte rastreada (web_sources)")
-def promote_discovered(opp_id: str, user_id: CurrentUserId, body: PromoteBody | None = None):
+def promote_discovered(opp_id: str, user_id: AdminUserId, body: PromoteBody | None = None):
     """Promove uma oportunidade.
 
     Sem `edital_link`: insere a URL original em `web_sources` (fonte curada)
@@ -237,7 +238,7 @@ class RejectBody(BaseModel):
 
 
 @router.post("/{opp_id}/reject", summary="Rejeita um achado (some da fila)")
-def reject_discovered(opp_id: str, user_id: CurrentUserId, body: RejectBody | None = None):
+def reject_discovered(opp_id: str, user_id: AdminUserId, body: RejectBody | None = None):
     """Marca o achado como `rejected`. O ledger da torneira já impede que a mesma
     URL volte à fila em runs futuras."""
     db = get_supabase_service()
@@ -265,7 +266,7 @@ class PatchEditalLinkBody(BaseModel):
 
 @router.patch("/{opp_id}/edital-link",
               summary="Atualiza edital_link de uma oportunidade pendente")
-def patch_edital_link(opp_id: str, user_id: CurrentUserId, body: PatchEditalLinkBody):
+def patch_edital_link(opp_id: str, user_id: AdminUserId, body: PatchEditalLinkBody):
     """Permite que o revisor preencha/atualize o `edital_link` ANTES de
     promover. Só funciona em oportunidades com status `pending`."""
     db = get_supabase_service()

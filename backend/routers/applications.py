@@ -8,9 +8,9 @@ from datetime import date
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from backend.common import wiki_matcher
 from core.auth import CurrentUserId, DbClient
-from core.kg.wiki_schema import parse_deadline
+from core.kg import hypergraph_catalog
+from core.kg.schema import parse_deadline
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,7 @@ def _build_pipeline_items(rows: list[dict], sessions_by_id: dict[str, dict]) -> 
     """
     items = []
     for row in rows:
-        card = wiki_matcher.get_edital_by_id(row.get("edital_id"))
+        card = hypergraph_catalog.get_edital(row.get("edital_id"))
         session = sessions_by_id.get(row.get("session_id")) if row.get("session_id") else None
         items.append(_serialize_application(row, card, session))
     return items

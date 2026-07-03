@@ -1,13 +1,16 @@
-"""Geração de proposta completa (batch) — orquestrador + agente por seção.
+"""Geração de proposta completa (batch) — orquestração paralela + agente por seção.
 
-Zero rede: chat model scriptado + save_draft fake. Verifica que o orquestrador
-determinístico despacha cada seção ao agente interno, classifica done/failed pela
-persistência real (verify_saved) e agrega o resultado.
+Zero rede: chat model scriptado + save_draft fake. Verifica que a orquestração
+(asyncio.gather + Semaphore) despacha cada seção ao agente interno, classifica
+done/failed pela persistência real (verify_saved), agrega o resultado e de fato
+roda seções em paralelo (respeitando GENERATION_CONCURRENCY).
 """
 from __future__ import annotations
 
+import asyncio
+
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.tools import tool
 from pydantic import PrivateAttr
@@ -20,7 +23,8 @@ SAVED: dict[str, str] = {}
 
 class ScriptedChatModel(BaseChatModel):
     """Devolve `responses[i]` na i-ésima chamada (persistente entre invokes —
-    compartilhado por todas as runs de seção)."""
+    compartilhado por todas as runs de seção). Ordem só é determinística com
+    GENERATION_CONCURRENCY=1."""
     responses: list
     _idx: int = PrivateAttr(default=0)
 
@@ -32,6 +36,41 @@ class ScriptedChatModel(BaseChatModel):
         msg = self.responses[self._idx]
         self._idx += 1
         return ChatResult(generations=[ChatGeneration(message=msg)])
+
+    def bind_tools(self, tools, **kwargs):  # noqa: ANN001
+        return self
+
+
+class ParallelProbeChatModel(BaseChatModel):
+    """Modelo content-driven (independe da ordem de chegada): na 1ª chamada de
+    cada seção emite o tool_call de save; na 2ª (pós-ToolMessage) encerra.
+    Mede o overlap real de runs concorrentes via contador em `_agenerate`."""
+    _active: int = PrivateAttr(default=0)
+    _max_active: int = PrivateAttr(default=0)
+
+    @property
+    def _llm_type(self) -> str:
+        return "parallel-probe"
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+        raise NotImplementedError("use o caminho async")
+
+    async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+        self._active += 1
+        self._max_active = max(self._max_active, self._active)
+        await asyncio.sleep(0.05)  # janela p/ overlap entre seções
+        try:
+            if isinstance(messages[-1], ToolMessage):
+                msg = _ai("Pronto.")
+            else:
+                section = next(
+                    str(m.content).removeprefix("escreva ")
+                    for m in messages if isinstance(m, HumanMessage)
+                )
+                msg = _save_call(f"tc-{section}", section, f"corpo {section}")
+            return ChatResult(generations=[ChatGeneration(message=msg)])
+        finally:
+            self._active -= 1
 
     def bind_tools(self, tools, **kwargs):  # noqa: ANN001
         return self
@@ -56,10 +95,10 @@ def fake_save_draft(section_title: str, content: str) -> str:
 
 
 def _wire(monkeypatch, responses):
-    """Injeta o chat model scriptado + dispensa o checkpointer durável."""
+    """Injeta o chat model scriptado + força execução serial (ordem do script)."""
     scripted = ScriptedChatModel(responses=responses)
     monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: scripted)
-    monkeypatch.setattr(ag, "_get_writing_checkpointer", lambda: None)
+    monkeypatch.setenv("GENERATION_CONCURRENCY", "1")
     return scripted
 
 
@@ -73,7 +112,6 @@ def _run(sections):
         system="sys",
         build_section_messages=lambda s: [{"role": "user", "content": f"escreva {s}"}],
         sections=sections,
-        outline=sections,
         tools=[fake_save_draft],
         model="m",
         provider="anthropic",
@@ -125,3 +163,32 @@ def test_generation_empty_sections_is_noop(monkeypatch):
     out = _run([])
     assert out.sections_done == []
     assert out.failed_sections == []
+
+
+def test_generation_runs_sections_in_parallel(monkeypatch):
+    SAVED.clear()
+    probe = ParallelProbeChatModel()
+    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: probe)
+    monkeypatch.delenv("GENERATION_CONCURRENCY", raising=False)  # default = 4
+
+    sections = ["Sec A", "Sec B", "Sec C", "Sec D"]
+    out = _run(sections)
+
+    # Contrato preservado: todas salvas, na ordem de entrada.
+    assert out.sections_done == sections
+    assert out.failed_sections == []
+    assert SAVED == {s: f"corpo {s}" for s in sections}
+    # Prova do paralelismo: houve chamadas LLM simultâneas de seções distintas.
+    assert probe._max_active >= 2
+
+
+def test_generation_concurrency_env_clamps_to_one(monkeypatch):
+    SAVED.clear()
+    probe = ParallelProbeChatModel()
+    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: probe)
+    monkeypatch.setenv("GENERATION_CONCURRENCY", "1")
+
+    out = _run(["Sec A", "Sec B", "Sec C"])
+
+    assert out.sections_done == ["Sec A", "Sec B", "Sec C"]
+    assert probe._max_active == 1  # serial de fato

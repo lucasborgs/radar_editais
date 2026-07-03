@@ -1,15 +1,13 @@
-"""Testes do path agente de ExploreAgent.explore (Sprint 3 do Cenário B).
+"""Testes do ExploreAgent (rota única = agente, pós-Sprint 3).
 
-Estratégia: instanciamos `ExploreAgent()` real (lê o índice JSON de
-knowledge_graph/index.json, que existe no repo) mas stubbamos `run_agent` para
-não bater na API Anthropic.
+Estratégia: instanciamos `ExploreAgent()` real e stubbamos `run_agent` para não
+bater na API. As tools de leitura leem o hipergrado (hypergraph_catalog/kg_store)
+direto — sem index.json/wiki/GraphService.
 
 Cobre:
-  - dispatcher explore() → _explore_agent vs _explore_legacy
   - _build_explore_hint pra clique no grafo
-  - _explore_agent error path
-  - tools de explore_tools (list_editais, get_edital, find_analogues,
-    get_graph_neighbors) — wrappers leves sobre ExploreAgent já testado
+  - explore() → _explore_agent (rota única) + error/fallback paths
+  - tools de explore_tools (set, planning, leitura)
 """
 from __future__ import annotations
 
@@ -22,7 +20,6 @@ sys.path.insert(0, str(ROOT))
 from core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
 from core.llm.agent_tools import build_explore_tools  # noqa: E402
 from core.services.explore_agent import ExploreAgent  # noqa: E402
-from core.services.graph_service import GraphService  # noqa: E402
 
 # ============================================================================
 # _build_explore_hint
@@ -34,24 +31,22 @@ def test_build_explore_hint_empty_when_no_click():
 
 
 def test_build_explore_hint_node_only():
-    h = ExploreAgent._build_explore_hint(None, "radar-editais/temas/bio", "tema")
-    assert "radar-editais/temas/bio" in h
+    h = ExploreAgent._build_explore_hint(None, "bioeconomia", "tema")
+    assert "bioeconomia" in h
     assert "tipo=tema" in h
-    assert "get_graph_neighbors" in h
+    assert "get_node_neighborhood" in h
 
 
 def test_build_explore_hint_edital_ids_only():
     h = ExploreAgent._build_explore_hint(["finep:589", "finep:613"], None, None)
     assert "finep:589" in h
     assert "finep:613" in h
-    assert "get_edital" in h or "find_analogues" in h
+    assert "get_edital" in h or "get_node_neighborhood" in h
 
 
 def test_build_explore_hint_node_and_ids():
-    h = ExploreAgent._build_explore_hint(
-        ["finep:589"], "radar-editais/temas/bio", "tema",
-    )
-    assert "radar-editais/temas/bio" in h
+    h = ExploreAgent._build_explore_hint(["finep:589"], "bioeconomia", "tema")
+    assert "bioeconomia" in h
     assert "finep:589" in h
 
 
@@ -64,107 +59,28 @@ def test_build_explore_hint_caps_at_3_ids():
 
 
 # ============================================================================
-# _classify_intent
+# explore() — rota única (sempre _explore_agent)
 # ============================================================================
 
-def test_classify_intent_factual():
-    assert ExploreAgent._classify_intent("quais editais estão abertos") == "factual"
-    assert ExploreAgent._classify_intent("mostra o edital 589") == "factual"
-    assert ExploreAgent._classify_intent("quantos editais existem") == "factual"
-    assert ExploreAgent._classify_intent("lista editais de saúde") == "factual"
-    assert ExploreAgent._classify_intent("tem editais abertos") == "factual"
-
-
-def test_classify_intent_reasoning():
-    r = ExploreAgent._classify_intent("o que é subvenção")
-    assert r == "reasoning"
-    r = ExploreAgent._classify_intent("como funciona o FNDCT")
-    assert r == "reasoning"
-    r = ExploreAgent._classify_intent("qual a diferença entre subvenção e reembolsável")
-    assert r == "reasoning"
-
-
-def test_classify_intent_agent():
-    assert ExploreAgent._classify_intent(
-        "qual edital combina com minha startup", has_profile=True,
-    ) == "agent"
-    assert ExploreAgent._classify_intent(
-        "existe ICT que faça parceria em agro",
-    ) == "agent"
-    assert ExploreAgent._classify_intent(
-        "recomende um edital pra minha empresa",
-    ) == "agent"
-
-
-def test_classify_intent_fallback_reasoning():
-    """Pergunta ambígua sem padrão claro → reasoning (1 call, barato)."""
-    assert ExploreAgent._classify_intent("editais") == "reasoning"
-    assert ExploreAgent._classify_intent("quero saber mais") == "reasoning"
-
-
-def test_classify_intent_with_edital_ids():
-    """Com IDs de edital (clique), pergunta simples → factual."""
-    assert ExploreAgent._classify_intent(
-        "mostra detalhes do edital", has_edital_ids=True,
-    ) == "factual"
-    """Com IDs + pergunta aberta → agent (precisa de contexto)."""
-    assert ExploreAgent._classify_intent(
-        "o que você acha desse edital", has_edital_ids=True,
-    ) == "agent"
-
-
-# ============================================================================
-# explore() dispatcher (3 rotas)
-# ============================================================================
-
-def test_explore_dispatches_to_factual(monkeypatch):
+def test_explore_routes_to_agent(monkeypatch):
     svc = ExploreAgent()
-    monkeypatch.setattr(ExploreAgent, "_classify_intent",
-                        lambda *a, **kw: "factual")
-    svc._factual_route = lambda *a, **kw: "resposta factual"
-    monkeypatch.setattr(ExploreAgent, "_factual_route",
-                        lambda *a, **kw: "resposta factual")
-    monkeypatch.setattr(ExploreAgent, "_explore_legacy",
-                        lambda *a, **kw: AssertionError("não deve chamar"))
-    monkeypatch.setattr(ExploreAgent, "_explore_agent",
-                        lambda *a, **kw: AssertionError("não deve chamar"))
-    assert svc.explore("quais estão abertos") == "resposta factual"
+    monkeypatch.setattr(
+        ExploreAgent, "_explore_agent",
+        lambda *a, **kw: ("resposta agente", {"stop_reason": "end_turn", "truncated": False}),
+    )
+    assert svc.explore("qualquer pergunta") == "resposta agente"
 
 
-def test_explore_dispatches_to_reasoning(monkeypatch):
+def test_explore_with_meta_exposes_truncated(monkeypatch):
+    """PR6.2 (F10): o router lê `truncated` do meta para avisar a UI."""
     svc = ExploreAgent()
-    monkeypatch.setattr(ExploreAgent, "_classify_intent",
-                        lambda *a, **kw: "reasoning")
-    monkeypatch.setattr(ExploreAgent, "_explore_legacy",
-                        lambda *a, **kw: "resposta reasoning")
-    monkeypatch.setattr(ExploreAgent, "_explore_agent",
-                        lambda *a, **kw: AssertionError("não deve chamar"))
-    assert svc.explore("o que é subvenção") == "resposta reasoning"
-
-
-def test_explore_dispatches_to_agent(monkeypatch):
-    svc = ExploreAgent()
-    monkeypatch.setattr(ExploreAgent, "_classify_intent",
-                        lambda *a, **kw: "agent")
-    monkeypatch.setattr(ExploreAgent, "_explore_agent",
-                        lambda *a, **kw: "resposta agent")
-    monkeypatch.setattr(ExploreAgent, "_explore_legacy",
-                        lambda *a, **kw: AssertionError("não deve chamar"))
-    assert svc.explore("qual combina com minha startup", has_profile=True) == "resposta agent"
-
-
-def test_explore_factual_fallback_to_reasoning(monkeypatch):
-    """Factual route retorna None → fallback para reasoning."""
-    svc = ExploreAgent()
-    monkeypatch.setattr(ExploreAgent, "_classify_intent",
-                        lambda *a, **kw: "factual")
-    monkeypatch.setattr(ExploreAgent, "_factual_route",
-                        lambda *a, **kw: None)
-    monkeypatch.setattr(ExploreAgent, "_explore_legacy",
-                        lambda *a, **kw: "fallback reasoning")
-    monkeypatch.setattr(ExploreAgent, "_explore_agent",
-                        lambda *a, **kw: AssertionError("não deve chamar"))
-    assert svc.explore("editais de nanotecnologia") == "fallback reasoning"
+    monkeypatch.setattr(
+        ExploreAgent, "_explore_agent",
+        lambda *a, **kw: ("resposta", {"stop_reason": "max_steps", "truncated": True}),
+    )
+    answer, meta = svc.explore_with_meta("qualquer pergunta")
+    assert answer == "resposta"
+    assert meta["truncated"] is True
 
 
 # ============================================================================
@@ -185,8 +101,24 @@ def test_explore_agent_happy_path(monkeypatch):
     )
     monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
-    out = svc._explore_agent("oi", None, None, None, None)
+    out, meta = svc._explore_agent("oi", None, None, None, None)
     assert out == "Resposta do agente."
+    assert meta == {"stop_reason": "end_turn", "truncated": False}
+
+
+def test_explore_agent_max_steps_marks_truncated(monkeypatch):
+    """stop_reason=max_steps → meta.truncated=True (PR6.2/F10) e a resposta
+    parcial é entregue mesmo assim (comportamento 'entrega avisando')."""
+    svc = ExploreAgent()
+    fake_result = AgentResult(
+        final_text="resposta parcial", steps=[], stop_reason="max_steps",
+        usage={"input_tokens": 0, "output_tokens": 0},
+    )
+    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
+
+    out, meta = svc._explore_agent("oi", None, None, None, None)
+    assert out == "resposta parcial"
+    assert meta["truncated"] is True
 
 
 def test_explore_agent_with_hint_passes_to_messages(monkeypatch):
@@ -207,19 +139,19 @@ def test_explore_agent_with_hint_passes_to_messages(monkeypatch):
     svc._explore_agent(
         "qual o prazo?", history=None,
         edital_ids=None,
-        node_id="radar-editais/temas/bio", node_type="tema",
+        node_id="bioeconomia", node_type="tema",
     )
 
     msgs = captured["initial_messages"]
     # hint vem antes da pergunta atual
-    hint_msg = next((m for m in msgs if "radar-editais/temas/bio" in m["content"]), None)
+    hint_msg = next((m for m in msgs if "bioeconomia" in m["content"]), None)
     assert hint_msg is not None
     last_msg = msgs[-1]
     assert last_msg["content"] == "qual o prazo?"
 
 
 def test_explore_agent_passes_history_window(monkeypatch):
-    """Apenas os últimos 8 turnos vão pro agente (igual ao legacy)."""
+    """Apenas os últimos 8 turnos vão pro agente."""
     svc = ExploreAgent()
     captured: dict = {}
 
@@ -251,8 +183,7 @@ def test_explore_agent_passes_history_window(monkeypatch):
 
 
 def test_explore_agent_includes_planning_tool(monkeypatch):
-    """O agente de explore ganha write_todos (Opção A) além das 8 tools de
-    leitura — habilita planejamento multi-etapa no chat de Descoberta."""
+    """O agente de explore ganha write_todos além das tools de leitura."""
     svc = ExploreAgent()
     captured: dict = {}
 
@@ -271,8 +202,8 @@ def test_explore_agent_includes_planning_tool(monkeypatch):
 
     names = {t.name for t in captured["tools"]}
     assert "write_todos" in names
-    # as 8 de leitura continuam presentes
-    assert {"list_editais", "oportunidades_por_tema", "list_icts"} <= names
+    # as de leitura continuam presentes
+    assert {"list_editais", "explore_opportunity", "list_icts", "get_node_neighborhood"} <= names
     assert captured["max_steps"] >= 8  # espaço pra planejamento + multi-task
 
 
@@ -284,7 +215,7 @@ def test_explore_agent_error_returns_friendly_message(monkeypatch):
     )
     monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
-    out = svc._explore_agent("oi", None, None, None, None)
+    out, _meta = svc._explore_agent("oi", None, None, None, None)
     assert "não consegui processar" in out.lower()
 
 
@@ -296,25 +227,21 @@ def test_explore_agent_empty_final_text_falls_back(monkeypatch):
     )
     monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
-    out = svc._explore_agent("oi", None, None, None, None)
+    out, _meta = svc._explore_agent("oi", None, None, None, None)
     assert "não consegui" in out.lower() or out  # algo útil, não vazio
 
 
 # ============================================================================
-# explore_tools — wrappers leves
+# explore_tools — tools de leitura do hipergrado
 # ============================================================================
 
 def test_explore_tools_count_and_names():
-    svc = ExploreAgent()
-    tools = build_explore_tools(svc, GraphService())
+    tools = build_explore_tools()
     names = [t.name for t in tools]
     assert set(names) == {
-        "list_editais", "get_edital", "find_analogues", "get_graph_neighbors",
-        "find_ict_partners",
-        # Cross-dimensionais (Fase 2 — chat de Descoberta sobre todas as dimensões)
-        "list_icts", "list_investidores", "oportunidades_por_tema",
-        # Comparação/detalhe fundamentado (KG localiza → RAG recupera trecho)
-        "search_edital_trechos",
+        "list_editais", "get_edital",
+        "get_node_neighborhood",
+        "list_icts", "list_investidores", "explore_opportunity",
     }
 
 
@@ -334,12 +261,11 @@ def test_explore_tools_deep_research_gated(monkeypatch):
     assert "deep_research" in on
 
 
-def test_oportunidades_por_tema_is_cross_dimensional():
+def test_explore_opportunity_is_cross_dimensional():
     """O panorama cobre as três frentes (eventos + ICTs + investidores) num só
     retorno — robusto mesmo se alguma dimensão estiver vazia no ambiente."""
-    svc = ExploreAgent()
-    tools = {t.name: t for t in build_explore_tools(svc, GraphService())}
-    fn = getattr(tools["oportunidades_por_tema"], "func", tools["oportunidades_por_tema"])
+    tools = {t.name: t for t in build_explore_tools()}
+    fn = getattr(tools["explore_opportunity"], "func", tools["explore_opportunity"])
     out = fn(tema="agro")
     assert isinstance(out, str)
     assert "Editais" in out and "ICTs" in out and "Investidores" in out
@@ -372,20 +298,18 @@ def test_theme_match_rejects_unrelated():
 
 
 def test_list_editais_tool_returns_string_with_results():
-    svc = ExploreAgent()
-    tools = build_explore_tools(svc, GraphService())
+    tools = build_explore_tools()
     t = next(x for x in tools if x.name == "list_editais")
     out = t.invoke({"limit": 3})
     assert isinstance(out, str)
-    # Sem assert sobre conteúdo específico — depende do índice em disco —
+    # Sem assert sobre conteúdo específico — depende do hipergrado em disco —
     # mas deve mencionar quantidade ou ausência.
     assert ("Encontrados" in out) or ("Nenhum edital" in out)
 
 
 def test_list_editais_caps_limit():
     """Limit > 50 é cortado para 50 (proteção contra prompt blowup)."""
-    svc = ExploreAgent()
-    tools = build_explore_tools(svc, GraphService())
+    tools = build_explore_tools()
     t = next(x for x in tools if x.name == "list_editais")
     # Não dá pra inspecionar contagem direto; só garante que não levanta erro
     out = t.invoke({"limit": 99999})
@@ -393,27 +317,8 @@ def test_list_editais_caps_limit():
 
 
 def test_get_edital_tool_returns_error_string_for_invalid_id():
-    svc = ExploreAgent()
-    tools = build_explore_tools(svc, GraphService())
+    tools = build_explore_tools()
     t = next(x for x in tools if x.name == "get_edital")
     out = t.invoke({"edital_id": "id_que_nao_existe_xyz"})
     assert isinstance(out, str)
     assert "Erro" in out or "não encontrado" in out
-
-
-def test_find_analogues_tool_handles_missing_id():
-    svc = ExploreAgent()
-    tools = build_explore_tools(svc, GraphService())
-    t = next(x for x in tools if x.name == "find_analogues")
-    out = t.invoke({"edital_id": "id_invalido"})
-    assert isinstance(out, str)
-    assert "análogo" in out.lower() or "Nenhum" in out
-
-
-def test_get_graph_neighbors_tool_handles_missing_node():
-    svc = ExploreAgent()
-    tools = build_explore_tools(svc, GraphService())
-    t = next(x for x in tools if x.name == "get_graph_neighbors")
-    out = t.invoke({"node_id": "no/que/nao/existe"})
-    assert isinstance(out, str)
-    assert "não tem" in out.lower() or "não existe" in out.lower()

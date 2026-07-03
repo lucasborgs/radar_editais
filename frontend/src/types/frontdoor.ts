@@ -6,7 +6,7 @@
 
 import type { CompanyProfile } from "./profile";
 import { EMPTY_PROFILE } from "./profile";
-import type { ConversationEntry, ProfileDiffItem, RadarResponse } from "@/lib/api";
+import type { ConversationEntry, MatchedEdital, MatchedEntity, ProfileDiffItem } from "@/lib/api";
 
 export type ChatRole = "user" | "assistant";
 
@@ -20,6 +20,8 @@ export interface MsgEntry {
   kind: "msg";
   role: ChatRole;
   content: string;
+  // PR6.2: resposta interrompida no teto de passos do agente (aviso discreto).
+  truncated?: boolean;
 }
 
 export interface DiffEntry {
@@ -36,20 +38,32 @@ export interface DiffEntry {
   entryId?: number;
 }
 
-export interface RadarEntry {
-  kind: "radar";
-  data: RadarResponse;
-  ts: number;
-  // Id da row em session_turns quando persistida (logado).
-  entryId?: number;
-}
-
 export interface GateEntry {
   kind: "gate";
   action: GateAction;
 }
 
-export type TranscriptEntry = MsgEntry | DiffEntry | RadarEntry | GateEntry;
+export interface ProfileIncompleteEntry {
+  kind: "profile_incomplete";
+  missingFields: string[];
+}
+
+// Cards de match (editais/entidades com afinidade ao perfil) inline no
+// transcript — entry_kind='radar' já reservado pela migration 020, nunca
+// tinha sido escrito. Persiste igual msg/diff (sessionStorage +, logado,
+// session_turns) — sobrevive a trocar de aba/fechar o browser.
+export interface RadarEntry {
+  kind: "radar";
+  matchedEditais: MatchedEdital[];
+  matchedEntities: MatchedEntity[];
+}
+
+export type TranscriptEntry =
+  | MsgEntry
+  | DiffEntry
+  | GateEntry
+  | ProfileIncompleteEntry
+  | RadarEntry;
 
 // ── Persistência (sessionStorage v2) ──────────────────────────────────────────
 export const HISTORY_KEY = "frontdoor_history";
@@ -94,19 +108,23 @@ export function migrateHistory(raw: unknown): TranscriptEntry[] {
           });
         }
         break;
-      case "radar":
-        if (e.data && typeof e.data === "object") {
-          out.push({
-            kind: "radar",
-            data: e.data as RadarResponse,
-            ts: typeof e.ts === "number" ? e.ts : Date.now(),
-            entryId: typeof e.entryId === "number" ? e.entryId : undefined,
-          });
-        }
-        break;
       case "gate":
         if (e.action === "anexo" || e.action === "brief" || e.action === "proposta") {
           out.push({ kind: "gate", action: e.action });
+        }
+        break;
+      case "profile_incomplete":
+        if (Array.isArray(e.missingFields)) {
+          out.push({ kind: "profile_incomplete", missingFields: e.missingFields as string[] });
+        }
+        break;
+      case "radar":
+        if (Array.isArray(e.matchedEditais) || Array.isArray(e.matchedEntities)) {
+          out.push({
+            kind: "radar",
+            matchedEditais: (e.matchedEditais as MatchedEdital[]) ?? [],
+            matchedEntities: (e.matchedEntities as MatchedEntity[]) ?? [],
+          });
         }
         break;
       default:
@@ -143,14 +161,20 @@ export function entriesFromServer(entries: ConversationEntry[]): TranscriptEntry
         }
         break;
       }
+      case "profile_incomplete": {
+        const p = (e.payload ?? {}) as Record<string, unknown>;
+        if (Array.isArray(p.missingFields)) {
+          out.push({ kind: "profile_incomplete", missingFields: p.missingFields as string[] });
+        }
+        break;
+      }
       case "radar": {
         const p = (e.payload ?? {}) as Record<string, unknown>;
-        if (p.data && typeof p.data === "object") {
+        if (Array.isArray(p.matched_editais) || Array.isArray(p.matched_entities)) {
           out.push({
             kind: "radar",
-            data: p.data as RadarResponse,
-            ts: typeof p.ts === "number" ? p.ts : Date.now(),
-            entryId: e.id,
+            matchedEditais: (p.matched_editais as MatchedEdital[]) ?? [],
+            matchedEntities: (p.matched_entities as MatchedEntity[]) ?? [],
           });
         }
         break;
@@ -197,6 +221,23 @@ export function profileCompleteness(profile: CompanyProfile): number {
 // Perfil "rodável" pelo radar: o backend exige nome + descricao_atividades (422).
 export function isRadarReady(profile: CompanyProfile): boolean {
   return !!profile.nome.trim() && !!profile.descricao_atividades.trim();
+}
+
+const WRITING_MIN_FIELDS: (keyof CompanyProfile)[] = [
+  "nome", "tipo_entidade", "trl", "tamanho_empresa", "uf", "descricao_atividades",
+];
+
+export function isCompleteForWriting(profile: CompanyProfile): { ok: boolean; missing: string[] } {
+  const missing: string[] = [];
+  for (const field of WRITING_MIN_FIELDS) {
+    const val = profile[field];
+    if (field === "trl") {
+      if (val === null || val === undefined) missing.push(field);
+    } else {
+      if (val === "" || val === null || val === undefined) missing.push(field);
+    }
+  }
+  return { ok: missing.length === 0, missing };
 }
 
 // Aplica os items de um diff (com `new` final) sobre um perfil, devolvendo um
@@ -278,14 +319,10 @@ export interface ProfileGap {
   why: string; // o que destrava
 }
 
-// Lacunas de maior alavanca, ordenadas por impacto, dado o perfil + o radar atual.
-// `capital_social` é CONDICIONAL: só com porte pequeno (MEI/ME) e algum evento no
-// radar — proxy do "edital exige contrapartida" (o flag por-edital não vem no
-// payload do radar; simplificação sancionada na spec). Retorna no máx. 3 itens.
-export function missingHighImpact(
-  profile: CompanyProfile,
-  radar: RadarResponse | null,
-): ProfileGap[] {
+// Lacunas de maior alavanca, ordenadas por impacto, dado o perfil. Profile-only
+// (pós-Sprint 3 o radar legacy saiu): `capital_social` é pedido para porte
+// pequeno (MEI/ME) — proxy do "edital pode exigir contrapartida". Máx. 3 itens.
+export function missingHighImpact(profile: CompanyProfile): ProfileGap[] {
   const gaps: ProfileGap[] = [];
 
   if (profile.tipos_financiamento_interesse.length === 0) {
@@ -303,8 +340,7 @@ export function missingHighImpact(
     });
   }
   const small = profile.tamanho_empresa === "MEI" || profile.tamanho_empresa === "ME";
-  const hasEvento = !!radar?.radar.some((i) => i.kind_class === "evento");
-  if (profile.capital_social === null && small && hasEvento) {
+  if (profile.capital_social === null && small) {
     gaps.push({
       field: "capital_social",
       prompt: "Qual o capital social da empresa (R$)?",

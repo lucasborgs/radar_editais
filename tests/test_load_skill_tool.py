@@ -94,17 +94,17 @@ class _FakePitchSession(_FakeSession):
     edital_id = "investidor:fundo-x"
 
 
-def _build_load_skill(monkeypatch, wiki, session=None):
-    monkeypatch.setattr("core.kg.kg_store.load_wiki_page", lambda eid: wiki)
+def _build_load_skill(monkeypatch, card_data, session=None):
+    mock_get = lambda eid: {"mechanism": card_data.get("mechanism", ""), "key_requirements": []} if card_data else None  # noqa: E731
+    monkeypatch.setattr("core.kg.hypergraph_catalog.get_edital", mock_get)
     tools = writing_tools.build_writing_tools(session or _FakeSession())
     return next(t for t in tools if t.name == "load_skill")
 
 
 def test_tool_keys_agency_from_edital_id_prefix_not_source_field(monkeypatch):
-    """edital_id=finep:734 → overlay FINEP casa, mesmo com source='etl_process'
-    na wiki (campo source é proveniência de ingestão, não a agência)."""
+    """edital_id=finep:734 → overlay FINEP casa, mesmo sem campo source."""
     tool = _build_load_skill(
-        monkeypatch, {"source": "etl_process", "mechanism": "subvencao"},
+        monkeypatch, {"mechanism": "subvencao"},
     )
     out = tool.invoke({})
     assert "PLAYBOOK DE ESCRITA (subvencao · finep)" in out
@@ -115,7 +115,7 @@ def test_tool_keys_agency_from_edital_id_prefix_not_source_field(monkeypatch):
 
 def test_tool_graceful_when_no_mechanism(monkeypatch):
     """Sem mechanism resolvível → mensagem amigável (fallback genérico vazio)."""
-    tool = _build_load_skill(monkeypatch, {"source": "etl_process"})
+    tool = _build_load_skill(monkeypatch, {"mechanism": ""})
     out = tool.invoke({})
     assert "Sem playbook de escrita" in out
 
@@ -129,8 +129,8 @@ def test_tool_pitch_session_uses_equity(monkeypatch):
 
 def test_tool_is_in_writer_toolset(monkeypatch):
     monkeypatch.setattr(
-        "core.kg.kg_store.load_wiki_page",
-        lambda eid: {"source": "etl_process", "mechanism": "subvencao"},
+        "core.kg.hypergraph_catalog.get_edital",
+        lambda eid: {"mechanism": "subvencao", "key_requirements": []},
     )
     names = {t.name for t in writing_tools.build_writing_tools(_FakeSession())}
     assert "load_skill" in names

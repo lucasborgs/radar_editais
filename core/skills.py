@@ -82,7 +82,11 @@ def _normalize_source(source: str | None) -> str:
 
 
 def _normalize_mechanism(mechanism: str | None) -> str | None:
-    """Resolve o mecanismo para um slug canônico, ou None se desconhecido/ausente."""
+    """Resolve o mecanismo para um slug canônico, ou None se desconhecido/ausente.
+
+    Se a string inteira não casar, tenta token por vírgula — cobre o caso de
+    edital_card() concatenar múltiplos nós Mecanismo num único campo.
+    """
     if not mechanism:
         return None
     key = _deburr(mechanism)
@@ -90,6 +94,12 @@ def _normalize_mechanism(mechanism: str | None) -> str | None:
         return key
     if key in _MECHANISM_SYNONYMS:
         return _MECHANISM_SYNONYMS[key]
+    for part in mechanism.split(","):
+        part_key = _deburr(part)
+        if part_key in _CANONICAL_MECHANISMS:
+            return part_key
+        if part_key in _MECHANISM_SYNONYMS:
+            return _MECHANISM_SYNONYMS[part_key]
     return None
 
 

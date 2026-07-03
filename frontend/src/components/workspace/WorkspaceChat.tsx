@@ -33,8 +33,9 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
   onAnswerPending: (answer: string) => void;
   onUndoSection: (title: string) => void;
   token: string | null;
+  fullWidth?: boolean; // quando true, ocupa toda a largura disponível (chat-first)
 }>(function WorkspaceChat(
-  { messages, input, onInput, onSend, working, pending, onAnswerPending, onUndoSection, token },
+  { messages, input, onInput, onSend, working, pending, onAnswerPending, onUndoSection, token, fullWidth },
   ref,
 ) {
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -54,7 +55,7 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
   }, [messages, working]);
 
   return (
-    <div className="w-[26rem] shrink-0 border-l border-border bg-app-bg flex flex-col min-w-0">
+    <div className={cn(fullWidth ? "w-full" : "w-[26rem] shrink-0", "border-l border-border bg-app-bg flex flex-col min-w-0")}>
       <div className="h-9 shrink-0 px-3 flex items-center border-b border-border bg-white">
         <span className="text-[10px] font-semibold text-content-secondary font-sans uppercase tracking-wide">
           Agente
@@ -67,6 +68,13 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
             <ChatBubble role={msg.role} timestamp={msg.timestamp}>
               <pre className="whitespace-pre-wrap font-sans text-inherit">{msg.content}</pre>
             </ChatBubble>
+
+            {/* aviso discreto de truncamento (PR6.2): resposta cortada no teto de passos */}
+            {msg.role === "assistant" && msg.truncated && (
+              <p className="px-1 text-[11px] italic text-content-secondary font-sans">
+                Resposta interrompida no limite de passos — continue a conversa para o agente retomar.
+              </p>
+            )}
 
             {/* avisos de compliance (âmbar) */}
             {msg.role === "assistant" && (msg.complianceFlags?.length ?? 0) > 0 && (

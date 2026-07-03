@@ -14,14 +14,14 @@ sys.path.insert(0, str(ROOT))
 
 import pytest  # noqa: E402
 
-from core.kg import wiki_schema  # noqa: E402
+from core.kg import schema  # noqa: E402
 from core.pme_filter import (  # noqa: E402
     is_target_relevant,
     relevance_with_reason,
 )
 
 # Garante leitura limpa do doc autoritativo a cada execução de teste
-wiki_schema.clear_cache()
+schema.clear_cache()
 
 
 # =============================================================================

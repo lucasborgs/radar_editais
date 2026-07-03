@@ -129,7 +129,8 @@ def test_tool_error_recovers(monkeypatch):
 
 def test_max_steps_stop_reason(monkeypatch):
     """Modelo insiste em tool além do teto → stop_reason=max_steps; tools da última
-    rodada SÃO executadas (trace llm,tool,llm,tool)."""
+    rodada SÃO executadas (trace llm,tool,llm,tool), e uma rodada final SEM tools
+    é forçada (`finalize`/`agent_final`) para o usuário nunca ficar sem resposta."""
     @tool
     def search(q: str) -> str:
         """Busca."""
@@ -140,10 +141,19 @@ def test_max_steps_stop_reason(monkeypatch):
          "usage": {"input_tokens": 10, "output_tokens": 2}},
         {"text": "t2", "tool_calls": [{"id": "b", "name": "search", "args": {"q": "2"}}],
          "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "melhor resposta possível", "tool_calls": [],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
     ]
-    graph, _ = _run_graph(monkeypatch, turns, [search], max_steps=2)
+    graph, scripted = _run_graph(monkeypatch, turns, [search], max_steps=2)
     assert graph.stop_reason == "max_steps"
-    assert [s.kind for s in graph.steps] == ["llm", "tool", "llm", "tool"]
+    assert [s.kind for s in graph.steps] == ["llm", "tool", "llm", "tool", "llm"]
+    # A resposta final é a da rodada forçada, nunca vazia.
+    assert graph.final_text == "melhor resposta possível"
+    third_call_msgs = scripted._received[2]
+    assert any(
+        isinstance(m, HumanMessage) and "Aviso interno" in str(m.content)
+        for m in third_call_msgs
+    ), "finalize não injetou o aviso de rodada final"
 
 
 # ---------------------------------------------------------------------------
@@ -159,6 +169,10 @@ def test_reflection_node_injects_prompt(monkeypatch):
     turns = [
         {"text": "buscando", "tool_calls": [{"id": "a", "name": "search", "args": {"q": "x"}}],
          "usage": {"input_tokens": 10, "output_tokens": 2}},
+        # Resposta À REFLEXÃO sem tool_calls — é uma nota interna, não pode virar
+        # a resposta final (por isso NÃO termina o turno; ver reflect_followup).
+        {"text": "Aprendi que X, ainda preciso de Y", "tool_calls": [],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
         {"text": "pronto", "tool_calls": [], "usage": {"input_tokens": 10, "output_tokens": 2}},
     ]
     graph, scripted = _run_graph(monkeypatch, turns, [search], reflect_every=1)
@@ -168,6 +182,13 @@ def test_reflection_node_injects_prompt(monkeypatch):
         isinstance(m, HumanMessage) and "Reflexão interna" in str(m.content)
         for m in second_call_msgs
     ), "nó reflect não injetou o prompt de reflexão"
+    # 3ª chamada deve conter o follow-up forçado (a reflexão sozinha não termina o turno).
+    third_call_msgs = scripted._received[2]
+    assert any(
+        isinstance(m, HumanMessage) and "Continuação interna" in str(m.content)
+        for m in third_call_msgs
+    ), "reflect_followup não forçou mais uma rodada após a reflexão sem tool_calls"
+    # A resposta final ao usuário é a da 3ª chamada, NUNCA o texto da reflexão.
     assert graph.final_text == "pronto"
 
 

@@ -64,8 +64,8 @@ _SKIP_KEYWORDS_FALLBACK = [
 
 def _skip_keywords() -> list[str]:
     """Skip-list autoritativa do doc (wikis/fapesc.md); fallback à constante."""
-    from core.kg import wiki_schema  # import tardio: evita ciclo no import do pipeline
-    return wiki_schema.skip_keywords("fapesc") or _SKIP_KEYWORDS_FALLBACK
+    from core.kg import schema  # import tardio: evita ciclo no import do pipeline
+    return schema.skip_keywords("fapesc") or _SKIP_KEYWORDS_FALLBACK
 
 
 class FAPESCScraper(BaseScraper):

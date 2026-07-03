@@ -200,7 +200,7 @@ def build_critic_tools(session, section_title: str):
         """
         mode = getattr(session, "mode", "proposal")
         if mode == "pitch":
-            ctx = getattr(session, "_pitch_target_context", "") or ""
+            ctx = getattr(session, "_source_card_context", "") or ""
             if not ctx.strip():
                 return "Nenhum dado do fundo-alvo disponível para verificação."
             return ctx

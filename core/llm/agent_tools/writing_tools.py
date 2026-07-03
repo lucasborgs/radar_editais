@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import unicodedata
 from typing import TYPE_CHECKING, Annotated
 
 from langchain_core.tools import BaseTool, tool
@@ -42,6 +44,56 @@ logger = logging.getLogger(__name__)
 # orienta o modelo a usar read_section para detalhe pontual.
 READ_FULL_PROPOSAL_CHAR_CAP = int(os.getenv("READ_FULL_PROPOSAL_CHAR_CAP", "8000"))
 SEARCH_EDITAL_CHAR_CAP = int(os.getenv("SEARCH_EDITAL_CHAR_CAP", "8000"))
+
+# Termos genéricos demais para ancorar o snippet (perguntas em PT-BR sobre o
+# edital tendem a repeti-los) — sem isso o "hit" mais cedo no texto costuma
+# ser um desses em vez do termo que importa.
+_SNIPPET_STOPWORDS = {
+    "que", "para", "sobre", "como", "quais", "qual", "uma", "umas", "uns",
+    "com", "sem", "por", "dos", "das", "dele", "dela", "esse", "essa", "este",
+    "esta", "isso", "aborda", "fala", "trata", "secao", "edital", "sao",
+}
+
+
+def _fold(text: str) -> str:
+    """Remove acentos e normaliza caixa preservando o índice 1:1 com o original
+    (NFKD decompõe cada char acentuado em base+combining mark; ao descartar só
+    as combining marks, o comprimento da string não muda)."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
+
+
+def _snippet_around_query(txt: str, query: str, *, window: int = 280, lead: int = 60) -> str:
+    """Recorta o preview do chunk centrado no primeiro termo da query encontrado.
+
+    search_edital só mostra um resumo por chunk (o texto denso vai para
+    read_exact_chunk) — um corte cru no prefixo esconde o trecho relevante
+    sempre que ele não abre o chunk, o que é comum em chunks longos que
+    cobrem vários itens numerados do edital. Sem termo encontrado, cai no
+    corte de prefixo de sempre.
+    """
+    if len(txt) <= window:
+        return txt
+
+    folded = _fold(txt)
+    terms = [
+        w for w in re.findall(r"\w+", _fold(query))
+        if len(w) >= 4 and w not in _SNIPPET_STOPWORDS
+    ]
+    hit = -1
+    for term in terms:
+        idx = folded.find(term)
+        if idx != -1 and (hit == -1 or idx < hit):
+            hit = idx
+
+    if hit == -1:
+        return txt[:window] + "…"
+
+    start = max(0, hit - lead)
+    end = min(len(txt), start + window)
+    prefix = "…" if start > 0 else ""
+    suffix = "…" if end < len(txt) else ""
+    return f"{prefix}{txt[start:end]}{suffix}"
 
 
 def build_writing_tools(session: WritingSession) -> list[BaseTool]:
@@ -69,11 +121,11 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
         except Exception:
             _skill_source = ""
         try:
-            from core.kg import kg_store
-            _wiki = kg_store.load_wiki_page(session.edital_id)
-            if _wiki:
-                _skill_mechanism = str(_wiki.get("mechanism", "") or "")
-        except Exception as e:  # nunca quebra a construção do toolset
+            from core.kg import hypergraph_catalog
+            card = hypergraph_catalog.get_edital(session.edital_id)
+            if card:
+                _skill_mechanism = str(card.get("mechanism", "") or "")
+        except Exception as e:
             logger.debug("load_skill: falha ao resolver mechanism de %s: %s",
                          getattr(session, "edital_id", "?"), e)
 
@@ -99,7 +151,7 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
         """
         # Pitch (entidade): o substrato é o nó do fundo, não chunks de edital.
         if getattr(session, "mode", "proposal") == "pitch":
-            return session._pitch_target_context or (
+            return session._source_card_context or (
                 "Nenhum dado do fundo-alvo disponível. Prossiga com o perfil da startup."
             )
 
@@ -135,7 +187,7 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                 is_analogue = primary is not None and chunk_edital and chunk_edital != primary
 
                 label = f"Análogo {chunk_edital} — {section}" if is_analogue else section
-                snippet = (txt[:250] + "…") if len(txt) > 250 else txt
+                snippet = _snippet_around_query(txt, query)
                 pointer_parts.append(
                     f"[{chunk_id}] {label} ({source}, score={score:.3f})\n"
                     f"  {snippet}"
@@ -145,7 +197,9 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                 f"Foram encontrados {len(chunks)} trecho(s) relevante(s). "
                 f"Para ler o texto COMPLETO de qualquer trecho, "
                 f"use a ferramenta read_exact_chunk passando o chunk_id exato.\n\n"
+                "<dados_externos>\n"
                 + "\n\n".join(pointer_parts)
+                + "\n</dados_externos>"
             )
             return _cap(
                 summary, SEARCH_EDITAL_CHAR_CAP, tool_name="search_edital",
@@ -180,7 +234,7 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                 "Faça uma nova busca com search_edital para obter referências "
                 "atualizadas."
             )
-        return content
+        return f"<dados_externos>\n{content}\n</dados_externos>"
 
     @tool
     def search_library(query: str, k: int = 3) -> str:
@@ -340,11 +394,16 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
 
         try:
             session.set_section_content(target_title, content)
-            suffix = "" if force else " (aprovado pelo critic)"
+        except Exception as e:
+            logger.warning("[%s] save_draft falhou: %s", session.session_id, e)
+            return f"Erro ao salvar rascunho: {e}"
 
-            # Scope classifier: só em modo conversacional, após critic aprovar,
-            # e NÃO durante ripple ativo (D9 depth limit = 1).
-            if not force and not getattr(session, '_ripple_active', False):
+        suffix = "" if force else " (aprovado pelo critic)"
+
+        # Scope classifier: best-effort (heurística de ripple), NÃO deve mascarar
+        # um save que já teve sucesso — se falhar (ex.: rede), loga e segue.
+        if not force and not getattr(session, '_ripple_active', False):
+            try:
                 from core.llm.agent_tools.scope_classifier import classify_correction_scope
                 scope = classify_correction_scope(old_content, content, target_title, session)
                 if scope and scope.get("type") == "conceptual":
@@ -352,14 +411,16 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                         "source_section": target_title,
                         "affected_sections": scope.get("changed_elements", []),
                     }
+            except Exception as e:
+                logger.warning(
+                    "[%s] scope classifier falhou (save já persistido): %s",
+                    session.session_id, e,
+                )
 
-            return (
-                f"Rascunho salvo em '{target_title}' ({len(content)} chars){suffix}. "
-                "Continue a conversa ou prossiga para a próxima seção."
-            )
-        except Exception as e:
-            logger.warning("[%s] save_draft falhou: %s", session.session_id, e)
-            return f"Erro ao salvar rascunho: {e}"
+        return (
+            f"Rascunho salvo em '{target_title}' ({len(content)} chars){suffix}. "
+            "Continue a conversa ou prossiga para a próxima seção."
+        )
 
     @tool
     def recall_company_learnings(topic: str = "") -> str:
@@ -440,8 +501,38 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
             label += f" · {playbook.source}"
         return f"PLAYBOOK DE ESCRITA ({label}):\n{content}"
 
+    from core.llm.agent_tools.match_tools import build_match_tools
     from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
     from core.llm.agent_tools.research_tools import build_research_tools
+
+    # ICT/investidor/programa por afinidade ao perfil (hardening 2026-07-02):
+    # mesmo motor de match do ExploreAgent (match_tools.py). Só
+    # find_matching_entities — find_matching_editais fica de fora porque
+    # descobrir OUTROS editais é fora de escopo de uma sessão já ancorada num
+    # edital (arrisca desviar o agente no meio do rascunho). company_nodes
+    # duráveis (se existirem) evitam re-extrair o perfil; getattr defensivo
+    # para sessões fake/sem auth (mesmo padrão de build_research_tools abaixo).
+    match_tools: list[BaseTool] = []
+    profile_text = getattr(session, "_profile_context", None)
+    if profile_text:
+        company_nodes = None
+        db = getattr(session, "_db", None)
+        workspace_id = getattr(session, "workspace_id", None)
+        if db is not None and workspace_id:
+            try:
+                from core.services.company_corpus import load_company_hypergraph
+                record = load_company_hypergraph(db, workspace_id)
+                if record:
+                    company_nodes = record.get("nodes") or None
+            except Exception:
+                logger.debug(
+                    "[%s] falha ao carregar hipergrado durável da empresa",
+                    getattr(session, "session_id", "?"), exc_info=True,
+                )
+        match_tools = [
+            t for t in build_match_tools(profile_text, company_nodes=company_nodes)
+            if t.name == "find_matching_entities"
+        ]
 
     return [
         search_edital,
@@ -453,6 +544,7 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
         save_draft,
         request_user_info,
         recall_company_learnings,
+        *match_tools,
         # Fase B (Item 2): com session, deep_research persiste cada finding em
         # research_findings (verified=false) para o gate humano de promoção.
         # getattr defensivo: sessões sem workspace_id/_db (fakes, contextos sem

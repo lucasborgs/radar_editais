@@ -11,16 +11,12 @@ from pydantic import BaseModel
 
 from core.services.content_library import get_item
 from core.services.explore_agent import ExploreAgent
-from core.services.graph_service import GraphService
-from core.services.hybrid_match_service import HybridMatchService
 from domain.user_profile import CompanyProfile as PyCompanyProfile
 
 # =============================================================================
 # SINGLETONS
 # =============================================================================
 
-wiki_matcher = HybridMatchService()
-graph_service = GraphService()
 explore_agent = ExploreAgent()
 
 

@@ -7,17 +7,17 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.common import (
     CompanyProfileSchema,
     load_library_items,
     profile_from_workspace,
     to_py_profile,
-    wiki_matcher,
 )
 from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient
+from core.kg import hypergraph_catalog
 from core.services.content_library import get_workspace_id
 from core.services.writing_session import (
     ProfileIncompleteError,
@@ -52,8 +52,10 @@ class WritingStartRequest(BaseModel):
 
 class WritingTurnRequest(BaseModel):
     session_id: str
-    user_message: str
-    section_hint: str | None = None
+    # Caps (PR1.2 hardening-pre-beta): o rate limit é por minuto; o cap limita
+    # o custo LLM de UM request.
+    user_message: str = Field(max_length=16_000)
+    section_hint: str | None = Field(default=None, max_length=200)
     profile: CompanyProfileSchema | None = None
     library_item_ids: list[str] = []
     model_tier: str | None = None  # Fase 4 #24: 'fast' | 'auto' | 'pro'
@@ -92,8 +94,13 @@ class WritingTurnResponse(BaseModel):
     # First-turn generation (Parte A)
     sections_done: list[str] = []
     failed_sections: list[str] = []
+    # Sinaliza que um draft completo foi gerado neste turno
+    draft_ready: bool = False
     # Ripple correction suggestion (Parte B)
     ripple_suggestion: dict | None = None
+    # PR6.2 (F10): turno cortado no teto de passos do agente (stop_reason ==
+    # "max_steps") — o front mostra aviso discreto ("continue a conversa").
+    truncated: bool = False
 
 
 class WritingGenerateRequest(BaseModel):
@@ -141,27 +148,37 @@ def writing_start(
     Retorna session_id, títulos das seções e contexto da sessão.
     """
     # Alvo de escrita: evento (edital/desafio/programa, no índice) OU entidade
-    # (investidor:<slug>, em investidores.json → pitch outbound). Valida na fonte
-    # certa por namespace do id; a WritingSession deriva o mode do mesmo id.
+    # (investidor:<slug>/programa:<slug>, em JSON curado → modo derivado do id).
+    # Fundos/programas não encontrados no JSON curado prosseguem sem dados do nó
+    # (WritingSession tolera contexto vazio — os builders retornam "" graciosamente).
     if req.edital_id.startswith("investidor:"):
         from core.kg import kg_store
         if req.edital_id not in {i["id"] for i in kg_store.load_investidores()}:
-            raise HTTPException(status_code=404, detail=f"Fundo '{req.edital_id}' não encontrado")
+            logger.warning("writing/start: fundo '%s' não encontrado em investidores.json — sessão prossegue sem dados do fundo", req.edital_id)
     elif req.edital_id.startswith("programa:"):
         from core.kg import kg_store
         if req.edital_id not in {p["id"] for p in kg_store.load_programas()}:
-            raise HTTPException(status_code=404, detail=f"Programa '{req.edital_id}' não encontrado")
-    elif wiki_matcher.get_edital_by_id(req.edital_id) is None:
-        raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
+            logger.warning("writing/start: programa '%s' não encontrado em programas.json — sessão prossegue sem dados do programa", req.edital_id)
     else:
-        # Prefetch lazy do chunking (ver docs/specs/lazy-chunking.md): só para
-        # editais de verdade (investidor:/programa: não têm chunks). Best-effort,
-        # nunca quebra a rota.
+        if hypergraph_catalog.get_edital(req.edital_id) is None:
+            raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
+        # Chunking inline (síncrono): verifica se já existem chunks no banco;
+        # se não, roda o pipeline completo (PDF → Documento Canônico → silver →
+        # chunk → contextual retrieval → embed → upsert). Leva ~1min na primeira
+        # vez; idempotente (re-chunking só força com force=True).
         try:
-            from core.tasks import app
-            app.configure_task("chunk_edital").defer(edital_id=req.edital_id)
+            from core.db import get_supabase_service
+            svc = get_supabase_service()
+            existing = svc.table("edital_chunks").select("id", count="exact").eq(
+                "edital_id", req.edital_id,
+            ).limit(1).execute()
+            if existing.count == 0:
+                import asyncio
+
+                from core.tasks import chunk_edital_task
+                asyncio.run(chunk_edital_task(req.edital_id))
         except Exception as e:
-            logger.warning("falha ao enfileirar chunk_edital para %s: %s", req.edital_id, e)
+            logger.warning("falha ao chunkear %s inline: %s", req.edital_id, e)
 
     workspace_id = get_workspace_id(db, user_id)
     profile = to_py_profile(req.profile)
@@ -242,7 +259,9 @@ async def writing_turn(
         asyncio.to_thread(session.turn, req.user_message, req.section_hint),
         asyncio.to_thread(check_compliance, req.user_message, session.edital_id),
     )
-    return {**turn_result, "compliance_flags": compliance_flags}
+    sections_done = turn_result.get("sections_done", [])
+    return {**turn_result, "compliance_flags": compliance_flags,
+            "draft_ready": bool(sections_done)}
 
 
 @router.post(
@@ -334,7 +353,7 @@ def _attach_target_titles(sessions: list[dict]) -> None:
 
     for eid in ids - investor_ids:
         try:
-            card = wiki_matcher.get_edital_by_id(eid)
+            card = hypergraph_catalog.get_edital(eid)
             if card and card.get("title"):
                 titles[eid] = card["title"]
         except Exception:
@@ -446,12 +465,11 @@ async def writing_checklist_auto_review(
     # Falha silenciosa: playbook ausente → compliance roda sem regras adicionais.
     playbook_monitor = ""
     try:
-        from core import kg_store
         from core.kg.edital_id import source_of
         from core.skills import load_playbook
         edital_id = doc["edital_id"]
-        wiki = kg_store.load_wiki_page(edital_id)
-        mechanism = str((wiki or {}).get("mechanism", "") or "")
+        card = hypergraph_catalog.get_edital(edital_id) or {}
+        mechanism = str(card.get("mechanism", "") or "")
         source = source_of(edital_id)
         playbook_monitor = load_playbook(mechanism, source).for_monitor()
     except Exception:
@@ -462,6 +480,8 @@ async def writing_checklist_auto_review(
         edital_requirements=build_checklist(doc["edital_id"]),
         outline=outline,
         playbook_context=playbook_monitor,
+        workspace_id=workspace_id,
+        session_id=session_id,
     )
     _attach_issue_sections(review, outline)
     return {"session_id": session_id, "review": review}

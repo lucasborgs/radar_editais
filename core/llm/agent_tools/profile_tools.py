@@ -85,7 +85,8 @@ def build_profile_tools(state: ExtractionState) -> list[BaseTool]:
         cached = state.fetched.get(url)
         if cached is not None:
             return (
-                f"[cache] {cached['title']}\n\n{cached['text']}"
+                f"[cache] {cached['title']}\n\n"
+                f"<dados_externos>\n{cached['text']}\n</dados_externos>"
                 if cached.get("text")
                 else f"[cache] Página '{url}' já buscada antes e não tinha texto útil."
             )
@@ -107,7 +108,7 @@ def build_profile_tools(state: ExtractionState) -> list[BaseTool]:
         state.fetched[url] = data
         if not data["text"]:
             return f"Página '{url}' carregou mas sem texto útil. Tente outro link."
-        return f"{data['title']}\n\n{data['text']}"
+        return f"{data['title']}\n\n<dados_externos>\n{data['text']}\n</dados_externos>"
 
     @tool
     def list_links_matching(url: str, pattern: str) -> str:

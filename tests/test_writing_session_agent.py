@@ -53,7 +53,7 @@ def _make_session() -> WritingSession:
     s._reflection_insights_context = ""
     s._temporal_block = ""
     s.mode = "proposal"
-    s._pitch_target_context = ""
+    s._source_card_context = ""
     s._programa_context = ""
     s._project_description = None
     s._ripple_suggestion = None
@@ -419,7 +419,7 @@ def _make_pitch_session() -> WritingSession:
     s = _make_session()
     s.edital_id = "investidor:kptl"
     s.mode = "pitch"
-    s._pitch_target_context = (
+    s._source_card_context = (
         "FUNDO-ALVO (use para ancorar o fit; não invente tese):\n"
         "FUNDO-ALVO: KPTL\nTese: deep-tech early-stage.\nEstágio alvo: seed"
     )

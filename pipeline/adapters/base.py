@@ -18,7 +18,7 @@ import re
 from abc import ABC, abstractmethod
 from typing import TypedDict
 
-from core.kg import wiki_schema
+from core.kg import schema
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ def get_adapter(source: str) -> SourceAdapter:
 
     Convenção: cada módulo de adapter expõe uma classe `Adapter`.
     """
-    registry = wiki_schema.load().get("source_adapters", {})
+    registry = schema.source_adapters()
     entry = registry.get(source)
     if not entry or not entry.get("module"):
         raise ValueError(f"Source adapter não registrado em WIKI.md §12.4: {source!r}")

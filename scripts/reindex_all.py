@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import sys
 from pathlib import Path
 
@@ -26,16 +25,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from config import KNOWLEDGE_GRAPH_DIR  # noqa: E402
 from core.db import get_supabase_service  # noqa: E402
+from core.kg import hypergraph_catalog  # noqa: E402
 from core.tasks import chunk_edital_task  # noqa: E402
-
-INDEX_FILE = KNOWLEDGE_GRAPH_DIR / "index.json"
 
 
 def _load_ids(source_filter: str | None) -> list[str]:
-    data = json.loads(INDEX_FILE.read_text(encoding="utf-8"))
-    ids = [e["id"] for e in data.get("editais", []) if e.get("id")]
+    data = hypergraph_catalog.list_editais(limit=500)
+    ids = [e["id"] for e in data if e.get("id")]
     if source_filter:
         ids = [eid for eid in ids if eid.startswith(f"{source_filter}:")]
     return sorted(ids)
@@ -91,7 +88,7 @@ async def _process_one(db, edital_id: str, queue: bool, force: bool) -> dict:
 async def _main_async(args: argparse.Namespace) -> int:
     targets = _load_ids(args.source)
     if not targets:
-        print(f"[reindex_all] Nenhum edital encontrado em {INDEX_FILE}")
+        print("[reindex_all] Nenhum edital encontrado no hipergrafo")
         return 1
 
     db = get_supabase_service()

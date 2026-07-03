@@ -6,7 +6,7 @@ estruturados (texto verbatim + section_path + kind). Artefato neutro e burro,
 consumido pela Knowledge gold (síntese wiki) e pela Retrieval gold
 (chunkeamento RAG), com caches independentes (§11.4).
 
-Schema, prompt e parâmetros vêm de WIKI.md §11 via core.kg.wiki_schema —
+Schema, prompt e parâmetros vêm de WIKI.md §11 via core.kg.schema —
 mudança de regra é no doc, não aqui.
 
 Agnóstico à fonte (§12): consome Documento Canônico (§12.3). Não abre
@@ -23,12 +23,12 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from config import SILVER_DIR
-from core.kg import wiki_schema
+from core.kg import schema
 from pipeline.adapters.base import CanonicalDoc
 
 logger = logging.getLogger(__name__)
 
-_KINDS = set(wiki_schema.structured_doc_schema().get("kinds", []))
+_KINDS = set(schema.structured_doc_schema().get("kinds", []))
 _JSON_FENCE_RE = re.compile(r"```(?:json)?|```")
 
 # Acima desta fração de páginas falhadas o silver é considerado DEGRADADO:
@@ -93,8 +93,8 @@ def structure_page(
     """Uma chamada LLM → blocos crus desta página (sem idx/doc/page ainda)."""
     if not page_text.strip():
         return []
-    params = wiki_schema.structurer_params()
-    prompt = wiki_schema.structurer_prompt().format(
+    params = schema.structurer_params()
+    prompt = schema.structurer_prompt().format(
         doc_name=doc_name,
         page_num=page_num,
         page_text=page_text,
@@ -183,7 +183,7 @@ def structure_document(documents: CanonicalDoc) -> tuple[list[dict], dict]:
     if not documents:
         return [], {"n_pages_total": 0, "n_pages_failed": 0}
 
-    max_workers = wiki_schema.structurer_params().get("max_concurrent_docs", 8)
+    max_workers = schema.structurer_params().get("max_concurrent_docs", 8)
     workers = max(1, min(max_workers, len(documents)))
     # OpenAI/Gemini clients são thread-safe; LLM calls são I/O-bound (GIL libera).
     with ThreadPoolExecutor(max_workers=workers) as ex:
@@ -227,7 +227,7 @@ def _source_hash(documents: CanonicalDoc) -> str:
 
 
 def _cache_meta() -> dict:
-    p = wiki_schema.structurer_params()
+    p = schema.structurer_params()
     return {
         "silver_version": p.get("silver_version", "1"),
         "prompt_version": p.get("prompt_version", "1"),

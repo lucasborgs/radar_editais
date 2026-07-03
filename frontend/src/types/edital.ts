@@ -21,6 +21,8 @@ export interface EditalEntry {
   pub_date: string;
   link: string;
   themes: string[];
+  technologies: string[];
+  programs: string[];
   publico_alvo: string[];
   fonte_recurso: string[];
   n_pdfs: number;
@@ -31,6 +33,7 @@ export interface EditalEntry {
 export interface EditalCard extends EditalEntry {
   objective: string | null;
   mechanism: "subvencao" | "reembolsavel" | "investimento" | "misto" | null;
+  technologies: string[];
   eligible_entities: string[];
   eligible_sectors: string[];
   value_range: ValueRange;
@@ -95,4 +98,7 @@ export interface DashboardStats {
   by_status: Record<string, number>;
   n_themes: number;
   n_fontes: number;
+  n_programas: number;
+  n_investidores: number;
+  total_oportunidades: number;
 }

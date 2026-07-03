@@ -14,7 +14,7 @@ from __future__ import annotations
 import datetime as _dt
 
 from core.kg import kg_store
-from core.kg import wiki_schema as ws
+from core.kg import schema as ws
 
 # Novos fundos da curadoria (ChatGPT, Prompt B1) que NÃO estão nos 11 existentes.
 # URLs já limpas do markdown. verificado_em deixado None de propósito (não-verificado).
@@ -102,8 +102,8 @@ def _validate(f: dict, themes: set[str], setores: set[str], estagios: set[str]) 
 
 def main() -> None:
     themes = set(ws.tema_vocab())
-    setores = set(ws.load().get("setor_vocab", []))
-    estagios = set(ws.load().get("estagio_vocab", []))
+    setores = set(ws.setor_vocab())
+    estagios = set(ws.estagio_vocab())
 
     inv = kg_store.load("investidores", default={})
     existing = inv.get("investidores", [])

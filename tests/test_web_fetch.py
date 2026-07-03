@@ -37,7 +37,7 @@ def _fake_response(text: str = _HTML):
 
 
 def test_fetch_url_respects_char_limit():
-    with patch("core.web.fetch.requests.get", return_value=_fake_response()) as get:
+    with patch("core.web.fetch.safe_get", return_value=_fake_response()) as get:
         out_small = web_fetch.fetch_url("http://example.com", char_limit=100)
     # Formato "title\n{text}". O texto (após o \n) é truncado em char_limit.
     title, _, body = out_small.partition("\n")
@@ -47,7 +47,7 @@ def test_fetch_url_respects_char_limit():
 
 
 def test_fetch_url_larger_limit_returns_more():
-    with patch("core.web.fetch.requests.get", return_value=_fake_response()):
+    with patch("core.web.fetch.safe_get", return_value=_fake_response()):
         small = web_fetch.fetch_url("http://example.com/a", char_limit=100)
         big = web_fetch.fetch_url("http://example.com/b", char_limit=500)
     assert len(big.partition("\n")[2]) == 500
@@ -55,18 +55,18 @@ def test_fetch_url_larger_limit_returns_more():
 
 
 def test_second_fetch_is_cache_hit_no_io():
-    with patch("core.web.fetch.requests.get", return_value=_fake_response()) as get:
+    with patch("core.web.fetch.safe_get", return_value=_fake_response()) as get:
         first = web_fetch.fetch_url("http://example.com/page", char_limit=3000)
         second = web_fetch.fetch_url("http://example.com/page", char_limit=3000)
     assert first == second
-    # I/O real (requests.get) ocorre exatamente uma vez: a 2a é servida do cache.
+    # I/O real (safe_get) ocorre exatamente uma vez: a 2a é servida do cache.
     assert get.call_count == 1
 
 
 def test_cache_disabled_when_ttl_zero(monkeypatch):
     monkeypatch.setenv("WEB_CACHE_TTL", "0")
     web_fetch.clear_cache()
-    with patch("core.web.fetch.requests.get", return_value=_fake_response()) as get:
+    with patch("core.web.fetch.safe_get", return_value=_fake_response()) as get:
         web_fetch.fetch_url("http://example.com/x", char_limit=100)
         web_fetch.fetch_url("http://example.com/x", char_limit=100)
     # TTL=0 desliga o cache → dois GETs reais.
@@ -78,7 +78,7 @@ def test_cache_expires_after_ttl(monkeypatch):
     web_fetch.clear_cache()
     times = [1000.0]
     with patch("core.web.fetch.time.monotonic", side_effect=lambda: times[0]), \
-         patch("core.web.fetch.requests.get", return_value=_fake_response()) as get:
+         patch("core.web.fetch.safe_get", return_value=_fake_response()) as get:
         web_fetch.fetch_url("http://example.com/y", char_limit=100)
         times[0] = 1000.0 + 901  # passou do TTL
         web_fetch.fetch_url("http://example.com/y", char_limit=100)
