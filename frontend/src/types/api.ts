@@ -54,6 +54,13 @@ export interface WritingTurnResponse {
   pending_user_input?: PendingUserInput | null;
   tool_trace?: ToolTraceEntry[];
   compliance_flags?: Array<Record<string, unknown>>;
+  // Geração em lote: seções concluídas / falhas
+  sections_done?: string[];
+  failed_sections?: string[];
+  // True quando um draft completo foi gerado neste turno
+  draft_ready?: boolean;
+  // PR6.2: turno cortado no teto de passos do agente — mostrar aviso discreto.
+  truncated?: boolean;
 }
 
 export interface SectionStartResponse {

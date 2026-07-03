@@ -21,16 +21,12 @@ Princípios:
 from __future__ import annotations
 
 import logging
-import os
 import re
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
 
 from langchain_core.tools import BaseTool, tool
 
-from core.kg import kg_store
-from core.llm.agent_runtime import _cap
-from core.retrieval.retriever import format_chunks_for_prompt, retrieve_chunks
+from core.kg import hypergraph_catalog, kg_store
 
 # Stopwords PT/EN + conectivos que não discriminam tema (não devem casar
 # sozinhos). Termos curtos como "ia"/"ai" caem pelo corte de tamanho (<4).
@@ -67,26 +63,274 @@ def _theme_match(needle: str, themes: list[str]) -> bool:
     ttoks = _theme_tokens(blob)
     return any(nt in tt or tt in nt for nt in ntoks for tt in ttoks)
 
-if TYPE_CHECKING:
-    from core.services.explore_agent import ExploreAgent
-    from core.services.graph_service import GraphService
+
+# =============================================================================
+# Entity resolution cross-source (resolução de entidade entre subgrafos)
+# =============================================================================
+# Cada subgrafo é um KA independente. Uma mesma entidade real (ex.: "UFSC")
+# pode aparecer em múltiplos subgrafos como nós separados. Esta camada
+# permite navegar entre subgrafos via nome + tipo como chave composta:
+#   resolve_entity(index, "UFSC", "ICT") → todos os nós ICT "UFSC" no grafo
+# Fiel ao Hyper-Extract: cada KA preserva sua identidade; a conexão é
+# resolvida em tempo de query por matching de (type, name).
+
+def build_entity_index(graphs: dict[str, dict]) -> dict[tuple[str, str], list[tuple[str, dict]]]:
+    """Índice global (type, name_lower) → [(file_key, node)] para resolução cross-source.
+
+    Varre todos os subgrafos e indexa cada nó por (type, name_lower). Permite
+    descobrir em quais subgrafos uma entidade aparece e navegar entre KAs."""
+    idx: dict[tuple[str, str], list[tuple[str, dict]]] = {}
+    for fk, g in graphs.items():
+        for n in g.get("nodes", []):
+            nm = (n.get("name") or "").strip().lower()
+            tp = (n.get("type") or "").strip().lower()
+            if nm and tp:
+                key = (tp, nm)
+                idx.setdefault(key, []).append((fk, n))
+    return idx
+
+
+def resolve_entity(
+    idx: dict[tuple[str, str], list[tuple[str, dict]]],
+    name: str, type_: str,
+) -> list[tuple[str, dict]]:
+    """Resolve (type, name) no índice global. Retorna [(file_key, node)] de todos
+    os subgrafos onde esta entidade aparece. Vazio se não encontrada."""
+    key = (type_.strip().lower(), name.strip().lower())
+    return idx.get(key, [])
+
+
+# =============================================================================
+# Leitura nativa do hipergrado (get_node_neighborhood) — funções puras
+# =============================================================================
+# Separadas da tool (que só carrega o grafo via kg_store e delega) para serem
+# testáveis com fixture em memória — os arquivos hypergraphs/ são gitignored e
+# não existem na CI.
+
+def _node_index(graph: dict) -> dict[str, dict]:
+    """name_lower → node de um subgrafo (último vence em colisão de nome)."""
+    return {
+        (n.get("name") or "").strip().lower(): n
+        for n in graph.get("nodes", [])
+        if n.get("name")
+    }
+
+
+def _member_label(idx: dict[str, dict], member: str) -> str:
+    """Rótulo de um membro de aresta: nome canônico + tipo, via índice do subgrafo.
+
+    As arestas referenciam membros lowercased; recupera o nome/tipo do nó
+    (fallback = o membro cru quando o nó não está no subgrafo)."""
+    n = idx.get((member or "").strip().lower())
+    if not n:
+        return member
+    name = n.get("name") or member
+    return f"{name} ({n['type']})" if n.get("type") else name
+
+
+def resolve_graph_nodes(
+    graphs: dict[str, dict], node_name: str, *, cap: int = 3,
+) -> list[tuple[str, dict]]:
+    """Resolve `node_name` para (file_key, node) varrendo os subgrafos.
+
+    Prioridade: nome exato → Edital por id/fonte → substring de nome. As arestas
+    do hipergrado referenciam nós por nome lowercased, então toda comparação é
+    case-insensitive. Cap evita inundar quando um tema aparece em muitos editais.
+    """
+    needle = (node_name or "").strip().lower()
+    if not needle:
+        return []
+    id_tokens = set(re.findall(r"[a-z]*\d[\w-]*", needle))
+    exact: list[tuple[str, dict]] = []
+    by_id: list[tuple[str, dict]] = []
+    partial: list[tuple[str, dict]] = []
+    for fk, g in graphs.items():
+        native = fk.split("__")[-1].lower()
+        src = fk.split("__")[0].lower()
+        for n in g.get("nodes", []):
+            nm = (n.get("name") or "").strip().lower()
+            if not nm:
+                continue
+            if nm == needle:
+                exact.append((fk, n))
+            elif needle in nm or (len(nm) >= 4 and nm in needle):
+                partial.append((fk, n))
+            if n.get("type") == "Edital":
+                eid = str(n.get("edital_id") or native).lower()
+                if eid in id_tokens or native in id_tokens or (src and src in needle and eid in needle):
+                    by_id.append((fk, n))
+    out: list[tuple[str, dict]] = []
+    seen: set[tuple[str, str]] = set()
+    for group in (exact, by_id, partial):
+        for fk, n in group:
+            key = (fk, n.get("name") or "")
+            if key not in seen:
+                seen.add(key)
+                out.append((fk, n))
+    return out[:cap]
+
+
+def _bfs_subgraph(
+    graph: dict, idx: dict[str, dict], seed_name: str, depth: int, max_edges: int,
+) -> tuple[list[dict], set[str]]:
+    """BFS de arestas em UM subgrafo a partir de `seed_name`.
+
+    Retorna (collected_edges, visited_node_names) — visited_node_names são
+    os nomes de TODOS os nós alcançados durante a BFS (incluindo o seed),
+    para continuar BFS em outros subgrafos (cross-source)."""
+    seed = seed_name.strip().lower()
+    frontier = {seed}
+    visited = set(frontier)
+    seen_edges: set[int] = set()
+    edges = graph.get("edges", [])
+    collected: list[dict] = []
+    for _ in range(depth):
+        nxt: set[str] = set()
+        for i, e in enumerate(edges):
+            if i in seen_edges:
+                continue
+            mem = [(m or "").strip().lower() for m in e.get("members", [])]
+            if frontier.intersection(mem):
+                seen_edges.add(i)
+                collected.append(e)
+                nxt.update(m for m in mem if m not in visited)
+        visited |= nxt
+        frontier = nxt
+        if not frontier:
+            break
+    return collected[:max_edges], visited
+
+
+def _format_edges(
+    collected: list[dict], idx: dict[str, dict],
+) -> list[str]:
+    """Formata arestas coletadas para display."""
+    lines: list[str] = []
+    if collected:
+        lines.append(f"  relações ({len(collected)}):")
+        for e in collected:
+            members = ", ".join(_member_label(idx, m) for m in e.get("members", []))
+            desc = (e.get("description") or "")[:120]
+            lines.append(
+                f"    • {e.get('type', '?')}: {members}" + (f" — {desc}" if desc else "")
+            )
+    else:
+        lines.append("  (sem relações nativas neste subgrafo)")
+    return lines
+
+
+def neighborhood(
+    graphs: dict[str, dict], node_name: str, depth: int = 1, *,
+    max_edges: int = 25, cross_source: bool = False,
+    entity_index: dict[tuple[str, str], list[tuple[str, dict]]] | None = None,
+) -> str:
+    """Vizinhança N-ária de um nó: props de display + arestas nativas (BFS até
+    `depth` saltos) + vizinhos rotulados por tipo. String para a tool.
+
+    Quando `cross_source=True`, a BFS atravessa subgrafos: após esgotar as arestas
+    no subgrafo atual, resolve a entidade em outros subgrafos (via `entity_index`)
+    e continua a BFS neles. O índice é construído automaticamente se não fornecido.
+    """
+    depth = max(1, min(int(depth), 2))
+    targets = resolve_graph_nodes(graphs, node_name)
+    if not targets:
+        return (
+            f"Nenhum nó '{node_name}' no hipergrado. Tente o nome do edital, o id "
+            "(ex.: '589') ou um tema/tecnologia."
+        )
+
+    if cross_source:
+        eidx = entity_index if entity_index is not None else build_entity_index(graphs)
+    else:
+        eidx = None
+
+    blocks: list[str] = []
+    visited_graph_nodes: set[tuple[str, str]] = set()
+
+    for fk, node in targets:
+        graph = graphs.get(fk, {})
+        idx = _node_index(graph)
+        src = fk.split("__")[0]
+        native = fk.split("__")[-1]
+        node_type = node.get("type", "?")
+
+        gk = (fk, (node.get("name") or "").strip().lower())
+        if gk in visited_graph_nodes:
+            continue
+        visited_graph_nodes.add(gk)
+
+        lines = [f"### {node.get('name', '')} [{node_type}] · fonte={src}"]
+        if node_type == "Edital":
+            disp = []
+            if node.get("prazo"):
+                disp.append(f"prazo {node['prazo']}")
+            if node.get("status"):
+                disp.append(f"status {node['status']}")
+            if node.get("valor"):
+                disp.append(f"valor {node['valor']}")
+            disp.append(f"id {node.get('edital_id') or native}")
+            lines.append("  " + " | ".join(disp))
+        if node.get("description"):
+            lines.append(f"  {node['description'][:200]}")
+
+        # BFS no subgrafo atual
+        collected, visited = _bfs_subgraph(
+            graph, idx, node.get("name", ""), depth, max_edges,
+        )
+        lines.extend(_format_edges(collected, idx))
+
+        # BFS cross-source: para cada nó alcançado na BFS, busca em outros
+        # subgrafos e continua a BFS neles. Usa `visited` (todos os nós
+        # visitados, não só a frontier) para maximizar conexões cross-source.
+        if cross_source and eidx is not None and visited:
+            cross_seen: set[tuple[str, str]] = set()
+            # Monta (type, name_lower) dos nós visitados no subgrafo atual
+            visited_types: dict[str, str] = {}
+            for vn in visited:
+                vn_node = idx.get(vn)
+                if vn_node:
+                    visited_types[vn] = vn_node.get("type", "")
+
+            for vn, vn_type in visited_types.items():
+                if not vn_type:
+                    continue
+                other_key = (vn_type.strip().lower(), vn)
+                for other_fk, other_node in eidx.get(other_key, []):
+                    if other_fk == fk:
+                        continue  # já processamos este subgrafo
+                    ogk = (other_fk, vn)
+                    if ogk in visited_graph_nodes or ogk in cross_seen:
+                        continue
+                    cross_seen.add(ogk)
+                    other_graph = graphs.get(other_fk, {})
+                    other_idx = _node_index(other_graph)
+                    other_src = other_fk.split("__")[0]
+                    olines = [
+                        f"  ↳ [{vn_type}] em {other_fk} (fonte={other_src}):",
+                    ]
+                    o_collected, _ = _bfs_subgraph(
+                        other_graph, other_idx, other_node.get("name", ""),
+                        depth, max_edges,
+                    )
+                    olines.extend(
+                        line.replace("  ", "    ") for line in _format_edges(o_collected, other_idx)
+                    )
+                    lines.extend(olines)
+
+        blocks.append("\n".join(lines))
+
+    return "\n\n".join(blocks)
+
 
 logger = logging.getLogger(__name__)
 
-# Caps de orçamento de contexto para search_edital_trechos. O explore soma N
-# editais × k trechos numa só chamada — cresce rápido. Defaults folgados;
-# calibrar com o log de disparo (mesma disciplina do writing/spec 02).
-EXPLORE_CHUNK_CHAR_CAP = int(os.getenv("EXPLORE_CHUNK_CHAR_CAP", "800"))   # por trecho
-EXPLORE_TRECHOS_CHAR_CAP = int(os.getenv("EXPLORE_TRECHOS_CHAR_CAP", "6000"))  # total da tool-result
-MAX_EDITAIS = 5  # teto de editais por chamada (orçamento de contexto)
 
+def build_explore_tools() -> list[BaseTool]:
+    """Constrói as tools de leitura do agente de explore.
 
-def build_explore_tools(explore_agent: ExploreAgent, graph_service: GraphService) -> list[BaseTool]:
-    """Constrói as 9 tools do agente de explore.
-
-    `explore_agent` fornece list_editais/get_edital/get_stats/matching.
-    `graph_service` fornece navegação do grafo (find_analogues, neighbors).
-    Ambos são stateless e reusáveis entre turns/usuários.
+    Tudo lê o HIPERGRADO (via core.kg.hypergraph_catalog / kg_store) — stateless,
+    reusável entre turns/usuários. A relação fina do grafo é o get_node_neighborhood
+    (substitui find_analogues/get_graph_neighbors do GraphService legacy).
     """
 
     @tool
@@ -113,8 +357,8 @@ def build_explore_tools(explore_agent: ExploreAgent, graph_service: GraphService
         limit = max(1, min(int(limit), 50))
         try:
             # Filtro de tema robusto (token bidirecional) no lado da tool — não
-            # delega o `tema` ao service (substring-direto, frágil p/ frase).
-            editais = explore_agent.list_editais(status=status or None, limit=200)
+            # delega o `tema` ao catálogo (substring-direto, frágil p/ frase).
+            editais = hypergraph_catalog.list_editais(status=status or None, limit=500)
             if tema:
                 editais = [e for e in editais if _theme_match(tema, e.get("themes", []))]
             editais = editais[:limit]
@@ -151,7 +395,7 @@ def build_explore_tools(explore_agent: ExploreAgent, graph_service: GraphService
             edital_id: identificador do edital (string numérica)
         """
         try:
-            card = explore_agent.get_edital_by_id(edital_id)
+            card = hypergraph_catalog.get_edital(edital_id)
         except Exception as e:
             return f"Erro ao buscar edital {edital_id}: {e}."
 
@@ -196,129 +440,13 @@ def build_explore_tools(explore_agent: ExploreAgent, graph_service: GraphService
         return "\n".join(parts)
 
     @tool
-    def find_analogues(edital_id: str) -> str:
-        """Encontra editais análogos a um de referência via grafo (mesmo tema,
-        público, subprograma ou fonte de recurso).
-
-        Use quando o usuário pergunta "editais parecidos com X" ou quer
-        explorar alternativas a um candidato específico. Retorna até 10
-        IDs+títulos. Use get_edital depois para aprofundar.
-
-        Args:
-            edital_id: identificador do edital de referência
-        """
-        try:
-            analogue_ids = graph_service.find_analogue_ids(edital_id)
-        except Exception as e:
-            return f"Erro ao buscar análogos de {edital_id}: {e}."
-
-        if not analogue_ids:
-            return (
-                f"Nenhum análogo encontrado para o edital {edital_id}. "
-                "Pode ser que o edital não esteja indexado no grafo, ou que "
-                "seja muito singular."
-            )
-
-        lines = [f"Análogos do edital {edital_id} (até 10):"]
-        for aid in analogue_ids[:10]:
-            card = explore_agent.get_edital_by_id(aid)
-            title = card.get("title", "(sem título)") if card else "(detalhes ausentes)"
-            status = card.get("status", "?") if card else "?"
-            lines.append(f"  ID:{aid} | {title[:65]} | {status}")
-        return "\n".join(lines)
-
-    @tool
-    def get_graph_neighbors(node_id: str) -> str:
-        """Lista vizinhos de um nó do grafo (tema, público, subprograma, fonte).
-
-        Use quando o usuário pergunta sobre uma categoria (ex.: "que editais
-        atendem a bioeconomia?", "quais editais subvencionam ICTs?"). Para
-        nós de tipo edital, prefira find_analogues. Para detalhar um edital
-        vizinho, use get_edital com o ID retornado.
-
-        Args:
-            node_id: identificador do nó no grafo (formato "radar-editais/<folder>/<slug>")
-        """
-        try:
-            edital_ids = graph_service.edital_ids_for_node(node_id)
-        except Exception as e:
-            return f"Erro ao buscar vizinhos de {node_id}: {e}."
-
-        if not edital_ids:
-            return (
-                f"Nó '{node_id}' não tem editais ligados (ou não existe no vault). "
-                "Verifique o formato (radar-editais/<folder>/<slug>) e tente de novo."
-            )
-
-        lines = [f"Editais ligados a '{node_id}' ({len(edital_ids)}):"]
-        for eid in edital_ids[:15]:
-            card = explore_agent.get_edital_by_id(eid)
-            title = card.get("title", "(sem título)") if card else "(detalhes ausentes)"
-            status = card.get("status", "?") if card else "?"
-            lines.append(f"  ID:{eid} | {title[:65]} | {status}")
-        if len(edital_ids) > 15:
-            lines.append(f"  ... e mais {len(edital_ids) - 15} editais")
-        return "\n".join(lines)
-
-    @tool
-    def find_ict_partners(edital_id: str) -> str:
-        """Sugere ICTs (instituições de C&T) parceiras para um edital, por
-        afinidade temática.
-
-        Use quando o usuário pergunta sobre parceiros/ICTs para um edital, ou
-        quando o edital exige parceria com ICT. As ICTs são candidatas por
-        sobreposição de tema — é uma SUGESTÃO para o usuário avaliar, não uma
-        parceria firmada. Devolve nome, tipo, temas em comum e contato.
-
-        Args:
-            edital_id: identificador do edital (ex.: "finep:782")
-        """
-        from core import ict_match
-
-        try:
-            entry = ict_match.edital_entry(edital_id)
-            partners = ict_match.find_partners(edital_id, k=5)
-        except Exception as e:
-            return f"Erro ao buscar parceiros ICT de {edital_id}: {e}."
-
-        if entry is None:
-            return (
-                f"Edital {edital_id} não encontrado no índice. "
-                "Use list_editais para descobrir IDs válidos."
-            )
-
-        requires = entry.get("requires_ict_partner", False)
-        header = (
-            f"Edital {edital_id} exige parceria com ICT."
-            if requires else
-            f"Edital {edital_id} NÃO aparenta exigir parceria com ICT "
-            "(sugestões abaixo são por afinidade temática, não exigência)."
-        )
-
-        if not partners:
-            return (
-                f"{header}\n"
-                "Nenhuma ICT com afinidade temática encontrada — o edital pode "
-                "não ter tema mapeado, ou não há ICT compatível no grafo."
-            )
-
-        lines = [header, f"ICTs candidatas (até {len(partners)}, por tema em comum):"]
-        for p in partners:
-            contact = p.contact.get("email") or p.contact.get("site") or "(sem contato)"
-            lines.append(
-                f"  {p.name} [{p.kind}] | temas: {', '.join(p.themes_match)} "
-                f"| {contact} | {p.url}"
-            )
-        return "\n".join(lines)
-
-    @tool
     def list_icts(tema: str = "", limit: int = 20) -> str:
         """Lista ICTs (institutos de C&T, ex.: unidades EMBRAPII) por tema/setor.
 
         Use quando o usuário pergunta QUEM pode executar/fazer parceria num
         tema, ou quer um panorama da capacidade instalada de pesquisa. ICTs não
-        lançam editais — viabilizam projetos (parceria). Para ICTs de um edital
-        específico, prefira find_ict_partners.
+        lançam editais — viabilizam projetos (parceria). Para ICTs ligadas a um
+        edital específico, use get_node_neighborhood no edital.
 
         Args:
             tema: palavra-chave ou tema (casa por token, tolerante a frase);
@@ -327,15 +455,15 @@ def build_explore_tools(explore_agent: ExploreAgent, graph_service: GraphService
         """
         limit = max(1, min(int(limit), 50))
         try:
-            icts = [i for i in kg_store.load_icts() if _theme_match(tema, i.get("themes", []))]
+            icts = hypergraph_catalog.list_entity_catalog("ict", tema=tema, limit=limit)
         except Exception as e:
             return f"Erro ao listar ICTs: {e}."
         if not icts:
             return f"Nenhuma ICT encontrada{f' para tema={tema!r}' if tema else ''}."
         lines = [f"Encontradas {len(icts)} ICTs (mostrando até {limit}):"]
         for i in icts[:limit]:
-            contact = (i.get("contact") or {}).get("email") or i.get("url", "")
             themes = ", ".join(i.get("themes", [])[:3])[:60]
+            contact = i.get("description", "")[:60]
             lines.append(f"  {i.get('name', i['id'])[:55]} | temas:{themes} | {contact}")
         return "\n".join(lines)
 
@@ -354,150 +482,110 @@ def build_explore_tools(explore_agent: ExploreAgent, graph_service: GraphService
         """
         limit = max(1, min(int(limit), 50))
         try:
-            invs = [
-                v for v in kg_store.load_investidores()
-                if _theme_match(tema, v.get("tese_themes", []) + v.get("setores", []))
-            ]
+            invs = hypergraph_catalog.list_entity_catalog("investidores", tema=tema, limit=limit)
         except Exception as e:
             return f"Erro ao listar investidores: {e}."
         if not invs:
             return f"Nenhum investidor encontrado{f' para tema={tema!r}' if tema else ''}."
         lines = [f"Encontrados {len(invs)} investidores (mostrando até {limit}):"]
         for v in invs[:limit]:
-            estagio = ", ".join(v.get("estagio_alvo", [])[:3])
             lines.append(
-                f"  {v.get('name', v['id'])[:45]} | tese:{(v.get('tese') or '')[:70]} "
-                f"| estágio:{estagio} | {v.get('site', '')}"
+                f"  {v.get('name', v['id'])[:45]} | temas:{', '.join(v.get('themes', [])[:3])[:60]}"
             )
         return "\n".join(lines)
 
     @tool
-    def oportunidades_por_tema(tema: str) -> str:
-        """Panorama CROSS-DIMENSIONAL de um tema/setor: junta editais/desafios
-        abertos, ICTs parceiras e investidores com tese no tema — as quatro
-        dimensões do grafo num só lugar.
+    def explore_opportunity(tema: str, top_k: int = 15) -> str:
+        """Panorama completo de oportunidades num tema: editais, ICTs,
+        investidores e programas — tudo que o ecossistema tem para o tema.
+        Inclui travessia cross-source entre subgrafos (edital → ICT → temas
+        → outros editais) e, se houver perfil da empresa, match por afinidade.
 
-        Use para perguntas amplas de descoberta, ex.: "quais oportunidades em
-        agronegócio?", "o que existe para deep tech em saúde?". Depois, aprofunde
-        com get_edital, list_icts ou list_investidores conforme o interesse.
+        Use como PRIMEIRA chamada para QUALQUER pergunta ampla de descoberta:
+        "quais oportunidades em agronegócio?", "o que existe para IA em saúde?",
+        "quero desenvolver um trocador de calor". Depois, aprofunde com
+        get_edital, get_node_neighborhood, list_icts ou list_investidores.
 
         Args:
-            tema: palavra-chave ou tema; casa por token e tolera frase natural
-                  (ex.: "agro", "saúde", "IA em saúde", "IA no agronegócio")
+            tema: palavra-chave ou tema (casa por token, tolera frase natural)
+            top_k: máximo de resultados por categoria (default 15)
         """
+        top_k = max(1, min(int(top_k), 30))
+        try:
+            from core.services.opportunity_service import OpportunityService
+            svc = OpportunityService()
+            result = svc.explore(tema, top_k=top_k)
+        except Exception as e:
+            return f"Erro ao explorar oportunidades: {e}."
+
         out: list[str] = [f"Panorama de oportunidades em '{tema}':"]
-        # Eventos (editais/desafios/programas) — filtro de tema robusto na tool.
-        try:
-            abertos = explore_agent.list_editais(status="ABERTA", limit=200)
-            editais = [e for e in abertos if _theme_match(tema, e.get("themes", []))]
-        except Exception:
-            editais = []
-        out.append(f"\n📋 Editais/desafios abertos ({len(editais)}):")
+
+        editais = result.get("editais", [])
+        out.append(f"\n📋 Editais/desafios ({len(editais)}):")
         for e in editais[:10]:
-            out.append(f"  ID:{e['id']} | {e['title'][:60]} | prazo:{e.get('deadline', '?')}")
+            title = e.get("title", e.get("name", ""))
+            out.append(f"  ID:{e.get('id', '?')} | {title[:60]} | prazo:{e.get('deadline', '?')}")
         if not editais:
-            out.append("  (nenhum aberto com esse tema)")
-        # Entidades
-        try:
-            icts = [i for i in kg_store.load_icts() if _theme_match(tema, i.get("themes", []))]
-        except Exception:
-            icts = []
+            out.append("  (nenhum edital com esse tema)")
+
+        icts = result.get("icts", [])
         out.append(f"\n🔬 ICTs parceiras ({len(icts)}):")
         for i in icts[:8]:
-            out.append(f"  {i.get('name', i['id'])[:55]}")
+            out.append(f"  {i.get('name', i.get('id', ''))[:55]}")
         if not icts:
-            out.append("  (nenhuma no tema)")
-        try:
-            invs = [
-                v for v in kg_store.load_investidores()
-                if _theme_match(tema, v.get("tese_themes", []) + v.get("setores", []))
-            ]
-        except Exception:
-            invs = []
-        out.append(f"\n💸 Investidores com tese no tema ({len(invs)}):")
-        for v in invs[:8]:
-            out.append(f"  {v.get('name', v['id'])[:45]} | estágio:{', '.join(v.get('estagio_alvo', [])[:2])}")
-        if not invs:
-            out.append("  (nenhum no tema)")
+            out.append("  (nenhuma ICT no tema)")
+
+        investidores = result.get("investidores", [])
+        out.append(f"\n💸 Investidores com tese no tema ({len(investidores)}):")
+        for v in investidores[:8]:
+            out.append(f"  {v.get('name', v.get('id', ''))[:45]}")
+        if not investidores:
+            out.append("  (nenhum investidor no tema)")
+
+        programas = result.get("programas", [])
+        out.append(f"\n📋 Programas ({len(programas)}):")
+        for p in programas[:5]:
+            out.append(f"  {p.get('name', p.get('id', ''))[:55]}")
+        if not programas:
+            out.append("  (nenhum programa no tema)")
+
         return "\n".join(out)
 
     @tool
-    def search_edital_trechos(
-        edital_ids: list[str],
-        query: str,
-        k_por_edital: int = 3,
-    ) -> str:
-        """Recupera TRECHOS LITERAIS dos editais para detalhe fino ou comparação fundamentada.
+    def get_node_neighborhood(node_name: str, depth: int = 1, cross_source: bool = False) -> str:
+        """Lê o hipergrado N-ário direto: a vizinhança de um nó (edital, tema,
+        tecnologia, aplicação, requisito, ICT, programa...).
 
-        Use SÓ quando a pergunta exige o texto real — ex.: "compare a contrapartida
-        exigida nestes editais", "o que o edital X exige de TRL no detalhe". Para
-        panorama/triagem, use list_editais / get_edital / oportunidades_por_tema:
-        o resumo basta e é mais barato.
+        Use para perguntas FACTUAIS sobre um edital (prazo, status, valor — vêm
+        como propriedades do nó Edital) E para perguntas SEMÂNTICAS (quais
+        tecnologias/temas/requisitos/parcerias um edital cobre — vêm das arestas
+        nativas, ex.: `abrange_tema`, `exige`, `parceria_com`). Resolve o nó pelo
+        nome ou pelo id do edital e devolve props + as relações N-árias em que ele
+        participa, com os vizinhos rotulados por tipo.
 
-        Localize PRIMEIRO os edital_ids (list_editais, oportunidades_por_tema,
-        get_graph_neighbors) e passe-os aqui.
+        Quando `cross_source=True`, a BFS atravessa subgrafos: após esgotar as
+        arestas no subgrafo do edital, busca a mesma entidade em outros subgrafos
+        (catálogos de ICT, programas, investidores) e continua a BFS neles. Útil
+        para perguntas como "quais ICTs são parceiras deste edital e que temas elas
+        dominam?" ou "que outros editais tocam os mesmos temas desta ICT?".
 
         Args:
-            edital_ids: IDs já localizados (máx 5). Ex.: ["<id_a>", "<id_b>"]
-            query: o aspecto a detalhar/comparar, PT-BR. Frases curtas funcionam melhor.
-            k_por_edital: trechos por edital (default 3, máx 5).
+            node_name: nome do nó ou id do edital (ex.: "FINEP 589", "589",
+                       "espectroscopia NIR", "bioeconomia").
+            depth: 1 = arestas diretas (default). 2 = inclui vizinhos-dos-vizinhos
+                   (mais contexto, mais ruído).
+            cross_source: se True, atravessa subgrafos via resolução de entidade
+                          (default False).
         """
-        ids = [e for e in (edital_ids or []) if e][:MAX_EDITAIS]
-        if not ids:
-            return (
-                "Nenhum edital_id válido. Localize IDs com list_editais / "
-                "oportunidades_por_tema antes."
-            )
-        k = max(1, min(int(k_por_edital), 5))
+        try:
+            graphs = kg_store.load_all_hypergraphs()
+        except Exception as e:
+            return f"Erro ao carregar o hipergrado: {e}."
+        eidx = build_entity_index(graphs) if cross_source else None
+        return neighborhood(graphs, node_name, depth=depth, cross_source=cross_source, entity_index=eidx)
 
-        blocos: list[str] = []
-        for eid in ids:
-            try:
-                # 1 edital por vez → cada um garante representação. Numa união
-                # ranqueada (edital_ids=[a,b,c] numa só chamada), um edital pode
-                # dominar o top-k e sufocar os outros — ruim p/ comparação.
-                # `db=None`: retrieve_chunks ignora o parâmetro e conecta sozinha.
-                chunks = retrieve_chunks(None, [eid], query=query, k=k)
-            except Exception as e:
-                logger.warning("search_edital_trechos: falha em %s: %s", eid, e)
-                blocos.append(f"### {eid}\n(erro ao recuperar: {e})")
-                continue
-            if not chunks:
-                # Lista vazia = nenhum chunk recuperado. Com lazy chunking, o
-                # caso comum é o edital ainda NÃO ter sido indexado (só é
-                # chunkado sob demanda, quando alguém o seleciona para escrever)
-                # — distinto de erro real, que cai no except acima. Degradamos
-                # graciosamente apontando o overview da wiki em vez de sumir
-                # silenciosamente.
-                blocos.append(
-                    f"### {eid}\n"
-                    f"O edital {eid} ainda não foi indexado para busca em "
-                    "trechos (isso acontece sob demanda quando alguém o "
-                    "seleciona para escrever). Use a wiki page (get_edital / "
-                    "list_icts conforme o caso) para o conteúdo de visão geral."
-                )
-                continue
-            # Cap por trecho: cada chunk é truncado antes da concatenação
-            # (k chunks inteiros somam rápido). Cap total na sequência.
-            for c in chunks:
-                txt = c.get("text", "")
-                if txt:
-                    c["text"] = _cap(
-                        txt, EXPLORE_CHUNK_CHAR_CAP,
-                        tool_name="search_edital_trechos[chunk]",
-                    )
-            blocos.append(
-                f"### {eid}\n" + format_chunks_for_prompt(chunks, edital_ids=[eid])
-            )
-
-        return _cap(
-            "\n\n".join(blocos), EXPLORE_TRECHOS_CHAR_CAP,
-            tool_name="search_edital_trechos",
-        )
-
-    return [list_editais, get_edital, find_analogues, get_graph_neighbors,
-            find_ict_partners, list_icts, list_investidores, oportunidades_por_tema,
-            search_edital_trechos]
+    return [explore_opportunity, list_editais, get_edital, get_node_neighborhood,
+            list_icts, list_investidores]
 
 
 # =============================================================================

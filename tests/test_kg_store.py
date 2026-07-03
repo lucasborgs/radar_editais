@@ -17,6 +17,7 @@ from core.kg import kg_store
 def _isolate_kg(monkeypatch, tmp_path):
     """KG num tmp dir, sem Postgres, caches limpos — testes não tocam dados reais."""
     monkeypatch.setattr(kg_store, "KNOWLEDGE_GRAPH_DIR", tmp_path)
+    monkeypatch.setattr(kg_store, "_HYPERGRAPHS_DIR", tmp_path / "hypergraphs")
     monkeypatch.setattr(kg_store, "_pg_configured", lambda: False)
     monkeypatch.setenv("KG_STORE_BACKEND", "file")
     kg_store._file_cache.clear()
@@ -64,6 +65,26 @@ def test_mtime_invalidation(monkeypatch):
     os.utime(path, (future, future))
 
     assert kg_store.load_index()["editais"][0]["id"] == "b"
+
+
+def test_load_all_hypergraphs_roundtrip():
+    graphs = {
+        "finep__1": {
+            "nodes": [{"type": "Edital", "id": "finep:1", "name": "Edital 1", "prazo": "31/12/2026"}],
+            "edges": [],
+        },
+        "fapesp__2": {
+            "nodes": [{"type": "Edital", "id": "fapesp:2", "name": "Edital 2"}],
+            "edges": [],
+        },
+    }
+    hg_dir = kg_store._HYPERGRAPHS_DIR
+    hg_dir.mkdir(parents=True, exist_ok=True)
+    for fk, g in graphs.items():
+        (hg_dir / f"{fk}.json").write_text(__import__("json").dumps(g), encoding="utf-8")
+
+    loaded = kg_store.load_all_hypergraphs()
+    assert loaded == graphs
 
 
 def tmp_index_path():

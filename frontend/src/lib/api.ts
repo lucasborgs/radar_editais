@@ -1,7 +1,7 @@
 import { API_BASE_URL } from "./constants";
 import { createSupabaseClient } from "./supabase";
-import type { EditalEntry, EditalCard, KGMatchResult, DashboardStats } from "@/types/edital";
-import type { InvestorMatch } from "@/types/investidor";
+import type { EditalEntry, EditalCard, DashboardStats } from "@/types/edital";
+import type { OpportunityEntry } from "@/types/oportunidade";
 import type { CompanyProfile } from "@/types/profile";
 import type {
   WritingStartResponse,
@@ -101,6 +101,9 @@ export const getMe = (token: string) =>
     profile: Partial<CompanyProfile>;
     preferences?: UserPreferences;
     contribute_to_global_weights?: boolean;
+    // Operador do sistema (ADMIN_EMAILS no backend) — controla ferramentas de
+    // gestão na UI (ex.: fila da Descoberta).
+    is_admin?: boolean;
   }>(
     "/me",
     undefined,
@@ -136,114 +139,28 @@ export const getEditalById = (id: string) =>
 export const getDashboardStats = () =>
   apiFetch<DashboardStats>("/stats");
 
-// ── Knowledge Graph (público — Dashboard) ──────────────────
-
-export type GraphNodeType =
-  | "edital"
-  | "tema"
-  | "publico"
-  | "subprograma"
-  | "home"
-  | "outro";
-
-export interface GraphNode {
-  id: string;
-  type: GraphNodeType;
-  label: string;
-  edital_id?: string;
-  status?: string;
+export interface OpportunitiesFilters {
+  tipo?: string;
+  limit?: number;
 }
 
-export interface GraphLink {
-  source: string;
-  target: string;
-}
-
-export interface GraphData {
-  nodes: GraphNode[];
-  links: GraphLink[];
-}
+export const getOpportunities = (filters?: OpportunitiesFilters) => {
+  const params = new URLSearchParams();
+  if (filters?.tipo) params.set("tipo", filters.tipo);
+  if (filters?.limit) params.set("limit", String(filters.limit));
+  const qs = params.toString();
+  return apiFetch<OpportunityEntry[]>(`/opportunities${qs ? `?${qs}` : ""}`);
+};
 
 export interface KGChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
-export const getGraph = () => apiFetch<GraphData>("/graph");
-
-export const kgExplore = (
-  message: string,
-  history: KGChatMessage[],
-  editalIds: string[] = [],
-  nodeId?: string,
-  nodeType?: string,
-) =>
-  apiFetch<{ answer: string }>("/kg-explore", {
-    method: "POST",
-    body: JSON.stringify({
-      message,
-      history,
-      edital_ids: editalIds,
-      node_id: nodeId,
-      node_type: nodeType,
-    }),
-  });
-
-// ── Matching ───────────────────────────────────────────────
-
-export const getMatches = (profile: CompanyProfile, topK: number = 10) =>
-  apiFetch<{ matches: KGMatchResult[] }>("/match", {
-    method: "POST",
-    body: JSON.stringify({ profile, top_k: topK }),
-  });
-
-// ── Radar unificado (L2) ───────────────────────────────────
-// Shape espelha core/services/radar_service.py::merge_radar: cada item carrega
-// os campos comuns + `payload` cru do matcher de origem (KGMatchResult p/ evento,
-// InvestorMatch p/ entidade). O front lê os campos comuns p/ o card e desce ao
-// payload só na expansão (justificativa, dimensões, etc.). Rota PÚBLICA (B2):
-// sem JWT usa pesos globais; com JWT usa pesos do workspace.
-
-export type RadarKindClass = "evento" | "entidade";
-export type RadarOpportunityType = "edital" | "desafio" | "programa" | "investidor";
-export type RadarTier = "forte" | "fraco";
-
-export interface RadarItem {
-  id: string;
-  kind_class: RadarKindClass;
-  opportunity_type: RadarOpportunityType;
-  verificacao: string;        // "verificado" | "provisorio"
-  title: string;
-  score: number;
-  why_now: string;            // sinal "por que agora" (countdown / tese)
-  tier: RadarTier;            // "fraco" = rebaixado (aproximado/abaixo do floor)
-  // Cluster de DISPLAY (spec D2): "capital de risco" (investidores + editais de
-  // investimento/FIP) vs "fomento" (resto). Só agrupamento — não toca ranking.
-  cluster?: string;
-  rank: number;
-  rrf: number;
-  // payload cru do matcher de origem — tipado por kind_class no consumo.
-  payload: KGMatchResult | InvestorMatch;
-}
-
-export interface RadarResponse {
-  radar: RadarItem[];
-  counts: Record<string, number>;
-}
-
-export const getRadar = (
-  profile: CompanyProfile,
-  topK: number = 10,
-  perTypeCap?: number | null,
-) =>
-  apiFetch<RadarResponse>("/match/radar", {
-    method: "POST",
-    body: JSON.stringify({ profile, top_k: topK, per_type_cap: perTypeCap ?? null }),
-  });
-
-// ── Front-door (turno conversacional, público) ─────────────
-// POST /frontdoor/turn (backend/routers/frontdoor.py): resposta sobre a base +
+// ── Explore (turno conversacional exploratório) ────────────
+// POST /explore (backend/routers/explore.py): resposta sobre a base +
 // proposta de diff de perfil. O front aplica o diff só após aceite (D4).
+// Autenticado: persiste a conversa (kind='frontdoor') e devolve session_id.
 
 export interface ProfileDiffItem {
   field: keyof CompanyProfile;
@@ -252,12 +169,44 @@ export interface ProfileDiffItem {
   new: unknown;
 }
 
-// Ids das entradas persistidas num turno logado (backend/routers/frontdoor.py:
-// persist_frontdoor_turn). `diff` é o que o front usa (PATCH no aceite/descarte).
+// Ids das entradas persistidas num turno logado via
+// persist_frontdoor_turn. `diff` é o que o front usa (PATCH no aceite/descarte).
 export interface FrontdoorEntryIds {
   user: number | null;
   assistant: number | null;
   diff?: number | null;
+}
+
+export interface MatchedEditalPath {
+  src: string;
+  dst: string;
+  dst_type: string;
+  score: number;
+}
+
+export interface MatchedEdital {
+  source: string;
+  edital_id: string;
+  name: string;
+  score: number;
+  affinity: number;
+  n_paths: number;
+  status: string | null;
+  prazo: string | null;
+  valor: string | null;
+  paths: MatchedEditalPath[];
+}
+
+export interface MatchedEntity {
+  file_key: string;
+  kind: "Investidor" | "Programa" | "ICT";
+  name: string;
+  description: string | null;
+  score: number;
+  affinity: number;
+  n_paths: number;
+  paths: MatchedEditalPath[];
+  entity_id?: string;
 }
 
 export const frontdoorTurn = (
@@ -266,15 +215,15 @@ export const frontdoorTurn = (
   profile: Partial<CompanyProfile> | null,
   sessionId?: string | null,
 ) =>
-  // O JWT vai automático pelo apiFetch quando há sessão Supabase — o endpoint
-  // tem auth opcional: anônimo segue público, logado persiste e devolve
-  // session_id/entry_ids (spec chat-first, fase 2).
   apiFetch<{
     answer: string;
+    truncated?: boolean; // PR6.2: resposta cortada no teto de passos do agente
     profile_diff: ProfileDiffItem[] | null;
+    matched_editais?: MatchedEdital[];
+    matched_entities?: MatchedEntity[];
     session_id?: string;
     entry_ids?: FrontdoorEntryIds;
-  }>("/frontdoor/turn", {
+  }>("/explore", {
     method: "POST",
     body: JSON.stringify({
       message,
@@ -282,48 +231,6 @@ export const frontdoorTurn = (
       profile,
       session_id: sessionId ?? null,
     }),
-  });
-
-// ── Opportunity Brief (GO/NO-GO, logado) ───────────────────
-// Shape espelha core/opportunity_brief_service.py::generate_brief.
-
-export type BriefRecommendation = "GO" | "GO_COM_RESSALVAS" | "NO_GO";
-
-export interface BriefDecisionRow {
-  dimension: string;
-  score: number;
-  max: number;
-}
-
-export interface OpportunityBrief {
-  application_id: string;
-  edital_id: string;
-  recommendation: BriefRecommendation;
-  total_score: number;        // 0-100
-  decision_matrix: BriefDecisionRow[];
-  narrative: { strengths: string[]; risks: string[]; next_steps: string[] };
-  error?: string;
-}
-
-export const getOpportunityBrief = (
-  editalId: string,
-  profile: CompanyProfile | null,
-  modelTier?: ModelTier,
-) =>
-  apiFetch<OpportunityBrief>("/opportunity/brief", {
-    method: "POST",
-    body: JSON.stringify({
-      edital_id: editalId,
-      profile: profile ?? null,
-      model_tier: modelTier ?? null,
-    }),
-  });
-
-// Investidores (Q3) — entidade, sem gate, dois modos (tese vs estágio).
-export const getInvestorMatches = (profile: CompanyProfile, topK: number = 6) =>
-  apiFetch<{ matches: InvestorMatch[] }>("/match/investidores", {
-    method: "POST",
-    body: JSON.stringify({ profile, top_k: topK }),
   });
 
 // ── Writing Session ────────────────────────────────────────
@@ -590,7 +497,7 @@ export interface ConversationSummary {
 export interface ConversationEntry {
   id: number; // session_turns.id
   turn_index: number;
-  entry_kind: "msg" | "diff" | "radar";
+  entry_kind: "msg" | "diff" | "radar" | "profile_incomplete";
   role: "user" | "assistant";
   content: string; // entry_kind=msg
   payload: Record<string, unknown> | null; // entry_kind=diff|radar
@@ -689,96 +596,6 @@ export const updateMyPreferences = (prefs: Partial<UserPreferences>, token: stri
     method: "PUT",
     body: JSON.stringify(prefs),
   }, token);
-
-// ── Matching weights & reflection suggestions (Gap 2) ─────
-
-export type WeightDimension =
-  | "elegibilidade"
-  | "tematico"
-  | "trl"
-  | "mecanismo"
-  | "contrapartida";
-
-export interface WorkspaceWeight {
-  dimension: WeightDimension;
-  weight: number;
-  source: "manual" | "reflection" | "global_aggregated";
-  scope: "workspace" | "global";
-  approved_from_insight_id?: string;
-  approved_at?: string;
-  updated_at?: string;
-}
-
-export type SuggestionStatus = "pending" | "approved" | "superseded";
-
-export interface PendingSuggestion {
-  dimension: WeightDimension;
-  delta: number;
-  rationale: string;
-  status: SuggestionStatus;
-}
-
-export interface PendingInsight {
-  insight_id: string;
-  insight: string;
-  confidence: "low" | "medium" | "high";
-  created_at: string;
-  suggestions: PendingSuggestion[];
-}
-
-export const getWorkspaceWeights = (token: string) =>
-  apiFetch<{ weights: WorkspaceWeight[] }>("/me/weights", undefined, token);
-
-export const getPendingWeightSuggestions = (token: string) =>
-  apiFetch<{ insights: PendingInsight[] }>("/me/weights/pending", undefined, token);
-
-export const approveWeightSuggestions = (
-  insightId: string,
-  suggestions: Array<{ dimension: WeightDimension; delta: number }>,
-  token: string,
-) =>
-  apiFetch<{ applied: Array<{ dimension: string; weight: number }> }>(
-    "/me/weights/approve",
-    {
-      method: "POST",
-      body: JSON.stringify({ insight_id: insightId, suggestions }),
-    },
-    token,
-  );
-
-export const revertWorkspaceWeight = (dimension: WeightDimension, token: string) =>
-  apiFetch<{ success: boolean; dimension: string }>(
-    `/me/weights/${dimension}`,
-    { method: "DELETE" },
-    token,
-  );
-
-// Item 1 (fechamento do loop): mudanças de peso AUTO-aplicadas pela reflexão.
-// Uma linha por delta aplicado (confidence != null) ou por revert (confidence
-// == null, rationale "revert de <id>"). reverted_at != null = já revertida.
-export interface WeightChange {
-  id: string;
-  dimension: WeightDimension;
-  old_weight: number;
-  new_weight: number;
-  delta: number;
-  confidence: "low" | "medium" | "high" | null;
-  outcomes_window: number | null;
-  rationale: string | null;
-  insight_id: string | null;
-  applied_at: string;
-  reverted_at: string | null;
-}
-
-export const getWeightChanges = (token: string) =>
-  apiFetch<{ changes: WeightChange[] }>("/me/weight-changes", undefined, token);
-
-export const revertWeightChange = (changeId: string, token: string) =>
-  apiFetch<{ reverted: boolean }>(
-    `/me/weight-changes/${changeId}/revert`,
-    { method: "POST" },
-    token,
-  );
 
 // ── Research findings (Item 2, Fase B do deep_research) ────
 // Staging area: findings do sub-agente de pesquisa chegam verified=false; o

@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 
 from core.profile_inference import (
+    CAPITAL_RISCO,
     PESQUISA_COLABORATIVA,
     SUBVENCAO,
     infer_financiamento,
@@ -33,9 +34,9 @@ _CASES = [
         [PESQUISA_COLABORATIVA],
     ),
     (
-        "startup TRL baixo (≤4) → ambos",
+        "startup TRL baixo (≤4) → subvenção + pesquisa + capital risco",
         {"tipo_entidade": "startup", "trl": 3},
-        [SUBVENCAO, PESQUISA_COLABORATIVA],
+        [SUBVENCAO, PESQUISA_COLABORATIVA, CAPITAL_RISCO],
     ),
     (
         "empresa sem nenhum sinal técnico → []",
@@ -58,9 +59,9 @@ _CASES = [
         [SUBVENCAO],
     ),
     (
-        "startup sem TRL mas entidade tech → subvenção",
+        "startup sem TRL mas entidade tech → subvenção + capital risco",
         {"tipo_entidade": "startup"},
-        [SUBVENCAO],
+        [SUBVENCAO, CAPITAL_RISCO],
     ),
 ]
 

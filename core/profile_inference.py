@@ -15,10 +15,11 @@ import unicodedata
 
 from domain.user_profile import CompanyProfile
 
-# ── Valores válidos de mecanismo (escopo PR #29 — só 2 opções) ────────────────
-# Espelham _MECHANISM_MAP em core/services/hybrid_match_service.py.
+# ── Valores válidos ──────────────────────────────────────────────────────────
+# Espelham as opções do perfil em frontend/src/components/frontdoor/profileFields.ts.
 SUBVENCAO = "subvencao_nao_reembolsavel"
 PESQUISA_COLABORATIVA = "pesquisa_colaborativa"
+CAPITAL_RISCO = "capital_risco"
 
 # Termos que sinalizam atividade de P&D/tecnologia no texto livre do perfil.
 # Normalizados (sem acento, minúsculos) para comparação. Lista curta e conservadora:
@@ -69,13 +70,30 @@ def _has_tech_signal(profile: CompanyProfile) -> bool:
     return any(kw in blob for kw in _TECH_KEYWORDS)
 
 
+def _has_investor_signal(profile: CompanyProfile) -> bool:
+    """Sinais de que a empresa busca/qualiﬁca para capital privado."""
+    if profile.estagio:
+        return True
+    if profile.mrr_arr is not None and profile.mrr_arr > 0:
+        return True
+    if profile.round_alvo_brl is not None and profile.round_alvo_brl > 0:
+        return True
+    blob = _normalize(
+        " ".join(
+            (profile.one_liner, profile.solution_summary, profile.descricao_atividades),
+        ),
+    )
+    keywords = ("captacao", "rodada", "equity", "venture", "série", "serie a", "investidor")
+    return any(kw in blob for kw in keywords)
+
+
 def infer_financiamento(profile: CompanyProfile) -> list[str]:
     """Infere `tipos_financiamento_interesse` candidatos a partir do perfil.
 
     PROPOSTA (humano confirma) — alimenta a dimensão *mecanismo* do match
-    (peso 15); por isso é eval-gated. Só há 2 opções, ambas "fomento competitivo
-    por mérito", então a heurística é permissiva mas conservadora: sem sinal
-    técnico, não chuta (`[]` → nota neutra no match).
+    (peso 15); por isso é eval-gated. 3 opções hoje: subvenção, pesquisa
+    colaborativa e capital de risco. Sem sinal técnico, não chuta (`[]` → nota
+    neutra no match).
     """
     if not _has_tech_signal(profile):
         return []
@@ -92,6 +110,10 @@ def infer_financiamento(profile: CompanyProfile) -> list[str]:
         profile.trl is not None and profile.trl <= 4
     ):
         out.append(PESQUISA_COLABORATIVA)
+
+    # Capital de risco: startup + sinais de captação ou fields Q3/Q4 preenchidos.
+    if entidade == "startup" or _has_investor_signal(profile):
+        out.append(CAPITAL_RISCO)
 
     # Dedup preservando ordem.
     deduped = list(dict.fromkeys(out))

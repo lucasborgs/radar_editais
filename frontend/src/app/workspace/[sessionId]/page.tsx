@@ -62,20 +62,17 @@ export default function WorkspacePage() {
 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [docLoading, setDocLoading] = useState(true);
-  const [mobileTab, setMobileTab] = useState<"doc" | "chat">("doc");
+  const [mobileTab, setMobileTab] = useState<"doc" | "chat">("chat");
   const [mobileDrawer, setMobileDrawer] = useState(false);
 
-  // N3 — auto-review: findings da sessão de UI (não persiste; re-revisar substitui).
+  // Chat-first UX: começa sem documento; após gerar draft, mostra o split view.
+  const [draftReady, setDraftReady] = useState(false);
+
   const [findings, setFindings] = useState<Finding[]>([]);
   const [reviewing, setReviewing] = useState(false);
-
-  // N4 — export modal.
   const [exportOpen, setExportOpen] = useState(false);
 
-  // Co-edição: seções tocadas pelo agente (highlight) + pilha de undo por seção.
   const [highlighted, setHighlighted] = useState<Set<string>>(new Set());
-  // Snapshot do conteúdo ANTERIOR por seção (último valor antes da edição do
-  // agente). Em memória — undo de 1 passo basta (spec §2/§7).
   const undoSnapshots = useRef<Record<string, string>>({});
 
   const chatRef = useRef<WorkspaceChatHandle>(null);
@@ -91,8 +88,6 @@ export default function WorkspacePage() {
   }, [authLoading, getToken]);
 
   // ── Carrega documento (fonte de verdade) + anexos ─────────────────────────
-  // Retorna {sections, editalId} — o estado é a fonte de verdade do documento
-  // que o workspace recarrega após cada turno (spec §9).
   const reloadDocument = useCallback(async (): Promise<{
     sections: WorkspaceSection[];
     editalId: string;
@@ -115,7 +110,6 @@ export default function WorkspacePage() {
       try {
         const { sections: next, editalId: id } = await reloadDocument();
         if (cancelled) return;
-        // Título do alvo: tenta o card do edital; fundos (investidor:) caem no id.
         if (!id.startsWith("investidor:")) {
           try {
             const card = await getEditalById(id);
@@ -126,17 +120,20 @@ export default function WorkspacePage() {
         } else if (!cancelled) {
           setTargetTitle(id);
         }
-        // Mensagem inicial do agente (welcome local — N1 não chama section-start).
-        if (!cancelled && next.length > 0) {
-          setMessages([
-            {
-              role: "assistant",
-              content:
-                "Pronto para trabalhar nesta proposta. Peça um rascunho de seção, " +
-                "tire dúvidas sobre o edital ou edite o documento direto à esquerda.",
-              timestamp: nowTime(),
-            },
-          ]);
+
+        // Se já houver conteúdo salvo, mostra o split view direto.
+        const hasContent = next.some((s) => s.content.trim());
+        if (!cancelled && hasContent) {
+          setDraftReady(true);
+        }
+
+        // Mensagem inicial.
+        if (!cancelled) {
+          const welcome = hasContent
+            ? "Pronto para revisar a proposta. Edite as seções à esquerda ou continue conversando no chat."
+            : "Bem-vindo(a) ao workspace. Converse sobre o edital, tire dúvidas " +
+              "ou peça um rascunho quando estiver pronto(a).";
+          setMessages([{ role: "assistant", content: welcome, timestamp: nowTime() }]);
         }
       } catch (e) {
         if (!cancelled) {
@@ -166,13 +163,10 @@ export default function WorkspacePage() {
   }, []);
 
   const handleSelectAttachment = useCallback((item: ContentItemSummary) => {
-    // O resolver de mentions do backend usa @<uuid>; inserimos o token
-    // resolvível. O autocomplete da MentionsTextarea mostra o nome.
     chatRef.current?.appendToComposer(`@${item.id}`);
     setMobileTab("chat");
   }, []);
 
-  // Esmaece o highlight quando o usuário interage com a seção.
   const handleSectionInteract = useCallback((title: string) => {
     setHighlighted((prev) => {
       if (!prev.has(title)) return prev;
@@ -182,12 +176,11 @@ export default function WorkspacePage() {
     });
   }, []);
 
-  // ── Edição manual inline (N2) ─────────────────────────────────────────────
+  // ── Edição manual inline ─────────────────────────────────────────────────
   const handleSaveSection = useCallback(
     async (title: string, content: string) => {
       if (!sessionId) return;
       setSavingSection(title);
-      // Otimista: reflete já no editor; backend é a fonte de verdade no próximo load.
       setSections((prev) => prev.map((s) => (s.title === title ? { ...s, content } : s)));
       try {
         await saveDocumentSection(sessionId, title, content);
@@ -195,7 +188,6 @@ export default function WorkspacePage() {
         toast.error(
           e instanceof Error ? `Erro ao salvar: ${e.message}` : "Erro ao salvar a seção.",
         );
-        // Reverte para o valor do backend.
         try {
           await reloadDocument();
         } catch {
@@ -208,14 +200,14 @@ export default function WorkspacePage() {
     [sessionId, reloadDocument],
   );
 
-  // ── Undo de edição do agente (N2) ─────────────────────────────────────────
+  // ── Undo de edição do agente ──────────────────────────────────────────────
   const handleUndoSection = useCallback(
     async (title: string) => {
       if (!sessionId) return;
       const prevContent = undoSnapshots.current[title] ?? "";
       setSavingSection(title);
       setSections((prev) => prev.map((s) => (s.title === title ? { ...s, content: prevContent } : s)));
-      handleSectionInteract(title); // remove highlight
+      handleSectionInteract(title);
       try {
         await saveDocumentSection(sessionId, title, prevContent);
         delete undoSnapshots.current[title];
@@ -234,13 +226,11 @@ export default function WorkspacePage() {
     [sessionId, handleSectionInteract, reloadDocument],
   );
 
-  // ── Turno (o coração — F2) ────────────────────────────────────────────────
+  // ── Turno ─────────────────────────────────────────────────────────────────
   const runTurn = useCallback(
     async (text: string, sectionHint?: string) => {
       const content = text.trim();
       if (!content || !sessionId || working) return;
-      // O turno usa o perfil do workspace no backend (fallback) — igual ao
-      // fluxo de escrita atual, que não reenvia o perfil a cada turno.
 
       setMessages((prev) => [...prev, { role: "user", content, timestamp: nowTime() }]);
       setInput("");
@@ -250,7 +240,6 @@ export default function WorkspacePage() {
       try {
         const res = await sendWritingTurn(sessionId, content, sectionHint);
 
-        // Seções persistidas neste turno (W-D1: saved_section no tool_trace).
         const editedSections = Array.from(
           new Set(
             (res.tool_trace ?? [])
@@ -259,7 +248,6 @@ export default function WorkspacePage() {
           ),
         );
 
-        // Snapshot do conteúdo ANTERIOR (antes de recarregar) p/ a pilha de undo.
         setSections((prevSections) => {
           for (const title of editedSections) {
             const before = prevSections.find((s) => s.title === title)?.content ?? "";
@@ -277,14 +265,26 @@ export default function WorkspacePage() {
             editedSections: editedSections.length > 0 ? editedSections : undefined,
             complianceFlags:
               (res.compliance_flags?.length ?? 0) > 0 ? res.compliance_flags : undefined,
+            truncated: res.truncated || undefined,
           },
         ]);
 
-        // Recarrega SEMPRE do backend (spec §9 — não confiar no estado local).
-        try {
-          await reloadDocument();
-        } catch {
-          /* mantém estado local; texto segue salvo no DB */
+        // Se um draft foi gerado, recarrega o documento e mostra o split view.
+        if (res.draft_ready || (res.sections_done?.length ?? 0) > 0) {
+          setDraftReady(true);
+          setMobileTab("doc");
+          try {
+            await reloadDocument();
+          } catch {
+            /* mantém estado local */
+          }
+        } else {
+          // Turno conversacional comum: só recarrega se houve edição.
+          try {
+            await reloadDocument();
+          } catch {
+            /* ignore */
+          }
         }
 
         if (editedSections.length > 0) {
@@ -310,13 +310,12 @@ export default function WorkspacePage() {
     scrollToSectionRef.current = fn;
   }, []);
 
-  // ── N3 — Revisar (auto-review ancorado) ───────────────────────────────────
+  // ── Revisar ───────────────────────────────────────────────────────────────
   const handleReview = useCallback(async () => {
     if (!sessionId || !token || reviewing) return;
     setReviewing(true);
     try {
       const { review } = await autoReviewChecklist(sessionId, token);
-      // Re-revisar substitui os findings anteriores (spec §F4).
       const flat = flattenReview(review);
       setFindings(flat);
       if (flat.length === 0) {
@@ -334,8 +333,6 @@ export default function WorkspacePage() {
     }
   }, [sessionId, token, reviewing]);
 
-  // "Corrigir com IA": monta um prompt pré-preenchido com o finding e dispara
-  // um turno com section_hint da seção (null = finding "Geral").
   const handleFixWithAI = useCallback(
     (sectionHint: string | null, finding: Finding) => {
       const where = sectionHint ? `na seção "${sectionHint}"` : "na proposta";
@@ -376,14 +373,11 @@ export default function WorkspacePage() {
   }
 
   const filled = filledCount(sections);
-
-  // Findings agrupados por seção; "Geral" vira bloco no topo do editor.
   const grouped = groupBySection(findings);
   const generalFindings = grouped.get("Geral") ?? [];
   const findingsBySection = new Map(
     Array.from(grouped.entries()).filter(([k]) => k !== "Geral"),
   );
-  // Contadores p/ o explorer (inclui "Geral" no total via Revisar badge).
   const findingCounts = new Map(
     Array.from(grouped.entries()).map(([k, v]) => [k, v.length]),
   );
@@ -394,125 +388,150 @@ export default function WorkspacePage() {
         title={targetTitle || editalId || "Carregando…"}
         mode={mode}
         filled={filled}
-        total={sections.length}
+        total={draftReady ? sections.length : 0}
       />
 
-      {/* Mobile: abas Documento | Chat + botão do drawer do explorer */}
-      <div className="md:hidden flex items-center border-b border-border bg-white">
-        <button
-          onClick={() => setMobileDrawer(true)}
-          title="Abrir explorer"
-          className="px-3 py-2 text-content-secondary hover:text-content-primary transition-colors"
-        >
-          ☰
-        </button>
-        {(["doc", "chat"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setMobileTab(tab)}
-            className={cn(
-              "flex-1 py-2 text-sm font-sans transition-colors",
-              mobileTab === tab
-                ? "text-primary font-semibold border-b-2 border-primary"
-                : "text-content-secondary",
-            )}
-          >
-            {tab === "doc" ? "Documento" : "Chat"}
-          </button>
-        ))}
-      </div>
+      {draftReady && (
+        <>
+          {/* Mobile: abas Documento | Chat + botão do drawer do explorer */}
+          <div className="md:hidden flex items-center border-b border-border bg-white">
+            <button
+              onClick={() => setMobileDrawer(true)}
+              title="Abrir explorer"
+              className="px-3 py-2 text-content-secondary hover:text-content-primary transition-colors"
+            >
+              ☰
+            </button>
+            {(["doc", "chat"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setMobileTab(tab)}
+                className={cn(
+                  "flex-1 py-2 text-sm font-sans transition-colors",
+                  mobileTab === tab
+                    ? "text-primary font-semibold border-b-2 border-primary"
+                    : "text-content-secondary",
+                )}
+              >
+                {tab === "doc" ? "Documento" : "Chat"}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="flex-1 flex min-h-0">
-        {/* Explorer — sidebar no desktop */}
-        <div className="hidden md:flex">
-          <Explorer
-            sections={sections}
-            attachments={attachments}
-            findingCounts={findingCounts}
-            reviewing={reviewing}
-            onSelectSection={handleSelectSection}
-            onSelectAttachment={handleSelectAttachment}
-            onReview={() => void handleReview()}
-            onExport={() => setExportOpen(true)}
-          />
-        </div>
-
-        {/* Explorer — drawer overlay no mobile */}
-        {mobileDrawer && (
-          <div className="md:hidden fixed inset-0 z-40 flex">
-            <button
-              aria-label="Fechar explorer"
-              onClick={() => setMobileDrawer(false)}
-              className="absolute inset-0 bg-black/40"
-            />
-            <div className="relative z-10 h-full shadow-xl animate-in slide-in-from-left">
+        {draftReady ? (
+          <>
+            {/* Explorer — sidebar no desktop */}
+            <div className="hidden md:flex">
               <Explorer
                 sections={sections}
                 attachments={attachments}
                 findingCounts={findingCounts}
                 reviewing={reviewing}
-                onSelectSection={(t) => {
-                  handleSelectSection(t);
-                  setMobileDrawer(false);
-                }}
-                onSelectAttachment={(item) => {
-                  handleSelectAttachment(item);
-                  setMobileDrawer(false);
-                }}
-                onReview={() => {
-                  void handleReview();
-                  setMobileDrawer(false);
-                }}
-                onExport={() => {
-                  setExportOpen(true);
-                  setMobileDrawer(false);
-                }}
+                onSelectSection={handleSelectSection}
+                onSelectAttachment={handleSelectAttachment}
+                onReview={() => void handleReview()}
+                onExport={() => setExportOpen(true)}
               />
             </div>
+
+            {/* Explorer — drawer overlay no mobile */}
+            {mobileDrawer && (
+              <div className="md:hidden fixed inset-0 z-40 flex">
+                <button
+                  aria-label="Fechar explorer"
+                  onClick={() => setMobileDrawer(false)}
+                  className="absolute inset-0 bg-black/40"
+                />
+                <div className="relative z-10 h-full shadow-xl animate-in slide-in-from-left">
+                  <Explorer
+                    sections={sections}
+                    attachments={attachments}
+                    findingCounts={findingCounts}
+                    reviewing={reviewing}
+                    onSelectSection={(t) => {
+                      handleSelectSection(t);
+                      setMobileDrawer(false);
+                    }}
+                    onSelectAttachment={(item) => {
+                      handleSelectAttachment(item);
+                      setMobileDrawer(false);
+                    }}
+                    onReview={() => {
+                      void handleReview();
+                      setMobileDrawer(false);
+                    }}
+                    onExport={() => {
+                      setExportOpen(true);
+                      setMobileDrawer(false);
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Editor */}
+            <div
+              className={cn(
+                "flex-1 min-w-0 flex flex-col",
+                mobileTab === "chat" ? "hidden md:flex" : "flex",
+              )}
+            >
+              {docLoading ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (
+                <DocumentEditor
+                  sections={sections}
+                  highlightedSections={highlighted}
+                  savingSection={savingSection}
+                  findingsBySection={findingsBySection}
+                  generalFindings={generalFindings}
+                  onSaveSection={handleSaveSection}
+                  onSectionInteract={handleSectionInteract}
+                  onFixWithAI={handleFixWithAI}
+                  registerScrollTo={registerScrollTo}
+                />
+              )}
+            </div>
+
+            {/* Chat */}
+            <div className={cn(mobileTab === "doc" ? "hidden md:flex" : "flex w-full md:w-auto")}>
+              <WorkspaceChat
+                ref={chatRef}
+                messages={messages}
+                input={input}
+                onInput={setInput}
+                onSend={() => void runTurn(input)}
+                working={working}
+                pending={pending}
+                onAnswerPending={(answer) => void runTurn(answer)}
+                onUndoSection={(title) => void handleUndoSection(title)}
+                token={token}
+              />
+            </div>
+          </>
+        ) : (
+          /* Chat-first: workspace é só o chat até gerar o draft */
+          <div className="flex-1 flex min-h-0">
+            <WorkspaceChat
+              ref={chatRef}
+              messages={messages}
+              input={input}
+              onInput={setInput}
+              onSend={() => void runTurn(input)}
+              working={working}
+              pending={pending}
+              onAnswerPending={(answer) => void runTurn(answer)}
+              onUndoSection={() => {}}
+              token={token}
+              fullWidth
+            />
           </div>
         )}
-
-        {/* Editor */}
-        <div
-          className={cn(
-            "flex-1 min-w-0 flex flex-col",
-            mobileTab === "chat" ? "hidden md:flex" : "flex",
-          )}
-        >
-          {docLoading ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : (
-            <DocumentEditor
-              sections={sections}
-              highlightedSections={highlighted}
-              savingSection={savingSection}
-              findingsBySection={findingsBySection}
-              generalFindings={generalFindings}
-              onSaveSection={handleSaveSection}
-              onSectionInteract={handleSectionInteract}
-              onFixWithAI={handleFixWithAI}
-              registerScrollTo={registerScrollTo}
-            />
-          )}
-        </div>
-
-        {/* Chat */}
-        <div className={cn(mobileTab === "doc" ? "hidden md:flex" : "flex w-full md:w-auto")}>
-          <WorkspaceChat
-            ref={chatRef}
-            messages={messages}
-            input={input}
-            onInput={setInput}
-            onSend={() => void runTurn(input)}
-            working={working}
-            pending={pending}
-            onAnswerPending={(answer) => void runTurn(answer)}
-            onUndoSection={(title) => void handleUndoSection(title)}
-            token={token}
-          />
-        </div>
       </div>
 
       {exportOpen && (

@@ -11,6 +11,93 @@
 
 ## Aberto
 
+### 🔴 P0 DEPLOY — `supabase db push` (migration 034 fecha leak da fila procrastinate)
+
+- **O quê:** a [migration 034](../supabase/migrations/034_procrastinate_lockdown.sql)
+  (RLS + REVOKE nas tabelas/funções `procrastinate*`) foi aplicada e verificada só no
+  Supabase **local**. O leak-test apontado ao **remoto** ainda REPROVA
+  (`tests/test_tenant_isolation.py::...::test_procrastinate_surface_negada`) — ou seja,
+  **em produção a anon key ainda lê `procrastinate_jobs.args` (workspace_id/payloads
+  cross-tenant) e deleta/enfileira jobs**. Junto sobem 032/033 (pendentes no ledger remoto).
+- **Por que importa:** é o furo P0 da Frente 1 do leak-test pré-beta — vazamento
+  cross-tenant + controle de fila por chamador anônimo. Bloqueia o beta externo.
+- **Onde está specado:** `docs/security/tenant-isolation.md` (seção "FURO P0"),
+  `docs/specs/pre-beta-verification.md` (Frente 1).
+- **Ponto de entrada:** `supabase db push` (ou runbook Railway/deploy.sh). Depois,
+  rodar o leak-test contra staging com `TENANT_ISOLATION_ALLOW_REMOTE=1` p/ confirmar verde.
+- **Status:** aberto (2026-07-02) — fix pronto e testado local; falta só o push ao remoto.
+
+### Regra de operação — branch retomada com gate de eval pendente roda o gate ANTES de código novo
+
+- **O quê:** disciplina de processo (Frente 3 do `pre-beta-verification.md`), não
+  workstream. Ao retomar uma branch que tem gate de eval pendente, **rodar o gate antes
+  de escrever código novo nela** — evita empilhar trabalho sobre uma base cuja qualidade
+  nunca foi medida.
+- **Pendências conhecidas (2026-07-02):**
+  - `feat/elig-constraints-producer` (PR2+PR3 WIP de [[project_eligibility_constraints]]):
+    **3 gates NÃO rodados** (matching/produtor/golden). Localmente só existe
+    `feat/elig-constraints-schema` (PR1 mergeado) — a branch do produtor está no remoto/stash.
+  - agentic-evolution F2/F3A (PRs #36/#37, [[project_agentic_evolution_phases]]): gates de
+    env não rodados.
+  - Eval de escrita como gate da **remoção do legacy de match** (spec robustez).
+- **Status:** regra ativa (2026-07-02). Sem entregável próprio — dissolve no fluxo.
+
+### Hardening pré-beta — spec COMPLETA (6/6 PRs na branch); falta push/merge
+
+- **O quê:** a spec `docs/specs/hardening-pre-beta.md` tem 6 PRs. Estado em 2026-07-02
+  (todos consolidados na branch `feat/hardening-pre-beta`, HEAD 4953ed5ca):
+  - **PR1** (segurança P0 — SSRF/caps/DEMO_MODE/rate-limit/delimitadores): ✅ integrado.
+  - **PR2** (prompt caching — temporal no tail + `cache_control` dormente em OpenAI):
+    ✅ integrado (merge de `feat/prompt-caching`; conflito semântico com o fix de
+    outline reconciliado em `test_prompt_caching.py`).
+  - **PR4** (retry nas tasks + fix ledger discovery + alerta e-mail): ✅ integrado
+    (merge de `feat/resilience-email`).
+  - **PR3** (geração batch paralela — `asyncio.gather`+Semaphore, F4): ✅ commit
+    665dc33ea. `GENERATION_CONCURRENCY` (default 4); contrato `GenerationOutcome`
+    idêntico; timeout de 300s agora preserva seções já concluídas.
+  - **PR5** (observabilidade de custo — `llm_span` nas chamadas 1-shot, F11): ✅ commit
+    0cee1dd50. 6 call sites instrumentados com workspace/session como metadata.
+  - **PR6** (purge de checkpoints F9 + `truncated` F10 + cache no match F12): ✅ commit
+    4953ed5ca. Task `purge_agent_checkpoints` (dom 06:00 UTC, `CHECKPOINT_RETENTION_DAYS`
+    default 30); `truncated` em /writing/turn e /explore com aviso na UI; memo
+    `_ecosystem_snapshot` + cache in-process dos embeddings da empresa.
+- **Gates rodados (2026-07-02):** eval `writing` sem crash, `mean_saved=1.0`
+  (`pct_grounded` 0.38 — dentro da banda de ruído 0.06–0.43 das runs do dia, ver
+  Frente 2 de `pre-beta-verification.md`); eval `matching` 0.881/3.625 idêntico ao
+  baseline; ruff + 629 pytest + `tsc --noEmit` verdes.
+- **Falta:** push + merge da branch na main (decisão do Lucas — testa local primeiro).
+- **Débito lateral:** edição não-commitada na worktree `feat/resilience-email`
+  (`core/tasks.py` remove `build_knowledge_graph` legado do cron de ETL — alinha com o
+  CLAUDE.md mas o código ainda o chama). Patch salvo no scratchpad da sessão; decidir
+  integrar ou descartar.
+- **Status:** implementação FECHADA (2026-07-02) — aberto só o push/merge.
+
+### Match por hipergrado — 2ª camada (elegibilidade dura) via hiperarestas nativas
+
+- **O quê:** o match cross-domínio (`core/services/hypergraph_match.py`) responde só
+  *"é relevante pro meu tema?"* — **afinidade**, por cosseno sobre os NÓS (Tema/Tec/
+  Aplicação). Falta a 2ª pergunta: *"eu posso? / isso me desqualifica?"* — **elegibilidade
+  dura**. Esse sinal não está nos nós: mora nas **hiperarestas nativas** do KG
+  (`Edital —exige→ TRL/porte/região`, `Edital —exclui→ setor`), que o match **ignora**
+  hoje ([[project_hyperedges_underused]]).
+- **Por que importa:** sem isso, (a) um match temático forte mas **inelegível** (TRL/
+  porte/região fora) sobe igual; (b) **exclusões** não reprovam — empresa de tabaco casa
+  «tabaco»↔«tabaco» com cosseno alto e o match a *aprova*, quando a aresta `exclui` deveria
+  reprovar. Nó-cosseno não tem sinal negativo nem condição numérica.
+- **Decisão de design já tomada:** o golden de matching cravou *"critério = afinidade;
+  elegibilidade é camada SEPARADA"* (eval_data/golden/matching.json) — **essa camada
+  separada são literalmente as arestas**. Logo NÃO é otimização do ranking de afinidade
+  (esse está coberto sem elas); é **capacidade nova** (filtro duro + exclusões + explicação
+  encadeada do `get_node_neighborhood`).
+- **Por que adiado:** é o "obj 1" da discussão PÓS-sprints da spec
+  (`docs/specs/hypergraph-architecture.md`). Sprints 1–3 entregam o eixo afinidade primeiro.
+- **Ponto de entrada:** `hypergraph_match.find_matching_editais` (hoje lê só nós via
+  `load_ecosystem_nodes`) — precisaria ler as `edges` dos subgrafos e cruzar requisitos/
+  exclusões com o `CompanyProfile` (TRL/porte/UF). Casa com [[project_eligibility_constraints]]
+  (o produtor de `eligibility_constraints` é a fonte estruturada equivalente).
+- **Status:** aberto (2026-06-29). Reforçado a pedido após F3 (Sprint 1). Não bloqueia
+  as sprints; é a evolução natural quando o eixo afinidade estabilizar.
+
 ### Filtragem por público-alvo — editais fora da persona (startups) entram no radar
 
 - **O quê:** o radar ingere chamadas FINEP que **não são para o público-alvo**

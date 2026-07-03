@@ -31,14 +31,11 @@ from backend.auth_routes import router as auth_router
 from backend.library_routes import router as library_router
 from backend.rate_limit import limiter
 from backend.routers.applications import router as applications_router
-from backend.routers.brief import router as brief_router
 from backend.routers.catalog import router as catalog_router
 from backend.routers.conversations import router as conversations_router
 from backend.routers.discovered import router as discovered_router
 from backend.routers.explore import router as explore_router
 from backend.routers.files import router as files_router
-from backend.routers.graph import router as graph_router
-from backend.routers.matching import router as matching_router
 from backend.routers.playbooks import router as playbooks_router
 from backend.routers.profile import router as profile_router
 from backend.routers.research import router as research_router
@@ -47,6 +44,26 @@ from core.logging_config import request_id_var, setup_logging
 
 setup_logging()
 logger = logging.getLogger(__name__)
+
+
+def _guard_demo_mode() -> None:
+    """PR1.3 (hardening-pre-beta): DEMO_MODE bypassa auth+RLS via service-role.
+
+    Em produção multiusuário isso colapsa todos os usuários num único workspace
+    sem login — recusa o boot, salvo override deliberado.
+    """
+    demo = os.getenv("DEMO_MODE", "").strip().lower() in ("1", "true", "yes", "on")
+    env = (os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("ENVIRONMENT") or "").strip().lower()
+    allow = os.getenv("DEMO_MODE_ALLOW_PROD", "").strip().lower() in ("1", "true", "yes", "on")
+    if demo and env == "production" and not allow:
+        raise RuntimeError(
+            "DEMO_MODE=1 em produção bypassa auth+RLS (todos os usuários viram o "
+            "mesmo workspace). Desligue DEMO_MODE ou sete DEMO_MODE_ALLOW_PROD=1 "
+            "para forçar deliberadamente."
+        )
+
+
+_guard_demo_mode()
 
 # =============================================================================
 # APP + CORS
@@ -154,11 +171,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(auth_router)
 app.include_router(library_router)
 app.include_router(catalog_router)
-app.include_router(graph_router)
 app.include_router(explore_router)
-app.include_router(matching_router)
 app.include_router(applications_router)
-app.include_router(brief_router)
 app.include_router(writing_router)
 app.include_router(conversations_router)
 app.include_router(files_router)

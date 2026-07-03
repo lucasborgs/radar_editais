@@ -131,6 +131,27 @@ _REFLECT_PROMPT = (
     "O que ainda precisa para responder bem ao pedido do usuário?"
 )
 
+# Follow-up forçado quando a resposta à reflexão acima veio sem tool_calls: sem
+# isso, o texto da reflexão (uma nota interna) vaza como se fosse a resposta
+# final ao usuário — a causa raiz de respostas tipo "Aprendi que X, preciso Y"
+# aparecendo no chat em vez de uma resposta de verdade. Ver agent_graph._build_graph.
+_REFLECT_FOLLOWUP_PROMPT = (
+    "[Continuação interna — não é mensagem do usuário] "
+    "O texto anterior foi sua reflexão PRIVADA, não a resposta ao usuário. Agora "
+    "AJA de verdade: se ainda falta algo, chame a tool necessária; se você já tem "
+    "o suficiente, escreva agora a resposta COMPLETA para o usuário."
+)
+
+# Rodada final forçada quando max_steps é atingido logo após uma rodada de tools
+# (o loop terminaria ali sem o modelo nunca escrever uma resposta — texto vazio
+# pro usuário). Roda SEM tools vinculadas (não pode pedir mais uma busca).
+_FINALIZE_PROMPT = (
+    "[Aviso interno — não é mensagem do usuário] Você atingiu o limite de passos "
+    "desta ferramenta: NÃO é possível chamar mais nenhuma tool. Com o que você já "
+    "tem, escreva agora a melhor resposta possível ao usuário — mesmo que parcial, "
+    "nunca deixe de responder."
+)
+
 # Reflexão dinâmica (spec 08): sinais leves (sem LLM) que antecipam a reflexão
 # antes do teto reflect_every. `reflect_every` vira piso de frequência; entre
 # tetos, só rodadas com sinal disparam — rodadas triviais não geram reflexão à toa.

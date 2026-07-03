@@ -27,7 +27,7 @@ import logging
 import os
 import re
 
-from core.kg import kg_store
+from core.kg import hypergraph_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -63,21 +63,21 @@ JSON:
 
 
 def _load_edital_requirements(edital_id: str) -> tuple[list[str], str]:
-    """Lê key_requirements + mechanism da wiki page. ([], "") se ausente.
+    """Lê key_requirements + mechanism do hypergraph card. ([], "") se ausente.
 
     `mechanism` keya o playbook. A agência (overlay de fonte) NÃO vem do campo
-    `source` da wiki page — esse guarda a proveniência da ingestão
-    (`etl_process`/`web`) — e sim do prefixo do edital_id (`edital_id.source_of`).
+    `source` do card — esse guarda a proveniência da ingestão — e sim do
+    prefixo do edital_id (`edital_id.source_of`).
     """
-    data = kg_store.load_wiki_page(edital_id)
-    if not data:
-        return [], ""
     try:
-        reqs = data.get("key_requirements", []) or []
-        mechanism = str(data.get("mechanism", "") or "")
+        card = hypergraph_catalog.get_edital(edital_id)
+        if not card:
+            return [], ""
+        reqs = card.get("key_requirements", []) or []
+        mechanism = str(card.get("mechanism", "") or "")
         return [str(r) for r in reqs], mechanism
     except Exception as e:
-        logger.warning("ComplianceMonitor: falha ao ler wiki page %s: %s", edital_id, e)
+        logger.warning("ComplianceMonitor: falha ao ler hypergraph %s: %s", edital_id, e)
         return [], ""
 
 

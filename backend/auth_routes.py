@@ -5,10 +5,13 @@ Magic link e verificação de token são tratados diretamente pelo Supabase Auth
 (frontend usa @supabase/supabase-js). O backend apenas gerencia o workspace/perfil.
 """
 
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from core.auth import CurrentUserId, DbClient
+from backend.rate_limit import limiter
+from core.auth import CurrentUserId, DbClient, get_current_user, is_admin_payload
 
 router = APIRouter(prefix="", tags=["auth"])
 
@@ -48,14 +51,6 @@ class FeedbackPayload(BaseModel):
     context: dict = {}
 
 
-class WeightSuggestionApproval(BaseModel):
-    dimension: str
-    delta: int
-
-
-class ApproveSuggestionsPayload(BaseModel):
-    insight_id: str
-    suggestions: list[WeightSuggestionApproval]
 
 
 # =============================================================================
@@ -84,7 +79,11 @@ def _ensure_workspace(user_id: str, db) -> dict:
 # =============================================================================
 
 @router.get("/me", summary="Retorna usuário atual e seu perfil")
-def get_me(user_id: CurrentUserId, db: DbClient):
+def get_me(
+    user_id: CurrentUserId,
+    db: DbClient,
+    payload: Annotated[dict, Depends(get_current_user)],
+):
     workspace = _ensure_workspace(user_id, db)
     # contribute_to_global_weights pode não existir se migration 004 ainda
     # não tiver sido aplicada — default False para compatibilidade.
@@ -95,6 +94,9 @@ def get_me(user_id: CurrentUserId, db: DbClient):
         "profile": workspace.get("profile", {}),
         "contribute_to_global_weights": consent,
         "updated_at": workspace.get("updated_at"),
+        # Operador do sistema (ADMIN_EMAILS) — o front usa para exibir/ocultar
+        # ferramentas de gestão (ex.: fila da Descoberta).
+        "is_admin": is_admin_payload(payload),
     }
 
 
@@ -165,7 +167,8 @@ def update_preferences(
 
 
 @router.post("/me/reflect", summary="Dispara ReflectionService on-demand (Fase 2 #17)")
-def trigger_reflection(user_id: CurrentUserId, db: DbClient):
+@limiter.limit("10/minute")
+def trigger_reflection(request: Request, user_id: CurrentUserId, db: DbClient):
     """Roda síntese de outcomes do workspace e persiste em reflection_insights.
 
     Inline (não via fila procrastinate) para retornar o resultado imediatamente
@@ -204,73 +207,6 @@ async def trigger_synthesis(user_id: CurrentUserId, db: DbClient):
             detail="Falha ao enfileirar a síntese — tente novamente.",
         ) from e
     return {"status": "enqueued", "workspace_id": workspace["id"]}
-
-
-# =============================================================================
-# WEIGHT APPROVAL (Gap 2 — fecha Loop C)
-# =============================================================================
-# Sugestões geradas pelo ReflectionService só viram pesos reais via aprovação
-# explícita aqui. Princípio: nada é aplicado automaticamente.
-
-@router.get("/me/weights", summary="Pesos efetivos do workspace (merge global + workspace)")
-def get_workspace_weights(user_id: CurrentUserId, db: DbClient):
-    from core.weight_approval import list_workspace_weights
-    workspace = _ensure_workspace(user_id, db)
-    return {"weights": list_workspace_weights(db, workspace["id"])}
-
-
-@router.get(
-    "/me/weights/pending",
-    summary="Sugestões de peso pendentes de aprovação (Gap 2)",
-)
-def get_pending_weight_suggestions(user_id: CurrentUserId, db: DbClient):
-    """Lista insights ativos com weight_suggestions, com status por sugestão:
-    pending (nunca aplicada) / approved (aplicada deste insight) / superseded
-    (peso atual veio de outro insight ou manual)."""
-    from core.weight_approval import list_pending_suggestions
-    workspace = _ensure_workspace(user_id, db)
-    return {"insights": list_pending_suggestions(db, workspace["id"])}
-
-
-@router.post(
-    "/me/weights/approve",
-    summary="Aprova sugestões de peso de um reflection_insight (Gap 2)",
-)
-def approve_weight_suggestions(
-    payload: ApproveSuggestionsPayload, user_id: CurrentUserId, db: DbClient
-):
-    """Aplica sugestões aprovadas como rows em matching_weights.
-
-    Cada sugestão vira: novo_peso = clamp(peso_atual + delta, 0, 100).
-    `source='reflection'`, `approved_from_insight_id` preenchido para audit.
-    Invalida o cache TTL de 60s para que o próximo match use os pesos novos.
-    """
-    from core.weight_approval import approve_suggestions
-    workspace = _ensure_workspace(user_id, db)
-    try:
-        upserted = approve_suggestions(
-            db, workspace["id"], payload.insight_id,
-            [s.model_dump() for s in payload.suggestions],
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
-    return {"applied": upserted}
-
-
-@router.delete(
-    "/me/weights/{dimension}",
-    summary="Remove override do workspace para uma dimensão (volta ao global)",
-)
-def revert_weight(dimension: str, user_id: CurrentUserId, db: DbClient):
-    from core.weight_approval import revert_workspace_weight
-    workspace = _ensure_workspace(user_id, db)
-    try:
-        reverted = revert_workspace_weight(db, workspace["id"], dimension)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
-    if not reverted:
-        raise HTTPException(status_code=404, detail="Sem override para esta dimensão")
-    return {"success": True, "dimension": dimension}
 
 
 # =============================================================================

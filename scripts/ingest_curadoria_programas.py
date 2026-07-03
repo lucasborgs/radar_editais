@@ -12,7 +12,7 @@ from __future__ import annotations
 import datetime as _dt
 
 from core.kg import kg_store
-from core.kg import wiki_schema as ws
+from core.kg import schema as ws
 
 _TIPOS = {"aceleracao", "incubacao", "subvencao", "fundo", "capacitacao"}
 _FORMATOS = {"cohort", "edital-periodico", "fluxo-continuo"}
@@ -128,8 +128,8 @@ def _validate(p: dict, themes: set[str], setores: set[str], estagios: set[str]) 
 
 def main() -> None:
     themes = set(ws.tema_vocab())
-    setores = set(ws.load().get("setor_vocab", []))
-    estagios = set(ws.load().get("estagio_vocab", []))
+    setores = set(ws.setor_vocab())
+    estagios = set(ws.estagio_vocab())
 
     accepted, rejected = [], []
     for p in PROGRAMAS:

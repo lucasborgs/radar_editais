@@ -2,7 +2,8 @@ export type CompanySize = "MEI" | "ME" | "EPP" | "MEDIO" | "GRANDE";
 export type TipoEntidade = "empresa" | "startup" | "universidade" | "ICT";
 export type TipoFinanciamento =
   | "subvencao_nao_reembolsavel"
-  | "pesquisa_colaborativa";
+  | "pesquisa_colaborativa"
+  | "capital_risco";
 
 export interface CompanyProfile {
   // Identificação

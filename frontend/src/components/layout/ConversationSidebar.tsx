@@ -16,6 +16,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
+import { useIsAdmin } from "@/lib/hooks";
 import { ThemeToggle } from "./ThemeToggle";
 import { HISTORY_KEY, SESSION_ID_KEY } from "@/types/frontdoor";
 import {
@@ -74,12 +75,13 @@ const ICON_PATHS = {
     "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm4-12l-6 2-2 6 6-2 2-6z",
 } as const;
 
-const UTILITY_ITEMS: { href: string; label: string; d: string }[] = [
+const UTILITY_ITEMS: { href: string; label: string; d: string; adminOnly?: boolean }[] = [
   { href: "/perfil", label: "Perfil", d: ICON_PATHS.profile },
   { href: "/pipeline", label: "Pipeline", d: ICON_PATHS.pipeline },
-  { href: "/editais", label: "Editais", d: ICON_PATHS.editais },
+  { href: "/oportunidades", label: "Oportunidades", d: ICON_PATHS.editais },
   { href: "/library", label: "Arquivos", d: ICON_PATHS.files },
-  { href: "/discovered", label: "Descobertas", d: ICON_PATHS.discovered },
+  // Fila da Descoberta é ferramenta do operador (ADMIN_EMAILS), não do cliente.
+  { href: "/discovered", label: "Descobertas", d: ICON_PATHS.discovered, adminOnly: true },
   { href: "/settings", label: "Configurações", d: ICON_PATHS.settings },
 ];
 
@@ -89,6 +91,7 @@ export function ConversationSidebar() {
   const router = useRouter();
   const { session, user, getToken, signOut } = useAuth();
   const isAuthed = !!session;
+  const isAdmin = useIsAdmin();
 
   const [sessions, setSessions] = useState<ConversationSummary[]>([]);
   const [titles, setTitles] = useState<Record<string, string>>({});
@@ -412,7 +415,7 @@ export function ConversationSidebar() {
 
       {/* Rodapé: utilitárias discretas + identidade */}
       <div className="border-t border-border px-3 py-2 space-y-0.5">
-        {UTILITY_ITEMS.map(({ href, label, d }) => {
+        {UTILITY_ITEMS.filter((i) => !i.adminOnly || isAdmin).map(({ href, label, d }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link

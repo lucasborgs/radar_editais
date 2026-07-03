@@ -91,6 +91,8 @@ export interface WorkspaceMessage {
   editedSections?: string[];
   // Avisos de compliance (âmbar) anexados ao turno.
   complianceFlags?: Array<Record<string, unknown>>;
+  // PR6.2: resposta interrompida no limite de passos do agente (aviso discreto).
+  truncated?: boolean;
 }
 
 // Uma seção no documento contínuo. `content` vem do backend; os demais campos

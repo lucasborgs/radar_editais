@@ -37,7 +37,7 @@ Implicação de design: o pipeline preserva wiki pages de editais encerrados mes
 | Wiki page | `knowledge_graph/wiki/{id}.json` | Uma por edital, gerada pela LLM |
 | Cache de ingestão | `knowledge_graph/wiki/.etl_process_cache.json` | Hash MD5 por edital (evita reprocessar) |
 | Doc estruturado (silver) | `silver_data/structured_docs/{source}/{id}.jsonl` | Linearização limpa + rotulada dos PDFs (1 passada LLM/página). Insumo compartilhado da wiki (Ramo A) e do chunkeamento RAG (Ramo B). Ver §11 |
-| Vault Obsidian | `obsidian_vault/` | Espelho Markdown do grafo, unificado no projeto, exportado sob demanda |
+| Vault Obsidian | `data/hyper_extract_output_v2/vault/` | Espelho Markdown do grafo, exportado sob demanda via `scripts/export_to_obsidian.py` |
 
 ---
 
