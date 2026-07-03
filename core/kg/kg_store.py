@@ -32,6 +32,7 @@ import threading
 import time
 
 from config import KNOWLEDGE_GRAPH_DIR
+from core.kg.migrate_v2 import migrate_to_v2
 
 logger = logging.getLogger(__name__)
 
@@ -198,16 +199,22 @@ def load_hypergraph(file_key: str) -> dict | None:
 
     postgres → do blob `hypergraphs`; file → arquivo por-edital. Em postgres, se
     faltar no blob, cai pro arquivo (cobre transição/dev). Retorna o dict
-    {source_hash, nodes, edges}. Single source para os consumidores no request-path.
+    {format_version, source_hash, proveniencia, nodes, edges}. Single source para
+    os consumidores no request-path.
+
+    UPGRADE-ON-READ (PR1 KG v2): normaliza para o formato v2 (`migrate_to_v2`) —
+    blobs/arquivos ainda em v1 e extrações frescas (o extractor só emite v2 no
+    PR2) são migrados em memória, para que os leitores nunca vejam v1. Idempotente
+    e barato para grafos já-v2.
     """
     if os.getenv("KG_STORE_BACKEND", "file").lower() == "postgres":
         graph = _load_hypergraph_blob_pg().get(file_key)
         if graph is not None:
-            return graph
+            return migrate_to_v2(graph)
     path = _HYPERGRAPHS_DIR / f"{file_key}.json"
     if path.exists():
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            return migrate_to_v2(json.loads(path.read_text(encoding="utf-8")))
         except Exception as e:
             logger.warning("kg_store: falha ao ler hypergraph %s: %s", file_key, e)
     return None
@@ -239,6 +246,9 @@ def load_all_hypergraphs() -> dict[str, dict]:
     (mesma transição de `load_hypergraph`); file → arquivos por-edital no disco.
     Single source para os consumidores que varrem o grafo inteiro (vizinhança,
     catálogo, match). Não cacheia além do TTL do blob PG.
+
+    UPGRADE-ON-READ (PR1 KG v2): cada subgrafo é normalizado para v2 via
+    `migrate_to_v2` (idempotente) — ver `load_hypergraph`.
     """
     out: dict[str, dict] = {}
     if os.getenv("KG_STORE_BACKEND", "file").lower() == "postgres":
@@ -250,7 +260,7 @@ def load_all_hypergraphs() -> dict[str, dict]:
             out[p.stem] = json.loads(p.read_text(encoding="utf-8"))
         except Exception as e:
             logger.warning("kg_store: falha ao ler hypergraph %s: %s", p.stem, e)
-    return out
+    return {fk: migrate_to_v2(g) for fk, g in out.items()}
 
 
 # ---------------------------------------------------------------------------

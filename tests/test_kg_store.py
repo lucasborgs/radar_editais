@@ -68,13 +68,20 @@ def test_mtime_invalidation(monkeypatch):
 
 
 def test_load_all_hypergraphs_roundtrip():
+    # Grafos JÁ-v2 passam intactos pelo upgrade-on-read (migrate_to_v2 é no-op).
     graphs = {
         "finep__1": {
-            "nodes": [{"type": "Edital", "id": "finep:1", "name": "Edital 1", "prazo": "31/12/2026"}],
+            "format_version": 2,
+            "source_hash": None,
+            "proveniencia": {},
+            "nodes": [{"type": "Edital", "id": "ed:edital-1", "name": "Edital 1", "prazo": "31/12/2026"}],
             "edges": [],
         },
         "fapesp__2": {
-            "nodes": [{"type": "Edital", "id": "fapesp:2", "name": "Edital 2"}],
+            "format_version": 2,
+            "source_hash": None,
+            "proveniencia": {},
+            "nodes": [{"type": "Edital", "id": "ed:edital-2", "name": "Edital 2"}],
             "edges": [],
         },
     }
@@ -85,6 +92,28 @@ def test_load_all_hypergraphs_roundtrip():
 
     loaded = kg_store.load_all_hypergraphs()
     assert loaded == graphs
+
+
+def test_load_hypergraph_upgrades_v1_on_read():
+    # Um arquivo v1 (sem format_version, arestas ligadas por name) é normalizado
+    # para v2 no load: nós ganham id, members viram ids (PR1 KG v2).
+    v1 = {
+        "source_hash": "h",
+        "nodes": [
+            {"type": "Edital", "name": "Edital X"},
+            {"type": "Tema", "name": "Robótica"},
+        ],
+        "edges": [{"type": "abrange_tema", "members": ["edital x", "robótica"]}],
+    }
+    hg_dir = kg_store._HYPERGRAPHS_DIR
+    hg_dir.mkdir(parents=True, exist_ok=True)
+    (hg_dir / "finep__v1.json").write_text(__import__("json").dumps(v1), encoding="utf-8")
+
+    g = kg_store.load_hypergraph("finep__v1")
+    assert g["format_version"] == 2
+    assert {n["id"] for n in g["nodes"]} == {"ed:edital-x", "tema:robotica"}
+    # a aresta agora referencia ids, não name-strings
+    assert g["edges"][0]["members"] == ["ed:edital-x", "tema:robotica"]
 
 
 def tmp_index_path():

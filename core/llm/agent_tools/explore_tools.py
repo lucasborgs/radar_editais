@@ -27,6 +27,14 @@ from datetime import datetime, timezone
 from langchain_core.tools import BaseTool, tool
 
 from core.kg import hypergraph_catalog, kg_store
+from core.kg.migrate_v2 import migrate_to_v2
+
+
+def _ensure_v2(graphs: dict[str, dict]) -> dict[str, dict]:
+    """Normaliza cada subgrafo para o formato v2 (idempotente). Permite que as
+    funções puras aceitem tanto grafos já-v2 (do kg_store) quanto v1 (fixtures de
+    teste em memória) — as arestas passam a referenciar members por `id`."""
+    return {fk: migrate_to_v2(g) for fk, g in graphs.items()}
 
 # Stopwords PT/EN + conectivos que não discriminam tema (não devem casar
 # sozinhos). Termos curtos como "ia"/"ai" caem pelo corte de tamanho (<4).
@@ -79,6 +87,7 @@ def build_entity_index(graphs: dict[str, dict]) -> dict[tuple[str, str], list[tu
 
     Varre todos os subgrafos e indexa cada nó por (type, name_lower). Permite
     descobrir em quais subgrafos uma entidade aparece e navegar entre KAs."""
+    graphs = _ensure_v2(graphs)  # nós ganham id (usado p/ semear BFS cross-source)
     idx: dict[tuple[str, str], list[tuple[str, dict]]] = {}
     for fk, g in graphs.items():
         for n in g.get("nodes", []):
@@ -108,20 +117,14 @@ def resolve_entity(
 # não existem na CI.
 
 def _node_index(graph: dict) -> dict[str, dict]:
-    """name_lower → node de um subgrafo (último vence em colisão de nome)."""
-    return {
-        (n.get("name") or "").strip().lower(): n
-        for n in graph.get("nodes", [])
-        if n.get("name")
-    }
+    """id → node de um subgrafo v2 (as arestas referenciam members por id)."""
+    return {n["id"]: n for n in graph.get("nodes", []) if n.get("id")}
 
 
 def _member_label(idx: dict[str, dict], member: str) -> str:
-    """Rótulo de um membro de aresta: nome canônico + tipo, via índice do subgrafo.
-
-    As arestas referenciam membros lowercased; recupera o nome/tipo do nó
-    (fallback = o membro cru quando o nó não está no subgrafo)."""
-    n = idx.get((member or "").strip().lower())
+    """Rótulo de um membro de aresta: nome canônico + tipo, via índice (id → nó)
+    do subgrafo (fallback = o id cru quando o nó não está no subgrafo)."""
+    n = idx.get(member)
     if not n:
         return member
     name = n.get("name") or member
@@ -171,15 +174,14 @@ def resolve_graph_nodes(
 
 
 def _bfs_subgraph(
-    graph: dict, idx: dict[str, dict], seed_name: str, depth: int, max_edges: int,
+    graph: dict, idx: dict[str, dict], seed_id: str, depth: int, max_edges: int,
 ) -> tuple[list[dict], set[str]]:
-    """BFS de arestas em UM subgrafo a partir de `seed_name`.
+    """BFS de arestas em UM subgrafo a partir de `seed_id` (id de nó v2).
 
-    Retorna (collected_edges, visited_node_names) — visited_node_names são
-    os nomes de TODOS os nós alcançados durante a BFS (incluindo o seed),
-    para continuar BFS em outros subgrafos (cross-source)."""
-    seed = seed_name.strip().lower()
-    frontier = {seed}
+    Retorna (collected_edges, visited_node_ids) — os ids de TODOS os nós
+    alcançados durante a BFS (incluindo o seed), para continuar BFS em outros
+    subgrafos (cross-source)."""
+    frontier = {seed_id}
     visited = set(frontier)
     seen_edges: set[int] = set()
     edges = graph.get("edges", [])
@@ -189,7 +191,7 @@ def _bfs_subgraph(
         for i, e in enumerate(edges):
             if i in seen_edges:
                 continue
-            mem = [(m or "").strip().lower() for m in e.get("members", [])]
+            mem = e.get("members", [])  # ids (v2)
             if frontier.intersection(mem):
                 seen_edges.add(i)
                 collected.append(e)
@@ -232,6 +234,7 @@ def neighborhood(
     e continua a BFS neles. O índice é construído automaticamente se não fornecido.
     """
     depth = max(1, min(int(depth), 2))
+    graphs = _ensure_v2(graphs)  # arestas por id; nós ganham id (seed da BFS)
     targets = resolve_graph_nodes(graphs, node_name)
     if not targets:
         return (
@@ -254,7 +257,7 @@ def neighborhood(
         native = fk.split("__")[-1]
         node_type = node.get("type", "?")
 
-        gk = (fk, (node.get("name") or "").strip().lower())
+        gk = (fk, node.get("id", ""))
         if gk in visited_graph_nodes:
             continue
         visited_graph_nodes.add(gk)
@@ -275,7 +278,7 @@ def neighborhood(
 
         # BFS no subgrafo atual
         collected, visited = _bfs_subgraph(
-            graph, idx, node.get("name", ""), depth, max_edges,
+            graph, idx, node.get("id", ""), depth, max_edges,
         )
         lines.extend(_format_edges(collected, idx))
 
@@ -284,21 +287,20 @@ def neighborhood(
         # visitados, não só a frontier) para maximizar conexões cross-source.
         if cross_source and eidx is not None and visited:
             cross_seen: set[tuple[str, str]] = set()
-            # Monta (type, name_lower) dos nós visitados no subgrafo atual
-            visited_types: dict[str, str] = {}
-            for vn in visited:
-                vn_node = idx.get(vn)
-                if vn_node:
-                    visited_types[vn] = vn_node.get("type", "")
-
-            for vn, vn_type in visited_types.items():
-                if not vn_type:
+            # `visited` são ids de nós; resolve cada um p/ (type, name) e busca a
+            # MESMA entidade nos outros subgrafos via índice global (type, name).
+            for vn_id in visited:
+                vn_node = idx.get(vn_id)
+                if not vn_node or not vn_node.get("type"):
                     continue
-                other_key = (vn_type.strip().lower(), vn)
+                other_key = (
+                    vn_node["type"].strip().lower(),
+                    (vn_node.get("name") or "").strip().lower(),
+                )
                 for other_fk, other_node in eidx.get(other_key, []):
                     if other_fk == fk:
                         continue  # já processamos este subgrafo
-                    ogk = (other_fk, vn)
+                    ogk = (other_fk, vn_id)
                     if ogk in visited_graph_nodes or ogk in cross_seen:
                         continue
                     cross_seen.add(ogk)
@@ -306,10 +308,10 @@ def neighborhood(
                     other_idx = _node_index(other_graph)
                     other_src = other_fk.split("__")[0]
                     olines = [
-                        f"  ↳ [{vn_type}] em {other_fk} (fonte={other_src}):",
+                        f"  ↳ [{vn_node['type']}] em {other_fk} (fonte={other_src}):",
                     ]
                     o_collected, _ = _bfs_subgraph(
-                        other_graph, other_idx, other_node.get("name", ""),
+                        other_graph, other_idx, other_node.get("id", ""),
                         depth, max_edges,
                     )
                     olines.extend(
