@@ -369,6 +369,70 @@ class TestS3AgenticNamespacing:
         finally:
             ag.memory_delete(ws_a, key)
 
+    def test_checkpoints_fora_do_postgrest(self, two_tenants):
+        """As tabelas do CHECKPOINTER (agent_memory.checkpoints*) também são
+        invisíveis pela REST API — complementa o teste da tabela `store`
+        (mesmo schema, mesma defesa da migration 028)."""
+        db_b = get_supabase_user(two_tenants["jwt_b"])
+        for table in ("checkpoints", "checkpoint_blobs", "checkpoint_writes"):
+            with pytest.raises(APIError):
+                db_b.table(table).select("*").limit(1).execute()
+
+    def test_checkpointer_isola_thread_por_workspace(self, two_tenants):
+        """Leak-test DURÁVEL do checkpointer (pendência da migração LangGraph):
+        o AsyncPostgresSaver bypassa RLS por design — o isolamento é 100% o
+        namespace do thread_id ({workspace_id}:{session_id}:{turn}).
+
+        Grava um checkpoint no thread de A e prova que B, conhecendo session_id
+        e turn (tudo menos o prefixo), NÃO alcança o estado: o thread homólogo
+        sob o workspace de B volta vazio. O prefixo vem sempre do servidor
+        (JWT→workspace, ver teste de convenção abaixo), nunca de input do user.
+        """
+        from langgraph.checkpoint.base import empty_checkpoint
+
+        import core.llm.agent_graph as ag
+
+        saver = ag._get_writing_checkpointer()
+        if type(saver).__name__ != "AsyncPostgresSaver":
+            pytest.skip("checkpointer durável indisponível (DATABASE_URL/setup)")
+
+        ws_a, ws_b = two_tenants["ws_a"], two_tenants["ws_b"]
+        session, turn = str(uuid.uuid4()), 1
+        thread_a = f"{ws_a}:{session}:{turn}"
+        cfg_a = {"configurable": {"thread_id": thread_a, "checkpoint_ns": ""}}
+        cp = empty_checkpoint()
+        cp["channel_values"] = {"segredo": "SEGREDO-DE-A"}
+
+        ag._run_on_bg_loop(saver.aput(cfg_a, cp, {"source": "leak-test", "step": 1}, {}))
+        try:
+            tup_a = ag._run_on_bg_loop(saver.aget_tuple(cfg_a))
+            assert tup_a is not None, "A não lê o próprio checkpoint — inconclusivo"
+
+            # B tenta o MESMO session/turn sob o seu workspace → nada.
+            thread_b_guess = f"{ws_b}:{session}:{turn}"
+            tup_b = ag._run_on_bg_loop(saver.aget_tuple(
+                {"configurable": {"thread_id": thread_b_guess, "checkpoint_ns": ""}}
+            ))
+            assert tup_b is None, (
+                "LEAK: checkpoint de A alcançável por thread homólogo de B"
+            )
+        finally:
+            ag._run_on_bg_loop(saver.adelete_thread(thread_a))
+
+    def test_thread_id_sempre_prefixado_pelo_workspace(self):
+        """Trava de convenção: TODO thread_id do runtime de escrita nasce de
+        f\"{self.workspace_id}:{self.session_id}:...\" — o prefixo vem do
+        estado server-side da sessão (que o RLS/S2 protege), nunca do request.
+        Se alguém trocar a construção, o teste durável acima perde a premissa."""
+        import inspect
+
+        from core.services import writing_session as ws
+
+        src = inspect.getsource(ws.WritingSession)
+        assert 'f"{self.workspace_id}:{self.session_id}:' in src, (
+            "thread_id do turno deve ser prefixado pelo workspace da sessão"
+        )
+
     def test_subagente_nao_herda_checkpointer_do_pai(self, monkeypatch):
         """S3: o caminho stateless (subagentes/kg_match/profile) compila o grafo
         com checkpointer=False, não None — None faria o LangGraph HERDAR o
