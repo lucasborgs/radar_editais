@@ -162,6 +162,46 @@ def get_user_id(payload: Annotated[dict, Depends(get_current_user)]) -> str:
 CurrentUserId = Annotated[str, Depends(get_user_id)]
 
 
+# ---------------------------------------------------------------------------
+# Gate de operador (admin) — decisão de produto 2026-07-03: a Descoberta é
+# ferramenta do OPERADOR do sistema, não do cliente final. ADMIN_EMAILS (CSV)
+# define quem é operador; vazio = ninguém (fail-closed).
+# ---------------------------------------------------------------------------
+
+def _admin_emails() -> set[str]:
+    """Lê ADMIN_EMAILS em call-time (não no import) — testável e ajustável
+    sem restart de módulo."""
+    return {
+        e.strip().lower()
+        for e in os.getenv("ADMIN_EMAILS", "").split(",")
+        if e.strip()
+    }
+
+
+def is_admin_payload(payload: dict) -> bool:
+    """True quando o e-mail do JWT está na allowlist ADMIN_EMAILS."""
+    email = (payload.get("email") or "").strip().lower()
+    return bool(email) and email in _admin_emails()
+
+
+def get_admin_user_id(payload: Annotated[dict, Depends(get_current_user)]) -> str:
+    """FastAPI dependency — user_id (sub) SOMENTE para operadores.
+
+    Fail-closed: sem ADMIN_EMAILS configurado, ou JWT sem e-mail na allowlist,
+    responde 403. Em DEMO_MODE o payload não tem e-mail → também 403 (a fila
+    de descoberta não faz parte da demo pública).
+    """
+    if not is_admin_payload(payload):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito ao operador do sistema",
+        )
+    return payload["sub"]
+
+
+AdminUserId = Annotated[str, Depends(get_admin_user_id)]
+
+
 # Bearer opcional: nunca levanta por header ausente/malformado (auto_error=False),
 # para as rotas com auth OPCIONAL (ex.: /match/radar — delta B2). Anônimo segue
 # com pesos globais default; logado mantém o comportamento atual.

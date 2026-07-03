@@ -101,6 +101,9 @@ export const getMe = (token: string) =>
     profile: Partial<CompanyProfile>;
     preferences?: UserPreferences;
     contribute_to_global_weights?: boolean;
+    // Operador do sistema (ADMIN_EMAILS no backend) — controla ferramentas de
+    // gestão na UI (ex.: fila da Descoberta).
+    is_admin?: boolean;
   }>(
     "/me",
     undefined,

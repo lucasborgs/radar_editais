@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
+import { getMe } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+
 interface AsyncState<T> {
   data: T | null;
   loading: boolean;
@@ -49,4 +52,50 @@ export function useAsync<T>(
   }, [execute]);
 
   return { ...state, refetch: execute };
+}
+
+// Cache de módulo: 1 GET /me por aba resolve o flag de operador para todos os
+// componentes que o consultam (sidebar, header). Keyed por user id — troca de
+// conta invalida naturalmente.
+let adminCache: { userId: string; isAdmin: boolean } | null = null;
+
+/**
+ * Flag de operador do sistema (`is_admin` do GET /me — allowlist ADMIN_EMAILS
+ * no backend). Controla a exibição de ferramentas de gestão na UI (ex.: fila
+ * da Descoberta). Anônimo/erro → false; o enforcement real é o 403 da API.
+ */
+export function useIsAdmin(): boolean {
+  const { session, getToken } = useAuth();
+  const userId = session?.user?.id ?? null;
+  const [isAdmin, setIsAdmin] = useState(
+    adminCache !== null && adminCache.userId === userId ? adminCache.isAdmin : false,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!userId) {
+      setIsAdmin(false);
+      return;
+    }
+    if (adminCache !== null && adminCache.userId === userId) {
+      setIsAdmin(adminCache.isAdmin);
+      return;
+    }
+    (async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const me = await getMe(token);
+        adminCache = { userId, isAdmin: !!me.is_admin };
+        if (!cancelled) setIsAdmin(!!me.is_admin);
+      } catch {
+        // segue não-admin — os endpoints devolvem 403 de qualquer forma.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, getToken]);
+
+  return isAdmin;
 }
