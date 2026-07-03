@@ -17,6 +17,7 @@ export default function DiscoveredPage() {
   const { getToken } = useAuth();
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [opportunities, setOpportunities] = useState<DiscoveredOpportunity[]>([]);
   const [actingOn, setActingOn] = useState<string | null>(null);
   const [editalInputs, setEditalInputs] = useState<Record<string, string>>({});
@@ -34,6 +35,12 @@ export default function DiscoveredPage() {
       const res = await getDiscoveredOpportunities(token, filter === "all");
       setOpportunities(res.opportunities);
     } catch (e: unknown) {
+      // Fila da Descoberta é do operador (ADMIN_EMAILS): 403 vira estado
+      // amigável em vez de toast de erro (acesso direto por URL).
+      if (e instanceof ApiError && e.status === 403) {
+        setForbidden(true);
+        return;
+      }
       const msg = e instanceof ApiError
         ? e.message
         : e instanceof Error
@@ -135,6 +142,20 @@ export default function DiscoveredPage() {
     } finally {
       setActingOn(null);
     }
+  }
+
+  if (forbidden) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-16 text-center">
+        <h1 className="font-heading text-lg font-bold text-content-primary">
+          Acesso restrito
+        </h1>
+        <p className="mt-2 text-sm text-content-secondary font-sans">
+          A fila de descoberta é uma ferramenta de gestão do sistema, disponível
+          apenas para o operador.
+        </p>
+      </div>
+    );
   }
 
   return (
