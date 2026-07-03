@@ -13,7 +13,20 @@ sys.path.insert(0, str(ROOT))
 
 import pytest
 
+from core.kg import hypergraph_catalog
 from core.services.opportunity_service import OpportunityService
+
+# TestExplore roda o pipeline real contra os hipergrados EM DISCO
+# (data/knowledge_graph/hypergraphs/), que NÃO é versionado — durabilidade via
+# kg_store/Postgres. Num checkout limpo (CI) o corpus está vazio: explore()
+# retorna {} (o _merge omite categorias vazias) e os asserts de shape quebram.
+# Pulamos os end-to-end quando não há corpus; os testes de shape dos tiers
+# (toleram vazio) e o TestMerge unitário seguem cobrindo a lógica.
+_HAS_CORPUS = bool(hypergraph_catalog.list_editais(limit=1))
+_needs_corpus = pytest.mark.skipif(
+    not _HAS_CORPUS,
+    reason="sem corpus de hipergrafos em disco (não versionado; CI/data-less)",
+)
 
 # ===========================================================================
 # Fixtures
@@ -112,6 +125,7 @@ class TestMerge:
 # Explore (end-to-end)
 # ===========================================================================
 
+@_needs_corpus
 class TestExplore:
     def test_explore_returns_expected_structure(self, svc):
         result = svc.explore("inteligência artificial", top_k=5)

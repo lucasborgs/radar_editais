@@ -63,7 +63,16 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # PIN deliberado (não "latest"). A suíte semeia via service_role pelo
+          # PostgREST; ela depende dos default privileges do schema `public`
+          # (postgres/supabase_admin → anon,authenticated,service_role) que o
+          # `supabase start` estabelece, para as migrations 027/034 então
+          # REVOGAREM anon/authenticated das tabelas travadas. CLIs recentes
+          # (2.99+) regrediram o fresh-start: service_role fica SEM grant nas
+          # tabelas de migration → `permission denied for table workspaces` (a
+          # suíte nem semeia). 2.98.2 é a versão validada localmente (33 passed).
+          # Reproduzível > último. Ver docs/security/tenant-isolation.md.
+          version: 2.98.2
 
       - name: Start Supabase (aplica migrations, inclui 034)
         run: supabase start
