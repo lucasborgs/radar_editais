@@ -262,4 +262,25 @@ Os itens da seção "Guardrails de travessia" entram junto: serialização de pr
 
 ## Previsto → Realizado
 
-_(preencher durante a implementação, no padrão da spec hypergraph-architecture: divergência + por quê)_
+### PR1 — Formato v2: IDs estáveis + migrador (2026-07-03)
+
+**Pronto quando (todos atingidos):**
+- ✓ todos os arquivos migrados validam — `migrate_hypergraphs_v2.py` confirma "todo membro resolve para um id existente" (0 não resolvidos);
+- ✓ suíte de testes verde — 636 passed, 35 skipped (3 testes de Store Postgres deselecionados: gated em `DATABASE_URL`, ortogonais ao KG);
+- ✓ `find_matching_editais` isomórfico — eval matching **recall@8 0.881 / ruído 3.625**, idêntico ao baseline documentado em `hypergraph_match.py` (recall 0.88 / ruído 3.6).
+
+**Divergências do plano:**
+
+1. **Contagem de arquivos: 35, não 63.** O corpus real são 35 hipergrados em `data/knowledge_graph/hypergraphs/` (32 editais `*__*` + 3 catálogos `ict`/`investidores`/`programas`). O "63" da spec estava desatualizado. (`investidores.json`/`programas.json` na raiz do `knowledge_graph/` são os CURADOS, formato diferente — PR4.)
+
+2. **Prefixo de id deriva do tipo v1** (`ed:`/`tema:`/`mec:`/`ict:`/…), não `op/ator/con`. PR1 precede a consolidação de tipos (PR2); o id é `{'{prefixo}'}:{'{slug(name)}'}`, determinístico a partir de (tipo, name). Consequência boa e não prevista: o MESMO (tipo, name) recebe o MESMO id em qualquer subgrafo → a resolução cross-fonte (antes por casamento de (type, name)) já é lookup por id, sem esperar o PR3. O PR2 remapeia os prefixos.
+
+3. **`upgrade-on-read` no `kg_store`** (não estava explícito no plano). `load_hypergraph`/`load_all_hypergraphs` aplicam `migrate_to_v2` (idempotente) a cada leitura. Motivo: os arquivos hypergraphs/ são gitignored e o extractor só emite v2 no PR2 — sem isso, blobs/arquivos v1 e extrações frescas quebrariam os leitores. Assim "leitores exigem v2" vira "leitores sempre VÊEM v2".
+
+4. **Funções puras auto-normalizam** (`neighborhood`, `build_entity_index`, `list_entity_catalog` chamam `migrate_to_v2` na entrada). Necessário porque recebem grafos em memória direto (fixtures de teste v1, não via kg_store). API pública de `build_entity_index`/`resolve_entity` mantida em (type, name) — o cross-source deriva (type,name) do nó-id visitado, sem quebrar callers/testes.
+
+5. **Dados dropados na migração:** 171 members dangling (1,2% — já eram no-op em todo leitor) + 19 arestas que sobraram com <2 membros. Logados pelo migrador. `proveniencia` criado vazio (`{}`) — PR4 preenche a URL.
+
+6. **Entrega dos dados:** como hypergraphs/ não é versionado, os 35 arquivos migrados são locais; a publicação p/ prod é via `kg_store`→Postgres pelo build (não por commit git). Backup de `data/knowledge_graph/` feito antes da reescrita (`data/knowledge_graph.bak.<ts>`, fora do git).
+
+**Toca (código):** `core/kg/migrate_v2.py` (novo), `scripts/migrate_hypergraphs_v2.py` (novo), `core/kg/kg_store.py`, `core/kg/hypergraph_catalog.py`, `core/llm/agent_tools/explore_tools.py`, `core/services/hypergraph_match.py`, `tests/test_kg_store.py`.
