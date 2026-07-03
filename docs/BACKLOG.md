@@ -1016,6 +1016,22 @@ de fora — nenhum bloqueia o que foi entregue.
 - **Export Obsidian ainda FINEP-only** — nós `ict` não são exportados ao vault.
 - **Flag só sobre texto coletado** — exigência de ICT em anexo PDF não baixado é
   falso-negativo estrutural (limite da heurística, documentado em §5.10).
+- **Hyper-Extract (`core/retrieval/hyper_extractor.py`) — 3 dívidas achadas na
+  auditoria de 2026-07-03** (ver [[project_hyperextract_schema_audit]]):
+  1. Dedup só por lowercase-exato em 10 dos 12 tipos de nó (só Mecanismo e Fonte
+     têm normalizador pós-extração). Sinônimos ("IA" vs "Inteligência Artificial")
+     viram nós diferentes no grafo; só reconciliam por cosseno no match, nunca no
+     KG. Cresce o corpus, cresce a fragmentação — relacionado a
+     [[project_hyperedges_underused]]. Pode ficar moot se a exploração de schema
+     em andamento consolidar os tipos-eixo.
+  2. Dois dicionários de canonicalização de Fonte divergentes: `WIKI.md §5.4
+     fontes_canonicas` (via `core.kg.schema`) vs `hypergraph_catalog._FONTE_CANONICAL`
+     (hardcoded, usado de fato pelo normalizador vivo). Viola o princípio do
+     projeto ("regra vive no doc") — risco de drift silencioso.
+  3. Output do hipergrado (`hypergraphs/{id}.json`) não versiona schema/prompt
+     (só `source_hash`), ao contrário do silver (`meta_sidecar` com
+     `structurer_prompt_version`/`structurer_model`). Convenção atual é "mudou
+     prompt? apague `hypergraphs/` na mão" — não documentada, não enforced.
 
 ---
 
