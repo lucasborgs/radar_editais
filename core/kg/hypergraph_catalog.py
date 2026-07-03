@@ -19,6 +19,7 @@ import re
 import unicodedata
 
 from core.kg import kg_store
+from core.kg.migrate_v2 import migrate_to_v2
 
 logger = logging.getLogger(__name__)
 
@@ -298,25 +299,22 @@ def list_entity_catalog(
     g = graphs.get(catalog_key)
     if not g:
         return []
+    g = migrate_to_v2(g)  # v2: arestas por id (idempotente se já-v2)
     nodes = g.get("nodes", [])
     edges = g.get("edges", [])
 
-    node_by_lower: dict[str, dict] = {}
-    for n in nodes:
-        nm = (n.get("name") or "").strip().lower()
-        if nm:
-            node_by_lower[nm] = n
+    node_by_id: dict[str, dict] = {n["id"]: n for n in nodes if n.get("id")}
 
-    # Índice de arestas: name_lower → temas conectados via arestas nativas
+    # Índice de arestas: id da entidade → temas conectados via arestas nativas
     edge_themes: dict[str, set[str]] = {}
     for e in edges:
-        members = [(m or "").strip().lower() for m in e.get("members", [])]
+        members = e.get("members", [])  # ids (v2)
         thematic = [
             n["name"] for m in members
-            if (n := node_by_lower.get(m)) and n.get("type") in ("Tema", "Tecnologia", "Aplicação")
+            if (n := node_by_id.get(m)) and n.get("type") in ("Tema", "Tecnologia", "Aplicação")
         ]
         for m in members:
-            nd = node_by_lower.get(m)
+            nd = node_by_id.get(m)
             if nd and nd.get("type") == wanted_type:
                 edge_themes.setdefault(m, set()).update(thematic)
 
@@ -325,12 +323,11 @@ def list_entity_catalog(
         if n.get("type") != wanted_type:
             continue
         nm = n.get("name", "")
-        nm_lower = nm.strip().lower()
-        themes_list = sorted(edge_themes.get(nm_lower, set()))
+        themes_list = sorted(edge_themes.get(n.get("id", ""), set()))
         if tema and not _theme_match(tema, themes_list):
             continue
         out.append({
-            "id": nm_lower,
+            "id": nm.strip().lower(),  # id público da entidade (name_lower) — compat consumers
             "name": nm,
             "description": n.get("description") or "",
             "themes": themes_list,
