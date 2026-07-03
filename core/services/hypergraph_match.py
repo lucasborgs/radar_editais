@@ -329,20 +329,17 @@ def _expand_match_via_catalog(
     if not ict_graph:
         return matches
 
-    # Índice de nós do catálogo ICT: name_lower → node
-    ict_idx = {
-        (n.get("name") or "").strip().lower(): n
-        for n in ict_graph.get("nodes", [])
-        if n.get("name")
-    }
+    # Índice de nós do catálogo ICT: id → node (v2)
+    ict_by_id = {n["id"]: n for n in ict_graph.get("nodes", []) if n.get("id")}
 
-    # Índice de arestas do catálogo ICT: nome ICT(lower) → [(tipo_aresta, [membros])]
+    # Índice de arestas do catálogo ICT: id da ICT → [(tipo_aresta, [ids_membros])]
     ict_edges_by_entity: dict[str, list[tuple[str, list[str]]]] = defaultdict(list)
     for e in ict_graph.get("edges", []):
         et = e.get("type", "")
-        members = [(m or "").strip().lower() for m in e.get("members", [])]
+        members = e.get("members", [])  # ids (v2)
         for m in members:
-            if m in ict_idx and ict_idx[m].get("type") == "ICT":
+            nd = ict_by_id.get(m)
+            if nd and nd.get("type") == "ICT":
                 ict_edges_by_entity[m].append((et, members))
 
     # Embed da empresa (só nós de afinidade) para comparar com temas do catálogo
@@ -360,37 +357,34 @@ def _expand_match_via_catalog(
         graph = graphs.get(mt.file_key)
         if not graph:
             continue
-        # ICTs parceiras deste edital (arestas `parceria_com` no subgrafo)
+        # ICTs parceiras deste edital (arestas `parceria_com` no subgrafo).
+        # A ligação com o catálogo ict.json é por id (`ict:{slug}`), determinístico
+        # a partir de (tipo, name) — a MESMA ICT tem o mesmo id em ambos os grafos.
+        graph_by_id = {n["id"]: n for n in graph.get("nodes", []) if n.get("id")}
         ict_partners: set[str] = set()
         for e in graph.get("edges", []):
             if e.get("type") != "parceria_com":
                 continue
-            members = [(m or "").strip().lower() for m in e.get("members", [])]
-            # O nó Edital é um dos members; os outros são ICTs/Investidores
-            for m in members:
-                node_type = ""
-                for n in graph.get("nodes", []):
-                    if (n.get("name") or "").strip().lower() == m:
-                        node_type = n.get("type", "")
-                        break
-                if node_type == "ICT":
+            for m in e.get("members", []):  # ids
+                nd = graph_by_id.get(m)
+                if nd and nd.get("type") == "ICT":
                     ict_partners.add(m)
 
         if not ict_partners:
             continue
 
         # Para cada ICT parceira, buscar temas no catálogo ict.json
-        for ict_name in ict_partners:
-            related_edges = ict_edges_by_entity.get(ict_name, [])
+        for ict_id in ict_partners:
+            related_edges = ict_edges_by_entity.get(ict_id, [])
             for et, e_members in related_edges:
                 # Tipos de aresta que conectam ICT a conteúdo temático
                 if et not in {"abrange_tema", "viabiliza", "aplica_em"}:
                     continue
                 # Os outros membros da aresta (que não são a ICT)
                 for m in e_members:
-                    if m == ict_name:
+                    if m == ict_id:
                         continue
-                    m_node = ict_idx.get(m)
+                    m_node = ict_by_id.get(m)
                     if not m_node:
                         continue
                     m_type = m_node.get("type", "")
