@@ -11,15 +11,32 @@ L1 (per-fonte), não L2 (agnóstico).
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 from pathlib import Path
 
-from config import FINEP_PDFS_DIR
+from config import BRONZE_DIR, FINEP_PDFS_DIR
 
-from .base import CanonicalDoc, SourceAdapter
+from .base import CanonicalDoc, SourceAdapter, coletado_em
 
 logger = logging.getLogger(__name__)
+
+_BRONZE_DIR = BRONZE_DIR / "finep_raw"
+
+
+def _load_latest_bronze() -> list[dict]:
+    """Lê o JSON bronze FINEP mais recente (lista de chamadas). [] se ausente."""
+    if not _BRONZE_DIR.exists():
+        return []
+    files = sorted(_BRONZE_DIR.glob("*.json"))
+    if not files:
+        return []
+    try:
+        return json.loads(files[-1].read_text(encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001 — bronze corrompido não derruba o build
+        logger.warning("finep adapter: erro lendo %s: %s", files[-1].name, e)
+        return []
 
 
 # =============================================================================
@@ -154,3 +171,21 @@ class Adapter(SourceAdapter):
                 continue
             documents.append({"doc_name": pdf.name, "units": pages})
         return documents
+
+    def provenance(self, edital_id: str) -> dict:
+        """URL oficial (`link`) + PDFs (`pdf_urls`) + data de coleta do bronze
+        FINEP, casando por `chamada_id`. Determinístico (D14) — a URL não passa
+        pela extração-LLM."""
+        for ch in _load_latest_bronze():
+            if str(ch.get("chamada_id")) != str(edital_id):
+                continue
+            prov: dict = {"fonte": "finep"}
+            if ch.get("link"):
+                prov["url"] = ch["link"]
+            pdfs = [u for u in (ch.get("pdf_urls") or []) if u]
+            if pdfs:
+                prov["urls_documentos"] = pdfs
+            if coletado_em(ch):
+                prov["coletado_em"] = coletado_em(ch)
+            return prov
+        return {}
