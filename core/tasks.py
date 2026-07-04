@@ -215,6 +215,70 @@ async def build_company_hypergraph_task(workspace_id: str) -> None:
     )
 
 
+@app.task(name="compute_match_verdicts", queue="default", retry=UNIT_TASK_RETRY)
+async def compute_match_verdicts_task(
+    workspace_id: str, items: list[dict], profile: dict,
+) -> None:
+    """Computa e cacheia os vereditos LLM do top-K do radar (KG v2 PR7 / Estágio 2).
+
+    `items` = misses do último refresh (`[{file_key, paths}]`, ≤ K), com os paths
+    de afinidade que justificaram o match. A task re-serializa cada subgrafo do
+    corpus ATUAL e recomputa o `input_hash` (mesma função do router) — se o corpus
+    mudou entre o defer e a execução, o hash gravado reflete o corpus novo, que é
+    o que o próximo request também verá (cache-hit correto, nunca stale servido
+    como fresco).
+
+    Fail-open POR PAR: `compute_verdict` devolve None em erro (o card fica sem
+    veredito); um par ruim não derruba os demais. Exceções de infra (DB/fila)
+    propagam e o procrastinate re-tenta com backoff — o upsert é idempotente.
+    """
+    from core.kg import kg_store
+    from core.services import match_verdict as mv
+
+    db = get_supabase_service()
+    graphs = await asyncio.to_thread(kg_store.load_all_hypergraphs)
+
+    prepared: list[tuple[str, str, list[dict], str]] = []  # (oid, serialized, paths, hash)
+    for item in items or []:
+        fk = str(item.get("file_key") or "")
+        graph = graphs.get(fk)
+        node = mv.opportunity_node(graph) if graph else None
+        if node is None:
+            logger.info("compute_match_verdicts: %s sem nó de oportunidade — pulado", fk)
+            continue
+        serialized = mv.serialize_opportunity(graph, node)
+        paths = item.get("paths") or []
+        prepared.append((fk, serialized, paths, mv.verdict_input_hash(serialized, profile, paths)))
+
+    # Segunda visita = zero chamadas: pares já gravados com o MESMO hash saem aqui
+    # (o defer duplicado é possível — queueing_lock só cobre jobs ainda na fila).
+    wanted = {oid: h for oid, _, _, h in prepared}
+    hits = await asyncio.to_thread(mv.get_cached_verdicts, db, workspace_id, wanted)
+    misses = [p for p in prepared if p[0] not in hits]
+
+    async def _one(oid: str, serialized: str, paths: list[dict], h: str) -> bool:
+        verdict = await asyncio.to_thread(mv.compute_verdict, serialized, profile, paths)
+        if verdict is None:
+            return False
+        await asyncio.to_thread(
+            mv.upsert_verdict, db, workspace_id, oid, h, verdict, mv._verdict_model()
+        )
+        return True
+
+    results = await asyncio.gather(
+        *(_one(*p) for p in misses), return_exceptions=True
+    )
+    n_ok = sum(1 for r in results if r is True)
+    n_err = sum(1 for r in results if isinstance(r, Exception))
+    for r in results:
+        if isinstance(r, Exception):
+            logger.warning("compute_match_verdicts: par falhou: %s", r)
+    logger.info(
+        "compute_match_verdicts: workspace=%s pares=%d cache_hit=%d computados=%d falhas=%d",
+        workspace_id, len(prepared), len(hits), n_ok, n_err,
+    )
+
+
 # =============================================================================
 # Reflection (Fase 2 #17)
 # =============================================================================
