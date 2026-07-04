@@ -161,8 +161,10 @@ def edital_card(file_key: str, graph: dict, *, full: bool = False) -> dict | Non
     if edital is None:
         return None
     source, _, native = file_key.partition("__")
-    # `fonte` de recurso: campo do nó edital (Fonte deixou de ser nó — D4; a URL/
-    # proveniência determinística é PR4).
+    # Proveniência determinística (D4/D14/PR4): URL oficial + PDFs + data de coleta,
+    # encanada do bronze por fora do LLM. Bloco por-arquivo (1 arquivo = 1 edital).
+    prov = graph.get("proveniencia") or {}
+    # `fonte` de recurso: campo do nó edital (Fonte deixou de ser nó — D4).
     raw_fonte = [edital["fonte"]] if edital.get("fonte") else []
     fonte = sorted(set(
         _normalize_source_name(f)
@@ -183,6 +185,8 @@ def edital_card(file_key: str, graph: dict, *, full: bool = False) -> dict | Non
         "publico_alvo": _publico_alvo(nodes),
         "fonte_recurso": fonte,
         "opportunity_type": "edital",
+        # Link oficial (PR4) — para a lista já linkar para a página da fonte.
+        "official_url": prov.get("url") or "",
     }
     if full:
         card.update({
@@ -195,6 +199,9 @@ def edital_card(file_key: str, graph: dict, *, full: bool = False) -> dict | Non
             "value": edital.get("valor"),
             "icts": _by_kind(nodes, "Ator", "ict"),
             "investidores": _by_kind(nodes, "Ator", "investidor"),
+            # Proveniência completa (PR4/D14): link oficial + PDFs + coleta.
+            "document_urls": list(prov.get("urls_documentos") or []),
+            "collected_at": prov.get("coletado_em") or "",
         })
     return card
 

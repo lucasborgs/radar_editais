@@ -329,3 +329,22 @@ Os itens da seção "Guardrails de travessia" entram junto: serialização de pr
 8. **Dados/backup:** reescrita in-place dos 35 arquivos; rollback pré-PR3 em `data/knowledge_graph.bak.pr3_20260704_022409` (fora do git). Com o PR3 fechado, os backups do PR1/PR2 podem ser removidos após o merge (critério da spec atendido).
 
 **Toca (código):** `core/kg/canonicalize.py` (novo), `scripts/canonicalize_concepts.py` (novo), `core/kg/schema.py`, `core/kg/kg_store.py`, `core/kg/migrate_v2.py` (PR2, fix 7), `core/retrieval/hyper_extractor.py`, `core/llm/agent_tools/explore_tools.py`, `WIKI.md` (§6.4 macro_temas), `tests/test_canonicalize.py` (novo), `tests/test_kg_store.py`.
+
+### PR4 — Proveniência/URL ponta a ponta (2026-07-04)
+
+**Pronto quando:**
+- ✓ 100% das Oportunidades(edital) com bronze têm `proveniencia.url` — **30/30 editais reais** encanados do bronze (finep/fapesp/fapesc). Os 2 "faltantes" na cobertura bruta (93,8%) são fixtures sintéticos órfãos (`finep__1` "Edital 1", `fapesp__2` "Edital 2") sem silver nem bronze — some no próximo ETL real, não são editais;
+- ✓ endpoint de detalhe expõe o campo — `GET /editais/{id}` (`edital_card`) carrega `official_url` (também no resumo, p/ a lista linkar), `document_urls` (PDFs), `collected_at`; live check em `finep:778` → URL oficial + 9 PDFs + `2026-06-13`.
+
+**Decisão de escopo (usuário, 2026-07-04): URL-first agora, desdobramento depois.**
+Os catálogos curados (investidores/programas) NÃO foram reconstruídos deterministicamente neste PR — seguem extraídos por LLM, com `proveniencia` de arquivo vazia (documentados como pendência: `ict`, `investidores`, `programas`). Motivo: cada item curado tem URL PRÓPRIA (per-nó, não per-arquivo), e o rebuild determinístico é o desdobramento **D2** (investidor → `Ator` + `Oportunidade(kind=investimento)`), que também exige wiring no match e mudança do contrato de entidades no frontend. Atacar isso agora com name-match fuzzy seria exatamente o "achatamento" que a spec condena.
+> **Condição registrada (não-opcional):** o **PR4.1** (desdobramento D2 + rebuild determinístico dos curados a partir do JSON, preservando tese/estágio/ticket/elegibilidade/URL por item) entra na fila **imediatamente após o PR6, antes do PR7/PR8** — as Oportunidades de investimento precisam EXISTIR antes do veredito (PR7) e da ficha (PR8) poderem exibi-las.
+
+**Divergências do plano:**
+1. **Proveniência é capacidade do adapter, não do builder.** Cada `SourceAdapter` ganhou `provenance(native_id) -> {fonte, url, urls_documentos, coletado_em}` (default vazio na base). É o lugar certo: o adapter já sabe ler o bronze da sua fonte e casar por id. finep casa por `chamada_id` (url=`link`, docs=`pdf_urls`); fapesp por native_id-da-URL (só `url`, texto inline); fapesc por `native_id` (url + `edital_pdf_url`); web por `url_hash` (cobre a Descoberta promovida). `coletado_em` = data de `data_extracao` (sem hora).
+2. **Discovery promote já estava coberto.** O promote (`backend/routers/discovered.py`) grava `url`+`url_hash`+`data_extracao` no bronze web; a URL flui staging → bronze → `web.provenance()` → builder, sem novo wiring — só faltava o adapter expor.
+3. **Backfill mecânico (D15), não re-extração.** Os 32 editais migrados carregavam `proveniencia: {}`. `scripts/backfill_proveniencia.py` reescreve in-place a partir do bronze (zero LLM). O builder (`run_hyper_extract`) preenche na extração fresca via `_provenance()` (fail-open — proveniência ausente nunca derruba o build).
+4. **Sanity:** eval matching **recall@8 0.833 / ruído 3.125 — idêntico ao PR3** (esperado: proveniência é metadado, o match não a lê). 33 testes KG/adapter/catalog verdes.
+5. **Dados/backup:** backup pré-PR4 em `data/knowledge_graph.bak.pr4_20260704_102628` (fora do git). Reescrita in-place dos 30 editais reais.
+
+**Toca (código):** `pipeline/adapters/base.py` (contrato `provenance` + helper `coletado_em`), `pipeline/adapters/{finep,fapesp,fapesc,web}.py`, `core/retrieval/hyper_extractor.py` (`_provenance` + wiring), `core/kg/hypergraph_catalog.py` (card expõe proveniência), `scripts/backfill_proveniencia.py` (novo).
