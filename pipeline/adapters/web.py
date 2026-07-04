@@ -16,7 +16,7 @@ import logging
 
 from config import BRONZE_DIR
 
-from .base import CanonicalDoc, SourceAdapter, html_to_text, split_into_units
+from .base import CanonicalDoc, SourceAdapter, coletado_em, html_to_text, split_into_units
 
 logger = logging.getLogger(__name__)
 
@@ -75,3 +75,18 @@ class Adapter(SourceAdapter):
 
         doc_name = match.get("title") or "pagina-web"
         return [{"doc_name": doc_name, "units": split_into_units(texto)}]
+
+    def provenance(self, edital_id: str) -> dict:
+        """URL da página (fonte da Descoberta promovida) + data de coleta, casando
+        por `url_hash`. É a URL que a staging carrega para o build (D14/PR4)."""
+        match = next(
+            (it for it in _load_web_bronze() if it.get("url_hash") == edital_id), None
+        )
+        if match is None:
+            return {}
+        prov: dict = {"fonte": match.get("fonte") or "web"}
+        if match.get("url"):
+            prov["url"] = match["url"]
+        if coletado_em(match):
+            prov["coletado_em"] = coletado_em(match)
+        return prov
