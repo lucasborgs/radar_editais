@@ -616,6 +616,22 @@ hypergraph_schema:
   conceito_dims: [tema, tecnologia, aplicacao]
   apertures: [prazo, continua, recorrente, fechada]
   edge_types: [financia, exige, abrange_tema, aplica_em, destina_a, exclui, parceria_com, pertence_a, viabiliza, resolve]
+  # Vocabulário controlado de macro-temas (D8, two-tier): propriedade
+  # `macro_temas[]` da Oportunidade — filtro/UI estável, distinto dos Conceitos
+  # abertos (match fino). Semeado pelo themes_index dos catálogos curados
+  # (6 primeiros) + extensões ancoradas no corpus de editais (PR3, 2026-07-04).
+  # Adicionar valor = editar AQUI (conscientemente); o build valida contra a lista.
+  macro_temas:
+    - tecnologias digitais e conectividade
+    - materiais, química e manufatura avançada
+    - agro - bioeconomia e alimentos
+    - saúde e ciências da vida
+    - energia e transição sustentável
+    - mobilidade e logística
+    - defesa e soberania nacional
+    - meio ambiente, água e saneamento
+    - petróleo, gás e mineração
+    - construção e cidades inteligentes
 ```
 
 Mapa de migração dos 12 tipos v1 (mecânico, `core/kg/migrate_v2.consolidate_to_v2_types`):
