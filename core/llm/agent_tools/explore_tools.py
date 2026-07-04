@@ -78,7 +78,7 @@ def _theme_match(needle: str, themes: list[str]) -> bool:
 # Cada subgrafo é um KA independente. Uma mesma entidade real (ex.: "UFSC")
 # pode aparecer em múltiplos subgrafos como nós separados. Esta camada
 # permite navegar entre subgrafos via nome + tipo como chave composta:
-#   resolve_entity(index, "UFSC", "ICT") → todos os nós ICT "UFSC" no grafo
+#   resolve_entity(index, "UFSC", "Ator") → todos os nós Ator "UFSC" no grafo
 # Fiel ao Hyper-Extract: cada KA preserva sua identidade; a conexão é
 # resolvida em tempo de query por matching de (type, name).
 
@@ -122,13 +122,21 @@ def _node_index(graph: dict) -> dict[str, dict]:
 
 
 def _member_label(idx: dict[str, dict], member: str) -> str:
-    """Rótulo de um membro de aresta: nome canônico + tipo, via índice (id → nó)
-    do subgrafo (fallback = o id cru quando o nó não está no subgrafo)."""
+    """Rótulo de um membro de aresta: nome canônico + tipo (+kind quando houver),
+    via índice (id → nó) do subgrafo (fallback = o id cru quando ausente).
+
+    O kind entra no rótulo (`Ator/ict`, `Oportunidade/programa`) porque o TIPO v2
+    sozinho não distingue ICT de Investidor (ambos Ator) — consumidores como o
+    tier2 do OpportunityService discriminam por esse rótulo."""
     n = idx.get(member)
     if not n:
         return member
     name = n.get("name") or member
-    return f"{name} ({n['type']})" if n.get("type") else name
+    t = n.get("type")
+    if not t:
+        return name
+    k = n.get("kind")
+    return f"{name} ({t}/{k})" if k else f"{name} ({t})"
 
 
 def resolve_graph_nodes(
@@ -158,7 +166,7 @@ def resolve_graph_nodes(
                 exact.append((fk, n))
             elif needle in nm or (len(nm) >= 4 and nm in needle):
                 partial.append((fk, n))
-            if n.get("type") == "Edital":
+            if n.get("type") == "Oportunidade" and n.get("kind") == "edital":
                 eid = str(n.get("edital_id") or native).lower()
                 if eid in id_tokens or native in id_tokens or (src and src in needle and eid in needle):
                     by_id.append((fk, n))
@@ -262,8 +270,11 @@ def neighborhood(
             continue
         visited_graph_nodes.add(gk)
 
-        lines = [f"### {node.get('name', '')} [{node_type}] · fonte={src}"]
-        if node_type == "Edital":
+        node_kind = node.get("kind", "")
+        head = f"### {node.get('name', '')} [{node_type}"
+        head += f"/{node_kind}]" if node_kind else "]"
+        lines = [f"{head} · fonte={src}"]
+        if node_type == "Oportunidade" and node_kind == "edital":
             disp = []
             if node.get("prazo"):
                 disp.append(f"prazo {node['prazo']}")
@@ -275,6 +286,15 @@ def neighborhood(
             lines.append("  " + " | ".join(disp))
         if node.get("description"):
             lines.append(f"  {node['description'][:200]}")
+        # Guardrail de travessia (KG v2): Mecanismo/Requisito/Exclusão deixaram de
+        # ser nós — sem serializar as PROPRIEDADES aqui, a LLM perderia info que
+        # via como vizinhos. mecanismo/elegibilidade continuam visíveis na tool.
+        if node.get("mecanismo"):
+            lines.append(f"  mecanismo: {', '.join(node['mecanismo'])}")
+        for label, key in (("requisitos", "requisitos_texto"), ("exclusões", "exclusoes_texto")):
+            vals = node.get(key) or []
+            if vals:
+                lines.append(f"  {label}: " + "; ".join(str(v)[:80] for v in vals[:4]))
 
         # BFS no subgrafo atual
         collected, visited = _bfs_subgraph(

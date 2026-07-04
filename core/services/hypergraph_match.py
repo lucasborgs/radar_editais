@@ -49,12 +49,24 @@ MIN_AGGREGATE_SCORE = 0.30
 # entidade ainda (ver [[project-hypergraph-sprint3]]).
 MIN_AGGREGATE_ENTITY = 0.05
 
-# Tipos que contam como AFINIDADE (sinal de match cross-domínio). Mecanismo e
-# Requisito ficam de FORA de propósito: são estruturais (todo edital tem
-# "subvenção"/"TRL"), casam com cosseno altíssimo e afogam o sinal de conteúdo —
-# eles são ELEGIBILIDADE (filtro duro), não afinidade. Empírico: sem isso, uma
-# agtech florestal "casa" com 100% dos editais via subvenção↔subvenção.
-AFFINITY_TYPES = frozenset({"Tema", "Tecnologia", "Aplicação"})
+# Tipo que conta como AFINIDADE (sinal de match cross-domínio): Conceito (v2 —
+# funde Tema/Tecnologia/Aplicação, D7). Mecanismo/Requisito saíram do grafo (viraram
+# propriedade/constraint) — são ELEGIBILIDADE (filtro duro), não afinidade. Empírico:
+# sem isso, uma agtech florestal "casa" com 100% dos editais via subvenção↔subvenção.
+AFFINITY_TYPES = frozenset({"Conceito"})
+
+# Marca de ex-Entidade reclassificada no PR2 (core/kg/migrate_v2). Em v1 Entidade
+# NUNCA esteve em AFFINITY_TYPES; excluí-la aqui preserva o comportamento (a promoção
+# nó-a-nó desses descritores é decisão do PR3/higiene, não desta consolidação).
+_ENTIDADE_V1_ORIGEM = "entidade_v1"
+
+
+def _is_affinity(node: dict, types: frozenset = AFFINITY_TYPES) -> bool:
+    """True se o nó conta como afinidade: tipo ∈ `types` (vazio = qualquer) e NÃO é
+    ex-Entidade v1 (inerte no match até a higiene do PR3)."""
+    if node.get("origem") == _ENTIDADE_V1_ORIGEM:
+        return False
+    return not types or node.get("type") in types
 
 
 @dataclass
@@ -68,15 +80,34 @@ class SyntheticEdge:
     src_type: str
     dst_type: str
     score: float
+    dst_kind: str = ""  # kind (slug) da entidade destino — "" se não é entidade-oferta
+
+
+# kind-slug da entidade-OFERTA de um nó v2, ou None se não é entidade. Ator(ict/
+# investidor) + Oportunidade(programa) são entidades do match de entidade; o edital
+# (Oportunidade kind=edital) NÃO é (é o resultado do match direto de editais).
+ENTITY_KINDS = frozenset({"ict", "investidor", "programa"})
+_ENTITY_NODE_TYPES = frozenset({"Ator", "Oportunidade"})
+
+
+def _entity_kind(node: dict) -> str | None:
+    k = node.get("kind")
+    if k in ENTITY_KINDS and node.get("type") in _ENTITY_NODE_TYPES:
+        return k
+    return None
 
 
 def _node_text(node: dict) -> str:
     """Representação textual canônica de um nó p/ embedding — IDÊNTICA nos dois
-    lados (o match é geométrico: exige a mesma função de texto em empresa e eco)."""
+    lados (o match é geométrico: exige a mesma função de texto em empresa e eco).
+
+    Prefixo = descritor MAIS específico do v2 (dim → kind → type). Preserva o sinal
+    semântico do type v1 e minimiza o drift dos cossenos vs. o baseline: um Conceito
+    dim=tema vira `tema: X` (≈ `Tema: X` de antes), um Ator ict vira `ict: X`."""
     name = node.get("name", "")
-    typ = node.get("type", "")
+    prefix = node.get("dim") or node.get("kind") or node.get("type", "")
     desc = node.get("description", "") or ""
-    return f"{typ}: {name}. {desc}".strip()
+    return f"{prefix}: {name}. {desc}".strip()
 
 
 def load_ecosystem_nodes() -> list[tuple[str, dict]]:
@@ -230,22 +261,20 @@ def build_synthetic_edges(
         eco_emb = _eco_embeddings_for(eco)  # memo (identidade) ou .npz por hash
     sims = _cosine_matrix(comp_emb, eco_emb)
 
-    def _ok(node: dict, types: frozenset) -> bool:
-        return not types or node.get("type") in types
-
     edges: list[SyntheticEdge] = []
     for i, cn in enumerate(company_nodes):
-        if not _ok(cn, affinity_types):
+        if not _is_affinity(cn, affinity_types):
             continue
         for j, (fk, en) in enumerate(eco):
-            if not _ok(en, dst_filter):
+            if not _is_affinity(en, dst_filter):
                 continue
             s = float(sims[i, j])
             if s >= threshold:
                 edges.append(
                     SyntheticEdge(
                         src=cn.get("name", ""), dst=en.get("name", ""), file_key=fk,
-                        src_type=cn.get("type", ""), dst_type=en.get("type", ""), score=s,
+                        src_type=cn.get("type", ""), dst_type=en.get("type", ""),
+                        dst_kind=_entity_kind(en) or "", score=s,
                     )
                 )
     edges.sort(key=lambda e: e.score, reverse=True)
@@ -339,11 +368,11 @@ def _expand_match_via_catalog(
         members = e.get("members", [])  # ids (v2)
         for m in members:
             nd = ict_by_id.get(m)
-            if nd and nd.get("type") == "ICT":
+            if nd and _entity_kind(nd) == "ict":
                 ict_edges_by_entity[m].append((et, members))
 
     # Embed da empresa (só nós de afinidade) para comparar com temas do catálogo
-    comp_affinity = [n for n in company_nodes if n.get("type") in AFFINITY_TYPES]
+    comp_affinity = [n for n in company_nodes if _is_affinity(n)]
     if not comp_affinity:
         return matches
     comp_emb = np.asarray(
@@ -367,7 +396,7 @@ def _expand_match_via_catalog(
                 continue
             for m in e.get("members", []):  # ids
                 nd = graph_by_id.get(m)
-                if nd and nd.get("type") == "ICT":
+                if nd and _entity_kind(nd) == "ict":
                     ict_partners.add(m)
 
         if not ict_partners:
@@ -387,9 +416,9 @@ def _expand_match_via_catalog(
                     m_node = ict_by_id.get(m)
                     if not m_node:
                         continue
-                    m_type = m_node.get("type", "")
-                    if m_type not in AFFINITY_TYPES:
+                    if not _is_affinity(m_node):
                         continue
+                    m_type = m_node.get("type", "")
                     # Embed do tema e cosseno com empresa
                     m_emb = np.asarray(
                         embed_texts([_node_text(m_node)]), dtype=np.float32
@@ -465,7 +494,10 @@ def find_matching_editais(
     # por identidade e reusa os embeddings sem re-hash/reload.
     eco = ecosystem if ecosystem is not None else _ecosystem_snapshot()[1]
     edges = build_synthetic_edges(company_nodes, threshold=threshold, ecosystem=eco)
-    edital_node = {fk: n for fk, n in eco if n.get("type") == "Edital"}
+    edital_node = {
+        fk: n for fk, n in eco
+        if n.get("type") == "Oportunidade" and n.get("kind") == "edital"
+    }
 
     by_file: dict[str, list[SyntheticEdge]] = defaultdict(list)
     for e in edges:
@@ -511,9 +543,6 @@ def find_matching_editais(
 # file_key); entidades coabitam um arquivo de catálogo (group by NÓ). Unifica o
 # que o RadarService fundia (HybridMatch + EntityMatcher + ict_match) num motor só.
 
-# Tipos de nó que SÃO uma entidade-oferta (não conteúdo).
-ENTITY_TYPES = frozenset({"Investidor", "Programa", "ICT"})
-
 # Arquivos de catálogo no ecossistema (file_key SEM '__' — não são editais).
 CATALOG_FILES = frozenset({"investidores", "programas", "ict"})
 
@@ -523,7 +552,7 @@ class EntityMatch:
     """Uma entidade (investidor/programa/ICT) que casa com a empresa por afinidade."""
 
     file_key: str               # investidores | programas | ict
-    kind: str                   # Investidor | Programa | ICT
+    kind: str                   # slug v2: investidor | programa | ict
     name: str
     description: str | None
     score: float                # melhor cosseno — display
@@ -551,34 +580,40 @@ def _entity_attribution(
     graphs: dict[str, dict],
 ) -> tuple[dict[str, dict[str, list[tuple[str, str]]]], dict[str, dict[str, tuple[str, str, str | None]]]]:
     """Pré-computa, por arquivo de catálogo:
-      • attribution: nome-de-nó-de-conteúdo(lower) → [(kind, nome_canônico)] donos,
-        derivado das arestas nativas (uma ICT `viabiliza`/`abrange_tema` um Tema);
-      • entity_index: nome-de-entidade(lower) → (kind, nome_canônico, descrição),
+      • attribution: nome-de-nó-de-conteúdo(lower) → [(kind_slug, nome_canônico)] donos,
+        derivado das arestas nativas (uma ICT `viabiliza`/`abrange_tema` um Conceito);
+      • entity_index: nome-de-entidade(lower) → (kind_slug, nome_canônico, descrição),
         para o caminho direto (Programa casa pela própria descrição).
-    """
+
+    v2: as arestas referenciam members por `id` (não por name), então resolvemos
+    cada member pelo índice id→nó do arquivo. Conceitos ex-Entidade (entidade_v1)
+    não atribuem (não são afinidade)."""
     attribution: dict[str, dict[str, list[tuple[str, str]]]] = {}
     entity_index: dict[str, dict[str, tuple[str, str, str | None]]] = {}
     for fk in CATALOG_FILES:
         g = graphs.get(fk)
         if not g:
             continue
-        type_by: dict[str, str] = {}
-        name_by: dict[str, str] = {}
+        by_id = {n["id"]: n for n in g.get("nodes", []) if n.get("id")}
         ent_idx: dict[str, tuple[str, str, str | None]] = {}
         for n in g.get("nodes", []):
-            nm = (n.get("name") or "").strip().lower()
-            if not nm:
-                continue
-            t = n.get("type") or ""
-            type_by[nm] = t
-            name_by[nm] = n.get("name") or nm
-            if t in ENTITY_TYPES:
-                ent_idx[nm] = (t, n.get("name") or nm, n.get("description"))
+            if (ek := _entity_kind(n)) is not None:
+                nm = (n.get("name") or "").strip().lower()
+                if nm:
+                    ent_idx[nm] = (ek, n.get("name") or nm, n.get("description"))
         attr: dict[str, list[tuple[str, str]]] = defaultdict(list)
         for e in g.get("edges", []):
-            members = [(x or "").strip().lower() for x in e.get("members", [])]
-            ents = [(type_by[x], name_by[x]) for x in members if type_by.get(x) in ENTITY_TYPES]
-            for a in (x for x in members if type_by.get(x) in AFFINITY_TYPES):
+            ents: list[tuple[str, str]] = []
+            aff_names: list[str] = []
+            for m in e.get("members", []):  # ids (v2)
+                nd = by_id.get(m)
+                if nd is None:
+                    continue
+                if (ek := _entity_kind(nd)) is not None:
+                    ents.append((ek, nd.get("name") or m))
+                elif _is_affinity(nd):
+                    aff_names.append((nd.get("name") or "").strip().lower())
+            for a in aff_names:
                 for ent in ents:
                     if ent not in attr[a]:
                         attr[a].append(ent)
@@ -594,7 +629,7 @@ def find_matching_entities(
     min_aggregate: float = MIN_AGGREGATE_ENTITY,
     top_k: int = 10,
     max_paths: int = 5,
-    kinds: frozenset = ENTITY_TYPES,
+    kinds: frozenset = ENTITY_KINDS,
     ecosystem: list[tuple[str, dict]] | None = None,
     graphs: dict[str, dict] | None = None,
 ) -> list[EntityMatch]:
@@ -602,12 +637,14 @@ def find_matching_entities(
 
     Mesmo motor (build_synthetic_edges + marginsum), agrupando por NÓ de catálogo.
     Caminho duplo conforme o catálogo (ver `_entity_attribution`):
-      • aresta a um nó de CONTEÚDO (Tema/Tec/Aplic de ict/investidores) → atribui à(s)
+      • aresta a um nó de CONTEÚDO (Conceito de ict/investidores) → atribui à(s)
         entidade(s) dona(s) via arestas nativas — é como a ICT casa (desc é pobre);
-      • aresta a um nó-ENTIDADE direto (descrição rica do Programa/Investidor) → atribui
-        a ele — programas não têm temas no arquivo, casam pela descrição.
-    Sem LLM no loop. `min_aggregate` usa MIN_AGGREGATE_ENTITY (mais baixo — provisório,
-    sem golden de entidade; EntityMatcher legacy nunca foi gate duro)."""
+      • aresta a um nó-ENTIDADE direto (Ator investidor/ict ou Oportunidade programa,
+        descrição rica) → atribui a ele — programas não têm temas no arquivo, casam
+        pela descrição.
+    `kinds` filtra por slug v2 ({"ict","investidor","programa"}). Sem LLM no loop.
+    `min_aggregate` usa MIN_AGGREGATE_ENTITY (mais baixo — provisório, sem golden de
+    entidade; EntityMatcher legacy nunca foi gate duro)."""
     # eco e atribuição saem do MESMO snapshot (postgres-aware) — nunca misturar
     # disco↔PG (senão em prod o eco vem vazio e a atribuição não, e o match de
     # entidade devolve nada). O snapshot memoizado (PR6.3) garante isso de graça.
@@ -620,10 +657,12 @@ def find_matching_entities(
         eco = ecosystem if ecosystem is not None else [
             (fk, n) for fk, g in graphs.items() for n in g.get("nodes", [])
         ]
-    # dst inclui ENTIDADE além de conteúdo → cobre o caminho direto (programas).
+    # dst inclui os tipos-ENTIDADE (Ator/Oportunidade) além de conteúdo (Conceito)
+    # → cobre o caminho direto (programas/investidores). Editais são descartados
+    # abaixo por file_key (têm '__'), mesmo entrando aqui como Oportunidade.
     edges = build_synthetic_edges(
         company_nodes, threshold=threshold,
-        dst_types=AFFINITY_TYPES | ENTITY_TYPES, ecosystem=eco,
+        dst_types=AFFINITY_TYPES | _ENTITY_NODE_TYPES, ecosystem=eco,
     )
     attribution, entity_index = _entity_attribution(graphs)
 
@@ -633,8 +672,8 @@ def find_matching_entities(
         if e.file_key not in CATALOG_FILES:
             continue
         dst_lower = e.dst.strip().lower()
-        if e.dst_type in ENTITY_TYPES:
-            owners = [(e.dst_type, e.dst)]                              # direto
+        if e.dst_kind:  # entidade direta (Ator investidor/ict ou Oportunidade programa)
+            owners = [(e.dst_kind, e.dst)]
         else:
             owners = attribution.get(e.file_key, {}).get(dst_lower, [])  # via aresta
         for kind, name in owners:
