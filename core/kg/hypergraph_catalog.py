@@ -119,20 +119,51 @@ def _status(edital: dict) -> str:
     return "Desconhecido"
 
 
-def _names(nodes: list[dict], *types: str) -> list[str]:
-    wanted = set(types)
-    return [n["name"] for n in nodes if n.get("type") in wanted and n.get("name")]
+def _by_dim(nodes: list[dict], dim: str, *, include_entidade_v1: bool = False) -> list[str]:
+    """Nomes dos Conceitos de uma dimensão (tema/tecnologia/aplicacao). Ex-Entidade
+    (origem=entidade_v1) fica de FORA por default — em v1 eram nós Entidade (público-
+    alvo), não Tema; incluí-los poluiria os temas do card."""
+    out = []
+    for n in nodes:
+        if n.get("type") != "Conceito" or n.get("dim") != dim:
+            continue
+        if not include_entidade_v1 and n.get("origem") == "entidade_v1":
+            continue
+        if n.get("name"):
+            out.append(n["name"])
+    return out
+
+
+def _by_kind(nodes: list[dict], v2type: str, kind: str) -> list[str]:
+    """Nomes dos nós de um (type, kind) v2 — ex.: Ator/ict, Oportunidade/programa."""
+    return [n["name"] for n in nodes if n.get("type") == v2type and n.get("kind") == kind and n.get("name")]
+
+
+def _publico_alvo(nodes: list[dict]) -> list[str]:
+    """Ex-nós Entidade (público-alvo elegível): Conceito marcado origem=entidade_v1."""
+    return [n["name"] for n in nodes if n.get("origem") == "entidade_v1" and n.get("name")]
 
 
 def edital_card(file_key: str, graph: dict, *, full: bool = False) -> dict | None:
     """Deriva o card de um subgrafo de edital. `full` adiciona os campos de detalhe
-    (objetivo, mecanismo, elegíveis, requisitos) — a lista usa o resumo."""
+    (objetivo, mecanismo, elegíveis, requisitos) — a lista usa o resumo.
+
+    v2: o edital é `Oportunidade(kind=edital)`; temas/tecnologias/aplicações são
+    `Conceito(dim=…)`; mecanismo/requisitos/exclusões vêm das PROPRIEDADES do nó
+    edital (foldadas na consolidação); ICTs/investidores são `Ator(kind=…)`."""
+    from core.skills import mechanism_display
+
     nodes = graph.get("nodes", [])
-    edital = next((n for n in nodes if n.get("type") == "Edital"), None)
+    edital = next(
+        (n for n in nodes if n.get("type") == "Oportunidade" and n.get("kind") == "edital"),
+        None,
+    )
     if edital is None:
         return None
     source, _, native = file_key.partition("__")
-    raw_fonte = [edital["fonte"]] if edital.get("fonte") else _names(nodes, "Fonte")
+    # `fonte` de recurso: campo do nó edital (Fonte deixou de ser nó — D4; a URL/
+    # proveniência determinística é PR4).
+    raw_fonte = [edital["fonte"]] if edital.get("fonte") else []
     fonte = sorted(set(
         _normalize_source_name(f)
         for item in raw_fonte
@@ -146,27 +177,24 @@ def edital_card(file_key: str, graph: dict, *, full: bool = False) -> dict | Non
         "title": edital.get("name", ""),
         "status": _status(edital),
         "deadline": edital.get("prazo") or "",
-        "themes": _names(nodes, "Tema"),
-        "technologies": _names(nodes, "Tecnologia"),
-        "programs": _names(nodes, "Programa"),
-        "publico_alvo": _names(nodes, "Entidade"),
+        "themes": _by_dim(nodes, "tema"),
+        "technologies": _by_dim(nodes, "tecnologia"),
+        "programs": _by_kind(nodes, "Oportunidade", "programa"),
+        "publico_alvo": _publico_alvo(nodes),
         "fonte_recurso": fonte,
         "opportunity_type": "edital",
     }
     if full:
         card.update({
             "objective": edital.get("description") or "",
-            "mechanism": ", ".join(_names(nodes, "Mecanismo")),
-            "eligible_entities": _names(nodes, "Entidade"),
-            "key_requirements": [
-                (n.get("description") or n.get("name"))
-                for n in nodes if n.get("type") == "Requisito"
-            ],
-            "aplicacoes": _names(nodes, "Aplicação"),
-            "exclusoes": _names(nodes, "Exclusão"),
+            "mechanism": ", ".join(mechanism_display(m) for m in edital.get("mecanismo", [])),
+            "eligible_entities": _publico_alvo(nodes),
+            "key_requirements": list(edital.get("requisitos_texto", [])),
+            "aplicacoes": _by_dim(nodes, "aplicacao"),
+            "exclusoes": list(edital.get("exclusoes_texto", [])),
             "value": edital.get("valor"),
-            "icts": _names(nodes, "ICT"),
-            "investidores": _names(nodes, "Investidor"),
+            "icts": _by_kind(nodes, "Ator", "ict"),
+            "investidores": _by_kind(nodes, "Ator", "investidor"),
         })
     return card
 
@@ -271,11 +299,17 @@ def _theme_match(needle: str, themes: list[str]) -> bool:
     return any(nt in tt or tt in nt for nt in ntoks for tt in ttoks)
 
 
-_CATALOG_TYPE_MAP: dict[str, str] = {
-    "ict": "ICT",
-    "investidores": "Investidor",
-    "programas": "Programa",
+# catalog_key → (tipo v2, kind). Ex.: ICTs são Ator(kind=ict).
+_CATALOG_TYPE_MAP: dict[str, tuple[str, str]] = {
+    "ict": ("Ator", "ict"),
+    "investidores": ("Ator", "investidor"),
+    "programas": ("Oportunidade", "programa"),
 }
+
+
+def _is_content(n: dict) -> bool:
+    """Nó de conteúdo temático (Conceito real, não ex-Entidade)."""
+    return n.get("type") == "Conceito" and n.get("origem") != "entidade_v1"
 
 
 def list_entity_catalog(
@@ -291,19 +325,23 @@ def list_entity_catalog(
 
     Fonte única para tools e consumers: substitui o acesso direto a
     `kg_store.load_icts()` / `.load_investidores()` / `.load_programas()`."""
-    wanted_type = _CATALOG_TYPE_MAP.get(catalog_key)
-    if wanted_type is None:
+    wanted = _CATALOG_TYPE_MAP.get(catalog_key)
+    if wanted is None:
         return []
+    wanted_type, wanted_kind = wanted
     if graphs is None:
         graphs = kg_store.load_all_hypergraphs()
     g = graphs.get(catalog_key)
     if not g:
         return []
-    g = migrate_to_v2(g)  # v2: arestas por id (idempotente se já-v2)
+    g = migrate_to_v2(g)  # v2: tipos consolidados + arestas por id (idempotente)
     nodes = g.get("nodes", [])
     edges = g.get("edges", [])
 
     node_by_id: dict[str, dict] = {n["id"]: n for n in nodes if n.get("id")}
+
+    def _is_wanted(n: dict) -> bool:
+        return n.get("type") == wanted_type and n.get("kind") == wanted_kind
 
     # Índice de arestas: id da entidade → temas conectados via arestas nativas
     edge_themes: dict[str, set[str]] = {}
@@ -311,16 +349,16 @@ def list_entity_catalog(
         members = e.get("members", [])  # ids (v2)
         thematic = [
             n["name"] for m in members
-            if (n := node_by_id.get(m)) and n.get("type") in ("Tema", "Tecnologia", "Aplicação")
+            if (n := node_by_id.get(m)) and _is_content(n)
         ]
         for m in members:
             nd = node_by_id.get(m)
-            if nd and nd.get("type") == wanted_type:
+            if nd and _is_wanted(nd):
                 edge_themes.setdefault(m, set()).update(thematic)
 
     out: list[dict] = []
     for n in nodes:
-        if n.get("type") != wanted_type:
+        if not _is_wanted(n):
             continue
         nm = n.get("name", "")
         themes_list = sorted(edge_themes.get(n.get("id", ""), set()))

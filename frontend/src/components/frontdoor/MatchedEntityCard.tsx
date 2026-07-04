@@ -18,17 +18,24 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
+// KG v2: `kind` é slug (investidor/programa/ict). Estilo e rótulo de display por slug.
 const KIND_STYLES: Record<string, string> = {
-  Investidor: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  Programa: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  ICT: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+  investidor: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  programa: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  ict: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+};
+
+const KIND_LABELS: Record<string, string> = {
+  investidor: "Investidor",
+  programa: "Programa",
+  ict: "ICT",
 };
 
 function KindBadge({ kind }: { kind: string }) {
   const cls = KIND_STYLES[kind] ?? "bg-content-secondary/15 text-content-secondary";
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium font-sans ${cls}`}>
-      {kind}
+      {KIND_LABELS[kind] ?? kind}
     </span>
   );
 }
@@ -40,9 +47,9 @@ export function MatchedEntityCard({
   entity: MatchedEntity;
   onStartWriting?: (entityId: string, mode: "proposal" | "pitch") => void;
 }) {
-  const canWrite = entity.kind === "Investidor" || entity.kind === "Programa";
-  const writeLabel = entity.kind === "Investidor" ? "Escrever pitch →" : "Escrever proposta →";
-  const writeMode = entity.kind === "Investidor" ? ("pitch" as const) : ("proposal" as const);
+  const canWrite = entity.kind === "investidor" || entity.kind === "programa";
+  const writeLabel = entity.kind === "investidor" ? "Escrever pitch →" : "Escrever proposta →";
+  const writeMode = entity.kind === "investidor" ? ("pitch" as const) : ("proposal" as const);
 
   return (
     <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm font-sans">

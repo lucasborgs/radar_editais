@@ -90,548 +90,277 @@
     "iflorestal": [
       {
         "name": "iFlorestal Tecnologia",
-        "type": "Entidade",
+        "type": "Conceito",
         "description": "empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema",
+        "origem": "entidade_v1"
       },
       {
         "name": "bioeconomia",
-        "type": "Tema",
+        "type": "Conceito",
         "description": "domínio em que a empresa atua",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema"
       },
       {
         "name": "IA",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "monitoramento",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "caso de uso concreto da empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "subvenção",
-        "type": "Mecanismo",
-        "description": "modalidade de financiamento que a empresa busca",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "TRL 5",
-        "type": "Requisito",
-        "description": "característica de elegibilidade que a empresa atende",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       }
     ],
     "fintech_saas": [
       {
         "name": "PagAgil",
-        "type": "Entidade",
+        "type": "Conceito",
         "description": "startup",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema",
+        "origem": "entidade_v1"
       },
       {
         "name": "e-commerce",
-        "type": "Tema",
+        "type": "Conceito",
         "description": "domínio em que a empresa atua",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema"
       },
       {
         "name": "machine learning",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "gateway de pagamentos",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "caso de uso concreto da empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "credito_reembolsavel",
-        "type": "Mecanismo",
-        "description": "modalidade de financiamento que a empresa busca",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "TRL 7",
-        "type": "Requisito",
-        "description": "característica de elegibilidade que a empresa atende",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       }
     ],
     "ia_digital_mg": [
       {
         "name": "NeuralMinas Tecnologia",
-        "type": "Entidade",
+        "type": "Conceito",
         "description": "startup",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema",
+        "origem": "entidade_v1"
       },
       {
         "name": "indústria 4.0",
-        "type": "Tema",
+        "type": "Conceito",
         "description": "domínio em que a empresa atua",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema"
       },
       {
         "name": "IA generativa",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "automação industrial",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "caso de uso concreto da empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       },
       {
         "name": "análise de dados em tempo real",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "caso de uso concreto da empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "subvenção",
-        "type": "Mecanismo",
-        "description": "modalidade de financiamento que a empresa busca",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "TRL 4",
-        "type": "Requisito",
-        "description": "característica de elegibilidade que a empresa atende",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       }
     ],
     "biofarma_saude": [
       {
         "name": "BioSano Biotecnologia",
-        "type": "Entidade",
+        "type": "Conceito",
         "description": "startup",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema",
+        "origem": "entidade_v1"
       },
       {
         "name": "saúde",
-        "type": "Tema",
+        "type": "Conceito",
         "description": "domínio em que a empresa atua",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema"
       },
       {
         "name": "biotecnologia",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "desenvolvimento de insumos farmacêuticos ativos",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "caso de uso concreto da empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "subvenção",
-        "type": "Mecanismo",
-        "description": "modalidade de financiamento que a empresa busca",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "TRL 4",
-        "type": "Requisito",
-        "description": "característica de elegibilidade que a empresa atende",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       }
     ],
     "agritech_maquinas": [
       {
         "name": "AgroMaq Sistemas",
-        "type": "Entidade",
+        "type": "Conceito",
         "description": "empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema",
+        "origem": "entidade_v1"
       },
       {
         "name": "agricultura familiar",
-        "type": "Tema",
+        "type": "Conceito",
         "description": "domínio em que a empresa atua",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema"
       },
       {
         "name": "máquinas e equipamentos agrícolas",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "mecanização",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "operação aplicada a um objeto",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "subvenção",
-        "type": "Mecanismo",
-        "description": "modalidade de financiamento que a empresa busca",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "TRL 6",
-        "type": "Requisito",
-        "description": "característica de elegibilidade que a empresa atende",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       }
     ],
     "energia_hidrogenio": [
       {
         "name": "HidroVerde Energia",
-        "type": "Entidade",
+        "type": "Conceito",
         "description": "empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema",
+        "origem": "entidade_v1"
       },
       {
         "name": "energia renovável",
-        "type": "Tema",
+        "type": "Conceito",
         "description": "domínio em que a empresa atua",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema"
       },
       {
         "name": "armazenamento de energia",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "hidrogênio de baixa emissão",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "eletromobilidade",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "armazenamento",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "CASO DE USO concreto da empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       },
       {
         "name": "descarbonização industrial",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "CASO DE USO concreto da empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "subvenção",
-        "type": "Mecanismo",
-        "description": "modalidade de financiamento que a empresa BUSCA",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "TRL 5",
-        "type": "Requisito",
-        "description": "característica de elegibilidade que a empresa ATENDE",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       }
     ],
     "semicondutores": [
       {
         "name": "SiliconBR Microeletrônica",
-        "type": "Entidade",
+        "type": "Conceito",
         "description": "startup",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema",
+        "origem": "entidade_v1"
       },
       {
         "name": "microeletrônica",
-        "type": "Tema",
+        "type": "Conceito",
         "description": "domínio em que a empresa atua",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema"
       },
       {
         "name": "semicondutores",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "circuitos integrados",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "design de semicondutores",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "caso de uso concreto da empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       },
       {
         "name": "fabricação de chips",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "caso de uso concreto da empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "subvenção",
-        "type": "Mecanismo",
-        "description": "modalidade de financiamento que a empresa busca",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "TRL 3",
-        "type": "Requisito",
-        "description": "característica de elegibilidade que a empresa atende",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       }
     ],
     "defesa_robotica": [
       {
         "name": "DefTech Sistemas Não Tripulados",
-        "type": "Entidade",
+        "type": "Conceito",
         "description": "empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema",
+        "origem": "entidade_v1"
       },
       {
         "name": "defesa nacional",
-        "type": "Tema",
+        "type": "Conceito",
         "description": "domínio em que a empresa atua",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tema"
       },
       {
         "name": "drones",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "plataformas robóticas autônomas",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "robótica",
-        "type": "Tecnologia",
+        "type": "Conceito",
         "description": "capacidade técnica que a empresa domina",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "tecnologia"
       },
       {
         "name": "desenvolvimento de robótica",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "caso de uso concreto da empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       },
       {
         "name": "veículos autônomos",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "caso de uso concreto da empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       },
       {
         "name": "tecnologias de defesa e segurança",
-        "type": "Aplicação",
+        "type": "Conceito",
         "description": "caso de uso concreto da empresa",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "subvenção",
-        "type": "Mecanismo",
-        "description": "modalidade de financiamento que a empresa busca",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "EPP",
-        "type": "Requisito",
-        "description": "característica de elegibilidade que a empresa atende",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
-      },
-      {
-        "name": "TRL 6",
-        "type": "Requisito",
-        "description": "característica de elegibilidade que a empresa atende",
-        "prazo": null,
-        "status": null,
-        "valor": null,
-        "fonte": null
+        "dim": "aplicacao"
       }
     ]
   },

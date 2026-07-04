@@ -80,8 +80,8 @@ class OpportunityService:
         # Nós Tema/Tecnologia/Aplicação varrendo todos os subgrafos (nome match)
         seen_themes: dict[str, set[str]] = defaultdict(set)
         for fk, n in (self._eco_nodes or []):
-            nt = n.get("type", "")
-            if nt not in ("Tema", "Tecnologia", "Aplicação"):
+            # Conteúdo temático v2 = Conceito (exceto ex-Entidade inerte, entidade_v1).
+            if n.get("type") != "Conceito" or n.get("origem") == "entidade_v1":
                 continue
             nm = n.get("name", "")
             if hypergraph_catalog._theme_match(tema, [nm]):
@@ -91,7 +91,7 @@ class OpportunityService:
             result["temas"].append({
                 "name": name,
                 "fontes": sorted(fontes),
-                "type": "Tema" if name else "",
+                "type": "Conceito" if name else "",
             })
             if len(result["temas"]) >= top_k:
                 break
@@ -120,11 +120,14 @@ class OpportunityService:
             )
             for line in out.split("\n"):
                 text = line.strip()
+                # Marcadores v2: o rótulo de membro é `nome (Type/kind)` (ver
+                # explore_tools._member_label) — ICT/Investidor são ambos Ator,
+                # distintos só pelo kind.
                 for marker, key in [
-                    ("(Edital)", "editais"),
-                    ("(ICT)", "icts"),
-                    ("(Investidor)", "investidores"),
-                    ("(Programa)", "programas"),
+                    ("(Oportunidade/edital)", "editais"),
+                    ("(Ator/ict)", "icts"),
+                    ("(Ator/investidor)", "investidores"),
+                    ("(Oportunidade/programa)", "programas"),
                 ]:
                     if marker not in text:
                         continue
@@ -167,9 +170,9 @@ class OpportunityService:
         )
         for ent in entities:
             key = {
-                "ICT": "icts",
-                "Investidor": "investidores",
-                "Programa": "programas",
+                "ict": "icts",
+                "investidor": "investidores",
+                "programa": "programas",
             }.get(ent.kind)
             if key:
                 result[key].append({
