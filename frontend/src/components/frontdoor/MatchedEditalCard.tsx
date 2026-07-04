@@ -69,6 +69,16 @@ export function MatchedEditalCard({
         </div>
       </div>
 
+      {edital.elegibilidade?.status === "nao_verificada" && (
+        <div
+          className="mt-2 pt-2 border-t border-border text-[11px] text-amber-600"
+          title={edital.elegibilidade.unknown.join("; ")}
+        >
+          ⚠️ Elegibilidade não verificada — complete o perfil ({edital.elegibilidade.unknown.length} critério
+          {edital.elegibilidade.unknown.length > 1 ? "s" : ""}: {edital.elegibilidade.unknown.join("; ")})
+        </div>
+      )}
+
       {edital.paths.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-border">
           {edital.paths.map((p, i) => (

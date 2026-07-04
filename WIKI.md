@@ -632,6 +632,22 @@ hypergraph_schema:
     - meio ambiente, água e saneamento
     - petróleo, gás e mineração
     - construção e cidades inteligentes
+  # Elegibilidade DURA (D6/PR5) — propriedade `constraints[]` da Oportunidade:
+  # objetos AVALIÁVEIS `{tipo, op, valor}`, distintos do texto residual
+  # (`requisitos_texto`/`exclusoes_texto`, que só informam). Um constraint se
+  # AVALIA contra o perfil da empresa (sat/unsat/unknown) e vira o Estágio 0 do
+  # match (filtro duro): `unsat` elimina; `unknown` (campo faltando no perfil)
+  # NÃO elimina — marca "elegibilidade não verificada" no card. Supersede a nota
+  # "nunca gate (§D2)" do campo legado `eligibility_constraints` (§4.2, pipeline
+  # de wiki page removido). Semântica por tipo:
+  #   porte         op in|not_in   valor=[mei,me,epp,media,grande]  (perfil: tamanho_empresa)
+  #   sede_uf       op in|not_in   valor=[SC,SP,…] (UF)             (perfil: uf)
+  #   faturamento   op lte|gte     valor=<BRL/ano>                  (perfil: faturamento_anual)
+  #   trl           op lte|gte|in  valor=<1-9> ou [1-9]             (perfil: trl)
+  #   forma_juridica op in|not_in  valor=[empresa,startup,ict,universidade,…] (perfil: tipo_entidade)
+  #   parceria      op exige       valor=<ator_kind> (ex. ict)      (relacional — unknown no perfil)
+  constraint_tipos: [porte, sede_uf, faturamento, trl, forma_juridica, parceria]
+  constraint_ops: [in, not_in, lte, gte, exige]
 ```
 
 Mapa de migração dos 12 tipos v1 (mecânico, `core/kg/migrate_v2.consolidate_to_v2_types`):
