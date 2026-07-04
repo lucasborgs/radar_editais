@@ -66,10 +66,11 @@ def test_unknown_mechanism_falls_back_low_confidence():
     assert pb2.confidence == "low"
 
 
-def test_investimento_synonym_maps_to_credito():
-    """'investimento' (D2) normaliza para credito."""
+def test_investimento_synonym_maps_to_equity():
+    """'investimento' normaliza para equity (KG v2 PR2 — fix da colisão com o
+    display 'Investimento' de equity; antes mapeava p/ credito)."""
     pb = load_playbook("investimento", "finep")
-    assert pb.mechanism == "credito"
+    assert pb.mechanism == "equity"
 
 
 def test_equity_loads_without_source():

@@ -589,6 +589,42 @@ slugify_rules:
   fallback: "sem-nome"
 ```
 
+### 6.4 Schema do hipergrado v2 (KG v2)
+
+O hipergrado N-ário (`data/knowledge_graph/hypergraphs/`, produzido por
+`core/retrieval/hyper_extractor.py`) usa um schema **próprio**, distinto do grafo
+Obsidian acima (§6.1–6.3). Spec: `docs/specs/kg-redesign.md`. **Três** tipos de nó,
+discriminados por `kind` (Oportunidade/Ator) ou `dim` (Conceito):
+
+- **Oportunidade** — a oferta pública (unidade de resultado do radar). Carrega
+  display (`prazo`/`status`/`valor`/`fonte`), `aperture` e as propriedades foldadas
+  na consolidação: `mecanismo[]` (slugs), `requisitos_texto[]`, `exclusoes_texto[]`,
+  `constraints[]` (PR5), `macro_temas[]` (PR3).
+- **Ator** — identidade referenciável (agência, ICT, investidor, corporate). Nunca é
+  card direto do radar; aparece via suas ofertas.
+- **Conceito** — dimensão graduada, comparada por similaridade. `dim` guia a extração
+  e é canonicalizada no PR3. Descritores ex-`Entidade` da migração ficam marcados
+  `origem: entidade_v1` (inertes no match até a higiene do PR3).
+
+Fonte da verdade dos enums (validados no build — valor fora da lista é rejeitado):
+
+```yaml
+hypergraph_schema:
+  node_types: [Oportunidade, Ator, Conceito]
+  oportunidade_kinds: [edital, desafio, aceleracao, incubacao, parceria_pd, investimento, programa]
+  ator_kinds: [agencia, fap, ict, corporate, aceleradora, investidor]
+  conceito_dims: [tema, tecnologia, aplicacao]
+  apertures: [prazo, continua, recorrente, fechada]
+  edge_types: [financia, exige, abrange_tema, aplica_em, destina_a, exclui, parceria_com, pertence_a, viabiliza, resolve]
+```
+
+Mapa de migração dos 12 tipos v1 (mecânico, `core/kg/migrate_v2.consolidate_to_v2_types`):
+`Edital`→`Oportunidade/edital`; `Programa`→`Oportunidade/programa`; `ICT`→`Ator/ict`;
+`Investidor`→`Ator/investidor`; `Tema|Tecnologia|Aplicação`→`Conceito/dim`;
+`Mecanismo`→propriedade `mecanismo[]`; `Requisito`→`requisitos_texto[]`;
+`Exclusão`→`exclusoes_texto[]`; `Fonte`→proveniência (D4); `Entidade`→heurística
+(Ator conhecido → `Ator`; senão `Conceito/tema` marcado `entidade_v1`).
+
 ---
 
 ## 7. Regras de vigência
