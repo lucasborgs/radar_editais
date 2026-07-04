@@ -637,6 +637,20 @@ def _canonize_fresh(source_hash: str, nodes: list, edges: list, *, file_key: str
     return canonicalize_fresh_graph(graph, file_key=file_key, llm_new=llm_new)
 
 
+def _provenance(source: str, edital_id: str) -> dict:
+    """Proveniência determinística (D4/D14) do adapter da fonte — a URL oficial
+    que TODO bronze tem mas a extração-LLM perde. Fail-open: proveniência nunca
+    derruba o build (só deixa o card sem link)."""
+    if not source:
+        return {}
+    try:
+        from pipeline.adapters.base import get_adapter
+        return get_adapter(source).provenance(edital_id) or {}
+    except Exception as e:  # noqa: BLE001 — fonte sem adapter/bronze não é fatal
+        logger.warning("hyper_extract: proveniência indisponível %s/%s: %s", source, edital_id, e)
+        return {}
+
+
 # ── API pública ───────────────────────────────────────────────────────────────
 
 def run_hyper_extract(
@@ -691,6 +705,11 @@ def run_hyper_extract(
     # Formato v2 (ids) + higiene canonicalizada (PR3) antes de persistir.
     graph = _canonize_fresh(source_hash, nodes, edges, file_key=file_key)
     nodes, edges = graph["nodes"], graph["edges"]
+
+    # Proveniência determinística (D4/D14) — encanada do bronze POR FORA do LLM.
+    prov = _provenance(source, edital_id)
+    if prov:
+        graph["proveniencia"] = prov
 
     written: Path | None = None
     if write:

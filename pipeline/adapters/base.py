@@ -41,6 +41,23 @@ class SourceAdapter(ABC):
         """Retorna o conjunto canônico de documentos de um edital. Vazio
         significa 'sem conteúdo extraível' — o caller decide o fallback."""
 
+    def provenance(self, edital_id: str) -> dict:
+        """Proveniência DETERMINÍSTICA do edital (D4/D14): a URL oficial e a data
+        de coleta que TODO bronze já carrega, mas que a extração-LLM perde. Encana
+        por fora do LLM (bronze → build). Formato:
+        `{fonte, url, urls_documentos, coletado_em}` (campos vazios omitidos).
+
+        Default vazio — cada fonte que expõe URL no bronze sobrescreve. Nunca
+        levanta: proveniência ausente não pode derrubar o build (só deixa o card
+        sem link oficial)."""
+        return {}
+
+
+def coletado_em(rec: dict) -> str:
+    """Data de coleta (`coletado_em`) a partir do `data_extracao` do bronze
+    (`'2026-06-13 00:24:04'` → `'2026-06-13'`). '' se ausente."""
+    return (rec.get("data_extracao") or "").split(" ")[0].strip()
+
 
 def get_adapter(source: str) -> SourceAdapter:
     """Resolve o adapter pelo `source_adapters` registry (§12.4 WIKI.md).

@@ -17,7 +17,7 @@ import re
 
 from config import BRONZE_DIR
 
-from .base import CanonicalDoc, SourceAdapter, split_into_units
+from .base import CanonicalDoc, SourceAdapter, coletado_em, split_into_units
 
 logger = logging.getLogger(__name__)
 
@@ -84,3 +84,16 @@ class Adapter(SourceAdapter):
             return []
 
         return [{"doc_name": "pagina-chamada", "units": split_into_units(texto)}]
+
+    def provenance(self, edital_id: str) -> dict:
+        """URL oficial (`url`) + data de coleta do bronze FAPESP, casando pelo
+        native_id extraído da própria URL. Sem PDF (texto inline no HTML)."""
+        for ch in _load_latest_bronze():
+            url = (ch.get("url") or "").replace("http://", "https://").rstrip("/")
+            if not url or _extract_native_id(url) != edital_id:
+                continue
+            prov: dict = {"fonte": "fapesp", "url": url}
+            if coletado_em(ch):
+                prov["coletado_em"] = coletado_em(ch)
+            return prov
+        return {}
