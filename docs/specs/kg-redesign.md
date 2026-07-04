@@ -370,3 +370,24 @@ Os catálogos curados (investidores/programas) NÃO foram reconstruídos determi
 9. **Dados/backup:** backup pré-PR5 em `data/knowledge_graph.bak.pr5_20260704_104523` (fora do git); corpus reescrito in-place com `constraints[]`.
 
 **Toca (código):** `WIKI.md` (§6.4 constraint schema), `core/kg/schema.py` (accessors + validate), `core/kg/constraints_producer.py` (novo), `core/services/eligibility.py` (novo), `core/services/hypergraph_match.py` (Estágio 0 + `EditalMatch.elegibilidade`), `core/retrieval/hyper_extractor.py` (`_produce_constraints` + wiring), `core/kg/hypergraph_catalog.py` (card expõe `constraints`), `backend/routers/explore.py` (passa `profile`), `scripts/extract_constraints.py` (novo), `tests/test_eligibility.py` (novo), `frontend/src/lib/api.ts`, `frontend/src/components/frontdoor/MatchedEditalCard.tsx`.
+
+### PR4.1 — Desdobramento D2 dos curados + rebuild determinístico + threading do perfil (2026-07-04)
+
+Branch da main. Agendada (janela pinada pelo usuário) **entre PR6 e PR7**: as Oportunidades de investimento precisam EXISTIR antes do veredito (PR7) e da ficha (PR8). Nota de stack: PR6 (MaxSim, #55) e esta saem em paralelo da main; conflito trivial só no append da spec (seções distintas) — sem conflito de código (esta NÃO toca `hypergraph_match.py`).
+
+**Pronto quando:**
+- ✓ curados reconstruídos deterministicamente (zero LLM), preservando as facetas — **investidores 25→78 nós** (17 `Ator(investidor)` + **17 `Oportunidade(investimento)`** + Conceitos), **programas** enriquecidos (10 Oportunidades, `mecanismo`/`estagio`/`ticket`/`requisitos_texto`); **100% das Oportunidades curadas com `url`** (17+10);
+- ✓ desdobramento **D2** vivo: cada fundo → `Ator(investidor)` (casa como antes) + `Oportunidade(kind=investimento, aperture=continua, mecanismo=[equity])` ligada por `pertence_a`, carregando tese/estágio/ticket/URL — o que o extractor-LLM achatava;
+- ✓ threading do perfil até a tool do agente: `GRANDE` no perfil → a tool `find_matching_editais` do ExploreAgent elimina `finep__734` (Estágio 0 ativo DENTRO da tool, não só no match direto do router); sem perfil, não filtra;
+- ✓ eval matching **antes 0.8333/3.125 → depois 0.8333/3.125 (idêntico)** — esperado: `find_matching_editais` só rankeia `kind=edital` de arquivos com `__`; catálogos (sem `__`) não entram, então o rebuild não mexe no ranking de editais. É smoke/regressão, não medida de ganho (o ganho é estrutural: as Oportunidades de investimento passam a existir).
+
+**Divergências do plano:**
+1. **Offer de investimento é nó IRMÃO, topologia de match inalterada** (decisão registrada e aceita): o fundo segue casando como `Ator(kind=investidor)` via `find_matching_entities`; a `Oportunidade(investimento)` carrega os dados estruturados para o PR7/PR8 consumirem. Transformar o offer no card do radar (D1 pleno) é trabalho do PR8 — evita mexer no contrato de entidades do frontend agora.
+2. **Build determinístico substitui o LLM só para investidores/programas**; `ict` (narrativo, de `bronze/ict_raw`) segue no extractor-LLM. `load_investidores_text`/`load_programas_text` ficaram órfãos e foram **removidos**.
+3. **Higiene canônica aplicada aos curados** (replay determinístico, `llm_new=False`) alinha os Conceitos curados ao vocabulário do ecossistema. Efeito colateral benigno: 1 keyword-Conceito foi retipada para `Ator/ict` (o canon a conhece como organização) → 1 aresta `viabiliza` liga dois Atores; `_entity_attribution` trata (no-op). Coberto no teste.
+4. **URL por-NÓ, não file-level** (divergência do bloco `proveniencia` do PR4): arquivos de catálogo são multi-item, então `url`/`urls_documentos` vão como propriedade de cada Oportunidade. A ficha (PR8) lê do nó.
+5. **Threading:** `profile` (dict) encanado `explore.py → explore_agent.{explore,explore_with_meta,_explore_agent} → build_match_tools(profile=) → find_matching_editais(profile=)`. WritingSession NÃO se aplica (usa só `find_matching_entities`, sem filtro de elegibilidade dura).
+6. **Testes:** `tests/test_curadoria_build.py` (6 casos: D2, pertence_a, atribuição, programa enriquecido, macro_temas ⊆ vocab, roda sem `OPENAI_API_KEY`). Suíte: **663 passed** (+6), 37 skipped, os 3 errors de `test_memory_store_postgres` seguem pré-existentes.
+7. **Dados/backup:** backup pré-PR4.1 em `data/knowledge_graph.bak.pr4_1_20260704_150848` (fora do git); `hypergraphs/{investidores,programas}.json` reescritos.
+
+**Toca (código):** `core/kg/curadoria_build.py` (novo), `core/retrieval/hyper_extractor.py` (CATALOG_LOADERS só ict + build determinístico dos curados; loaders órfãos removidos), `core/services/explore_agent.py` (thread `profile`), `core/llm/agent_tools/match_tools.py` (`build_match_tools(profile=)` → tool), `backend/routers/explore.py` (passa `profile`), `scripts/rebuild_curadoria.py` (novo), `tests/test_curadoria_build.py` (novo).

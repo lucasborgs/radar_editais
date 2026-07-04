@@ -129,6 +129,9 @@ def explore(
         explore_message, req.history, req.edital_ids, req.node_id,
         req.node_type, has_profile=req.profile is not None,
         profile_text=ctx or None,
+        # Estágio 0 (PR5/PR4.1): perfil estruturado p/ o filtro de elegibilidade
+        # DENTRO da tool do agente (não só no match direto do router abaixo).
+        profile=current or None,
     )
 
     # PR6.2 (F10): truncamento no teto de passos deixa de ser invisível na UI.
