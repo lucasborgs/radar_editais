@@ -620,15 +620,21 @@ def _is_current(out_path: Path, source_hash: str) -> bool:
         return False
 
 
-def _write_hypergraph(out_path: Path, source_hash: str, nodes: list, edges: list) -> None:
+def _write_hypergraph(out_path: Path, graph: dict) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(
-        json.dumps(
-            {"source_hash": source_hash, "nodes": nodes, "edges": edges},
-            ensure_ascii=False, indent=2,
-        ),
-        encoding="utf-8",
-    )
+    out_path.write_text(json.dumps(graph, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _canonize_fresh(source_hash: str, nodes: list, edges: list, *, file_key: str,
+                    llm_new: bool | None = None) -> dict:
+    """Extração fresca → grafo v2 canonicalizado (PR3): `migrate_to_v2` atribui
+    ids/formato (op:/ator:/con:) e `canonicalize_fresh_graph` replayia o canon
+    map (higiene) — a oportunidade nova entra no KG já canonicalizada."""
+    from core.kg.canonicalize import canonicalize_fresh_graph
+    from core.kg.migrate_v2 import migrate_to_v2
+
+    graph = migrate_to_v2({"source_hash": source_hash, "nodes": nodes, "edges": edges})
+    return canonicalize_fresh_graph(graph, file_key=file_key, llm_new=llm_new)
 
 
 # ── API pública ───────────────────────────────────────────────────────────────
@@ -682,9 +688,13 @@ def run_hyper_extract(
     # (subvencao/credito/equity/…) e descarta ruído. Fonte deixou de ser nó (D4).
     nodes, edges = _normalize_mecanismo_property(nodes, edges)
 
+    # Formato v2 (ids) + higiene canonicalizada (PR3) antes de persistir.
+    graph = _canonize_fresh(source_hash, nodes, edges, file_key=file_key)
+    nodes, edges = graph["nodes"], graph["edges"]
+
     written: Path | None = None
     if write:
-        _write_hypergraph(out_path, source_hash, nodes, edges)
+        _write_hypergraph(out_path, graph)
         written = out_path
         logger.info(
             "hyper_extract: edital_id=%s nós=%d arestas=%d → %s",
@@ -845,9 +855,13 @@ def run_hyper_extract_catalog(
     # Catálogos (programas) também têm mecanismo como propriedade → normaliza p/ slug.
     nodes, edges = _normalize_mecanismo_property(nodes, edges)
 
+    # Formato v2 (ids) + higiene canonicalizada (PR3) antes de persistir.
+    graph = _canonize_fresh(source_hash, nodes, edges, file_key=graph_id)
+    nodes, edges = graph["nodes"], graph["edges"]
+
     written: Path | None = None
     if write:
-        _write_hypergraph(out_path, source_hash, nodes, edges)
+        _write_hypergraph(out_path, graph)
         written = out_path
         logger.info(
             "hyper_extract_catalog: graph_id=%s nós=%d arestas=%d → %s",
@@ -879,6 +893,11 @@ def run_hyper_extract_company(
     data = hg.data
     nodes = [n.model_dump() for n in data.nodes]
     edges = [e.model_dump() for e in data.edges]
+    # Replay DETERMINÍSTICO do canon (renames/descartes conhecidos) — alinha o
+    # lado demanda ao vocabulário canônico do ecossistema. Sem LLM extra
+    # (llm_new=False): o grafo é efêmero, vereditos novos não são persistidos.
+    graph = _canonize_fresh(_text_hash(text), nodes, edges, file_key=company_id, llm_new=False)
+    nodes, edges = graph["nodes"], graph["edges"]
     logger.info(
         "hyper_extract_company: company_id=%s nós=%d arestas=%d",
         company_id, len(nodes), len(edges),

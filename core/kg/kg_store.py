@@ -47,6 +47,9 @@ _FILES: dict[str, str] = {
     # em prod o FS do worker é EFÊMERO — sem durabilidade aqui, cada redeploy
     # re-sintetiza toda wiki (rate limit) e a Descoberta re-tria URLs já vistas.
     "discovery_ledger": ".discovery_ledger.json",
+    # Canon map da higiene de Conceitos (KG v2 PR3, core/kg/canonicalize):
+    # produzido pelo passe de build, reaplicado pelo ingest em extração fresca.
+    "concept_canon": "concept_canon.json",
 }
 
 _TABLE = "kg_artifacts"

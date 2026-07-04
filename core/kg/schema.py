@@ -149,6 +149,13 @@ def valid_v2_kinds() -> set[str]:
     return set(s.get("oportunidade_kinds", [])) | set(s.get("ator_kinds", []))
 
 
+def macro_temas_vocab() -> list[str]:
+    """Vocabulário controlado de macro-temas (D8, KG v2 PR3) — tier estável do
+    two-tier: propriedade `macro_temas[]` da Oportunidade. Versionado no bloco
+    `hypergraph_schema` do WIKI.md (§6.4); mudar o vocabulário = editar o doc."""
+    return hypergraph_schema().get("macro_temas", [])
+
+
 def validate_v2_node(node: dict) -> str | None:
     """Valida os enums de um nó v2 contra o WIKI (§6.4). Retorna a violação como
     string, ou None se ok. Usado como sanity no build (não levanta — loga/coleta)."""
@@ -167,6 +174,11 @@ def validate_v2_node(node: dict) -> str | None:
         ap = node.get("aperture")
         if ap is not None and ap not in s.get("apertures", []):
             return f"aperture inválida: {ap!r}"
+        vocab = s.get("macro_temas")
+        if vocab:
+            fora = [m for m in node.get("macro_temas", []) if m not in vocab]
+            if fora:
+                return f"macro_temas fora do vocabulário: {fora!r}"
     elif t == "Ator":
         if node.get("kind") not in s.get("ator_kinds", []):
             return f"Ator com kind inválido: {node.get('kind')!r}"
