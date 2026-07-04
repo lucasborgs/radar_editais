@@ -184,6 +184,15 @@ export interface MatchedEditalPath {
   score: number;
 }
 
+// Elegibilidade dura (KG v2 PR5 / Estágio 0). `inelegivel` nunca chega ao
+// front (é filtrado antes); sobram `elegivel` e `nao_verificada` (perfil
+// incompleto → o card mostra "elegibilidade não verificada" + o que completar).
+export interface Elegibilidade {
+  status: "elegivel" | "nao_verificada" | "inelegivel";
+  unsat: string[];
+  unknown: string[];
+}
+
 export interface MatchedEdital {
   source: string;
   edital_id: string;
@@ -194,6 +203,7 @@ export interface MatchedEdital {
   status: string | null;
   prazo: string | null;
   valor: string | null;
+  elegibilidade?: Elegibilidade | null;
   paths: MatchedEditalPath[];
 }
 

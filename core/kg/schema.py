@@ -156,6 +156,16 @@ def macro_temas_vocab() -> list[str]:
     return hypergraph_schema().get("macro_temas", [])
 
 
+def constraint_tipos() -> list[str]:
+    """Tipos válidos de constraint de elegibilidade dura (D6/PR5), do WIKI §6.4."""
+    return hypergraph_schema().get("constraint_tipos", [])
+
+
+def constraint_ops() -> list[str]:
+    """Operadores válidos de constraint (in|not_in|lte|gte|exige), do WIKI §6.4."""
+    return hypergraph_schema().get("constraint_ops", [])
+
+
 def validate_v2_node(node: dict) -> str | None:
     """Valida os enums de um nó v2 contra o WIKI (§6.4). Retorna a violação como
     string, ou None se ok. Usado como sanity no build (não levanta — loga/coleta)."""
@@ -179,6 +189,13 @@ def validate_v2_node(node: dict) -> str | None:
             fora = [m for m in node.get("macro_temas", []) if m not in vocab]
             if fora:
                 return f"macro_temas fora do vocabulário: {fora!r}"
+        tipos, ops = s.get("constraint_tipos", []), s.get("constraint_ops", [])
+        if tipos:
+            for c in node.get("constraints", []) or []:
+                if c.get("tipo") not in tipos:
+                    return f"constraint com tipo inválido: {c.get('tipo')!r}"
+                if c.get("op") not in ops:
+                    return f"constraint com op inválido: {c.get('op')!r}"
     elif t == "Ator":
         if node.get("kind") not in s.get("ator_kinds", []):
             return f"Ator com kind inválido: {node.get('kind')!r}"

@@ -308,6 +308,10 @@ class EditalMatch:
     status: str | None
     valor: str | None
     paths: list[SyntheticEdge]  # arestas-justificativa, ordenadas por score desc
+    # Elegibilidade dura (PR5/Estágio 0): {status, unsat[], unknown[]} quando um
+    # perfil foi passado ao match; None quando não avaliada. `inelegivel` NÃO
+    # aparece aqui — é filtrado antes; sobram `elegivel`/`nao_verificada`.
+    elegibilidade: dict | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -320,6 +324,7 @@ class EditalMatch:
             "status": self.status,
             "prazo": self.prazo,
             "valor": self.valor,
+            "elegibilidade": self.elegibilidade,
             "paths": [
                 {"src": p.src, "dst": p.dst, "dst_type": p.dst_type, "score": p.score}
                 for p in self.paths
@@ -474,6 +479,7 @@ def find_matching_editais(
     max_paths: int = 5,
     ecosystem: list[tuple[str, dict]] | None = None,
     catalog_expansion: bool = False,
+    profile: object | None = None,
 ) -> list[EditalMatch]:
     """Match por PATH SEARCH: empresa → aresta sintética → Edital.
 
@@ -488,6 +494,13 @@ def find_matching_editais(
     de ICTs (ADDITIVO): identifica ICTs parceiras dos editais, consulta `ict.json`
     para temas que elas dominam, e adiciona paths com damping. Empresa → tema da
     ICT → edital parceiro da ICT.
+
+    `profile` (PR5/Estágio 0 — FILTRO DURO de elegibilidade): quando passado (dict
+    OU CompanyProfile), avalia as `constraints[]` de cada edital contra os campos
+    estruturados do perfil ANTES do rank. `unsat` (incompatibilidade comprovada)
+    elimina o edital; `unknown` (campo faltando no perfil) NÃO elimina — anexa a
+    flag `elegibilidade` ao match para o card mostrar "não verificada". Sem
+    `profile`, comportamento idêntico ao anterior (nada é filtrado).
 
     Catálogos (ICT/inv/prog) ficam fora do match direto (não têm '__' no file_key)."""
     # eco do snapshot memoizado (PR6.3): build_synthetic_edges reconhece o objeto
@@ -505,12 +518,22 @@ def find_matching_editais(
             by_file[e.file_key].append(e)
 
     matches: list[EditalMatch] = []
+    n_eliminados = 0
     for fk, es in by_file.items():
         es.sort(key=lambda x: x.score, reverse=True)
         affinity = sum(e.score - threshold for e in es)  # marginsum
         if affinity < min_aggregate:
             continue
         node = edital_node[fk]
+        # Estágio 0 (PR5): filtro duro de elegibilidade. `unsat` elimina;
+        # `unknown` não elimina (anexa flag). Sem perfil → elegibilidade=None.
+        elegibilidade = None
+        if profile is not None:
+            from core.services import eligibility
+            elegibilidade = eligibility.evaluate_opportunity(node.get("constraints"), profile)
+            if elegibilidade["status"] == eligibility.INELEGIVEL:
+                n_eliminados += 1
+                continue
         source, _, native = fk.partition("__")
         matches.append(
             EditalMatch(
@@ -518,6 +541,7 @@ def find_matching_editais(
                 name=node.get("name", ""), score=es[0].score, affinity=affinity,
                 n_paths=len(es), prazo=node.get("prazo"), status=node.get("status"),
                 valor=node.get("valor"), paths=es[:max_paths],
+                elegibilidade=elegibilidade,
             )
         )
     matches.sort(key=lambda m: m.affinity, reverse=True)
@@ -531,8 +555,11 @@ def find_matching_editais(
             max_paths=max_paths,
         )
 
-    logger.info("find_matching_editais: %d editais (threshold=%.2f, min_agg=%.2f, catalog_expansion=%s)",
-                len(matches), threshold, min_aggregate, catalog_expansion)
+    logger.info(
+        "find_matching_editais: %d editais (threshold=%.2f, min_agg=%.2f, "
+        "catalog_expansion=%s, elegibilidade_eliminou=%d)",
+        len(matches), threshold, min_aggregate, catalog_expansion, n_eliminados,
+    )
     return matches[:top_k]
 
 
