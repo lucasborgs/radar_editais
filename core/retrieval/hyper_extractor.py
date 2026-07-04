@@ -804,62 +804,18 @@ def load_ict_text(max_chars: int | None = None) -> str:
     return text[:max_chars] if max_chars else text
 
 
-def load_investidores_text(max_chars: int | None = None) -> str:
-    """Texto narrativo do catálogo de investidores (campos curados, sem scraping)."""
-    path = KNOWLEDGE_GRAPH_DIR / "investidores.json"
-    if not path.exists():
-        return ""
-    data = json.loads(path.read_text(encoding="utf-8"))
-    blocks = [
-        _block(
-            f"Investidor: {it.get('name', '')}",
-            [
-                ("Tese", it.get("tese")),
-                ("Temas", it.get("tese_themes")),
-                ("Setores", it.get("setores")),
-                ("Estágio-alvo", it.get("estagio_alvo")),
-                ("Ticket", it.get("ticket_range")),
-            ],
-        )
-        for it in data.get("investidores", [])
-        if it.get("name")
-    ]
-    text = "\n\n---\n\n".join(blocks)
-    return text[:max_chars] if max_chars else text
+# investidores/programas: build determinístico (core/kg/curadoria_build), não
+# mais texto p/ o LLM — ver CATALOG_LOADERS abaixo.
 
 
-def load_programas_text(max_chars: int | None = None) -> str:
-    """Texto narrativo do catálogo de programas (campos curados, sem scraping)."""
-    path = KNOWLEDGE_GRAPH_DIR / "programas.json"
-    if not path.exists():
-        return ""
-    data = json.loads(path.read_text(encoding="utf-8"))
-    blocks = [
-        _block(
-            f"Programa: {it.get('name', '')}",
-            [
-                ("Operador", it.get("operador")),
-                ("Tipo", it.get("tipo")),
-                ("Descrição", it.get("descricao")),
-                ("Benefício", it.get("beneficio")),
-                ("Temas", it.get("tese_themes")),
-                ("Setores", it.get("setores")),
-                ("Estágio-alvo", it.get("estagio_alvo")),
-                ("Elegibilidade", it.get("elegibilidade")),
-            ],
-        )
-        for it in data.get("programas", [])
-        if it.get("name")
-    ]
-    text = "\n\n---\n\n".join(blocks)
-    return text[:max_chars] if max_chars else text
-
-
-# (graph_id, loader). Cada catálogo → hypergraphs/{graph_id}.json.
+# (graph_id, loader). Catálogo NARRATIVO (bronze/ict_raw) → extractor-LLM.
+# investidores/programas saíram daqui (PR4.1): são curados com facetas
+# estruturadas e passam pelo build DETERMINÍSTICO (core/kg/curadoria_build),
+# que preserva tese/estágio/ticket/URL e faz o desdobramento D2 — o LLM os
+# achatava. `load_investidores_text`/`load_programas_text` ficaram órfãos e
+# foram removidos com eles.
 CATALOG_LOADERS = {
     "ict": load_ict_text,
-    "investidores": load_investidores_text,
-    "programas": load_programas_text,
 }
 
 
@@ -1001,5 +957,16 @@ def build_all_hypergraphs(
         except Exception:
             logger.exception("build_all_hypergraphs: falha catálogo=%s", graph_id)
             failed += 1
+    # Catálogos curados (investidores/programas): build DETERMINÍSTICO do JSON
+    # curado — preserva as facetas estruturadas + URL por item + desdobramento D2
+    # (PR4.1). Sem LLM, sem skip-by-hash (barato). Escreve como qualquer subgrafo.
+    try:
+        from core.kg.curadoria_build import build_curated_graphs
+        for graph_id, graph in build_curated_graphs().items():
+            _write_hypergraph(HYPERGRAPHS_DIR / f"{graph_id}.json", graph)
+            built += 1
+    except Exception:
+        logger.exception("build_all_hypergraphs: falha nos catálogos curados")
+        failed += 1
     published = _publish_hypergraphs()  # durável p/ prod (no-op em modo file)
     return {"built": built, "skipped": skipped, "failed": failed, "published": published}
