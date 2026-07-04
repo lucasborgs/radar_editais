@@ -181,14 +181,32 @@ def resolve_graph_nodes(
     return out[:cap]
 
 
+# Cap de grau do BFS (guardrail PR3): pós-canonicalização, Conceitos populares
+# ("saúde", "IA") viram super-nós de alto fan-in — sem o cap, um nó desses
+# inunda o contexto da LLM. Expande no máximo N arestas POR NÓ da frontier,
+# priorizando arestas que tocam Oportunidade/Ator (o mapa fica rico em
+# entidades, não em keyphrases).
+BFS_NODE_DEGREE_CAP = 20
+
+
+def _edge_priority(e: dict, idx: dict[str, dict]) -> int:
+    """0 = aresta com Oportunidade/Ator entre os membros (expande primeiro)."""
+    for m in e.get("members", []):
+        if idx.get(m, {}).get("type") in ("Oportunidade", "Ator"):
+            return 0
+    return 1
+
+
 def _bfs_subgraph(
     graph: dict, idx: dict[str, dict], seed_id: str, depth: int, max_edges: int,
+    degree_cap: int = BFS_NODE_DEGREE_CAP,
 ) -> tuple[list[dict], set[str]]:
     """BFS de arestas em UM subgrafo a partir de `seed_id` (id de nó v2).
 
     Retorna (collected_edges, visited_node_ids) — os ids de TODOS os nós
     alcançados durante a BFS (incluindo o seed), para continuar BFS em outros
-    subgrafos (cross-source)."""
+    subgrafos (cross-source). Cada nó da frontier expande no máximo
+    `degree_cap` arestas, priorizadas por tipo (ver _edge_priority)."""
     frontier = {seed_id}
     visited = set(frontier)
     seen_edges: set[int] = set()
@@ -196,14 +214,22 @@ def _bfs_subgraph(
     collected: list[dict] = []
     for _ in range(depth):
         nxt: set[str] = set()
-        for i, e in enumerate(edges):
-            if i in seen_edges:
-                continue
+        candidates = [
+            (i, e) for i, e in enumerate(edges)
+            if i not in seen_edges and frontier.intersection(e.get("members", []))
+        ]
+        candidates.sort(key=lambda ie: _edge_priority(ie[1], idx))
+        budget: dict[str, int] = dict.fromkeys(frontier, degree_cap)
+        for i, e in candidates:
             mem = e.get("members", [])  # ids (v2)
-            if frontier.intersection(mem):
-                seen_edges.add(i)
-                collected.append(e)
-                nxt.update(m for m in mem if m not in visited)
+            hit = [m for m in mem if m in frontier]
+            if not any(budget.get(h, 0) > 0 for h in hit):
+                continue  # todos os nós da frontier que a aresta toca já saturaram
+            for h in hit:
+                budget[h] = budget.get(h, 0) - 1
+            seen_edges.add(i)
+            collected.append(e)
+            nxt.update(m for m in mem if m not in visited)
         visited |= nxt
         frontier = nxt
         if not frontier:
@@ -291,6 +317,8 @@ def neighborhood(
         # via como vizinhos. mecanismo/elegibilidade continuam visíveis na tool.
         if node.get("mecanismo"):
             lines.append(f"  mecanismo: {', '.join(node['mecanismo'])}")
+        if node.get("macro_temas"):
+            lines.append(f"  macro-temas: {', '.join(node['macro_temas'])}")
         for label, key in (("requisitos", "requisitos_texto"), ("exclusões", "exclusoes_texto")):
             vals = node.get(key) or []
             if vals:

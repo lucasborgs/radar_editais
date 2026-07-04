@@ -76,3 +76,7 @@ data/knowledge_graph/.discovery_ledger.json
 data/knowledge_graph/hypergraphs/
 data/knowledge_graph/graph/
 data/hyper_extract_output*/
+# Higiene de Conceitos (PR3): planos auditáveis + canon map (kg_store) + backups
+data/knowledge_graph/canonicalization/
+data/knowledge_graph/concept_canon.json
+data/knowledge_graph.bak.*/
