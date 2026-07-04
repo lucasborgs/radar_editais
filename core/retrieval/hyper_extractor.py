@@ -651,6 +651,25 @@ def _provenance(source: str, edital_id: str) -> dict:
         return {}
 
 
+_ELIG_CONSTRAINTS_ENV = "ELIG_CONSTRAINTS_LLM"
+
+
+def _produce_constraints(graph: dict) -> None:
+    """Estrutura os textos residuais de elegibilidade das Oportunidades(edital)
+    do grafo em `constraints[]` tipadas (PR5) — passe LLM de build, gated por
+    `ELIG_CONSTRAINTS_LLM` (default on) e fail-open (nunca derruba o ETL). Muta
+    o grafo in-place."""
+    if os.environ.get(_ELIG_CONSTRAINTS_ENV, "1") == "0":
+        return
+    try:
+        from core.kg.constraints_producer import produce_for_graph
+        n = produce_for_graph(graph)
+        if n:
+            logger.info("hyper_extract: %d edital(is) com constraints de elegibilidade", n)
+    except Exception as e:  # noqa: BLE001 — produtor nunca derruba o build
+        logger.warning("hyper_extract: produtor de constraints falhou: %s", e)
+
+
 # ── API pública ───────────────────────────────────────────────────────────────
 
 def run_hyper_extract(
@@ -710,6 +729,10 @@ def run_hyper_extract(
     prov = _provenance(source, edital_id)
     if prov:
         graph["proveniencia"] = prov
+
+    # Elegibilidade dura (PR5): estrutura requisitos/exclusões residuais em
+    # `constraints[]` tipadas (passe LLM de build, gated + fail-open).
+    _produce_constraints(graph)
 
     written: Path | None = None
     if write:

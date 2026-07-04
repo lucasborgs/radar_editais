@@ -199,6 +199,10 @@ def edital_card(file_key: str, graph: dict, *, full: bool = False) -> dict | Non
             "value": edital.get("valor"),
             "icts": _by_kind(nodes, "Ator", "ict"),
             "investidores": _by_kind(nodes, "Ator", "investidor"),
+            # Constraints de elegibilidade dura tipadas (PR5) — a avaliação
+            # sat/unsat depende do perfil (match-time); aqui vai a lista crua
+            # p/ a ficha (PR8) renderizar como chips.
+            "constraints": list(edital.get("constraints", [])),
             # Proveniência completa (PR4/D14): link oficial + PDFs + coleta.
             "document_urls": list(prov.get("urls_documentos") or []),
             "collected_at": prov.get("coletado_em") or "",

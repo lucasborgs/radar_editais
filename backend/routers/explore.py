@@ -146,7 +146,12 @@ def explore(
         try:
             company_nodes = _company_nodes(ctx)
             if company_nodes:
-                editais = find_matching_editais(company_nodes, top_k=8)
+                # Estágio 0 (PR5): passa o perfil estruturado p/ o filtro duro de
+                # elegibilidade — edital com constraint incompatível some do radar;
+                # perfil incompleto mantém o card com flag "não verificada".
+                editais = find_matching_editais(
+                    company_nodes, top_k=8, profile=req.profile,
+                )
                 result["matched_editais"] = [m.to_dict() for m in editais]
                 entities = find_matching_entities(company_nodes, top_k=8)
                 entity_dicts = [e.to_dict() for e in entities]
