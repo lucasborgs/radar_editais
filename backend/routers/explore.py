@@ -157,13 +157,13 @@ def explore(
                     prog_by_name = {p["name"].lower(): p["id"] for p in kg_store.load_programas()}
                     for ed in entity_dicts:
                         key = ed["name"].strip().lower()
-                        if ed["kind"] == "Investidor":
+                        if ed["kind"] == "investidor":
                             ed["entity_id"] = inv_by_name.get(key)
-                        elif ed["kind"] == "Programa":
+                        elif ed["kind"] == "programa":
                             ed["entity_id"] = prog_by_name.get(key)
-                        if ed.get("entity_id") is None and ed["kind"] in ("Investidor", "Programa"):
+                        if ed.get("entity_id") is None and ed["kind"] in ("investidor", "programa"):
                             slug = re.sub(r'[^a-z0-9]+', '-', key).strip('-')
-                            ed["entity_id"] = f"{ed['kind'].lower()}:{slug}"
+                            ed["entity_id"] = f"{ed['kind']}:{slug}"
                 result["matched_entities"] = entity_dicts
         except Exception as e:
             logger.warning("explore: falha ao extrair matched_editais: %s", e)

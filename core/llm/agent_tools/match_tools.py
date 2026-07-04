@@ -148,13 +148,13 @@ def build_match_tools(
             top_k: máximo de entidades a retornar (default 8).
         """
         kind_map = {
-            "investidor": "Investidor", "investidores": "Investidor", "investor": "Investidor",
-            "fundo": "Investidor", "fundos": "Investidor",
-            "programa": "Programa", "programas": "Programa",
-            "ict": "ICT", "icts": "ICT", "instituto": "ICT",
+            "investidor": "investidor", "investidores": "investidor", "investor": "investidor",
+            "fundo": "investidor", "fundos": "investidor",
+            "programa": "programa", "programas": "programa",
+            "ict": "ict", "icts": "ict", "instituto": "ict",
         }
         k = (kind or "").strip().lower()
-        kinds = frozenset({kind_map[k]}) if k in kind_map else hypergraph_match.ENTITY_TYPES
+        kinds = frozenset({kind_map[k]}) if k in kind_map else hypergraph_match.ENTITY_KINDS
         try:
             nodes = company_nodes or _company_nodes(profile_text)
         except Exception as e:  # noqa: BLE001 — erro-como-string (padrão das tools)

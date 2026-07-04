@@ -134,6 +134,45 @@ def node_types() -> dict:
     return load().get("node_types", {})
 
 
+# ---------------------------------------------------------------------------
+# Schema do hipergrado v2 (WIKI.md §6.4) — enums validados no build
+# ---------------------------------------------------------------------------
+
+def hypergraph_schema() -> dict:
+    """Bloco `hypergraph_schema` do WIKI.md (node_types + kinds/dims/apertures/edges)."""
+    return load().get("hypergraph_schema", {})
+
+
+def valid_v2_kinds() -> set[str]:
+    """União de todos os kinds válidos (Oportunidade + Ator) do schema v2."""
+    s = hypergraph_schema()
+    return set(s.get("oportunidade_kinds", [])) | set(s.get("ator_kinds", []))
+
+
+def validate_v2_node(node: dict) -> str | None:
+    """Valida os enums de um nó v2 contra o WIKI (§6.4). Retorna a violação como
+    string, ou None se ok. Usado como sanity no build (não levanta — loga/coleta)."""
+    s = hypergraph_schema()
+    if not s:  # WIKI sem o bloco → sem validação (não falha)
+        return None
+    t = node.get("type")
+    if t not in s.get("node_types", []):
+        return f"type inválido: {t!r}"
+    if t == "Conceito":
+        if node.get("dim") not in s.get("conceito_dims", []):
+            return f"Conceito com dim inválida: {node.get('dim')!r}"
+    elif t == "Oportunidade":
+        if node.get("kind") not in s.get("oportunidade_kinds", []):
+            return f"Oportunidade com kind inválido: {node.get('kind')!r}"
+        ap = node.get("aperture")
+        if ap is not None and ap not in s.get("apertures", []):
+            return f"aperture inválida: {ap!r}"
+    elif t == "Ator":
+        if node.get("kind") not in s.get("ator_kinds", []):
+            return f"Ator com kind inválido: {node.get('kind')!r}"
+    return None
+
+
 def trl_faixas() -> dict:
     return load().get("trl_faixas", {})
 

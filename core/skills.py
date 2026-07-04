@@ -53,12 +53,15 @@ _LOW_CONF_MARKER = (
     "não específica do instrumento."
 )
 
-# ── Vocabulário canônico de mecanismo (D1) + sinônimos (D2: investimento→credito) ──
+# ── Vocabulário canônico de mecanismo + sinônimos ──
+# KG v2 PR2: fix da colisão — "investimento" mapeava para `credito`, mas o display
+# de `equity` era "Investimento" (dois conceitos, um rótulo). Agora "investimento"→
+# `equity` e o display de equity é "Equity/Investimento" (ver MECHANISM_DISPLAY).
 _CANONICAL_MECHANISMS = {
     "subvencao", "credito", "bolsa", "matching", "equity", "premio", "outro",
 }
 _MECHANISM_SYNONYMS = {
-    "investimento": "credito",
+    "investimento": "equity",
     "financiamento": "credito",
     "reembolsavel": "credito",
     "naoreembolsavel": "subvencao",
@@ -67,6 +70,24 @@ _MECHANISM_SYNONYMS = {
     "captacao": "equity",
     "embrapii": "matching",
 }
+
+# Rótulo de display por slug canônico (fonte única — usada pelo card de catálogo e
+# pelo normalizador do extractor). `equity` = "Equity/Investimento" (desambigua a
+# colisão histórica com crédito).
+MECHANISM_DISPLAY = {
+    "subvencao": "Subvenção",
+    "credito": "Crédito",
+    "bolsa": "Bolsa",
+    "matching": "Matching",
+    "equity": "Equity/Investimento",
+    "premio": "Prêmio",
+    "outro": "Outro",
+}
+
+
+def mechanism_display(slug: str) -> str:
+    """Rótulo de display de um slug canônico de mecanismo (fallback = o próprio slug)."""
+    return MECHANISM_DISPLAY.get(slug, slug)
 
 
 def _deburr(s: str) -> str:

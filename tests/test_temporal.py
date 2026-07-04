@@ -19,7 +19,8 @@ def _patch_hypergraph(monkeypatch, editais: list[dict]):
         source, _, native = eid.partition(":")
         graphs[f"{source}__{native}"] = {
             "nodes": [{
-                "type": "Edital",
+                "type": "Oportunidade",
+                "kind": "edital",
                 "edital_id": eid,
                 "prazo": e.get("deadline"),
                 "status": e.get("status"),

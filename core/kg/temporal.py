@@ -25,7 +25,10 @@ def _index_entry(edital_id: str) -> dict | None:
         if "__" not in fk:
             continue
         for n in graph.get("nodes", []):
-            if n.get("type") == "Edital" and n.get("edital_id") == edital_id:
+            if (
+                n.get("type") == "Oportunidade" and n.get("kind") == "edital"
+                and n.get("edital_id") == edital_id
+            ):
                 return {"deadline": n.get("prazo"), "status": n.get("status")}
     return None
 

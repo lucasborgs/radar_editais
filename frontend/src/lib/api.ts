@@ -199,7 +199,7 @@ export interface MatchedEdital {
 
 export interface MatchedEntity {
   file_key: string;
-  kind: "Investidor" | "Programa" | "ICT";
+  kind: "investidor" | "programa" | "ict";  // KG v2: slug (era "Investidor"/…)
   name: string;
   description: string | null;
   score: number;

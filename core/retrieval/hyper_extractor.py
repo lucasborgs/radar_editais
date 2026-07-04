@@ -1,8 +1,8 @@
 """Hyper-Extract — extração de hipergrado N-ário por edital (arquitetura hipergrado).
 
 Wrapper de produção sobre a lib `hyperextract` (`AutoHypergraph`). Lê o silver
-`*.jsonl` de UM edital, extrai um hipergrafo com o schema de produção (12 tipos
-de nó, 10 tipos de aresta, todos `Literal`) e grava
+`*.jsonl` de UM edital, extrai um hipergrafo com o schema de produção v2 (3 tipos
+de nó — Oportunidade/Ator/Conceito — discriminados por kind/dim, 10 tipos de aresta) e grava
 `data/knowledge_graph/hypergraphs/{edital_id}.json` no formato `{nodes, edges}`.
 
 Substitui (em paralelo, sem remover nada ainda) a síntese LLM de wiki_pages.
@@ -94,58 +94,78 @@ _MAX_WORKERS = 4
 
 # ── schema de produção ────────────────────────────────────────────────────────
 
+# KG v2 (spec docs/specs/kg-redesign.md): 3 entidades, discriminadas por kind/dim.
+# `Oportunidade`/`Ator` são identidade referenciável (nó); `Conceito` é dimensão
+# graduada (canonicalizada no PR3). Mecanismo/Requisito/Exclusão/Fonte SAÍRAM do
+# grafo — viram propriedade/constraint/proveniência (Mecanismo=propriedade aqui;
+# constraints/requisitos = produtor do PR5; proveniência/URL = PR4).
 NodeType = Literal[
-    "Fonte",       # FINEP, FAPESP, FAPESC — atribuição e agrupamento
-    "Edital",      # a chamada pública (carrega título/prazo/status/valor/fonte)
-    "Programa",    # PIPE, PAPPE, FNDCT — conexão transversal entre editais
-    "ICT",         # institutos, universidades — parceria obrigatória/oportunidade
-    "Investidor",  # FIPs, VCs — trilho investidor
-    "Tema",        # domínio de aplicação (saúde, agronegócio, manufatura 4.0)
-    "Tecnologia",  # capacidade técnica (IA, IoT, visão computacional)
-    "Aplicação",   # caso de uso específico (triagem, classificação de grãos)
-    "Mecanismo",   # subvenção, crédito, investimento
-    "Requisito",   # constraint de elegibilidade (TRL, porte, idade, região, prazo)
-    "Exclusão",    # exclusão explícita
-    "Entidade",    # tipo de organização elegível (empresa, startup, ICT)
+    "Oportunidade",  # a oferta pública (edital, programa, …) — carrega display/mecanismo
+    "Ator",          # identidade referenciável (agência, ICT, investidor, corporate)
+    "Conceito",      # dimensão graduada (tema/tecnologia/aplicacao via `dim`)
 ]
 
+# Vocabulário fechado de kind/dim/aperture (validado no prompt; enums em WIKI.md).
+OportunidadeKind = Literal["edital", "programa", "desafio", "aceleracao", "incubacao", "parceria_pd", "investimento"]
+AtorKind = Literal["agencia", "fap", "ict", "corporate", "aceleradora", "investidor"]
+ConceitoDim = Literal["tema", "tecnologia", "aplicacao"]
+Aperture = Literal["prazo", "continua", "recorrente", "fechada"]
+
 EdgeType = Literal[
-    "financia",     # Fonte/Edital → Entidade
-    "exige",        # Edital/Programa → Requisito
-    "abrange_tema", # Edital/Programa → Tema/Tecnologia
-    "aplica_em",    # Tecnologia → Aplicação
-    "destina_a",    # Edital → Entidade
-    "exclui",       # Edital → Exclusão
-    "parceria_com", # Edital → ICT/Investidor
-    "pertence_a",   # Edital → Programa → Fonte
-    "viabiliza",    # ICT/Tecnologia → Aplicação/Tema
-    "resolve",      # Tecnologia/Aplicação → Desafio/Tema
+    "financia",     # Oportunidade/Ator → Ator
+    "exige",        # Oportunidade → Ator (ex.: exige parceria com ICT — relacional)
+    "abrange_tema", # Oportunidade → Conceito
+    "aplica_em",    # Conceito(tecnologia) → Conceito(aplicacao)
+    "destina_a",    # Oportunidade → Ator/Conceito (público-alvo)
+    "exclui",       # Oportunidade → Ator/Conceito (vedação relacional)
+    "parceria_com", # Oportunidade → Ator (ICT/investidor)
+    "pertence_a",   # Oportunidade(chamada) → Oportunidade(programa)
+    "viabiliza",    # Ator/Conceito → Conceito
+    "resolve",      # Conceito(tecnologia/aplicacao) → Conceito(tema)
 ]
 
 
 class HyperNode(BaseModel):
-    """Nó do hipergrado. Para nós `Edital`, os campos de display
-    (prazo/status/valor/fonte) carregam as propriedades antes na wiki_page."""
+    """Nó do hipergrado v2. `kind` discrimina Oportunidade/Ator; `dim` discrimina
+    Conceito. Os campos de display (prazo/status/valor/fonte) e `mecanismo` valem
+    SÓ para Oportunidade."""
 
-    name: str = Field(description="Nome canônico da entidade. Para Edital, é o título da chamada.")
-    type: NodeType = Field(description="Categoria da entidade no ecossistema de fomento")
+    name: str = Field(description="Nome canônico da entidade. Para Oportunidade edital, é o título da chamada.")
+    type: NodeType = Field(description="Oportunidade (oferta) | Ator (identidade) | Conceito (dimensão temática)")
     description: str = Field(description="Descrição breve no contexto do edital")
-    # Propriedades de display — preencher SOMENTE para nós do tipo Edital.
+    kind: str | None = Field(
+        default=None,
+        description="Subtipo. Oportunidade: edital|programa|desafio|investimento. "
+        "Ator: agencia|fap|ict|corporate|aceleradora|investidor. null para Conceito.",
+    )
+    dim: ConceitoDim | None = Field(
+        default=None,
+        description="SÓ para Conceito: tema (domínio) | tecnologia (capacidade) | aplicacao (caso de uso). null nos demais.",
+    )
+    aperture: Aperture | None = Field(
+        default=None,
+        description="SÓ para Oportunidade: prazo (data limite) | continua | recorrente | fechada. null nos demais.",
+    )
+    mecanismo: list[str] | None = Field(
+        default=None,
+        description="SÓ para Oportunidade: modalidade(s) de apoio (subvenção, crédito, bolsa, equity/investimento, prêmio, matching).",
+    )
+    # Propriedades de display — preencher SOMENTE para nós Oportunidade.
     prazo: str | None = Field(
         default=None,
-        description="SÓ para Edital: prazo/data limite de submissão (cronograma). null nos demais tipos.",
+        description="SÓ para Oportunidade: prazo/data limite de submissão (cronograma). null nos demais tipos.",
     )
     status: str | None = Field(
         default=None,
-        description="SÓ para Edital: situação (aberto, encerrado, previsto). null nos demais tipos.",
+        description="SÓ para Oportunidade: situação (aberto, encerrado, previsto). null nos demais tipos.",
     )
     valor: str | None = Field(
         default=None,
-        description="SÓ para Edital: valor/recurso disponível (teto por projeto ou total). null nos demais tipos.",
+        description="SÓ para Oportunidade: valor/recurso disponível (teto por projeto ou total). null nos demais tipos.",
     )
     fonte: str | None = Field(
         default=None,
-        description="SÓ para Edital: agência financiadora (FINEP, FAPESP, FAPESC). null nos demais tipos.",
+        description="SÓ para Oportunidade: agência financiadora (FINEP, FAPESP, FAPESC). null nos demais tipos.",
     )
 
 
@@ -164,42 +184,43 @@ class HyperEdge(BaseModel):
 _NODE_PROMPT = """\
 Você está analisando UM documento do ecossistema brasileiro de fomento público à
 pesquisa e inovação (um edital/chamada). Extraia TODAS as entidades distintas
-MENCIONADAS NO TEXTO DE ORIGEM abaixo, cada uma com seu tipo.
+MENCIONADAS NO TEXTO DE ORIGEM abaixo, cada uma com seu tipo (type) e subtipo.
 
 REGRA CRÍTICA: extraia SOMENTE entidades que aparecem no TEXTO DE ORIGEM. As
-definições de tipo abaixo são descrições — NUNCA extraia um nome citado nelas a
-menos que ele também apareça no texto.
+definições abaixo são descrições — NUNCA extraia um nome citado nelas a menos que
+ele também apareça no texto.
 
-TIPOS DE ENTIDADE (cada entidade recebe exatamente um):
-- Fonte: a agência/fundação financiadora citada no texto (quem banca a chamada)
-- Edital: a chamada pública que ESTE documento descreve (título + número). Para o
-  nó Edital preencha prazo (data limite de submissão), status (aberto/encerrado/
-  previsto), valor (recurso disponível) e fonte (agência) quando o texto informar.
-  Esses quatro campos ficam null em todos os outros tipos.
-- Programa: o programa guarda-chuva ao qual a chamada pertence, se citado
-- ICT: instituto, universidade ou centro de pesquisa parceiro citado
-- Investidor: fundo de venture capital, CVC, FIP ou aceleradora citado
-- Tema: domínio de aplicação amplo tratado pela chamada
-- Tecnologia: capacidade técnica específica citada (uma ferramenta/método)
-- Aplicação: CASO DE USO concreto onde uma tecnologia atua — é o tipo central
-  para conectar domínios diferentes. Conceitualmente é uma OPERAÇÃO (triagem,
-  classificação, diagnóstico, detecção, previsão, monitoramento, otimização)
-  aplicada a um objeto. Extraia só quando o texto descreve um caso de uso concreto.
-- Mecanismo: modalidade de apoio citada (subvenção, crédito reembolsável,
-  investimento, bolsa, prêmio). NÃO extraia como Mecanismo: leis, decretos,
-  anexos, regulamentos, portarias, certificações, valores monetários, guias,
-  termos de compromisso/outorga, sistemas nem procedimentos administrativos.
-  Modalidades de bolsa (mestrado, doutorado, iniciação científica) são
-  Mecanismo — NUNCA Edital.
-- Requisito: condição de elegibilidade citada (TRL, porte, receita, idade da
-  empresa, região, certificação) ou prazo exigido
-- Exclusão: entidade ou atividade explicitamente vedada pelo texto
-- Entidade: TIPO DE ORGANIZAÇÃO elegível para aplicar (empresa, startup,
-  microempresa, ICT). NÃO é papel nem pessoa (pesquisador, bolsista, diretoria).
+Cada entidade recebe UM `type`: Oportunidade, Ator ou Conceito.
 
-Documentos, normas, portarias e sistemas internos (ex.: termo de outorga, portaria,
-sistema de submissão) NÃO são entidades — ignore-os. Seja exaustivo no que importa;
-cada entidade DEVE receber exatamente um destes tipos.
+- Oportunidade — a OFERTA pública. A chamada que ESTE documento descreve tem
+  `kind=edital` e é o nó central; o programa guarda-chuva citado (se houver) tem
+  `kind=programa`. Para a Oportunidade preencha:
+    • `aperture`: prazo (tem data limite) | continua | recorrente | fechada;
+    • `mecanismo`: lista de modalidades de apoio (subvenção, crédito, bolsa,
+      equity/investimento, prêmio, matching). Modalidades de bolsa (mestrado,
+      doutorado, IC) entram em `mecanismo`, NUNCA viram Oportunidade própria;
+    • `prazo` (data limite), `status` (aberto/encerrado/previsto), `valor`
+      (recurso), `fonte` (agência) quando o texto informar.
+  Esses campos ficam null em Ator e Conceito.
+
+- Ator — identidade referenciável (uma organização nomeada). `kind`:
+    • agencia/fap: a agência/fundação financiadora citada (FINEP, FAPESP, MCTI…);
+    • ict: instituto, universidade ou centro de pesquisa parceiro;
+    • investidor: fundo de venture capital, CVC, FIP ou aceleradora;
+    • corporate: empresa âncora/mantenedora citada.
+
+- Conceito — dimensão temática (NÃO uma organização). `dim`:
+    • tema: domínio de aplicação amplo (saúde, agronegócio, energia, manufatura 4.0);
+    • tecnologia: capacidade técnica específica (IA, IoT, visão computacional);
+    • aplicacao: CASO DE USO concreto — uma OPERAÇÃO (triagem, classificação,
+      diagnóstico, detecção, previsão, monitoramento, otimização) aplicada a um
+      objeto. É o `dim` central para conectar domínios; extraia só caso de uso concreto.
+
+NÃO extraia como entidade: leis, decretos, anexos, portarias, regulamentos,
+certificações, valores monetários, guias, termos de outorga, sistemas de submissão
+nem procedimentos administrativos — ignore-os. Condições de elegibilidade (TRL,
+porte, receita, região) e vedações NÃO são nós aqui (são tratadas como propriedade
+depois). Seja exaustivo no que importa; cada entidade recebe exatamente um `type`.
 
 ### TEXTO DE ORIGEM:
 {source_text}
@@ -214,16 +235,16 @@ REGRAS:
 2. Use SOMENTE entidades da lista "Entidades conhecidas" abaixo. Se algo não
    estiver na lista, exclua da aresta. Não invente participantes.
 3. Cada aresta DEVE usar exatamente um destes tipos:
-   - financia      : quem é financiado (Fonte/Edital → Entidade)
-   - exige         : constraint de elegibilidade (Edital/Programa → Requisito)
-   - abrange_tema  : cobertura temática (Edital/Programa → Tema/Tecnologia)
-   - aplica_em     : como a tecnologia é usada (Tecnologia → Aplicação)
-   - destina_a     : quem pode aplicar (Edital → Entidade)
-   - exclui        : exclusão explícita (Edital → Exclusão)
-   - parceria_com  : parceria obrigatória/oportunidade (Edital → ICT/Investidor)
-   - pertence_a    : hierarquia (Edital → Programa → Fonte)
-   - viabiliza     : capacidade habilita resultado (ICT/Tecnologia → Aplicação/Tema)
-   - resolve       : ponte problema-solução (Tecnologia/Aplicação → Tema)
+   - financia      : quem é financiado (Ator/Oportunidade → Ator)
+   - exige         : parceria/condição relacional obrigatória (Oportunidade → Ator, ex.: exige parceria com ICT)
+   - abrange_tema  : cobertura temática (Oportunidade → Conceito)
+   - aplica_em     : como a tecnologia é usada (Conceito tecnologia → Conceito aplicacao)
+   - destina_a     : público-alvo (Oportunidade → Ator/Conceito)
+   - exclui        : vedação relacional (Oportunidade → Ator/Conceito)
+   - parceria_com  : parceria/oportunidade (Oportunidade → Ator ICT/investidor)
+   - pertence_a    : hierarquia (Oportunidade chamada → Oportunidade programa)
+   - viabiliza     : capacidade habilita resultado (Ator/Conceito → Conceito)
+   - resolve       : ponte problema-solução (Conceito → Conceito tema)
 
 # Entidades conhecidas
 {known_nodes}
@@ -233,35 +254,31 @@ REGRAS:
 """
 
 # Variante para catálogos do ecossistema (ICT/Investidor/Programa) — NÃO são
-# editais. Mesma taxonomia de 12 tipos, mas sem o enquadramento edital-cêntrico
+# editais. Mesma taxonomia v2 (3 tipos), mas sem o enquadramento edital-cêntrico
 # (que faria o LLM forçar nós Edital onde não há chamada).
 _CATALOG_NODE_PROMPT = """\
 Você está analisando um CATÁLOGO de atores do ecossistema brasileiro de fomento à
 inovação — institutos de ciência e tecnologia (ICTs), investidores ou programas.
 Cada bloco descreve um ator. Extraia TODAS as entidades MENCIONADAS NO TEXTO,
-cada uma com seu tipo.
+cada uma com seu `type` (Oportunidade, Ator ou Conceito) e subtipo.
 
-REGRA CRÍTICA: extraia SOMENTE entidades que aparecem no TEXTO. As definições de
-tipo abaixo são descrições — NUNCA extraia um nome citado nelas.
+REGRA CRÍTICA: extraia SOMENTE entidades que aparecem no TEXTO. As definições
+abaixo são descrições — NUNCA extraia um nome citado nelas.
 
-TIPOS DE ENTIDADE (cada entidade recebe exatamente um):
-- ICT: instituto, universidade ou centro de pesquisa (o ator do catálogo)
-- Investidor: fundo de venture capital, CVC, FIP ou aceleradora (o ator)
-- Programa: programa/iniciativa de fomento (o ator)
-- Fonte: agência/operador financiador citado
-- Tema: domínio de atuação (saúde, agronegócio, energia, manufatura 4.0…)
-- Tecnologia: capacidade técnica específica citada (uma ferramenta/método)
-- Aplicação: CASO DE USO concreto — uma OPERAÇÃO (triagem, classificação,
-  diagnóstico, detecção, previsão, monitoramento, otimização) aplicada a um objeto
-- Mecanismo: modalidade de apoio (subvenção, crédito, investimento/equity, bolsa)
-- Requisito: condição de elegibilidade (estágio, ticket, setor, porte)
-- Entidade: TIPO DE ORGANIZAÇÃO-alvo (startup, empresa, scale-up, microempresa)
-- Exclusão: ator ou atividade explicitamente vedado
-- Edital: NÃO se aplica a catálogo — só extraia se o texto citar uma chamada nominal
+- Ator — o ator nomeado de cada bloco. `kind`:
+    • ict: instituto, universidade ou centro de pesquisa;
+    • investidor: fundo de VC, CVC, FIP ou aceleradora;
+    • agencia/corporate: agência/operador ou empresa mantenedora citada.
+- Oportunidade — programa/iniciativa de fomento (`kind=programa`,
+  `aperture=recorrente`). Preencha `mecanismo` (subvenção, crédito, equity/
+  investimento, bolsa) quando o texto informar.
+- Conceito — dimensão temática do ator. `dim`: tema (domínio de atuação),
+  tecnologia (capacidade técnica), aplicacao (caso de uso concreto — uma OPERAÇÃO:
+  triagem, classificação, diagnóstico, detecção, previsão, monitoramento).
 
 O ATOR de cada bloco (a ICT, o investidor ou o programa nomeado) é sempre um nó.
-Ligue-o aos seus Temas/Tecnologias/Aplicações/Mecanismos. Cada entidade DEVE
-receber exatamente um destes tipos.
+Ligue-o aos seus Conceitos. Condições de elegibilidade (estágio, ticket, porte) e
+vedações NÃO são nós. Cada entidade recebe exatamente um `type`.
 
 ### TEXTO DE ORIGEM:
 {source_text}
@@ -273,30 +290,23 @@ receber exatamente um destes tipos.
 # empresa não é a oferta pública — evita alucinar oferta no lado demanda).
 _COMPANY_NODE_PROMPT = """\
 Você está analisando o PERFIL de UMA EMPRESA (ou startup/ICT) que busca
-financiamento público à inovação. Extraia TODAS as entidades MENCIONADAS NO TEXTO,
-cada uma com seu tipo — o que a empresa FAZ, DOMINA e BUSCA.
+financiamento público à inovação. Extraia TODAS as entidades MENCIONADAS NO TEXTO
+— o que a empresa FAZ, DOMINA e BUSCA. TODAS são do type `Conceito`.
 
-REGRA CRÍTICA: extraia SOMENTE entidades que aparecem no TEXTO. As definições de
-tipo abaixo são descrições — NUNCA extraia um nome citado nelas.
+REGRA CRÍTICA: extraia SOMENTE entidades que aparecem no TEXTO. As definições
+abaixo são descrições — NUNCA extraia um nome citado nelas.
 
-TIPOS DE ENTIDADE (cada entidade recebe exatamente um):
-- Entidade: a própria empresa/organização do perfil (o ator) e seu tipo (startup,
-  empresa, microempresa, ICT)
-- Tema: domínio em que a empresa atua (saúde, agronegócio, energia, manufatura 4.0…)
-- Tecnologia: capacidade técnica que a empresa domina (ferramenta/método: IA, visão
-  computacional, IoT, biotecnologia)
-- Aplicação: CASO DE USO concreto da empresa — uma OPERAÇÃO (triagem, classificação,
+Extraia Conceitos (todos type=Conceito), variando o `dim`:
+- dim=tema: domínio em que a empresa atua (saúde, agronegócio, energia, manufatura 4.0);
+- dim=tecnologia: capacidade técnica que domina (IA, visão computacional, IoT, biotecnologia);
+- dim=aplicacao: CASO DE USO concreto — uma OPERAÇÃO (triagem, classificação,
   diagnóstico, detecção, previsão, monitoramento, otimização) aplicada a um objeto.
-  É o tipo CENTRAL do match cross-domínio; extraia da proposta de valor, solução,
+  É o `dim` CENTRAL do match cross-domínio; extraia da proposta de valor, solução,
   portfólio e tração.
-- Mecanismo: modalidade de financiamento que a empresa BUSCA (subvenção, crédito,
-  investimento/equity, bolsa)
-- Requisito: característica de elegibilidade que a empresa ATENDE (TRL, porte,
-  faturamento, idade, UF/região)
 
-NÃO extraia Edital, Fonte, Programa, ICT nem Investidor: a empresa é o lado DEMANDA,
-não a oferta pública. Seja exaustivo no que a empresa faz e busca; cada entidade
-DEVE receber exatamente um destes tipos.
+NÃO extraia Oportunidade nem Ator: a empresa é o lado DEMANDA, não a oferta pública
+(porte/UF/mecanismo buscado/TRL vêm do perfil estruturado, não desta extração).
+Seja exaustivo no que a empresa faz e busca; cada entidade recebe type=Conceito.
 
 ### TEXTO DE ORIGEM:
 {source_text}
@@ -347,102 +357,34 @@ def _norm(s: str) -> str:
     return s.lower().strip()
 
 
-def _normalize_mecanismo_nodes(
+def _normalize_mecanismo_property(
     nodes: list[dict], edges: list[dict]
 ) -> tuple[list[dict], list[dict]]:
-    """Renomeia nós Mecanismo para slugs canônicos + preserva originais.
+    """Normaliza a propriedade `mecanismo[]` das Oportunidades para slugs canônicos.
 
-    Mapeia os 155+ nomes variantes que o LLM produz (ex.: "Subvenção Econômica
-    Direta", "Financiamento Reembolsável Descentralizado 1") para os 7 slugs
-    canônicos de `skills._CANONICAL_MECHANISMS`, usando a mesma lógica de
-    deburr + sinônimos. Nós sem correspondência são PRESERVADOS com o nome
-    original — o LLM já os classificou como Mecanismo, e descartar nomes
-    desconhecidos eliminaria variações válidas não mapeadas.
-    """
-    from core.skills import _CANONICAL_MECHANISMS, _MECHANISM_SYNONYMS, _deburr
+    KG v2: mecanismo é PROPRIEDADE do nó Oportunidade (não mais nó Mecanismo). O LLM
+    pode emitir variantes ("Subvenção Econômica", "investimento") — cada item vira o
+    slug canônico de `core/skills` (subvencao/credito/equity/…); itens não mapeáveis
+    (leis, anexos, ruído) caem. Idempotente."""
+    from core.skills import _normalize_mechanism
 
-    _display: dict[str, str] = {
-        "subvencao": "Subvenção",
-        "credito": "Crédito",
-        "bolsa": "Bolsa",
-        "matching": "Matching",
-        "equity": "Investimento",
-        "premio": "Prêmio",
-        "outro": "Outro",
-    }
-
-    token_map: dict[str, str] = {}
-    for c in _CANONICAL_MECHANISMS:
-        token_map[c] = _display[c]
-    for syn, canon in _MECHANISM_SYNONYMS.items():
-        token_map[syn] = _display[canon]
-
-    kept: list[dict] = []
     for n in nodes:
-        if n.get("type") != "Mecanismo":
-            kept.append(n)
+        if n.get("type") != "Oportunidade":
             continue
-        name = n.get("name", "")
-        key = _deburr(name)
-        canon_key = None
-        if key in _CANONICAL_MECHANISMS:
-            canon_key = key
-        elif key in _MECHANISM_SYNONYMS:
-            canon_key = _MECHANISM_SYNONYMS[key]
-        if canon_key:
-            n["name"] = _display.get(canon_key, name)
-        kept.append(n)
-
-    # Colapsar duplicatas após renomeação
-    seen: set[str] = set()
-    final: list[dict] = []
-    for n in kept:
-        nk = _norm(n.get("name", ""))
-        if n.get("type") == "Mecanismo" and nk in seen:
+        raw = n.get("mecanismo")
+        if not raw:
             continue
-        seen.add(nk)
-        final.append(n)
-
-    return final, edges
-
-
-def _normalize_fonte_nodes(
-    nodes: list[dict], edges: list[dict]
-) -> tuple[list[dict], list[dict]]:
-    """Normaliza nós Fonte para nomes canônicos + preserva originais.
-
-    Usa o dicionário canônico de `hypergraph_catalog._FONTE_CANONICAL` (fonte
-    única de verdade). Nós conhecidos são renomeados para o canônico; nós SEM
-    mapeamento são PRESERVADOS com o nome original — o LLM já os classificou
-    como Fonte, e descartar nomes desconhecidos eliminaria fontes válidas como
-    FAPERJ, FAPEMIG, FAPESB que ainda não foram adicionadas ao dicionário.
-    """
-    from core.kg.hypergraph_catalog import _FONTE_CANONICAL
-    from core.skills import _deburr
-
-    kept: list[dict] = []
-    for n in nodes:
-        if n.get("type") != "Fonte":
-            kept.append(n)
-            continue
-        name = n.get("name", "")
-        key = _deburr(name)
-        canon = _FONTE_CANONICAL.get(key)
-        if canon:
-            n["name"] = canon
-        kept.append(n)
-
-    # Colapsar duplicatas após renomeação
-    seen: set[str] = set()
-    final: list[dict] = []
-    for n in kept:
-        nk = _norm(n.get("name", ""))
-        if n.get("type") == "Fonte" and nk in seen:
-            continue
-        seen.add(nk)
-        final.append(n)
-
-    return final, edges
+        items = raw if isinstance(raw, list) else [raw]
+        slugs: list[str] = []
+        for item in items:
+            s = _normalize_mechanism(str(item))
+            if s and s not in slugs:
+                slugs.append(s)
+        if slugs:
+            n["mecanismo"] = slugs
+        else:
+            n.pop("mecanismo", None)
+    return nodes, edges
 
 
 def _node_key(n: HyperNode) -> str:
@@ -461,7 +403,7 @@ def _build_extractor(node_prompt: str = _NODE_PROMPT):
     """Constrói um `AutoHypergraph` fresco com o schema de produção.
 
     `node_prompt` troca o enquadramento da extração de nós (edital vs catálogo);
-    o schema de 12 tipos e o prompt de arestas são compartilhados."""
+    o schema de 3 tipos e o prompt de arestas são compartilhados."""
     from hyperextract import AutoHypergraph
 
     return AutoHypergraph(
@@ -572,10 +514,13 @@ def _collapse_editais(
       * prazo/status/valor/fonte = primeiro valor não-nulo entre os fragmentos
       * membros das arestas que referenciavam qualquer fragmento → nome canônico
     Arestas que degeneram (<2 membros distintos) ou duplicam são removidas."""
-    edital_nodes = [n for n in nodes if n.get("type") == "Edital"]
+    def _is_edital(n: dict) -> bool:
+        return n.get("type") == "Oportunidade" and n.get("kind") == "edital"
+
+    edital_nodes = [n for n in nodes if _is_edital(n)]
     if not edital_nodes:
         return nodes, edges
-    others = [n for n in nodes if n.get("type") != "Edital"]
+    others = [n for n in nodes if not _is_edital(n)]
 
     def _first(prop: str):
         for n in edital_nodes:
@@ -592,9 +537,17 @@ def _collapse_editais(
         frag_like = [n["name"] for n in edital_nodes if _TITLE_RE.search(n["name"])]
         pool = frag_like or [n["name"] for n in edital_nodes]
         canon_name = max(pool, key=len) if pool else f"Edital {edital_id}"
+    # mecanismo: união dos fragmentos (é lista); normalizado depois p/ slug.
+    mecanismo: list[str] = []
+    for n in edital_nodes:
+        for m in (n.get("mecanismo") or []):
+            if m not in mecanismo:
+                mecanismo.append(m)
     canon = {
         "name": canon_name,
-        "type": "Edital",
+        "type": "Oportunidade",
+        "kind": "edital",
+        "aperture": _first("aperture") or "prazo",
         "description": _first("description") or "",
         "prazo": _first("prazo"),
         "status": _first("status"),
@@ -602,6 +555,8 @@ def _collapse_editais(
         "fonte": _first("fonte"),
         "edital_id": edital_id,
     }
+    if mecanismo:
+        canon["mecanismo"] = mecanismo
     frag_keys = {_norm(n["name"]) for n in edital_nodes}
 
     new_edges: list[dict] = []
@@ -642,8 +597,8 @@ class HypergraphResult:
 
     @property
     def editais(self) -> list[dict]:
-        """Nós do tipo Edital (carregam as propriedades de display)."""
-        return [n for n in self.nodes if n.get("type") == "Edital"]
+        """Nós Oportunidade edital (carregam as propriedades de display)."""
+        return [n for n in self.nodes if n.get("type") == "Oportunidade" and n.get("kind") == "edital"]
 
 
 # ── cache por hash do input ───────────────────────────────────────────────────
@@ -720,16 +675,12 @@ def run_hyper_extract(
     data = hg.data
     nodes = [n.model_dump() for n in data.nodes]
     edges = [e.model_dump() for e in data.edges]
-    # Colapsa os fragmentos de Edital num nó canônico (1 arquivo = 1 edital).
+    # Colapsa os fragmentos de Oportunidade edital num nó canônico (1 arquivo = 1 edital).
     nodes, edges = _collapse_editais(nodes, edges, title=title, edital_id=edital_id)
 
-    # Normaliza nós Mecanismo para o vocabulário canônico (subvenção/credito/…)
-    # e remove ruído (anexos, leis, decretos classificados como Mecanismo).
-    nodes, edges = _normalize_mecanismo_nodes(nodes, edges)
-
-    # Normaliza nós Fonte para nomes canônicos (FINEP, FAPESP, …) e remove
-    # ruído (países, leis, classificações incorretas como Fonte).
-    nodes, edges = _normalize_fonte_nodes(nodes, edges)
+    # Normaliza a propriedade mecanismo[] das Oportunidades p/ slugs canônicos
+    # (subvencao/credito/equity/…) e descarta ruído. Fonte deixou de ser nó (D4).
+    nodes, edges = _normalize_mecanismo_property(nodes, edges)
 
     written: Path | None = None
     if write:
@@ -891,6 +842,8 @@ def run_hyper_extract_catalog(
     data = hg.data
     nodes = [n.model_dump() for n in data.nodes]
     edges = [e.model_dump() for e in data.edges]
+    # Catálogos (programas) também têm mecanismo como propriedade → normaliza p/ slug.
+    nodes, edges = _normalize_mecanismo_property(nodes, edges)
 
     written: Path | None = None
     if write:
