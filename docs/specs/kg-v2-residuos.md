@@ -253,6 +253,56 @@ Aplica-se a toda extração futura (edital, catálogo, perfil).
 apply (cria nós, reata arestas, cross-file, dedup, preserva intactos,
 passthrough sem plano, aresta mantida pós-rename).
 
+### Execução serializada dos passes de dados · realizada 2026-07-05 (supervisão Fable)
+
+Sequência backup → B → sanity → C → sanity → D → sanity → E.1, conforme R5. Backups por
+passe em `data/knowledge_graph.bak.*`. Sanity = `core.eval matching` (baseline 0.8334/3.0).
+
+**Passe B (higiene).** Validação: 61 descartes propostos; **3 falsos positivos revertidos
+na supervisão** (aquicultura, CEIS, curtailment — conceitos de domínio reais). Aplicado:
+96 instâncias descartadas (TRL ×3 grafias, LGPD, boilerplate legal/financeiro). Fusões:
+o run inicial produziu só 3 grupos — **dois defeitos compostos** achados e corrigidos
+(PR #60): `_variant_key` não tratava plural -ções/parentético/aglutinado, e o auto-merge
+só rodava dentro dos clusters de embedding (cuja descrição separa as variantes triviais).
+Pós-fix: **21 grupos (44→21 ids)**, cluster TIC unificado (4 grafias; a 5ª, com "(TIC)"
+no nome, deslocava o embedding e ficou de fora por design — componentes conexos).
+Sanity: 0.8334 / **2.875** (ruído melhorou de 3.0).
+
+**Passe C (programas).** Mesmo padrão de defeito, mesmo fix (PR #61): `_program_key`
+determinística (letra-dígito, prefixo genérico) no cluster e no índice do registro.
+Antes: "centelha" promovido com colisão de id e família Rota 2030 em 3 canônicos;
+depois: Centelha→curado, Rota unificada. Resultado: 111 menções → **94 canônicos**
+(10 curados, 84 na fila `queue`), 18 menções viraram `pertence_a`, 3 lixos descartados.
+Sanity estável.
+
+**Passe D (granularidade).** 494 conceitos divididos → 1.112 termos atômicos, 516
+arestas reatadas, replay do canon pós-split. Names 5+ palavras: **29% → 6%** (meta <10%).
+Tecido conectivo: compartilhamento entre editais do MESMO macro-tema **0,79 → 1,00**
+e entre temas diferentes 0,53 → 0,45 (mais conectivo E mais discriminativo). Amostra do
+plano: ~1/15 split ruim ("H urbana" de hidrogênio truncado) — aceito, ruído marginal.
+Sanity: 0.8334 / 3.125 (ruído subiu levemente com a atomização; dentro da faixa histórica).
+
+**Passe E.1 (cobertura).** Macro-temas: aplicado — **24/32 editais (75%)**, 8/17
+investimentos (os 9 sem macro são fundos GENERALISTAS: tese vazia é verdade do domínio,
+não gap), 36/108 programas (menções nuas não têm conceitos próprios para mapear).
+**Constraints: PREMISSA DA SPEC ERA FALSA** — o produtor funciona, mas o
+`requisitos_texto` herdado da migração v1 é citação de lei ("Lei que altera a Lei
+Federal n.º 10.973"), sem elegibilidade estruturável; o LLM corretamente não inventa.
+A elegibilidade real está no TEXTO do edital e no `publico_alvo` do bronze — o caminho
+é um produtor sobre essas fontes (escopo original de `feat/elig-constraints-producer`),
+que precisa de decisão própria (fonte de input + golden). **Meta ≥95% de constraints é
+INALCANÇÁVEL pela via da spec; recalibrada como pendência com dono.**
+
+**Pendências saídas da execução:**
+1. Produtor de constraints sobre texto do edital/`publico_alvo` (decisão de design + golden).
+2. 4 arquivos-toco no corpus com zero conceitos (`finep__1`, `fapesp__2`, `fapesp__18067`,
+   `finep__743` — "Edital 1"/"Edital 2") — candidatos a remoção na curadoria.
+3. Fila de 84 programas `promovido_auto` para o curador (`scripts/resolve_programas.py queue`).
+4. Macro-temas de investimento poderiam vir direto de `tese_themes` do curado (hoje só
+   via Conceitos); menções de programa poderiam herdar do edital de contexto — design call.
+5. Deploy: republicar hipergrafos + canon maps no PG de prod (kg_store) — os passes rodaram
+   no disco local.
+
 ### PR-E.2 — Regras de elegibilidade curadas · realizado 2026-07-05
 
 **`data/curadoria/regras_elegibilidade.json`** — tabelas curadas (R4):
