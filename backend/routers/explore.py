@@ -209,9 +209,12 @@ def explore(
                     misses += match_verdict.attach_cached_verdicts(
                         db, workspace_id, result["matched_editais"], current,
                     )
-                    result["matched_editais"] = match_verdict.reorder_by_verdict(
-                        result["matched_editais"]
-                    )
+                    # KG v2 resíduos PR-A / R6: a geometria rankeia (afinidade
+                    # decrescente, chave única); o veredito é SINALIZAÇÃO no card
+                    # (red flag, R3), não posição. Divergência deliberada do D9 da
+                    # kg-redesign (que reordenava por recomendação) — o ranking
+                    # unificado do radar não pode reagrupar por kind nem por
+                    # veredito. `reorder_by_verdict` fica definido p/ outros usos.
                 # PR8.1: veredito das OFERTAS de investimento (matched_entities) —
                 # mesmo cache/task, chaveado por entity_id. Um defer só p/ os dois.
                 if result.get("matched_entities"):

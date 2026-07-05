@@ -47,6 +47,7 @@ import {
   diffFromProfile,
   diffFromExtracted,
   entriesFromServer,
+  mergeRadar,
   profileCompleteness,
   isRadarReady,
   isCompleteForWriting,
@@ -784,43 +785,37 @@ export default function FrontDoorPage() {
               return <GateCard key={i} action={entry.action} />;
             case "profile_incomplete":
               return <ProfileIncompleteCard key={i} missingFields={entry.missingFields} />;
-            case "radar":
+            case "radar": {
+              // KG v2 resíduos PR-A / R6: lista única intercalada por afinidade
+              // decrescente (mergeRadar é o único lugar com a ordenação); um `map`
+              // só decide o card por item. Sem agrupamento por kind.
+              const radarItems = mergeRadar(entry.matchedEditais, entry.matchedEntities);
+              if (radarItems.length === 0) return null;
               return (
                 <div key={i} className="flex flex-col gap-2 pt-1 pb-2">
-                  {entry.matchedEditais.length > 0 && (
-                    <>
-                      <p className="text-xs font-medium text-content-secondary px-4">
-                        Editais com afinidade
-                      </p>
-                      <div className="flex flex-col gap-2">
-                        {entry.matchedEditais.map((m) => (
-                          <MatchedEditalCard
-                            key={`${m.source}/${m.edital_id}`}
-                            edital={m}
-                            onStartWriting={handleStartWriting}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {entry.matchedEntities.length > 0 && (
-                    <>
-                      <p className="text-xs font-medium text-content-secondary px-4">
-                        Investidores, Programas e ICTs com afinidade
-                      </p>
-                      <div className="flex flex-col gap-2">
-                        {entry.matchedEntities.map((m) => (
-                          <MatchedEntityCard
-                            key={`${m.kind}/${m.name}`}
-                            entity={m}
-                            onStartWriting={handleStartWritingEntity}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
+                  <p className="text-xs font-medium text-content-secondary px-4">
+                    Oportunidades com afinidade
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {radarItems.map((it) =>
+                      it.kind === "edital" ? (
+                        <MatchedEditalCard
+                          key={it.sortId}
+                          edital={it.edital}
+                          onStartWriting={handleStartWriting}
+                        />
+                      ) : (
+                        <MatchedEntityCard
+                          key={it.sortId}
+                          entity={it.entity}
+                          onStartWriting={handleStartWritingEntity}
+                        />
+                      ),
+                    )}
+                  </div>
                 </div>
               );
+            }
             default:
               return null;
           }

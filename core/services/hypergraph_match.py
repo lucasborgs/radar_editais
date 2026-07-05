@@ -336,6 +336,9 @@ class EditalMatch:
 
     def to_dict(self) -> dict:
         return {
+            # KG v2 resíduos PR-A: discriminador p/ o ranking unificado do radar
+            # (entities já têm `kind`); o front funde as duas listas num `map` só.
+            "kind": "edital",
             "source": self.source,
             "edital_id": self.edital_id,
             "name": self.name,
