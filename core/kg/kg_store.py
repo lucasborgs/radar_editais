@@ -50,6 +50,9 @@ _FILES: dict[str, str] = {
     # Canon map da higiene de Conceitos (KG v2 PR3, core/kg/canonicalize):
     # produzido pelo passe de build, reaplicado pelo ingest em extração fresca.
     "concept_canon": "concept_canon.json",
+    # Canon map da resolução de programas (KG v2 resíduos PR-C):
+    # produzido pelo passe resolve_programas, consumido pelo ingest.
+    "programa_canon": "programa_canon.json",
 }
 
 _TABLE = "kg_artifacts"
