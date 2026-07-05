@@ -240,15 +240,14 @@ async def compute_match_verdicts_task(
 
     prepared: list[tuple[str, str, list[dict], str]] = []  # (oid, serialized, paths, hash)
     for item in items or []:
-        fk = str(item.get("file_key") or "")
-        graph = graphs.get(fk)
-        node = mv.opportunity_node(graph) if graph else None
-        if node is None:
-            logger.info("compute_match_verdicts: %s sem nó de oportunidade — pulado", fk)
+        # serialize_for_verdict despacha edital (file_key) × investimento (PR8.1).
+        prep = mv.serialize_for_verdict(item, graphs)
+        if prep is None:
+            logger.info("compute_match_verdicts: item sem oportunidade resolvível — pulado: %s", item)
             continue
-        serialized = mv.serialize_opportunity(graph, node)
+        oid, serialized = prep
         paths = item.get("paths") or []
-        prepared.append((fk, serialized, paths, mv.verdict_input_hash(serialized, profile, paths)))
+        prepared.append((oid, serialized, paths, mv.verdict_input_hash(serialized, profile, paths)))
 
     # Segunda visita = zero chamadas: pares já gravados com o MESMO hash saem aqui
     # (o defer duplicado é possível — queueing_lock só cobre jobs ainda na fila).

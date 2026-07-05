@@ -45,6 +45,16 @@ def get_edital(edital_id: str):
     return edital
 
 
+@router.get("/oportunidades/{opp_id:path}", summary="Ficha completa de uma oportunidade (edital | programa | investimento)")
+def get_opportunity(opp_id: str):
+    """Ficha unificada (D1/PR8): resolve edital OU curado (programa/investimento).
+    `:path` porque ids curados podem conter ':' (ex.: `investidor:indicator capital`)."""
+    opp = hypergraph_catalog.get_opportunity(opp_id)
+    if opp is None:
+        raise HTTPException(status_code=404, detail=f"Oportunidade '{opp_id}' não encontrada")
+    return opp
+
+
 @router.get("/commands", summary="Lista slash commands disponíveis e LLM tiers (Fase 4 #24/#25)")
 def list_commands():
     """Registry de slash commands + model tiers para o frontend popular UI.

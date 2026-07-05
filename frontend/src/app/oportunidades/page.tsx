@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { DataTable, Modal, MetricCard, StatusBadge } from "@/components/ui";
+import { DataTable, MetricCard, StatusBadge } from "@/components/ui";
 import type { Column } from "@/components/ui";
 import { truncate } from "@/lib/utils";
 import { getDashboardStats, getOpportunities } from "@/lib/api";
@@ -89,7 +89,6 @@ export default function OportunidadesPage() {
   const { data: opportunities, loading, error } = useAsync<OpportunityEntry[]>(() => getOpportunities({ limit: 500 }), []);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [themeQuery, setThemeQuery] = useState("");
-  const [detailItem, setDetailItem] = useState<OpportunityEntry | null>(null);
 
   const filtered = useMemo(() => {
     let items = opportunities ?? [];
@@ -105,12 +104,10 @@ export default function OportunidadesPage() {
     return items;
   }, [opportunities, typeFilter, themeQuery]);
 
+  // D1/PR8: toda oportunidade (edital, programa, investidor) abre a ficha
+  // unificada. `id` pode conter ':' e espaço (curados) → encode.
   const handleRowClick = (row: OpportunityEntry) => {
-    if (row.type === "edital") {
-      router.push(`/editais/${row.id}`);
-    } else {
-      setDetailItem(row);
-    }
+    router.push(`/oportunidades/${encodeURIComponent(row.id)}`);
   };
 
   return (
@@ -187,49 +184,6 @@ export default function OportunidadesPage() {
           onRowClick={handleRowClick}
         />
       </div>
-
-      {/* Detail modal for programas/investidores */}
-      <Modal
-        open={!!detailItem}
-        onClose={() => setDetailItem(null)}
-        title={detailItem?.title}
-        size="md"
-      >
-        {detailItem && (
-          <div className="space-y-4">
-            <div>
-              <TypeBadge type={detailItem.type} />
-            </div>
-            {detailItem.description && (
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-content-secondary mb-1 font-sans">
-                  Descrição
-                </h4>
-                <p className="text-sm text-content-primary font-sans whitespace-pre-wrap">
-                  {detailItem.description}
-                </p>
-              </div>
-            )}
-            {detailItem.themes.length > 0 && (
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-content-secondary mb-1 font-sans">
-                  Temas
-                </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {detailItem.themes.map((t) => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center rounded-full bg-content-secondary/10 px-2.5 py-0.5 text-xs font-medium text-content-secondary font-sans"
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
     </DashboardLayout>
   );
 }

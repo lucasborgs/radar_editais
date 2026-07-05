@@ -182,7 +182,7 @@ export default function EditaisPage() {
         columns={COLUMNS}
         loading={loading}
         emptyMessage="Nenhum edital corresponde aos filtros selecionados."
-        onRowClick={(row) => router.push(`/editais/${row.id}`)}
+        onRowClick={(row) => router.push(`/oportunidades/${encodeURIComponent(row.id)}`)}
       />
     </DashboardLayout>
   );
