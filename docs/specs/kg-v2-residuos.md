@@ -295,8 +295,11 @@ INALCANÇÁVEL pela via da spec; recalibrada como pendência com dono.**
 
 **Pendências saídas da execução:**
 1. Produtor de constraints sobre texto do edital/`publico_alvo` (decisão de design + golden).
-2. 4 arquivos-toco no corpus com zero conceitos (`finep__1`, `fapesp__2`, `fapesp__18067`,
-   `finep__743` — "Edital 1"/"Edital 2") — candidatos a remoção na curadoria.
+2. ~~4 arquivos-toco~~ RESOLVIDO PARCIAL (2026-07-05): `finep__1`/`fapesp__2` ("Edital 1"/
+   "Edital 2", 1 nó, sem URL) eram toco puro e foram REMOVIDOS; `fapesp__18067` e
+   `finep__743` são oportunidades REAIS com extração rala (zero Conceitos, invisíveis ao
+   match) — pendência vira RE-EXTRAÇÃO; o 743 ainda tem prazo 2024 com status "aberto"
+   (refresh do ETL).
 3. Fila de 84 programas `promovido_auto` para o curador (`scripts/resolve_programas.py queue`).
 4. Macro-temas de investimento poderiam vir direto de `tese_themes` do curado (hoje só
    via Conceitos); menções de programa poderiam herdar do edital de contexto — design call.
