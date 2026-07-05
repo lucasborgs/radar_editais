@@ -19,9 +19,10 @@ from slowapi.util import get_remote_address
 
 from backend.common import CompanyProfileSchema, explore_agent
 from backend.rate_limit import limiter
-from core.auth import OptionalDbClient, OptionalUserId
+from core.auth import CurrentUserId, DbClient, OptionalDbClient, OptionalUserId
 from core.llm.agent_tools.match_tools import _company_nodes
 from core.profile_extractor import ProfileExtractor
+from core.services import match_verdict
 from core.services.content_library import get_workspace_id
 from core.services.hypergraph_match import (
     find_matching_editais,
@@ -177,6 +178,7 @@ def explore(
             logger.warning("explore: falha ao extrair matched_editais: %s", e)
 
     if user_id and db:
+        workspace_id = None
         try:
             workspace_id = get_workspace_id(db, user_id)
             profile_diff_list = diff if diff else None
@@ -190,4 +192,71 @@ def explore(
         except Exception as e:
             logger.warning("explore: falha ao persistir turno: %s", e)
 
+        # Estágio 2 (PR7): veredito LLM no top-K — cache-first; LLM só na fila.
+        # Anônimo fica sem veredito (não há workspace p/ chavear o cache). O
+        # snapshot persistido acima fica SEM veredito de propósito (o card
+        # restaurado re-hidrata via POST /match/verdicts, cache-only).
+        if workspace_id and result.get("matched_editais"):
+            try:
+                misses = match_verdict.attach_cached_verdicts(
+                    db, workspace_id, result["matched_editais"], current,
+                )
+                result["matched_editais"] = match_verdict.reorder_by_verdict(
+                    result["matched_editais"]
+                )
+                if misses:
+                    _enqueue_verdicts(workspace_id, misses, current)
+            except Exception as e:
+                logger.warning("explore: falha no veredito do match: %s", e)
+
     return result
+
+
+def _enqueue_verdicts(workspace_id: str, items: list[dict], profile: dict) -> None:
+    """Defer síncrono da task de vereditos (o endpoint /explore é sync).
+
+    `queueing_lock` por workspace: turnos em rajada não empilham jobs duplicados
+    na fila — o job rejeitado re-entra no próximo refresh (os misses continuam
+    sem veredito e serão re-detectados)."""
+    from procrastinate.exceptions import AlreadyEnqueued
+
+    from core.tasks import app as tasks_app
+
+    try:
+        with tasks_app.open():
+            tasks_app.configure_task(
+                "compute_match_verdicts",
+                queueing_lock=f"match_verdicts:{workspace_id}",
+            ).defer(workspace_id=workspace_id, items=items, profile=profile)
+    except AlreadyEnqueued:
+        logger.info("explore: vereditos já na fila p/ workspace=%s", workspace_id)
+
+
+class VerdictsRequest(BaseModel):
+    # Cap generoso (top-K do radar é 8 hoje) sem deixar o body virar scan.
+    oportunidade_ids: list[str] = Field(max_length=32)
+
+
+@router.post(
+    "/match/verdicts",
+    summary="Vereditos LLM cacheados do radar (Estágio 2 — fetch cache-only)",
+)
+def fetch_match_verdicts(req: VerdictsRequest, user_id: CurrentUserId, db: DbClient):
+    """Poll do card: devolve os vereditos JÁ computados do workspace para os ids
+    pedidos — zero LLM (o cômputo é da task `compute_match_verdicts`). Devolve o
+    veredito mais recente por par SEM revalidar o `input_hash`: o poll acontece
+    segundos após o defer; um perfil editado no meio re-hasheia e re-enfileira no
+    próximo refresh do radar (a linha é substituída pelo upsert)."""
+    if not req.oportunidade_ids:
+        return {"verdicts": {}}
+    workspace_id = get_workspace_id(db, user_id)
+    rows = (
+        db.table("match_verdicts")
+        .select("oportunidade_id, verdict")
+        .eq("workspace_id", workspace_id)
+        .in_("oportunidade_id", req.oportunidade_ids)
+        .execute()
+        .data
+        or []
+    )
+    return {"verdicts": {r["oportunidade_id"]: r["verdict"] for r in rows}}
