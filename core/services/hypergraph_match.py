@@ -36,18 +36,22 @@ _EMB_CACHE = HYPERGRAPHS_DIR.parent / "graph" / "ecosystem_embeddings.npz"
 # corte de cauda. 0.55 deixa mais arestas p/ o marginsum agregar (ver abaixo).
 SYNTHETIC_EDGE_THRESHOLD = 0.55
 
-# Piso no score AGREGADO (marginsum) p/ um edital entrar no resultado. Editais que
-# casam só por uma aresta fraca de boilerplate ficam abaixo e somem (corta ruído sem
-# matar recall: golden recall@8=0.88 estável até 0.30, despenca em 0.40).
-MIN_AGGREGATE_SCORE = 0.30
+# Piso no score AGREGADO (MaxSim, PR6) p/ um edital entrar no resultado. Editais que
+# casam só por afinidade fraca ficam abaixo e somem. RECALIBRADO p/ a escala MaxSim
+# (Σ dos máximos por nó-empresa, cosseno cru ~1-4) — o 0.30 antigo era do marginsum
+# (Σ de score-threshold). Calibrado no golden matching (2026-07-04): platô recall@8
+# 0.8333 preservado em [1.33, 1.39], ruído 3.0 (< 3.125 do marginsum); recall despenca
+# em 1.40. 1.35 fica central, com margem do precipício.
+MIN_AGGREGATE_SCORE = 1.35
 
 # Piso AGREGADO p/ ENTIDADES (find_matching_entities). Mais baixo que o de editais
 # de propósito: um Programa/Investidor casa pelo CAMINHO DIRETO (1 aresta à própria
 # descrição — programas não têm nós de conteúdo no arquivo), então o piso de editais
-# (0.30 ≈ exige cosseno ≥ 0.85 numa aresta só) os mataria. 0.05 deixa passar o
-# direto razoável (cosseno ≥ 0.60) e ainda discrimina. PROVISÓRIO — sem golden de
-# entidade ainda (ver [[project-hypergraph-sprint3]]).
-MIN_AGGREGATE_ENTITY = 0.05
+# os mataria. RECALIBRADO p/ MaxSim (era 0.05 no marginsum): 0.60 ≈ um casamento
+# direto razoável (cosseno ≥ 0.60 num nó-empresa) — em MaxSim a afinidade de 1 aresta
+# É o próprio cosseno. PROVISÓRIO — sem golden de entidade ainda (ver
+# [[project_hypergraph_sprint3]]).
+MIN_AGGREGATE_ENTITY = 0.60
 
 # Tipo que conta como AFINIDADE (sinal de match cross-domínio): Conceito (v2 —
 # funde Tema/Tecnologia/Aplicação, D7). Mecanismo/Requisito saíram do grafo (viraram
@@ -88,6 +92,23 @@ class SyntheticEdge:
 # (Oportunidade kind=edital) NÃO é (é o resultado do match direto de editais).
 ENTITY_KINDS = frozenset({"ict", "investidor", "programa"})
 _ENTITY_NODE_TYPES = frozenset({"Ator", "Oportunidade"})
+
+
+def _maxsim(edges: list[SyntheticEdge]) -> float:
+    """Agregação MaxSim (família ColBERT, KG v2 PR6) — chave de RANKING.
+
+    Para cada nó DA EMPRESA (`src`), conta só a MELHOR aresta (max cosseno) até a
+    oferta; `score = Σ dos máximos por nó-empresa`. Substitui o marginsum (Σ de
+    TODAS as arestas acima do threshold), que inflava ofertas com muitos Conceitos
+    redundantes — cada Conceito quase-duplicado da oferta somava outro termo. Com
+    MaxSim um Conceito da empresa contribui UMA vez (seu melhor casamento), então a
+    densidade de nós da oferta não infla o score. Escala nova (cosseno cru, não
+    marginal) → pisos recalibrados (MIN_AGGREGATE_*)."""
+    best_by_src: dict[str, float] = {}
+    for e in edges:
+        if e.score > best_by_src.get(e.src, 0.0):
+            best_by_src[e.src] = e.score
+    return sum(best_by_src.values())
 
 
 def _entity_kind(node: dict) -> str | None:
@@ -457,8 +478,8 @@ def _expand_match_via_catalog(
                     merged.append(p)
             merged.sort(key=lambda x: x.score, reverse=True)
             mt.paths = merged[:max_paths]
-            # Recalcula affinity com expansão (marginsum com damping)
-            mt.affinity = sum(x.score - threshold for x in merged)
+            # Recalcula affinity com expansão (MaxSim; paths de catálogo já com damping)
+            mt.affinity = _maxsim(merged)
             mt.n_paths = len(merged)
 
     matches.sort(key=lambda m: m.affinity, reverse=True)
@@ -484,11 +505,11 @@ def find_matching_editais(
     """Match por PATH SEARCH: empresa → aresta sintética → Edital.
 
     Agrupa as arestas sintéticas por edital e rankeia por EVIDÊNCIA AGREGADA, não pela
-    melhor aresta: `affinity = Σ(cosseno − threshold)` sobre as arestas (marginsum). Um
-    edital tematicamente DENSO (várias afinidades reais) vence o spike único de um nó
-    boilerplate genérico — o max-cosseno deixava «defesa»↔«PROPOSTA»=0.71 soterrar o
-    match real. Editais abaixo de `min_aggregate` somem (corta ruído sem matar recall).
-    Calibrado na suíte `matching`: recall@8 0.80→0.88, ruído 4.2→3.6. Sem LLM.
+    melhor aresta: `affinity = MaxSim` (PR6) — para cada nó DA EMPRESA, o melhor
+    casamento com a oferta; Σ dos máximos. Um edital tematicamente DENSO (várias
+    afinidades reais) vence o spike único de um nó genérico, SEM inflar por Conceitos
+    redundantes da oferta (o que o marginsum — Σ de todas as arestas — fazia). Editais
+    abaixo de `min_aggregate` somem (corta ruído sem matar recall). Sem LLM.
 
     Quando `catalog_expansion=True`, após o match geométrico, expande via catálogo
     de ICTs (ADDITIVO): identifica ICTs parceiras dos editais, consulta `ict.json`
@@ -521,7 +542,7 @@ def find_matching_editais(
     n_eliminados = 0
     for fk, es in by_file.items():
         es.sort(key=lambda x: x.score, reverse=True)
-        affinity = sum(e.score - threshold for e in es)  # marginsum
+        affinity = _maxsim(es)  # MaxSim (PR6): Σ do melhor casamento por nó-empresa
         if affinity < min_aggregate:
             continue
         node = edital_node[fk]
@@ -715,7 +736,7 @@ def find_matching_entities(
     matches: list[EntityMatch] = []
     for (fk, name), es in by_entity.items():
         es.sort(key=lambda x: x.score, reverse=True)
-        affinity = sum(x.score - threshold for x in es)  # marginsum
+        affinity = _maxsim(es)  # MaxSim (PR6): Σ do melhor casamento por nó-empresa
         if affinity < min_aggregate:
             continue
         kind, desc = meta[(fk, name)]
