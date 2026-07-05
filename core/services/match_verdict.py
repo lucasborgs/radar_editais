@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from core.services.eligibility import _reason as _constraint_reason
+from core.services.eligibility import format_curated_rules_block
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def _verdict_model() -> str:
 
 # Versão do prompt — entra no input_hash: mudar o prompt invalida o cache inteiro
 # (senão vereditos velhos de um prompt antigo pareceriam frescos para sempre).
-_PROMPT_VERSION = "v1"
+_PROMPT_VERSION = "v2"
 
 # Caps de serialização (bound de tokens por chamada; o subgrafo de um edital tem
 # dezenas de nós/arestas, não centenas — os caps são cinto de segurança).
@@ -332,9 +333,11 @@ def compute_verdict(
             if not api_key:
                 raise ValueError("OPENAI_API_KEY não definida (veredito usa o tier 3)")
             client = make_client(api_key=api_key)
+        rules_block = format_curated_rules_block(profile)
         user = "\n\n".join(filter(None, [
             "[PERFIL DA EMPRESA]\n" + _profile_block(profile),
             ("[PARES DE AFINIDADE (Estágio 1)]\n" + _paths_block(paths)) if paths else "",
+            ("[REGRAS DE ELEGIBILIDADE (TABELAS CURADAS)]\n" + rules_block) if rules_block else "",
             "[SUBGRAFO DA OPORTUNIDADE]\n" + serialized,
         ]))
         resp = client.chat.completions.create(

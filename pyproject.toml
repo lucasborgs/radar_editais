@@ -76,6 +76,7 @@ ignore = ["E501"]  # line too long handled by formatter
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E402"]
+"scripts/*" = ["E402"]
 # load_dotenv() must run before module imports that read os.environ at import time
 "backend/api.py" = ["E402"]
 "core/hybrid_match_service.py" = ["E402"]
