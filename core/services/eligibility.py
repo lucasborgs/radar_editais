@@ -11,12 +11,21 @@ NUNCA elimina a oportunidade — marca "elegibilidade não verificada" e diz qua
 campo completar. Só `unsat` (incompatibilidade COMPROVADA) elimina no filtro
 duro do match.
 
-Puro/determinístico: sem I/O, sem LLM. O produtor (build-time) é quem estrutura
-`Requisito`/`Exclusão` em constraints; aqui só se avalia.
+Regras CURADAS (KG v2 resíduos PR-E.2, R4): `data/curadoria/regras_elegibilidade.json`
+carrega tabelas de porte (bandas FINEP), contrapartida porte×região e interpretações
+padrão (receita, grupo econômico, SUDAM/SUDENE). O avaliador consome essas regras
+para expandir/julgar constraints que referenciam portes ou regiões.
+
+Puro/determinístico: sem I/O (fora o load da regra curada), sem LLM.
 """
 from __future__ import annotations
 
+import json
+import logging
+from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 SAT = "sat"
 UNSAT = "unsat"
@@ -75,6 +84,16 @@ _REGIOES = {
     "S": {"PR", "RS", "SC"},
     "SUL": {"PR", "RS", "SC"},
 }
+
+
+# Mapa UF → região curta (usa a 1ª chave que contém a UF no _REGIOES,
+# priorizando a forma curta N/NE/CO/SUDESTE/S sobre NORTE/NORDESTE etc.).
+_UF_REGIAO: dict[str, str] = {}
+for _reg, _ufs in _REGIOES.items():
+    if _reg in ("NORTE", "NORDESTE", "CENTRO-OESTE", "SUL"):
+        continue
+    for _uf in _ufs:
+        _UF_REGIAO.setdefault(_uf, _reg)
 
 
 def _expand_uf(values: list) -> set[str]:
@@ -215,3 +234,145 @@ def is_eliminated(constraints: list[dict] | None, profile: Any) -> bool:
     """Atalho do Estágio 0: True só quando há incompatibilidade COMPROVADA
     (`unsat`). `unknown` nunca elimina (PR5)."""
     return evaluate_opportunity(constraints, profile)["status"] == INELEGIVEL
+
+
+# ── Regras curadas (KG v2 resíduos PR-E.2, R4) ───────────────────────────────
+
+_CACHED_RULES: dict | None = None
+
+
+def load_curated_rules() -> dict:
+    """Carrega `data/curadoria/regras_elegibilidade.json` (tabelas curadas de
+    porte, contrapartida, interpretações). Cacheia em módulo após primeira leitura.
+    Retorna dict vazio se o arquivo não existir (fallback seguro)."""
+    global _CACHED_RULES
+    if _CACHED_RULES is not None:
+        return _CACHED_RULES
+    path = Path(__file__).parent.parent.parent / "data" / "curadoria" / "regras_elegibilidade.json"
+    if not path.exists():
+        logger.warning("regras_elegibilidade.json não encontrado em %s", path)
+        _CACHED_RULES = {"version": 1, "portes": {}, "contrapartida": {"tabela": []},
+                         "sudam_sudene": {}, "interpretacoes": {}}
+        return _CACHED_RULES
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        _CACHED_RULES = data
+    except Exception as e:
+        logger.warning("falha ao carregar regras_elegibilidade.json: %s", e)
+        _CACHED_RULES = {"version": 1, "portes": {}, "contrapartida": {"tabela": []},
+                         "sudam_sudene": {}, "interpretacoes": {}}
+    return _CACHED_RULES
+
+
+def porte_info(porte_slug: str) -> dict:
+    """Metadados de um porte (label, faturamento_max, descricao) das regras curadas.
+    Retorna dict vazio se o porte não estiver na tabela."""
+    rules = load_curated_rules()
+    return rules.get("portes", {}).get(porte_slug, {})
+
+
+def contrapartida_minima(porte: str, uf: str) -> dict:
+    """Percentual de contrapartida mínima esperado dado porte + UF.
+
+    Retorna `{pct: int, regiao: str, fonte: str}` ou dict vazio se não
+    houver regra. Usa a expansão de UF→região do `_REGIOES` para casar."""
+    rules = load_curated_rules()
+    tabela = rules.get("contrapartida", {}).get("tabela", [])
+    regiao = _UF_REGIAO.get(uf.upper())
+    if not regiao:
+        return {}
+    # Busca na tabela
+    for row in tabela:
+        if row.get("porte") == porte and row.get("regiao") == regiao:
+            return {"pct": row["contrapartida_pct"], "regiao": regiao, "uf": uf.upper(),
+                    "fonte": "regras_elegibilidade.json v1"}
+    # Tenta entrada sem região (genérica)
+    for row in tabela:
+        if row.get("porte") == porte and row.get("regiao") is None:
+            return {"pct": row["contrapartida_pct"], "regiao": None, "uf": uf.upper(),
+                    "fonte": "regras_elegibilidade.json v1"}
+    return {}
+
+
+def format_receita_regra(profile: Any) -> str:
+    """Interpreta o campo `receita = último exercício` das regras curadas,
+    devolvendo o texto da regra + o valor do perfil (se disponível)."""
+    rules = load_curated_rules()
+    texto = rules.get("interpretacoes", {}).get("receita", "")
+    raw = _profile_get(profile, "faturamento_anual")
+    if raw is not None:
+        try:
+            texto += f" (perfil: R$ {float(raw):,.0f})"
+        except (ValueError, TypeError):
+            pass
+    return texto
+
+
+def format_curated_rules_block(profile: Any, constraints: list[dict] | None = None) -> str:
+    """Formata as regras curadas como bloco de texto para o prompt do veredito.
+
+    Se `constraints` for fornecido, filtra as seções para incluir só os tipos
+    de restrição presentes na oportunidade (porte, faturamento, sede_uf...).
+    Sem constraints, inclui tudo (fallback)."""
+    rules = load_curated_rules()
+    lines: list[str] = []
+
+    # Descobre quais seções são relevantes
+    tipos: set[str] = set()
+    if constraints:
+        for c in constraints:
+            t = c.get("tipo") if isinstance(c, dict) else None
+            if t:
+                tipos.add(t)
+
+    # Portes
+    portes = rules.get("portes", {})
+    if portes and (not tipos or "porte" in tipos or "faturamento" in tipos):
+        partes: list[str] = []
+        for slug, info in portes.items():
+            label = info.get("label", slug)
+            fat_max = info.get("faturamento_max")
+            if fat_max:
+                partes.append(f"{label} ≤ R$ {fat_max:,}")
+            else:
+                partes.append(f"{label} (sem limite)")
+        if partes:
+            lines.append("Portes (" + " | ".join(partes) + ")")
+
+    # Contrapartida
+    tabela = rules.get("contrapartida", {}).get("tabela", [])
+    if tabela:
+        p_slug = None
+        p_uf = None
+        if profile:
+            p_slug = _profile_get(profile, "tamanho_empresa")
+            p_uf = _profile_get(profile, "uf")
+        if p_slug and p_uf:
+            cp = contrapartida_minima(p_slug, p_uf)
+            if cp:
+                lines.append(
+                    f"Contrapartida mínima ({p_slug.upper()}, {p_uf.upper()}): "
+                    f"{cp['pct']}% (região {cp['regiao']})"
+                )
+        if not lines or not any("Contrapartida" in ln for ln in lines):
+            lines.append("Contrapartida: varia por porte e região (N/NE/CO: reduzida; S/SE: integral)")
+
+    # SUDAM/SUDENE
+    sudam = rules.get("sudam_sudene", {})
+    if sudam.get("ufs_sudam") and (not tipos or "sede_uf" in tipos):
+        lines.append("SUDAM: benefícios fiscais para UFs da Amazônia Legal")
+
+    # Interpretações
+    interp = rules.get("interpretacoes", {})
+    partes_interp: list[str] = []
+    for key in ("receita", "grupo_economico", "data_constituicao"):
+        texto = interp.get(key, "")
+        if texto:
+            texto_curto = texto.split(".")[0].strip() if "." in texto else texto
+            partes_interp.append(texto_curto)
+    if partes_interp:
+        lines.append("Interpretações: " + " | ".join(partes_interp))
+
+    if not lines:
+        return ""
+    return "\n".join("  • " + ln for ln in lines)

@@ -248,6 +248,44 @@ INVEST_CATALOG = {
 }
 
 
+PROGRAMA_CATALOG = {
+    "format_version": 2,
+    "proveniencia": {"fonte": "curadoria"},
+    "nodes": [
+        {"id": "op:centelha", "type": "Oportunidade", "kind": "programa",
+         "aperture": "recorrente", "name": "Centelha",
+         "description": "Fomento a ideias inovadoras.", "mecanismo": ["subvencao"],
+         "macro_temas": ["tecnologias digitais e conectividade"]},
+        {"id": "con:empreendedorismo", "type": "Conceito", "dim": "aplicacao",
+         "name": "empreendedorismo"},
+        # programa IRMÃO no mesmo arquivo — NÃO deve vazar no sub-grafo do Centelha
+        {"id": "op:outro-programa", "type": "Oportunidade", "kind": "programa",
+         "name": "Outro Programa", "mecanismo": ["subvencao"]},
+        {"id": "con:saude", "type": "Conceito", "dim": "tema", "name": "saúde"},
+    ],
+    "edges": [
+        {"type": "cobre", "members": ["op:centelha", "con:empreendedorismo"]},
+        {"type": "cobre", "members": ["op:outro-programa", "con:saude"]},
+    ],
+}
+
+
+def test_programa_subgraph_isola_programa_e_serializa():
+    graphs = {"programas": PROGRAMA_CATALOG}
+    sub = mv.programa_subgraph(graphs, "programa:centelha")  # entity_id
+    assert sub is not None
+    mini, node = sub
+    assert node["kind"] == "programa"
+    # sub-grafo = programa + o conceito ligado a ele; o OUTRO programa fica de fora
+    assert {n["id"] for n in mini["nodes"]} == {"op:centelha", "con:empreendedorismo"}
+    s = mv.serialize_opportunity(mini, node)
+    assert "[programa/recorrente]" in s and "mecanismo: subvencao" in s
+    assert "empreendedorismo" in s and "saúde" not in s      # sem vazamento
+    # id inexistente / kind errado → None (fail-safe)
+    assert mv.programa_subgraph(graphs, "programa:none") is None
+    assert mv.programa_subgraph({"investidores": INVEST_CATALOG}, "investidor:acme-ventures") is None
+
+
 def test_investment_offer_subgraph_isola_oferta_e_serializa_facetas():
     graphs = {"investidores": INVEST_CATALOG}
     sub = mv.investment_offer_subgraph(graphs, "investidor:acme-ventures")  # entity_id
@@ -266,36 +304,51 @@ def test_investment_offer_subgraph_isola_oferta_e_serializa_facetas():
     assert "pertence_a" in s and "viabiliza" in s
 
 
-def test_serialize_for_verdict_dispatch_edital_e_investimento():
-    graphs = {"investidores": INVEST_CATALOG, "finep__602": GRAPH}
+def test_serialize_for_verdict_dispatch_edital_investimento_e_programa():
+    graphs = {
+        "investidores": INVEST_CATALOG, "programas": PROGRAMA_CATALOG, "finep__602": GRAPH,
+    }
     ed = mv.serialize_for_verdict({"file_key": "finep__602", "paths": []}, graphs)
     inv = mv.serialize_for_verdict(
         {"kind": "investimento", "oportunidade_id": "investidor:acme-ventures", "paths": []}, graphs)
+    prog = mv.serialize_for_verdict(
+        {"kind": "programa", "oportunidade_id": "programa:centelha", "paths": []}, graphs)
     assert ed[0] == "finep__602" and "[edital/prazo]" in ed[1]
     assert inv[0] == "investidor:acme-ventures" and "[investimento/continua]" in inv[1]
+    assert prog[0] == "programa:centelha" and "[programa/recorrente]" in prog[1]
     # id inexistente → None (fail-safe, o item é pulado na task)
     assert mv.serialize_for_verdict(
         {"kind": "investimento", "oportunidade_id": "investidor:none"}, graphs) is None
+    assert mv.serialize_for_verdict(
+        {"kind": "programa", "oportunidade_id": "programa:none"}, graphs) is None
 
 
-def test_attach_cached_verdicts_entities_so_investidor(monkeypatch):
+def test_attach_cached_verdicts_entities_investidor_e_programa(monkeypatch):
     from core.kg import kg_store
 
-    monkeypatch.setattr(kg_store, "load_all_hypergraphs", lambda: {"investidores": INVEST_CATALOG})
-    sub = mv.investment_offer_subgraph({"investidores": INVEST_CATALOG}, "investidor:acme-ventures")
-    h = mv.verdict_input_hash(mv.serialize_opportunity(sub[0], sub[1]), PROFILE, [])
+    graphs = {"investidores": INVEST_CATALOG, "programas": PROGRAMA_CATALOG}
+    monkeypatch.setattr(kg_store, "load_all_hypergraphs", lambda: graphs)
+    inv_sub = mv.investment_offer_subgraph(graphs, "investidor:acme-ventures")
+    inv_h = mv.verdict_input_hash(mv.serialize_opportunity(inv_sub[0], inv_sub[1]), PROFILE, [])
+    prog_sub = mv.programa_subgraph(graphs, "programa:centelha")
+    prog_h = mv.verdict_input_hash(mv.serialize_opportunity(prog_sub[0], prog_sub[1]), PROFILE, [])
 
     inv = {"kind": "investidor", "name": "ACME Ventures", "entity_id": "investidor:acme-ventures", "paths": []}
-    prog = {"kind": "programa", "name": "P", "entity_id": "programa:p", "paths": []}   # ignorado
-    ict = {"kind": "ict", "name": "SENAI", "paths": []}                                # ignorado
-    db = _FakeDb([{"oportunidade_id": "investidor:acme-ventures", "input_hash": h, "verdict": VERDICT}])
+    prog = {"kind": "programa", "name": "Centelha", "entity_id": "programa:centelha", "paths": []}
+    ict = {"kind": "ict", "name": "SENAI", "paths": []}                                # fora do escopo
+    db = _FakeDb([
+        {"oportunidade_id": "investidor:acme-ventures", "input_hash": inv_h, "verdict": VERDICT},
+        {"oportunidade_id": "programa:centelha", "input_hash": prog_h, "verdict": VERDICT},
+    ])
 
     misses = mv.attach_cached_verdicts_entities(db, "ws", [inv, prog, ict], PROFILE)
-    assert inv["verdict"] == VERDICT                       # cache-hit anexado à oferta
-    assert prog["verdict"] is None and ict["verdict"] is None   # programa/ict fora do escopo
+    assert inv["verdict"] == VERDICT and prog["verdict"] == VERDICT   # ambos anexados do cache
+    assert ict["verdict"] is None                                    # ict sem veredito
     assert misses == []
 
-    # cache vazio → miss keyed por entity_id, com discriminador kind=investimento
+    # cache vazio → miss keyed por entity_id, com o discriminador de kind correto
     db2 = _FakeDb([])
-    misses2 = mv.attach_cached_verdicts_entities(db2, "ws", [dict(inv)], PROFILE)
-    assert misses2 == [{"kind": "investimento", "oportunidade_id": "investidor:acme-ventures", "paths": []}]
+    misses2 = mv.attach_cached_verdicts_entities(db2, "ws", [dict(inv), dict(prog)], PROFILE)
+    assert {"kind": "investimento", "oportunidade_id": "investidor:acme-ventures", "paths": []} in misses2
+    assert {"kind": "programa", "oportunidade_id": "programa:centelha", "paths": []} in misses2
+    assert len(misses2) == 2
