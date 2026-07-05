@@ -139,3 +139,42 @@ o anel exibe (R6 não pede) — candidato a revisitar se confundir na prática.
 
 **Não tocado:** os passes de dados (B→C→D→E) — PR-A é código puro. Nenhum script rodou
 sobre `data/knowledge_graph/` real.
+
+### PR-B — Higiene, segunda demão · realizado 2026-07-05
+
+Branch `feat/kg-v2-residuos-pr-b` (empilhada sobre PR-A). **Code-only** (Wave 1): o
+validador/merge foi reforçado + fixtures, **sem rodar sobre o corpus**. Sanity
+`python -m core.eval matching`: `recall@k 0.8334`, `noise 3.0`, exit 0 (baseline inalterado
+— o passe não roda aqui). `ruff` limpo; `pytest tests/test_canonicalize.py` 15/15.
+
+**Frente 1 — descarte determinístico por classe errada** (`core/kg/canonicalize.py`).
+- `anti_class_verdict(name)`: a "lista de padrões" da spec — **metrica** (TRL/readiness/
+  "nível de maturidade tecnológica"), **legal** (LGPD, "Lei nº X", decreto/portaria
+  numerados, Marco Civil), **generico** (rótulo nu: "programa", "tecnologia", "consultoria",
+  "inovação", …). Casa só o inequívoco; composto legítimo ("tecnologia assistiva", "saúde
+  digital") e falso-amigo ("Lei do Bem" = mecanismo, "marco regulatório de saneamento")
+  passam incólumes — coberto por teste.
+- Integrado como **pré-filtro** em `propose_validation`: os determinísticos entram no plano
+  já como `descartar` e **não vão ao LLM** (mais barato e determinístico); o julgamento LLM
+  fica só p/ o ambíguo. `_VALIDATION_SYSTEM` reforçado + categoria `metrica` no enum.
+
+**Frente 2 — fusão da banda >0.90** (`core/kg/canonicalize.py`).
+- `HIGH_CONF_MERGE=0.90` + `_variant_key` (deburr/lower, remove conectivo, singulariza
+  plural simples, ordena tokens) + `_auto_variant_merges`: variantes triviais (singular/
+  plural, "de/para", ordem) fundem **sem LLM** sob **gate duplo** (mesma chave E todo par com
+  cosseno ≥ 0.90 → falso-positivo ~0; falso-negativo cai no LLM). `propose_merges` manda só
+  o resto ao adjudicador. `_MERGE_SYSTEM` reforçado (variantes triviais SEMPRE fundem) e
+  corrigido (o exemplo estava usando TRL, que a Frente 1 agora descarta → troquei por IA).
+- CLI `propose-merges` reporta `N determinísticos (banda >0.90) + M por LLM` — os
+  determinísticos dispensam `sample-merges`. Os grupos levam `auto:true` p/ auditoria.
+
+**Re-embed:** é passo da execução serializada (não do código) — o cache de embedding
+invalida por hash do texto; conceito renomeado/fundido gera texto novo → re-embed no próximo
+`embed`. Nada a codar aqui.
+
+**Sobre "banda >0.90 zerada" (pronto-quando):** é critério de EXECUÇÃO — verificável só
+quando o passe rodar sobre o corpus real (R5, etapa serializada à parte). O código entrega o
+mecanismo (auto-merge determinístico + prompt reforçado) e o log que reporta o resultado; a
+zeragem/justificativa sai no `propose-merges` do passe real.
+
+**Não tocado:** nenhum script rodou sobre `data/knowledge_graph/` real.

@@ -162,8 +162,13 @@ def cmd_propose_merges(args) -> int:
     _save_json(_MERGE_PLAN, plan)
     merges = [g for c in plan["clusters"] for g in c["grupos"] if len(g["membros"]) >= 2]
     n_nodes = sum(len(g["membros"]) for g in merges)
+    n_auto = sum(1 for g in merges if g.get("auto"))
     print(f"{len(plan['clusters'])} clusters candidatos → {len(merges)} grupos de merge "
           f"({n_nodes} ids → {len(merges)} canônicos)")
+    # Frente 2 (PR-B): os determinísticos são variante trivial na banda >0.90 (sem
+    # LLM) — dispensam sample-merges; só os {len(merges)-n_auto} do LLM precisam.
+    print(f"  {n_auto} determinísticos (variante trivial, banda >{canon_mod.HIGH_CONF_MERGE:.2f})"
+          f" + {len(merges) - n_auto} por adjudicação LLM")
     print(f"plano salvo em {_MERGE_PLAN} — rode sample-merges antes do apply")
     return 0
 
