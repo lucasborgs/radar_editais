@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "ultima_atualizacao": "2026-07-05",
+  "descricao": "Tabelas curadas de interpretação de elegibilidade (R4). Regras de negócio que não são extraíveis por LLM do texto do edital — são conhecimento determinístico do curador.",
+  "portes": {
+    "me": {
+      "label": "ME (Microempresa)",
+      "faturamento_max": 4800000,
+      "descricao": "Microempresa: faturamento anual até R$ 4,8 milhões (Lei Complementar 123/2006 e Instrução FINEP vigente)."
+    },
+    "epp": {
+      "label": "EPP (Empresa de Pequeno Porte)",
+      "faturamento_max": 16000000,
+      "descricao": "Empresa de Pequeno Porte: faturamento anual entre R$ 4,8 mi e R$ 16 mi (LC 123/2006)."
+    },
+    "media": {
+      "label": "Média Empresa (FINEP)",
+      "faturamento_max": 90000000,
+      "descricao": "Média empresa p/ Finep: faturamento anual até R$ 90 milhões (Instrução FINEP — linha Inovacred, Tecnova etc.). Acima disso é grande empresa."
+    },
+    "grande": {
+      "label": "Grande Empresa",
+      "faturamento_max": null,
+      "descricao": "Grande empresa: faturamento acima de R$ 90 milhões (ou sem limite específico)."
+    }
+  },
+  "contrapartida": {
+    "descricao": "Tabela de contrapartida mínima (percentual do valor financiado) por porte e região. Dados compilados de instrumentos FINEP/FAPs. A contrapartida é a parcela de recursos PRÓPRIOS que a empresa deve aportar.",
+    "regra_geral": "A contrapartida mínima exigida varia conforme o porte da empresa e a região da sede. Empresas do N/NE/CO têm contrapartida menor (política regional).",
+    "tabela": [
+      {"porte": "me", "regiao": "N", "contrapartida_pct": 1},
+      {"porte": "me", "regiao": "NE", "contrapartida_pct": 1},
+      {"porte": "me", "regiao": "CO", "contrapartida_pct": 1},
+      {"porte": "me", "regiao": "SUDESTE", "contrapartida_pct": 5},
+      {"porte": "me", "regiao": "S", "contrapartida_pct": 5},
+      {"porte": "epp", "regiao": "N", "contrapartida_pct": 2},
+      {"porte": "epp", "regiao": "NE", "contrapartida_pct": 2},
+      {"porte": "epp", "regiao": "CO", "contrapartida_pct": 2},
+      {"porte": "epp", "regiao": "SUDESTE", "contrapartida_pct": 10},
+      {"porte": "epp", "regiao": "S", "contrapartida_pct": 10},
+      {"porte": "media", "regiao": null, "contrapartida_pct": 10},
+      {"porte": "grande", "regiao": null, "contrapartida_pct": 20}
+    ]
+  },
+  "sudam_sudene": {
+    "descricao": "Empresas sediadas em áreas da SUDAM (Amazônia Legal) ou SUDENE (Nordeste) podem usufruir de benefícios fiscais (redução de IRPJ, depreciação acelerada, etc.) que afetam a capacidade de contrapartida. A contrapartida de empresas beneficiárias de incentivos fiscais SUDAM/SUDENE é tratada CASO A CASO pelo agente financeiro.",
+    "ufs_sudam": ["AC", "AP", "AM", "MA", "MT", "PA", "RO", "RR", "TO"],
+    "ufs_sudene": ["AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE"],
+    "observacao": "O MA (Maranhão) pertence tanto à SUDAM quanto à SUDENE."
+  },
+  "interpretacoes": {
+    "receita": "Considera-se a receita bruta do ÚLTIMO exercício fiscal encerrado (ano-calendário completo anterior ao edital). Para empresas com menos de 12 meses, considera-se a receita anualizada.",
+    "grupo_economico": "Para fins de enquadramento de porte, o faturamento considerado é o do GRUPO ECONÔMICO (soma de todas as empresas do mesmo controlador), exceto quando o edital especificar o contrário.",
+    "data_constituicao": "Considera-se a data de registro do CNPJ na Receita Federal. Empresas com menos de 12 meses de constituição têm restrições em alguns editais (ex.: Centelha, PIPE-Fase 1)."
+  }
+}
