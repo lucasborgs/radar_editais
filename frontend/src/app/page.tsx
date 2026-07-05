@@ -246,7 +246,10 @@ export default function FrontDoorPage() {
               .flatMap((e) => [
                 ...e.matchedEditais.map((m) => `${m.source}__${m.edital_id}`),
                 ...e.matchedEntities
-                  .filter((m) => m.kind === "investidor" && m.entity_id)
+                  .filter(
+                    (m) =>
+                      (m.kind === "investidor" || m.kind === "programa") && m.entity_id,
+                  )
                   .map((m) => m.entity_id!),
               ]),
           ),
@@ -437,14 +440,20 @@ export default function FrontDoorPage() {
           }
           return next;
         });
-        // Estágio 2 (PR7/PR8.1): vereditos pendentes chegam async — poll cache-only.
-        // Editais chaveados por file_key; ofertas de investimento por entity_id.
+        // Estágio 2 (PR7/PR8.1 + KG v2 resíduos PR-A): vereditos pendentes chegam
+        // async — poll cache-only. Editais chaveados por file_key; ofertas de
+        // investimento e programas por entity_id (ICT fica sem veredito).
         const pendingVerdicts = [
           ...(matched_editais ?? [])
             .filter((m) => !m.verdict)
             .map((m) => `${m.source}__${m.edital_id}`),
           ...(matched_entities ?? [])
-            .filter((m) => m.kind === "investidor" && m.entity_id && !m.verdict)
+            .filter(
+              (m) =>
+                (m.kind === "investidor" || m.kind === "programa") &&
+                m.entity_id &&
+                !m.verdict,
+            )
             .map((m) => m.entity_id!),
         ];
         if (pendingVerdicts.length > 0) pollVerdicts(pendingVerdicts);

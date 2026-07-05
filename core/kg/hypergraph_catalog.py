@@ -472,6 +472,22 @@ def investment_offer(oportunidade_id: str, graphs: dict[str, dict] | None = None
     return node, graph
 
 
+def programa_node(oportunidade_id: str, graphs: dict[str, dict] | None = None) -> tuple[dict, dict] | None:
+    """`(node, catalog_graph)` da `Oportunidade(kind=programa)` identificada por
+    entity_id (`programa:x`) ou node-id (`op:…`), ou None. Espelha `investment_offer`
+    p/ o outro kind de Oportunidade curada — usado pelo veredito de programa
+    (KG v2 resíduos PR-A) para extrair o sub-grafo a serializar."""
+    if graphs is None:
+        graphs = kg_store.load_all_hypergraphs()
+    resolved = _resolve_curated_node(oportunidade_id, graphs)
+    if resolved is None:
+        return None
+    node, graph, _ = resolved
+    if node.get("kind") != "programa":
+        return None
+    return node, graph
+
+
 def investment_offers_by_fund(graphs: dict[str, dict] | None = None) -> dict[str, dict]:
     """{nome_do_fundo(lower): facetas da OFERTA de investimento} — para o card do
     radar (D1): um fundo casa como Ator, mas o que o card apresenta é a sua oferta
