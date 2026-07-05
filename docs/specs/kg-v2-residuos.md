@@ -178,3 +178,107 @@ mecanismo (auto-merge determinístico + prompt reforçado) e o log que reporta o
 zeragem/justificativa sai no `propose-merges` do passe real.
 
 **Não tocado:** nenhum script rodou sobre `data/knowledge_graph/` real.
+
+### PR-C — Resolução de menções de programa · realizado 2026-07-05
+
+Commit próprio na branch única empilhada `feat/kg-v2-residuos-pr-b` (na prática a Wave 1 não usou branches separadas; a branch `-pr-c` chegou a ser criada num worktree mas ficou vazia e foi removida). **Code-only** (Wave 1):
+o módulo de resolução + CLI + testes, **sem rodar sobre o corpus**. Sanity
+`python -m core.eval matching`: `recall@k 0.8334`, `noise 3.0`, exit 0 (baseline
+inalterado — o passe não roda aqui). `ruff` limpo; `pytest tests/test_resolve_programas.py` 11/11.
+
+**core/kg/resolve_programas.py** — três passos no padrão PROPOSE/APPLY:
+1. **Inventory** (`inventory_programas`): varre os hipergrados e enumera todos os
+   nós `Oportunidade(kind=programa)`, agregando por nome (112 names distintos, 129
+   nós). Lixo óbvio ("programa" nu) sinalizado mas mantido (a higiene decide).
+2. **Cluster + Resolve** (`cluster_programas` → `resolve_clusters`): agrupa por
+   similaridade de embedding (cosseno ≥ 0.80) + adjudicação LLM nos clusters não-
+   triviais, exatamente como `propose_merges` em canonicalize. Cada subcluster
+   resolve contra o registro curado (`programas.json`): casa → `status: curado`;
+   não casa → `status: promovido_auto` com id `programa:{slug}` (R2). A
+   adjudicação e a carga da registry são os únicos pontos com LLM.
+3. **Apply** (`apply`): reescreve os hipergrados — nós programa com alias viram
+   aresta `pertence_a` apontando para o canônico; lixo óbvio é removido com suas
+   arestas. O canon map `programa_canon` é persistido via kg_store.
+
+**scripts/resolve_programas.py** — CLI com 6 subcomandos:
+`stats`, `propose`, `sample -n`, `apply [--dry-run]`, `queue`, `report`.
+Backup automático antes de `apply`. Idempotente (recompila canon de proposta
+existente).
+
+**tests/test_resolve_programas.py** — 11 testes:
+- Inventário (encontra nós, agrega por nome, seleciona descrição mais longa)
+- `corpus_programa_stats` (total/únicos)
+- `build_canon` (compila canon map com curados + promovidos_auto)
+- `apply` (resolve → aresta `pertence_a`, descarta lixo, passthrough sem nós,
+  idempotência)
+- `queue_unresolved` (filtra promovidos_auto)
+- Purezas: `_UnionFind`, `_is_obvious_trash`
+- `cluster_programas` NÃO está nos testes de CI (requer embeddings reais) — mesmo
+  padrão de `propose_merges` em canonicalize.
+
+**Não tocado:** o validador de lixo "programa" usa `anti_class_verdict` do PR-B
+(categoriza "programa" como genérico); o descarte no apply aqui é redundante
+(proteção mecânica). Os clusters com LLM (adjudicação) e a resolução contra a
+registry são os únicos pontos não-testados em CI — exatamente o mesmo padrão de
+`canonicalize.py`.
+
+### PR-D — Granularidade atômica dos Conceitos · realizado 2026-07-05
+
+Commit próprio na branch única empilhada `feat/kg-v2-residuos-pr-b`. **Code-only** (Wave 2):
+prompts + split module + CLI + testes. `ruff` limpo; `pytest tests/test_split_concepts.py` 10/10.
+
+**Frente 1 — Prompt atômico (R7).** Os 4 prompts de extração
+(`_NODE_PROMPT`, `_CATALOG_NODE_PROMPT`, `_COMPANY_NODE_PROMPT`) ganharam a
+diretiva: *"termo ATÔMICO — até 3 palavras, salvo nome próprio consagrado. 'X e
+Y' vira DOIS Conceitos separados"* com o exemplo concreto do resíduo D
+("agricultura de baixo carbono e uso eficiente de recursos" → dois conceitos).
+Aplica-se a toda extração futura (edital, catálogo, perfil).
+
+**Frente 2 — Split retroativo (`core/kg/split_concepts.py`).**
+- `inventory_long_concepts(graphs, max_words=5)` — identifica os ~507 Conceitos
+  com 5+ palavras (29% do corpus).
+- `propose_splits(inventory)` — LLM decompõe cada name longo em termos atômicos
+  (R7). Mantém como está se já é atômico ou nome próprio. Prompt com exemplos
+  positivos/negativos.
+- `apply_splits(graphs, plan)` — reescreve hipergrados: nó original removido, nós
+  novos inseridos (herdam description + dim), arestas re-apontadas. Arestas com
+  <2 membros pós-split são removidas. Dedup por id dentro de cada arquivo.
+- `canonicalize_after_split(graphs)` — re-valida nós novos contra o canon map
+  do PR-B (replay determinístico, sem LLM).
+
+**scripts/split_concepts.py** — CLI: `stats`, `propose [--max-words] [--limit]`,
+`apply [--dry-run]`, `report`.
+
+**Testes (10/10):** word_count, inventário (filtra 5+, agrega cross-file),
+apply (cria nós, reata arestas, cross-file, dedup, preserva intactos,
+passthrough sem plano, aresta mantida pós-rename).
+
+### PR-E.2 — Regras de elegibilidade curadas · realizado 2026-07-05
+
+**`data/curadoria/regras_elegibilidade.json`** — tabelas curadas (R4):
+- `portes`: bandas FINEP (ME ≤ 4,8M, EPP ≤ 16M, média ≤ 90M, grande sem limite)
+- `contrapartida`: tabela porte×região (percentuais mínimos compilados de
+  instrumentos FINEP/FAPs)
+- `sudam_sudene`: UFs beneficiadas e observações
+- `interpretacoes`: receita (último exercício), grupo econômico, data de
+  constituição
+
+**`core/services/eligibility.py`** — novas funções:
+- `load_curated_rules()` — cacheia o JSON em memória
+- `porte_info(slug)` — label + faturamento_max + descricao de cada porte
+- `contrapartida_minima(porte, uf)` — busca na tabela porte×região (resolve
+  UF→região curta, N/NE/CO/SUDESTE/S)
+- `format_receita_regra(profile)` — texto da interpretação + valor do perfil
+- `_UF_REGIAO` — mapa UF→região curta adicionado ao módulo
+
+**`domain/user_profile.py`** — campo `data_constituicao` adicionado (AAAA-MM-DD)
+para a regra de 12 meses. Os demais campos (`faturamento_anual`, `tipo_entidade`,
+`uf`, `ano_fundacao`) já existiam.
+
+**Testes (20/20):** load_rules, porte_info (conhecido/desconhecido/todos),
+contrapartida (por UF, genérica, porte desconhecido), format_receita, e os 11
+testes originais de evaluate_constraint/evaluate_opportunity/is_eliminated
+seguem passando.
+
+**Não tocado:** PR-E.1 (cobertura — rodar extract_constraints no acervo inteiro)
+é passe de dados, fica para a execução serializada.
