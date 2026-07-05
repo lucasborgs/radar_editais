@@ -70,6 +70,7 @@ def _format_entity_matches(matches: list, *, brief: bool = False) -> str:
 
 def build_match_tools(
     profile_text: str, *, company_nodes: list[dict] | None = None, brief: bool = False,
+    profile: dict | None = None,
 ) -> list[BaseTool]:
     """Tool de match para o caminho COM perfil. `profile_text` (o bloco de perfil
     formatado) é capturado por closure — duas sessões nunca compartilham perfil.
@@ -84,7 +85,11 @@ def build_match_tools(
     modelo re-lista de qualquer jeito, testado ao vivo); em vez disso o RESULTADO
     da tool não carrega status/prazo/valor/justificativa, só nome+id — o texto
     do agente fica curto porque ele literalmente não tem o detalhe pra repetir.
-    False (default, WritingSession) mantém o resultado rico — não há card lá."""
+    False (default, WritingSession) mantém o resultado rico — não há card lá.
+
+    `profile` (PR4.1): perfil ESTRUTURADO (dict) p/ o Estágio 0 de elegibilidade
+    dura dentro da tool — editais com constraint incompatível somem da resposta do
+    agente; `unknown` não elimina. Sem ele, a tool não filtra (só afinidade)."""
 
     @tool
     def find_matching_editais(threshold: float = 0.55, top_k: int = 8) -> str:
@@ -115,7 +120,7 @@ def build_match_tools(
             )
         try:
             matches = hypergraph_match.find_matching_editais(
-                nodes, threshold=float(threshold), top_k=int(top_k),
+                nodes, threshold=float(threshold), top_k=int(top_k), profile=profile,
             )
         except Exception as e:  # noqa: BLE001
             return f"Erro no match: {e}."
