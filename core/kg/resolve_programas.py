@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -102,6 +103,25 @@ def _cluster_text(e: dict) -> str:
     return t
 
 
+_GENERIC_PREFIXES = ("programa", "projeto", "plano", "chamada")
+
+
+def _program_key(name: str) -> str:
+    """Chave determinística de identidade de programa (fix 2026-07-05): deburr+
+    lower, separa letra-dígito ("rota2030" → "rota 2030"), remove prefixo
+    genérico ("Programa/Projeto X" ≡ "X") e conectivos, ordena e junta. Mesmo
+    espírito do _variant_key da canonicalização — variantes triviais do MESMO
+    programa unem sem depender do embedding (a descrição desloca o cosseno)."""
+    from core.kg.canonicalize import _CONNECTIVES, _deburr
+
+    n = _deburr(name).lower()
+    n = re.sub(r"(?<=[a-z])(?=\d)|(?<=\d)(?=[a-z])", " ", n)
+    toks = [t for t in re.findall(r"\w+", n) if t not in _CONNECTIVES]
+    while toks and toks[0] in _GENERIC_PREFIXES:
+        toks = toks[1:]
+    return "".join(sorted(toks))
+
+
 class _UnionFind:
     def __init__(self):
         self.parent: dict[str, str] = {}
@@ -149,6 +169,20 @@ def cluster_programas(
     for i, j in zip(ii.tolist(), jj.tolist(), strict=True):
         uf.union(keys[i], keys[j])
         paired.update([keys[i], keys[j]])
+
+    # Fix 2026-07-05: variantes deterministicamente idênticas ("rota 2030" /
+    # "rota2030" / "projeto rota 2030") unem por _program_key, sem depender do
+    # embedding. Chave vazia (name só de prefixo genérico) fica de fora.
+    by_key: dict[str, list[str]] = defaultdict(list)
+    for k in keys:
+        pk = _program_key(inventory[k]["name"])
+        if pk:
+            by_key[pk].append(k)
+    for group in by_key.values():
+        if len(group) >= 2:
+            for a, b in zip(group, group[1:], strict=False):
+                uf.union(a, b)
+            paired.update(group)
 
     groups: dict[str, list[str]] = defaultdict(list)
     for k in paired:
@@ -259,6 +293,11 @@ def resolve_clusters(
         name = (p.get("name") or "").strip().lower()
         reg_index[name] = p
         reg_index[p.get("id", "").lower()] = p
+        # Fix 2026-07-05: indexa também pela chave determinística — "centelha"
+        # casa com o curado "Programa Centelha" (prefixo não é identidade).
+        pk = _program_key(name)
+        if pk:
+            reg_index.setdefault(f"pk::{pk}", p)
 
     def _find_registry(name: str) -> dict | None:
         n = name.strip().lower()
@@ -270,6 +309,9 @@ def resolve_clusters(
                 stripped = n[len(prefix):]
                 if stripped in reg_index:
                     return reg_index[stripped]
+        pk = _program_key(name)
+        if pk and f"pk::{pk}" in reg_index:
+            return reg_index[f"pk::{pk}"]
         return None
 
     resolutions: list[dict] = []
