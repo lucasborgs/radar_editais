@@ -371,6 +371,29 @@ Os catálogos curados (investidores/programas) NÃO foram reconstruídos determi
 
 **Toca (código):** `WIKI.md` (§6.4 constraint schema), `core/kg/schema.py` (accessors + validate), `core/kg/constraints_producer.py` (novo), `core/services/eligibility.py` (novo), `core/services/hypergraph_match.py` (Estágio 0 + `EditalMatch.elegibilidade`), `core/retrieval/hyper_extractor.py` (`_produce_constraints` + wiring), `core/kg/hypergraph_catalog.py` (card expõe `constraints`), `backend/routers/explore.py` (passa `profile`), `scripts/extract_constraints.py` (novo), `tests/test_eligibility.py` (novo), `frontend/src/lib/api.ts`, `frontend/src/components/frontdoor/MatchedEditalCard.tsx`.
 
+### PR6 — MaxSim (Estágio 1) (2026-07-04)
+
+Branch nova a partir da main (com PR2–PR5 já mergeados: #50/#54/#52/#53).
+
+**Antes → Depois (suíte matching, gate = sanity, não estatístico):**
+
+| | agregação | piso | recall@8 | ruído |
+|---|---|---|---|---|
+| **antes** | marginsum `Σ(cosseno−threshold)` | `MIN_AGGREGATE_SCORE=0.30` | **0.8333** | **3.1250** |
+| **depois** | MaxSim `Σ máx por nó-empresa` | `MIN_AGGREGATE_SCORE=1.35` | **0.8334** | **3.0000** |
+
+Recall preservado (Δ≈0, ruído de arredondamento); ruído **−0.125** (3.125→3.0).
+
+**Recalibração (empírica, no golden):** a escala do score muda (MaxSim soma cosseno cru ~1–4, marginsum somava o marginal ~0.05–0.2). Sweep do piso: recall@8 fica no platô 0.8333 até **1.39** e despenca em 1.40 (0.714); o ruído cai a **3.0** a partir de **1.33**. Janela boa `[1.33, 1.39]` → **1.35** (central, com margem do precipício). `MIN_AGGREGATE_ENTITY` reescalado 0.05→**0.60** (≈ um casamento direto a cosseno ≥ 0.60; em MaxSim a afinidade de 1 aresta é o próprio cosseno) — **provisório**, ainda sem golden de entidade.
+
+**Divergências do plano:**
+1. **Primeira leitura enganosa, corrigida por sweep fino.** Em pisos grossos MaxSim parecia PIOR (floor 1.2 → ruído 4.0 a recall 0.833; floor 1.4 → recall despenca). O sweep fino 1.2–1.4 revelou o platô real (1.33–1.39: recall 0.833 / ruído 3.0). Lição registrada: recalibrar em passo fino perto do precipício de recall.
+2. **Por que o ganho é pequeno neste corpus:** os falsos-positivos do golden (`finep__781`, `fapesp__18203`, `finep__780`) são editais TEMATICAMENTE LARGOS que casam muitos nichos com cosseno alto de verdade — não é inflação por nós redundantes (que o MaxSim mata), é afinidade genuína. Numa oferta pequena (35 arquivos) o problema que o MaxSim resolve é modesto; o ganho principal é forward-looking (corpus maior + late-interaction, família ColBERT) e a robustez de ranking (uma oferta densa não infla). O Estágio 2 (veredito LLM, PR7) é quem vai separar "largo mas raso" de "nichado".
+3. **3 sítios de agregação trocados** por um helper único `_maxsim(edges)`: `find_matching_editais`, `find_matching_entities`, e `_expand_match_via_catalog` (expansão de catálogo, paths já com damping) — antes eram três `sum(score−threshold)` duplicados.
+4. **Sanity de testes:** 72 passed nos testes de match/hypergraph/eligibility; suíte cheia idem (os 3 errors de `test_memory_store_postgres` seguem pré-existentes/env-gated).
+
+**Toca (código):** `core/services/hypergraph_match.py` (helper `_maxsim` + 3 sítios + `MIN_AGGREGATE_*` recalibrados + docstrings).
+
 ### PR4.1 — Desdobramento D2 dos curados + rebuild determinístico + threading do perfil (2026-07-04)
 
 Branch da main. Agendada (janela pinada pelo usuário) **entre PR6 e PR7**: as Oportunidades de investimento precisam EXISTIR antes do veredito (PR7) e da ficha (PR8). Nota de stack: PR6 (MaxSim, #55) e esta saem em paralelo da main; conflito trivial só no append da spec (seções distintas) — sem conflito de código (esta NÃO toca `hypergraph_match.py`).
