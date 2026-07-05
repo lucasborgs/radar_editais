@@ -138,12 +138,13 @@ class ExploreAgent:
         profile_text: str | None = None,
         workspace_id: str | None = None,
         db=None,
+        profile: dict | None = None,
     ) -> str:
         """Roteia todo pedido para o agente multi-step (rota única pós-Sprint 3)."""
         answer, _meta = self.explore_with_meta(
             message, history, edital_ids, node_id, node_type,
             has_profile=has_profile, profile_text=profile_text,
-            workspace_id=workspace_id, db=db,
+            workspace_id=workspace_id, db=db, profile=profile,
         )
         return answer
 
@@ -158,13 +159,14 @@ class ExploreAgent:
         profile_text: str | None = None,
         workspace_id: str | None = None,
         db=None,
+        profile: dict | None = None,
     ) -> tuple[str, dict]:
         """Como `explore`, mas devolve também metadados do run: `stop_reason` e
         `truncated` (= cortado no teto de passos, PR6.2/F10) — o router expõe
         `truncated` no response para o front avisar o usuário."""
         return self._explore_agent(
             message, history, edital_ids, node_id, node_type,
-            profile_text=profile_text, workspace_id=workspace_id, db=db,
+            profile_text=profile_text, workspace_id=workspace_id, db=db, profile=profile,
         )
 
     def _explore_tools(self) -> list:
@@ -189,6 +191,7 @@ class ExploreAgent:
         profile_text: str | None = None,
         workspace_id: str | None = None,
         db=None,
+        profile: dict | None = None,
     ) -> tuple[str, dict]:
         """Pipeline agente: run_agent + tools de leitura do hipergrado,
         planejamento e (gated) deep_research — montadas em `_explore_tools`.
@@ -235,7 +238,9 @@ class ExploreAgent:
                 except Exception:  # noqa: BLE001 — fallback à extração efêmera, não derruba o explore
                     logger.debug("falha ao carregar hipergrado durável da empresa", exc_info=True)
                     company_nodes = None
-            tools = tools + build_match_tools(profile_text, company_nodes=company_nodes, brief=True)
+            tools = tools + build_match_tools(
+                profile_text, company_nodes=company_nodes, brief=True, profile=profile,
+            )
             system = system + EXPLORE_MATCH_INSTRUCTION
 
         # Memória do ExploreAgent (Fase 3A): só com workspace autenticado + db.
