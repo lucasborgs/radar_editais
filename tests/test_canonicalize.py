@@ -271,6 +271,12 @@ def test_variant_key_collapses_trivial_variants():
     assert _variant_key("gestão de resíduo") == _variant_key("gestão para resíduo")  # conectivo
     assert _variant_key("energia solar") == _variant_key("solar energia")        # ordem
     assert _variant_key("Saúde Digital") == _variant_key("saude digital")        # caixa/acento
+    # fix 2026-07-05: plural -ções, parentético de sigla, hífen/aglutinado
+    assert _variant_key("tecnologia da informação e comunicações") == _variant_key(
+        "tecnologias da informação e comunicação")
+    assert _variant_key("tecnologia da informação e comunicação (TIC)") == _variant_key(
+        "tecnologia da informação e comunicação")
+    assert _variant_key("sistemas ciber-físicos") == _variant_key("sistemas ciberfísicos")
     # conceitos distintos NÃO colidem
     assert _variant_key("saúde digital") != _variant_key("saúde mental")
     assert _variant_key("produção animal") != _variant_key("produção vegetal")

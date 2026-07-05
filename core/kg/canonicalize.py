@@ -465,18 +465,23 @@ _CONNECTIVES = frozenset({
 
 def _variant_key(name: str) -> str:
     """Chave canônica de variante TRIVIAL (singular/plural, "de/para", ordem,
-    pontuação): deburr+lower, tokeniza, remove conectivos, singulariza plural
-    simples ('-s'), ordena. Dois names com a MESMA chave são a mesma expressão —
-    a base do auto-merge da banda >0.90. Heurística: um falso-NEGATIVO só cai no
-    LLM (seguro); o gate de cosseno cobre o falso-positivo."""
+    pontuação, parentético, hífen/aglutinado): deburr+lower, remove parentético,
+    tokeniza, remove conectivos, singulariza plural ('-ções/-sões' → '-ção/-são'
+    e '-s' simples), ordena e JUNTA SEM espaço (cobre "ciber-físicos" ≡
+    "ciberfísicos"). Dois names com a MESMA chave são a mesma expressão — a base
+    do auto-merge da banda >0.90. Heurística: um falso-NEGATIVO só cai no LLM
+    (seguro); o gate de cosseno cobre o falso-positivo."""
+    name = re.sub(r"\([^)]*\)", " ", name)  # "(TIC)"/"(sigla)" não muda o conceito
     out: list[str] = []
     for t in re.findall(r"\w+", _deburr(name).lower()):
         if t in _CONNECTIVES:
             continue
-        if len(t) > 3 and t.endswith("s"):  # plural pt simples → singular
+        if len(t) > 4 and t.endswith("oes"):  # comunicações→comunicacao (deburred)
+            t = t[:-3] + "ao"
+        elif len(t) > 3 and t.endswith("s"):  # plural pt simples → singular
             t = t[:-1]
         out.append(t)
-    return " ".join(sorted(out))
+    return "".join(sorted(out))
 
 
 def _pair_score(pair_scores: dict, a: str, b: str) -> float:
@@ -521,6 +526,56 @@ def _auto_variant_merges(
     return auto, [m for m in members if m not in consumed]
 
 
+def _corpus_variant_merges(concepts: dict[str, dict]) -> list[dict]:
+    """Variantes triviais procuradas no CORPUS INTEIRO por `_variant_key` — não
+    dentro dos clusters de embedding (fix 2026-07-05). O texto do clustering
+    inclui a descrição, que separa "ciência de dados" (arquivo A) de "ciências
+    de dados" (arquivo B) em clusters distintos — a chave de variante nunca via
+    esses pares. Gate duplo preservado: o cosseno aqui é do NOME cru (sem
+    descrição), todo par do grupo ≥ HIGH_CONF_MERGE."""
+    import numpy as np
+
+    from core.retrieval.embedder import embed_texts
+
+    by_key: dict[str, list[str]] = defaultdict(list)
+    for nid, c in concepts.items():
+        by_key[_variant_key(c["name"])].append(nid)
+    candidates = [sorted(g) for g in by_key.values() if len(g) >= 2]
+    if not candidates:
+        return []
+    ids = sorted({nid for g in candidates for nid in g})
+    emb = np.asarray(embed_texts([concepts[n]["name"] for n in ids]), dtype=np.float32)
+    emb = emb / (np.linalg.norm(emb, axis=1, keepdims=True) + 1e-9)
+    idx = {n: i for i, n in enumerate(ids)}
+    out: list[dict] = []
+    for group in candidates:
+        # Componentes conexos por pares ≥ HIGH_CONF_MERGE dentro do grupo de
+        # chave: uma variante "estranha" (ex. parentético desloca o embedding)
+        # não derruba as demais — ela sobra p/ clustering+LLM decidirem.
+        uf = _UnionFind()
+        for i, a in enumerate(group):
+            for b in group[i + 1:]:
+                if float(emb[idx[a]] @ emb[idx[b]]) >= HIGH_CONF_MERGE:
+                    uf.union(a, b)
+        comps: dict[str, list[str]] = defaultdict(list)
+        for m in group:
+            comps[uf.find(m)].append(m)
+        for comp in comps.values():
+            if len(comp) < 2:
+                continue
+            sims = [float(emb[idx[a]] @ emb[idx[b]])
+                    for i, a in enumerate(comp) for b in comp[i + 1:]]
+            canon_id = _pick_canonical(comp, concepts)
+            out.append({
+                "membros": sorted(comp),
+                "nome_canonico": concepts[canon_id]["name"],
+                "dim": Counter(concepts[m]["dim"] for m in comp).most_common(1)[0][0],
+                "auto": True,
+                "score_min": round(min(sims), 4),
+            })
+    return out
+
+
 def propose_merges(
     concepts: dict[str, dict], *, threshold: float = MERGE_THRESHOLD,
     client=None, model: str | None = None,
@@ -539,7 +594,13 @@ def propose_merges(
         client, _ = _make_llm()
     model = model or CANON_MERGE_MODEL
 
-    raw_clusters, pair_scores = _cluster_candidates(concepts, threshold=threshold)
+    # Fix 2026-07-05: variantes triviais fundem por chave corpus-wide ANTES do
+    # clustering (ver _corpus_variant_merges); consumidos saem do clustering.
+    corpus_auto = _corpus_variant_merges(concepts)
+    corpus_consumed = {m for g in corpus_auto for m in g["membros"]}
+    remaining = {k: v for k, v in concepts.items() if k not in corpus_consumed}
+
+    raw_clusters, pair_scores = _cluster_candidates(remaining, threshold=threshold)
     clusters: list[list[str]] = []
     for c in raw_clusters:
         clusters.extend(_split_oversized(c, pair_scores))
@@ -549,7 +610,11 @@ def propose_merges(
         return round(sum(vals) / len(vals), 4) if vals else 0.0
 
     plan: dict = {"threshold": threshold, "model": model, "clusters": [], "rejeitados": []}
-    n_auto = 0
+    for g in corpus_auto:
+        plan["clusters"].append({
+            "members": g["membros"], "score_medio": g.get("score_min", 0.0), "grupos": [g],
+        })
+    n_auto = len(corpus_auto)
     for members in clusters:
         # Frente 2 (PR-B): variantes triviais da banda >0.90 fundem SEM LLM; o
         # adjudicador vê só o resto (e não roda p/ cluster que virou <2 restantes).
