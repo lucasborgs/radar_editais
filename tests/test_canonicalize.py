@@ -2,16 +2,25 @@
 
 Cobrem só a metade PURA (inventário, compilação do canon, canonicalize_graph,
 macro_temas) — as funções propose-* usam LLM/embeddings e ficam fora da CI
-(mesmo padrão do hyper_extractor)."""
+(mesmo padrão do hyper_extractor). A segunda demão de higiene (KG v2 resíduos
+PR-B) acrescenta lógica DETERMINÍSTICA (padrões anti-classe, chave de variante,
+auto-merge da banda >0.90) que é pura e entra aqui."""
 from __future__ import annotations
+
+import json
+from types import SimpleNamespace
 
 from core.kg.canonicalize import (
     CanonStats,
+    _auto_variant_merges,
+    _variant_key,
+    anti_class_verdict,
     apply_macro_temas,
     build_canon,
     canonicalize_graph,
     corpus_stats,
     inventory_concepts,
+    propose_validation,
 )
 
 # Subgrafo v2 sintético: 1 edital, 1 ICT, 4 Conceitos (1 ruído-geografia,
@@ -197,3 +206,102 @@ def test_bfs_degree_cap_prioritizes_entity_edges():
     assert len(collected) == 10  # cap por nó, não as 30
     # as 5 arestas de entidade vêm primeiro
     assert all(e["type"] == "abrange_tema" for e in collected[:5])
+
+
+# ── KG v2 resíduos PR-B: Frente 1 (descarte determinístico por classe errada) ──
+
+def test_anti_class_verdict_flags_wrong_class():
+    assert anti_class_verdict("TRL")["categoria"] == "metrica"
+    assert anti_class_verdict("Technology Readiness Level")["categoria"] == "metrica"
+    assert anti_class_verdict("nível de maturidade tecnológica")["categoria"] == "metrica"
+    assert anti_class_verdict("LGPD")["categoria"] == "legal"
+    assert anti_class_verdict("Lei nº 14.133")["categoria"] == "legal"
+    assert anti_class_verdict("Marco Civil da Internet")["categoria"] == "legal"
+    assert anti_class_verdict("Programa")["categoria"] == "generico"
+    assert anti_class_verdict("tecnologia")["categoria"] == "generico"
+    assert anti_class_verdict("consultoria")["categoria"] == "generico"
+    # composto legítimo e tema real passam incólumes (→ julgamento LLM)
+    for keep in ("tecnologia assistiva", "saúde digital", "inteligência artificial",
+                 "eficiência energética", "internet das coisas"):
+        assert anti_class_verdict(keep) is None
+
+
+class _FakeCanonClient:
+    """Cliente que devolve 'manter' p/ todo id recebido, gravando os ids vistos —
+    p/ provar que os determinísticos NÃO chegam ao LLM."""
+
+    def __init__(self):
+        self.seen_ids: set[str] = set()
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+    def _create(self, *, messages, **_):
+        payload = json.loads(messages[1]["content"])
+        ids = [it["id"] for it in payload]
+        self.seen_ids.update(ids)
+        itens = [{"id": i, "veredicto": "manter"} for i in ids]
+        msg = SimpleNamespace(content=json.dumps({"itens": itens}))
+        return SimpleNamespace(choices=[SimpleNamespace(message=msg)])
+
+
+def test_propose_validation_deterministic_prefilter():
+    concepts = {
+        "con:trl": {"id": "con:trl", "name": "TRL", "dim": "tecnologia"},
+        "con:lgpd": {"id": "con:lgpd", "name": "LGPD", "dim": "tema"},
+        "con:programa": {"id": "con:programa", "name": "Programa", "dim": "tema"},
+        "con:saude-digital": {"id": "con:saude-digital", "name": "saúde digital", "dim": "tema"},
+        "con:tec-assistiva": {"id": "con:tec-assistiva", "name": "tecnologia assistiva",
+                              "dim": "tecnologia"},
+    }
+    client = _FakeCanonClient()
+    plan = propose_validation(concepts, client=client, model="fake")
+    # determinísticos descartados SEM passar pelo LLM
+    assert plan["con:trl"] == {"veredicto": "descartar", "categoria": "metrica"}
+    assert plan["con:lgpd"] == {"veredicto": "descartar", "categoria": "legal"}
+    assert plan["con:programa"] == {"veredicto": "descartar", "categoria": "generico"}
+    assert client.seen_ids == {"con:saude-digital", "con:tec-assistiva"}
+    # compostos legítimos seguem ao LLM e são mantidos
+    assert plan["con:saude-digital"]["veredicto"] == "manter"
+    assert plan["con:tec-assistiva"]["veredicto"] == "manter"
+
+
+# ── KG v2 resíduos PR-B: Frente 2 (auto-merge da banda >0.90) ──────────────────
+
+def test_variant_key_collapses_trivial_variants():
+    assert _variant_key("rede elétrica") == _variant_key("redes elétricas")     # plural
+    assert _variant_key("gestão de resíduo") == _variant_key("gestão para resíduo")  # conectivo
+    assert _variant_key("energia solar") == _variant_key("solar energia")        # ordem
+    assert _variant_key("Saúde Digital") == _variant_key("saude digital")        # caixa/acento
+    # conceitos distintos NÃO colidem
+    assert _variant_key("saúde digital") != _variant_key("saúde mental")
+    assert _variant_key("produção animal") != _variant_key("produção vegetal")
+
+
+def test_auto_variant_merges_only_high_conf_band():
+    concepts = {
+        "con:rede-eletrica": {"id": "con:rede-eletrica", "name": "rede elétrica",
+                              "dim": "tema", "fan_in": 3},
+        "con:redes-eletricas": {"id": "con:redes-eletricas", "name": "redes elétricas",
+                                "dim": "tema", "fan_in": 1},
+        "con:energia-solar": {"id": "con:energia-solar", "name": "energia solar",
+                              "dim": "tema", "fan_in": 1},
+    }
+    members = list(concepts)
+    pair_scores = {
+        ("con:rede-eletrica", "con:redes-eletricas"): 0.97,   # variante na banda >0.90
+        ("con:rede-eletrica", "con:energia-solar"): 0.88,
+        ("con:redes-eletricas", "con:energia-solar"): 0.86,
+    }
+    auto, rest = _auto_variant_merges(members, concepts, pair_scores)
+    assert len(auto) == 1
+    g = auto[0]
+    assert set(g["membros"]) == {"con:rede-eletrica", "con:redes-eletricas"}
+    assert g["nome_canonico"] == "rede elétrica"   # maior fan_in vence
+    assert g["auto"] is True
+    assert rest == ["con:energia-solar"]            # não-variante fica p/ o LLM
+
+    # mesma variante, mas fora da banda (cosseno < 0.90) → NÃO auto-merge
+    low = {("con:rede-eletrica", "con:redes-eletricas"): 0.80}
+    auto2, rest2 = _auto_variant_merges(
+        ["con:rede-eletrica", "con:redes-eletricas"], concepts, low)
+    assert auto2 == []
+    assert set(rest2) == {"con:rede-eletrica", "con:redes-eletricas"}
