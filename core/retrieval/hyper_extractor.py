@@ -215,6 +215,9 @@ Cada entidade recebe UM `type`: Oportunidade, Ator ou Conceito.
     • aplicacao: CASO DE USO concreto — uma OPERAÇÃO (triagem, classificação,
       diagnóstico, detecção, previsão, monitoramento, otimização) aplicada a um
       objeto. É o `dim` central para conectar domínios; extraia só caso de uso concreto.
+    • termo ATÔMICO — até 3 palavras, salvo nome próprio consagrado. "X e Y" vira
+      DOIS Conceitos separados. "agricultura de baixo carbono e uso eficiente de
+      recursos" → "agricultura de baixo carbono" + "uso eficiente de recursos".
 
 NÃO extraia como entidade: leis, decretos, anexos, portarias, regulamentos,
 certificações, valores monetários, guias, termos de outorga, sistemas de submissão
@@ -275,6 +278,8 @@ abaixo são descrições — NUNCA extraia um nome citado nelas.
 - Conceito — dimensão temática do ator. `dim`: tema (domínio de atuação),
   tecnologia (capacidade técnica), aplicacao (caso de uso concreto — uma OPERAÇÃO:
   triagem, classificação, diagnóstico, detecção, previsão, monitoramento).
+  Termo ATÔMICO — até 3 palavras, salvo nome próprio. "X e Y" vira dois
+  Conceitos separados.
 
 O ATOR de cada bloco (a ICT, o investidor ou o programa nomeado) é sempre um nó.
 Ligue-o aos seus Conceitos. Condições de elegibilidade (estágio, ticket, porte) e
@@ -303,6 +308,9 @@ Extraia Conceitos (todos type=Conceito), variando o `dim`:
   diagnóstico, detecção, previsão, monitoramento, otimização) aplicada a um objeto.
   É o `dim` CENTRAL do match cross-domínio; extraia da proposta de valor, solução,
   portfólio e tração.
+
+Termo ATÔMICO — até 3 palavras, salvo nome próprio. "X e Y" vira dois
+Conceitos separados.
 
 NÃO extraia Oportunidade nem Ator: a empresa é o lado DEMANDA, não a oferta pública
 (porte/UF/mecanismo buscado/TRL vêm do perfil estruturado, não desta extração).

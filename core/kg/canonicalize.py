@@ -26,6 +26,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -55,6 +57,10 @@ MACRO_BATCH = 12
 # dos candidatos. Calibrável olhando a distribuição impressa pelo propose.
 MERGE_THRESHOLD = float(os.environ.get("CANON_MERGE_THRESHOLD", "0.85"))
 _MAX_CLUSTER = 20  # cap de membros por chamada de adjudicação
+# Frente 2 (KG v2 resíduos PR-B): banda de ALTA confiança onde variantes triviais
+# (singular/plural, "de/para", ordem) fundem DETERMINISTICAMENTE, sem LLM — o
+# gate duplo (mesma chave canônica + cosseno ≥ isto) mantém o falso-positivo ~0.
+HIGH_CONF_MERGE = float(os.environ.get("CANON_HIGH_CONF_MERGE", "0.90"))
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +146,62 @@ def _make_llm():
     return make_client(api_key=api_key, max_retries=6), CANON_MODEL
 
 
+# ---------------------------------------------------------------------------
+# Frente 1 (KG v2 resíduos PR-B): descarte DETERMINÍSTICO por classe errada
+# ---------------------------------------------------------------------------
+# A "lista de padrões" da spec: casos inequívocos que a extração deixou como
+# Conceito mas NÃO são dimensão temática. Rodam ANTES do LLM (o julgamento fica
+# só p/ o ambíguo) e casam a forma óbvia (bare / citação), nunca o composto
+# legítimo — "tecnologia assistiva" fica; o nu "tecnologia" some.
+def _deburr(s: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
+
+
+# Faceta/métrica de maturidade (capturada como propriedade `trl` do nó, nunca tema).
+_METRICA_RE = re.compile(
+    r"\b(trl|mrl|crl|irl)\b|technology readiness|n[íi]vel de maturidade tecnol[óo]g",
+    re.IGNORECASE,
+)
+# Citação legal específica (LGPD, "Lei nº X", decreto/portaria numerados, marco civil).
+# A parte numerada não leva \b final: o \d costuma ser seguido de outro dígito
+# ("14.133"), e \b ali quebraria o match. O separador entre a palavra-lei e o
+# número é uma classe explícita — só "nº/n°/no/n." + espaços/pontos/hífen (os
+# ordinais ª/º são LETRA em Unicode, então \W não os cobre); "Lei do Bem" (o "d"
+# não é separador) NÃO casa, de propósito (é mecanismo, não citação).
+_LEGAL_RE = re.compile(
+    r"\b(lgpd|lei geral de prote[çc][ãa]o de dados|marco civil)\b"
+    r"|\b(lei(\s+complementar)?|decreto(-lei)?|portaria|medida provis[óo]ria"
+    r"|emenda constitucional)\b[\sºª°no.\-]*\d",
+    re.IGNORECASE,
+)
+# Rótulos genéricos: só a forma NUA (name == rótulo, após deburr/lower) é lixo.
+_GENERIC_LABELS = frozenset({
+    "programa", "programas", "tecnologia", "tecnologias", "consultoria",
+    "inovacao", "projeto", "projetos", "pesquisa", "desenvolvimento",
+    "p&d", "pd&i", "p&d&i", "pdi", "empresa", "empresas", "startup", "startups",
+    "servico", "servicos", "produto", "produtos", "solucao", "solucoes",
+    "sistema", "sistemas", "plataforma", "metodologia", "processo",
+})
+
+
+def anti_class_verdict(name: str) -> dict | None:
+    """Descarte determinístico de Conceito por classe errada (Frente 1, PR-B):
+    métrica/faceta (TRL), citação legal (LGPD, "Lei nº X"), rótulo genérico nu
+    ("programa", "tecnologia", "consultoria"). Retorna {veredicto, categoria} ou
+    None (→ segue p/ o julgamento LLM). Casa só o inequívoco; composto legítimo
+    ("tecnologia assistiva", "saúde digital") passa incólume."""
+    n = (name or "").strip()
+    if not n:
+        return None
+    if _METRICA_RE.search(n):
+        return {"veredicto": "descartar", "categoria": "metrica"}
+    if _LEGAL_RE.search(n):
+        return {"veredicto": "descartar", "categoria": "legal"}
+    if _deburr(n).lower() in _GENERIC_LABELS:
+        return {"veredicto": "descartar", "categoria": "generico"}
+    return None
+
+
 _VALIDATION_SYSTEM = """Você é curador do grafo de conhecimento do ecossistema brasileiro de \
 fomento à inovação (editais, ICTs, investidores, programas).
 
@@ -152,11 +214,16 @@ classificá-lo.
 Para CADA item da lista, dê um veredicto:
 - "manter"    — conceito temático legítimo;
 - "descartar" — NÃO é conceito: geografia/região ("Brasil", "norte", "Santa Catarina"), \
-boilerplate legal/orçamentário (leis, decretos, "LDO 2026", rubricas, portarias), \
+boilerplate legal/orçamentário (leis, decretos, "LDO 2026", rubricas, portarias) e \
+CITAÇÃO LEGAL específica ("LGPD", "Lei nº 14.133", "Marco Civil" — é a norma, não um tema), \
+FACETA/MÉTRICA de maturidade ("TRL", "Technology Readiness Level", "nível de maturidade \
+tecnológica" — é escala, capturada como propriedade, não tema), \
 administrativo/formulário ("PROPOSTA", nomes de sistema de submissão, seções de \
 documento, cronogramas, cadastros e certidões como CNPJ), datas/valores/percentuais, \
-classe genérica de ator ("startups", "empresas", "ICTs", "pesquisadores" — público-alvo, \
-não tema), fragmento truncado sem sentido;
+RÓTULO GENÉRICO nu sem tema ("programa", "tecnologia", "consultoria", "inovação", \
+"solução", "projeto" — palavra-guarda-chuva sem domínio; mas "tecnologia assistiva" \
+ou "inovação social" FICAM), classe genérica de ator ("startups", "empresas", "ICTs", \
+"pesquisadores" — público-alvo, não tema), fragmento truncado sem sentido;
 - "ator"      — é uma ORGANIZAÇÃO ESPECÍFICA com nome próprio (ex.: JUCESC, EMBRAPII, \
 Ministério da Saúde, Sebrae) classificada errado como conceito. Classe genérica de \
 organização NÃO é ator — é descarte (categoria "generico").
@@ -165,8 +232,8 @@ Campos por veredicto:
 - "manter": informe SEMPRE "dim" — tema (domínio amplo) | tecnologia (capacidade \
 técnica) | aplicacao (caso de uso concreto, uma operação aplicada a um objeto). \
 Ecoe a dim atual se estiver certa; corrija se estiver errada.
-- "descartar": informe "categoria" — geografia | legal | administrativo | sistema | \
-orcamentario | generico | outro.
+- "descartar": informe "categoria" — geografia | legal | metrica | administrativo | \
+sistema | orcamentario | generico | outro.
 - "ator": informe "ator_kind" — agencia | fap | ict | corporate | aceleradora | investidor.
 
 Responda JSON: {"itens": [{"id": "...", "veredicto": "...", "dim": "...", \
@@ -191,7 +258,16 @@ def propose_validation(
         client, model = _make_llm()
     model = model or CANON_MODEL
 
-    items = list(concepts.values())
+    # Frente 1 (PR-B): descarte determinístico ANTES do LLM — a lista de padrões
+    # resolve o inequívoco (TRL/LGPD/genérico) de graça; o LLM julga só o resto.
+    det: dict[str, dict] = {}
+    items: list[dict] = []
+    for c in concepts.values():
+        v = anti_class_verdict(c.get("name", ""))
+        if v is not None:
+            det[c["id"]] = v
+        else:
+            items.append(c)
     batches = [items[s:s + batch_size] for s in range(0, len(items), batch_size)]
 
     def _judge(batch: list[dict]) -> dict[str, dict]:
@@ -221,7 +297,10 @@ def propose_validation(
             logger.warning("propose_validation: batch de %d falhou (%s) — manter todos", len(batch), e)
             return {}
 
-    plan: dict[str, dict] = {}
+    plan: dict[str, dict] = dict(det)  # descartes determinísticos entram prontos
+    if det:
+        logger.info("propose_validation: %d descartes determinísticos (Frente 1), "
+                    "%d ao LLM", len(det), len(items))
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         for batch, got in zip(batches, ex.map(_judge, batches), strict=True):
             for c in batch:
@@ -274,8 +353,11 @@ MESMO conceito (agrupados por similaridade de embedding) e decide o que funde.
 
 O teste: dois itens só fundem se forem INTERCAMBIÁVEIS — quem procura um aceitaria \
 o outro como exatamente a mesma coisa. Fundem: sinônimos, traduções ("machine \
-learning" ≡ "aprendizado de máquina"), siglas ("TRL" ≡ "Technology Readiness \
-Level"), variações de grafia/pontuação da MESMA expressão.
+learning" ≡ "aprendizado de máquina"), siglas ("IA" ≡ "inteligência artificial"), \
+e VARIANTES TRIVIAIS da MESMA expressão — singular/plural ("rede neural" ≡ "redes \
+neurais"), conectivo trocado ("eficiência de energia" ≡ "eficiência para energia"), \
+ordem das palavras ("energia solar" ≡ "solar, energia"), grafia/pontuação/acentuação. \
+Essas variantes triviais SEMPRE fundem.
 
 NÃO fundem (mantenha separados, mesmo que o embedding os aproxime):
 - um-contém-o-outro / especializações: "saúde" ≠ "saúde digital"; "eficiência \
@@ -371,6 +453,74 @@ def _split_oversized(cluster: list[str], pair_scores: dict, cap: int = _MAX_CLUS
     return [cluster[i:i + cap] for i in range(0, len(cluster), cap)]
 
 
+# ---------------------------------------------------------------------------
+# Frente 2 (KG v2 resíduos PR-B): auto-merge determinístico de variante trivial
+# ---------------------------------------------------------------------------
+# Conectivos ignorados na chave de variante ("energia de X" ≡ "energia para X").
+_CONNECTIVES = frozenset({
+    "de", "da", "do", "das", "dos", "e", "para", "a", "o", "as", "os",
+    "em", "com", "por", "na", "no", "nas", "nos", "ao", "aos",
+})
+
+
+def _variant_key(name: str) -> str:
+    """Chave canônica de variante TRIVIAL (singular/plural, "de/para", ordem,
+    pontuação): deburr+lower, tokeniza, remove conectivos, singulariza plural
+    simples ('-s'), ordena. Dois names com a MESMA chave são a mesma expressão —
+    a base do auto-merge da banda >0.90. Heurística: um falso-NEGATIVO só cai no
+    LLM (seguro); o gate de cosseno cobre o falso-positivo."""
+    out: list[str] = []
+    for t in re.findall(r"\w+", _deburr(name).lower()):
+        if t in _CONNECTIVES:
+            continue
+        if len(t) > 3 and t.endswith("s"):  # plural pt simples → singular
+            t = t[:-1]
+        out.append(t)
+    return " ".join(sorted(out))
+
+
+def _pair_score(pair_scores: dict, a: str, b: str) -> float:
+    """Cosseno de um par independente da ordem em que foi indexado."""
+    return pair_scores.get((a, b)) or pair_scores.get((b, a)) or 0.0
+
+
+def _pick_canonical(members: list[str], concepts: dict[str, dict]) -> str:
+    """Forma canônica de um grupo de variantes: mais frequente (fan-in), desempate
+    pelo name mais completo (mais longo)."""
+    return max(members, key=lambda m: (concepts[m].get("fan_in", 1), len(concepts[m]["name"])))
+
+
+def _auto_variant_merges(
+    members: list[str], concepts: dict[str, dict], pair_scores: dict,
+    *, min_score: float = HIGH_CONF_MERGE,
+) -> tuple[list[dict], list[str]]:
+    """Grupos de variante trivial de um cluster que fundem SEM LLM + o resto.
+
+    Gate duplo: mesma `_variant_key` E todo par do grupo com cosseno ≥ `min_score`
+    (banda de alta confiança). Devolve (grupos_auto, membros_restantes). Cada
+    grupo carrega `auto: True` p/ auditoria; o `build_canon` lê membros/nome/dim."""
+    by_key: dict[str, list[str]] = defaultdict(list)
+    for m in members:
+        by_key[_variant_key(concepts[m]["name"])].append(m)
+    auto: list[dict] = []
+    consumed: set[str] = set()
+    for group in by_key.values():
+        if len(group) < 2:
+            continue
+        if any(_pair_score(pair_scores, a, b) < min_score
+               for i, a in enumerate(group) for b in group[i + 1:]):
+            continue  # nem todo par na banda >0.90 → deixa p/ o LLM
+        canon_id = _pick_canonical(group, concepts)
+        auto.append({
+            "membros": sorted(group),
+            "nome_canonico": concepts[canon_id]["name"],
+            "dim": Counter(concepts[m]["dim"] for m in group).most_common(1)[0][0],
+            "auto": True,
+        })
+        consumed.update(group)
+    return auto, [m for m in members if m not in consumed]
+
+
 def propose_merges(
     concepts: dict[str, dict], *, threshold: float = MERGE_THRESHOLD,
     client=None, model: str | None = None,
@@ -399,32 +549,40 @@ def propose_merges(
         return round(sum(vals) / len(vals), 4) if vals else 0.0
 
     plan: dict = {"threshold": threshold, "model": model, "clusters": [], "rejeitados": []}
+    n_auto = 0
     for members in clusters:
+        # Frente 2 (PR-B): variantes triviais da banda >0.90 fundem SEM LLM; o
+        # adjudicador vê só o resto (e não roda p/ cluster que virou <2 restantes).
+        auto_groups, rest = _auto_variant_merges(members, concepts, pair_scores)
+        n_auto += len(auto_groups)
         payload = [
             {
                 "id": nid, "name": concepts[nid]["name"], "dim": concepts[nid]["dim"],
                 "descricao": (concepts[nid].get("description") or "")[:160],
                 "aparece_em_n_arquivos": concepts[nid].get("fan_in", 1),
             }
-            for nid in members
+            for nid in rest
         ]
-        try:
-            resp = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": _MERGE_SYSTEM},
-                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-                ],
-                temperature=0,
-                response_format={"type": "json_object"},
-            )
-            grupos = json.loads(resp.choices[0].message.content).get("grupos", [])
-        except Exception as e:  # noqa: BLE001 — fail-open: cluster sem merge
-            logger.warning("propose_merges: adjudicação do cluster %s falhou (%s)", members[:3], e)
-            grupos = [{"membros": [m], "nome_canonico": concepts[m]["name"]} for m in members]
-        # Sanitiza: só membros do cluster, cada um em no máximo um grupo.
-        seen: set[str] = set()
-        clean = []
+        grupos: list[dict] = []
+        if len(rest) >= 2:
+            try:
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": _MERGE_SYSTEM},
+                        {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+                    ],
+                    temperature=0,
+                    response_format={"type": "json_object"},
+                )
+                grupos = json.loads(resp.choices[0].message.content).get("grupos", [])
+            except Exception as e:  # noqa: BLE001 — fail-open: cluster sem merge
+                logger.warning("propose_merges: adjudicação do cluster %s falhou (%s)", rest[:3], e)
+                grupos = [{"membros": [m], "nome_canonico": concepts[m]["name"]} for m in rest]
+        # Sanitiza: só membros do cluster, cada um em no máximo um grupo. Os grupos
+        # auto já entram limpos (derivam de um membro) e reservam seus ids no `seen`.
+        seen: set[str] = {m for g in auto_groups for m in g["membros"]}
+        clean = list(auto_groups)
         for g in grupos:
             ms = [m for m in g.get("membros", []) if m in members and m not in seen]
             if not ms:
@@ -457,9 +615,11 @@ def propose_merges(
             "members": members, "score_medio": _mean_score(members), "grupos": clean,
         })
     logger.info(
-        "propose_merges: %d clusters candidatos (threshold=%.2f), %d grupos com merge",
+        "propose_merges: %d clusters candidatos (threshold=%.2f), %d grupos com merge "
+        "(%d determinísticos na banda >%.2f)",
         len(clusters), threshold,
         sum(1 for c in plan["clusters"] for g in c["grupos"] if len(g["membros"]) >= 2),
+        n_auto, HIGH_CONF_MERGE,
     )
     return plan
 

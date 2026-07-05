@@ -38,6 +38,7 @@ class CompanyProfile:
     uf: str = ""                       # UF/estado (elegibilidade geográfica)
     faturamento_anual: float | None = None   # receita (≠ capital_social)
     ano_fundacao: int | None = None    # ano de constituição (idade da empresa)
+    data_constituicao: str = ""         # data de registro do CNPJ (AAAA-MM-DD), p/ regras de 12 meses
 
     # ── Perfil tecnológico ─────────────────────────────────────────────────
     trl: int | None = None       # Technology Readiness Level atual do projeto (1-9)

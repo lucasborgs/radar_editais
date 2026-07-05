@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from core.services.eligibility import _reason as _constraint_reason
+from core.services.eligibility import format_curated_rules_block
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def _verdict_model() -> str:
 
 # Versão do prompt — entra no input_hash: mudar o prompt invalida o cache inteiro
 # (senão vereditos velhos de um prompt antigo pareceriam frescos para sempre).
-_PROMPT_VERSION = "v1"
+_PROMPT_VERSION = "v2"
 
 # Caps de serialização (bound de tokens por chamada; o subgrafo de um edital tem
 # dezenas de nós/arestas, não centenas — os caps são cinto de segurança).
@@ -142,12 +143,42 @@ def investment_offer_subgraph(graphs: dict, oportunidade_id: str) -> tuple[dict,
     return {"nodes": nodes, "edges": edges}, offer
 
 
+def programa_subgraph(graphs: dict, oportunidade_id: str) -> tuple[dict, dict] | None:
+    """`(mini_graph, programa_node)` de um programa curado (KG v2 resíduos PR-A).
+
+    Irmão de `investment_offer_subgraph` p/ o outro kind de Oportunidade curada. O
+    programa coabita o arquivo `programas` (multi-item) — serializar o arquivo
+    inteiro misturaria todos os programas. Extrai o sub-grafo enxuto: o nó do
+    programa + os Conceitos ligados a ele por qualquer aresta + essas arestas.
+    Sem o hop pelo fundo (isso é só de investimento): os Conceitos penduram direto
+    na Oportunidade(programa)."""
+    from core.kg import hypergraph_catalog
+
+    resolved = hypergraph_catalog.programa_node(oportunidade_id, graphs)
+    if resolved is None:
+        return None
+    node, graph = resolved
+    by_id = {n["id"]: n for n in graph.get("nodes", []) if n.get("id")}
+    nid = node.get("id")
+    keep: set[str] = {nid}
+    edges: list[dict] = []
+    for e in graph.get("edges", []):
+        members = e.get("members", [])
+        if nid in members:
+            edges.append(e)
+            keep.update(m for m in members if (nd := by_id.get(m)) and nd.get("type") == "Conceito")
+    nodes = [by_id[i] for i in keep if i in by_id]
+    return {"nodes": nodes, "edges": edges}, node
+
+
 def serialize_for_verdict(item: dict, graphs: dict) -> tuple[str, str] | None:
     """`(oportunidade_id, serialized)` de um item da fila, ou None. Dispatcher que
-    unifica os DOIS formatos de oportunidade do funil (PR8.1):
+    unifica os formatos de oportunidade do funil:
       • edital       → subgrafo por file_key + nó kind=edital;
-      • investimento → sub-grafo da oferta (offer+fundo+conceitos).
-    O `oportunidade_id` é a chave do cache (file_key p/ editais, entity_id p/ ofertas)."""
+      • investimento → sub-grafo da oferta (offer+fundo+conceitos) — PR8.1;
+      • programa     → sub-grafo do programa (nó+conceitos) — KG v2 resíduos PR-A.
+    O `oportunidade_id` é a chave do cache (file_key p/ editais, entity_id p/ ofertas
+    e programas)."""
     if item.get("kind") == "investimento":
         oid = str(item.get("oportunidade_id") or "")
         sub = investment_offer_subgraph(graphs, oid)
@@ -155,6 +186,13 @@ def serialize_for_verdict(item: dict, graphs: dict) -> tuple[str, str] | None:
             return None
         mini, offer = sub
         return oid, serialize_opportunity(mini, offer)
+    if item.get("kind") == "programa":
+        oid = str(item.get("oportunidade_id") or "")
+        sub = programa_subgraph(graphs, oid)
+        if sub is None:
+            return None
+        mini, node = sub
+        return oid, serialize_opportunity(mini, node)
     # default: edital (itens legados são {file_key, paths}, sem `kind`).
     fk = str(item.get("file_key") or item.get("oportunidade_id") or "")
     graph = graphs.get(fk)
@@ -295,9 +333,11 @@ def compute_verdict(
             if not api_key:
                 raise ValueError("OPENAI_API_KEY não definida (veredito usa o tier 3)")
             client = make_client(api_key=api_key)
+        rules_block = format_curated_rules_block(profile)
         user = "\n\n".join(filter(None, [
             "[PERFIL DA EMPRESA]\n" + _profile_block(profile),
             ("[PARES DE AFINIDADE (Estágio 1)]\n" + _paths_block(paths)) if paths else "",
+            ("[REGRAS DE ELEGIBILIDADE (TABELAS CURADAS)]\n" + rules_block) if rules_block else "",
             "[SUBGRAFO DA OPORTUNIDADE]\n" + serialized,
         ]))
         resp = client.chat.completions.create(
@@ -400,33 +440,42 @@ def attach_cached_verdicts(
     return misses
 
 
+# kind do card do radar → (builder do sub-grafo, kind do item no funil). Só as
+# entidades que são Oportunidade recomendável: investidor (→ sua OFERTA, D1/PR8.1)
+# e programa (→ o próprio programa, KG v2 resíduos PR-A). ICT fica de fora — é
+# parceiro sugerido, não Oportunidade com veredito.
+_ENTITY_VERDICT_RESOLVERS = {
+    "investidor": (investment_offer_subgraph, "investimento"),
+    "programa": (programa_subgraph, "programa"),
+}
+
+
 def attach_cached_verdicts_entities(
     db, workspace_id: str, entity_dicts: list[dict], profile: Any,
 ) -> list[dict]:
-    """Irmão de `attach_cached_verdicts` p/ as ofertas de INVESTIMENTO (PR8.1).
+    """Irmão de `attach_cached_verdicts` p/ as entidades do radar com veredito.
 
-    Só `kind=investidor` (o fundo casa como Ator, mas o veredito é da sua OFERTA —
-    D1). `oportunidade_id` = `entity_id` (`investidor:x`) — a chave que o card e a
-    ficha já usam. Programa/ICT ficam sem veredito (fora do escopo do PR8.1)."""
+    `oportunidade_id` = `entity_id` (`investidor:x` / `programa:x`) — a chave que o
+    card e a ficha já usam. O `_ENTITY_VERDICT_RESOLVERS` mapeia o kind do card
+    para o builder do sub-grafo e o kind do item no funil (que o
+    `serialize_for_verdict` reconhece). ICT (sem resolver) fica sem veredito."""
     from core.kg import kg_store
 
     graphs = kg_store.load_all_hypergraphs()
     wanted: dict[str, str] = {}
     items_by_oid: dict[str, dict] = {}
     for ed in entity_dicts:
-        if ed.get("kind") != "investidor":
+        resolver = _ENTITY_VERDICT_RESOLVERS.get(ed.get("kind"))
+        oid = ed.get("entity_id")
+        sub = resolver[0](graphs, oid) if (resolver and oid) else None
+        if sub is None:
             ed.setdefault("verdict", None)
             continue
-        oid = ed.get("entity_id")
-        sub = investment_offer_subgraph(graphs, oid) if oid else None
-        if sub is None:
-            ed["verdict"] = None
-            continue
-        mini, offer = sub
-        serialized = serialize_opportunity(mini, offer)
+        mini, node = sub
+        serialized = serialize_opportunity(mini, node)
         paths = ed.get("paths") or []
         wanted[oid] = verdict_input_hash(serialized, profile, paths)
-        items_by_oid[oid] = {"kind": "investimento", "oportunidade_id": oid, "paths": paths}
+        items_by_oid[oid] = {"kind": resolver[1], "oportunidade_id": oid, "paths": paths}
 
     hits = get_cached_verdicts(db, workspace_id, wanted)
     misses: list[dict] = []

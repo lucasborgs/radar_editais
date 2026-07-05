@@ -47,6 +47,7 @@ import {
   diffFromProfile,
   diffFromExtracted,
   entriesFromServer,
+  mergeRadar,
   profileCompleteness,
   isRadarReady,
   isCompleteForWriting,
@@ -245,7 +246,10 @@ export default function FrontDoorPage() {
               .flatMap((e) => [
                 ...e.matchedEditais.map((m) => `${m.source}__${m.edital_id}`),
                 ...e.matchedEntities
-                  .filter((m) => m.kind === "investidor" && m.entity_id)
+                  .filter(
+                    (m) =>
+                      (m.kind === "investidor" || m.kind === "programa") && m.entity_id,
+                  )
                   .map((m) => m.entity_id!),
               ]),
           ),
@@ -436,14 +440,20 @@ export default function FrontDoorPage() {
           }
           return next;
         });
-        // Estágio 2 (PR7/PR8.1): vereditos pendentes chegam async — poll cache-only.
-        // Editais chaveados por file_key; ofertas de investimento por entity_id.
+        // Estágio 2 (PR7/PR8.1 + KG v2 resíduos PR-A): vereditos pendentes chegam
+        // async — poll cache-only. Editais chaveados por file_key; ofertas de
+        // investimento e programas por entity_id (ICT fica sem veredito).
         const pendingVerdicts = [
           ...(matched_editais ?? [])
             .filter((m) => !m.verdict)
             .map((m) => `${m.source}__${m.edital_id}`),
           ...(matched_entities ?? [])
-            .filter((m) => m.kind === "investidor" && m.entity_id && !m.verdict)
+            .filter(
+              (m) =>
+                (m.kind === "investidor" || m.kind === "programa") &&
+                m.entity_id &&
+                !m.verdict,
+            )
             .map((m) => m.entity_id!),
         ];
         if (pendingVerdicts.length > 0) pollVerdicts(pendingVerdicts);
@@ -784,43 +794,37 @@ export default function FrontDoorPage() {
               return <GateCard key={i} action={entry.action} />;
             case "profile_incomplete":
               return <ProfileIncompleteCard key={i} missingFields={entry.missingFields} />;
-            case "radar":
+            case "radar": {
+              // KG v2 resíduos PR-A / R6: lista única intercalada por afinidade
+              // decrescente (mergeRadar é o único lugar com a ordenação); um `map`
+              // só decide o card por item. Sem agrupamento por kind.
+              const radarItems = mergeRadar(entry.matchedEditais, entry.matchedEntities);
+              if (radarItems.length === 0) return null;
               return (
                 <div key={i} className="flex flex-col gap-2 pt-1 pb-2">
-                  {entry.matchedEditais.length > 0 && (
-                    <>
-                      <p className="text-xs font-medium text-content-secondary px-4">
-                        Editais com afinidade
-                      </p>
-                      <div className="flex flex-col gap-2">
-                        {entry.matchedEditais.map((m) => (
-                          <MatchedEditalCard
-                            key={`${m.source}/${m.edital_id}`}
-                            edital={m}
-                            onStartWriting={handleStartWriting}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {entry.matchedEntities.length > 0 && (
-                    <>
-                      <p className="text-xs font-medium text-content-secondary px-4">
-                        Investidores, Programas e ICTs com afinidade
-                      </p>
-                      <div className="flex flex-col gap-2">
-                        {entry.matchedEntities.map((m) => (
-                          <MatchedEntityCard
-                            key={`${m.kind}/${m.name}`}
-                            entity={m}
-                            onStartWriting={handleStartWritingEntity}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
+                  <p className="text-xs font-medium text-content-secondary px-4">
+                    Oportunidades com afinidade
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {radarItems.map((it) =>
+                      it.kind === "edital" ? (
+                        <MatchedEditalCard
+                          key={it.sortId}
+                          edital={it.edital}
+                          onStartWriting={handleStartWriting}
+                        />
+                      ) : (
+                        <MatchedEntityCard
+                          key={it.sortId}
+                          entity={it.entity}
+                          onStartWriting={handleStartWritingEntity}
+                        />
+                      ),
+                    )}
+                  </div>
                 </div>
               );
+            }
             default:
               return null;
           }
