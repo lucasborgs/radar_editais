@@ -21,12 +21,14 @@ import { UrlHero } from "@/components/frontdoor/UrlHero";
 import { UnlockCard } from "@/components/frontdoor/UnlockCard";
 import {
   frontdoorTurn,
+  fetchMatchVerdicts,
   getMe,
   saveProfile,
   startWritingSession,
   extractProfileFromDocument,
   getConversation,
   updateConversationEntry,
+  type MatchVerdict,
   type ProfileDiffItem,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -173,6 +175,47 @@ export default function FrontDoorPage() {
     setHydrated(true);
   }, []);
 
+  // ── Veredito LLM do match (Estágio 2, KG v2 PR7) ────────────────────────────
+  // A task computa async; o card renderiza sem veredito e o recebe aqui.
+  // Chave = `${source}__${edital_id}` (file_key do hipergrado).
+  const applyVerdicts = useCallback(
+    (verdicts: Record<string, MatchVerdict | null>) => {
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.kind === "radar"
+            ? {
+                ...e,
+                matchedEditais: e.matchedEditais.map((m) => {
+                  const v = verdicts[`${m.source}__${m.edital_id}`];
+                  return v && !m.verdict ? { ...m, verdict: v } : m;
+                }),
+              }
+            : e,
+        ),
+      );
+    },
+    [],
+  );
+
+  // Poll cache-only (zero LLM no request) até os pendentes chegarem — 3
+  // tentativas espaçadas cobrem pickup da fila + chamadas do tier 3.
+  const pollVerdicts = useCallback(
+    (ids: string[], attempt = 0) => {
+      if (!isAuthed || ids.length === 0 || attempt >= 3) return;
+      window.setTimeout(async () => {
+        try {
+          const { verdicts } = await fetchMatchVerdicts(ids);
+          applyVerdicts(verdicts);
+          const missing = ids.filter((id) => !verdicts[id]);
+          if (missing.length > 0) pollVerdicts(missing, attempt + 1);
+        } catch {
+          // silencioso: o card funciona sem veredito
+        }
+      }, [4000, 8000, 16000][attempt]);
+    },
+    [isAuthed, applyVerdicts],
+  );
+
   // Retomada de conversa frontdoor (logado): carrega o transcript do servidor.
   // Espera o auth resolver — se o usuário for mesmo anônimo, o efeito nunca
   // dispara e a home fica como conversa nova.
@@ -185,8 +228,28 @@ export default function FrontDoorPage() {
         if (!token || !alive) return;
         const detail = await getConversation(resumeId, token);
         if (!alive) return;
-        setEntries(entriesFromServer(detail.entries));
+        const serverEntries = entriesFromServer(detail.entries);
+        setEntries(serverEntries);
         bindSession(detail.session_id);
+        // Snapshot persiste SEM veredito (decisão PR7): re-hidrata os cards
+        // restaurados com uma chamada cache-only, sem retry.
+        const ids = Array.from(
+          new Set(
+            serverEntries
+              .filter((e) => e.kind === "radar")
+              .flatMap((e) =>
+                e.matchedEditais.map((m) => `${m.source}__${m.edital_id}`),
+              ),
+          ),
+        );
+        if (ids.length > 0) {
+          try {
+            const { verdicts } = await fetchMatchVerdicts(ids);
+            if (alive) applyVerdicts(verdicts);
+          } catch {
+            // silencioso: cards restauram sem veredito
+          }
+        }
       } catch {
         if (alive) toast.error("Não consegui retomar esta conversa.");
       }
@@ -194,7 +257,7 @@ export default function FrontDoorPage() {
     return () => {
       alive = false;
     };
-  }, [hydrated, isAuthed, resumeId, getToken, bindSession]);
+  }, [hydrated, isAuthed, resumeId, getToken, bindSession, applyVerdicts]);
 
   // Persiste transcript a cada mudança (depois de hidratar).
   useEffect(() => {
@@ -365,6 +428,11 @@ export default function FrontDoorPage() {
           }
           return next;
         });
+        // Estágio 2 (PR7): vereditos pendentes chegam async — poll cache-only.
+        const pendingVerdicts = (matched_editais ?? [])
+          .filter((m) => !m.verdict)
+          .map((m) => `${m.source}__${m.edital_id}`);
+        if (pendingVerdicts.length > 0) pollVerdicts(pendingVerdicts);
       } catch (e) {
         setEntries((prev) => prev.filter((m) => m !== userEntry));
         setInput(trimmed);
@@ -375,7 +443,7 @@ export default function FrontDoorPage() {
         setSending(false);
       }
     },
-    [entries, sending, profile, sessionId, bindSession],
+    [entries, sending, profile, sessionId, bindSession, pollVerdicts],
   );
 
   // ── Aceite/descarte de um diff (por índice no transcript) ───────────────────

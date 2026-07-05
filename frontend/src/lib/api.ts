@@ -193,6 +193,16 @@ export interface Elegibilidade {
   unknown: string[];
 }
 
+// Veredito LLM do match (KG v2 PR7 / Estágio 2). Nullable: o card renderiza sem
+// ele e o recebe quando a task terminar (poll via fetchMatchVerdicts). Anônimo
+// nunca recebe veredito (o cache é por workspace).
+export interface MatchVerdict {
+  racional_afinidade: string;
+  red_flags_elegibilidade: string[];
+  fit_mecanismo: string;
+  recomendacao: "alta" | "media" | "baixa";
+}
+
 export interface MatchedEdital {
   source: string;
   edital_id: string;
@@ -204,6 +214,7 @@ export interface MatchedEdital {
   prazo: string | null;
   valor: string | null;
   elegibilidade?: Elegibilidade | null;
+  verdict?: MatchVerdict | null;
   paths: MatchedEditalPath[];
 }
 
@@ -241,6 +252,14 @@ export const frontdoorTurn = (
       profile,
       session_id: sessionId ?? null,
     }),
+  });
+
+// Poll cache-only dos vereditos (Estágio 2): a chave é o file_key do hipergrado
+// (`${source}__${edital_id}`). Auth obrigatória — anônimo não tem workspace.
+export const fetchMatchVerdicts = (oportunidadeIds: string[]) =>
+  apiFetch<{ verdicts: Record<string, MatchVerdict | null> }>("/match/verdicts", {
+    method: "POST",
+    body: JSON.stringify({ oportunidade_ids: oportunidadeIds }),
   });
 
 // ── Writing Session ────────────────────────────────────────
