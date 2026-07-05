@@ -189,6 +189,11 @@ export default function FrontDoorPage() {
                   const v = verdicts[`${m.source}__${m.edital_id}`];
                   return v && !m.verdict ? { ...m, verdict: v } : m;
                 }),
+                // PR8.1: veredito das ofertas de investimento, chaveado por entity_id.
+                matchedEntities: e.matchedEntities.map((m) => {
+                  const v = m.entity_id ? verdicts[m.entity_id] : null;
+                  return v && !m.verdict ? { ...m, verdict: v } : m;
+                }),
               }
             : e,
         ),
@@ -237,9 +242,12 @@ export default function FrontDoorPage() {
           new Set(
             serverEntries
               .filter((e) => e.kind === "radar")
-              .flatMap((e) =>
-                e.matchedEditais.map((m) => `${m.source}__${m.edital_id}`),
-              ),
+              .flatMap((e) => [
+                ...e.matchedEditais.map((m) => `${m.source}__${m.edital_id}`),
+                ...e.matchedEntities
+                  .filter((m) => m.kind === "investidor" && m.entity_id)
+                  .map((m) => m.entity_id!),
+              ]),
           ),
         );
         if (ids.length > 0) {
@@ -428,10 +436,16 @@ export default function FrontDoorPage() {
           }
           return next;
         });
-        // Estágio 2 (PR7): vereditos pendentes chegam async — poll cache-only.
-        const pendingVerdicts = (matched_editais ?? [])
-          .filter((m) => !m.verdict)
-          .map((m) => `${m.source}__${m.edital_id}`);
+        // Estágio 2 (PR7/PR8.1): vereditos pendentes chegam async — poll cache-only.
+        // Editais chaveados por file_key; ofertas de investimento por entity_id.
+        const pendingVerdicts = [
+          ...(matched_editais ?? [])
+            .filter((m) => !m.verdict)
+            .map((m) => `${m.source}__${m.edital_id}`),
+          ...(matched_entities ?? [])
+            .filter((m) => m.kind === "investidor" && m.entity_id && !m.verdict)
+            .map((m) => m.entity_id!),
+        ];
         if (pendingVerdicts.length > 0) pollVerdicts(pendingVerdicts);
       } catch (e) {
         setEntries((prev) => prev.filter((m) => m !== userEntry));

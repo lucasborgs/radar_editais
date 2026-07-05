@@ -161,13 +161,19 @@ def explore(
                 entity_dicts = [e.to_dict() for e in entities]
                 # Enriquece com entity_id p/ writing session (Investidor/Programa)
                 if entity_dicts:
-                    from core.kg import kg_store
+                    from core.kg import hypergraph_catalog, kg_store
                     inv_by_name = {i["name"].lower(): i["id"] for i in kg_store.load_investidores()}
                     prog_by_name = {p["name"].lower(): p["id"] for p in kg_store.load_programas()}
+                    # D1/PR8: o fundo casa como Ator, mas o card apresenta a OFERTA
+                    # (Oportunidade de investimento) — ticket/estágio/URL da oferta.
+                    offers = hypergraph_catalog.investment_offers_by_fund()
                     for ed in entity_dicts:
                         key = ed["name"].strip().lower()
                         if ed["kind"] == "investidor":
                             ed["entity_id"] = inv_by_name.get(key)
+                            offer = offers.get(key)
+                            if offer:
+                                ed["offer"] = offer  # facetas p/ o card do radar (D1)
                         elif ed["kind"] == "programa":
                             ed["entity_id"] = prog_by_name.get(key)
                         if ed.get("entity_id") is None and ed["kind"] in ("investidor", "programa"):
@@ -196,14 +202,22 @@ def explore(
         # Anônimo fica sem veredito (não há workspace p/ chavear o cache). O
         # snapshot persistido acima fica SEM veredito de propósito (o card
         # restaurado re-hidrata via POST /match/verdicts, cache-only).
-        if workspace_id and result.get("matched_editais"):
+        if workspace_id and (result.get("matched_editais") or result.get("matched_entities")):
             try:
-                misses = match_verdict.attach_cached_verdicts(
-                    db, workspace_id, result["matched_editais"], current,
-                )
-                result["matched_editais"] = match_verdict.reorder_by_verdict(
-                    result["matched_editais"]
-                )
+                misses: list[dict] = []
+                if result.get("matched_editais"):
+                    misses += match_verdict.attach_cached_verdicts(
+                        db, workspace_id, result["matched_editais"], current,
+                    )
+                    result["matched_editais"] = match_verdict.reorder_by_verdict(
+                        result["matched_editais"]
+                    )
+                # PR8.1: veredito das OFERTAS de investimento (matched_entities) —
+                # mesmo cache/task, chaveado por entity_id. Um defer só p/ os dois.
+                if result.get("matched_entities"):
+                    misses += match_verdict.attach_cached_verdicts_entities(
+                        db, workspace_id, result["matched_entities"], current,
+                    )
                 if misses:
                     _enqueue_verdicts(workspace_id, misses, current)
             except Exception as e:

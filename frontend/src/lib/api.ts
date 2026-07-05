@@ -1,6 +1,6 @@
 import { API_BASE_URL } from "./constants";
 import { createSupabaseClient } from "./supabase";
-import type { EditalEntry, EditalCard, DashboardStats } from "@/types/edital";
+import type { EditalEntry, EditalCard, OportunidadeDetail, DashboardStats } from "@/types/edital";
 import type { OpportunityEntry } from "@/types/oportunidade";
 import type { CompanyProfile } from "@/types/profile";
 import type {
@@ -136,6 +136,11 @@ export const getEditais = (filters?: EditaisFilters) => {
 export const getEditalById = (id: string) =>
   apiFetch<EditalCard>(`/editais/${id}`);
 
+// Ficha unificada por Oportunidade (KG v2 / PR8) — resolve edital, programa ou
+// investimento (D1). `id` pode conter ':' (curados: `investidor:indicator capital`).
+export const getOportunidadeById = (id: string) =>
+  apiFetch<OportunidadeDetail>(`/oportunidades/${encodeURIComponent(id)}`);
+
 export const getDashboardStats = () =>
   apiFetch<DashboardStats>("/stats");
 
@@ -218,6 +223,15 @@ export interface MatchedEdital {
   paths: MatchedEditalPath[];
 }
 
+// D1/PR8: quando o match é um fundo (kind=investidor), o card apresenta a OFERTA
+// de investimento (Oportunidade), não o Ator — o fundo é o veículo.
+export interface InvestmentOffer {
+  offer_name: string;
+  official_url: string;
+  estagio_alvo: string[];
+  ticket_range: { min_brl: number | null; max_brl: number | null } | null;
+}
+
 export interface MatchedEntity {
   file_key: string;
   kind: "investidor" | "programa" | "ict";  // KG v2: slug (era "Investidor"/…)
@@ -228,6 +242,8 @@ export interface MatchedEntity {
   n_paths: number;
   paths: MatchedEditalPath[];
   entity_id?: string;
+  offer?: InvestmentOffer;                   // só investidor (D1)
+  verdict?: MatchVerdict | null;             // veredito da oferta (PR8.1), chaveado por entity_id
 }
 
 export const frontdoorTurn = (

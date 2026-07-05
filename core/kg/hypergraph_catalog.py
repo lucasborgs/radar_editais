@@ -190,7 +190,13 @@ def edital_card(file_key: str, graph: dict, *, full: bool = False) -> dict | Non
     }
     if full:
         card.update({
+            # Backbone v2 exposto p/ a ficha (PR8): kind/aperture/macro_temas
+            # vinham do nó Oportunidade mas não eram surfaceados no card.
+            "kind": edital.get("kind", "edital"),
+            "aperture": edital.get("aperture") or "",
+            "macro_temas": list(edital.get("macro_temas", [])),
             "objective": edital.get("description") or "",
+            "mecanismo": list(edital.get("mecanismo", [])),
             "mechanism": ", ".join(mechanism_display(m) for m in edital.get("mecanismo", [])),
             "eligible_entities": _publico_alvo(nodes),
             "key_requirements": list(edital.get("requisitos_texto", [])),
@@ -262,6 +268,234 @@ def get_edital(edital_id: str) -> dict | None:
     if fk is None:
         return None
     return edital_card(fk, graphs[fk], full=True)
+
+
+# ── Ficha unificada por Oportunidade (PR8, D1) ───────────────────────────────
+# A unidade de resultado é SEMPRE a Oportunidade (D1). A ficha resolve as três
+# naturezas de oportunidade sob um payload único: editais (subgrafo `__`), e os
+# curados programa/investimento (nós de catálogo, url/facetas por-nó — PR4.1).
+# O Ator (fundo/ICT) nunca é ficha direta; aparece como relacionado da oferta.
+
+# Catálogos que carregam Oportunidades curadas (ICT é Ator, não vira ficha).
+_CURATED_CATALOGS = ("programas", "investidores")
+
+
+def _related_atores(node_id: str, nodes_by_id: dict[str, dict], edges: list[dict],
+                    kind: str) -> list[str]:
+    """Nomes dos Atores de um `kind` ligados a `node_id` por qualquer aresta."""
+    out: list[str] = []
+    for e in edges:
+        members = e.get("members", [])
+        if node_id not in members:
+            continue
+        for m in members:
+            nd = nodes_by_id.get(m)
+            if nd and nd is not nodes_by_id.get(node_id) \
+                    and nd.get("type") == "Ator" and nd.get("kind") == kind \
+                    and nd.get("name"):
+                out.append(nd["name"])
+    return sorted(set(out))
+
+
+def _concepts_via(node_ids: set[str], nodes_by_id: dict[str, dict],
+                  edges: list[dict], dim: str | None = None) -> list[str]:
+    """Nomes dos Conceitos ligados a qualquer id de `node_ids` por aresta.
+    Conceitos de curados penduram no Ator (aresta `viabiliza`), não na oferta —
+    daí a travessia offer → ator → conceito ser feita pelo caller via node_ids."""
+    out: list[str] = []
+    for e in edges:
+        members = e.get("members", [])
+        if not (node_ids & set(members)):
+            continue
+        for m in members:
+            nd = nodes_by_id.get(m)
+            if nd and _is_content(nd) and (dim is None or nd.get("dim") == dim) \
+                    and nd.get("name"):
+                out.append(nd["name"])
+    return sorted(set(out))
+
+
+def _curated_card(node: dict, graph: dict, public_id: str) -> dict:
+    """Ficha de uma Oportunidade curada (programa/investimento) a partir do nó +
+    vizinhança. Facetas (url, estágio, ticket, mecanismo) são propriedades do
+    próprio nó (PR4.1, URL por-nó); Conceitos/Atores vêm das arestas."""
+    from core.skills import mechanism_display
+
+    nodes = graph.get("nodes", [])
+    edges = graph.get("edges", [])
+    nodes_by_id = {n["id"]: n for n in nodes if n.get("id")}
+    nid = node.get("id", "")
+
+    # Investimento: o fundo é o Ator ligado por `pertence_a`; os Conceitos que o
+    # fundo viabiliza são a afinidade da oferta. Junta oferta+fundo p/ a travessia.
+    fund_ids = {
+        m for e in edges if nid in e.get("members", []) and e.get("type") == "pertence_a"
+        for m in e.get("members", [])
+        if (nd := nodes_by_id.get(m)) and nd.get("type") == "Ator"
+    }
+    concept_scope = {nid} | fund_ids
+    related_investidores = _related_atores(nid, nodes_by_id, edges, "investidor")
+    related_icts = _related_atores(nid, nodes_by_id, edges, "ict")
+
+    return {
+        "id": public_id,
+        "source": (graph.get("proveniencia") or {}).get("fonte") or "curadoria",
+        "kind": node.get("kind", ""),
+        "aperture": node.get("aperture") or "",
+        "title": node.get("name", ""),
+        "status": "Desconhecido",
+        "deadline": node.get("prazo") or "",
+        "objective": node.get("description") or "",
+        "mecanismo": list(node.get("mecanismo", [])),
+        "mechanism": ", ".join(mechanism_display(m) for m in node.get("mecanismo", [])),
+        "macro_temas": list(node.get("macro_temas", [])),
+        "themes": _concepts_via(concept_scope, nodes_by_id, edges, "tema"),
+        "technologies": _concepts_via(concept_scope, nodes_by_id, edges, "tecnologia"),
+        "aplicacoes": _concepts_via(concept_scope, nodes_by_id, edges, "aplicacao"),
+        "programs": [],
+        "publico_alvo": [],
+        "eligible_entities": [],
+        "key_requirements": list(node.get("requisitos_texto", [])),
+        "exclusoes": list(node.get("exclusoes_texto", [])),
+        "constraints": list(node.get("constraints", [])),
+        "value": node.get("ticket_range") or node.get("valor"),
+        "estagio_alvo": node.get("estagio_alvo") or "",
+        "ticket_range": node.get("ticket_range") or "",
+        "lead_follow": node.get("lead_follow") or "",
+        "icts": related_icts,
+        "investidores": related_investidores,
+        "fonte_recurso": [],
+        "opportunity_type": node.get("kind", ""),
+        "official_url": node.get("url") or "",
+        "document_urls": list(node.get("urls_documentos") or []),
+        "collected_at": (graph.get("proveniencia") or {}).get("coletado_em") or "",
+    }
+
+
+def _resolve_curated_node(opp_id: str, graphs: dict[str, dict]) -> tuple[dict, dict, str] | None:
+    """Resolve um id de ficha curada → (nó-oferta, grafo, public_id). Aceita:
+    node-id v2 direto (`op:…`/`ator:…`), e os ids da lista `programa:{name}` /
+    `investidor:{name}` / `investimento:{name}`. D1: para um fundo, devolve a
+    OFERTA de investimento (`Oportunidade`), não o Ator."""
+    eid = (opp_id or "").strip()
+    if not eid:
+        return None
+    prefix, _, rest = eid.partition(":")
+    rest_l = rest.strip().lower()
+    # Os ids da lista/entity_id são `{kind}:{sufixo}`, onde `sufixo` é o node-id
+    # SEM o prefixo de tipo — ex.: `programa:centelha` ↔ `op:centelha`;
+    # `investidor:indicator-capital` ↔ fundo `ator:indicator-capital` (→ sua
+    # oferta). Reconstruímos esses node-ids como candidatos de lookup direto.
+    op_cand = {f"op:{rest}", f"op:{rest}-investimento"}
+    ator_cand = f"ator:{rest}"
+
+    for cat in _CURATED_CATALOGS:
+        g = graphs.get(cat)
+        if not g:
+            continue
+        g = migrate_to_v2(g)
+        nodes = g.get("nodes", [])
+        edges = g.get("edges", [])
+        by_id = {n["id"]: n for n in nodes if n.get("id")}
+
+        # 1. node-id v2 direto (op:/ator:) OU reconstruído do id da lista.
+        node = by_id.get(eid)
+        if node is None and prefix in ("investidor", "investimento"):
+            node = by_id.get(ator_cand) or next(
+                (by_id[c] for c in op_cand if c in by_id), None)
+        elif node is None and prefix == "programa":
+            node = by_id.get(f"op:{rest}")
+        if node is not None:
+            if node.get("type") == "Ator":  # D1: Ator → sua oferta de investimento
+                node = _offer_of_ator(node.get("id", ""), nodes, edges) or node
+            if node.get("type") == "Oportunidade":
+                return node, g, eid
+            continue
+
+        # 2. fallback por nome (id da lista era `{prefix}:{name_lower}`).
+        if prefix == "programa":
+            for n in nodes:
+                if n.get("kind") == "programa" and (n.get("name") or "").strip().lower() == rest_l:
+                    return n, g, eid
+        elif prefix in ("investidor", "investimento"):
+            for n in nodes:
+                if n.get("kind") == "investimento" and (n.get("name") or "").strip().lower() == rest_l:
+                    return n, g, eid
+            for n in nodes:
+                if n.get("type") == "Ator" and n.get("kind") == "investidor" \
+                        and (n.get("name") or "").strip().lower() == rest_l:
+                    off = _offer_of_ator(n.get("id", ""), nodes, edges)
+                    if off is not None:
+                        return off, g, eid
+    return None
+
+
+def _offer_of_ator(ator_id: str, nodes: list[dict], edges: list[dict]) -> dict | None:
+    """A Oportunidade(investimento) ligada a um Ator(investidor) via `pertence_a`."""
+    by_id = {n["id"]: n for n in nodes if n.get("id")}
+    for e in edges:
+        members = e.get("members", [])
+        if e.get("type") == "pertence_a" and ator_id in members:
+            for m in members:
+                nd = by_id.get(m)
+                if nd and nd.get("type") == "Oportunidade":
+                    return nd
+    return None
+
+
+def get_opportunity(opp_id: str) -> dict | None:
+    """Ficha unificada (D1): resolve edital OU curado (programa/investimento).
+    Superset de `get_edital` — a ficha do frontend (PR8) chama esta."""
+    graphs = kg_store.load_all_hypergraphs()
+    fk = _resolve_file_key(opp_id, graphs)
+    if fk is not None:
+        return edital_card(fk, graphs[fk], full=True)
+    resolved = _resolve_curated_node(opp_id, graphs)
+    if resolved is None:
+        return None
+    node, graph, public_id = resolved
+    return _curated_card(node, graph, public_id)
+
+
+def investment_offer(oportunidade_id: str, graphs: dict[str, dict] | None = None) -> tuple[dict, dict] | None:
+    """`(offer_node, catalog_graph)` da `Oportunidade(kind=investimento)` identificada
+    por entity_id (`investidor:x`) ou node-id (`op:…`), ou None. Usado pelo veredito
+    de ofertas de investimento (PR8.1) para extrair o sub-grafo a serializar."""
+    if graphs is None:
+        graphs = kg_store.load_all_hypergraphs()
+    resolved = _resolve_curated_node(oportunidade_id, graphs)
+    if resolved is None:
+        return None
+    node, graph, _ = resolved
+    if node.get("kind") != "investimento":
+        return None
+    return node, graph
+
+
+def investment_offers_by_fund(graphs: dict[str, dict] | None = None) -> dict[str, dict]:
+    """{nome_do_fundo(lower): facetas da OFERTA de investimento} — para o card do
+    radar (D1): um fundo casa como Ator, mas o que o card apresenta é a sua oferta
+    `Oportunidade(kind=investimento)` (ticket/estágio/URL), ligada por `pertence_a`."""
+    if graphs is None:
+        graphs = kg_store.load_all_hypergraphs()
+    g = migrate_to_v2(graphs.get("investidores") or {})
+    nodes = g.get("nodes", [])
+    by_id = {n["id"]: n for n in nodes if n.get("id")}
+    out: dict[str, dict] = {}
+    for e in g.get("edges", []):
+        if e.get("type") != "pertence_a":
+            continue
+        members = [by_id.get(m) for m in e.get("members", [])]
+        offer = next((n for n in members if n and n.get("kind") == "investimento"), None)
+        fund = next((n for n in members if n and n.get("kind") == "investidor"), None)
+        if offer and fund and fund.get("name"):
+            out[fund["name"].strip().lower()] = {
+                "offer_name": offer.get("name", ""),
+                "official_url": offer.get("url") or "",
+                "estagio_alvo": list(offer.get("estagio_alvo") or []),
+                "ticket_range": offer.get("ticket_range"),
+            }
+    return out
 
 
 def get_stats() -> dict:

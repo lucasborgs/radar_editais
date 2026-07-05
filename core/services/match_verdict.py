@@ -89,11 +89,79 @@ _PROFILE_LABELS = {
 
 def opportunity_node(graph: dict) -> dict | None:
     """Nó `Oportunidade(kind=edital)` de um subgrafo de edital — a unidade que o
-    veredito julga (PR7 cobre matched_editais; ofertas de catálogo são PR8)."""
+    veredito julga no match de editais (matched_editais)."""
     for n in graph.get("nodes", []):
         if n.get("type") == "Oportunidade" and n.get("kind") == "edital":
             return n
     return None
+
+
+def _ticket_label(tr: dict) -> str:
+    """Formata `ticket_range` ({min_brl,max_brl}) em uma frase curta."""
+    lo, hi = tr.get("min_brl"), tr.get("max_brl")
+    fmt = lambda n: f"R$ {int(n):,}".replace(",", ".")  # noqa: E731
+    if lo and hi:
+        return f"{fmt(lo)} – {fmt(hi)}"
+    if hi:
+        return f"até {fmt(hi)}"
+    return f"a partir de {fmt(lo)}" if lo else ""
+
+
+def investment_offer_subgraph(graphs: dict, oportunidade_id: str) -> tuple[dict, dict] | None:
+    """`(mini_graph, offer_node)` de uma oferta de investimento (PR8.1).
+
+    A oferta coabita o arquivo `investidores` (multi-item) — não dá p/ serializar o
+    arquivo inteiro (misturaria todos os fundos). Extrai o sub-grafo da oferta: o nó
+    da oferta + o fundo (aresta `pertence_a`) + os Conceitos que o fundo viabiliza
+    (aresta `viabiliza`) + essas arestas, e devolve um grafo enxuto que o
+    `serialize_opportunity` consome como qualquer subgrafo de oportunidade."""
+    from core.kg import hypergraph_catalog
+
+    resolved = hypergraph_catalog.investment_offer(oportunidade_id, graphs)
+    if resolved is None:
+        return None
+    offer, graph = resolved
+    by_id = {n["id"]: n for n in graph.get("nodes", []) if n.get("id")}
+    oid = offer.get("id")
+    keep: set[str] = {oid}
+    edges: list[dict] = []
+    # 1. arestas que tocam a oferta (pertence_a → fundo).
+    for e in graph.get("edges", []):
+        if oid in e.get("members", []):
+            edges.append(e)
+            keep.update(e.get("members", []))
+    fund_ids = {i for i in keep if (nd := by_id.get(i)) and nd.get("type") == "Ator"}
+    # 2. arestas do fundo (viabiliza → Conceitos).
+    for e in graph.get("edges", []):
+        members = e.get("members", [])
+        if fund_ids & set(members):
+            if e not in edges:
+                edges.append(e)
+            keep.update(m for m in members if (nd := by_id.get(m)) and nd.get("type") == "Conceito")
+    nodes = [by_id[i] for i in keep if i in by_id]
+    return {"nodes": nodes, "edges": edges}, offer
+
+
+def serialize_for_verdict(item: dict, graphs: dict) -> tuple[str, str] | None:
+    """`(oportunidade_id, serialized)` de um item da fila, ou None. Dispatcher que
+    unifica os DOIS formatos de oportunidade do funil (PR8.1):
+      • edital       → subgrafo por file_key + nó kind=edital;
+      • investimento → sub-grafo da oferta (offer+fundo+conceitos).
+    O `oportunidade_id` é a chave do cache (file_key p/ editais, entity_id p/ ofertas)."""
+    if item.get("kind") == "investimento":
+        oid = str(item.get("oportunidade_id") or "")
+        sub = investment_offer_subgraph(graphs, oid)
+        if sub is None:
+            return None
+        mini, offer = sub
+        return oid, serialize_opportunity(mini, offer)
+    # default: edital (itens legados são {file_key, paths}, sem `kind`).
+    fk = str(item.get("file_key") or item.get("oportunidade_id") or "")
+    graph = graphs.get(fk)
+    node = opportunity_node(graph) if graph else None
+    if node is None:
+        return None
+    return fk, serialize_opportunity(graph, node)
 
 
 def serialize_opportunity(graph: dict, node: dict) -> str:
@@ -115,10 +183,15 @@ def serialize_opportunity(graph: dict, node: dict) -> str:
     for field, label in (
         ("prazo", "prazo"), ("status", "status"), ("valor", "valor"),
         ("mecanismo", "mecanismo"), ("macro_temas", "macro-temas"),
+        # Facetas de oferta de investimento (PR8.1) — só presentes em kind=investimento.
+        ("estagio_alvo", "estágio-alvo"), ("lead_follow", "posição (lead/follow)"),
     ):
         v = node.get(field)
         if v:
             lines.append(f"{label}: {', '.join(v) if isinstance(v, list) else v}")
+    tr = node.get("ticket_range")
+    if isinstance(tr, dict) and (tr.get("min_brl") or tr.get("max_brl")):
+        lines.append(f"ticket: {_ticket_label(tr)}")
 
     if node.get("constraints"):
         lines.append("constraints de elegibilidade (avaliadas no Estágio 0):")
@@ -322,6 +395,46 @@ def attach_cached_verdicts(
         if oid not in wanted:
             continue
         m["verdict"] = hits.get(oid)
+        if oid not in hits:
+            misses.append(items_by_oid[oid])
+    return misses
+
+
+def attach_cached_verdicts_entities(
+    db, workspace_id: str, entity_dicts: list[dict], profile: Any,
+) -> list[dict]:
+    """Irmão de `attach_cached_verdicts` p/ as ofertas de INVESTIMENTO (PR8.1).
+
+    Só `kind=investidor` (o fundo casa como Ator, mas o veredito é da sua OFERTA —
+    D1). `oportunidade_id` = `entity_id` (`investidor:x`) — a chave que o card e a
+    ficha já usam. Programa/ICT ficam sem veredito (fora do escopo do PR8.1)."""
+    from core.kg import kg_store
+
+    graphs = kg_store.load_all_hypergraphs()
+    wanted: dict[str, str] = {}
+    items_by_oid: dict[str, dict] = {}
+    for ed in entity_dicts:
+        if ed.get("kind") != "investidor":
+            ed.setdefault("verdict", None)
+            continue
+        oid = ed.get("entity_id")
+        sub = investment_offer_subgraph(graphs, oid) if oid else None
+        if sub is None:
+            ed["verdict"] = None
+            continue
+        mini, offer = sub
+        serialized = serialize_opportunity(mini, offer)
+        paths = ed.get("paths") or []
+        wanted[oid] = verdict_input_hash(serialized, profile, paths)
+        items_by_oid[oid] = {"kind": "investimento", "oportunidade_id": oid, "paths": paths}
+
+    hits = get_cached_verdicts(db, workspace_id, wanted)
+    misses: list[dict] = []
+    for ed in entity_dicts:
+        oid = ed.get("entity_id")
+        if oid not in wanted:
+            continue
+        ed["verdict"] = hits.get(oid)
         if oid not in hits:
             misses.append(items_by_oid[oid])
     return misses

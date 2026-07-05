@@ -1,6 +1,19 @@
 "use client";
 
-import type { MatchedEntity } from "@/lib/api";
+import Link from "next/link";
+import type { MatchedEntity, InvestmentOffer } from "@/lib/api";
+import { VerdictBlock } from "./VerdictBlock";
+
+const brl = (n: number) => `R$ ${n.toLocaleString("pt-BR")}`;
+
+function ticketLabel(t: InvestmentOffer["ticket_range"]): string | null {
+  if (!t) return null;
+  const { min_brl, max_brl } = t;
+  if (min_brl && max_brl) return `${brl(min_brl)} – ${brl(max_brl)}`;
+  if (max_brl) return `até ${brl(max_brl)}`;
+  if (min_brl) return `a partir de ${brl(min_brl)}`;
+  return null;
+}
 
 function ScoreRing({ score }: { score: number }) {
   const color = score >= 0.7 ? "#1DB954" : score >= 0.55 ? "#f59e0b" : "#f97316";
@@ -50,6 +63,13 @@ export function MatchedEntityCard({
   const canWrite = entity.kind === "investidor" || entity.kind === "programa";
   const writeLabel = entity.kind === "investidor" ? "Escrever pitch →" : "Escrever proposta →";
   const writeMode = entity.kind === "investidor" ? ("pitch" as const) : ("proposal" as const);
+  // D1/PR8: a unidade é a Oportunidade — o card leva à ficha (investidor →
+  // ficha da OFERTA de investimento; programa → ficha do programa). ICT não tem
+  // entity_id (é parceiro sugerido, não oportunidade) → não é clicável.
+  const fichaHref = entity.entity_id
+    ? `/oportunidades/${encodeURIComponent(entity.entity_id)}`
+    : null;
+  const ticket = entity.offer ? ticketLabel(entity.offer.ticket_range) : null;
 
   return (
     <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm font-sans">
@@ -58,24 +78,55 @@ export function MatchedEntityCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-0.5">
             <KindBadge kind={entity.kind} />
-            {entity.entity_id && (
-              <span className="text-[11px] font-medium text-content-secondary">
-                {entity.entity_id}
+            {entity.offer && (
+              <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                Oportunidade de investimento
               </span>
             )}
           </div>
-          <p className="text-sm font-medium text-content-primary leading-snug line-clamp-2">
-            {entity.name}
-          </p>
+          {fichaHref ? (
+            <Link
+              href={fichaHref}
+              className="text-sm font-medium text-content-primary leading-snug line-clamp-2 hover:text-primary transition-colors"
+            >
+              {entity.name}
+            </Link>
+          ) : (
+            <p className="text-sm font-medium text-content-primary leading-snug line-clamp-2">
+              {entity.name}
+            </p>
+          )}
           {entity.description && (
             <p className="text-xs text-content-secondary mt-1 line-clamp-2">
               {entity.description}
             </p>
           )}
+          {entity.offer && (ticket || entity.offer.estagio_alvo.length > 0) && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+              {ticket && (
+                <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-300">
+                  🎟 {ticket}
+                </span>
+              )}
+              {entity.offer.estagio_alvo.map((e) => (
+                <span
+                  key={e}
+                  className="inline-flex items-center rounded-full bg-content-secondary/10 px-2 py-0.5 text-[11px] text-content-secondary"
+                >
+                  {e}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-3 mt-1.5 text-xs text-content-secondary">
             <span>🎯 {(entity.affinity * 10).toFixed(1)}</span>
             {entity.n_paths > 0 && (
               <span>{entity.n_paths} {"conexão"}{entity.n_paths !== 1 ? "ões" : ""}</span>
+            )}
+            {fichaHref && (
+              <Link href={fichaHref} className="text-primary hover:underline">
+                Ver ficha ↗
+              </Link>
             )}
           </div>
         </div>
@@ -95,6 +146,9 @@ export function MatchedEntityCard({
           ))}
         </div>
       )}
+
+      {/* Veredito da oferta de investimento (Estágio 2, PR8.1) quando existir */}
+      {entity.verdict && <VerdictBlock verdict={entity.verdict} />}
 
       {canWrite && entity.entity_id && onStartWriting && (
         <button
