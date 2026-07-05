@@ -228,3 +228,17 @@ def test_is_obvious_trash():
     assert _is_obvious_trash("Programa") is True
     assert _is_obvious_trash("Programa PIPE") is False
     assert _is_obvious_trash("") is False
+
+
+# ── Fix 2026-07-05: chave determinística de identidade de programa ──────────────
+
+def test_program_key_collapses_trivial_variants():
+    from core.kg.resolve_programas import _program_key
+
+    assert _program_key("ROTA2030") == _program_key("Rota 2030")           # letra-dígito
+    assert _program_key("Projeto Rota 2030") == _program_key("rota 2030")  # prefixo genérico
+    assert _program_key("Programa Centelha") == _program_key("Centelha")   # prefixo genérico
+    assert _program_key("Programa") == ""                                  # só prefixo → vazia
+    # programas distintos NÃO colidem
+    assert _program_key("Centelha") != _program_key("Tecnova")
+    assert _program_key("PIPE") != _program_key("PITE")
