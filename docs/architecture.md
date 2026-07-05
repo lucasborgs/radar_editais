@@ -33,7 +33,7 @@ flowchart TB
   FINEP --> NORM
   FAPESP --> NORM
   FAPESC --> NORM
-  CURADOS -->|"rebuild determinístico<br/>curadoria_build.py"| CBUILD
+  CURADOS -->|"rebuild determinístico<br/>rebuild_curadoria.py"| CBUILD
 
   NORM["Normalizers por fonte (adapter pattern)"] --> HEX
 
@@ -46,7 +46,7 @@ flowchart TB
 
   subgraph POS["Pós-processo build-time"]
     CANON["canonicalize_concepts.py<br/>validação + canonicalização LLM<br/>descarta ruído, funde duplicatas<br/>gera macro_temas do vocabulário<br/>controlado (themes_index)"]
-    CONS["constraints_producer.py<br/>gpt-4o-mini extrai constraints<br/>estruturadas {tipo,op,valor}<br/>de requisitos/exclusões textuais"]
+    CONS["extract_constraints.py<br/>gpt-4o-mini extrai constraints<br/>estruturadas {tipo,op,valor}<br/>de requisitos/exclusões textuais"]
     PROV["backfill_proveniencia.py<br/>URL oficial do bronze → grafo<br/>(determinístico, zero LLM)"]
   end
 
@@ -57,14 +57,14 @@ flowchart TB
   CONS --> HGC
   PROV --> HGC
 
-  CBUILD["curadoria_build.py<br/>rebuild determinístico (zero LLM)<br/>D2: investidor → Ator +<br/>Oportunidade(kind=investimento)<br/>D3: programas → Oportunidade(kind=programa)<br/>100% com URL, tese, estágio, ticket"] --> HGC
+  CBUILD["rebuild_curadoria.py<br/>rebuild determinístico (zero LLM)<br/>D2: investidor → Ator +<br/>Oportunidade(kind=investimento)<br/>D3: programas → Oportunidade(kind=programa)<br/>100% com URL, tese, estágio, ticket"] --> HGC
 
   HGC --> EMB["embedder.py<br/>text-embedding-3-small (1536d)<br/>embeds nós Conceito,<br/>descrições de Oportunidade/Ator"]
   EMB --> CACHE[("ecosystem_embeddings.npz<br/>cacheados por hash do texto")]
 
   HGC --> CHK["chunk_edital · chunker.py (Art./§)"]
   CHK --> CTX["Contextual Retrieval<br/>core/contextual_retrieval.py"]
-  CTX --> CHKEMB["embedder.py<br/>text-embedding-3-large (1536d)"]
+  CTX --> CHKEMB["embedder.py<br/>text-embedding-3-small (1536d,<br/>default por env desde 2026-06-26)"]
   CHKEMB --> VEC[("edital_chunks<br/>pgvector + tsvector/BM25<br/>para RAG na escrita")]
 ```
 
@@ -134,7 +134,8 @@ flowchart TB
 `StateGraph` ReAct com checkpointer Postgres durável, `interrupt()` nativo para
 human-in-the-loop, memória cross-session via Store, e telemetria nativa. O
 isolamento multi-tenant usa `thread_id`/namespace por workspace (migrou de RLS) —
-o risco #1, ainda gated por um leak test cross-workspace com Postgres real (não rodado).
+o risco #1, coberto por leak test cross-workspace com Postgres real
+(`tests/test_tenant_isolation.py`, rodado 2026-07-03).
 
 ```mermaid
 flowchart TB
