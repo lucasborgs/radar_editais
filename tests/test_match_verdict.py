@@ -215,3 +215,87 @@ def test_attach_cached_verdicts_anexa_e_devolve_misses(monkeypatch):
     db2 = _FakeDb([])
     misses2 = mv.attach_cached_verdicts(db2, "ws", [dict(m_hit)], PROFILE)
     assert misses2 == [{"file_key": "finep__602", "paths": PATHS}]
+
+
+# ── ofertas de investimento (PR8.1) ───────────────────────────────────────────
+
+INVEST_CATALOG = {
+    "format_version": 2,
+    "proveniencia": {"fonte": "curadoria"},
+    "nodes": [
+        {"id": "op:acme-ventures-investimento", "type": "Oportunidade", "kind": "investimento",
+         "aperture": "continua", "name": "Investimento — ACME Ventures",
+         "description": "VC de deep-tech B2B.", "mecanismo": ["equity"],
+         "macro_temas": ["tecnologias digitais e conectividade"],
+         "estagio_alvo": ["seed", "serie-a"], "lead_follow": "lead",
+         "ticket_range": {"min_brl": 500000, "max_brl": 2000000}, "url": "https://acme.vc"},
+        {"id": "ator:acme-ventures", "type": "Ator", "kind": "investidor", "name": "ACME Ventures"},
+        {"id": "con:deep-tech", "type": "Conceito", "dim": "tecnologia", "name": "deep-tech"},
+        {"id": "con:b2b", "type": "Conceito", "dim": "aplicacao", "name": "b2b"},
+        # fundo IRMÃO no mesmo arquivo — NÃO deve vazar no sub-grafo da ACME
+        {"id": "op:outro-fundo-investimento", "type": "Oportunidade", "kind": "investimento",
+         "name": "Investimento — Outro", "mecanismo": ["equity"]},
+        {"id": "ator:outro-fundo", "type": "Ator", "kind": "investidor", "name": "Outro Fundo"},
+        {"id": "con:fintech", "type": "Conceito", "dim": "aplicacao", "name": "fintech"},
+    ],
+    "edges": [
+        {"type": "pertence_a", "members": ["op:acme-ventures-investimento", "ator:acme-ventures"]},
+        {"type": "viabiliza", "members": ["ator:acme-ventures", "con:deep-tech"]},
+        {"type": "viabiliza", "members": ["ator:acme-ventures", "con:b2b"]},
+        {"type": "pertence_a", "members": ["op:outro-fundo-investimento", "ator:outro-fundo"]},
+        {"type": "viabiliza", "members": ["ator:outro-fundo", "con:fintech"]},
+    ],
+}
+
+
+def test_investment_offer_subgraph_isola_oferta_e_serializa_facetas():
+    graphs = {"investidores": INVEST_CATALOG}
+    sub = mv.investment_offer_subgraph(graphs, "investidor:acme-ventures")  # entity_id
+    assert sub is not None
+    mini, offer = sub
+    assert offer["kind"] == "investimento"
+    # sub-grafo = oferta + fundo + os 2 conceitos do fundo; o OUTRO fundo fica de fora
+    assert {n["id"] for n in mini["nodes"]} == {
+        "op:acme-ventures-investimento", "ator:acme-ventures", "con:deep-tech", "con:b2b",
+    }
+    s = mv.serialize_opportunity(mini, offer)
+    assert "[investimento/continua]" in s and "mecanismo: equity" in s
+    assert "estágio-alvo: seed, serie-a" in s and "posição (lead/follow): lead" in s
+    assert "ticket: R$ 500.000 – R$ 2.000.000" in s
+    assert "deep-tech" in s and "b2b" in s and "fintech" not in s     # sem vazamento
+    assert "pertence_a" in s and "viabiliza" in s
+
+
+def test_serialize_for_verdict_dispatch_edital_e_investimento():
+    graphs = {"investidores": INVEST_CATALOG, "finep__602": GRAPH}
+    ed = mv.serialize_for_verdict({"file_key": "finep__602", "paths": []}, graphs)
+    inv = mv.serialize_for_verdict(
+        {"kind": "investimento", "oportunidade_id": "investidor:acme-ventures", "paths": []}, graphs)
+    assert ed[0] == "finep__602" and "[edital/prazo]" in ed[1]
+    assert inv[0] == "investidor:acme-ventures" and "[investimento/continua]" in inv[1]
+    # id inexistente → None (fail-safe, o item é pulado na task)
+    assert mv.serialize_for_verdict(
+        {"kind": "investimento", "oportunidade_id": "investidor:none"}, graphs) is None
+
+
+def test_attach_cached_verdicts_entities_so_investidor(monkeypatch):
+    from core.kg import kg_store
+
+    monkeypatch.setattr(kg_store, "load_all_hypergraphs", lambda: {"investidores": INVEST_CATALOG})
+    sub = mv.investment_offer_subgraph({"investidores": INVEST_CATALOG}, "investidor:acme-ventures")
+    h = mv.verdict_input_hash(mv.serialize_opportunity(sub[0], sub[1]), PROFILE, [])
+
+    inv = {"kind": "investidor", "name": "ACME Ventures", "entity_id": "investidor:acme-ventures", "paths": []}
+    prog = {"kind": "programa", "name": "P", "entity_id": "programa:p", "paths": []}   # ignorado
+    ict = {"kind": "ict", "name": "SENAI", "paths": []}                                # ignorado
+    db = _FakeDb([{"oportunidade_id": "investidor:acme-ventures", "input_hash": h, "verdict": VERDICT}])
+
+    misses = mv.attach_cached_verdicts_entities(db, "ws", [inv, prog, ict], PROFILE)
+    assert inv["verdict"] == VERDICT                       # cache-hit anexado à oferta
+    assert prog["verdict"] is None and ict["verdict"] is None   # programa/ict fora do escopo
+    assert misses == []
+
+    # cache vazio → miss keyed por entity_id, com discriminador kind=investimento
+    db2 = _FakeDb([])
+    misses2 = mv.attach_cached_verdicts_entities(db2, "ws", [dict(inv)], PROFILE)
+    assert misses2 == [{"kind": "investimento", "oportunidade_id": "investidor:acme-ventures", "paths": []}]

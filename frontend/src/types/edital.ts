@@ -46,6 +46,62 @@ export interface EditalCard extends EditalEntry {
   source: "facts+metadata" | "metadata_only";
 }
 
+// ── Ficha unificada por Oportunidade (KG v2 / PR8) ──────────────────────────
+// Payload de `GET /oportunidades/{id}` (hypergraph_catalog.get_opportunity).
+// Unidade = SEMPRE Oportunidade (D1): edital, programa ou investimento sob um
+// tipo só. Campos curated-only (estagio_alvo/ticket_range/lead_follow) são
+// opcionais. Substitui o EditalCard v1 (value_range/key_facts/link) na ficha.
+
+export type OpportunityKind = "edital" | "programa" | "investimento" | string;
+
+export interface TicketRange {
+  min_brl: number | null;
+  max_brl: number | null;
+}
+
+// Constraint de elegibilidade dura tipada (PR5). A avaliação sat/unsat é
+// match-time; na ficha a lista crua vira chips com rótulo humano.
+export interface EligibilityConstraint {
+  tipo: string;                 // porte | sede_uf | faturamento | trl | forma_juridica | parceria
+  op: string;                   // in | not_in | lte | gte | exige
+  valor: unknown;               // list | number | string, depende do tipo/op
+}
+
+export interface OportunidadeDetail {
+  id: string;
+  kind: OpportunityKind;
+  aperture: string;             // prazo | continua | recorrente | fechada | ""
+  source: string;
+  title: string;
+  status: string;
+  deadline: string;
+  objective: string;
+  mecanismo: string[];          // slugs
+  mechanism: string;            // rótulo de display já montado
+  macro_temas: string[];
+  themes: string[];
+  technologies: string[];
+  aplicacoes: string[];
+  programs: string[];
+  publico_alvo: string[];
+  eligible_entities: string[];
+  key_requirements: string[];
+  exclusoes: string[];
+  constraints: EligibilityConstraint[];
+  value: string | TicketRange | null;
+  icts: string[];
+  investidores: string[];
+  fonte_recurso: string[];
+  opportunity_type: string;
+  official_url: string;
+  document_urls: string[];
+  collected_at: string;
+  // Curated-only (programa/investimento):
+  estagio_alvo?: string[];
+  ticket_range?: TicketRange | "";
+  lead_follow?: string;
+}
+
 // Resultado do matching híbrido
 export interface DimScore {
   score: number;
