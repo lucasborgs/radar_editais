@@ -731,10 +731,10 @@ def _build_all_silver() -> int:
     from core.kg.edital_id import native_id_of, source_of  # noqa: PLC0415
     from pipeline.adapters.base import get_adapter  # noqa: PLC0415
 
-    # NOTA: enumera via load_all_hypergraphs (hipergrado) — migração coordenada.
-    # source_docs.persist_all_current migrou junto no mesmo PR (Phase 3).
-    # Quando o índice + build_knowledge_graph forem removidos, TODOS os consumidores
-    # restantes (hybrid_match_service, explore_agent, eval/matching…) migram juntos.
+    # NOTA: enumera via load_all_hypergraphs (hipergrado). O índice legado
+    # (build_knowledge_graph) e a wiki (etl_process) já foram removidos —
+    # todos os consumidores (hybrid_match_service, explore_agent, eval/matching…)
+    # leem hipergrado direto.
     editais = []
     for fk in kg_store.load_all_hypergraphs():
         if "__" not in fk:
@@ -860,27 +860,17 @@ async def _run_daily_etl(timestamp: int) -> None:
             )
 
     # -------------------------------------------------------------------
-    # Pós-scraping: reconstruir índice e sintetizar wiki pages.
-    # Antes esses dois passos eram CLI manuais — o cron só enfileirava
-    # chunk_edital. Resultado: vigência, prazos e os campos sintetizados
-    # (objective/key_requirements) ficavam congelados entre execuções
-    # manuais. Aqui fechamos o ciclo (requisito 3 + gap de vigência P0).
+    # Pós-scraping: persistência durável (fonte, silver, hipergrado) e
+    # regeneração do grafo Obsidian. O índice legado (build_knowledge_graph)
+    # e a síntese de wiki pages (etl_process) foram removidos — todo o
+    # catálogo e match vêm do hipergrado (ver CLAUDE.md).
     # -------------------------------------------------------------------
 
-    # 1) Índice vigentes/histórico a partir do bronze recém-salvo.
-    #    Pure-Python (sem LLM) — barato e idempotente.
-    try:
-        from pipeline import build_knowledge_graph  # noqa: PLC0415
-        await asyncio.to_thread(build_knowledge_graph.main)
-        logger.info("run_daily_etl_task: índice reconstruído (vigentes + histórico)")
-    except Exception as e:
-        logger.error("run_daily_etl_task: falha ao reconstruir índice: %s", e)
-        step_errors.append(f"reconstrução do índice: {e}")
-
-    # 1b) Persiste o Documento Canônico durável (§12.3) enquanto o bronze
-    #     recém-scraped está no disco. O FS do worker é EFÊMERO: sem isto, o
-    #     próximo redeploy apaga o bronze e o chunk_edital (lazy) produz 0 chunks.
-    #     Barato (extração já é eager; sem LLM). Spec: docs/specs/durable-source-docs.md.
+    # 1) Persiste o Documento Canônico durável (§12.3) enquanto o bronze
+    #    recém-scraped está no disco. O FS do worker não é fonte de verdade
+    #    durável: sem isto, um rebuild de imagem apaga o bronze e o
+    #    chunk_edital (lazy) produz 0 chunks. Barato (extração já é eager;
+    #    sem LLM). Spec: docs/specs/durable-source-docs.md.
     try:
         from core.kg.source_docs import persist_all_current  # noqa: PLC0415
         n_docs = await asyncio.to_thread(persist_all_current)
@@ -889,11 +879,10 @@ async def _run_daily_etl(timestamp: int) -> None:
         logger.error("run_daily_etl_task: falha ao persistir documentos-fonte: %s", e)
         step_errors.append(f"persistência do Documento Canônico: {e}")
 
-    # 1c) Silver EXPLÍCITO: materializa data/silver/structured_docs/*.jsonl de
-    #     todos os editais vigentes (structurer, durable-first). Antes isto era
-    #     EFEITO COLATERAL do etl_process (síntese de wiki) — que a migração
-    #     hipergrado remove. Passo próprio aqui DESACOPLA o silver da wiki:
-    #     hipergrado (1d) e RAG dependem do silver, não da wiki. Sem LLM.
+    # 2) Silver EXPLÍCITO: materializa data/silver/structured_docs/*.jsonl de
+    #    todos os editais vigentes (structurer, durable-first). Passo próprio
+    #    desacopla o silver da wiki (removida): hipergrado (3) e RAG dependem
+    #    do silver. Sem LLM.
     try:
         n_silver = await asyncio.to_thread(_build_all_silver)
         logger.info("run_daily_etl_task: silver materializado p/ %d editais", n_silver)
@@ -901,10 +890,8 @@ async def _run_daily_etl(timestamp: int) -> None:
         logger.error("run_daily_etl_task: falha ao materializar silver: %s", e)
         step_errors.append(f"materialização do silver: {e}")
 
-    # 1d) Hipergrado por edital + catálogos (arquitetura hipergrado, Sprint 0).
-    #     Depende do silver de 1c — NÃO da wiki. Roda EM PARALELO à wiki (nada
-    #     removido ainda). Skip por hash: só re-extrai o que mudou. Precisa de
-    #     OPENAI_API_KEY.
+    # 3) Hipergrado por edital + catálogos. Depende do silver de (2). Skip por
+    #    hash: só re-extrai o que mudou. Precisa de OPENAI_API_KEY.
     if os.getenv("OPENAI_API_KEY"):
         try:
             from core.retrieval.hyper_extractor import build_all_hypergraphs  # noqa: PLC0415
@@ -916,35 +903,12 @@ async def _run_daily_etl(timestamp: int) -> None:
     else:
         logger.warning("run_daily_etl_task: sem OPENAI_API_KEY — hipergrado pulado")
 
-    # 2) Síntese de wiki pages. O etl_process tem cache próprio por hash de
-    #    (metadata + silver) — só chama o LLM para editais que mudaram, então
-    #    rodar todo dia é barato. Guardamos a API key para não cair no getpass
-    #    (que travaria o worker headless).
-    wiki_backend = os.getenv("WIKI_SYNTH_BACKEND", "gemini")
-    key_ok = (
-        os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        if wiki_backend == "gemini"
-        else os.getenv("OPENAI_API_KEY")
-    )
-    if key_ok:
-        try:
-            from pipeline import etl_process  # noqa: PLC0415
-            await asyncio.to_thread(lambda: etl_process.main(backend=wiki_backend))
-            logger.info("run_daily_etl_task: wiki pages sintetizadas (backend=%s)", wiki_backend)
-        except Exception as e:
-            logger.error("run_daily_etl_task: falha na síntese de wiki pages: %s", e)
-            step_errors.append(f"síntese de wiki pages: {e}")
-    else:
-        logger.warning(
-            "run_daily_etl_task: sem API key p/ WIKI_SYNTH_BACKEND=%s — síntese de wiki pulada",
-            wiki_backend,
-        )
-
-    # 3) Regenera o vault Obsidian a partir do índice unificado. É a MESMA fonte
-    #    de dados do grafo do frontend (GET /graph lê OBSIDIAN_VAULT_DIR), então
-    #    isto atualiza Obsidian e frontend de uma vez. Agnóstico à fonte e sem
-    #    duplicar editais (nomes/wikilinks colon-free consistentes + dedup no
-    #    get_graph). `scripts` é importável como namespace package a partir da raiz.
+    # 4) Regenera o vault Obsidian a partir do hipergrado unificado. É a MESMA
+    #    fonte de dados do grafo do frontend (GET /graph lê OBSIDIAN_VAULT_DIR),
+    #    então isto atualiza Obsidian e frontend de uma vez. Agnóstico à fonte e
+    #    sem duplicar editais (nomes/wikilinks colon-free consistentes + dedup
+    #    no get_graph). `scripts` é importável como namespace package a partir
+    #    da raiz.
     try:
         from config import OBSIDIAN_VAULT_DIR  # noqa: PLC0415
         from scripts.export_to_obsidian import export as export_obsidian  # noqa: PLC0415
@@ -954,26 +918,6 @@ async def _run_daily_etl(timestamp: int) -> None:
     except Exception as e:
         logger.error("run_daily_etl_task: falha ao regenerar grafo Obsidian: %s", e)
         step_errors.append(f"regeneração do grafo Obsidian: {e}")
-
-    # 4) Alerta de fonte parada: bronze de alguma fonte registrada sem arquivo
-    #    novo há mais que o threshold (scraper quebrado retornando vazio, cron
-    #    capenga). O try/except por fonte acima captura exceções, mas um scraper
-    #    que "funciona" e não grava nada escaparia — este check pega pelo efeito.
-    try:
-        from pipeline.health_check import check_sources_freshness  # noqa: PLC0415
-        for r in await asyncio.to_thread(check_sources_freshness):
-            if r["status"] == "STALE":
-                logger.error(
-                    "run_daily_etl_task: fonte %s estagnada — bronze mais "
-                    "recente tem %.1f dias", r["source"], r["age_days"],
-                )
-                step_errors.append(
-                    f"fonte {r['source']} estagnada (bronze mais recente tem "
-                    f"{r['age_days']:.1f} dias)"
-                )
-    except Exception as e:
-        logger.warning("run_daily_etl_task: check de frescor das fontes falhou: %s", e)
-        step_errors.append(f"check de frescor das fontes: {e}")
 
     logger.info("run_daily_etl_task: concluído (total=%d novos)", total_new)
 
