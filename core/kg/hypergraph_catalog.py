@@ -532,6 +532,7 @@ def get_stats() -> dict:
     all_graphs = kg_store.load_all_hypergraphs()
     n_programas = len(list_entity_catalog("programas", graphs=all_graphs, limit=999))
     n_investidores = len(list_entity_catalog("investidores", graphs=all_graphs, limit=999))
+    n_icts = len(list_entity_catalog("ict", graphs=all_graphs, limit=999))
     return {
         "total_editais": total,
         "last_updated": "",
@@ -540,7 +541,8 @@ def get_stats() -> dict:
         "n_fontes": len(fontes),
         "n_programas": n_programas,
         "n_investidores": n_investidores,
-        "total_oportunidades": total + n_programas + n_investidores,
+        "n_icts": n_icts,
+        "total_oportunidades": total + n_programas + n_investidores + n_icts,
     }
 
 
@@ -675,6 +677,16 @@ def list_opportunities(
                 "id": f"investidor:{e['id']}",
                 "title": e["name"],
                 "type": "investidor",
+                "themes": e.get("themes", []),
+                "description": e.get("description", ""),
+            })
+
+    if tipo is None or tipo == "ict":
+        for e in list_entity_catalog("ict", graphs=graphs, limit=limit):
+            result.append({
+                "id": f"ict:{e['id']}",
+                "title": e["name"],
+                "type": "ict",
                 "themes": e.get("themes", []),
                 "description": e.get("description", ""),
             })

@@ -1,7 +1,7 @@
 export interface OpportunityEntry {
   id: string;
   title: string;
-  type: "edital" | "programa" | "investidor";
+  type: "edital" | "programa" | "investidor" | "ict";
   themes: string[];
   status?: string;
   deadline?: string;

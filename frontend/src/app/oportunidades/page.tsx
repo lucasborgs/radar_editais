@@ -18,19 +18,21 @@ const APERTURE_LABEL: Record<string, string> = {
   fechada: "Encerrada",
 };
 
-type TypeFilter = "all" | "edital" | "programa" | "investidor";
+type TypeFilter = "all" | "edital" | "programa" | "investidor" | "ict";
 
 const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
   { value: "all", label: "Todos" },
   { value: "edital", label: "Editais" },
   { value: "programa", label: "Programas" },
   { value: "investidor", label: "Investidores" },
+  { value: "ict", label: "ICTs" },
 ];
 
 const TYPE_BADGE: Record<string, { label: string; className: string }> = {
   edital: { label: "Edital", className: "bg-primary/15 text-primary" },
   programa: { label: "Programa", className: "bg-blue-500/15 text-blue-700 dark:text-blue-300" },
   investidor: { label: "Investidor", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
+  ict: { label: "ICT", className: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
 };
 
 function TypeBadge({ type }: { type: string }) {
@@ -145,8 +147,9 @@ export default function OportunidadesPage() {
   }, [opportunities, typeFilter, themeQuery]);
 
   // D1/PR8: toda oportunidade (edital, programa, investidor) abre a ficha
-  // unificada. `id` pode conter ':' e espaço (curados) → encode.
+  // unificada. ICTs não têm ficha detalhada (são Ator, não Oportunidade).
   const handleRowClick = (row: OpportunityEntry) => {
+    if (row.type === "ict") return;
     router.push(`/oportunidades/${encodeURIComponent(row.id)}`);
   };
 
@@ -154,11 +157,11 @@ export default function OportunidadesPage() {
     <DashboardLayout title="Oportunidades">
       <div className="space-y-5">
         {/* KPI row */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
           <MetricCard
             label="Total de Oportunidades"
             value={stats ? stats.total_oportunidades : "—"}
-            subtext="editais + programas + investidores"
+            subtext="editais + programas + investidores + ICTs"
           />
           <MetricCard
             label="Editais Abertos"
@@ -174,6 +177,11 @@ export default function OportunidadesPage() {
             label="Investidores"
             value={stats ? stats.n_investidores : "—"}
             subtext="parceiros de capital"
+          />
+          <MetricCard
+            label="ICTs"
+            value={stats ? stats.n_icts : "—"}
+            subtext="instituições parceiras"
           />
         </div>
 

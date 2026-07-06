@@ -156,5 +156,6 @@ export interface DashboardStats {
   n_fontes: number;
   n_programas: number;
   n_investidores: number;
+  n_icts: number;
   total_oportunidades: number;
 }
