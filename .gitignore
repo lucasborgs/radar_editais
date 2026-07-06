@@ -45,6 +45,7 @@ data/knowledge_graph/.ict_theme_map_cache.json
 # IDEs
 .vscode/
 .idea/
+.claude/
 
 # Node
 frontend/node_modules/
@@ -79,4 +80,5 @@ data/hyper_extract_output*/
 # Higiene de Conceitos (PR3): planos auditáveis + canon map (kg_store) + backups
 data/knowledge_graph/canonicalization/
 data/knowledge_graph/concept_canon.json
+data/knowledge_graph/programa_canon.json
 data/knowledge_graph.bak.*/
