@@ -15,6 +15,9 @@ build/
 .env.*
 !.env.example
 
+# Cloudflare Tunnel — credentials sensíveis
+cloudflared/
+
 # Data (raw sources — não versionar)
 data/bronze/
 data/silver/
