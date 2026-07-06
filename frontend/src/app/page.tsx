@@ -31,6 +31,7 @@ import {
   type MatchVerdict,
   type ProfileDiffItem,
 } from "@/lib/api";
+const PLANNING_CTX_KEY = "planning_context";
 import { useAuth } from "@/lib/auth";
 import {
   CompanyProfile,
@@ -90,22 +91,51 @@ function Bubble({
   role,
   content,
   truncated,
+  nextAction,
 }: {
   role: "user" | "assistant";
   content: string;
   truncated?: boolean;
+  nextAction?: { offer: string; options: Array<{ label: string; action: string }> };
 }) {
   const isUser = role === "user";
+  const router = useRouter();
+
+  const handleNextAction = useCallback(
+    (action: string) => {
+      if (action === "goto_planning") {
+        router.push("/workspace/planning");
+      } else if (action === "goto_execution") {
+        router.push("/workspace/new?mode=writing");
+      }
+    },
+    [router],
+  );
+
   return (
     <ChatBubble
       role={role}
       footer={
-        // Aviso discreto de truncamento (PR6.2): resposta cortada no teto de passos.
-        !isUser && truncated ? (
-          <p className="px-1 mt-1 text-[11px] italic text-content-secondary font-sans">
-            Resposta interrompida no limite de passos — continue a conversa para eu retomar.
-          </p>
-        ) : undefined
+        <>
+          {!isUser && truncated ? (
+            <p className="px-1 mt-1 text-[11px] italic text-content-secondary font-sans">
+              Resposta interrompida no limite de passos — continue a conversa para eu retomar.
+            </p>
+          ) : null}
+          {!isUser && nextAction ? (
+            <div className="flex flex-wrap gap-2 px-1 mt-2">
+              {nextAction.options.map((opt) => (
+                <button
+                  key={opt.action}
+                  onClick={() => handleNextAction(opt.action)}
+                  className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </>
       }
     >
       {isUser ? (
@@ -407,19 +437,28 @@ export default function FrontDoorPage() {
       setSending(true);
 
       try {
-        const { answer, truncated, profile_diff, matched_editais, matched_entities, session_id, entry_ids } = await frontdoorTurn(
+        const { answer, truncated, profile_diff, matched_editais, matched_entities, session_id, entry_ids, next_action } = await frontdoorTurn(
           trimmed,
           toApiHistory(withUser),
           profile.nome ? profile : null,
           sessionId,
         );
+        // PR1 (four-phase-workflow): guarda contexto para a fase de planejamento.
+        if (next_action && next_action.options.some((o) => o.action === "goto_planning")) {
+          const editalId = matched_editais?.[0]?.edital_id || undefined;
+          sessionStorage.setItem(PLANNING_CTX_KEY, JSON.stringify({
+            question: trimmed,
+            analysis: answer,
+            editalId,
+          }));
+        }
         // Logado: o backend persistiu o turno e devolveu o binding da conversa
         // (1º turno cria; seguintes reusam). Anônimo: session_id ausente.
         if (session_id) bindSession(session_id);
         setEntries((prev) => {
           const next: TranscriptEntry[] = [
             ...prev,
-            { kind: "msg", role: "assistant", content: answer, truncated: truncated || undefined },
+            { kind: "msg", role: "assistant", content: answer, truncated: truncated || undefined, nextAction: next_action ? { offer: next_action.offer, options: next_action.options } : undefined },
           ];
           if ((matched_editais?.length ?? 0) > 0 || (matched_entities?.length ?? 0) > 0) {
             next.push({
@@ -777,6 +816,7 @@ export default function FrontDoorPage() {
                   role={entry.role}
                   content={entry.content}
                   truncated={entry.truncated}
+                  nextAction={entry.nextAction}
                 />
               );
             case "diff":

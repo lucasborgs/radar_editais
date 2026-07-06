@@ -11,6 +11,9 @@ import {
   getLibraryItems,
   getEditalById,
   autoReviewChecklist,
+  refineSection,
+  workspaceMode,
+  type WritingRefineResponse,
 } from "@/lib/api";
 import type {
   ContentItemSummary,
@@ -59,6 +62,28 @@ export default function WorkspacePage() {
   const [working, setWorking] = useState(false);
   const [pending, setPending] = useState<PendingUserInput | null>(null);
   const [savingSection, setSavingSection] = useState<string | null>(null);
+  const [refining, setRefining] = useState<string | null>(null);
+  const [wsMode, setWsMode] = useState<"explorer" | "plan" | "escrita">("explorer");
+
+  const WELCOME_BY_MODE: Record<string, string> = {
+    explorer: "🧭 Modo /explorer ativado. Tire dúvidas sobre o edital. Quando quiser planejar, digite /plan.",
+    plan: "📋 Modo /plan ativado. Planeje a estrutura da proposta. Para escrever, digite /escrita.",
+    escrita: "✍️ Modo /escrita ativado. Escreva sua proposta. Para dúvidas sobre o edital, digite /explorer.",
+  };
+
+  function parseCommand(input: string): { command?: "explorer" | "plan" | "escrita"; message: string } {
+    const match = input.trim().match(/^\/(explorer|plan|escrita|help)\b/);
+    if (!match) return { message: input };
+    if (match[1] === "help") return { message: "" };
+    return {
+      command: match[1] as "explorer" | "plan" | "escrita",
+      message: input.slice(match[0].length).trim(),
+    };
+  }
+  const [refineFeedback, setRefineFeedback] = useState<{
+    title: string;
+    feedback: WritingRefineResponse;
+  } | null>(null);
 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [docLoading, setDocLoading] = useState(true);
@@ -121,18 +146,14 @@ export default function WorkspacePage() {
           setTargetTitle(id);
         }
 
-        // Se já houver conteúdo salvo, mostra o split view direto.
-        const hasContent = next.some((s) => s.content.trim());
-        if (!cancelled && hasContent) {
-          setDraftReady(true);
-        }
-
         // Mensagem inicial.
         if (!cancelled) {
-          const welcome = hasContent
+          const anyContent = next.some((s) => s.content.trim());
+          const welcome = anyContent
             ? "Pronto para revisar a proposta. Edite as seções à esquerda ou continue conversando no chat."
-            : "Bem-vindo(a) ao workspace. Converse sobre o edital, tire dúvidas " +
-              "ou peça um rascunho quando estiver pronto(a).";
+            : next.length > 0
+              ? "Plano de proposta carregado. Converse para começar a preencher cada seção.\n\n" + WELCOME_BY_MODE[wsMode]
+              : WELCOME_BY_MODE[wsMode];
           setMessages([{ role: "assistant", content: welcome, timestamp: nowTime() }]);
         }
       } catch (e) {
@@ -232,13 +253,74 @@ export default function WorkspacePage() {
       const content = text.trim();
       if (!content || !sessionId || working) return;
 
-      setMessages((prev) => [...prev, { role: "user", content, timestamp: nowTime() }]);
+      // Detecta comandos de modo (/explorer, /plan, /escrita, /help)
+      const { command, message } = parseCommand(content);
+
+      // /help: mostra comandos disponíveis
+      if (!message && command === undefined && content === "/help") {
+        setWorking(true);
+        setMessages((prev) => [...prev, { role: "user", content, timestamp: nowTime() }]);
+        setInput("");
+        const helpText = `**Comandos disponíveis:**
+  • \`/explorer\` — explorar o edital, tirar dúvidas
+  • \`/plan\` — planejar a estrutura da proposta
+  • \`/escrita\` — escrever/refinar as seções
+  • \`/help\` — mostrar esta mensagem
+
+  Modo atual: **/${wsMode}**`;
+        setMessages((prev) => [...prev, { role: "assistant", content: helpText, timestamp: nowTime() }]);
+        setWorking(false);
+        return;
+      }
+
+      // Troca de modo: /explorer, /plan, /escrita
+      if (command && command !== wsMode) {
+        setWsMode(command);
+        setMessages((prev) => [...prev, { role: "user", content: content, timestamp: nowTime() }]);
+        setInput("");
+        if (!message) {
+          // Só trocou de modo sem mensagem
+          setMessages((prev) => [...prev, { role: "assistant", content: WELCOME_BY_MODE[command], timestamp: nowTime() }]);
+          return;
+        }
+      }
+
+      const activeMode = command || wsMode;
+
+      // Modos não-escrita: roteia via workspaceMode endpoint
+      if (activeMode !== "escrita") {
+        setMessages((prev) => [...prev, { role: "user", content: message || content, timestamp: nowTime() }]);
+        setInput("");
+        setPending(null);
+        setWorking(true);
+        try {
+          const res = await workspaceMode(sessionId, activeMode, message || content);
+          if (res.error) {
+            toast.error(res.error);
+            return;
+          }
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: res.response, timestamp: nowTime() },
+          ]);
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? e.message : "Erro ao enviar mensagem.",
+          );
+        } finally {
+          setWorking(false);
+        }
+        return;
+      }
+
+      // Modo /escrita: fluxo normal de escrita
+      setMessages((prev) => [...prev, { role: "user", content: message || content, timestamp: nowTime() }]);
       setInput("");
       setPending(null);
       setWorking(true);
 
       try {
-        const res = await sendWritingTurn(sessionId, content, sectionHint);
+        const res = await sendWritingTurn(sessionId, message || content, sectionHint);
 
         const editedSections = Array.from(
           new Set(
@@ -269,7 +351,6 @@ export default function WorkspacePage() {
           },
         ]);
 
-        // Se um draft foi gerado, recarrega o documento e mostra o split view.
         if (res.draft_ready || (res.sections_done?.length ?? 0) > 0) {
           setDraftReady(true);
           setMobileTab("doc");
@@ -279,7 +360,6 @@ export default function WorkspacePage() {
             /* mantém estado local */
           }
         } else {
-          // Turno conversacional comum: só recarrega se houve edição.
           try {
             await reloadDocument();
           } catch {
@@ -303,7 +383,7 @@ export default function WorkspacePage() {
         setWorking(false);
       }
     },
-    [sessionId, working, reloadDocument],
+    [sessionId, working, reloadDocument, wsMode],
   );
 
   const registerScrollTo = useCallback((fn: (title: string) => void) => {
@@ -348,6 +428,33 @@ export default function WorkspacePage() {
     [runTurn],
   );
 
+  // ── Refinar seção (FASE 3) ────────────────────────────────────────────────
+  const handleRefineSection = useCallback(
+    async (title: string, instruction: string) => {
+      if (!sessionId || refining) return;
+      setRefining(title);
+      try {
+        const result = await refineSection(sessionId, title, instruction);
+        setRefineFeedback({ title, feedback: result });
+        if (result.section_updated) {
+          await reloadDocument();
+          toast.success(`"${title}" refinada com sucesso.`);
+        } else if (result.error) {
+          toast.error(result.error);
+        } else {
+          toast.info("Nenhuma alteração feita pelo refinamento.");
+        }
+      } catch (e) {
+        toast.error(
+          e instanceof Error ? e.message : "Erro ao refinar seção.",
+        );
+      } finally {
+        setRefining(null);
+      }
+    },
+    [sessionId, refining, reloadDocument],
+  );
+
   // ── Render ────────────────────────────────────────────────────────────────
   if (authChecked && !token) {
     return (
@@ -388,150 +495,140 @@ export default function WorkspacePage() {
         title={targetTitle || editalId || "Carregando…"}
         mode={mode}
         filled={filled}
-        total={draftReady ? sections.length : 0}
+        total={sections.length}
+        wsMode={wsMode}
+        sessionId={sessionId}
       />
 
-      {draftReady && (
-        <>
-          {/* Mobile: abas Documento | Chat + botão do drawer do explorer */}
-          <div className="md:hidden flex items-center border-b border-border bg-white">
+            {/* Mobile: abas Documento | Chat + drawer do explorer (só quando editor visível) */}
+      {wsMode === "escrita" && sections.length > 0 && (
+        <div className="md:hidden flex items-center border-b border-border bg-white">
+          <button
+            onClick={() => setMobileDrawer(true)}
+            title="Abrir explorer"
+            className="px-3 py-2 text-content-secondary hover:text-content-primary transition-colors"
+          >
+            ☰
+          </button>
+          {(["doc", "chat"] as const).map((tab) => (
             <button
-              onClick={() => setMobileDrawer(true)}
-              title="Abrir explorer"
-              className="px-3 py-2 text-content-secondary hover:text-content-primary transition-colors"
+              key={tab}
+              onClick={() => setMobileTab(tab)}
+              className={cn(
+                "flex-1 py-2 text-sm font-sans transition-colors",
+                mobileTab === tab
+                  ? "text-primary font-semibold border-b-2 border-primary"
+                  : "text-content-secondary",
+              )}
             >
-              ☰
+              {tab === "doc" ? "Documento" : "Chat"}
             </button>
-            {(["doc", "chat"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setMobileTab(tab)}
-                className={cn(
-                  "flex-1 py-2 text-sm font-sans transition-colors",
-                  mobileTab === tab
-                    ? "text-primary font-semibold border-b-2 border-primary"
-                    : "text-content-secondary",
-                )}
-              >
-                {tab === "doc" ? "Documento" : "Chat"}
-              </button>
-            ))}
-          </div>
-        </>
+          ))}
+        </div>
       )}
 
       <div className="flex-1 flex min-h-0">
-        {draftReady ? (
-          <>
-            {/* Explorer — sidebar no desktop */}
-            <div className="hidden md:flex">
+        {/* Explorer — sidebar no desktop (sempre que houver seções) */}
+        {sections.length > 0 && (
+          <div className="hidden md:flex">
+            <Explorer
+              sections={sections}
+              attachments={attachments}
+              findingCounts={findingCounts}
+              reviewing={reviewing}
+              onSelectSection={handleSelectSection}
+              onSelectAttachment={handleSelectAttachment}
+              onReview={() => void handleReview()}
+              onExport={() => setExportOpen(true)}
+            />
+          </div>
+        )}
+
+        {/* Explorer — drawer overlay no mobile */}
+        {mobileDrawer && sections.length > 0 && (
+          <div className="md:hidden fixed inset-0 z-40 flex">
+            <button
+              aria-label="Fechar explorer"
+              onClick={() => setMobileDrawer(false)}
+              className="absolute inset-0 bg-black/40"
+            />
+            <div className="relative z-10 h-full shadow-xl animate-in slide-in-from-left">
               <Explorer
                 sections={sections}
                 attachments={attachments}
                 findingCounts={findingCounts}
                 reviewing={reviewing}
-                onSelectSection={handleSelectSection}
-                onSelectAttachment={handleSelectAttachment}
-                onReview={() => void handleReview()}
-                onExport={() => setExportOpen(true)}
+                onSelectSection={(t) => {
+                  handleSelectSection(t);
+                  setMobileDrawer(false);
+                }}
+                onSelectAttachment={(item) => {
+                  handleSelectAttachment(item);
+                  setMobileDrawer(false);
+                }}
+                onReview={() => {
+                  void handleReview();
+                  setMobileDrawer(false);
+                }}
+                onExport={() => {
+                  setExportOpen(true);
+                  setMobileDrawer(false);
+                }}
               />
             </div>
-
-            {/* Explorer — drawer overlay no mobile */}
-            {mobileDrawer && (
-              <div className="md:hidden fixed inset-0 z-40 flex">
-                <button
-                  aria-label="Fechar explorer"
-                  onClick={() => setMobileDrawer(false)}
-                  className="absolute inset-0 bg-black/40"
-                />
-                <div className="relative z-10 h-full shadow-xl animate-in slide-in-from-left">
-                  <Explorer
-                    sections={sections}
-                    attachments={attachments}
-                    findingCounts={findingCounts}
-                    reviewing={reviewing}
-                    onSelectSection={(t) => {
-                      handleSelectSection(t);
-                      setMobileDrawer(false);
-                    }}
-                    onSelectAttachment={(item) => {
-                      handleSelectAttachment(item);
-                      setMobileDrawer(false);
-                    }}
-                    onReview={() => {
-                      void handleReview();
-                      setMobileDrawer(false);
-                    }}
-                    onExport={() => {
-                      setExportOpen(true);
-                      setMobileDrawer(false);
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Editor */}
-            <div
-              className={cn(
-                "flex-1 min-w-0 flex flex-col",
-                mobileTab === "chat" ? "hidden md:flex" : "flex",
-              )}
-            >
-              {docLoading ? (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : (
-                <DocumentEditor
-                  sections={sections}
-                  highlightedSections={highlighted}
-                  savingSection={savingSection}
-                  findingsBySection={findingsBySection}
-                  generalFindings={generalFindings}
-                  onSaveSection={handleSaveSection}
-                  onSectionInteract={handleSectionInteract}
-                  onFixWithAI={handleFixWithAI}
-                  registerScrollTo={registerScrollTo}
-                />
-              )}
-            </div>
-
-            {/* Chat */}
-            <div className={cn(mobileTab === "doc" ? "hidden md:flex" : "flex w-full md:w-auto")}>
-              <WorkspaceChat
-                ref={chatRef}
-                messages={messages}
-                input={input}
-                onInput={setInput}
-                onSend={() => void runTurn(input)}
-                working={working}
-                pending={pending}
-                onAnswerPending={(answer) => void runTurn(answer)}
-                onUndoSection={(title) => void handleUndoSection(title)}
-                token={token}
-              />
-            </div>
-          </>
-        ) : (
-          /* Chat-first: workspace é só o chat até gerar o draft */
-          <div className="flex-1 flex min-h-0">
-            <WorkspaceChat
-              ref={chatRef}
-              messages={messages}
-              input={input}
-              onInput={setInput}
-              onSend={() => void runTurn(input)}
-              working={working}
-              pending={pending}
-              onAnswerPending={(answer) => void runTurn(answer)}
-              onUndoSection={() => {}}
-              token={token}
-              fullWidth
-            />
           </div>
         )}
+
+        {/* Editor — só quando /escrita estiver ativo e há seções */}
+        {wsMode === "escrita" && sections.length > 0 && (
+          <div
+            className={cn(
+              "flex-1 min-w-0 flex flex-col",
+              mobileTab === "chat" ? "hidden md:flex" : "flex",
+            )}
+          >
+            {docLoading ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <DocumentEditor
+                sections={sections}
+                highlightedSections={highlighted}
+                savingSection={savingSection}
+                findingsBySection={findingsBySection}
+                generalFindings={generalFindings}
+                onSaveSection={handleSaveSection}
+                onSectionInteract={handleSectionInteract}
+                onFixWithAI={handleFixWithAI}
+                onRefineSection={handleRefineSection}
+                registerScrollTo={registerScrollTo}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Chat — sempre visível, ocupa espaço restante */}
+        <div className={cn(
+          "flex-1 flex min-h-0",
+          wsMode === "escrita" && sections.length > 0
+            ? mobileTab === "doc" ? "hidden md:flex md:max-w-sm" : "flex"
+            : "flex",
+        )}>
+          <WorkspaceChat
+            ref={chatRef}
+            messages={messages}
+            input={input}
+            onInput={setInput}
+            onSend={() => void runTurn(input)}
+            working={working}
+            pending={pending}
+            onAnswerPending={(answer) => void runTurn(answer)}
+            onUndoSection={(title) => void handleUndoSection(title)}
+            token={token}
+            fullWidth={wsMode !== "escrita" || sections.length === 0}
+          />
+        </div>
       </div>
 
       {exportOpen && (
@@ -543,6 +640,71 @@ export default function WorkspacePage() {
           token={token}
           onClose={() => setExportOpen(false)}
         />
+      )}
+
+      {/* Critic feedback after refinement (FASE 3) */}
+      {refineFeedback && refineFeedback.feedback.critic_feedback && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="max-w-lg w-full mx-4 bg-white rounded-lg shadow-xl border border-border">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-content-primary font-sans">
+                  Feedback da revisão — &ldquo;{refineFeedback.title}&rdquo;
+                </h3>
+                <button
+                  onClick={() => setRefineFeedback(null)}
+                  className="text-content-secondary hover:text-content-primary transition-colors text-lg leading-none"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="space-y-2 text-xs font-sans text-content-primary">
+                {refineFeedback.feedback.critic_feedback &&
+                typeof refineFeedback.feedback.critic_feedback === "object" &&
+                "issues" in (refineFeedback.feedback.critic_feedback as Record<string, unknown>) &&
+                Array.isArray((refineFeedback.feedback.critic_feedback as Record<string, unknown>).issues) ? (
+                  <>
+                    <p className="font-medium text-content-secondary">
+                      {(refineFeedback.feedback.critic_feedback as Record<string, unknown>).approved
+                        ? "✅ Aprovado pelo revisor"
+                        : "⚠ Revisor bloqueou — issues encontrados:"}
+                    </p>
+                    <ul className="space-y-1">
+                      {((refineFeedback.feedback.critic_feedback as Record<string, unknown>).issues as string[]).map(
+                        (issue, i) => (
+                          <li key={i} className="flex gap-1">
+                            <span className="text-amber-600 shrink-0">•</span>
+                            {issue}
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="text-content-secondary">
+                    Refinamento concluído. Verifique a seção no editor.
+                  </p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                {refineFeedback.feedback.options?.includes("voltar") && (
+                  <button
+                    onClick={() => setRefineFeedback(null)}
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-content-secondary font-sans hover:bg-gray-50 transition-colors"
+                  >
+                    Voltar
+                  </button>
+                )}
+                <button
+                  onClick={() => setRefineFeedback(null)}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white font-sans hover:bg-primary-dark transition-colors"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

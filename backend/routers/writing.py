@@ -3,6 +3,7 @@ documento, checklist e export."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -48,6 +49,11 @@ class WritingStartRequest(BaseModel):
     # campo para o front poder sinalizar a intenção (badge/header) sem depender
     # de inspecionar o id. Não altera a lógica do pitch em si.
     mode: str | None = None
+    # PR1 (four-phase-workflow): plano de proposta gerado pelo Planning.
+    # Se presente, WritingSession usa suas seções como outline.
+    plan: dict | None = None
+    # PR1: ajustes do usuário ao plano (merge sobre o plan antes de usar).
+    user_adjustments: dict | None = None
 
 
 class WritingTurnRequest(BaseModel):
@@ -130,6 +136,12 @@ class ChecklistUpdateRequest(BaseModel):
     status: str  # "pending" | "addressed" | "not_applicable"
 
 
+class WritingRefineRequest(BaseModel):
+    session_id: str
+    section_title: str
+    instruction: str = Field(max_length=4_000)
+
+
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
@@ -196,6 +208,8 @@ def writing_start(
             edital_id=req.edital_id,
             library_items=library_items,
             mode=req.mode,  # W-D3: opcional; None → modo derivado do id
+            plan=req.plan,  # PR1: plano do Planning (se houver)
+            user_adjustments=req.user_adjustments,  # PR1: ajustes do usuário
         )
     except ProfileIncompleteError as e:
         return JSONResponse(
@@ -232,7 +246,6 @@ async def writing_turn(
     """
     import asyncio
 
-    from core.compliance_monitor import check_compliance
     from core.llm_router import resolve_model
 
     workspace_id = get_workspace_id(db, user_id)
@@ -254,13 +267,11 @@ async def writing_turn(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
-    # Run LLM turn and compliance check in parallel (ADR A4).
-    turn_result, compliance_flags = await asyncio.gather(
-        asyncio.to_thread(session.turn, req.user_message, req.section_hint),
-        asyncio.to_thread(check_compliance, req.user_message, session.edital_id),
-    )
+    # PR3 (four-phase-workflow): compliance integrado ao Critic (executado dentro
+    # de save_draft). Removeu o ComplianceMonitor paralelo.
+    turn_result = await asyncio.to_thread(session.turn, req.user_message, req.section_hint)
     sections_done = turn_result.get("sections_done", [])
-    return {**turn_result, "compliance_flags": compliance_flags,
+    return {**turn_result, "compliance_flags": [],
             "draft_ready": bool(sections_done)}
 
 
@@ -713,3 +724,43 @@ def writing_section_start(
         raise HTTPException(status_code=404, detail=str(e)) from e
     starter = session.get_section_starter(req.section_title)
     return {"starter_message": starter, "section_title": req.section_title}
+
+
+@router.post(
+    "/writing/{session_id}/refine",
+    summary="Refina uma seção específica com instrução do usuário (FASE 3)",
+)
+@limiter.limit("10/minute")
+async def writing_refine(
+    request: Request,
+    session_id: str,
+    req: WritingRefineRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """Refinement mode: reescreve uma seção específica seguindo instrução do
+    usuário. A seção passa pelo Critic (qualidade + compliance) antes de ser
+    salva.
+
+    - MAX_STEPS = 20 (vs 10 do turno normal)
+    - Critic roda automaticamente via save_draft
+    - Retorna o novo conteúdo + feedback do Critic
+    """
+    workspace_id = get_workspace_id(db, user_id)
+    profile = profile_from_workspace(db, workspace_id)
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            session_id=session_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    result = await asyncio.to_thread(
+        session.refine_section,
+        req.section_title,
+        req.instruction,
+    )
+    return result

@@ -11,6 +11,7 @@ import type {
   ExtractProfileResponse,
   ContentItemSummary,
   ContentItemFull,
+  Plan,
 } from "@/types/api";
 
 // Recupera o JWT corrente da sessão Supabase (lazy). Existir aqui evita
@@ -260,6 +261,10 @@ export const frontdoorTurn = (
     matched_entities?: MatchedEntity[];
     session_id?: string;
     entry_ids?: FrontdoorEntryIds;
+    next_action?: {
+      offer: string;
+      options: Array<{ label: string; action: string }>;
+    }; // PR1 (4-phase): oferta de planejamento
   }>("/explore", {
     method: "POST",
     body: JSON.stringify({
@@ -278,16 +283,41 @@ export const fetchMatchVerdicts = (oportunidadeIds: string[]) =>
     body: JSON.stringify({ oportunidade_ids: oportunidadeIds }),
   });
 
+// ── Planning (FASE 1 do four-phase-workflow) ───────────────
+
+export const planningGenerate = (
+  question: string,
+  analysis: string,
+  editalId?: string | null,
+) =>
+  apiFetch<Plan>("/planning/generate", {
+    method: "POST",
+    body: JSON.stringify({
+      question,
+      analysis,
+      edital_id: editalId ?? null,
+    }),
+  });
+
+export const getExistingPlan = (sessionId: string) =>
+  apiFetch<Plan>(`/planning/${sessionId}`);
+
 // ── Writing Session ────────────────────────────────────────
 
 export const startWritingSession = (
   editalId: string,
   profile: CompanyProfile,
-  mode?: WritingMode,  // W-D3: opcional; omitido → modo derivado do id no backend
+  mode?: WritingMode,
+  plan?: Plan | null,
 ) =>
   apiFetch<WritingStartResponse>("/writing/start", {
     method: "POST",
-    body: JSON.stringify({ edital_id: editalId, profile, mode }),
+    body: JSON.stringify({
+      edital_id: editalId,
+      profile,
+      mode,
+      plan: plan ?? undefined,
+    }),
   });
 
 export type ModelTier = "fast" | "auto" | "pro";
@@ -498,6 +528,28 @@ export const autoReviewChecklist = (sessionId: string, token: string) =>
     { method: "POST" },
     token,
   );
+
+export interface WritingRefineResponse {
+  section_updated: boolean;
+  new_content: string | null;
+  critic_feedback: Record<string, unknown> | null;
+  options: string[];
+  error: string | null;
+}
+
+export const refineSection = (
+  sessionId: string,
+  sectionTitle: string,
+  instruction: string,
+) =>
+  apiFetch<WritingRefineResponse>(`/writing/${sessionId}/refine`, {
+    method: "POST",
+    body: JSON.stringify({
+      session_id: sessionId,
+      section_title: sectionTitle,
+      instruction,
+    }),
+  });
 
 export const saveSessionToStorage = (sessionId: string, token: string) =>
   apiFetch<{ path: string; signed_url: string; session_id: string }>(
@@ -738,6 +790,28 @@ export const updateDiscoveredEditalLink = (id: string, editalLink: string, token
     },
     token,
   );
+
+// ── Workspace multi-modo ──────────────────────────────────
+
+export interface ModeSwitchResponse {
+  mode: "explorer" | "plan" | "escrita";
+  response: string;
+  welcome?: string | null;
+  error?: string | null;
+}
+
+export const workspaceMode = (
+  sessionId: string,
+  mode: string,
+  message?: string,
+) =>
+  apiFetch<ModeSwitchResponse>(`/workspace/${sessionId}/mode`, {
+    method: "POST",
+    body: JSON.stringify({
+      mode,
+      message: message ?? "",
+    }),
+  });
 
 // ── Profile drift (Gap 4) ─────────────────────────────────
 

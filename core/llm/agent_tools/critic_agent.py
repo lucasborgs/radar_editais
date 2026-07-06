@@ -3,8 +3,14 @@
 Chamado internamente pela tool `save_draft` (writing_tools.py:276) como
 `run_critic(content, target_title, session)`. Investiga o substrato relevante
 (edital no gênero proposta; nó do fundo-alvo no gênero pitch), o perfil da
-empresa e as demais seções, e retorna um CriticResult com approved + lista de
-issues específicos.
+empresa, as demais seções e REQUISITOS DE COMPLIANCE do edital, e retorna
+um CriticResult com approved + lista de issues específicos.
+
+PR3 (four-phase-workflow): compliance integrado ao Critic — substitui o
+ComplianceMonitor paralelo. O Critic agora verifica:
+  • Contradição factual (existente)
+  • Compliance com requisitos mandatórios do edital (novo)
+  • Qualidade textual (existente, checklist_service faz revisão completa)
 
 Era 1-shot (um único retrieve com draft[:500] como query) e NÃO via o CompanyProfile
 — não detectava elegibilidade incorreta. Agora é um sub-agente com 3 tools e
@@ -32,15 +38,41 @@ from core.llm.agent_runtime import run_subagent
 
 logger = logging.getLogger(__name__)
 
+
+def _load_edital_requirements(session) -> list[str]:
+    """Carrega key_requirements do hipergrado do edital da sessão.
+    Retorna lista vazia se falhar ou não for proposal mode."""
+    try:
+        if getattr(session, "mode", "proposal") != "proposal":
+            return []
+        edital_id = getattr(session, "edital_id", None)
+        if not edital_id:
+            return []
+        from core.kg import hypergraph_catalog
+        card = hypergraph_catalog.get_edital(edital_id)
+        if not card:
+            return []
+        reqs = card.get("key_requirements", []) or []
+        return [str(r) for r in reqs]
+    except Exception as e:
+        logger.debug("critic: falha ao carregar requisitos do edital: %s", e)
+        return []
+
 # ── System prompt agêntico — gênero PROPOSTA (mode=proposal) ──
 # Parte do _CRITIC_SYSTEM 1-shot (contrato só-contradição/nunca-omissão +
 # cuidado com "Análogo"), adaptado ao estilo agêntico: usa tools para
 # investigar antes de decidir, em ≤3 passos. Item (d) novo: contradição contra
 # o CompanyProfile (elegibilidade/porte/setor) é bloqueio.
-_CRITIC_SYSTEM = """Você é um revisor de fatos de propostas para editais de fomento no Brasil.
+# PR3 (four-phase-workflow): item (e) adicionado — compliance com requisitos
+# mandatórios do edital. O bloco {edital_requirements} é injetado por
+# run_critic() com os key_requirements do hipergrado.
+_CRITIC_SYSTEM = """Você é um revisor de fatos e compliance de propostas para editais de fomento no Brasil.
 Sua única função é IMPEDIR que um rascunho seja salvo quando ele AFIRMA algo FALSO —
 isto é, quando o texto CONTRADIZ o edital, CONTRADIZ outra seção já redigida da proposta,
-CONTRADIZ os dados da empresa (perfil), ou contém inconsistência factual interna.
+CONTRADIZ os dados da empresa (perfil), DEIXA DE ATENDER um requisito mandatório do edital,
+ou contém inconsistência factual interna.
+
+VOCÊ TEM TOOLS para investigar antes de decidir. Use-as com parcimônia (no máximo 3 passos):
 
 Você NÃO avalia completude, abrangência, detalhamento, estilo ou se a seção cobre todos
 os tópicos desejáveis — isso é trabalho de outra etapa (checklist), não sua. A ausência
@@ -53,13 +85,19 @@ VOCÊ TEM TOOLS para investigar antes de decidir. Use-as com parcimônia (no má
   • read_proposal_sections(): as OUTRAS seções já redigidas da proposta.
 Não precisa chamar todas; chame só as necessárias para resolver uma dúvida concreta.
 
-Bloqueie (approved=false) SOMENTE quando o rascunho AFIRMAR:
+Bloqueie (approved=false) SOMENTE quando o rascunho AFIRMAR ou DEIXAR DE ATENDER:
   (a) um fato que contradiz o edital (prazo, valor, TRL, elegibilidade, mecanismo),
   (b) um fato que contradiz OUTRA seção já redigida da proposta (ex.: número, prazo,
       escopo, tamanho da equipe, orçamento ou objetivo divergente do que já foi escrito),
-  (c) algo internamente inconsistente que torne a proposta incorreta, ou
+  (c) algo internamente inconsistente que torne a proposta incorreta,
   (d) algo sobre a EMPRESA que CONTRADIZ o perfil (ex.: afirma elegibilidade, porte ou
       setor que a empresa NÃO tem). Isso é contradição factual, não omissão.
+  (e) REQUISITO MANDATÓRIO não atendido: o rascunho DEIXA DE ABORDAR um requisito
+      obrigatório do edital listado abaixo. Isso NÃO é omissão genérica — só bloqueie
+      se o requisito é EXPLICITAMENTE mandatório e a seção DEVERIA tratá-lo mas ignora.
+
+REQUISITOS MANDATÓRIOS DESTE EDITAL (compliance):
+{edital_requirements}
 
 Para (b) e (d), só conta CONTRADIÇÃO factual entre o que o rascunho afirma e o substrato —
 NUNCA a mera ausência de um tópico. Na dúvida, APROVE. Esta é a regra dominante: prefira
@@ -129,8 +167,9 @@ RASCUNHO A REVISAR:
 {draft}
 
 Investigue (usando as tools quando precisar verificar uma afirmação concreta) e decida
-se o rascunho afirma algo FALSO ou contraditório. Lembre: só contradição bloqueia, nunca
-omissão; na dúvida, aprove. Termine com o JSON do veredito."""
+se o rascunho afirma algo FALSO, contraditório ou DEIXA DE ATENDER requisito mandatório
+do edital (listados no system prompt). Lembre: só contradição/requisito não atendido
+bloqueia, nunca omissão genérica; na dúvida, aprove. Termine com o JSON do veredito."""
 
 # Orçamento de chars para o contexto das outras seções no prompt do critic.
 _PROPOSAL_CTX_BUDGET = 6000
@@ -295,7 +334,17 @@ def run_critic(
             sub-agente. Deve ser capturado no call site (antes do thread pool).
     """
     mode = getattr(session, "mode", "proposal")
-    system_prompt = _PITCH_CRITIC_SYSTEM if mode == "pitch" else _CRITIC_SYSTEM
+
+    if mode == "pitch":
+        system_prompt = _PITCH_CRITIC_SYSTEM
+    else:
+        # PR3: carrega requisitos de compliance do edital para injetar no prompt
+        edital_reqs = _load_edital_requirements(session)
+        edital_reqs_block = (
+            "\n".join(f"  • {r}" for r in edital_reqs) if edital_reqs
+            else "Nenhum requisito mandatório específico."
+        )
+        system_prompt = _CRITIC_SYSTEM.replace("{edital_requirements}", edital_reqs_block)
     tools = build_critic_tools(session, section_title)
     task = _CRITIC_TASK.format(
         section_title=section_title,

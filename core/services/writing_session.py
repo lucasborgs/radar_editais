@@ -400,6 +400,8 @@ class WritingSession:
         model: str | None = None,
         library_items: list[dict] | None = None,
         mode: str | None = None,
+        plan: dict | None = None,
+        user_adjustments: dict | None = None,
     ):
         self._db = db
         self.workspace_id = workspace_id
@@ -479,6 +481,12 @@ class WritingSession:
             self._build_programa_context() if self.edital_id.startswith("programa:") else ""
         )
 
+        # PR1 (four-phase-workflow): plano estruturado vindo do Planning.
+        if plan is not None:
+            self._plan = self._merge_adjustments(plan, user_adjustments)
+        else:
+            self._plan = None
+
         # Ids dos items anexados explicitamente — guardados pra dedup contra
         # o retrieval automático da biblioteca em turn() (normalizados lower).
         self._library_item_ids: set[str] = set()
@@ -499,14 +507,21 @@ class WritingSession:
         # dos editais já tem outline persistido em wiki page ou DB).
         self._documents_text_cache: str | None = None
 
-        # Outline: pitch usa o default de captação (fundo não tem wiki/PDF de
-        # outline); evento usa DB → wiki page → LLM.
+        # Outline: plano vindo do Planning → pitch default → DB/wiki/LLM.
         if not self._proposal_outline:
-            if self.mode == "pitch":
-                self._proposal_outline = self._default_pitch_outline()
-            else:
-                self._proposal_outline = self._generate_outline()
+            if self._plan:
+                sections = self._plan.get("sections", [])
+                self._proposal_outline = [
+                    s["title"] for s in sections if isinstance(s, dict) and s.get("title")
+                ]
+            if not self._proposal_outline:
+                if self.mode == "pitch":
+                    self._proposal_outline = self._default_pitch_outline()
+                else:
+                    self._proposal_outline = self._generate_outline()
             self._save_outline()
+            if self._plan:
+                self._save_plan()
 
         # Escopo de RAG: edital primário + análogos (mesmo tema/publico no
         # grafo). Computado uma vez por sessão — o vault muda raramente e a
@@ -633,6 +648,8 @@ class WritingSession:
         self._proposal_outline = [str(s) for s in outline] if outline else []
         drafts = row.get("section_drafts") or {}
         self._doc_sections = dict(drafts) if isinstance(drafts, dict) else {}
+        plan_data = self._doc_sections.pop("__plan__", None)
+        self._plan = plan_data if isinstance(plan_data, dict) else None
         pending = row.get("pending_user_input")
         self._pending_user_input = pending if isinstance(pending, dict) else None
         self._loaded_created_at = row.get("created_at") or datetime.utcnow().isoformat()
@@ -671,6 +688,33 @@ class WritingSession:
             }).eq("id", self.session_id).execute()
         except Exception as e:
             logger.warning("[%s] Falha ao salvar outline: %s", self.session_id, e)
+
+    @staticmethod
+    def _merge_adjustments(plan: dict, adjustments: dict | None) -> dict:
+        """Merge user_adjustments ao plano (adjustments override)."""
+        if not adjustments:
+            return plan
+        merged = {**plan}
+        user_secs = (adjustments.get("sections") or {}) if isinstance(adjustments, dict) else {}
+        if user_secs and isinstance(merged.get("sections"), list):
+            merged["sections"] = [
+                {**s, **user_secs.get(s["id"], {})} if isinstance(s, dict) and s.get("id") in user_secs else s
+                for s in merged["sections"]
+            ]
+        return merged
+
+    def _save_plan(self) -> None:
+        """Persiste o plano no JSONB section_drafts sob chave __plan__."""
+        if not self._plan:
+            return
+        try:
+            drafts = dict(self._doc_sections or {})
+            drafts["__plan__"] = self._plan
+            self._db.table("writing_sessions").update({
+                "section_drafts": drafts,
+            }).eq("id", self.session_id).execute()
+        except Exception as e:
+            logger.warning("[%s] Falha ao salvar plan: %s", self.session_id, e)
 
     # ------------------------------------------------------------------
     # Carregamento dos documentos
@@ -848,7 +892,7 @@ class WritingSession:
         portfólio, co-investidores. Vazio (com aviso) se o fundo não for achado;
         a sessão não quebra — opera só com o perfil da startup.
         """
-        from core import kg_store  # lazy: evita custo no boot do módulo
+        from core.kg import kg_store  # lazy: evita custo no boot do módulo
         try:
             invs = {i["id"]: i for i in kg_store.load_investidores()}
         except Exception as e:
@@ -893,7 +937,7 @@ class WritingSession:
         em texto pro prompt — descrição, operador, benefício, ticket, elegibilidade.
         Vazio (com aviso) se o programa não for achado; a sessão não quebra.
         """
-        from core import kg_store
+        from core.kg import kg_store
         try:
             progs = {p["id"]: p for p in kg_store.load_programas()}
         except Exception as e:
@@ -955,6 +999,8 @@ class WritingSession:
             "has_documents":      has_documents,
             "turn_count":         self._turn_count,
             "created_at":         self.created_at,
+            # PR1: plano de proposta gerado pelo Planning node.
+            "plan": self._plan,
             # Sprint 2 do Cenário B: se há pergunta pendente do agente, frontend
             # renderiza prompt destacado ao retomar a sessão (não só após turn).
             # Só expõe {field, prompt} — thread_id/n_msgs são internos do resume.
@@ -967,7 +1013,7 @@ class WritingSession:
             ),
         }
 
-    def turn(self, user_message: str, section_hint: str | None = None) -> dict:
+    def turn(self, user_message: str, section_hint: str | None = None, max_steps: int | None = None) -> dict:
         """Processa um turno de escrita via agente (único path).
 
         Todo turno roda o agente com tools (search_edital, save_draft com
@@ -1051,6 +1097,7 @@ class WritingSession:
 
             result = self._turn_agent(
                 user_message, section_hint, user_turn_index, resume_ctx=resume_ctx,
+                max_steps=max_steps,
             )
 
             # Persiste pending_user_input se a tool request_user_info disparou
@@ -1063,12 +1110,89 @@ class WritingSession:
             logger.error("[%s] Erro no turno %d: %s", self.session_id, self._turn_count, e)
             return self._error_result(str(e), "INTERNAL_ERROR")
 
+    def refine_section(
+        self,
+        section_title: str,
+        user_instruction: str,
+    ) -> dict:
+        """Refinement mode: reescreve uma seção específica com base em instrução
+        do usuário (FASE 3 da spec four-phase-workflow).
+
+        O método carrega o conteúdo atual da seção, envia a instrução do usuário
+        como turno com `section_hint` apontando para a seção, e retorna o novo
+        conteúdo após passar pelo Critic.
+
+        Args:
+            section_title: título da seção a refinar
+            user_instruction: instrução do usuário (ex: "deixa mais técnico",
+                              "resumir", "adicionar dados de cronograma")
+
+        Returns:
+            dict com chaves:
+              - section_updated: bool
+              - new_content: str | None
+              - critic_feedback: dict | None
+              - error: str | None
+        """
+        current = (self._doc_sections or {}).get(section_title, "")
+        if not current:
+            return {
+                "section_updated": False,
+                "new_content": None,
+                "critic_feedback": None,
+                "error": f"Seção '{section_title}' não encontrada ou vazia.",
+            }
+
+        # Concatena instrução + conteúdo atual para o agente
+        refinement_msg = f"[REFINAMENTO DA SEÇÃO '{section_title}']\n\nConteúdo atual:\n{current[:3000]}\n\n{user_instruction}"
+
+        result = self.turn(user_message=refinement_msg, section_hint=section_title, max_steps=20)
+
+        if not result.get("success", True):
+            return {
+                "section_updated": False,
+                "new_content": None,
+                "critic_feedback": None,
+                "error": result.get("error", "Erro desconhecido no refinement."),
+                "options": ["voltar"],
+            }
+
+        # Pega o conteúdo atualizado após o turno
+        updated = (self._doc_sections or {}).get(section_title, "")
+        was_updated = updated != current
+
+        # Extrai feedback estruturado do Critic do tool_trace (save_draft)
+        critic_feedback = None
+        trace = result.get("tool_trace") or []
+        for entry in trace:
+            if entry.get("name") == "save_draft" and isinstance(entry.get("output"), str):
+                out = entry["output"]
+                if "Critic encontrou" in out:
+                    lines = out.split("\n")
+                    critic_feedback = {
+                        "approved": False,
+                        "blocked": True,
+                        "issues": [ln.strip("• ") for ln in lines if ln.strip().startswith("•")],
+                        "feedback": next((ln.strip() for ln in lines if "Diagnóstico:" in ln), "").replace("Diagnóstico: ", ""),
+                    }
+                elif "aprovado pelo critic" in out:
+                    critic_feedback = {"approved": True, "blocked": False, "issues": [], "feedback": ""}
+
+        return {
+            "section_updated": was_updated,
+            "new_content": updated if was_updated else None,
+            "critic_feedback": critic_feedback or trace,
+            "options": ["approve", "refazer_novamente", "voltar"],
+            "error": None,
+        }
+
     def _turn_agent(
         self,
         user_message: str,
         section_hint: str | None,
         user_turn_index: int,
         resume_ctx: dict | None = None,
+        max_steps: int | None = None,
     ) -> dict:
         """Path de escrita: grafo LangGraph + tools (search_edital, search_library,
         read_section, read_full_proposal, save_draft, request_user_info, ...) sobre
@@ -1099,7 +1223,7 @@ class WritingSession:
                 system=self._writer_system(),
                 initial_messages=[],
                 tools=tools, model=model, provider=provider,
-                max_steps=AGENT_MAX_STEPS, reflect_every=3,
+                max_steps=max_steps or AGENT_MAX_STEPS, reflect_every=3,
                 thread_id=thread_id,
                 resume=user_message,
                 prior_n_msgs=resume_ctx.get("n_msgs", 0),
@@ -1114,7 +1238,7 @@ class WritingSession:
                 system=self._writer_system(),
                 initial_messages=messages,
                 tools=tools, model=model, provider=provider,
-                max_steps=AGENT_MAX_STEPS, reflect_every=3,
+                max_steps=max_steps or AGENT_MAX_STEPS, reflect_every=3,
                 thread_id=thread_id,
                 resume=None,
                 prior_n_msgs=0,

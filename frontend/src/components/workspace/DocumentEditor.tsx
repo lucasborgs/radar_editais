@@ -29,6 +29,7 @@ export function DocumentEditor({
   onSaveSection,
   onSectionInteract,
   onFixWithAI,
+  onRefineSection,
   registerScrollTo,
 }: {
   sections: WorkspaceSection[];
@@ -42,6 +43,8 @@ export function DocumentEditor({
   onSectionInteract: (title: string) => void;
   // "Corrigir com IA": dispara um turno pré-preenchido com section_hint.
   onFixWithAI: (sectionHint: string | null, finding: Finding) => void;
+  // Refinar seção (FASE 3): submete instrução do usuário via endpoint dedicate.
+  onRefineSection: (title: string, instruction: string) => void;
   // O pai registra um callback p/ rolar até uma seção (clique no explorer).
   registerScrollTo: (fn: (title: string) => void) => void;
 }) {
@@ -70,6 +73,7 @@ export function DocumentEditor({
             onSave={(content) => onSaveSection(s.title, content)}
             onInteract={() => onSectionInteract(s.title)}
             onFixWithAI={onFixWithAI}
+            onRefine={(instruction) => onRefineSection(s.title, instruction)}
           />
         ))}
         {sections.length === 0 && (
@@ -145,6 +149,7 @@ function SectionBlock({
   onSave,
   onInteract,
   onFixWithAI,
+  onRefine,
 }: {
   section: WorkspaceSection;
   highlighted: boolean;
@@ -153,11 +158,15 @@ function SectionBlock({
   onSave: (content: string) => void;
   onInteract: () => void;
   onFixWithAI: (sectionHint: string | null, finding: Finding) => void;
+  onRefine: (instruction: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(section.content);
   const [showFindings, setShowFindings] = useState(false);
+  const [showRefine, setShowRefine] = useState(false);
+  const [refineInstruction, setRefineInstruction] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const refineInputRef = useRef<HTMLInputElement>(null);
 
   // Sincroniza o draft quando o conteúdo muda no backend (turno/undo) e não
   // estamos editando — evita sobrescrever o que o usuário digita.
@@ -226,10 +235,64 @@ function SectionBlock({
             </button>
           )}
         </div>
-        {saving && (
-          <span className="text-[10px] text-content-secondary font-sans">salvando…</span>
-        )}
+        <div className="flex items-center gap-2">
+          {hasContent && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowRefine((v) => !v);
+                if (!showRefine) setTimeout(() => refineInputRef.current?.focus(), 50);
+              }}
+              className="text-[11px] font-medium text-primary hover:underline"
+              title="Refinar seção com IA"
+            >
+              ✨ Refinar
+            </button>
+          )}
+          {saving && (
+            <span className="text-[10px] text-content-secondary font-sans">salvando…</span>
+          )}
+        </div>
       </div>
+
+      {/* Refine inline input */}
+      {showRefine && (
+        <div className="mb-3 flex gap-2">
+          <input
+            ref={refineInputRef}
+            type="text"
+            value={refineInstruction}
+            onChange={(e) => setRefineInstruction(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && refineInstruction.trim()) {
+                onRefine(refineInstruction.trim());
+                setRefineInstruction("");
+                setShowRefine(false);
+              }
+              if (e.key === "Escape") {
+                setShowRefine(false);
+                setRefineInstruction("");
+              }
+            }}
+            placeholder="Ex: deixar mais técnico, encurtar, adicionar cronograma…"
+            className="flex-1 rounded-md border border-border px-3 py-1.5 text-xs font-sans text-content-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (refineInstruction.trim()) {
+                onRefine(refineInstruction.trim());
+                setRefineInstruction("");
+                setShowRefine(false);
+              }
+            }}
+            disabled={!refineInstruction.trim()}
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
+          >
+            Refinar
+          </button>
+        </div>
+      )}
 
       {/* Painel inline de findings da seção */}
       {findings.length > 0 && showFindings && (

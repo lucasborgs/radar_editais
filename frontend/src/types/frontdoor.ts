@@ -22,6 +22,11 @@ export interface MsgEntry {
   content: string;
   // PR6.2: resposta interrompida no teto de passos do agente (aviso discreto).
   truncated?: boolean;
+  // PR1 (4-phase): oferta de planejamento de proposta.
+  nextAction?: {
+    offer: string;
+    options: Array<{ label: string; action: string }>;
+  };
 }
 
 export interface DiffEntry {
@@ -228,9 +233,11 @@ export function mergeRadar(
       }),
     ),
   ];
-  return items.sort(
-    (a, b) => b.affinity - a.affinity || a.sortId.localeCompare(b.sortId),
-  );
+  return items
+    .filter((item) => item.kind !== "ict")
+    .sort(
+      (a, b) => b.affinity - a.affinity || a.sortId.localeCompare(b.sortId),
+    );
 }
 
 // Serializa só as mensagens p/ o `history` enviado ao /frontdoor/turn (o backend

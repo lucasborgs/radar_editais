@@ -440,6 +440,38 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
         return search_insights_for_tool(session._db, session.workspace_id, query=topic)
 
     @tool
+    def ask_about_edital(question: str) -> str:
+        """Tira uma dúvida pontual sobre o edital sem sair do contexto de escrita.
+
+        Use quando você precisa de um esclarecimento rápido sobre o edital (ex:
+        'qual o prazo?', 'o que o edital diz sobre contrapartida?', 'são
+        elegíveis empresas de qual porte?'). Esta tool consulta o edital via
+        um agente exploratório e devolve uma resposta concisa (~200 palavras).
+
+        NÃO use para buscar chunks específicos (use search_edital) ou para
+        ler seções já escritas (use read_section). Use APENAS para perguntas
+        que precisam de uma visão integrada do edital.
+
+        Args:
+            question: pergunta clara em PT-BR sobre o edital
+        """
+        if not question.strip():
+            return "Erro: pergunta vazia."
+        try:
+            from core.services.explore_agent import ExploreAgent
+            agent = ExploreAgent()
+            edital_id = getattr(session, "edital_id", None)
+            answer = agent.explore(
+                message=question,
+                edital_ids=[edital_id] if edital_id else None,
+                has_profile=False,
+            )
+            return answer or "Não consegui esclarecer essa dúvida agora."
+        except Exception as e:
+            logger.debug("ask_about_edital: erro ao esclarecer: %s", e)
+            return "Não consegui esclarecer essa dúvida agora. Tente novamente mais tarde."
+
+    @tool
     def request_user_info(field: str, prompt: str) -> str:
         """Pede ao usuário uma informação que falta e é necessária para
         redigir com precisão (ex: CNPJ, valor de contrapartida, nome do
@@ -544,6 +576,7 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
         save_draft,
         request_user_info,
         recall_company_learnings,
+        ask_about_edital,
         *match_tools,
         # Fase B (Item 2): com session, deep_research persiste cada finding em
         # research_findings (verified=false) para o gate humano de promoção.

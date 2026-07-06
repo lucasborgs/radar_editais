@@ -1,5 +1,31 @@
 // Tipos de resposta da API v2
 
+// ── Planning (FASE 1 do four-phase-workflow) ─────────────
+
+export interface PlanSection {
+  id: string;
+  title: string;
+  description: string;
+  key_points: string[];
+  estimated_length: string;
+  pre_fill: string | null;
+}
+
+export interface PlanAlignment {
+  company_themes: string[];
+  edital_themes: string[];
+  match_score: number;
+  critical_gaps: string[];
+}
+
+export interface Plan {
+  title: string;
+  sections_total: number;
+  sections: PlanSection[];
+  alignment: PlanAlignment;
+  compliance_hints: string[];
+}
+
 export interface WritingMessage {
   role: "user" | "assistant";
   content: string;

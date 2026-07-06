@@ -20,6 +20,7 @@ from slowapi.util import get_remote_address
 from backend.common import CompanyProfileSchema, explore_agent
 from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient, OptionalDbClient, OptionalUserId
+from core.kg.planning_node import is_complex_proposal
 from core.llm.agent_tools.match_tools import _company_nodes
 from core.profile_extractor import ProfileExtractor
 from core.services import match_verdict
@@ -135,8 +136,16 @@ def explore(
         profile=current or None,
     )
 
-    # PR6.2 (F10): truncamento no teto de passos deixa de ser invisível na UI.
+    # PR1 (four-phase-workflow): detecta se pergunta pede planejamento.
     result: dict = {"answer": answer, "truncated": explore_meta["truncated"]}
+    if is_complex_proposal(message, answer, len(req.history)):
+        result["next_action"] = {
+            "offer": "Estruturar proposta?",
+            "options": [
+                {"label": "Estruturar", "action": "goto_planning"},
+                {"label": "Começar a escrever", "action": "goto_execution"},
+            ],
+        }
     diff = None
     if req.profile is not None:
         diff = ProfileExtractor().extract_diff_from_message(message, current)
