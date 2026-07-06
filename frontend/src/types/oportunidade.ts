@@ -7,4 +7,6 @@ export interface OpportunityEntry {
   deadline?: string;
   fonte_recurso?: string[];
   description?: string;
+  aperture?: string;       // prazo | continua | recorrente | fechada
+  macro_temas?: string[];  // macro-temas do edital (desambiguação)
 }

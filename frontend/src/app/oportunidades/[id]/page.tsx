@@ -6,7 +6,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatusBadge } from "@/components/ui";
 import { VerdictBlock } from "@/components/frontdoor/VerdictBlock";
 import { getOportunidadeById, fetchMatchVerdicts } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, parseDeadline } from "@/lib/utils";
 import type { MatchVerdict } from "@/lib/api";
 import type {
   OportunidadeDetail,
@@ -126,9 +126,10 @@ function TagCard({ title, tags }: { title: string; tags: string[] }) {
 export default function OportunidadeDetailPage() {
   const params = useParams();
   const router = useRouter();
-  // useParams já devolve o segmento decodificado (App Router) — ids curados com
-  // ':' e espaço (ex.: "investidor:indicator capital") chegam prontos.
-  const id = (params?.id as string) || "";
+  // Algumas versões do Next App Router devolvem o segmento encoded; outras,
+  // decodificado. decodeURIComponent é idempotente (no-op se já limpo) —
+  // previne double-encoding no fetch seguinte (Fix 3).
+  const id = decodeURIComponent((params?.id as string) || "");
 
   const [detail, setDetail] = useState<OportunidadeDetail | null>(null);
   const [verdict, setVerdict] = useState<MatchVerdict | null>(null);
@@ -224,7 +225,10 @@ export default function OportunidadeDetailPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 mb-4">
-          {detail.deadline && <InfoRow label="Prazo" value={detail.deadline} />}
+          {detail.deadline && (() => {
+            const parsed = parseDeadline(detail.deadline);
+            return <InfoRow label="Prazo" value={parsed ?? detail.deadline} />;
+          })()}
           {detail.mechanism && <InfoRow label="Mecanismo" value={detail.mechanism} />}
           {value && <InfoRow label="Valor" value={value} />}
           {ticket && !value && <InfoRow label="Ticket" value={ticket} />}

@@ -5,11 +5,18 @@ import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { DataTable, MetricCard, StatusBadge } from "@/components/ui";
 import type { Column } from "@/components/ui";
-import { truncate } from "@/lib/utils";
+import { truncate, parseDeadline } from "@/lib/utils";
 import { getDashboardStats, getOpportunities } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
 import type { DashboardStats, EditalStatus } from "@/types/edital";
 import type { OpportunityEntry } from "@/types/oportunidade";
+
+const APERTURE_LABEL: Record<string, string> = {
+  prazo: "",
+  continua: "Fluxo contínuo",
+  recorrente: "Recorrente",
+  fechada: "Encerrada",
+};
 
 type TypeFilter = "all" | "edital" | "programa" | "investidor";
 
@@ -47,9 +54,20 @@ const COLUMNS: Column<OpportunityEntry>[] = [
   {
     key: "title",
     header: "Título",
-    render: (v) => (
-      <span className="font-medium">{truncate(String(v), 55)}</span>
-    ),
+    render: (v, row) => {
+      const title = String(v);
+      const disambiguator = (row as any)._disambiguator;
+      return (
+        <span className="font-medium">
+          {truncate(title, 45)}
+          {disambiguator && (
+            <span className="ml-1.5 text-[11px] text-content-secondary font-normal">
+              {disambiguator}
+            </span>
+          )}
+        </span>
+      );
+    },
   },
   {
     key: "type",
@@ -66,8 +84,16 @@ const COLUMNS: Column<OpportunityEntry>[] = [
     key: "deadline",
     header: "Prazo",
     numeric: true,
-    render: (v, row) =>
-      row.type === "edital" ? <span className="text-xs">{String(v || "—")}</span> : <span className="text-xs text-content-secondary">—</span>,
+    render: (v, row) => {
+      if (row.type !== "edital") return <span className="text-xs text-content-secondary">—</span>;
+      const aperture = (row as any).aperture;
+      const label = APERTURE_LABEL[aperture ?? ""];
+      if (label) return <span className="text-xs">{label}</span>;
+      const raw = String(v || "");
+      const parsed = parseDeadline(raw);
+      if (parsed) return <span className="text-xs font-data">{parsed}</span>;
+      return <span className="text-xs text-content-secondary">—</span>;
+    },
   },
   {
     key: "themes",
@@ -92,6 +118,8 @@ export default function OportunidadesPage() {
 
   const filtered = useMemo(() => {
     let items = opportunities ?? [];
+
+    // Apply type/theme filters
     if (typeFilter !== "all") {
       items = items.filter((o) => o.type === typeFilter);
     }
@@ -101,7 +129,19 @@ export default function OportunidadesPage() {
         o.themes.some((t) => t.toLowerCase().includes(q)),
       );
     }
-    return items;
+
+    // Disambiguate duplicate titles (Fix 2): detect collisions, annotate
+    // entry with _disambiguator from macro_temas[0] → themes[0] → id suffix
+    const titleCounts = new Map<string, number>();
+    for (const o of items) {
+      titleCounts.set(o.title, (titleCounts.get(o.title) ?? 0) + 1);
+    }
+    return items.map((o) => {
+      if ((titleCounts.get(o.title) ?? 0) <= 1) return o;
+      const mt = (o as any).macro_temas;
+      const pick = mt?.[0] ?? o.themes[0] ?? o.id.split(":").pop() ?? "";
+      return { ...o, _disambiguator: pick };
+    });
   }, [opportunities, typeFilter, themeQuery]);
 
   // D1/PR8: toda oportunidade (edital, programa, investidor) abre a ficha

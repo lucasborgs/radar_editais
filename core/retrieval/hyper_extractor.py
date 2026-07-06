@@ -199,8 +199,11 @@ Cada entidade recebe UM `type`: Oportunidade, Ator ou Conceito.
     • `mecanismo`: lista de modalidades de apoio (subvenção, crédito, bolsa,
       equity/investimento, prêmio, matching). Modalidades de bolsa (mestrado,
       doutorado, IC) entram em `mecanismo`, NUNCA viram Oportunidade própria;
-    • `prazo` (data limite), `status` (aberto/encerrado/previsto), `valor`
-      (recurso), `fonte` (agência) quando o texto informar.
+    • `prazo` (data limite de SUBMISSÃO — ex: "31/08/2026", "15 de maio de
+      2026"); NÃO inclua prazo de execução, vigência contratual, duração de
+      projeto ("36 meses", "12 anos", "10 dias a contar da comunicação");
+    • `status` (aberto/encerrado/previsto), `valor` (recurso), `fonte`
+      (agência) quando o texto informar.
   Esses campos ficam null em Ator e Conceito.
 
 - Ator — identidade referenciável (uma organização nomeada). `kind`:

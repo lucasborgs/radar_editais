@@ -185,8 +185,9 @@ def edital_card(file_key: str, graph: dict, *, full: bool = False) -> dict | Non
         "publico_alvo": _publico_alvo(nodes),
         "fonte_recurso": fonte,
         "opportunity_type": "edital",
-        # Link oficial (PR4) — para a lista já linkar para a página da fonte.
         "official_url": prov.get("url") or "",
+        "aperture": edital.get("aperture") or "",
+        "macro_temas": list(edital.get("macro_temas", [])),
     }
     if full:
         card.update({
@@ -654,6 +655,8 @@ def list_opportunities(
                 "status": c.get("status", "Desconhecido"),
                 "deadline": c.get("deadline", ""),
                 "fonte_recurso": c.get("fonte_recurso", []),
+                "aperture": c.get("aperture", ""),
+                "macro_temas": c.get("macro_temas", []),
             })
 
     if tipo is None or tipo == "programa":
