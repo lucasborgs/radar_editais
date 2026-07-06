@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from scripts.export_to_obsidian import _edge_neighbors, _investidor_note, _tema_note  # noqa: E402
+from scripts.export_to_obsidian import _edge_neighbors, _entity_note  # noqa: E402
 
 
 def _edital(eid="finep:1", title="Chamada X", status="ABERTA"):
@@ -26,20 +26,20 @@ def _edital(eid="finep:1", title="Chamada X", status="ABERTA"):
 
 
 def test_investidor_note_renders_editais():
-    note = _investidor_note("Indicator Capital", [_edital()], "radar-editais")
+    note = _entity_note("Indicator Capital", "💼", "Investidor", "investidor", [_edital()], "radar-editais")
     assert "Investidor: Indicator Capital" in note
-    assert "**1 editais** com participação." in note
+    assert "**1 editais** relacionados." in note
     assert "[[radar-editais/editais/finep_1|Chamada X]]" in note
     assert "  - investidor" in note
 
 
 def test_investidor_note_sem_editais_nao_quebra():
-    note = _investidor_note("Indicator Capital", [], "radar-editais")
-    assert "**0 editais** com participação." in note
+    note = _entity_note("Indicator Capital", "💼", "Investidor", "investidor", [], "radar-editais")
+    assert "**0 editais** relacionados." in note
 
 
 def test_tema_note_renders_editais():
-    note = _tema_note("tecnologias digitais e conectividade", [_edital()], "radar-editais")
+    note = _entity_note("tecnologias digitais e conectividade", "🏷️", "Tema", "tema", [_edital()], "radar-editais")
     assert "Tema: tecnologias digitais e conectividade" in note
     assert "[[radar-editais/editais/finep_1|Chamada X]]" in note
 
@@ -47,51 +47,65 @@ def test_tema_note_renders_editais():
 def test_edge_neighbors_follows_only_edges_where_entity_is_member():
     """A ponte investidor->tema: só segue arestas `financia` que citam o próprio
     investidor, não arestas de OUTROS investidores no mesmo hipergrafo (bug real
-    corrigido — antes coletava membros de toda aresta do grafo)."""
+    corrigido — antes coletava membros de toda aresta do grafo). `members` são
+    ids (resolvidos via `nodes`), não nomes."""
     graph = {
-        "nodes": [],
+        "nodes": [
+            {"id": "ator:indicator_capital", "name": "Indicator Capital"},
+            {"id": "con:tecnologias_digitais", "name": "tecnologias digitais e conectividade"},
+            {"id": "con:materiais", "name": "materiais"},
+            {"id": "ator:vox_capital", "name": "Vox Capital"},
+            {"id": "con:saude", "name": "saúde e ciências da vida"},
+        ],
         "edges": [
             {
                 "type": "financia",
-                "members": ["indicator capital", "tecnologias digitais e conectividade", "materiais"],
+                "members": ["ator:indicator_capital", "con:tecnologias_digitais", "con:materiais"],
             },
             {
                 "type": "financia",
-                "members": ["vox capital", "saúde e ciências da vida"],
+                "members": ["ator:vox_capital", "con:saude"],
             },
         ],
     }
-    occurrences = [("investidores", {"name": "Indicator Capital", "type": "Investidor"})]
-    neighbors = _edge_neighbors("indicator capital", occurrences, {"investidores": graph})
+    occurrences = [("investidores", {"id": "ator:indicator_capital", "name": "Indicator Capital", "type": "Investidor"})]
+    neighbors = _edge_neighbors("ator:indicator_capital", occurrences, {"investidores": graph})
 
     assert neighbors == {"tecnologias digitais e conectividade", "materiais"}
-    assert "vox capital" not in neighbors
+    assert "Vox Capital" not in neighbors
     assert "saúde e ciências da vida" not in neighbors
 
 
 def test_edge_neighbors_bridges_tema_back_to_investidor():
     """Simétrico: a nota do tema também deve enxergar o investidor de volta."""
     graph = {
-        "nodes": [],
+        "nodes": [
+            {"id": "ator:indicator_capital", "name": "Indicator Capital"},
+            {"id": "con:materiais", "name": "materiais"},
+        ],
         "edges": [
             {
                 "type": "financia",
-                "members": ["indicator capital", "materiais"],
+                "members": ["ator:indicator_capital", "con:materiais"],
             },
         ],
     }
-    occurrences = [("investidores", {"name": "materiais", "type": "Tema"})]
-    neighbors = _edge_neighbors("materiais", occurrences, {"investidores": graph})
+    occurrences = [("investidores", {"id": "con:materiais", "name": "materiais", "type": "Tema"})]
+    neighbors = _edge_neighbors("con:materiais", occurrences, {"investidores": graph})
 
-    assert neighbors == {"indicator capital"}
+    assert neighbors == {"Indicator Capital"}
 
 
 def test_edge_neighbors_no_edges_for_entity_returns_empty():
     graph = {
-        "nodes": [],
-        "edges": [{"type": "financia", "members": ["vox capital", "saúde e ciências da vida"]}],
+        "nodes": [
+            {"id": "ator:vox_capital", "name": "Vox Capital"},
+            {"id": "con:saude", "name": "saúde e ciências da vida"},
+            {"id": "ator:antler", "name": "Antler"},
+        ],
+        "edges": [{"type": "financia", "members": ["ator:vox_capital", "con:saude"]}],
     }
-    occurrences = [("investidores", {"name": "Antler", "type": "Investidor"})]
-    neighbors = _edge_neighbors("antler", occurrences, {"investidores": graph})
+    occurrences = [("investidores", {"id": "ator:antler", "name": "Antler", "type": "Investidor"})]
+    neighbors = _edge_neighbors("ator:antler", occurrences, {"investidores": graph})
 
     assert neighbors == set()
