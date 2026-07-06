@@ -36,9 +36,11 @@ from backend.routers.conversations import router as conversations_router
 from backend.routers.discovered import router as discovered_router
 from backend.routers.explore import router as explore_router
 from backend.routers.files import router as files_router
+from backend.routers.planning import router as planning_router
 from backend.routers.playbooks import router as playbooks_router
 from backend.routers.profile import router as profile_router
 from backend.routers.research import router as research_router
+from backend.routers.workspace import router as workspace_router
 from backend.routers.writing import router as writing_router
 from core.logging_config import request_id_var, setup_logging
 
@@ -112,7 +114,8 @@ class RequestIdMiddleware:
 
 def _allowed_origins() -> list[str]:
     # localhost sempre liberado para dev; FRONTEND_URL (CSV) adiciona origens de prod.
-    defaults = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    defaults = ["http://localhost:3000", "http://127.0.0.1:3000",
+                 "http://localhost:3003", "http://127.0.0.1:3003"]
     extra = [o.strip() for o in os.getenv("FRONTEND_URL", "").split(",") if o.strip()]
     return list(dict.fromkeys(defaults + extra))
 
@@ -172,7 +175,9 @@ app.include_router(auth_router)
 app.include_router(library_router)
 app.include_router(catalog_router)
 app.include_router(explore_router)
+app.include_router(planning_router)
 app.include_router(applications_router)
+app.include_router(workspace_router)
 app.include_router(writing_router)
 app.include_router(conversations_router)
 app.include_router(files_router)
