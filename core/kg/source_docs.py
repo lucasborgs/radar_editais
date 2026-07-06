@@ -1,8 +1,9 @@
 """core/kg/source_docs.py — Documento Canônico (§12.3) durável por edital.
 
-O FS do worker no Railway é EFÊMERO: cada redeploy apaga `data/bronze/` e os PDFs
-FINEP. Como o `chunk_edital` (lazy) lê o conteúdo-fonte via adapters que leem o
-disco, todo redeploy fazia o chunking produzir 0 chunks (job "succeeded" com 0).
+O FS do worker não é fonte de verdade durável: um rebuild de imagem sem volume
+persistente apaga `data/bronze/` e os PDFs FINEP. Como o `chunk_edital` (lazy)
+lê o conteúdo-fonte via adapters que leem o disco, isso fazia o chunking
+produzir 0 chunks (job "succeeded" com 0).
 
 Este módulo persiste o Documento Canônico (o contrato agnóstico §12.3 —
 `[{doc_name, units}]`) no Postgres, gravado no scrape (com o disco fresco). O

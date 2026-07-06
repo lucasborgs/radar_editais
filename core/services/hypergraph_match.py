@@ -134,7 +134,7 @@ def _node_text(node: dict) -> str:
 def load_ecosystem_nodes() -> list[tuple[str, dict]]:
     """Carrega `(file_key, node)` de todos os subgrafos do ecossistema via kg_store.
 
-    postgres-aware: lê o blob do PG em prod (disco do Railway é efêmero) e cai pro
+    postgres-aware: lê o blob do PG em prod (disco do worker não é fonte de verdade durável) e cai pro
     disco em dev — MESMA fonte que `_entity_attribution` usa (`load_all_hypergraphs`),
     para os dois lados do match de entidade não divergirem (disco vazio ↔ PG cheio)."""
     from core.kg import kg_store

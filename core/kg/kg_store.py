@@ -170,8 +170,8 @@ def load_programas() -> list[dict]:
 # ---------------------------------------------------------------------------
 # Paralelo EXATO das wiki pages acima, mesmo motivo: em modo file são arquivos
 # POR-EDITAL (KNOWLEDGE_GRAPH_DIR/hypergraphs/{file_key}.json, file_key =
-# "{source}__{native}"), mas o FS do worker no Railway é EFÊMERO — todo redeploy
-# perderia os subgrafos. Em postgres vivem num único blob kg_artifacts
+# "{source}__{native}"), mas o FS do worker não é fonte de verdade durável —
+# um rebuild de imagem sem volume persistente perderia os subgrafos. Em postgres vivem num único blob kg_artifacts
 # key='hypergraphs' = {file_key: {source_hash, nodes, edges}}, durável.
 _HYPERGRAPH_KEY = "hypergraphs"
 _HYPERGRAPHS_DIR = KNOWLEDGE_GRAPH_DIR / "hypergraphs"

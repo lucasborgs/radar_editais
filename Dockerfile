@@ -1,8 +1,8 @@
-# Dockerfile for Radar de Editais backend (Railway).
-# Imagem única para 2 serviços Railway:
-#   web    → usa o CMD abaixo (uvicorn).
-#   worker → sobrescreve o CMD via Custom Start Command no Railway
-#            (python -m procrastinate --app=core.tasks.app worker). Ver scripts/deploy.sh.
+# Dockerfile for Radar de Editais backend.
+# Imagem única para os 2 serviços do docker-compose.yml:
+#   app    → usa o CMD abaixo (uvicorn).
+#   worker → sobrescreve o CMD no docker-compose.yml
+#            (python -m procrastinate --app=core.tasks.app worker).
 # See ADR-001-decisoes-iniciais.md (D1, D3, D4).
 
 FROM python:3.11-slim
@@ -28,6 +28,6 @@ USER app
 
 EXPOSE 8000
 
-# Shell-form para expandir ${PORT}: Railway injeta uma porta dinâmica; local cai
-# no fallback 8000. O serviço worker sobrescreve este CMD (ver cabeçalho).
+# Shell-form para expandir ${PORT}, caso o ambiente injete uma porta dinâmica;
+# local cai no fallback 8000. O serviço worker sobrescreve este CMD (ver cabeçalho).
 CMD uvicorn backend.api:app --host 0.0.0.0 --port ${PORT:-8000}

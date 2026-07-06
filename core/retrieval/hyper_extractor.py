@@ -923,8 +923,8 @@ def iter_catalogs():
 
 
 def _publish_hypergraphs(out_dir: Path = HYPERGRAPHS_DIR) -> int:
-    """Publica os subgrafos do disco no storage durável (PG) — o FS do worker no
-    Railway é EFÊMERO. Lê de `out_dir` (inclui os pulados por cache, que não
+    """Publica os subgrafos do disco no storage durável (PG) — o FS do worker
+    não é fonte de verdade durável. Lê de `out_dir` (inclui os pulados por cache, que não
     retornam nodes) e delega a `kg_store.save_hypergraphs` (no-op em modo file
     puro, sem Supabase). Retorna nº de subgrafos publicados."""
     from core.kg.kg_store import save_hypergraphs  # lazy: não acopla no import-time
