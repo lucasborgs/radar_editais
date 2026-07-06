@@ -1013,7 +1013,14 @@ de fora — nenhum bloqueia o que foi entregue.
 - **`domain/vocabulary.canonicalize_themes` é stub** (só lowercase/dedupe). O vocab
   canônico de temas vive em WIKI.md §5.9; quando uma fonte emitir variação de tema,
   implementar o mapa de sinônimos para convergir ao §5.9.
-- **Export Obsidian ainda FINEP-only** — nós `ict` não são exportados ao vault.
+- ~~**Export Obsidian ainda FINEP-only** — nós `ict` não são exportados ao vault.~~
+  RESOLVIDO 2026-07-06: `scripts/export_to_obsidian.py` reescrito p/ o schema
+  v2 (Oportunidade/Ator/Conceito) — cobre todos os `kind`/`dim` com dado real
+  (icts, investidores, agências, FAPs, corporates, aceleradoras, temas,
+  tecnologias, aplicações, programas, investimentos), restaura os wikilinks
+  cross-source e via-arestas (quebrados desde a migração v2, que comparavam
+  contra strings de tipo v1) e passa a renderizar `constraints[]`,
+  `macro_temas[]` e `aperture` nas notas de edital.
 - **Flag só sobre texto coletado** — exigência de ICT em anexo PDF não baixado é
   falso-negativo estrutural (limite da heurística, documentado em §5.10).
 - **Hyper-Extract (`core/retrieval/hyper_extractor.py`) — 3 dívidas achadas na
