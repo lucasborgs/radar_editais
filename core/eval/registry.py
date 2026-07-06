@@ -6,7 +6,6 @@ wired end-to-end reaproveitando core/{matching,rag,writing}_eval.py.
 from __future__ import annotations
 
 from core.eval import (
-    compliance_monitor,
     extraction,
     matching,
     opportunity_type,
@@ -29,7 +28,6 @@ SUITES: dict[str, Suite] = {
     profile_extractor.SUITE.name: profile_extractor.SUITE,
     reranker.SUITE.name: reranker.SUITE,
     structurer.SUITE.name: structurer.SUITE,
-    compliance_monitor.SUITE.name: compliance_monitor.SUITE,
 }
 
 

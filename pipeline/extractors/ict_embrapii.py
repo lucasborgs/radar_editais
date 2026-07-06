@@ -16,11 +16,11 @@ Endpoints:
   /wp-json/wp/v2/tech_skills          → competências técnicas (id → nome)
 
 Cada unidade referencia termos das duas taxonomias por id; resolvemos para nomes
-e juntamos em `areas_raw` (expertise crua, alvo do normalizador fino→macro no
-build_ict_graph). Contato/endereço vêm do bloco ACF.
+e juntamos em `areas_raw` (expertise crua, alvo do normalizador fino→macro na
+extração do hipergrado). Contato/endereço vêm do bloco ACF.
 
 Output bronze (bronze_data/ict_raw/embrapii_*.json), shape consumido por
-pipeline/build_ict_graph.py:
+core/retrieval/hyper_extractor.py:
   name, slug, source='embrapii', kind='embrapii_unit', url, about,
   institution_type, address, contact{responsavel,email,telefone,site},
   areas_raw[list[str]], data_extracao.
