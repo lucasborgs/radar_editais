@@ -87,4 +87,4 @@ def planning_get(session_id: str, db: DbClient):
         raise
     except Exception as e:
         logger.error("planning_get erro: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
