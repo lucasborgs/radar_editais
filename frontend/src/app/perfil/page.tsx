@@ -265,6 +265,11 @@ export default function PerfilPage() {
     const t = toast.loading("Lendo o site da empresa…");
     try {
       const res = await extractProfileFromUrl(u);
+      if (res.error) {
+        toast.dismiss(t);
+        toast.error(res.error);
+        return;
+      }
       const n = mergeExtracted(res.profile ?? {});
       toast.dismiss(t);
       toast.success(n > 0 ? `${n} campo(s) preenchido(s) — revise e salve.` : "Nada novo encontrado no site.");
@@ -282,6 +287,11 @@ export default function PerfilPage() {
       const t = toast.loading("Lendo o documento…");
       try {
         const res = await extractProfileFromDocument(file);
+        if (res.error) {
+          toast.dismiss(t);
+          toast.error(res.error);
+          return;
+        }
         const n = mergeExtracted(res.profile ?? {});
         toast.dismiss(t);
         toast.success(n > 0 ? `${n} campo(s) preenchido(s) — revise e salve.` : "Nada de perfil no documento.");
