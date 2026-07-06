@@ -4,7 +4,7 @@ Status: implementado 2026-06-27. Migration 032.
 
 ## Problema-raiz
 
-O filesystem do worker no Railway é **efêmero**: todo redeploy (deploy de código
+O filesystem do worker não é fonte de verdade durável: todo rebuild de imagem (deploy de código
 OU mudança de env var) apaga `data/bronze/` e os PDFs FINEP (`FINEP_PDFS_DIR`).
 
 O `chunk_edital` (lazy — spec [lazy-chunking.md](lazy-chunking.md)) lê o

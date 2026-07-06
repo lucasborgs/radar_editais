@@ -10,97 +10,102 @@ edital), revisão automática em 3 passes e pipeline Kanban de candidaturas.
 Filosofia do produto: **a IA rascunha, o humano decide** — nada é submetido,
 salvo ou alterado sem revisão humana.
 
+**Demo ao vivo:** [radar-editais-gold.vercel.app](https://radar-editais-gold.vercel.app)
+
+## Stack
+
+- **Backend**: Python — FastAPI + [LangGraph](https://langchain-ai.github.io/langgraph/)
+  (runtime agêntico com checkpointer Postgres durável) + procrastinate (worker
+  de jobs assíncronos/crons)
+- **Frontend**: Next.js 14 (App Router) + TypeScript + Tailwind + Radix UI
+- **Dados**: Supabase (Postgres + pgvector + Auth + Storage)
+- **LLM**: OpenAI (embeddings, extração, tiers 1-3) e Anthropic (agentes de
+  escrita/exploração, tier 4-5) — trocáveis por env var, ver [CLAUDE.md](CLAUDE.md)
+- **Observabilidade**: Langfuse (traces LLM + eval)
+- **Deploy**: Docker Compose (app + worker atrás de um Cloudflare Tunnel) +
+  Vercel (frontend) + Supabase Cloud (dados) — ver
+  [docs/architecture.md §0](docs/architecture.md#0-deploy--camadas-de-produção)
+
 ## Arquitetura
+
+Visão de alto nível — diagramas Mermaid detalhados (data plane, funil de
+match, runtime agêntico, eval) em [docs/architecture.md](docs/architecture.md).
 
 ```mermaid
 flowchart LR
     subgraph Torneiras
-        FINEP[FINEP API] --> B[(bronze)]
+        FINEP[FINEP · Liferay API] --> B[(bronze)]
         FAPESP[FAPESP scraper] --> B
-        DOU[DOU/INLABS feeder] --> D[Descoberta web<br/>triagem + extração LLM]
-        TAV[Tavily search] --> D
-        D --> B
+        WEB[Descoberta web<br/>triagem + extração LLM] --> B
     end
-    B --> ETL[pipeline/<br/>ETL medallion] --> KG[(knowledge graph<br/>index + wiki pages)]
+    B --> HEX[core/retrieval/<br/>hyper_extractor.py] --> HG[(hipergrafos<br/>Oportunidade/Ator/Conceito)]
     B --> CH[core/retrieval/<br/>chunk + embed] --> PG[(Supabase Postgres<br/>pgvector + tsvector)]
-    KG --> M[core/services/<br/>match híbrido + radar L2]
-    PG --> W[core/services/<br/>writing session RAG]
-    KG --> W
+    HG --> M[core/services/<br/>funil de match: elegibilidade<br/>→ MaxSim → veredito LLM]
+    PG --> W[core/services/<br/>writing session · RAG]
+    HG --> W
     M --> API[backend/<br/>FastAPI routers]
     W --> API
     API --> FE[frontend/<br/>Next.js 14]
-    WK[worker procrastinate<br/>crons 03h/04h UTC] -.-> ETL
-    WK -.-> D
+    WK[worker procrastinate<br/>crons 03h/04h UTC] -.-> HEX
+    WK -.-> WEB
 ```
 
-- **Dados**: pipeline medallion (bronze cru → índice consolidado + wiki pages
-  por edital). O schema dos dados é **autoritativo em doc**
-  ([WIKI.md](WIKI.md) + `wikis/<fonte>.md`); o código o lê via
-  `core/kg/wiki_schema.py` e um teste garante que doc e código não divergem.
-- **Match**: scoring determinístico (Stage 1) + LLM semântico (Stage 2);
-  investidores casam por tese; o radar L2 funde tudo com Reciprocal Rank
-  Fusion. Itens descobertos automaticamente entram rotulados `provisorio`.
-- **Escrita**: sessões persistidas em Postgres, RAG sobre os chunks do edital,
-  compliance monitor em paralelo e critic pós-draft.
-- **Avaliação**: harness unificado (`python -m core.eval <suite>`) com suítes de
-  matching, RAG, escrita e extração — mudanças de prompt/pipeline são gated por
-  eval.
-
-## Stack
-
-FastAPI + procrastinate (worker) · Next.js 14 + TypeScript + Tailwind ·
-Supabase (Postgres + pgvector + Auth + Storage) · OpenAI (embeddings,
-extração) e Anthropic (agentes de escrita/exploração) · Langfuse
-(observabilidade) · deploy Vercel (frontend) + Railway (backend/worker).
+- **Dados**: hipergrafo N-ário (KG v2 — 3 tipos de nó: `Oportunidade`/`Ator`/`Conceito`)
+  extraído por LLM a partir do bronze; substituiu o índice/wiki-pages legados.
+- **Match**: funil de 3 estágios — filtro duro de elegibilidade (determinístico)
+  → afinidade MaxSim (cosseno, sem LLM) → veredito LLM no top-K. Investidores
+  casam por tese. Itens descobertos automaticamente entram rotulados
+  `provisorio` até aprovação humana.
+- **Escrita**: sessões LangGraph persistidas em Postgres, RAG sobre os chunks
+  do edital, checklist de compliance em paralelo e critic pós-draft.
+- **Avaliação**: harness unificado (`python -m core.eval <suite>`) com 9
+  suítes — mudanças de prompt/pipeline são gated por eval.
 
 ## Como rodar
 
-Pré-requisitos: Docker, [Supabase CLI](https://supabase.com/docs/guides/cli),
-Python ≥3.10, Node 20.
+### Docker Compose (recomendado)
+
+Pré-requisitos: Docker, [Supabase CLI](https://supabase.com/docs/guides/cli)
+(para o Postgres local) ou um projeto Supabase Cloud.
 
 ```bash
-# 1. Stack local do Supabase (Postgres + Auth + Storage; aplica migrations)
-./scripts/dev.sh                 # = supabase start
+supabase start                   # Postgres local (54322) + Auth + Storage
 supabase status                  # copie URL/keys/JWT para o .env (base: .env.example)
 
-# 2. Backend
-pip install -e .
-uvicorn backend.api:app --reload --port 8000     # docs em /docs
+docker compose up -d --build     # sobe app (FastAPI, :8000) + worker (procrastinate)
+```
 
-# 3. Worker (jobs: enriquecimento, chunking, crons de scrape/descoberta)
-#    Usa o mesmo .env da API; DATABASE_URL aponta pro Postgres local (porta 54322)
-python -m procrastinate --app=core.tasks.app worker
+O `worker` roda os crons de scrape/descoberta (03:00/04:00 UTC) e os jobs de
+chunking/enriquecimento — sem ele essas filas nunca processam. Runbook
+completo de deploy (Cloudflare Tunnel + Vercel): [scripts/deploy.sh](scripts/deploy.sh).
 
-# 4. Frontend
+Frontend:
+```bash
 cd frontend && npm install && npm run dev        # porta 3000
 ```
 
-Para reaplicar migrations do zero: `supabase db reset`. Para parar:
-`supabase stop`.
-
-### Pipeline de dados (manual)
+### Dev com hot-reload (alternativa sem Docker)
 
 ```bash
-python pipeline/build_knowledge_graph.py   # bronze → índice + grafo (todas as fontes)
-python -m core.opportunity_discovery       # torneira web (Tavily; DOU com DISCOVERY_DOU_ENABLED=1)
-python -m core.eval matching               # avaliação (Langfuse se configurado)
+pip install -e .
+uvicorn backend.api:app --reload --port 8000              # docs em /docs
+python -m procrastinate --app=core.tasks.app worker        # worker
 ```
 
-Em produção os scrapers e a Descoberta rodam pelos crons do worker
-(03:00/04:00 UTC).
+Comandos de teste, lint e eval: ver [CLAUDE.md](CLAUDE.md).
 
 ## Estrutura
 
 ```
 backend/    FastAPI: api.py (shell) + routers/ por domínio + common.py
 core/       services/ (match, escrita, revisão) · kg/ (store, schema, identidade)
-            retrieval/ (chunk, embed, busca) · llm/ (client, agentes, tools)
+            retrieval/ (chunk, embed, busca, hyper_extractor) · llm/ (client, agentes, tools)
             eval/ (harness) · flat: tasks, auth, db, descoberta (web/DOU), …
 domain/     CompanyProfile (dataclass de perfil)
-pipeline/   ETL multi-fonte (extractors/, adapters/, build_knowledge_graph)
+pipeline/   ETL multi-fonte (extractors/, adapters/ por fonte)
 frontend/   Next.js 14 (App Router)
 supabase/   migrations + config do CLI local
-docs/       ROADMAP, specs por frente, BACKLOG
+docs/       architecture.md, ROADMAP, specs por frente, BACKLOG
 wikis/      schema/vocabulários por fonte (doc-as-config)
 ```
 
@@ -108,18 +113,17 @@ wikis/      schema/vocabulários por fonte (doc-as-config)
 
 - **Imports absolutos** (`from core.services... import …`); o pacote é instalado
   com `pip install -e .` — nunca `sys.path` hacks.
-- **Regra vive no doc, não no código**: schema/vocab/queries em
-  WIKI.md/`wikis/*.md`; o código lê via `wiki_schema`.
+- **Regra vive no doc, não no código**: vocabulário/workflows de ingestão em
+  [WIKI.md](WIKI.md)/`wikis/*.md`; o código lê via `core/kg/schema.py`.
 - **Eval-gated**: mexeu em prompt/pipeline → rode a suíte correspondente; não
   crie harnesses paralelos (registre em `core/eval/registry.py`).
 - **Routers por domínio** no backend; dependências compartilhadas em
   `backend/common.py`.
 - CI roda `ruff check .` + pytest + build do frontend.
 
-## Deploy
+## Documentação
 
-Frontend na Vercel, backend + worker na Railway (mesma imagem Docker), dados no
-Supabase Cloud. Runbook passo-a-passo: [scripts/deploy.sh](scripts/deploy.sh).
-Guia detalhado de arquitetura para agentes/contribuidores: [CLAUDE.md](CLAUDE.md);
-direção do produto: [docs/ROADMAP.md](docs/ROADMAP.md); decisões fundacionais:
+Arquitetura para agentes/contribuidores: [CLAUDE.md](CLAUDE.md); diagramas
+detalhados: [docs/architecture.md](docs/architecture.md); direção do produto:
+[docs/ROADMAP.md](docs/ROADMAP.md); decisões fundacionais:
 [ADR-001](docs/historical/ADR-001-decisoes-iniciais.md).

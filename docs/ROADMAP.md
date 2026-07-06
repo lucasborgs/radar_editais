@@ -38,7 +38,7 @@ Detalhe e seams em [spec_multi_quadrante.md](spec_multi_quadrante.md) + memória
 | Fase | O quê | Por que aqui | Pré-requisito / risco |
 |---|---|---|---|
 | **0 — Handoff** ✅ | merge PR #8 + este ROADMAP + nota de arquitetura + memória | ponte pra próxima conversa/modelo | baixo |
-| **1 — Ligar a torneira** ✅ código (PR #9) · 🔄 operação | Descoberta web em prod | fundacional e pequeno | falta só: **shadow-run** diário ~1 semana (runbook spec_dou_feeder §9; dia 1 rodado e logado), revisar 13 labels do golden de triagem (BACKLOG) e setar 4 envs no Railway. Suíte `triage` eval-gated criada (baseline 0.8525/0.9836) |
+| **1 — Ligar a torneira** ✅ código (PR #9) · 🔄 operação | Descoberta web em prod | fundacional e pequeno | falta só: **shadow-run** diário ~1 semana (runbook spec_dou_feeder §9; dia 1 rodado e logado), revisar 13 labels do golden de triagem (BACKLOG) e setar 4 envs no .env do Docker Compose. Suíte `triage` eval-gated criada (baseline 0.8525/0.9836) |
 | **2 — Reorg backend** ✅ (2026-06-11, PRs #10-#13) | api.py→routers; core/ em subpacotes (kg/retrieval/llm/services); README+diagrama; data/ unificado; cache de síntese e ledger duráveis (cloud b+d) | — | frontend intocado (Fase 3); bronze→Storage fica como item solto |
 | **3 — Frontend** | **1a ✅ ENTREGUE** (2026-06-11, PR #14: spec + M1–M4 + deltas B1–B3/B5) → **1b workspace tipo IDE** ⬅️ EM IMPLEMENTAÇÃO | base limpa ✅ (Fase 2); dados enriquecem com o shadow-run | spec UX da 1b ✅ (2026-06-11, [spec_workspace_ux.md](spec_workspace_ux.md) — decisões W1–W8 + marcos N1–N4); restos do M5 no BACKLOG; `/chat?edital=` será absorvido pelo workspace (N4) |
 

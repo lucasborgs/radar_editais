@@ -23,7 +23,7 @@
   cross-tenant + controle de fila por chamador anônimo. Bloqueia o beta externo.
 - **Onde está specado:** `docs/security/tenant-isolation.md` (seção "FURO P0"),
   `docs/specs/pre-beta-verification.md` (Frente 1).
-- **Ponto de entrada:** `supabase db push` (ou runbook Railway/deploy.sh). Depois,
+- **Ponto de entrada:** `supabase db push` (ou runbook `scripts/deploy.sh`). Depois,
   rodar o leak-test contra staging com `TENANT_ISOLATION_ALLOW_REMOTE=1` p/ confirmar verde.
 - **Status:** aberto (2026-07-02) — fix pronto e testado local; falta só o push ao remoto.
 
@@ -324,7 +324,7 @@
 
 ### Rerank cross-encoder em prod (estágio 2 do item 6 da auditoria)
 
-- **O quê:** ligar o reranker cross-encoder (mMiniLM) no Railway. Hoje prod
+- **O quê:** ligar o reranker cross-encoder (mMiniLM) em produção. Hoje prod
   roda `RERANK_BACKEND=off`; o estágio 1 (flip pra `llm` no painel, sem
   deploy) entrega +7pp de gold_recall@3 vs off. O estágio 2 troca llm→CE:
   build com `pip install .[rerank]` (+~1GB de imagem, torch CPU), warmup no
@@ -600,7 +600,7 @@
   pras zonas não-DOU (§6.1), badge "não verificado" pro `provisorio`
   (índice→match→radar→card; política: rotular, não filtrar).
 - **Em curso:** **shadow-run** local antes de ligar em prod — runbook e critério
-  de graduação em `spec_dou_feeder.md` §9. Ligar = setar envs no Railway.
+  de graduação em `spec_dou_feeder.md` §9. Ligar = setar envs no .env do Docker Compose.
 - **Status:** shadow-run pendente de rodar (~1 semana de runs).
 
 ### Triagem da Descoberta — 13 labels do golden aguardam decisão de persona
@@ -1002,7 +1002,7 @@ de fora — nenhum bloqueia o que foi entregue.
   fatos externos (não conhece tração real). Insumo futuro: perfil/biblioteca para
   checar coerência de tração/números. **Onde:** `core/agent_tools/critic_agent.py`.
 - **Ligar a torneira web em prod (sair do "inerte").** Não é código — são 3 chaves
-  de ops: worker procrastinate ativo + `TAVILY_API_KEY` + chave LLM no Railway. O
+  de ops: worker procrastinate ativo + `TAVILY_API_KEY` + chave LLM no .env do Docker Compose. O
   cron diário (`discover_opportunities_task`, 04:00 UTC) liga sozinho. Pré-requisito
   do fix de `titulo` vazio (item acima) antes de `write=True` em prod.
 

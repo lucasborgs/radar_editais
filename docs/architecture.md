@@ -13,6 +13,50 @@ que modelo faz o quê, e como isso é medido — não o CRUD/auth/frontend.
 
 ---
 
+## 0. Deploy — camadas de produção
+
+4 camadas independentes, sem PaaS de backend: o app roda em Docker no host do
+próprio operador, exposto à internet via Cloudflare Tunnel (sem porta aberta,
+sem IP público).
+
+```mermaid
+flowchart LR
+  subgraph HOST["Docker Compose (host)"]
+    APP["app · uvicorn<br/>backend.api:app :8000"]
+    WORKER["worker · procrastinate<br/>chunk_edital, enrich_content,<br/>crons 03h/04h UTC"]
+    TUN["tunnel · cloudflared<br/>lê cloudflared/config.yml"]
+  end
+
+  TUN -->|"ingress http://app:8000"| APP
+  WORKER -.->|"mesma imagem Dockerfile<br/>CMD sobrescrito"| APP
+
+  CF["Cloudflare Tunnel<br/>api.akapo.com.br"] --> TUN
+  VERCEL["Vercel<br/>frontend/ (Next.js 14)<br/>radar-editais-gold.vercel.app"] -->|"NEXT_PUBLIC_API_URL"| CF
+
+  APP --> SB[("Supabase Cloud<br/>Postgres + pgvector<br/>Auth + Storage")]
+  WORKER --> SB
+
+  USER["Browser"] --> VERCEL
+```
+
+- **Docker Compose** (`docker-compose.yml`): 3 serviços na mesma imagem
+  (`Dockerfile`) — `app` (uvicorn), `worker` (procrastinate, sem HTTP; roda
+  `chunk_edital`/`enrich_content`/`run_daily_etl` 03:00 UTC/`discover_opportunities`
+  04:00 UTC) e `tunnel` (cloudflared). Volume `./data:/app/data` persiste bronze/silver
+  entre restarts do container.
+- **Cloudflare Tunnel** (`cloudflared/`, credenciais gitignored): expõe `app:8000`
+  em `api.akapo.com.br` sem porta aberta no host nem IP público — `config.yml` só
+  faz `ingress` para o serviço `app` dentro da rede docker-compose.
+- **Vercel**: build do `frontend/` (Next.js 14), aponta pro backend via
+  `NEXT_PUBLIC_API_URL=https://api.akapo.com.br`.
+- **Supabase Cloud**: única fonte de dados durável — Postgres (schema + pgvector),
+  Auth, Storage. `KG_STORE_BACKEND=postgres` faz o hipergrado viver em
+  `kg_artifacts` (blob JSONB), não em arquivo — o FS do container não é fonte de
+  verdade durável entre rebuilds.
+- Runbook completo: [`scripts/deploy.sh`](../scripts/deploy.sh).
+
+---
+
 ## 1. Data plane — Bronze → Hipergrafo v2 → Chunks
 
 Multi-fonte com adapters por fonte; a descoberta web é uma "torneira" que passa

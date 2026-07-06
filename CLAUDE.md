@@ -49,7 +49,10 @@ cd frontend && npx tsc --noEmit         # TypeScript check (use this, NOT npm ru
 python -m core.opportunity_discovery       # torneira web (DOU com DISCOVERY_DOU_ENABLED=1)
 ```
 Em prod, scrapers e Descoberta rodam pelos crons do worker (`run_daily_etl`
-03:00 UTC, `discover_opportunities` 04:00 UTC — core/tasks.py). O pipeline de build (hyper_extractor + embed) roda em lote via `scripts/run_all.py`.
+03:00 UTC, `discover_opportunities` 04:00 UTC — core/tasks.py). O pipeline de
+build do hipergrado (`hyper_extractor.build_all_hypergraphs` + embed) roda
+dentro do próprio `run_daily_etl`; para rodar manualmente em dev, chame
+`build_all_hypergraphs()` diretamente.
 
 Discovery web não escreve diretamente no KG — vai para staging com gate humano (`/discovered-opportunities` na UI).
 
@@ -82,8 +85,8 @@ supabase db push                # aplica migrations pendentes no remoto
 ### LLM backend env vars
 O projeto tem 5 tiers de LLM separados por env var — cada um trocável independentemente:
 ```bash
-# Tier 1: Embeddings (padrão: OpenAI text-embedding-3-large 1536d)
-EMBEDDING_MODEL=text-embedding-3-large
+# Tier 1: Embeddings (padrão: OpenAI text-embedding-3-small 1536d, desde 2026-06-26)
+EMBEDDING_MODEL=text-embedding-3-small
 # EMBEDDING_BASE_URL=   # endpoint OpenAI-compat (Ollama/vLLM); vazio = canônico
 
 # Tier 2: Contextual Retrieval (padrão: gpt-4o-mini; Gemini Flash-Lite empata no gate)
@@ -119,7 +122,8 @@ Bronze (FINEP/FAPESP/FAPESC raw via adapters por fonte)
 
 ─── LEGADO (removido): o pipeline acima foi substituído pelo hypergrado ───
 
-Bronze → pipeline/hyper_extractor.py  (hipergrafos N-ários: 12 nós/10 arestas)
+Bronze → core/retrieval/hyper_extractor.py  (hipergrafos N-ários: 3 tipos v2 —
+  Oportunidade/Ator/Conceito)
   → core/retrieval/embedder.py        (embed dos nós por Edital/Tema/Tecnologia/Aplicação)
   → data/knowledge_graph/hypergraphs/{id}.json
 
@@ -127,7 +131,7 @@ Edital chunks (para RAG na WritingSession):
   → procrastinate task `chunk_edital` (core/tasks.py)
   → core/retrieval/chunker.py    chunking estrutural por Art./§
   → core/contextual_retrieval.py  injeta contexto de capítulo via LLM
-  → core/retrieval/embedder.py   OpenAI text-embedding-3-large
+  → core/retrieval/embedder.py   OpenAI text-embedding-3-small
   → tabela edital_chunks (pgvector + tsvector)
 ```
 Paths em `config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, HYPERGRAPHS_DIR).
@@ -138,17 +142,18 @@ backend/       api.py (shell: app + middleware + wiring) + routers/ por domínio
                (catalog, graph, matching, applications, brief, writing, files,
                profile) + auth_routes/library_routes + common.py (singletons +
                schema de perfil) + rate_limit.py (limiter)
-core/          services/ (writing_session, hybrid/kg/investor/radar match,
-               checklist, content_library, explore_agent, graph_service,
-               entity_matcher), kg/ (kg_store, wiki_schema, edital_id,
-               temporal), retrieval/ (chunker, embedder, retriever, hyde),
+core/          services/ (writing_session, hypergraph_match, match_verdict,
+               checklist, content_library, explore_agent, eligibility,
+               opportunity_service), kg/ (kg_store, schema, edital_id,
+               temporal, source_docs, hypergraph_catalog), retrieval/
+               (chunker, embedder, retriever, hyde, hyper_extractor),
                llm/ (llm_client, agent_runtime, agent_graph, agent_tools/),
                eval/ (harness); flat: db, auth, tasks (procrastinate),
                profile_extractor, opportunity_discovery, dou_feeder,
                web_search, contextual_retrieval, reranker, demais serviços
 domain/        CompanyProfile dataclass (user_profile.py)
-pipeline/      ETL FINEP (extractors/, etl_process, build_knowledge_graph, health_check)
-scripts/       CLI: run_all, reindex_edital, dev, deploy
+pipeline/      ETL multi-fonte (extractors/, adapters/)
+scripts/       CLI: reindex_edital, canonicalize_concepts, dev.sh, deploy.sh
 skills/        playbooks de mecanismo (subvencao, credito, equity) — lidos pelo WritingAgent
 supabase/      migrations/*.sql + config.toml (local CLI)
 data/          bronze/ (raw imutável), silver/ (derivado), knowledge_graph/ (hypergraphs/)

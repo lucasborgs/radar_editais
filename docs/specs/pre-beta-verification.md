@@ -184,7 +184,7 @@ roda ANTES de qualquer código novo nela.** Pendências conhecidas (2026-07-02):
 
 ## Fora de escopo
 
-- Pentest externo / infra (Railway, Vercel) — só a camada aplicação+dados.
+- Pentest externo / infra (hosting Docker, Cloudflare, Vercel) — só a camada aplicação+dados.
 - Hardening novo (rate limit, SSRF etc.) — já coberto pela spec de hardening.
 - Refatorar o modelo de isolamento (ex.: RLS no checkpointer) — só se o
   leak-test provar furo que namespacing não resolve.
