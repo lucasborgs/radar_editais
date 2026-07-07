@@ -90,9 +90,6 @@ export default function WorkspacePage() {
   const [mobileTab, setMobileTab] = useState<"doc" | "chat">("chat");
   const [mobileDrawer, setMobileDrawer] = useState(false);
 
-  // Chat-first UX: começa sem documento; após gerar draft, mostra o split view.
-  const [draftReady, setDraftReady] = useState(false);
-
   const [findings, setFindings] = useState<Finding[]>([]);
   const [reviewing, setReviewing] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -352,7 +349,6 @@ export default function WorkspacePage() {
         ]);
 
         if (res.draft_ready || (res.sections_done?.length ?? 0) > 0) {
-          setDraftReady(true);
           setMobileTab("doc");
           try {
             await reloadDocument();

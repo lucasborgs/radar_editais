@@ -69,7 +69,7 @@ export default function PlanningPage() {
         try {
           const result = await getExistingPlan(sessionId);
           setPlan(result);
-          const eid = (result as any)._edital_id;
+          const eid = (result as unknown as Record<string, unknown>)._edital_id as string | undefined;
           if (eid) {
             try {
               const card = await getEditalById(eid);

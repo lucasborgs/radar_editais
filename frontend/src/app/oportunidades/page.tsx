@@ -58,7 +58,7 @@ const COLUMNS: Column<OpportunityEntry>[] = [
     header: "Título",
     render: (v, row) => {
       const title = String(v);
-      const disambiguator = (row as any)._disambiguator;
+      const disambiguator = (row as unknown as Record<string, unknown>)._disambiguator as string | undefined;
       return (
         <span className="font-medium">
           {truncate(title, 45)}
@@ -88,7 +88,7 @@ const COLUMNS: Column<OpportunityEntry>[] = [
     numeric: true,
     render: (v, row) => {
       if (row.type !== "edital") return <span className="text-xs text-content-secondary">—</span>;
-      const aperture = (row as any).aperture;
+      const aperture = (row as unknown as Record<string, unknown>).aperture as string | undefined;
       const label = APERTURE_LABEL[aperture ?? ""];
       if (label) return <span className="text-xs">{label}</span>;
       const raw = String(v || "");
@@ -140,7 +140,7 @@ export default function OportunidadesPage() {
     }
     return items.map((o) => {
       if ((titleCounts.get(o.title) ?? 0) <= 1) return o;
-      const mt = (o as any).macro_temas;
+      const mt = (o as unknown as Record<string, unknown>).macro_temas as string[] | undefined;
       const pick = mt?.[0] ?? o.themes[0] ?? o.id.split(":").pop() ?? "";
       return { ...o, _disambiguator: pick };
     });
