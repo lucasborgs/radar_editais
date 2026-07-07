@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -38,7 +38,7 @@ function clearPlanningContext() {
   sessionStorage.removeItem(PLANNING_CTX_KEY);
 }
 
-export default function PlanningPage() {
+function PlanningInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
@@ -411,5 +411,13 @@ export default function PlanningPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PlanningPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64 text-content-secondary text-sm">Carregando...</div>}>
+      <PlanningInner />
+    </Suspense>
   );
 }
