@@ -14,10 +14,12 @@ applications e as tools de explore. Id no formato legado `source:native`
 from __future__ import annotations
 
 import datetime
+import json
 import logging
 import re
 import unicodedata
 
+from config import KNOWLEDGE_GRAPH_DIR
 from core.kg import kg_store
 from core.kg.migrate_v2 import migrate_to_v2
 
@@ -571,6 +573,20 @@ _CATALOG_TYPE_MAP: dict[str, tuple[str, str]] = {
 }
 
 
+def _curated_ict_names() -> set[str]:
+    """Nomes canônicos das ICTs curadas (fonte de verdade). Lê do arquivo
+    `curated_icts.json`. Retorna vazio se o arquivo não existir ou falhar
+    (degradação silenciosa)."""
+    p = KNOWLEDGE_GRAPH_DIR / "curated_icts.json"
+    if not p.exists():
+        return set()
+    try:
+        return set(json.loads(p.read_text()))
+    except Exception:
+        logger.exception("erro ao ler curated_icts.json")
+        return set()
+
+
 def _is_content(n: dict) -> bool:
     """Nó de conteúdo temático (Conceito real, não ex-Entidade)."""
     return n.get("type") == "Conceito" and n.get("origem") != "entidade_v1"
@@ -620,16 +636,19 @@ def list_entity_catalog(
             if nd and _is_wanted(nd):
                 edge_themes.setdefault(m, set()).update(thematic)
 
+    curated_ict = _curated_ict_names() if catalog_key == "ict" else None
     out: list[dict] = []
     for n in nodes:
         if not _is_wanted(n):
             continue
-        nm = n.get("name", "")
+        nm = n.get("name", "").strip()
+        if curated_ict is not None and curated_ict and nm not in curated_ict:
+            continue
         themes_list = sorted(edge_themes.get(n.get("id", ""), set()))
         if tema and not _theme_match(tema, themes_list):
             continue
         out.append({
-            "id": nm.strip().lower(),  # id público da entidade (name_lower) — compat consumers
+            "id": nm.lower(),  # id público da entidade (name_lower) — compat consumers
             "name": nm,
             "description": n.get("description") or "",
             "themes": themes_list,
@@ -643,7 +662,7 @@ def list_entity_catalog(
 def list_opportunities(
     tipo: str | None = None, limit: int = 200,
 ) -> list[dict]:
-    """Merge editais + programas + investidores com campo type discriminator."""
+    """Merge editais + programas + investidores + ICTs com campo type discriminator."""
     result: list[dict] = []
     graphs = kg_store.load_all_hypergraphs()
 

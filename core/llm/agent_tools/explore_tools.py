@@ -571,28 +571,55 @@ def build_explore_tools() -> list[BaseTool]:
         out: list[str] = [f"Panorama de oportunidades em '{tema}':"]
 
         editais = result.get("editais", [])
-        out.append(f"\n📋 Editais/desafios ({len(editais)}):")
+        # Enriquece com status do catálogo (Tier 2/3 não carregam status)
+        if editais:
+            try:
+                catalog = {e["title"].lower(): e.get("status", "?") for e in hypergraph_catalog.list_editais(limit=500)}
+                for ed in editais:
+                    nm = (ed.get("title") or ed.get("name", "")).strip().lower()
+                    if "status" not in ed:
+                        ed["status"] = catalog.get(nm, "?")
+            except Exception:
+                pass
+        abertos = sum(1 for e in editais if e.get("status") == "ABERTA")
+        info = f" ({abertos} {'aberto' if abertos == 1 else 'abertos'})" if abertos else ""
+        out.append(f"\n📋 Editais/desafios ({len(editais)}){info}:")
         for e in editais[:10]:
             title = e.get("title", e.get("name", ""))
-            out.append(f"  ID:{e.get('id', '?')} | {title[:60]} | prazo:{e.get('deadline', '?')}")
+            status = e.get("status", "?")
+            out.append(f"  ID:{e.get('id', '?')} | {title[:60]} | {status} | prazo:{e.get('deadline', '?')}")
         if not editais:
             out.append("  (nenhum edital com esse tema)")
 
-        icts = result.get("icts", [])
+        # Filtra pelo catálogo curado (BFS cross-source encontra itens de subgrafos
+        # aninhados que não são oportunidades autônomas)
+        try:
+            curated_icts = {e["name"].lower() for e in hypergraph_catalog.list_entity_catalog("ict", limit=999)}
+            icts = [i for i in result.get("icts", []) if (i.get("name") or "").strip().lower() in curated_icts]
+        except Exception:
+            icts = result.get("icts", [])
         out.append(f"\n🔬 ICTs parceiras ({len(icts)}):")
         for i in icts[:8]:
             out.append(f"  {i.get('name', i.get('id', ''))[:55]}")
         if not icts:
             out.append("  (nenhuma ICT no tema)")
 
-        investidores = result.get("investidores", [])
+        try:
+            curated_invs = {e["name"].lower() for e in hypergraph_catalog.list_entity_catalog("investidores", limit=999)}
+            investidores = [v for v in result.get("investidores", []) if (v.get("name") or "").strip().lower() in curated_invs]
+        except Exception:
+            investidores = result.get("investidores", [])
         out.append(f"\n💸 Investidores com tese no tema ({len(investidores)}):")
         for v in investidores[:8]:
             out.append(f"  {v.get('name', v.get('id', ''))[:45]}")
         if not investidores:
             out.append("  (nenhum investidor no tema)")
 
-        programas = result.get("programas", [])
+        try:
+            curated_progs = {e["name"].lower() for e in hypergraph_catalog.list_entity_catalog("programas", limit=999)}
+            programas = [p for p in result.get("programas", []) if (p.get("name") or "").strip().lower() in curated_progs]
+        except Exception:
+            programas = result.get("programas", [])
         out.append(f"\n📋 Programas ({len(programas)}):")
         for p in programas[:5]:
             out.append(f"  {p.get('name', p.get('id', ''))[:55]}")

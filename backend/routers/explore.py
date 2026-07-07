@@ -152,10 +152,10 @@ def explore(
         result["profile_diff"] = diff or None
 
     # Structured match data: converte profile → nós → find_matching_editais +
-    # find_matching_entities. Roda independente do agente (que também faz match
-    # internamente, mas só devolve texto). Custo: só cosseno, sem LLM extra
-    # quando o perfil já foi extraído (cache de _company_nodes por hash).
-    if req.profile is not None and ctx:
+    # find_matching_entities. Só roda quando o agente chamou uma das ferramentas
+    # de match — senão cartões apareceriam em toda mensagem com perfil.
+    # O sinal vem dos steps do agente (explore_meta["called_match"]).
+    if explore_meta.get("called_match") and req.profile is not None and ctx:
         try:
             company_nodes = _company_nodes(ctx)
             if company_nodes:

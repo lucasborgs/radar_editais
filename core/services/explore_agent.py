@@ -30,19 +30,22 @@ EXPLORE_MATCH_INSTRUCTION = """
 
 MATCH COM O PERFIL (find_matching_editais / find_matching_entities)
 - Este usuário TEM perfil preenchido. Quando ele pedir oportunidades para a
-  empresa ("quais editais servem para mim?", "o que tem para a gente?"), ou logo
-  ao abrir uma conversa com perfil, chame find_matching_editais.
+  empresa ("quais oportunidades servem para mim?", "o que tem para a gente?"),
+  ou logo ao abrir uma conversa com perfil, chame **ambas** as ferramentas:
+  find_matching_editais + find_matching_entities. O resumo deve mencionar
+  tanto editais quanto entidades (investidores/programas) encontrados.
 - Para PARCERIA, CAPITAL ou PROGRAMAS (não editais) — "que fundos investiriam na
   gente?", "ICTs para parceria?", "programa de aceleração?" — chame
   find_matching_entities (investidores/programas/ICTs por afinidade).
-- CRÍTICO: depois de chamar a tool, a interface JÁ mostra os resultados como
+- CRÍTICO: depois de chamar as tools, a interface JÁ mostra os resultados como
   cards visuais (nome, status, prazo, valor, justificativa) logo abaixo da sua
-  mensagem — o usuário vai ver tudo isso de qualquer forma, sem você escrever.
-  Sua resposta em texto tem NO MÁXIMO 2 frases, SEM listar nome/status/prazo/
-  valor/justificativa de nenhum item individualmente (nem em bullets numerados).
+  mensagem — o usuário vai ver tudo isso de qualquer forma, sem você escrever
+  cada detalhe. Sua resposta em texto tem NO MÁXIMO 2 frases, SEM listar nome/
+  status/prazo/valor/justificativa de nenhum item individualmente (nem em bullets
+  numerados).
   Errado: "1. Edital X (aberto, prazo Y, R$ Z) — porque...". Certo: "Encontrei
-  3 editais com boa afinidade, principalmente em bioeconomia — dá uma olhada
-  nos cards abaixo. Quer que eu detalhe algum deles?"
+  3 editais e 2 investidores com boa afinidade, principalmente em bioeconomia —
+  dá uma olhada nos cards abaixo. Quer que eu detalhe algum deles?"
 - Em ambos é afinidade temática (conteúdo), NÃO elegibilidade dura: apresente como
   ponto de partida e deixe a decisão com o usuário. Use get_edital ou
   get_node_neighborhood para aprofundar um match."""
@@ -72,14 +75,6 @@ DIRETRIZES
 - Para perguntas conceituais (ex.: "o que é subvenção?"), explique o conceito
   brevemente e ancore no grafo via ferramenta quando fizer sentido.
 
-PLANEJAMENTO (write_todos)
-- Quando a pergunta tem VÁRIAS partes ou exige vários passos (ex.: "compare os
-  prazos de saúde com os de energia e diga quais ICTs cobrem cada um"), comece
-  registrando um plano com write_todos e atualize os status conforme avança
-  (in_progress ao começar a tarefa, completed ao terminar). É sua âncora — evita
-  perder de vista alguma parte do pedido em loops longos.
-- Em perguntas triviais de um passo só, NÃO use write_todos — responda direto.
-
 COMO USAR AS FERRAMENTAS DE LEITURA
 - explore_opportunity → PRIMEIRA escolha para QUALQUER pergunta ampla de
   descoberta ("o que existe em agronegócio?", "fomento para IA em saúde?",
@@ -88,6 +83,8 @@ COMO USAR AS FERRAMENTAS DE LEITURA
 - list_editais → quando o usuário já sabe que quer editais específicos (abertos
   hoje, filtrar por status). Comece restrito (limit 10-20) e amplie se pedirem.
 - list_icts → QUEM pode executar/fazer parceria num tema (capacidade de P&D).
+  IMPORTANTE: quando perguntarem sobre ICTs para parceria, liste os NOMES
+  das ICTs explicitamente — não apenas descrições genéricas.
 - list_investidores → captação privada: fundos com tese num tema.
 - get_edital → resumo de um edital específico (após explore_opportunity ou
   quando o ID já aparece na pergunta): objetivo, mecanismo, elegíveis, temas.
@@ -100,6 +97,9 @@ COMO USAR AS FERRAMENTAS DE LEITURA
 - Para ICTs ligadas a um edital específico, use get_node_neighborhood no edital
   com cross_source=True (as arestas parceria_com/viabiliza trazem as ICTs, e a
   travessia cross-source alcança os temas que essas ICTs dominam no catálogo).
+  IMPORTANTE: quando o usuário perguntar sobre ICTs parceiras de um edital,
+  use get_node_neighborhood nesse edital e liste os NOMES das ICTs na resposta
+  — não se limite a descrever as áreas delas genericamente.
 
 QUANDO PARAR DE USAR FERRAMENTAS
 - Após cobrir todas as partes da pergunta (ou todos os todos) com base nos
@@ -121,7 +121,7 @@ ANTHROPIC_MODEL_AGENT_EXPLORE = os.getenv(
     "ANTHROPIC_MODEL_AGENT_EXPLORE",
     os.getenv("ANTHROPIC_MODEL_AGENT", "claude-sonnet-4-6"),
 )
-EXPLORE_AGENT_MAX_STEPS = int(os.getenv("EXPLORE_AGENT_MAX_STEPS", "10"))
+EXPLORE_AGENT_MAX_STEPS = int(os.getenv("EXPLORE_AGENT_MAX_STEPS", "15"))
 
 
 class ExploreAgent:
@@ -170,12 +170,11 @@ class ExploreAgent:
         )
 
     def _explore_tools(self) -> list:
-        """Tools do agente de explore: leitura do hipergrado + planejamento, e
+        """Tools do agente de explore: leitura do hipergrado, e
         opcionalmente deep_research (subagente web)."""
         from core.llm.agent_tools import build_explore_tools
-        from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
 
-        tools = build_explore_tools() + build_planning_tools(PlanState())
+        tools = build_explore_tools()
         if os.getenv("EXPLORE_DEEP_RESEARCH_ENABLED", "false").lower() == "true":
             from core.llm.agent_tools.research_tools import build_research_tools
             tools = tools + build_research_tools()
@@ -269,9 +268,15 @@ class ExploreAgent:
             max_steps=EXPLORE_AGENT_MAX_STEPS,
         )
 
+        called_match = any(
+            s.kind == "tool"
+            and s.name in ("find_matching_editais", "find_matching_entities")
+            for s in result.steps
+        )
         meta = {
             "stop_reason": result.stop_reason,
             "truncated": result.stop_reason == "max_steps",
+            "called_match": called_match,
         }
         if result.stop_reason == "error":
             logger.error("explore agent: stop_reason=error após %d steps", len(result.steps))

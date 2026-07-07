@@ -21,14 +21,14 @@ from core.services.hypergraph_match import (
 _GRAPHS_V1 = {
     "ict": {
         "nodes": [
-            {"name": "SENAI/SP", "type": "ICT", "description": "Instituto Privado"},
+            {"name": "CERTI", "type": "ICT", "description": "Instituto Privado"},
             {"name": "Bioindústria", "type": "Tema"},
             {"name": "Visão Computacional", "type": "Tecnologia"},
         ],
         "edges": [
             {
                 "type": "abrange_tema",
-                "members": ["senai/sp", "bioindústria", "visão computacional"],
+                "members": ["certi", "bioindústria", "visão computacional"],
                 "description": "áreas de atuação",
             },
         ],
@@ -64,8 +64,8 @@ def test_constants():
 def test_attribution_ict_theme_to_owner():
     attribution, _ = _entity_attribution(GRAPHS)
     # tema "bioindústria" sobe até a ICT (Ator/ict) dona via abrange_tema
-    assert ("ict", "SENAI/SP") in attribution["ict"]["bioindústria"]
-    assert ("ict", "SENAI/SP") in attribution["ict"]["visão computacional"]
+    assert ("ict", "CERTI") in attribution["ict"]["bioindústria"]
+    assert ("ict", "CERTI") in attribution["ict"]["visão computacional"]
 
 
 def test_attribution_investidor_financia():

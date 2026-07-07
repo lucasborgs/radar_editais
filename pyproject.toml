@@ -14,6 +14,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "openai>=1.0",
     "anthropic>=0.40",               # Sonnet 4.6 para agentes (WritingSession + explore)
+    "hyperextract>=0.3.0",           # extração de nós-empresa para o match geométrico (AutoHypergraph)
     # Runtime agêntico LangGraph (migração — docs/specs/langgraph-migration.md).
     # Runtime único desde a Etapa 2 (legado deletado). checkpoint-postgres: durabilidade
     # da WritingSession + interrupt/resume de request_user_info (Etapa 3) sobre DATABASE_URL.

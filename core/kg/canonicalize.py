@@ -175,21 +175,72 @@ _LEGAL_RE = re.compile(
     re.IGNORECASE,
 )
 # Rótulos genéricos: só a forma NUA (name == rótulo, após deburr/lower) é lixo.
+# Expandido em 2026-07-07 para cobrir mais stop-words temáticas que aparecem em
+# praticamente todo edital de fomento e não discriminam domínio.
 _GENERIC_LABELS = frozenset({
+    # Originais
     "programa", "programas", "tecnologia", "tecnologias", "consultoria",
     "inovacao", "projeto", "projetos", "pesquisa", "desenvolvimento",
     "p&d", "pd&i", "p&d&i", "pdi", "empresa", "empresas", "startup", "startups",
     "servico", "servicos", "produto", "produtos", "solucao", "solucoes",
     "sistema", "sistemas", "plataforma", "metodologia", "processo",
+    # Prototipagem / fabricação / engenharia
+    "prototipagem", "prototipo", "prototipos",
+    "benchmark", "ensaio", "teste", "testes",
+    "calibracao", "validacao", "homologacao",
+    # Escala / abrangência
+    "escala", "porte",
+    # Sustentabilidade / gestão (bare)
+    "sustentabilidade", "viabilidade",
+    "gestao", "governanca",
+    # Fomento / financiamento (bare)
+    "fomento", "incentivo", "subvencao", "financiamento", "credito",
+    "investimento", "capital", "recurso", "recursos",
+    # Infraestrutura / recursos (bare)
+    "infraestrutura", "laboratorio", "laboratorios",
+    "equipamento", "equipamentos",
+    "ferramenta", "ferramentas", "dispositivo", "dispositivos",
+    "instrumento", "instrumentos", "sensor", "sensores",
+    "modulo", "unidade",
+    # Genérico / transversal
+    "concepcao", "modelagem", "simulacao", "otimizacao",
+    "caracterizacao", "parametrizacao", "padronizacao",
+    "monitoramento", "mensuracao",
+    "rastreamento", "rastreabilidade",
+    "inspecao", "normatizacao", "certificacao",
+    "afericao", "medicao", "quantificacao", "qualificacao",
+    # Mercado / negócio (bare)
+    "mercado", "negocio", "negocios",
+    "cliente", "clientes", "demanda", "demandas",
+    "desafio", "desafios", "tendencia",
+    # Suporte / capacitação (bare)
+    "suporte", "assessoria", "apoio", "assistencia",
+    "capacitacao", "treinamento", "formacao",
+    "divulgacao", "comunicacao", "difusao",
+    "transferencia", "absorcao", "adocao",
+    "implantacao", "implementacao",
+    "execucao", "realizacao", "coordenacao",
+    # Tempo / planejamento
+    "fase", "fases", "etapa", "etapas",
+    "prazo", "cronograma", "vigencia",
+    # Qualidade / avaliação (bare)
+    "qualidade", "eficiencia", "eficacia", "efetividade",
+    "desempenho", "produtividade", "competitividade",
+    "fundamento", "principio", "principios",
+    "diretriz", "diretrizes",
+    "norma", "normas", "regra", "regras",
+    "criterio", "criterios",
+    "premissa", "premissas",
 })
 
 
 def anti_class_verdict(name: str) -> dict | None:
     """Descarte determinístico de Conceito por classe errada (Frente 1, PR-B):
     métrica/faceta (TRL), citação legal (LGPD, "Lei nº X"), rótulo genérico nu
-    ("programa", "tecnologia", "consultoria"). Retorna {veredicto, categoria} ou
-    None (→ segue p/ o julgamento LLM). Casa só o inequívoco; composto legítimo
-    ("tecnologia assistiva", "saúde digital") passa incólume."""
+    ("programa", "tecnologia", "prototipagem", "sustentabilidade"). Retorna
+    {veredicto, categoria} ou None (→ segue p/ o julgamento LLM). Casa só o
+    inequívoco; composto legítimo ("tecnologia assistiva", "saúde digital")
+    passa incólume. Lista expandida em 2026-07-07 (~130 entradas)."""
     n = (name or "").strip()
     if not n:
         return None

@@ -12,10 +12,12 @@ global durável. A "sobreposição" é o conjunto de arestas sintéticas, não u
 """
 from __future__ import annotations
 
+import datetime
 import hashlib
 import logging
 import os
 import time
+import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -64,13 +66,82 @@ AFFINITY_TYPES = frozenset({"Conceito"})
 # nó-a-nó desses descritores é decisão do PR3/higiene, não desta consolidação).
 _ENTIDADE_V1_ORIGEM = "entidade_v1"
 
+# Stop-words temáticas: Conceitos genéricos/transversais que aparecem em
+# praticamente todo edital de fomento e não discriminam domínio. Não devem
+# gerar arestas sintéticas de match. Lista espelhada de canonicalize.py.
+_GENERIC_CONCEPT_LABELS = frozenset({
+    "programa", "programas", "tecnologia", "tecnologias", "consultoria",
+    "inovacao", "projeto", "projetos", "pesquisa", "desenvolvimento",
+    "p&d", "pd&i", "p&d&i", "pdi", "empresa", "empresas", "startup", "startups",
+    "servico", "servicos", "produto", "produtos", "solucao", "solucoes",
+    "sistema", "sistemas", "plataforma", "metodologia", "processo",
+    "prototipagem", "prototipo", "prototipos",
+    "benchmark", "ensaio", "teste", "testes",
+    "calibracao", "validacao", "homologacao",
+    "escala", "porte",
+    "sustentabilidade", "viabilidade",
+    "gestao", "governanca",
+    "fomento", "incentivo", "subvencao", "financiamento", "credito",
+    "investimento", "capital", "recurso", "recursos",
+    "infraestrutura", "laboratorio", "laboratorios",
+    "equipamento", "equipamentos",
+    "ferramenta", "ferramentas", "dispositivo", "dispositivos",
+    "instrumento", "instrumentos", "sensor", "sensores",
+    "modulo", "unidade",
+    "concepcao", "modelagem", "simulacao", "otimizacao",
+    "caracterizacao", "parametrizacao", "padronizacao",
+    "monitoramento", "mensuracao",
+    "rastreamento", "rastreabilidade",
+    "inspecao", "normatizacao", "certificacao",
+    "afericao", "medicao", "quantificacao", "qualificacao",
+    "mercado", "negocio", "negocios",
+    "cliente", "clientes", "demanda", "demandas",
+    "desafio", "desafios", "tendencia",
+    "suporte", "assessoria", "apoio", "assistencia",
+    "capacitacao", "treinamento", "formacao",
+    "divulgacao", "comunicacao", "difusao",
+    "transferencia", "absorcao", "adocao",
+    "implantacao", "implementacao",
+    "execucao", "realizacao", "coordenacao",
+    "fase", "fases", "etapa", "etapas",
+    "prazo", "cronograma", "vigencia",
+    "qualidade", "eficiencia", "eficacia", "efetividade",
+    "desempenho", "produtividade", "competitividade",
+    "fundamento", "principio", "principios",
+    "diretriz", "diretrizes",
+    "norma", "normas", "regra", "regras",
+    "criterio", "criterios",
+    "premissa", "premissas",
+})
+
+
+def _deburr(s: str) -> str:
+    """Remove acentos (NFKD + combine)."""
+    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
+
+
+def _is_generic_concept(name: str) -> bool:
+    """True se QUALQUER token do nome (split por espaço) é uma stop-word temática.
+    Token-level intencionalmente mais agressivo que o anti_class_verdict da
+    canonicalização (exato por nó): aqui o custo de falso positivo é maior
+    (poluir o match), então varremos mais fino."""
+    if not name:
+        return False
+    tokens = _deburr(name).lower().split()
+    return any(t in _GENERIC_CONCEPT_LABELS for t in tokens)
+
 
 def _is_affinity(node: dict, types: frozenset = AFFINITY_TYPES) -> bool:
-    """True se o nó conta como afinidade: tipo ∈ `types` (vazio = qualquer) e NÃO é
-    ex-Entidade v1 (inerte no match até a higiene do PR3)."""
+    """True se o nó conta como afinidade: tipo ∈ `types` (vazio = qualquer), NÃO é
+    ex-Entidade v1 (inerte no match até a higiene do PR3), e NÃO é Conceito genérico
+    (stop-word temática que todo edital tem)."""
     if node.get("origem") == _ENTIDADE_V1_ORIGEM:
         return False
-    return not types or node.get("type") in types
+    if not types or node.get("type") in types:
+        if node.get("type") == "Conceito" and _is_generic_concept(node.get("name", "")):
+            return False
+        return True
+    return False
 
 
 @dataclass
@@ -579,6 +650,25 @@ def find_matching_editais(
             max_paths=max_paths,
         )
 
+    # Remove editais com prazo vencido (ENCERRADA). Mantém editais sem prazo
+    # definido (Desconhecido) — pecar pelo excesso, não pela falta.
+    today = datetime.date.today()
+    filtered: list[EditalMatch] = []
+    for m in matches:
+        if m.prazo:
+            for fmt in ("%d.%m.%Y", "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d.%m.%y", "%d/%m/%y"):
+                try:
+                    deadline = datetime.datetime.strptime(m.prazo, fmt).date()
+                    break
+                except ValueError:
+                    continue
+            else:
+                deadline = None
+            if deadline is not None and deadline < today:
+                continue
+        filtered.append(m)
+    matches = filtered
+
     logger.info(
         "find_matching_editais: %d editais (threshold=%.2f, min_agg=%.2f, "
         "catalog_expansion=%s, elegibilidade_eliminou=%d)",
@@ -646,11 +736,19 @@ def _entity_attribution(
         if not g:
             continue
         by_id = {n["id"]: n for n in g.get("nodes", []) if n.get("id")}
+
+        # Apenas ICTs curadas são entidades matcháveis (não curadas = conhecimento)
+        if fk == "ict":
+            from core.kg.hypergraph_catalog import _curated_ict_names
+            curated = _curated_ict_names()
+
         ent_idx: dict[str, tuple[str, str, str | None]] = {}
         for n in g.get("nodes", []):
             if (ek := _entity_kind(n)) is not None:
                 nm = (n.get("name") or "").strip().lower()
                 if nm:
+                    if fk == "ict" and curated and n.get("name", "").strip() not in curated:
+                        continue
                     ent_idx[nm] = (ek, n.get("name") or nm, n.get("description"))
         attr: dict[str, list[tuple[str, str]]] = defaultdict(list)
         for e in g.get("edges", []):
@@ -661,6 +759,8 @@ def _entity_attribution(
                 if nd is None:
                     continue
                 if (ek := _entity_kind(nd)) is not None:
+                    if fk == "ict" and curated and nd.get("name", "").strip() not in curated:
+                        continue
                     ents.append((ek, nd.get("name") or m))
                 elif _is_affinity(nd):
                     aff_names.append((nd.get("name") or "").strip().lower())
