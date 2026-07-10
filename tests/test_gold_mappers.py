@@ -7,7 +7,10 @@ de mecanismo/formato e a detecção conservadora de programa-pai (subordinado_a)
 """
 from __future__ import annotations
 
+import json
 from datetime import date, timedelta
+
+import pytest
 
 from core.kg import gold
 
@@ -160,6 +163,28 @@ class TestMecanismoFormato:
 # Detecção de programa-pai (subordinado_a) — conservadora
 # ---------------------------------------------------------------------------
 class TestProgramaDetection:
+    """Hermético: `_programa_detection` é data-driven de SILVER_DIR/programas.json
+    (gitignored — ausente no CI), então o teste monta a própria fixture em
+    tmp_path em vez de depender do arquivo real."""
+
+    @pytest.fixture(autouse=True)
+    def _silver_fixture(self, tmp_path, monkeypatch):
+        (tmp_path / "programas.json").write_text(
+            json.dumps({
+                "programas": [
+                    {"id": "programa:centelha", "name": "Programa Centelha"},
+                    {"id": "programa:tecnova", "name": "Tecnova"},
+                ]
+            }),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(gold, "SILVER_DIR", tmp_path)
+        # _programa_detection é @lru_cache: limpar antes (outro teste pode ter
+        # cacheado um mapa de outro SILVER_DIR) e depois (não vazar a fixture).
+        gold._programa_detection.cache_clear()
+        yield
+        gold._programa_detection.cache_clear()
+
     def test_brand_inequivoca(self):
         assert gold._detect_programa("Centelha SC 2026") == "programa:centelha"
         assert gold._detect_programa("TECNOVA Santa Catarina") == "programa:tecnova"
@@ -167,6 +192,11 @@ class TestProgramaDetection:
     def test_nao_marca_generico(self):
         assert gold._detect_programa("Chamada Pública Bilateral FINEP-CDTI") is None
         assert gold._detect_programa("Auxílio à Inovação Regular") is None
+
+    def test_sem_arquivo_retorna_none(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(gold, "SILVER_DIR", tmp_path / "vazio")
+        gold._programa_detection.cache_clear()
+        assert gold._detect_programa("Centelha SC 2026") is None
 
 
 # ---------------------------------------------------------------------------
