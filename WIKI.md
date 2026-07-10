@@ -1257,8 +1257,21 @@ constraint_vocab:
   ops: [in, not_in, lte, gte, exige]
   # Enums fechados para os tipos categóricos — validados em `produce_from_text`
   # (achado do bake-off Fase 1.5: sem isso o produtor vazava valores fora do
-  # vocabulário, ex. forma_juridica="sociedade limitada"/"fundacao", porte="250").
+  # vocabulário, ex. forma_juridica="sociedade limitada"/"fundacao", porte="250",
+  # sede_uf="BR"/"Brasil"/"nacional" num edital NACIONAL — não é sigla de UF).
   valores:
     porte: [mei, me, epp, media, grande]
     forma_juridica: [empresa, startup, ict, universidade, cooperativa, associacao]
+    sede_uf: [AC, AL, AP, AM, BA, CE, DF, ES, GO, MA, MT, MS, MG, PA, PB, PR,
+              PE, PI, RJ, RN, RS, RO, RR, SC, SP, SE, TO]
+  # Hierarquia de comparação (NÃO de emissão): valores do PERFIL da empresa que
+  # satisfazem um valor EXIGIDO pelo constraint, além do próprio valor (ex.
+  # constraint forma_juridica=[empresa] também é satisfeito por uma empresa
+  # startup/ltda/sa/eireli/me/epp — achado do bake-off Fase 1.5: o produtor
+  # tratava "startup" e "empresa" como categorias mutuamente exclusivas quando,
+  # na prática, toda startup registrada já é uma empresa). Lido por
+  # `eligibility.py` na comparação — não altera o que `produce_from_text` emite.
+  satisfies:
+    forma_juridica:
+      empresa: [empresa, startup, ltda, sa, eireli, me, epp]
 ```

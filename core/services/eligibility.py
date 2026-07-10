@@ -25,6 +25,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from core.kg import schema
+
 logger = logging.getLogger(__name__)
 
 SAT = "sat"
@@ -111,6 +113,23 @@ def _norm_forma(v: Any) -> str:
     return _deaccent_lower(v)
 
 
+def _expand_forma_juridica(values: list) -> set[str]:
+    """Expande cada valor EXIGIDO pela sua hierarquia de satisfação
+    (`constraint_vocab.satisfies.forma_juridica` no WIKI). Achado do bake-off
+    Fase 1.5: exigir `forma_juridica=[empresa]` era avaliado como UNSAT para
+    perfis com `tipo_entidade="startup"` — mas toda startup registrada JÁ é
+    uma empresa; a ontologia tratava maturidade/estágio e natureza jurídica
+    como categorias mutuamente exclusivas. O mapa vive no WIKI (não hardcoded
+    aqui) — mudar a hierarquia é editar o doc, não este módulo."""
+    satisfies = schema.constraint_vocab_satisfies().get("forma_juridica", {})
+    out: set[str] = set()
+    for v in values:
+        tok = _norm_forma(v)
+        out.add(tok)
+        out |= {_norm_forma(x) for x in satisfies.get(tok, [])}
+    return out
+
+
 # Mapa tipo-de-constraint → (campo do perfil, normalizador). `parceria` não tem
 # campo no perfil (é relacional) → sempre unknown.
 _PROFILE_FIELD = {
@@ -189,6 +208,9 @@ def evaluate_constraint(constraint: dict, profile: Any) -> tuple[str, str]:
     if tipo == "sede_uf":  # expande macro-região → UFs antes de comparar
         pv = _norm_uf(raw)
         vset = _expand_uf(values)
+    elif tipo == "forma_juridica":  # expande pela hierarquia de satisfação
+        pv = _norm_forma(raw)
+        vset = _expand_forma_juridica(values)
     elif norm is not None:
         pv = norm(raw)
         vset = {norm(x) for x in values}

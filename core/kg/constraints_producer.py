@@ -193,12 +193,20 @@ Responda JSON: {"constraints": [{"tipo": "...", "op": "...", "valor": ...}], \
 "requisitos_texto": ["..."]}. Listas vazias se nada se encaixa."""
 
 
+_UF_ENUM = [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS",
+    "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC",
+    "SP", "SE", "TO",
+]
+
+
 def _v3_vocab() -> tuple[set[str], set[str], dict[str, set[str]]]:
     """(tipos, ops, valores_enum) do bloco `constraint_vocab` do WIKI (§13.4).
     Fallback à lista §4.4 embutida se o bloco estiver ausente. `valores_enum`
-    traz os enums fechados de tipos categóricos (porte, forma_juridica) —
-    achado do bake-off Fase 1.5: sem checar contra este enum o produtor vazava
-    valores livres (ex. forma_juridica="sociedade limitada", porte="250")."""
+    traz os enums fechados de tipos categóricos (porte, forma_juridica, sede_uf)
+    — achado do bake-off Fase 1.5: sem checar contra este enum o produtor
+    vazava valores livres (ex. forma_juridica="sociedade limitada",
+    porte="250", sede_uf="BR" num edital NACIONAL — não é sigla de UF)."""
     v = schema.constraint_vocab_v3()
     tipos = set(v.get("tipos") or [
         "porte", "faturamento", "idade_empresa_meses", "sede_uf", "forma_juridica",
@@ -208,14 +216,17 @@ def _v3_vocab() -> tuple[set[str], set[str], dict[str, set[str]]]:
     valores_raw = v.get("valores") or {
         "porte": ["mei", "me", "epp", "media", "grande"],
         "forma_juridica": ["empresa", "startup", "ict", "universidade", "cooperativa", "associacao"],
+        "sede_uf": _UF_ENUM,
     }
     valores = {k: {str(x).strip().lower() for x in vs} for k, vs in valores_raw.items()}
     return tipos, ops, valores
 
 
 # tipos categóricos com enum fechado + op esperado (in/not_in — lte/gte não faz
-# sentido para um vocabulário categórico, ex. porte="250" com op="lte").
-_CATEGORICAL_ENUM_TIPOS = {"porte", "forma_juridica"}
+# sentido para um vocabulário categórico, ex. porte="250" com op="lte"). Um
+# valor de sede_uf fora das 27 UFs (ex. "BR", "Brasil", "nacional") indica
+# edital NACIONAL — não é constraint de sede, então NÃO deve ser emitido.
+_CATEGORICAL_ENUM_TIPOS = {"porte", "forma_juridica", "sede_uf"}
 
 
 def _valid_v3(c: dict, tipos: set[str], ops: set[str], valores: dict[str, set[str]]) -> bool:

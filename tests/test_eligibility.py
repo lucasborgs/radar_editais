@@ -43,6 +43,34 @@ def test_sede_uf_bare_se_is_sergipe_not_sudeste():
     assert el.evaluate_constraint(c, {"uf": "SP"})[0] == el.UNSAT  # NÃO expande p/ Sudeste
 
 
+def test_forma_juridica_startup_satisfies_empresa():
+    # achado da auditoria externa do bake-off Fase 1.5: constraint exige
+    # forma_juridica=[empresa], perfil tem tipo_entidade="startup" — toda
+    # startup registrada JÁ é uma empresa, não deveriam ser tratadas como
+    # categorias mutuamente exclusivas (matou biofarma_saude x finep:773/774
+    # e semicondutores x finep:780, positivos verdadeiros de afinidade).
+    c = {"tipo": "forma_juridica", "op": "in", "valor": ["empresa"]}
+    assert el.evaluate_constraint(c, {"tipo_entidade": "startup"})[0] == el.SAT
+    for variante in ("ltda", "sa", "eireli", "me", "epp", "empresa"):
+        assert el.evaluate_constraint(c, {"tipo_entidade": variante})[0] == el.SAT
+
+
+def test_forma_juridica_ict_nao_satisfaz_empresa():
+    # negativo real: ICTs/universidades continuam UNSAT contra forma_juridica=[empresa]
+    # (a hierarquia só aproxima "empresa" de seus subtipos, não de outras naturezas).
+    c = {"tipo": "forma_juridica", "op": "in", "valor": ["empresa"]}
+    assert el.evaluate_constraint(c, {"tipo_entidade": "ict"})[0] == el.UNSAT
+    assert el.evaluate_constraint(c, {"tipo_entidade": "universidade"})[0] == el.UNSAT
+
+
+def test_forma_juridica_not_in_nao_afetado_pela_hierarquia():
+    # not_in continua exato — a hierarquia de satisfação é sobre "in" (o que
+    # cumpre a exigência), não deve abrir brecha numa exclusão.
+    c = {"tipo": "forma_juridica", "op": "not_in", "valor": ["ict"]}
+    assert el.evaluate_constraint(c, {"tipo_entidade": "startup"})[0] == el.SAT
+    assert el.evaluate_constraint(c, {"tipo_entidade": "ict"})[0] == el.UNSAT
+
+
 def test_not_in():
     c = {"tipo": "porte", "op": "not_in", "valor": ["grande"]}
     assert el.evaluate_constraint(c, {"tamanho_empresa": "GRANDE"})[0] == el.UNSAT

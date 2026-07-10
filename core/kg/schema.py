@@ -270,6 +270,15 @@ def constraint_vocab_v3() -> dict:
     return load().get("constraint_vocab", {})
 
 
+def constraint_vocab_satisfies() -> dict[str, dict[str, list[str]]]:
+    """Sub-bloco `constraint_vocab.satisfies` (§13.4): hierarquia de
+    comparação — valores do PERFIL que satisfazem um valor EXIGIDO pelo
+    constraint (ex. forma_juridica=empresa é satisfeito por startup/ltda/...).
+    Usado por `core/services/eligibility.py` na COMPARAÇÃO; não afeta o que
+    `produce_from_text` emite."""
+    return constraint_vocab_v3().get("satisfies", {})
+
+
 # ---------------------------------------------------------------------------
 # Slug
 # ---------------------------------------------------------------------------

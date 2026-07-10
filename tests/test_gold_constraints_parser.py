@@ -91,6 +91,35 @@ def test_valor_fora_do_enum_categorico_descartado():
     assert cons[0]["valor"] == ["me", "epp"]
 
 
+def test_sede_uf_fora_do_enum_de_27_ufs_descartado():
+    # achado da auditoria externa do bake-off Fase 1.5: editais NACIONAIS (sem
+    # exigência real de sede) faziam o LLM emitir sede_uf="BR"/"Brasil" — não é
+    # sigla de UF, e virava UNSAT espúrio p/ toda empresa (eliminava editais
+    # nacionais legítimos, ex. ia_digital_mg x finep:779).
+    resp = {
+        "constraints": [
+            {"tipo": "sede_uf", "op": "in", "valor": ["BR"]},
+            {"tipo": "faturamento", "op": "lte", "valor": 16000000},
+        ],
+        "requisitos_texto": [],
+    }
+    cons, _req = cp.produce_from_text("texto", client=_client(resp))
+    assert [c["tipo"] for c in cons] == ["faturamento"]
+
+
+def test_sede_uf_variantes_de_nacional_descartadas():
+    for variante in ("Brasil", "nacional", "BRA", "todo o territorio nacional"):
+        resp = {"constraints": [{"tipo": "sede_uf", "op": "in", "valor": [variante]}], "requisitos_texto": []}
+        cons, _req = cp.produce_from_text("texto", client=_client(resp))
+        assert cons == [], f"variante {variante!r} deveria ser descartada"
+
+
+def test_sede_uf_valido_continua_emitido():
+    resp = {"constraints": [{"tipo": "sede_uf", "op": "in", "valor": ["SC", "SP"]}], "requisitos_texto": []}
+    cons, _req = cp.produce_from_text("texto", client=_client(resp))
+    assert cons == [{"tipo": "sede_uf", "op": "in", "valor": ["SC", "SP"]}]
+
+
 def test_texto_vazio_nao_chama_llm():
     # sem texto → ([], []) sem tocar no client (mesmo que o client explodisse)
     class _Boom:
