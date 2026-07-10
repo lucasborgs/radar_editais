@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import { STATUS_CONFIG } from "@/lib/constants";
 import type { EditalStatus } from "@/types/edital";
-import type { MatchedEdital, MatchedEditalPath } from "@/lib/api";
+import type { MatchedEdital, MatchedExcerpt } from "@/lib/api";
 import { VerdictBlock } from "./VerdictBlock";
 
 function ScoreRing({ score }: { score: number }) {
@@ -22,13 +22,40 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-function JustificationBadge({ path }: { path: MatchedEditalPath }) {
+// A explicação do match v3 são os TRECHOS REAIS que casaram (empresa ↔ edital),
+// não conceitos extraídos — "AI drafts, humans decide": o usuário lê o texto.
+export function ExcerptRow({ excerpt }: { excerpt: MatchedExcerpt }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-primary/8 px-2 py-0.5 text-[11px] font-sans text-content-secondary">
-      <span className="max-w-[120px] truncate">«{path.src}»</span>
-      <span className="text-content-tertiary">↔</span>
-      <span className="max-w-[120px] truncate">«{path.dst}»</span>
-    </span>
+    <div
+      className="rounded-lg bg-primary/5 px-2.5 py-1.5 text-[11px] leading-snug font-sans"
+      title={`cosseno ${excerpt.score.toFixed(2)}`}
+    >
+      <p className="text-content-secondary line-clamp-2">
+        <span className="font-medium text-content-primary">Você:</span> {excerpt.company_text}
+      </p>
+      <p className="text-content-secondary line-clamp-2 mt-0.5">
+        <span className="font-medium text-content-primary">
+          {excerpt.section ? `Edital (${excerpt.section})` : "Edital"}:
+        </span>{" "}
+        {excerpt.edital_text}
+      </p>
+    </div>
+  );
+}
+
+export function SetorChips({ setores }: { setores?: string[] }) {
+  if (!setores || setores.length === 0) return null;
+  return (
+    <>
+      {setores.map((s) => (
+        <span
+          key={s}
+          className="inline-flex items-center rounded-full bg-content-secondary/10 px-2 py-0.5 text-[11px] text-content-secondary"
+        >
+          {s}
+        </span>
+      ))}
+    </>
   );
 }
 
@@ -65,7 +92,7 @@ export function MatchedEditalCard({
             {edital.valor && (
               <span>💰 {edital.valor}</span>
             )}
-            <span>🎯 {(edital.affinity * 10).toFixed(1)}</span>
+            <SetorChips setores={edital.setores} />
           </div>
         </div>
       </div>
@@ -82,10 +109,10 @@ export function MatchedEditalCard({
 
       {edital.verdict && <VerdictBlock verdict={edital.verdict} />}
 
-      {edital.paths.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-border">
-          {edital.paths.map((p, i) => (
-            <JustificationBadge key={i} path={p} />
+      {edital.matched_excerpts.length > 0 && (
+        <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-border">
+          {edital.matched_excerpts.slice(0, 3).map((x, i) => (
+            <ExcerptRow key={i} excerpt={x} />
           ))}
         </div>
       )}

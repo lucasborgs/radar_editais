@@ -122,7 +122,7 @@ def _cleanup(user_id: str) -> None:
     # workspace cascata (FK on delete cascade) leva junto content_items,
     # writing_sessions, session_turns, application_log, matching_weights,
     # reflection_insights, research_findings, exploration_log, weight_change_log,
-    # company_hypergraphs. Depois removemos o user (cascata pega o workspace).
+    # company_chunks. Depois removemos o user (cascata pega o workspace).
     with _pg() as c, c.cursor() as cur:
         cur.execute("delete from auth.users where id = %s", (user_id,))
 
@@ -166,7 +166,10 @@ def two_tenants():
     svc.table("exploration_log").insert(
         {"workspace_id": ws_a, "edital_id": "finep:leak-a", "decision": "recommended"}
     ).execute()
-    svc.table("company_hypergraphs").insert({"workspace_id": ws_a}).execute()
+    svc.table("company_chunks").insert(
+        {"workspace_id": ws_a, "origin": "profile", "text": "SEGREDO-DE-A",
+         "embedding": [0.1] + [0.0] * 1535}
+    ).execute()
     svc.table("user_feedback").insert(
         {"user_id": user_a, "message": "SEGREDO-DE-A"}
     ).execute()
@@ -216,7 +219,7 @@ _OWN_SCOPED_TABLES = [
     "reflection_insights",
     "research_findings",
     "exploration_log",
-    "company_hypergraphs",
+    "company_chunks",
     "user_feedback",
 ]
 

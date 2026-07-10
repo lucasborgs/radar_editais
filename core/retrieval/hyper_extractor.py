@@ -292,38 +292,6 @@ vedações NÃO são nós. Cada entidade recebe exatamente um `type`.
 {source_text}
 """
 
-# Variante para o PERFIL DA EMPRESA (lado DEMANDA) — mesma taxonomia/embedder do
-# ecossistema (o "canvas único" do match), enquadramento empresa-cêntrico. Extrai
-# o que a empresa FAZ e BUSCA; nunca Edital/Fonte/ICT/Investidor/Programa (a
-# empresa não é a oferta pública — evita alucinar oferta no lado demanda).
-_COMPANY_NODE_PROMPT = """\
-Você está analisando o PERFIL de UMA EMPRESA (ou startup/ICT) que busca
-financiamento público à inovação. Extraia TODAS as entidades MENCIONADAS NO TEXTO
-— o que a empresa FAZ, DOMINA e BUSCA. TODAS são do type `Conceito`.
-
-REGRA CRÍTICA: extraia SOMENTE entidades que aparecem no TEXTO. As definições
-abaixo são descrições — NUNCA extraia um nome citado nelas.
-
-Extraia Conceitos (todos type=Conceito), variando o `dim`:
-- dim=tema: domínio em que a empresa atua (saúde, agronegócio, energia, manufatura 4.0);
-- dim=tecnologia: capacidade técnica que domina (IA, visão computacional, IoT, biotecnologia);
-- dim=aplicacao: CASO DE USO concreto — uma OPERAÇÃO (triagem, classificação,
-  diagnóstico, detecção, previsão, monitoramento, otimização) aplicada a um objeto.
-  É o `dim` CENTRAL do match cross-domínio; extraia da proposta de valor, solução,
-  portfólio e tração.
-
-Termo ATÔMICO — até 3 palavras, salvo nome próprio. "X e Y" vira dois
-Conceitos separados.
-
-NÃO extraia Oportunidade nem Ator: a empresa é o lado DEMANDA, não a oferta pública
-(porte/UF/mecanismo buscado/TRL vêm do perfil estruturado, não desta extração).
-Seja exaustivo no que a empresa faz e busca; cada entidade recebe type=Conceito.
-
-### TEXTO DE ORIGEM:
-{source_text}
-"""
-
-
 # ── clientes canônicos ────────────────────────────────────────────────────────
 
 class _CanonicalEmbeddings:
@@ -880,38 +848,10 @@ def run_hyper_extract_catalog(
     return HypergraphResult(edital_id=graph_id, path=written, nodes=nodes, edges=edges)
 
 
-def run_hyper_extract_company(
-    text: str,
-    *,
-    company_id: str = "company",
-    build_index: bool = False,
-) -> HypergraphResult:
-    """Extrai o hipergrado do PERFIL DA EMPRESA (lado DEMANDA) — MESMO schema e
-    embedder do ecossistema (o canvas único do match). NÃO grava no KG global: o
-    grafo da empresa é privado/efêmero (por workspace), computado on-demand para o
-    match e descartado. Sem colapso (não é Edital). Retorna nodes/edges em memória."""
-    if not text.strip():
-        logger.warning("hyper_extract_company: perfil vazio company_id=%s", company_id)
-        return HypergraphResult(edital_id=company_id, path=None)
-
-    hg = _build_extractor(node_prompt=_COMPANY_NODE_PROMPT)
-    hg.feed_text(text)
-    if build_index:
-        hg.build_index()
-
-    data = hg.data
-    nodes = [n.model_dump() for n in data.nodes]
-    edges = [e.model_dump() for e in data.edges]
-    # Replay DETERMINÍSTICO do canon (renames/descartes conhecidos) — alinha o
-    # lado demanda ao vocabulário canônico do ecossistema. Sem LLM extra
-    # (llm_new=False): o grafo é efêmero, vereditos novos não são persistidos.
-    graph = _canonize_fresh(_text_hash(text), nodes, edges, file_key=company_id, llm_new=False)
-    nodes, edges = graph["nodes"], graph["edges"]
-    logger.info(
-        "hyper_extract_company: company_id=%s nós=%d arestas=%d",
-        company_id, len(nodes), len(edges),
-    )
-    return HypergraphResult(edital_id=company_id, path=None, nodes=nodes, edges=edges)
+# `run_hyper_extract_company` (lado DEMANDA) morreu na Fase 2 do v3: o lado
+# empresa do match agora é texto real chunkado (core/services/company_chunks),
+# não nós extraídos por LLM. O build de EDITAIS/catálogos abaixo permanece até
+# o PR-B/PR-C (catálogo/explore ainda leem os hipergrafos).
 
 
 def iter_catalogs():

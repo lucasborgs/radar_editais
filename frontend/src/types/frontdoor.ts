@@ -204,13 +204,12 @@ export type RadarItem =
     };
 
 // ÚNICO lugar com a lógica de ordenação do radar (R6): funde editais + entidades
-// numa lista intercalada por AFINIDADE decrescente (soma MaxSim, comparável entre
-// os dois desde o PR6), com desempate estável por id. Sem agrupamento por kind —
-// programa de afinidade alta fica acima de edital de afinidade baixa. Usado tanto
-// no turno fresco quanto na retomada de conversa (ambos chegam como duas listas),
-// então o mesmo caminho vale para os dois. NÃO usa `verdict` na ordenação: a
-// geometria rankeia, o veredito é sinalização no card (divergência deliberada do
-// D9 da kg-redesign).
+// numa lista intercalada por AFINIDADE decrescente (escala 0..1 do motor v3,
+// comparável entre os dois), com desempate estável por id. Sem agrupamento por
+// kind — programa de afinidade alta fica acima de edital de afinidade baixa.
+// Usado tanto no turno fresco quanto na retomada de conversa (ambos chegam como
+// duas listas), então o mesmo caminho vale para os dois. NÃO usa `verdict` na
+// ordenação: a geometria rankeia, o veredito é sinalização no card.
 export function mergeRadar(
   matchedEditais: MatchedEdital[],
   matchedEntities: MatchedEntity[],
@@ -233,11 +232,9 @@ export function mergeRadar(
       }),
     ),
   ];
-  return items
-    .filter((item) => item.kind !== "ict")
-    .sort(
-      (a, b) => b.affinity - a.affinity || a.sortId.localeCompare(b.sortId),
-    );
+  return items.sort(
+    (a, b) => b.affinity - a.affinity || a.sortId.localeCompare(b.sortId),
+  );
 }
 
 // Serializa só as mensagens p/ o `history` enviado ao /frontdoor/turn (o backend

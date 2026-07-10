@@ -13,7 +13,6 @@ from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient
 from core.profile_extractor import ExtractResult, ProfileExtractor
 from core.profile_inference import infer_financiamento
-from core.services.company_corpus import completude_message, load_company_hypergraph
 from core.services.content_library import extract_document_text, get_item, get_workspace_id
 
 router = APIRouter(tags=["profile"])
@@ -142,63 +141,8 @@ def extract_profile_from_library(
     return _serialize_extract_result(result)
 
 
-@router.post(
-    "/profile/corpus",
-    summary="Dispara a (re)construção do hipergrado da empresa a partir do corpus",
-)
-async def build_company_corpus(user_id: CurrentUserId, db: DbClient):
-    """Enfileira a (re)construção do hipergrado durável da empresa (Sprint 2).
-
-    Dispara a task de background `build_company_hypergraph`, que consome o corpus
-    já persistido no DB do workspace (documentos/itens) e roda extração +
-    embeddings para materializar nós/arestas em `company_hypergraphs`. Como é uma
-    etapa cara (LLM + embeddings), vai pela fila procrastinate — o status é
-    consultável em GET /profile/corpus/status.
-    """
-    workspace_id = get_workspace_id(db, user_id)
-    from core.tasks import app as tasks_app
-    try:
-        async with tasks_app.open_async():
-            await tasks_app.configure_task("build_company_hypergraph").defer_async(
-                workspace_id=workspace_id
-            )
-    except Exception as e:  # fila offline/indisponível → 503 limpo (convenção do projeto)
-        raise HTTPException(
-            status_code=503,
-            detail="Falha ao enfileirar a construção do corpus — tente novamente.",
-        ) from e
-    return {"status": "queued", "workspace_id": workspace_id}
-
-
-@router.get(
-    "/profile/corpus/status",
-    summary="Status do hipergrado durável da empresa (completude + cobertura)",
-)
-def company_corpus_status(user_id: CurrentUserId, db: DbClient):
-    """Retorna o estado do hipergrado da empresa para o workspace do usuário.
-
-    Sem hipergrado materializado (corpus nunca construído) → status "empty".
-    Caso contrário, devolve completude + mensagem de feedback, nº de nós, nº de
-    documentos do corpus, URLs cobertas e o timestamp da última atualização.
-    """
-    workspace_id = get_workspace_id(db, user_id)
-    record = load_company_hypergraph(db, workspace_id)
-    if record is None:
-        return {
-            "status": "empty",
-            "completude": 0.0,
-            "completude_message": completude_message(0.0),
-            "n_nos": 0,
-            "n_docs": 0,
-            "corpus_urls": [],
-            "updated_at": None,
-        }
-    return {
-        "status": "ready",
-        "completude": record["completude"],
-        "completude_message": completude_message(record["completude"]),
-        "n_nos": len(record["nodes"]),
-        "n_docs": record["n_docs"],
-        "corpus_urls": record["corpus_urls"],
-        "updated_at": record["updated_at"],
-    }
+# Os endpoints /profile/corpus (build) e /profile/corpus/status morreram na
+# Fase 2 do v3 junto com o hipergrado da empresa: o lado empresa do match agora
+# é `company_chunks`, com refresh ON-DEMAND dentro do próprio match
+# (core/services/company_chunks.ensure_company_chunks) — não há mais build de
+# background para disparar nem status para consultar. Nenhum caller no frontend.

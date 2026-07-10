@@ -185,69 +185,37 @@ async def embed_content_task(item_id: str) -> None:
     logger.info("embed_content_task: item_id=%s embedded (1536d)", item_id)
 
 
-@app.task(name="build_company_hypergraph", queue="default", retry=UNIT_TASK_RETRY)
-async def build_company_hypergraph_task(workspace_id: str) -> None:
-    """(Re)constrói o hipergrado durável da empresa a partir do corpus já no DB.
-
-    Orquestra corpus → extração → completude → persistência via
-    `core.services.company_corpus.build_company_hypergraph` (Sprint 2). Essa
-    chamada é SÍncrona e bloqueia (1 LLM call + embeddings), então a envolvemos
-    em `asyncio.to_thread` para não travar o event loop do worker.
-
-    Roda contra o cliente service-role (sem request context) — a fronteira de
-    tenant é o próprio `workspace_id`. Exceções propagam e o procrastinate
-    re-tenta com backoff exponencial (retry=UNIT_TASK_RETRY, como nas demais
-    tasks unitárias).
-    """
-    from core.services.company_corpus import build_company_hypergraph
-
-    db = get_supabase_service()
-
-    logger.info("build_company_hypergraph_task: workspace_id=%s iniciando", workspace_id)
-    result = await asyncio.to_thread(build_company_hypergraph, db, workspace_id)
-    logger.info(
-        "build_company_hypergraph_task: workspace_id=%s concluído "
-        "(nós=%d, docs=%d, completude=%.2f)",
-        workspace_id,
-        len(result["nodes"]),
-        result["n_docs"],
-        result["completude"],
-    )
-
-
 @app.task(name="compute_match_verdicts", queue="default", retry=UNIT_TASK_RETRY)
 async def compute_match_verdicts_task(
     workspace_id: str, items: list[dict], profile: dict,
 ) -> None:
-    """Computa e cacheia os vereditos LLM do top-K do radar (KG v2 PR7 / Estágio 2).
+    """Computa e cacheia os vereditos LLM do top-K do radar (Estágio 3 do v3).
 
-    `items` = misses do último refresh (`[{file_key, paths}]`, ≤ K), com os paths
-    de afinidade que justificaram o match. A task re-serializa cada subgrafo do
-    corpus ATUAL e recomputa o `input_hash` (mesma função do router) — se o corpus
-    mudou entre o defer e a execução, o hash gravado reflete o corpus novo, que é
-    o que o próximo request também verá (cache-hit correto, nunca stale servido
-    como fresco).
+    `items` = misses do último refresh (`[{oportunidade_id, excerpts}]`, ≤ K),
+    com os trechos que justificaram o match. A task re-serializa cada ficha do
+    corpus ATUAL (linha de `entities` via snapshot do match_v3) e recomputa o
+    `input_hash` (mesma função do router) — se o corpus mudou entre o defer e a
+    execução, o hash gravado reflete o corpus novo, que é o que o próximo
+    request também verá (cache-hit correto, nunca stale servido como fresco).
 
     Fail-open POR PAR: `compute_verdict` devolve None em erro (o card fica sem
     veredito); um par ruim não derruba os demais. Exceções de infra (DB/fila)
     propagam e o procrastinate re-tenta com backoff — o upsert é idempotente.
     """
-    from core.kg import kg_store
     from core.services import match_verdict as mv
 
     db = get_supabase_service()
-    graphs = await asyncio.to_thread(kg_store.load_all_hypergraphs)
 
-    prepared: list[tuple[str, str, list[dict], str]] = []  # (oid, serialized, paths, hash)
+    prepared: list[tuple[str, str, list[dict], str]] = []  # (oid, serialized, excerpts, hash)
     for item in items or []:
-        # serialize_for_verdict despacha edital (file_key) × investimento (PR8.1).
-        prep = mv.serialize_for_verdict(item, graphs)
+        prep = await asyncio.to_thread(mv.serialize_for_verdict, item)
         if prep is None:
             logger.info("compute_match_verdicts: item sem oportunidade resolvível — pulado: %s", item)
             continue
         oid, serialized = prep
-        paths = item.get("paths") or []
-        prepared.append((oid, serialized, paths, mv.verdict_input_hash(serialized, profile, paths)))
+        excerpts = item.get("excerpts") or []
+        prepared.append((oid, serialized, excerpts,
+                         mv.verdict_input_hash(serialized, profile, excerpts)))
 
     # Segunda visita = zero chamadas: pares já gravados com o MESMO hash saem aqui
     # (o defer duplicado é possível — queueing_lock só cobre jobs ainda na fila).
@@ -255,8 +223,8 @@ async def compute_match_verdicts_task(
     hits = await asyncio.to_thread(mv.get_cached_verdicts, db, workspace_id, wanted)
     misses = [p for p in prepared if p[0] not in hits]
 
-    async def _one(oid: str, serialized: str, paths: list[dict], h: str) -> bool:
-        verdict = await asyncio.to_thread(mv.compute_verdict, serialized, profile, paths)
+    async def _one(oid: str, serialized: str, excerpts: list[dict], h: str) -> bool:
+        verdict = await asyncio.to_thread(mv.compute_verdict, serialized, profile, excerpts)
         if verdict is None:
             return False
         await asyncio.to_thread(

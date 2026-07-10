@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { MatchedEntity, InvestmentOffer } from "@/lib/api";
 import { VerdictBlock } from "./VerdictBlock";
+import { ExcerptRow, SetorChips } from "./MatchedEditalCard";
 
 const brl = (n: number) => `R$ ${n.toLocaleString("pt-BR")}`;
 
@@ -31,17 +32,14 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-// KG v2: `kind` é slug (investidor/programa/ict). Estilo e rótulo de display por slug.
 const KIND_STYLES: Record<string, string> = {
   investidor: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   programa: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  ict: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
 };
 
 const KIND_LABELS: Record<string, string> = {
   investidor: "Investidor",
   programa: "Programa",
-  ict: "ICT",
 };
 
 function KindBadge({ kind }: { kind: string }) {
@@ -60,12 +58,10 @@ export function MatchedEntityCard({
   entity: MatchedEntity;
   onStartWriting?: (entityId: string, mode: "proposal" | "pitch") => void;
 }) {
-  const canWrite = entity.kind === "investidor" || entity.kind === "programa";
   const writeLabel = entity.kind === "investidor" ? "Escrever pitch →" : "Escrever proposta →";
   const writeMode = entity.kind === "investidor" ? ("pitch" as const) : ("proposal" as const);
-  // D1/PR8: a unidade é a Oportunidade — o card leva à ficha (investidor →
-  // ficha da OFERTA de investimento; programa → ficha do programa). ICT não tem
-  // entity_id (é parceiro sugerido, não oportunidade) → não é clicável.
+  // A unidade é a Oportunidade — o card leva à ficha (investidor → ficha da
+  // tese/oferta; programa → ficha do programa), chaveada pelo native_id.
   const fichaHref = entity.entity_id
     ? `/oportunidades/${encodeURIComponent(entity.entity_id)}`
     : null;
@@ -78,7 +74,7 @@ export function MatchedEntityCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-0.5">
             <KindBadge kind={entity.kind} />
-            {entity.offer && (
+            {entity.kind === "investidor" && (
               <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
                 Oportunidade de investimento
               </span>
@@ -101,58 +97,46 @@ export function MatchedEntityCard({
               {entity.description}
             </p>
           )}
-          {entity.offer && (ticket || entity.offer.estagio_alvo.length > 0) && (
-            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-              {ticket && (
-                <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-300">
-                  🎟 {ticket}
-                </span>
-              )}
-              {entity.offer.estagio_alvo.map((e) => (
-                <span
-                  key={e}
-                  className="inline-flex items-center rounded-full bg-content-secondary/10 px-2 py-0.5 text-[11px] text-content-secondary"
-                >
-                  {e}
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="flex items-center gap-3 mt-1.5 text-xs text-content-secondary">
-            <span>🎯 {(entity.affinity * 10).toFixed(1)}</span>
-            {entity.n_paths > 0 && (
-              <span>{entity.n_paths} {"conexão"}{entity.n_paths !== 1 ? "ões" : ""}</span>
+          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+            {ticket && (
+              <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-300">
+                🎟 {ticket}
+              </span>
             )}
-            {fichaHref && (
+            {(entity.estagio_alvo ?? entity.offer?.estagio_alvo ?? []).map((e) => (
+              <span
+                key={e}
+                className="inline-flex items-center rounded-full bg-content-secondary/10 px-2 py-0.5 text-[11px] text-content-secondary"
+              >
+                {e}
+              </span>
+            ))}
+            <SetorChips setores={entity.setores} />
+          </div>
+          {fichaHref && (
+            <div className="mt-1.5 text-xs">
               <Link href={fichaHref} className="text-primary hover:underline">
                 Ver ficha ↗
               </Link>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {entity.paths.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-border">
-          {entity.paths.map((p, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center gap-1 rounded-full bg-primary/8 px-2 py-0.5 text-[11px] font-sans text-content-secondary"
-            >
-              <span className="max-w-[120px] truncate">«{p.src}»</span>
-              <span className="text-content-tertiary">↔</span>
-              <span className="max-w-[120px] truncate">«{p.dst}»</span>
-            </span>
+      {entity.matched_excerpts.length > 0 && (
+        <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-border">
+          {entity.matched_excerpts.slice(0, 3).map((x, i) => (
+            <ExcerptRow key={i} excerpt={x} />
           ))}
         </div>
       )}
 
-      {/* Veredito da oferta de investimento (Estágio 2, PR8.1) quando existir */}
+      {/* Veredito LLM (Estágio 3) quando existir */}
       {entity.verdict && <VerdictBlock verdict={entity.verdict} />}
 
-      {canWrite && entity.entity_id && onStartWriting && (
+      {entity.entity_id && onStartWriting && (
         <button
-          onClick={() => onStartWriting(entity.entity_id!, writeMode)}
+          onClick={() => onStartWriting(entity.entity_id, writeMode)}
           className="mt-2 w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
         >
           {writeLabel}

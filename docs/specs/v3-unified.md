@@ -163,7 +163,7 @@ CREATE TABLE match_chunks (
 );
 ```
 
-- **Embed cru do texto do silver, sem contextual retrieval.** Motivos: (a) o contexto injetado é institucional e aproxima todos os editais entre si (anti-sinal para match); (b) a parte útil já está estruturada de graça em `section_path`/`kind`; (c) simetria de regime com os chunks da empresa (que não têm "capítulo"); (d) custo — 1 edital FINEP tem ~172 blocos; contextual = 1 LLM/chunk × corpus eager. Hipótese testável no bake-off (§10).
+- ~~Embed cru do texto do silver, sem contextual retrieval.~~ **REVOGADO pelo gate da Fase 1.5 (2026-07-10):** a célula `contextual` venceu o cru em TODAS as métricas (MRR 0.505→0.666) — o embedding dos `match_chunks` é **contextualizado** (`core/contextual_retrieval.py`, doc de contexto = blocos temáticos do próprio silver; texto armazenado segue cru, só o vetor muda — mesma convenção de `edital_chunks`). Os motivos originais do cru ((a) contexto institucional como anti-sinal, (c) simetria com o lado empresa) eram hipóteses e foram refutados empiricamente; o custo (d) foi aceito (~US$0,7/corpus, pago só no re-ingest por `source_hash`).
 - **Só seções temáticas entram** (objetivos, temas, linhas, escopo). Boilerplate (cronograma, documentação exigida, disposições gerais) é excluído por `section_path`/`kind` — regra no WIKI.md.
 - Editais e programas geram chunks (programas: description curada = 1-2 chunks). Investidores/ICTs usam só `entities.embedding` (descrições curtas — single-vector basta).
 

@@ -11,7 +11,11 @@ eles é resolvida em tempo de query via entity index (type, name).
 Tiers paralelos (asyncio.gather):
   Tier 1 — Léxico: varre name+description de todos os nós com _theme_match
   Tier 2 — Cross-source: BFS multi-subgrafo a partir dos nós match do Tier 1
-  Tier 3 — Embedding: match geométrico (só se houver perfil da empresa)
+
+O antigo Tier 3 (match geométrico por nós de empresa) morreu na Fase 2 do v3:
+nenhum caller passava `company_nodes` (a tool explore_opportunity chama só por
+tema), e o match por perfil agora é do motor `core/services/match_v3.py`. Este
+serviço inteiro migra para `entities` (SQL) no PR-B.
 """
 from __future__ import annotations
 
@@ -146,54 +150,14 @@ class OpportunityService:
                     break
         return extra
 
-    # ── Tier 3 — Embedding match (~500ms, condicional) ──────────────────
-
-    def _tier3_embed(self, company_nodes: list[dict], top_k: int) -> dict:
-        """Match geométrico: empresa → aresta sintética → ecossistema."""
-        from core.services.hypergraph_match import (
-            find_matching_editais,
-            find_matching_entities,
-        )
-        result: dict = {"editais": [], "icts": [], "investidores": [], "programas": []}
-
-        editais = find_matching_editais(
-            company_nodes, top_k=top_k, ecosystem=self._eco_nodes,
-        )
-        result["editais"] = [
-            {"id": f"{e.source}:{e.edital_id}", "name": e.name,
-             "affinity": e.affinity, "score": e.score, "source": "embedding"}
-            for e in editais
-        ]
-
-        entities = find_matching_entities(
-            company_nodes, top_k=top_k, ecosystem=self._eco_nodes,
-        )
-        for ent in entities:
-            key = {
-                "ict": "icts",
-                "investidor": "investidores",
-                "programa": "programas",
-            }.get(ent.kind)
-            if key:
-                result[key].append({
-                    "id": ent.name.lower(),
-                    "name": ent.name,
-                    "affinity": ent.affinity,
-                    "score": ent.score,
-                    "source": "embedding",
-                })
-        return result
-
     # ── Merge ───────────────────────────────────────────────────────────
 
-    def _merge(self, t1: dict, t2: dict, t3: dict | None) -> dict:
-        """Merge dos 3 tiers com dedup."""
+    def _merge(self, t1: dict, t2: dict) -> dict:
+        """Merge dos tiers com dedup."""
         seen: dict[str, set[str]] = defaultdict(set)
         merged: dict[str, list] = defaultdict(list)
 
-        for tier, _source in [(t1, "lex"), (t2, "cross"), (t3, "embed")]:
-            if tier is None:
-                continue
+        for tier in (t1, t2):
             for category in ("editais", "icts", "investidores", "programas"):
                 for item in tier.get(category, []):
                     name = item.get("name", "") or item.get("title", "")
@@ -207,35 +171,15 @@ class OpportunityService:
 
     # ── Public API ──────────────────────────────────────────────────────
 
-    def explore(
-        self,
-        tema: str,
-        *,
-        top_k: int = 15,
-        company_nodes: list[dict] | None = None,
-    ) -> dict:
+    def explore(self, tema: str, *, top_k: int = 15) -> dict:
         """Pipeline completa de descoberta. Síncrona (chama asyncio.run
         internamente para paralelizar tiers). Retorna dict com:
         {editais, icts, investidores, programas, temas}."""
         self._ensure_graphs()
 
-        # Tiers paralelos (assíncronos)
         async def _run():
-            t1 = asyncio.to_thread(self._tier1_lexical, tema, top_k)
-            t2_coro = self._tier2_cross  # precisa do resultado de t1
-            t3 = (
-                asyncio.to_thread(self._tier3_embed, company_nodes, top_k)
-                if company_nodes else None
-            )
-            t1_result = await t1
-            t2 = asyncio.create_task(
-                asyncio.to_thread(t2_coro, t1_result)
-            )
-            tasks = [t2]
-            if t3:
-                tasks.append(t3)
-            t2_result, *t3_results = await asyncio.gather(*tasks)
-            t3_result = t3_results[0] if t3_results else None
-            return self._merge(t1_result, t2_result, t3_result)
+            t1_result = await asyncio.to_thread(self._tier1_lexical, tema, top_k)
+            t2_result = await asyncio.to_thread(self._tier2_cross, t1_result)
+            return self._merge(t1_result, t2_result)
 
         return asyncio.run(_run())

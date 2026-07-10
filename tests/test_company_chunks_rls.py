@@ -132,3 +132,44 @@ class TestCompanyChunksRLS:
         db_a = get_supabase_user(two_tenants["jwt_a"])
         rows = db_a.table("company_chunks").select("*").eq("workspace_id", two_tenants["ws_a"]).execute().data
         assert any(r.get("text") == "SEGREDO-DE-A" for r in rows), "A não lê a própria linha — inconclusivo"
+
+
+class TestCaminhoNovoV3:
+    """RLS no CAMINHO NOVO (Fase 2): o refresh on-demand do match
+    (`ensure_company_chunks`, psycopg service-side) escreve SÓ o workspace
+    pedido, e `load_company_chunks` (o insumo do Stage 2) devolve SÓ os chunks
+    daquele workspace — mesmo com outro tenant populado ao lado."""
+
+    def test_refresh_e_load_escopados_por_workspace(self, two_tenants, monkeypatch):
+        import core.retrieval.embedder as embedder
+        from core.services.company_chunks import ensure_company_chunks, load_company_chunks
+
+        # sem rede: embedding fake determinístico (o alvo do teste é o escopo)
+        monkeypatch.setattr(
+            embedder, "embed_texts", lambda texts: [[0.1] * 1536 for _ in texts],
+        )
+        profile_b = {
+            "nome": "Empresa-B",
+            "one_liner": "Perfil exclusivo de B para o leak-test do caminho novo.",
+            "descricao_atividades": "Atividades de B. " * 30,  # rico → sem HyDE/LLM
+        }
+        n = ensure_company_chunks(two_tenants["ws_b"], profile_b)
+        assert n > 0
+
+        texts_b, embs_b = load_company_chunks(two_tenants["ws_b"])
+        assert len(texts_b) == n
+        assert all("SEGREDO-DE-A" not in t for t in texts_b), "LEAK: chunk de A no lado B"
+        assert embs_b.shape[0] == n
+
+        # o refresh de B não tocou as linhas de A
+        db_a = get_supabase_user(two_tenants["jwt_a"])
+        rows_a = (
+            db_a.table("company_chunks").select("text")
+            .eq("workspace_id", two_tenants["ws_a"]).execute().data
+        )
+        assert any(r["text"] == "SEGREDO-DE-A" for r in rows_a)
+
+        # e B, via PostgREST (RLS), vê exatamente o que o motor leu — nada de A
+        db_b = get_supabase_user(two_tenants["jwt_b"])
+        rows_b = db_b.table("company_chunks").select("workspace_id, text").execute().data
+        assert {r["workspace_id"] for r in rows_b} <= {two_tenants["ws_b"]}

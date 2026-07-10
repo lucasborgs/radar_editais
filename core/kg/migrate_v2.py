@@ -178,9 +178,9 @@ _V2_ID_PREFIX = {"Oportunidade": "op", "Ator": "ator", "Conceito": "con"}
 # Exclusão) ou proveniência (Fonte, D4). Foldados file-level (ver _fold_facets).
 _FOLDED_TYPES = frozenset({"Fonte", "Mecanismo", "Requisito", "Exclusão"})
 
-# Marca de ex-Entidade reclassificada como Conceito (D5). Excluída da afinidade
-# do match (em v1 Entidade NUNCA esteve em AFFINITY_TYPES) — a promoção nó-a-nó
-# é decisão do PR3 (higiene). Ver core/services/hypergraph_match.
+# Marca de ex-Entidade reclassificada como Conceito (D5). O match v2 que a
+# consumia morreu (Fase 2 do v3); a marca segue usada pelo catálogo/explore
+# (inerte na navegação) até o PR-B.
 ENTIDADE_V1_ORIGEM = "entidade_v1"
 
 

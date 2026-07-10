@@ -183,14 +183,16 @@ export interface FrontdoorEntryIds {
   diff?: number | null;
 }
 
-export interface MatchedEditalPath {
-  src: string;
-  dst: string;
-  dst_type: string;
+// Par de trechos reais que gerou o match (motor v3, Stage 2) — a explicação
+// do card: trecho da empresa ↔ trecho do edital/tese, com o cosseno do par.
+export interface MatchedExcerpt {
+  company_text: string;
+  edital_text: string;
+  section?: string | null;
   score: number;
 }
 
-// Elegibilidade dura (KG v2 PR5 / Estágio 0). `inelegivel` nunca chega ao
+// Elegibilidade dura (Stage 1 do funil v3). `inelegivel` nunca chega ao
 // front (é filtrado antes); sobram `elegivel` e `nao_verificada` (perfil
 // incompleto → o card mostra "elegibilidade não verificada" + o que completar).
 export interface Elegibilidade {
@@ -199,7 +201,7 @@ export interface Elegibilidade {
   unknown: string[];
 }
 
-// Veredito LLM do match (KG v2 PR7 / Estágio 2). Nullable: o card renderiza sem
+// Veredito LLM do match (Estágio 3 do funil v3). Nullable: o card renderiza sem
 // ele e o recebe quando a task terminar (poll via fetchMatchVerdicts). Anônimo
 // nunca recebe veredito (o cache é por workspace).
 export interface MatchVerdict {
@@ -210,22 +212,25 @@ export interface MatchVerdict {
 }
 
 export interface MatchedEdital {
+  kind: "edital";
   source: string;
   edital_id: string;
+  entity_id: string;          // native_id ("finep:589")
   name: string;
-  score: number;
-  affinity: number;
-  n_paths: number;
+  description: string;
+  score: number;              // melhor par (cosseno 0..1) — ring
+  affinity: number;           // média dos máximos (0..1) — ranking
+  setores: string[];
+  matched_excerpts: MatchedExcerpt[];
   status: string | null;
   prazo: string | null;
   valor: string | null;
+  url?: string | null;
   elegibilidade?: Elegibilidade | null;
   verdict?: MatchVerdict | null;
-  paths: MatchedEditalPath[];
 }
 
-// D1/PR8: quando o match é um fundo (kind=investidor), o card apresenta a OFERTA
-// de investimento (Oportunidade), não o Ator — o fundo é o veículo.
+// Facetas do card de investidor (site/ticket/estágio da tese).
 export interface InvestmentOffer {
   offer_name: string;
   official_url: string;
@@ -234,17 +239,18 @@ export interface InvestmentOffer {
 }
 
 export interface MatchedEntity {
-  file_key: string;
-  kind: "investidor" | "programa" | "ict";  // KG v2: slug (era "Investidor"/…)
+  kind: "investidor" | "programa";
+  entity_id: string;          // native_id ("investidor:kptl" / "programa:centelha")
   name: string;
   description: string | null;
   score: number;
-  affinity: number;
-  n_paths: number;
-  paths: MatchedEditalPath[];
-  entity_id?: string;
-  offer?: InvestmentOffer;                   // só investidor (D1)
-  verdict?: MatchVerdict | null;             // veredito da oferta (PR8.1), chaveado por entity_id
+  affinity: number;           // mesma escala 0..1 do funil (ranking unificado)
+  setores?: string[];
+  matched_excerpts: MatchedExcerpt[];
+  estagio_alvo?: string[];
+  offer?: InvestmentOffer;                   // só investidor
+  verificado?: boolean;
+  verdict?: MatchVerdict | null;             // veredito, chaveado por entity_id
 }
 
 export const frontdoorTurn = (

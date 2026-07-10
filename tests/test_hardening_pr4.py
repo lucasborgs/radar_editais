@@ -31,7 +31,6 @@ from core.web_search import SearchHit
 UNIT_TASKS = [
     "enrich_content",
     "embed_content",
-    "build_company_hypergraph",
     "reflect_workspace",
     "synthesize_patterns",
     "chunk_edital",
