@@ -20,7 +20,13 @@ cloudflared/
 
 # Data (raw sources — não versionar)
 data/bronze/
-data/silver/
+# silver é derivado (não versionar), EXCETO as fontes curadas à mão do v3
+# (§3 da spec docs/specs/v3-unified.md) — load-bearing, precisam de versão.
+# Nota: "data/silver/*" (não "data/silver/") porque git não re-inclui arquivo
+# dentro de diretório ignorado.
+data/silver/*
+!data/silver/programas.json
+!data/silver/investidores.json
 data/vocab_lint/
 profiles/
 artigos/
