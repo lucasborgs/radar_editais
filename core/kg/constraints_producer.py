@@ -147,6 +147,149 @@ def extract_constraints(
     return out
 
 
+# ===========================================================================
+# v3 (spec docs/specs/v3-unified.md) — entry point ADITIVO: lê o TEXTO das seções
+# de elegibilidade do silver e devolve (constraints, requisitos_texto). Vocabulário
+# §4.4 (10 tipos) lido do WIKI (`constraint_vocab`), separado do subconjunto v2
+# acima. `produce_for_graph`/`extract_constraints`/`_normalize` (v2) NÃO mudam.
+# ===========================================================================
+
+_SYSTEM_V3 = """Você extrai ELEGIBILIDADE DURA de editais/programas brasileiros de \
+fomento à inovação a partir do TEXTO das seções de elegibilidade, convertendo-o em \
+constraints ESTRUTURADAS que um sistema avalia contra o perfil da empresa.
+
+Emita SOMENTE constraints EXPLÍCITAS e VERIFICÁVEIS de UM destes tipos — na dúvida, \
+NÃO emita (um constraint falso exclui a empresa por engano; o texto continua sendo \
+exibido por outra via):
+
+- porte: quem pode concorrer por tamanho. valor = lista dos portes PERMITIDOS entre \
+[mei, me, epp, media, grande]; op="in". "Até média empresa" → ["mei","me","epp","media"]. \
+"Micro e pequena" → ["mei","me","epp"]. Exclusão ("vedado a grandes") → op="not_in", valor=["grande"].
+- faturamento: teto/piso de faturamento/receita anual. valor = número em R$/ano \
+(ex. 4800000 para "R$ 4,8 milhões"); op="lte" (até) ou "gte" (a partir de).
+- idade_empresa_meses: idade máxima/mínima do CNPJ em MESES. valor = número; op="lte" \
+(no máximo) ou "gte" (no mínimo). "Criada há no máximo 12 meses" → op="lte", valor=12.
+- sede_uf: exigência de sede/domicílio em UF. valor = lista de siglas (2 letras, ex. ["SC"]); \
+op="in" (deve estar) ou "not_in".
+- forma_juridica: natureza jurídica exigida. valor = lista entre \
+[empresa, startup, ict, universidade, cooperativa, associacao]; op="in"/"not_in".
+- trl: nível de maturidade tecnológica. valor = número 1-9; op="gte"/"lte"/"in".
+- cnae: restrição por CNAE/atividade econômica. valor = lista de códigos/prefixos CNAE \
+(strings, ex. ["62"]); op="in"/"not_in".
+- parceria: exige parceria/consórcio com um tipo de ator. op="exige", valor = um de \
+[agencia, fap, ict, corporate, aceleradora, investidor] (ex. "parceria obrigatória com ICT" → "ict").
+- vinculo_incubacao: exige vínculo com incubadora/aceleradora credenciada. op="exige", valor=true.
+- investidor_privado: exige aporte/compromisso de investidor privado. op="exige", valor=true.
+
+NÃO emita constraint para: exigências documentais (plano de trabalho, certidões, CNPJ \
+regular), critérios de mérito/pontuação, prazos, contrapartida financeira, setor/tema \
+(afinidade, não elegibilidade), ou qualquer coisa fora dos 10 tipos acima.
+
+Além das constraints, devolva `requisitos_texto`: uma lista curta (≤6) de frases \
+objetivas em português com as EXIGÊNCIas de elegibilidade relevantes (inclusive as que \
+você NÃO estruturou), para exibição no card. Não repita boilerplate.
+
+Responda JSON: {"constraints": [{"tipo": "...", "op": "...", "valor": ...}], \
+"requisitos_texto": ["..."]}. Listas vazias se nada se encaixa."""
+
+
+def _v3_vocab() -> tuple[set[str], set[str]]:
+    """(tipos, ops) do bloco `constraint_vocab` do WIKI (§13.4). Fallback à lista
+    §4.4 embutida se o bloco estiver ausente."""
+    v = schema.constraint_vocab_v3()
+    tipos = set(v.get("tipos") or [
+        "porte", "faturamento", "idade_empresa_meses", "sede_uf", "forma_juridica",
+        "trl", "cnae", "parceria", "vinculo_incubacao", "investidor_privado",
+    ])
+    ops = set(v.get("ops") or ["in", "not_in", "lte", "gte", "exige"])
+    return tipos, ops
+
+
+def _valid_v3(c: dict, tipos: set[str], ops: set[str]) -> bool:
+    return (
+        isinstance(c, dict)
+        and c.get("tipo") in tipos
+        and c.get("op") in ops
+        and c.get("valor") not in (None, "", [])
+    )
+
+
+def _normalize_v3(c: dict) -> dict:
+    """Normaliza o `valor` para a forma canônica que o avaliador compara (v3):
+    UF maiúsculo, porte/forma_juridica/cnae minúsculo, números como número,
+    `exige` como bool/string enxuto."""
+    tipo, op, valor = c["tipo"], c["op"], c["valor"]
+    if tipo == "sede_uf":
+        vals = valor if isinstance(valor, list) else [valor]
+        c["valor"] = [str(v).strip().upper() for v in vals]
+    elif tipo in ("porte", "forma_juridica"):
+        vals = valor if isinstance(valor, list) else [valor]
+        c["valor"] = [str(v).strip().lower() for v in vals]
+    elif tipo == "cnae":
+        vals = valor if isinstance(valor, list) else [valor]
+        c["valor"] = [str(v).strip() for v in vals if str(v).strip()]
+    elif tipo in ("faturamento", "trl", "idade_empresa_meses"):
+        if isinstance(valor, list):
+            c["valor"] = [_num(v) for v in valor if _num(v) is not None]
+        else:
+            c["valor"] = _num(valor)
+    elif op == "exige":
+        # parceria → tipo de ator (string minúscula); vinculo/investidor → bool.
+        if tipo == "parceria":
+            c["valor"] = str(valor).strip().lower()
+        else:
+            c["valor"] = bool(valor) if not isinstance(valor, str) else valor.strip().lower() in ("true", "sim", "1", "yes")
+    return c
+
+
+def produce_from_text(
+    text: str, *, client=None, model: str | None = None
+) -> tuple[list[dict], list[str]]:
+    """Extrai `(constraints, requisitos_texto)` do TEXTO das seções de elegibilidade
+    do silver (entry point v3 — não toca o grafo).
+
+    Fail-open: qualquer erro (sem chave, parse, chamada) → `([], [])` (a entidade
+    cai no "unknown não elimina"). CONSERVADOR: constraint inválida/fora do vocab é
+    descartada; o texto continua em `requisitos_texto`. Não levanta."""
+    text = (text or "").strip()
+    if not text:
+        return [], []
+    try:
+        if client is None:
+            client, model = _make_llm()
+        model = model or CONSTRAINTS_MODEL
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": _SYSTEM_V3},
+                {"role": "user", "content": text[:12000]},
+            ],
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+        data = json.loads(resp.choices[0].message.content)
+    except Exception as e:  # noqa: BLE001 — produtor nunca derruba o ingest
+        logger.warning("produce_from_text: falha (%s) — sem constraints", e)
+        return [], []
+
+    tipos, ops = _v3_vocab()
+    constraints: list[dict] = []
+    for c in data.get("constraints", []) or []:
+        if not isinstance(c, dict):
+            continue
+        c = {"tipo": c.get("tipo"), "op": c.get("op"), "valor": c.get("valor")}
+        if _valid_v3(c, tipos, ops):
+            constraints.append(_normalize_v3(c))
+        else:
+            logger.info("produce_from_text: constraint descartada (fora do vocab): %s", c)
+
+    requisitos = [
+        str(r).strip() for r in (data.get("requisitos_texto") or [])
+        if isinstance(r, str) and str(r).strip()
+    ][:8]
+    return constraints, requisitos
+
+
 def _edital_nodes(graph: dict) -> list[dict]:
     return [
         n for n in graph.get("nodes", [])

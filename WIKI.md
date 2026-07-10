@@ -1018,3 +1018,239 @@ Débito conhecido, a ser pago no rename (Fase 2). O structurer faz `pdfplumber`
 — extração é trabalho de L1, não de L2. `_SOURCE = "finep"` e
 `FINEP_PDFS_DIR` em etl_process/tasks fixam a fonte. O alvo: extração migra
 pro Source Adapter; L2/L3 passam a consumir Documento Canônico, source-neutro.
+
+## 13. Vocabulários gold v3 (spec `docs/specs/v3-unified.md`)
+
+Blocos lidos por `core/kg/schema.py` (accessors `setores_taxonomia()`,
+`tag_normalization()`, `match_sections()`, `constraint_vocab_v3()`) e aplicados
+no ingest gold (`core/kg/gold.py`). **Mudou a regra → edite estes blocos, não o
+código.** Estes vocabulários pertencem ao pipeline v3 (aditivo); os blocos v2
+(`§5.9`, `§6.4`) seguem intocados enquanto o match v2 estiver vivo.
+
+### 13.1 Taxonomia de setores (`setores_taxonomia`, §4.3)
+
+Taxonomia FECHADA de 16 setores. 1-3 por entidade; fallback `Multissetorial`.
+Nunca é hard filter no match — só facet de catálogo e boost opcional de ranking.
+`labels` = valores canônicos. `tese_theme_map` mapeia `tese_themes` (estilo
+`tema_vocab`, usados por investidores/programas) → labels. `alias_map` normaliza
+qualquer string crua (setores curados, slugs `setor_vocab`, sinônimos comuns) →
+label. Validação (1-3, vocabulário fechado, fallback) é em aplicação, não em CHECK SQL.
+
+```yaml
+setores_taxonomia:
+  labels:
+    - Agro
+    - Saúde
+    - Energia
+    - TIC
+    - Bioeconomia
+    - Defesa
+    - Mobilidade
+    - Urbano
+    - Educação
+    - Química
+    - Materiais
+    - Sustentabilidade
+    - Marítimo
+    - Social
+    - Finanças
+    - Multissetorial
+  fallback: Multissetorial
+  max_por_entidade: 3
+  # tese_themes (tema_vocab / macro_temas) → labels
+  tese_theme_map:
+    "agro - bioeconomia e alimentos": [Agro, Bioeconomia]
+    "tecnologias digitais e conectividade": [TIC]
+    "saúde e ciências da vida": [Saúde]
+    "energia e transição sustentável": [Energia]
+    "materiais, química e manufatura avançada": [Materiais, Química]
+    "mobilidade e logística": [Mobilidade]
+    "espaço - defesa e segurança": [Defesa]
+    "defesa e soberania nacional": [Defesa]
+    "meio ambiente, água e saneamento": [Sustentabilidade]
+    "petróleo, gás e mineração": [Energia]
+    "construção e cidades inteligentes": [Urbano]
+  # string crua (lowercase+sem acento no lookup) → label
+  alias_map:
+    multissetorial: Multissetorial
+    multissetoriais: Multissetorial
+    transversal: Multissetorial
+    agro: Agro
+    agronegocio: Agro
+    agropecuaria: Agro
+    saude: Saúde
+    "ciencias da vida": Saúde
+    healthtech: Saúde
+    energia: Energia
+    "oleo-gas": Energia
+    "oleo e gas": Energia
+    "petroleo e gas": Energia
+    tic: TIC
+    ti: TIC
+    "ti-software": TIC
+    "ti e software": TIC
+    software: TIC
+    "tecnologia da informacao": TIC
+    "tecnologias digitais": TIC
+    bioeconomia: Bioeconomia
+    biotecnologia: Bioeconomia
+    defesa: Defesa
+    seguranca: Defesa
+    espacial: Defesa
+    espaco: Defesa
+    mobilidade: Mobilidade
+    logistica: Mobilidade
+    transporte: Mobilidade
+    urbano: Urbano
+    "cidades inteligentes": Urbano
+    "smart cities": Urbano
+    construcao: Urbano
+    educacao: Educação
+    edtech: Educação
+    quimica: Química
+    materiais: Materiais
+    "manufatura avancada": Materiais
+    industria: Materiais
+    industrial: Materiais
+    sustentabilidade: Sustentabilidade
+    "meio-ambiente": Sustentabilidade
+    "meio ambiente": Sustentabilidade
+    ambiental: Sustentabilidade
+    "transicao energetica": Sustentabilidade
+    saneamento: Sustentabilidade
+    maritimo: Marítimo
+    oceano: Marítimo
+    "economia azul": Marítimo
+    naval: Marítimo
+    social: Social
+    "impacto social": Social
+    financas: Finanças
+    financeiro: Finanças
+    fintech: Finanças
+```
+
+### 13.2 Normalização de tags (`tag_normalization`, §4.3)
+
+Passe DETERMINÍSTICO aplicado a TODA `tecnologias_tags` de TODA fonte
+(`gold.normalize_tags`): lowercase, trim, singular simples, mapa de sinônimos.
+Depois do mapa, `anti_class_verdict()` (`core/kg/canonicalize.py`) filtra o que
+sobrou de genérico/legal/métrica. Seed do mapa = curadoria do `concept_canon`
+(vazio no disco local — mora no PG); o mapa abaixo é a semente inicial e cresce
+com a curadoria. `synonyms`: variante (lowercase+trim) → forma canônica.
+
+```yaml
+tag_normalization:
+  lowercase: true
+  strip_accents: false     # folksonomia pt mantém acento (legível no card)
+  singularize: true        # -s final (len>4), pulando irregulares -ais/-eis/-ois/-uis/-ns
+  min_len: 2
+  synonyms:
+    ia: inteligência artificial
+    ai: inteligência artificial
+    "a.i.": inteligência artificial
+    "inteligencia artificial": inteligência artificial
+    ml: aprendizado de máquina
+    "machine learning": aprendizado de máquina
+    "aprendizado de maquina": aprendizado de máquina
+    iot: internet das coisas
+    "internet of things": internet das coisas
+    "visao computacional": visão computacional
+    "computer vision": visão computacional
+    nlp: processamento de linguagem natural
+    pln: processamento de linguagem natural
+    "big data": big data
+    "data science": ciência de dados
+    "ciencia de dados": ciência de dados
+    saas: saas
+    "software as a service": saas
+    b2b: b2b
+    "deep tech": deep-tech
+    deeptech: deep-tech
+    biotech: biotecnologia
+    agritech: agtech
+    agtech: agtech
+    fintech: fintech
+    edtech: edtech
+    "energias renovaveis": energia renovável
+    "energia renovavel": energia renovável
+    "digital twin": gêmeo digital
+    "gemeos digitais": gêmeo digital
+    "realidade aumentada": realidade aumentada
+    "realidade virtual": realidade virtual
+    blockchain: blockchain
+```
+
+### 13.3 Seções de match (`match_sections`, §5.3)
+
+Classifica cada bloco silver `{section_path, kind}` em `thematic` (→ tagger e
+`match_chunks`), `eligibility` (→ `constraints_producer.produce_from_text`) ou
+`boilerplate` (descartado). `drop_kinds` derruba o bloco pelo `kind`. Os padrões
+são regex (aplicados sobre o `section_path` deburrado/lowercase, qualquer nível).
+Precedência: `eligibility` > `boilerplate` > (default) `thematic`.
+
+```yaml
+match_sections:
+  drop_kinds: [signature, boilerplate]
+  eligibility_patterns:
+    - elegibilidade
+    - eligibilidade
+    - quem pode (participar|concorrer|se inscrever)
+    - publico[- ]?alvo
+    - participantes
+    - particip(es|antes|acao)
+    - condicoes de participacao
+    - requisitos
+    - beneficiarios
+  boilerplate_patterns:
+    - cronograma
+    - "^prazos?$"
+    - documentacao
+    - documentos exigidos
+    - disposicoes (finais|gerais)
+    - "^anexo"
+    - contatos?
+    - pontos de contato
+    - publicacao dos resultados
+    - divulgacao
+    - recursos? administrativ
+    - impugnac
+    - penalidades
+    - formulario
+    - declaracao
+    - certidao
+    - vigencia
+    - propriedade (intelectual|dos resultados|industrial)
+    - responsabilidades
+    - "^organizacao$"
+    - execucao do projeto
+    - "^financiamento$"
+    - "^montante"
+    - orcament
+    - assinatura
+```
+
+### 13.4 Vocabulário de constraints v3 (`constraint_vocab`, §4.4)
+
+Elegibilidade DURA do match v3 (o que editais BR de fato declaram: porte,
+faturamento-teto, idade de CNPJ, sede, natureza jurídica, TRL, CNAE, parceria,
+vínculo de incubação, investidor privado). Produzido por
+`constraints_producer.produce_from_text` a partir das seções de elegibilidade do
+silver; avaliado por `eligibility.py` (`unsat` elimina, `unknown` nunca elimina).
+Bloco SEPARADO do `hypergraph_schema.constraint_tipos` (v2) de propósito — o v2
+segue com seu subconjunto até morrer.
+
+```yaml
+constraint_vocab:
+  tipos:
+    - porte                 # in/not_in [mei, me, epp, media, grande]
+    - faturamento           # lte/gte  R$/ano
+    - idade_empresa_meses   # lte/gte  meses desde a abertura do CNPJ
+    - sede_uf               # in/not_in [SC, SP, ...]
+    - forma_juridica        # in/not_in [empresa, startup, ict, universidade, cooperativa, associacao]
+    - trl                   # gte/lte/in  1-9
+    - cnae                  # in/not_in  lista de CNAE (prefixo)
+    - parceria              # exige  [agencia, fap, ict, corporate, aceleradora, investidor]
+    - vinculo_incubacao     # exige  (incubadora/aceleradora credenciada)
+    - investidor_privado    # exige  (aporte privado — ex. PIPE Invest)
+  ops: [in, not_in, lte, gte, exige]
+```
