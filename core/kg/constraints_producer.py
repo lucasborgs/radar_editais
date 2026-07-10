@@ -193,25 +193,59 @@ Responda JSON: {"constraints": [{"tipo": "...", "op": "...", "valor": ...}], \
 "requisitos_texto": ["..."]}. Listas vazias se nada se encaixa."""
 
 
-def _v3_vocab() -> tuple[set[str], set[str]]:
-    """(tipos, ops) do bloco `constraint_vocab` do WIKI (§13.4). Fallback à lista
-    §4.4 embutida se o bloco estiver ausente."""
+_UF_ENUM = [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS",
+    "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC",
+    "SP", "SE", "TO",
+]
+
+
+def _v3_vocab() -> tuple[set[str], set[str], dict[str, set[str]]]:
+    """(tipos, ops, valores_enum) do bloco `constraint_vocab` do WIKI (§13.4).
+    Fallback à lista §4.4 embutida se o bloco estiver ausente. `valores_enum`
+    traz os enums fechados de tipos categóricos (porte, forma_juridica, sede_uf)
+    — achado do bake-off Fase 1.5: sem checar contra este enum o produtor
+    vazava valores livres (ex. forma_juridica="sociedade limitada",
+    porte="250", sede_uf="BR" num edital NACIONAL — não é sigla de UF)."""
     v = schema.constraint_vocab_v3()
     tipos = set(v.get("tipos") or [
         "porte", "faturamento", "idade_empresa_meses", "sede_uf", "forma_juridica",
         "trl", "cnae", "parceria", "vinculo_incubacao", "investidor_privado",
     ])
     ops = set(v.get("ops") or ["in", "not_in", "lte", "gte", "exige"])
-    return tipos, ops
+    valores_raw = v.get("valores") or {
+        "porte": ["mei", "me", "epp", "media", "grande"],
+        "forma_juridica": ["empresa", "startup", "ict", "universidade", "cooperativa", "associacao"],
+        "sede_uf": _UF_ENUM,
+    }
+    valores = {k: {str(x).strip().lower() for x in vs} for k, vs in valores_raw.items()}
+    return tipos, ops, valores
 
 
-def _valid_v3(c: dict, tipos: set[str], ops: set[str]) -> bool:
-    return (
+# tipos categóricos com enum fechado + op esperado (in/not_in — lte/gte não faz
+# sentido para um vocabulário categórico, ex. porte="250" com op="lte"). Um
+# valor de sede_uf fora das 27 UFs (ex. "BR", "Brasil", "nacional") indica
+# edital NACIONAL — não é constraint de sede, então NÃO deve ser emitido.
+_CATEGORICAL_ENUM_TIPOS = {"porte", "forma_juridica", "sede_uf"}
+
+
+def _valid_v3(c: dict, tipos: set[str], ops: set[str], valores: dict[str, set[str]]) -> bool:
+    if not (
         isinstance(c, dict)
         and c.get("tipo") in tipos
         and c.get("op") in ops
         and c.get("valor") not in (None, "", [])
-    )
+    ):
+        return False
+    tipo, op, valor = c["tipo"], c["op"], c["valor"]
+    if tipo in _CATEGORICAL_ENUM_TIPOS:
+        enum = valores.get(tipo)
+        if op not in ("in", "not_in") or not enum:
+            return False
+        vals = valor if isinstance(valor, list) else [valor]
+        if not vals or any(str(v).strip().lower() not in enum for v in vals):
+            return False
+    return True
 
 
 def _normalize_v3(c: dict) -> dict:
@@ -272,13 +306,13 @@ def produce_from_text(
         logger.warning("produce_from_text: falha (%s) — sem constraints", e)
         return [], []
 
-    tipos, ops = _v3_vocab()
+    tipos, ops, valores = _v3_vocab()
     constraints: list[dict] = []
     for c in data.get("constraints", []) or []:
         if not isinstance(c, dict):
             continue
         c = {"tipo": c.get("tipo"), "op": c.get("op"), "valor": c.get("valor")}
-        if _valid_v3(c, tipos, ops):
+        if _valid_v3(c, tipos, ops, valores):
             constraints.append(_normalize_v3(c))
         else:
             logger.info("produce_from_text: constraint descartada (fora do vocab): %s", c)
