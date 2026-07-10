@@ -74,6 +74,23 @@ def test_tipo_fora_do_vocab_descartado():
     assert req == []
 
 
+def test_valor_fora_do_enum_categorico_descartado():
+    # achado do bake-off Fase 1.5: LLM às vezes emite forma_juridica/porte fora do
+    # enum fechado (ex. "fundacao"/"sociedade limitada" p/ forma_juridica, ou um
+    # headcount numérico p/ porte) — isso vazava e virava UNSAT espúrio no avaliador.
+    resp = {
+        "constraints": [
+            {"tipo": "forma_juridica", "op": "in", "valor": ["empresa", "fundacao"]},
+            {"tipo": "porte", "op": "lte", "valor": ["250"]},
+            {"tipo": "porte", "op": "in", "valor": ["me", "epp"]},
+        ],
+        "requisitos_texto": [],
+    }
+    cons, _req = cp.produce_from_text("texto", client=_client(resp))
+    assert [c["tipo"] for c in cons] == ["porte"]
+    assert cons[0]["valor"] == ["me", "epp"]
+
+
 def test_texto_vazio_nao_chama_llm():
     # sem texto → ([], []) sem tocar no client (mesmo que o client explodisse)
     class _Boom:

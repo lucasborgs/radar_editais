@@ -1201,6 +1201,8 @@ match_sections:
     - condicoes de participacao
     - requisitos
     - beneficiarios
+    - admissibilidade
+    - habilita
   boilerplate_patterns:
     - cronograma
     - "^prazos?$"
@@ -1253,4 +1255,10 @@ constraint_vocab:
     - vinculo_incubacao     # exige  (incubadora/aceleradora credenciada)
     - investidor_privado    # exige  (aporte privado — ex. PIPE Invest)
   ops: [in, not_in, lte, gte, exige]
+  # Enums fechados para os tipos categóricos — validados em `produce_from_text`
+  # (achado do bake-off Fase 1.5: sem isso o produtor vazava valores fora do
+  # vocabulário, ex. forma_juridica="sociedade limitada"/"fundacao", porte="250").
+  valores:
+    porte: [mei, me, epp, media, grande]
+    forma_juridica: [empresa, startup, ict, universidade, cooperativa, associacao]
 ```
