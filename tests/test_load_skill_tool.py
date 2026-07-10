@@ -97,7 +97,7 @@ class _FakePitchSession(_FakeSession):
 
 def _build_load_skill(monkeypatch, card_data, session=None):
     mock_get = lambda eid: {"mechanism": card_data.get("mechanism", ""), "key_requirements": []} if card_data else None  # noqa: E731
-    monkeypatch.setattr("core.kg.hypergraph_catalog.get_edital", mock_get)
+    monkeypatch.setattr("core.kg.entity_catalog.get_edital", mock_get)
     tools = writing_tools.build_writing_tools(session or _FakeSession())
     return next(t for t in tools if t.name == "load_skill")
 
@@ -130,7 +130,7 @@ def test_tool_pitch_session_uses_equity(monkeypatch):
 
 def test_tool_is_in_writer_toolset(monkeypatch):
     monkeypatch.setattr(
-        "core.kg.hypergraph_catalog.get_edital",
+        "core.kg.entity_catalog.get_edital",
         lambda eid: {"mechanism": "subvencao", "key_requirements": []},
     )
     names = {t.name for t in writing_tools.build_writing_tools(_FakeSession())}

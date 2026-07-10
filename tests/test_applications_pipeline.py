@@ -111,7 +111,7 @@ def test_build_pipeline_items_maps_card_and_session(monkeypatch):
         "finep:1": {"title": "Edital Um", "deadline": future},
         "finep:2": None,  # card ausente
     }
-    monkeypatch.setattr(api.hypergraph_catalog, "get_edital", lambda eid: cards.get(eid))
+    monkeypatch.setattr(api.entity_catalog, "get_edital", lambda eid: cards.get(eid))
 
     rows = [
         _row(id="a1", edital_id="finep:1", session_id="s1"),

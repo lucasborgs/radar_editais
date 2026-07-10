@@ -18,7 +18,7 @@ from backend.common import (
 )
 from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient
-from core.kg import hypergraph_catalog
+from core.kg import entity_catalog
 from core.services.content_library import get_workspace_id
 from core.services.writing_session import (
     ProfileIncompleteError,
@@ -172,7 +172,7 @@ def writing_start(
         if req.edital_id not in {p["id"] for p in kg_store.load_programas()}:
             logger.warning("writing/start: programa '%s' não encontrado em programas.json — sessão prossegue sem dados do programa", req.edital_id)
     else:
-        if hypergraph_catalog.get_edital(req.edital_id) is None:
+        if entity_catalog.get_edital(req.edital_id) is None:
             raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
         # Chunking inline (síncrono): verifica se já existem chunks no banco;
         # se não, roda o pipeline completo (PDF → Documento Canônico → silver →
@@ -364,7 +364,7 @@ def _attach_target_titles(sessions: list[dict]) -> None:
 
     for eid in ids - investor_ids:
         try:
-            card = hypergraph_catalog.get_edital(eid)
+            card = entity_catalog.get_edital(eid)
             if card and card.get("title"):
                 titles[eid] = card["title"]
         except Exception:
@@ -479,7 +479,7 @@ async def writing_checklist_auto_review(
         from core.kg.edital_id import source_of
         from core.skills import load_playbook
         edital_id = doc["edital_id"]
-        card = hypergraph_catalog.get_edital(edital_id) or {}
+        card = entity_catalog.get_edital(edital_id) or {}
         mechanism = str(card.get("mechanism", "") or "")
         source = source_of(edital_id)
         playbook_monitor = load_playbook(mechanism, source).for_monitor()

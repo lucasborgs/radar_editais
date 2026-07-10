@@ -121,8 +121,8 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
         except Exception:
             _skill_source = ""
         try:
-            from core.kg import hypergraph_catalog
-            card = hypergraph_catalog.get_edital(session.edital_id)
+            from core.kg import entity_catalog
+            card = entity_catalog.get_edital(session.edital_id)
             if card:
                 _skill_mechanism = str(card.get("mechanism", "") or "")
         except Exception as e:
