@@ -242,6 +242,35 @@ def estagio_vocab() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Vocabulários gold v3 (WIKI.md §13) — lidos pelo ingest core/kg/gold.py
+# ---------------------------------------------------------------------------
+
+def setores_taxonomia() -> dict:
+    """Bloco `setores_taxonomia` (§13.1): labels (16), fallback, tese_theme_map,
+    alias_map. Aplicado por `gold.normalize_setores`."""
+    return load().get("setores_taxonomia", {})
+
+
+def tag_normalization() -> dict:
+    """Bloco `tag_normalization` (§13.2): regras + mapa de sinônimos do passe
+    determinístico de tags. Aplicado por `gold.normalize_tags`."""
+    return load().get("tag_normalization", {})
+
+
+def match_sections() -> dict:
+    """Bloco `match_sections` (§13.3): drop_kinds + padrões de eligibility/
+    boilerplate. Aplicado por `gold.classify_section`."""
+    return load().get("match_sections", {})
+
+
+def constraint_vocab_v3() -> dict:
+    """Bloco `constraint_vocab` (§13.4): tipos + ops de elegibilidade dura do
+    match v3. Usado por `constraints_producer.produce_from_text` (separado do
+    `hypergraph_schema.constraint_tipos` do v2)."""
+    return load().get("constraint_vocab", {})
+
+
+# ---------------------------------------------------------------------------
 # Slug
 # ---------------------------------------------------------------------------
 
