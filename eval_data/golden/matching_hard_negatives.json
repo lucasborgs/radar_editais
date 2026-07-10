@@ -1,0 +1,78 @@
+{
+  "_criterion": "Hard negatives de ELEGIBILIDADE (Stage 1) — spec docs/specs/v3-unified.md §10 Fase 1.5 item (c). Empresa tematicamente forte (Stage 2 deveria rankear o edital alto) mas INELEGÍVEL por um constraint duro real, já extraído em `entities.constraints` no Supabase local pós-fix (WIKI §13.3 + enum-fix em constraints_producer). Só usa os 5 tipos que `core/services/eligibility.py` de fato avalia (porte, sede_uf, faturamento, trl, forma_juridica) — os outros 5 do vocabulário v3 (idade_empresa_meses, cnae, parceria, vinculo_incubacao, investidor_privado) nunca eliminam hoje (sempre 'unknown'), então um hard negative que dependesse só deles não provaria nada.",
+  "_natural_cases_note": "2 dos 5 casos abaixo (ia_digital_mg_x_fapesp18203, semicondutores_x_finep780) NÃO são fabricados — reusam perfis JÁ existentes em matching.json onde o próprio golden de afinidade já lista o edital como positivo por CONTEÚDO. Isso confirma in loco a separação de eixos que o docstring de matching.json declara ('elegibilidade dura é camada SEPARADA, fora deste golden').",
+  "cases": [
+    {
+      "id": "sede_uf_errada__medai_x_fapesc65",
+      "edital": "fapesc:65-2025",
+      "constraint_esperado": "sede_uf in [SC]",
+      "profile": {
+        "nome": "MedAI Diagnósticos",
+        "tipo_entidade": "startup",
+        "tamanho_empresa": "ME",
+        "uf": "SP",
+        "trl": 6,
+        "one_liner": "IA para diagnóstico por imagem e segurança de dados em sistemas de saúde.",
+        "solution_summary": "Modelos de visão computacional para triagem diagnóstica, com módulo de segurança cibernética para proteção de dados clínicos e integração com sistemas alimentares hospitalares.",
+        "descricao_atividades": "Desenvolvimento de inteligência artificial aplicada à saúde, robótica assistiva hospitalar, segurança cibernética de dados clínicos e transferência de tecnologia para hospitais parceiros."
+      },
+      "expected_stage1": "inelegivel",
+      "expected_unsat_tipos": ["sede_uf"],
+      "note": "Temas (Saúde/IA/robótica/segurança cibernética/sistemas alimentares) batem quase 1:1 com os setores/tags de fapesc:65-2025 (Programa Horizonte Europa), mas o edital exige sede em SC — empresa é de SP."
+    },
+    {
+      "id": "faturamento_acima_teto__nanosaude_x_finep781",
+      "edital": "finep:781",
+      "constraint_esperado": "faturamento lte 4800000",
+      "profile": {
+        "nome": "NanoSaúde Feminina",
+        "tipo_entidade": "startup",
+        "tamanho_empresa": "MEDIO",
+        "uf": "RJ",
+        "trl": 7,
+        "faturamento_anual": 25000000,
+        "one_liner": "Startup liderada por mulheres em nanotecnologia e IA aplicadas à saúde.",
+        "solution_summary": "Plataforma de biotecnologia e IA com nanossensores (IoT) para diagnóstico remoto, usando blockchain para rastreabilidade de resultados em nuvem.",
+        "descricao_atividades": "P&D em biotecnologia, inteligência artificial, nanotecnologia, IoT e 5G aplicados à saúde; equipe de liderança majoritariamente feminina."
+      },
+      "expected_stage1": "inelegivel",
+      "expected_unsat_tipos": ["faturamento"],
+      "note": "Tags (biotecnologia/IA/nanotecnologia/IoT/5G/blockchain/healthtech) batem quase todas com finep:781 (Prêmio Mulheres Inovadoras), mas o edital tem teto de faturamento R$4,8mi (análogo ao teto citado na spec p/ Centelha) — empresa fatura R$25mi."
+    },
+    {
+      "id": "faturamento_abaixo_piso__pesquisatalent_x_finep745",
+      "edital": "finep:745",
+      "constraint_esperado": "faturamento gte 90000000",
+      "profile": {
+        "nome": "PesquisaTalent Repatriação",
+        "tipo_entidade": "empresa",
+        "tamanho_empresa": "EPP",
+        "uf": "SP",
+        "trl": 5,
+        "faturamento_anual": 2000000,
+        "one_liner": "Plataforma de recrutamento científico para repatriar pesquisadores brasileiros no exterior.",
+        "solution_summary": "Software de matching entre empresas brasileiras e pesquisadores/profissionais técnicos especializados brasileiros trabalhando no exterior, viabilizando o retorno ao Brasil.",
+        "descricao_atividades": "Recrutamento e alocação de pesquisadores e profissionais técnicos especializados brasileiros repatriados; consultoria em ciência, tecnologia e inovação."
+      },
+      "expected_stage1": "inelegivel",
+      "expected_unsat_tipos": ["faturamento"],
+      "note": "Conteúdo (repatriação de pesquisadores) é quase uma paráfrase do objetivo de finep:745 (Conhecimento Brasil), mas o edital exige faturamento >= R$90mi (piso, não teto) — empresa fatura R$2mi. Mesmo tipo de constraint (faturamento) que o caso acima, direção oposta (gte vs lte) — cobre as duas pontas do operador."
+    },
+    {
+      "id": "forma_juridica_empresa_vs_startup__ia_digital_mg_x_fapesp18203",
+      "edital": "fapesp:18203",
+      "profile_ref": "ia_digital_mg",
+      "expected_stage1": "inelegivel",
+      "expected_unsat_tipos": ["sede_uf", "forma_juridica"],
+      "note": "NÃO FABRICADO: fapesp__18203 já é um positivo de afinidade para ia_digital_mg em matching.json. sede_uf exige SP (empresa é MG) E forma_juridica exige 'empresa' (perfil tem tipo_entidade='startup', valor distinto no enum §4.4) — dupla eliminação real, achada ao rodar o Stage 1 sobre o golden de afinidade existente."
+    },
+    {
+      "id": "forma_juridica_empresa_vs_startup__semicondutores_x_finep780",
+      "edital": "finep:780",
+      "profile_ref": "semicondutores",
+      "expected_stage1": "inelegivel",
+      "expected_unsat_tipos": ["forma_juridica"],
+      "note": "NÃO FABRICADO: finep__780 já é positivo de afinidade para semicondutores em matching.json (é literalmente o único hit forte do caso). forma_juridica exige 'empresa'; perfil tem tipo_entidade='startup' — mesma causa-raiz do caso acima (ontologia forma_juridica conflando maturidade/estágio com natureza jurídica; 'startup' e 'empresa' são tratados como mutuamente exclusivos quando no mundo real toda startup registrada JÁ é uma empresa)."
+    }
+  ]
+}
