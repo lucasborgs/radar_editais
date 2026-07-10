@@ -847,8 +847,8 @@ class WritingSession:
             return self._build_investidor_card_context()
 
         try:
-            from core.kg import hypergraph_catalog
-            card = hypergraph_catalog.get_edital(self.edital_id)
+            from core.kg import entity_catalog
+            card = entity_catalog.get_edital(self.edital_id)
             if not card:
                 logger.warning("[%s] card não encontrado para %s",
                                self.session_id, self.edital_id)

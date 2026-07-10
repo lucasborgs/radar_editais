@@ -20,7 +20,7 @@ import logging
 import os
 import re
 
-from core.kg import hypergraph_catalog
+from core.kg import entity_catalog
 
 # Importado no nível do módulo (em vez de dentro de auto_review_checklist) para
 # que os testes possam monkeypatchar `make_async_client`. O SDK OpenAI é uma
@@ -191,7 +191,7 @@ def build_checklist(edital_id: str) -> list[dict]:
     seen: set[str] = set()
 
     try:
-        card = hypergraph_catalog.get_edital(edital_id)
+        card = entity_catalog.get_edital(edital_id)
         if card:
             for req in card.get("key_requirements", []):
                 if req and req not in seen:

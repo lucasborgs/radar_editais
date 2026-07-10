@@ -48,8 +48,8 @@ def _load_edital_requirements(session) -> list[str]:
         edital_id = getattr(session, "edital_id", None)
         if not edital_id:
             return []
-        from core.kg import hypergraph_catalog
-        card = hypergraph_catalog.get_edital(edital_id)
+        from core.kg import entity_catalog
+        card = entity_catalog.get_edital(edital_id)
         if not card:
             return []
         reqs = card.get("key_requirements", []) or []

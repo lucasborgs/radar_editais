@@ -18,7 +18,7 @@ import json
 import os
 from typing import Any
 
-from core.kg import hypergraph_catalog
+from core.kg import entity_catalog
 from core.llm.llm_client import make_client
 
 _PLANNING_MODEL = os.getenv("PLANNING_MODEL", "gpt-4o-mini")
@@ -77,7 +77,7 @@ def _format_edital_context(edital_id: str | None) -> str:
     """Busca ficha do edital no hipergrado e monta um bloco de contexto."""
     if not edital_id:
         return "Nenhum edital específico selecionado."
-    card = hypergraph_catalog.get_edital(edital_id)
+    card = entity_catalog.get_edital(edital_id)
     if not card:
         return f"Edital {edital_id} não encontrado no catálogo."
     lines: list[str] = [
