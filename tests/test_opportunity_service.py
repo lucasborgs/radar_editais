@@ -97,27 +97,19 @@ class TestMerge:
     def test_dedup_same_name_in_t1_and_t2(self, svc):
         t1 = {"editais": [{"name": "Edital A", "title": ""}]}
         t2 = {"editais": [{"name": "Edital A", "source": "cross"}]}
-        merged = svc._merge(t1, t2, None)
+        merged = svc._merge(t1, t2)
         assert len(merged["editais"]) == 1
 
-    def test_t3_none_is_safe(self, svc):
+    def test_t2_adds(self, svc):
         t1 = {"editais": [{"name": "Edital A"}]}
-        t2 = {"editais": []}
-        merged = svc._merge(t1, t2, None)
-        assert len(merged["editais"]) == 1
-
-    def test_t3_embed_adds(self, svc):
-        t1 = {"editais": [{"name": "Edital A"}]}
-        t2 = {"editais": []}
-        t3 = {"editais": [{"name": "Edital B", "source": "embed"}]}
-        merged = svc._merge(t1, t2, t3)
+        t2 = {"editais": [{"name": "Edital B", "source": "cross"}]}
+        merged = svc._merge(t1, t2)
         assert len(merged["editais"]) == 2
 
-    def test_dedup_across_all_three_tiers(self, svc):
+    def test_dedup_across_tiers(self, svc):
         t1 = {"editais": [{"name": "Edital X"}]}
         t2 = {"editais": [{"name": "Edital X", "source": "cross"}]}
-        t3 = {"editais": [{"name": "Edital X", "source": "embed"}]}
-        merged = svc._merge(t1, t2, t3)
+        merged = svc._merge(t1, t2)
         assert len(merged["editais"]) == 1
 
 
@@ -144,12 +136,11 @@ class TestExplore:
         result = svc.explore("agro", top_k=5)
         assert sum(len(result[k]) for k in result) > 0
 
-    def test_explore_tier3_merge_with_tier1(self, svc):
-        """Verifica que _merge com t3=None não quebra — t3 depende de LLM e
-        não roda em CI sem chave."""
+    def test_explore_merge_tier1_tier2(self, svc):
+        """Merge dos 2 tiers (o tier 3 de embedding morreu na Fase 2 do v3)."""
         t1 = svc._tier1_lexical("agro", top_k=5)
         t2 = svc._tier2_cross(t1)
-        merged = svc._merge(t1, t2, None)
+        merged = svc._merge(t1, t2)
         assert isinstance(merged, dict)
         # merge só retorna categorias com ao menos 1 item
         for k in ("editais", "icts", "investidores", "programas"):

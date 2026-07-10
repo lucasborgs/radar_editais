@@ -142,10 +142,11 @@ backend/       api.py (shell: app + middleware + wiring) + routers/ por domínio
                (catalog, graph, matching, applications, brief, writing, files,
                profile) + auth_routes/library_routes + common.py (singletons +
                schema de perfil) + rate_limit.py (limiter)
-core/          services/ (writing_session, hypergraph_match, match_verdict,
-               checklist, content_library, explore_agent, eligibility,
-               opportunity_service), kg/ (kg_store, schema, edital_id,
-               temporal, source_docs, hypergraph_catalog), retrieval/
+core/          services/ (writing_session, match_v3, company_chunks,
+               match_verdict, checklist, content_library, explore_agent,
+               eligibility, opportunity_service), kg/ (kg_store, schema, gold,
+               entity_catalog, edital_id, temporal, source_docs,
+               hypergraph_catalog), retrieval/
                (chunker, embedder, retriever, hyde, hyper_extractor),
                llm/ (llm_client, agent_runtime, agent_graph, agent_tools/),
                eval/ (harness); flat: db, auth, tasks (procrastinate),
@@ -160,7 +161,7 @@ data/          bronze/ (raw imutável), silver/ (derivado), knowledge_graph/ (hy
 ```
 
 ### Core services
-- **HypergraphMatch** (`core/services/hybrid_match_service.py`) — match por marginsum sobre cosseno entre nós do perfil empresa e nós Tema/Tecnologia/Aplicação dos hipergrados. Threshold 0.55, piso `min_aggregate`. Sem estágio LLM no match core.
+- **Match v3** (`core/services/match_v3.py`) — funil Stage 0 (vivo, deadline manda) → Stage 1 (`eligibility.py`: unsat elimina, unknown nunca) → Stage 2 (sum-of-max por chunk da empresa sobre `company_chunks` × `match_chunks`, boost de setores) → Stage 3 (rerank opcional + veredito LLM async via `match_verdict.py`). Trilha investidor paralela (cosseno perfil × `entities.embedding`). Lado empresa em `core/services/company_chunks.py` (refresh on-demand, RLS por workspace). Payload: `matched_excerpts[]` (trechos reais) + `setores`. Sem LLM no ranking.
 - **ExploreAgent** (`core/services/explore_agent.py`) — 3 rotas: factual → reasoning → agent. Lê hipergrados via `resolve_graph_nodes` + `neighborhood`. Retorna string; o `profile_diff` é extraído pelo router (`backend/routers/explore.py`) via `ProfileExtractor`.
 - **WritingSession** (`core/services/writing_session.py`) — runtime LangGraph (`agent_graph.py`) com checkpointer Postgres durável. RAG via `retrieve_chunks`. Primeiro turno: batch de 8 seções de uma vez (`_first_turn_with_generation`). `save_draft(force=False)` passa pelo Critic (subagente) + scope_classifier antes de persistir.
 - **ChecklistService** (`core/services/checklist_service.py`) — 3 passes paralelos via asyncio.gather: compliance + qualidade + completude.
@@ -226,10 +227,7 @@ Fiel ao Hyper-Extract: cada subgrafo (edital, catálogo) é um KA independente. 
 - Continua BFS neles (mesmo depth), evitando ciclos via `visited_graph_nodes`
 - Flag `cross_source=False` (default) = comportamento idêntico ao anterior
 
-**Expansão de match via catálogo** (`hypergraph_match.py`):
-- `_expand_match_via_catalog()`: pós-processo ADDITIVO ao `find_matching_editais`
-- Para cada edital matchado, identifica ICTs parceiras (aresta `parceria_com`)
-- Consulta `ict.json` para temas que essas ICTs dominam (arestas `abrange_tema`/`viabiliza`)
-- Se empresa casa com esses temas (cosseno), adiciona paths com `CATALOG_EXPANSION_DAMPING=0.30`
-- Ativado via flag `catalog_expansion=True` em `find_matching_editais`
-- Consumidores existentes (WritingSession, checklist, catalog, etc.) não são afetados
+**Match não usa mais o hipergrado** (Fase 2 do v3): `hypergraph_match.py` e o
+caminho de company hypergraph foram deletados — o match é `core/services/match_v3.py`
+sobre as tabelas gold (migration 036). O hipergrado segue servindo SÓ
+catálogo/explore (`hypergraph_catalog`, `explore_tools`) até o PR-B/PR-C.

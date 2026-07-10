@@ -10,7 +10,6 @@ Per spec match-evolution.md Fase 2.
 from __future__ import annotations
 
 import logging
-import re
 
 import jwt
 from fastapi import APIRouter, HTTPException, Request
@@ -21,14 +20,9 @@ from backend.common import CompanyProfileSchema, explore_agent
 from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient, OptionalDbClient, OptionalUserId
 from core.kg.planning_node import is_complex_proposal
-from core.llm.agent_tools.match_tools import _company_nodes
 from core.profile_extractor import ProfileExtractor
-from core.services import match_verdict
+from core.services import match_v3, match_verdict
 from core.services.content_library import get_workspace_id
-from core.services.hypergraph_match import (
-    find_matching_editais,
-    find_matching_entities,
-)
 from core.services.writing_session import persist_frontdoor_turn
 
 logger = logging.getLogger(__name__)
@@ -151,44 +145,23 @@ def explore(
         diff = ProfileExtractor().extract_diff_from_message(message, current)
         result["profile_diff"] = diff or None
 
-    # Structured match data: converte profile → nós → find_matching_editais +
-    # find_matching_entities. Só roda quando o agente chamou uma das ferramentas
+    # Structured match data (motor v3): funil Stage 0-2 sobre editais/programas
+    # + trilha investidor. Só roda quando o agente chamou uma das ferramentas
     # de match — senão cartões apareceriam em toda mensagem com perfil.
     # O sinal vem dos steps do agente (explore_meta["called_match"]).
     if explore_meta.get("called_match") and req.profile is not None and ctx:
         try:
-            company_nodes = _company_nodes(ctx)
-            if company_nodes:
-                # Estágio 0 (PR5): passa o perfil estruturado p/ o filtro duro de
-                # elegibilidade — edital com constraint incompatível some do radar;
-                # perfil incompleto mantém o card com flag "não verificada".
-                editais = find_matching_editais(
-                    company_nodes, top_k=8, profile=req.profile,
-                )
-                result["matched_editais"] = [m.to_dict() for m in editais]
-                entities = find_matching_entities(company_nodes, top_k=8)
-                entity_dicts = [e.to_dict() for e in entities]
-                # Enriquece com entity_id p/ writing session (Investidor/Programa)
-                if entity_dicts:
-                    from core.kg import hypergraph_catalog, kg_store
-                    inv_by_name = {i["name"].lower(): i["id"] for i in kg_store.load_investidores()}
-                    prog_by_name = {p["name"].lower(): p["id"] for p in kg_store.load_programas()}
-                    # D1/PR8: o fundo casa como Ator, mas o card apresenta a OFERTA
-                    # (Oportunidade de investimento) — ticket/estágio/URL da oferta.
-                    offers = hypergraph_catalog.investment_offers_by_fund()
-                    for ed in entity_dicts:
-                        key = ed["name"].strip().lower()
-                        if ed["kind"] == "investidor":
-                            ed["entity_id"] = inv_by_name.get(key)
-                            offer = offers.get(key)
-                            if offer:
-                                ed["offer"] = offer  # facetas p/ o card do radar (D1)
-                        elif ed["kind"] == "programa":
-                            ed["entity_id"] = prog_by_name.get(key)
-                        if ed.get("entity_id") is None and ed["kind"] in ("investidor", "programa"):
-                            slug = re.sub(r'[^a-z0-9]+', '-', key).strip('-')
-                            ed["entity_id"] = f"{ed['kind']}:{slug}"
-                result["matched_entities"] = entity_dicts
+            # Perfil estruturado alimenta o lado empresa (chunks efêmeros — o
+            # endpoint aceita anônimo) E o Stage 1 (unsat some do radar; perfil
+            # incompleto mantém o card com flag "não verificada").
+            opps = match_v3.find_matching_opportunities(current, top_k=8)
+            result["matched_editais"] = [m.to_dict() for m in opps if m.kind == "edital"]
+            entity_dicts = [m.to_dict() for m in opps if m.kind == "programa"]
+            entity_dicts += [
+                m.to_dict() for m in match_v3.find_matching_investors(current, top_k=5)
+            ]
+            entity_dicts.sort(key=lambda m: m.get("affinity", 0), reverse=True)
+            result["matched_entities"] = entity_dicts
         except Exception as e:
             logger.warning("explore: falha ao extrair matched_editais: %s", e)
 
@@ -207,29 +180,22 @@ def explore(
         except Exception as e:
             logger.warning("explore: falha ao persistir turno: %s", e)
 
-        # Estágio 2 (PR7): veredito LLM no top-K — cache-first; LLM só na fila.
-        # Anônimo fica sem veredito (não há workspace p/ chavear o cache). O
-        # snapshot persistido acima fica SEM veredito de propósito (o card
-        # restaurado re-hidrata via POST /match/verdicts, cache-only).
+        # Estágio 3 (precisão): veredito LLM no top-K — cache-first; LLM só na
+        # fila. Anônimo fica sem veredito (não há workspace p/ chavear o cache).
+        # O snapshot persistido acima fica SEM veredito de propósito (o card
+        # restaurado re-hidrata via POST /match/verdicts, cache-only). A
+        # geometria rankeia (afinidade decrescente); o veredito é SINALIZAÇÃO
+        # no card, não posição (`reorder_by_verdict` fica definido p/ outros
+        # usos). attach único: editais, programas e investidores usam a mesma
+        # chave (`verdict_key`).
         if workspace_id and (result.get("matched_editais") or result.get("matched_entities")):
             try:
                 misses: list[dict] = []
-                if result.get("matched_editais"):
-                    misses += match_verdict.attach_cached_verdicts(
-                        db, workspace_id, result["matched_editais"], current,
-                    )
-                    # KG v2 resíduos PR-A / R6: a geometria rankeia (afinidade
-                    # decrescente, chave única); o veredito é SINALIZAÇÃO no card
-                    # (red flag, R3), não posição. Divergência deliberada do D9 da
-                    # kg-redesign (que reordenava por recomendação) — o ranking
-                    # unificado do radar não pode reagrupar por kind nem por
-                    # veredito. `reorder_by_verdict` fica definido p/ outros usos.
-                # PR8.1: veredito das OFERTAS de investimento (matched_entities) —
-                # mesmo cache/task, chaveado por entity_id. Um defer só p/ os dois.
-                if result.get("matched_entities"):
-                    misses += match_verdict.attach_cached_verdicts_entities(
-                        db, workspace_id, result["matched_entities"], current,
-                    )
+                for key in ("matched_editais", "matched_entities"):
+                    if result.get(key):
+                        misses += match_verdict.attach_cached_verdicts(
+                            db, workspace_id, result[key], current,
+                        )
                 if misses:
                     _enqueue_verdicts(workspace_id, misses, current)
             except Exception as e:

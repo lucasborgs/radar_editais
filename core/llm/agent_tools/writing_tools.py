@@ -537,32 +537,25 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
     from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
     from core.llm.agent_tools.research_tools import build_research_tools
 
-    # ICT/investidor/programa por afinidade ao perfil (hardening 2026-07-02):
-    # mesmo motor de match do ExploreAgent (match_tools.py). Só
+    # Investidor/programa por afinidade ao perfil (hardening 2026-07-02): mesmo
+    # motor de match do ExploreAgent (match_tools.py → match_v3). Só
     # find_matching_entities — find_matching_editais fica de fora porque
     # descobrir OUTROS editais é fora de escopo de uma sessão já ancorada num
-    # edital (arrisca desviar o agente no meio do rascunho). company_nodes
-    # duráveis (se existirem) evitam re-extrair o perfil; getattr defensivo
-    # para sessões fake/sem auth (mesmo padrão de build_research_tools abaixo).
+    # edital (arrisca desviar o agente no meio do rascunho). Com workspace
+    # autenticado o lado empresa vem de company_chunks (perfil + library);
+    # getattr defensivo para sessões fake/sem auth (mesmo padrão de
+    # build_research_tools abaixo).
     match_tools: list[BaseTool] = []
     profile_text = getattr(session, "_profile_context", None)
-    if profile_text:
-        company_nodes = None
-        db = getattr(session, "_db", None)
-        workspace_id = getattr(session, "workspace_id", None)
-        if db is not None and workspace_id:
-            try:
-                from core.services.company_corpus import load_company_hypergraph
-                record = load_company_hypergraph(db, workspace_id)
-                if record:
-                    company_nodes = record.get("nodes") or None
-            except Exception:
-                logger.debug(
-                    "[%s] falha ao carregar hipergrado durável da empresa",
-                    getattr(session, "session_id", "?"), exc_info=True,
-                )
+    profile_obj = getattr(session, "profile", None)
+    if profile_text and profile_obj is not None:
         match_tools = [
-            t for t in build_match_tools(profile_text, company_nodes=company_nodes)
+            t for t in build_match_tools(
+                profile_text,
+                profile=profile_obj,
+                workspace_id=getattr(session, "workspace_id", None),
+                db=getattr(session, "_db", None),
+            )
             if t.name == "find_matching_entities"
         ]
 

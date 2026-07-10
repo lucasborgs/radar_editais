@@ -1,6 +1,12 @@
-"""Testes do veredito LLM top-K (KG v2, PR7 / Estágio 2 do funil de match)."""
+"""Testes do veredito LLM top-K (Estágio 3 do funil de match v3).
+
+Input do juiz = ficha da linha de `entities` + matched_excerpts (Fase 2 do
+v3-unified) — sem subgrafo. Cache por (workspace, oportunidade_id) com
+invalidação por input_hash, inalterado.
+"""
 from __future__ import annotations
 
+import datetime
 import json
 from types import SimpleNamespace
 
@@ -8,34 +14,35 @@ from core.services import match_verdict as mv
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
 
-GRAPH = {
-    "format_version": 2,
-    "nodes": [
-        {
-            "id": "op:finep-602", "type": "Oportunidade", "kind": "edital",
-            "aperture": "prazo", "name": "Chamada IA Embarcada",
-            "description": "Subvenção para IA embarcada em defesa.",
-            "prazo": "2026-08-01", "status": "ABERTA", "valor": "R$ 2M",
-            "mecanismo": ["subvencao"], "macro_temas": ["defesa e soberania"],
-            "constraints": [
-                {"tipo": "porte", "op": "in", "valor": ["mei", "me", "epp", "media"]},
-            ],
-            "requisitos_texto": ["Plano de trabalho conforme Anexo I."],
-            "exclusoes_texto": ["Vedado a órgãos públicos."],
-        },
-        {"id": "ator:senai-sp", "type": "Ator", "kind": "ict", "name": "SENAI/SP"},
-        {"id": "con:visao-computacional", "type": "Conceito", "dim": "tecnologia",
-         "name": "visão computacional"},
+ROW = {
+    "kind": "edital",
+    "native_id": "finep:602",
+    "name": "Chamada IA Embarcada",
+    "description": "Subvenção para IA embarcada em defesa.",
+    "mecanismo": "subvencao",
+    "formato": "edital_periodico",
+    "status": "aberta",
+    "deadline": datetime.date(2026, 8, 1),
+    "uf": None,
+    "setores": ["Defesa", "TIC"],
+    "tecnologias_tags": ["visão computacional", "ia embarcada"],
+    "ticket_min": 500_000,
+    "ticket_max": 2_000_000,
+    "constraints": [
+        {"tipo": "porte", "op": "in", "valor": ["mei", "me", "epp", "media"]},
+        {"tipo": "parceria", "op": "exige", "valor": "ict"},
     ],
-    "edges": [
-        {"type": "exige", "members": ["op:finep-602", "ator:senai-sp"],
-         "description": "parceria obrigatória com ICT"},
-        {"type": "cobre", "members": ["op:finep-602", "con:visao-computacional"]},
-    ],
+    "requisitos_texto": ["Plano de trabalho conforme Anexo I."],
+    "metadata": {},
 }
 
 PROFILE = {"nome": "ACME", "tamanho_empresa": "ME", "uf": "SP", "one_liner": "visão p/ drones"}
-PATHS = [{"src": "visão computacional", "dst": "visão computacional", "score": 0.91}]
+EXCERPTS = [{
+    "company_text": "Plataforma de visão computacional para drones autônomos.",
+    "edital_text": "Sistemas de IA embarcada para plataformas não tripuladas.",
+    "section": "Temas",
+    "score": 0.91,
+}]
 
 
 class _FakeClient:
@@ -54,301 +61,184 @@ class _FakeClient:
 
 VERDICT = {
     "racional_afinidade": "Visão computacional conecta direto com o foco do edital.",
-    "red_flags_elegibilidade": ["Exige parceria com ICT (SENAI/SP)."],
+    "red_flags_elegibilidade": ["Exige parceria com ICT."],
     "fit_mecanismo": "Subvenção casa com o estágio pré-receita.",
     "recomendacao": "alta",
 }
 
 
-# ── serializador ──────────────────────────────────────────────────────────────
+# ── serialize_entity ─────────────────────────────────────────────────────────
 
-def test_serialize_inclui_propriedades_constraints_texto_e_arestas():
-    node = mv.opportunity_node(GRAPH)
-    assert node is not None
-    s = mv.serialize_opportunity(GRAPH, node)
-    assert "Chamada IA Embarcada" in s and "[edital/prazo]" in s
-    assert "mecanismo: subvencao" in s and "macro-temas: defesa e soberania" in s
-    assert "porte deve ser um de" in s                      # constraint como frase
-    assert "Plano de trabalho" in s and "Vedado a órgãos públicos" in s
-    assert "visão computacional" in s                       # conceitos cobertos
-    # arestas com rótulo de membro (D12) — o insumo das red flags
-    assert "exige: Chamada IA Embarcada (Oportunidade/edital), SENAI/SP (Ator/ict)" in s
-
-
-def test_opportunity_node_none_em_catalogo():
-    catalogo = {"nodes": [{"id": "ator:x", "type": "Ator", "kind": "ict", "name": "X"}]}
-    assert mv.opportunity_node(catalogo) is None
+def test_serialize_inclui_ficha_completa():
+    s = mv.serialize_entity(ROW)
+    assert "OPORTUNIDADE [edital]: Chamada IA Embarcada" in s
+    assert "descrição: Subvenção para IA embarcada" in s
+    assert "mecanismo: subvencao" in s
+    assert "prazo: 01/08/2026" in s
+    assert "setores: Defesa, TIC" in s
+    assert "ticket: R$ 500.000 – R$ 2.000.000" in s
+    assert "porte deve ser um de" in s          # constraint renderizada como frase
+    assert "exige parceria com ict" in s
+    assert "Plano de trabalho conforme Anexo I." in s
 
 
-# ── input_hash (invalidação implícita) ────────────────────────────────────────
+def test_serialize_investidor_usa_metadata():
+    inv = {
+        "kind": "investidor", "name": "KPTL", "description": "Tese deep-tech.",
+        "setores": ["Multissetorial"], "ticket_min": None, "ticket_max": 5_000_000,
+        "constraints": [], "requisitos_texto": [],
+        "metadata": {"estagio_alvo": ["seed", "serie-a"], "lead_follow": "lead"},
+    }
+    s = mv.serialize_entity(inv)
+    assert "OPORTUNIDADE [investidor]: KPTL" in s
+    assert "estágio-alvo: seed, serie-a" in s
+    assert "posição (lead/follow): lead" in s
+    assert "ticket: até R$ 5.000.000" in s
 
-def test_hash_estavel_e_sensivel_a_perfil_oportunidade_e_paths():
-    node = mv.opportunity_node(GRAPH)
-    s = mv.serialize_opportunity(GRAPH, node)
-    h = mv.verdict_input_hash(s, PROFILE, PATHS)
-    assert h == mv.verdict_input_hash(s, dict(PROFILE), list(PATHS))  # determinístico
-    assert h != mv.verdict_input_hash(s, {**PROFILE, "uf": "SC"}, PATHS)      # perfil mudou
-    assert h != mv.verdict_input_hash(s + "\nnovo requisito", PROFILE, PATHS)  # opp mudou
-    assert h != mv.verdict_input_hash(s, PROFILE, [])                          # paths mudaram
-    # campos vazios do perfil não entram no hash (perfil {a: None} ≡ {})
-    assert mv.verdict_input_hash(s, {"uf": None}, PATHS) == mv.verdict_input_hash(s, {}, PATHS)
+
+# ── input hash ───────────────────────────────────────────────────────────────
+
+def test_hash_estavel_e_sensivel_a_perfil_ficha_e_excerpts():
+    s = mv.serialize_entity(ROW)
+    h1 = mv.verdict_input_hash(s, PROFILE, EXCERPTS)
+    assert h1 == mv.verdict_input_hash(s, dict(PROFILE), list(EXCERPTS))  # estável
+    assert h1 != mv.verdict_input_hash(s, {**PROFILE, "uf": "SC"}, EXCERPTS)
+    assert h1 != mv.verdict_input_hash(s + "\nnovo requisito", PROFILE, EXCERPTS)
+    assert h1 != mv.verdict_input_hash(s, PROFILE, [])
+    # ruído numérico de re-embedding (além de 3 casas) NÃO flapa o hash
+    quase = [dict(EXCERPTS[0], score=0.9101)]
+    outro = [dict(EXCERPTS[0], score=0.95)]
+    assert h1 == mv.verdict_input_hash(s, PROFILE, quase)
+    assert h1 != mv.verdict_input_hash(s, PROFILE, outro)
 
 
-# ── compute_verdict (validação + fail-open) ───────────────────────────────────
+# ── compute_verdict ──────────────────────────────────────────────────────────
 
 def test_compute_verdict_valida_e_envia_contexto():
-    node = mv.opportunity_node(GRAPH)
-    s = mv.serialize_opportunity(GRAPH, node)
     client = _FakeClient(VERDICT)
-    v = mv.compute_verdict(s, PROFILE, PATHS, client=client, model="fake")
-    assert v == VERDICT
-    user = client.calls[0]["messages"][1]["content"]
-    assert "PERFIL DA EMPRESA" in user and "ACME" in user
-    assert "PARES DE AFINIDADE" in user and "0.91" in user
-    assert "SUBGRAFO DA OPORTUNIDADE" in user
+    out = mv.compute_verdict(mv.serialize_entity(ROW), PROFILE, EXCERPTS, client=client)
+    assert out == VERDICT
+    user_msg = client.calls[0]["messages"][1]["content"]
+    assert "[PERFIL DA EMPRESA]" in user_msg
+    assert "[TRECHOS QUE GERARAM O MATCH (Stage 2)]" in user_msg
+    assert "[FICHA DA OPORTUNIDADE]" in user_msg
+    assert "drones autônomos" in user_msg       # excerpt da empresa chegou ao juiz
 
 
 def test_compute_verdict_output_invalido_vira_none():
-    node = mv.opportunity_node(GRAPH)
-    s = mv.serialize_opportunity(GRAPH, node)
-    # recomendação fora do enum → descarta (fail-open, sem raise)
-    assert mv.compute_verdict(s, PROFILE, client=_FakeClient({**VERDICT, "recomendacao": "x"})) is None
-    assert mv.compute_verdict(s, PROFILE, client=_FakeClient({})) is None
-    # red flags fora do shape são coagidas, não derrubam
-    v = mv.compute_verdict(s, PROFILE, client=_FakeClient({**VERDICT, "red_flags_elegibilidade": "não é lista"}))
-    assert v is not None and v["red_flags_elegibilidade"] == []
+    assert mv.compute_verdict("ficha", PROFILE, [], client=_FakeClient({"foo": 1})) is None
+    ruim = dict(VERDICT, recomendacao="urgente")
+    assert mv.compute_verdict("ficha", PROFILE, [], client=_FakeClient(ruim)) is None
 
 
 def test_compute_verdict_erro_de_infra_fail_open():
-    def _boom(**_):
-        raise RuntimeError("api down")
+    class _Boom:
+        class chat:  # noqa: N801
+            class completions:  # noqa: N801
+                @staticmethod
+                def create(**_):
+                    raise RuntimeError("api down")
 
-    client = SimpleNamespace(
-        chat=SimpleNamespace(completions=SimpleNamespace(create=_boom))
-    )
-    assert mv.compute_verdict("s", PROFILE, client=client) is None
+    assert mv.compute_verdict("ficha", PROFILE, [], client=_Boom()) is None
 
 
-# ── reordenação dentro do top-K ───────────────────────────────────────────────
+# ── verdict_key ──────────────────────────────────────────────────────────────
+
+def test_verdict_key_por_kind():
+    assert mv.verdict_key({"kind": "edital", "source": "finep", "edital_id": "602"}) == "finep__602"
+    assert mv.verdict_key({"kind": "programa", "entity_id": "programa:centelha"}) == "programa:centelha"
+    assert mv.verdict_key({"kind": "investidor", "entity_id": "investidor:kptl"}) == "investidor:kptl"
+    assert mv.verdict_key({"kind": "edital"}) is None
+
+
+# ── reorder ──────────────────────────────────────────────────────────────────
 
 def test_reorder_alta_sobe_baixa_afunda_pendente_neutro():
     ms = [
-        {"edital_id": "1", "affinity": 3.0, "verdict": {"recomendacao": "baixa"}},
-        {"edital_id": "2", "affinity": 2.5, "verdict": None},                       # pendente
-        {"edital_id": "3", "affinity": 2.0, "verdict": {"recomendacao": "alta"}},
-        {"edital_id": "4", "affinity": 1.5, "verdict": {"recomendacao": "media"}},
+        {"name": "b", "verdict": {"recomendacao": "baixa"}},
+        {"name": "p", "verdict": None},
+        {"name": "a", "verdict": {"recomendacao": "alta"}},
     ]
-    out = [m["edital_id"] for m in mv.reorder_by_verdict(ms)]
-    # alta primeiro; pendente (neutro) e media empatam preservando ordem de affinity
-    assert out == ["3", "2", "4", "1"]
+    assert [m["name"] for m in mv.reorder_by_verdict(ms)] == ["a", "p", "b"]
 
 
 def test_reorder_sem_vereditos_preserva_ordem():
-    ms = [{"edital_id": str(i), "verdict": None} for i in range(4)]
-    assert [m["edital_id"] for m in mv.reorder_by_verdict(ms)] == ["0", "1", "2", "3"]
+    ms = [{"name": str(i), "verdict": None} for i in range(4)]
+    assert [m["name"] for m in mv.reorder_by_verdict(ms)] == ["0", "1", "2", "3"]
 
 
-# ── cache helpers (db fake) ───────────────────────────────────────────────────
+# ── cache ────────────────────────────────────────────────────────────────────
 
 class _FakeDb:
-    """Supabase-like mínimo para match_verdicts (select por workspace + in_)."""
+    """Supabase-like: .table().select().eq().in_().execute().data."""
 
-    def __init__(self, rows: list[dict]):
-        self.rows = rows
+    def __init__(self, rows):
+        self._rows = rows
         self.upserts: list[dict] = []
 
     def table(self, name):
-        assert name == "match_verdicts"
+        self._name = name
         return self
 
     def select(self, *_):
-        self._mode = "select"
         return self
 
     def eq(self, *_):
         return self
 
-    def in_(self, _col, ids):
-        self._ids = set(ids)
+    def in_(self, *_):
         return self
 
     def upsert(self, row, **_):
-        self._mode = "upsert"
         self.upserts.append(row)
         return self
 
     def execute(self):
-        if self._mode == "upsert":
-            return SimpleNamespace(data=None)
-        return SimpleNamespace(data=[r for r in self.rows if r["oportunidade_id"] in self._ids])
+        return SimpleNamespace(data=self._rows)
 
 
 def test_get_cached_verdicts_hash_velho_e_miss():
     rows = [
-        {"oportunidade_id": "finep__602", "input_hash": "h1", "verdict": VERDICT},
-        {"oportunidade_id": "finep__734", "input_hash": "STALE", "verdict": VERDICT},
+        {"oportunidade_id": "finep__602", "input_hash": "H1", "verdict": VERDICT},
+        {"oportunidade_id": "finep__603", "input_hash": "VELHO", "verdict": VERDICT},
     ]
-    hits = mv.get_cached_verdicts(
-        _FakeDb(rows), "ws", {"finep__602": "h1", "finep__734": "h2", "finep__999": "h3"}
-    )
-    assert set(hits) == {"finep__602"}  # hash velho e linha ausente são miss
+    hits = mv.get_cached_verdicts(_FakeDb(rows), "ws", {"finep__602": "H1", "finep__603": "H2"})
+    assert "finep__602" in hits
+    assert "finep__603" not in hits
 
 
 def test_attach_cached_verdicts_anexa_e_devolve_misses(monkeypatch):
-    from core.kg import kg_store
-
-    monkeypatch.setattr(kg_store, "load_all_hypergraphs", lambda: {"finep__602": GRAPH})
-    node = mv.opportunity_node(GRAPH)
-    s = mv.serialize_opportunity(GRAPH, node)
-
-    m_hit = {"source": "finep", "edital_id": "602", "paths": PATHS, "affinity": 2.0}
-    m_off = {"source": "finep", "edital_id": "999", "paths": [], "affinity": 1.0}  # sem grafo
-    h = mv.verdict_input_hash(s, PROFILE, PATHS)
+    monkeypatch.setattr(mv, "_entity_row", lambda oid: ROW if "602" in oid else None)
+    match_dicts = [
+        {"kind": "edital", "source": "finep", "edital_id": "602",
+         "entity_id": "finep:602", "matched_excerpts": EXCERPTS},
+        {"kind": "edital", "source": "finep", "edital_id": "999",
+         "entity_id": "finep:999", "matched_excerpts": []},  # sumiu do corpus
+    ]
+    s = mv.serialize_entity(ROW)
+    h = mv.verdict_input_hash(s, PROFILE, EXCERPTS)
     db = _FakeDb([{"oportunidade_id": "finep__602", "input_hash": h, "verdict": VERDICT}])
-
-    misses = mv.attach_cached_verdicts(db, "ws", [m_hit, m_off], PROFILE)
-    assert m_hit["verdict"] == VERDICT      # cache-hit anexado
-    assert m_off["verdict"] is None         # sem subgrafo → sem veredito, sem miss
-    assert misses == []
-
-    # segundo cenário: cache vazio → o par vira miss p/ a task
-    db2 = _FakeDb([])
-    misses2 = mv.attach_cached_verdicts(db2, "ws", [dict(m_hit)], PROFILE)
-    assert misses2 == [{"file_key": "finep__602", "paths": PATHS}]
+    misses = mv.attach_cached_verdicts(db, "ws", match_dicts, PROFILE)
+    assert match_dicts[0]["verdict"] == VERDICT      # cache-hit anexado
+    assert match_dicts[1]["verdict"] is None         # sem linha → sem veredito
+    assert misses == []                              # hit não vira miss
 
 
-# ── ofertas de investimento (PR8.1) ───────────────────────────────────────────
-
-INVEST_CATALOG = {
-    "format_version": 2,
-    "proveniencia": {"fonte": "curadoria"},
-    "nodes": [
-        {"id": "op:acme-ventures-investimento", "type": "Oportunidade", "kind": "investimento",
-         "aperture": "continua", "name": "Investimento — ACME Ventures",
-         "description": "VC de deep-tech B2B.", "mecanismo": ["equity"],
-         "macro_temas": ["tecnologias digitais e conectividade"],
-         "estagio_alvo": ["seed", "serie-a"], "lead_follow": "lead",
-         "ticket_range": {"min_brl": 500000, "max_brl": 2000000}, "url": "https://acme.vc"},
-        {"id": "ator:acme-ventures", "type": "Ator", "kind": "investidor", "name": "ACME Ventures"},
-        {"id": "con:deep-tech", "type": "Conceito", "dim": "tecnologia", "name": "deep-tech"},
-        {"id": "con:b2b", "type": "Conceito", "dim": "aplicacao", "name": "b2b"},
-        # fundo IRMÃO no mesmo arquivo — NÃO deve vazar no sub-grafo da ACME
-        {"id": "op:outro-fundo-investimento", "type": "Oportunidade", "kind": "investimento",
-         "name": "Investimento — Outro", "mecanismo": ["equity"]},
-        {"id": "ator:outro-fundo", "type": "Ator", "kind": "investidor", "name": "Outro Fundo"},
-        {"id": "con:fintech", "type": "Conceito", "dim": "aplicacao", "name": "fintech"},
-    ],
-    "edges": [
-        {"type": "pertence_a", "members": ["op:acme-ventures-investimento", "ator:acme-ventures"]},
-        {"type": "viabiliza", "members": ["ator:acme-ventures", "con:deep-tech"]},
-        {"type": "viabiliza", "members": ["ator:acme-ventures", "con:b2b"]},
-        {"type": "pertence_a", "members": ["op:outro-fundo-investimento", "ator:outro-fundo"]},
-        {"type": "viabiliza", "members": ["ator:outro-fundo", "con:fintech"]},
-    ],
-}
+def test_attach_cached_verdicts_miss_vira_item_de_task(monkeypatch):
+    monkeypatch.setattr(mv, "_entity_row", lambda oid: ROW)
+    match_dicts = [{"kind": "programa", "entity_id": "programa:centelha",
+                    "matched_excerpts": EXCERPTS}]
+    db = _FakeDb([])  # cache vazio
+    misses = mv.attach_cached_verdicts(db, "ws", match_dicts, PROFILE)
+    assert match_dicts[0]["verdict"] is None
+    assert misses == [{"oportunidade_id": "programa:centelha", "excerpts": EXCERPTS}]
 
 
-PROGRAMA_CATALOG = {
-    "format_version": 2,
-    "proveniencia": {"fonte": "curadoria"},
-    "nodes": [
-        {"id": "op:centelha", "type": "Oportunidade", "kind": "programa",
-         "aperture": "recorrente", "name": "Centelha",
-         "description": "Fomento a ideias inovadoras.", "mecanismo": ["subvencao"],
-         "macro_temas": ["tecnologias digitais e conectividade"]},
-        {"id": "con:empreendedorismo", "type": "Conceito", "dim": "aplicacao",
-         "name": "empreendedorismo"},
-        # programa IRMÃO no mesmo arquivo — NÃO deve vazar no sub-grafo do Centelha
-        {"id": "op:outro-programa", "type": "Oportunidade", "kind": "programa",
-         "name": "Outro Programa", "mecanismo": ["subvencao"]},
-        {"id": "con:saude", "type": "Conceito", "dim": "tema", "name": "saúde"},
-    ],
-    "edges": [
-        {"type": "cobre", "members": ["op:centelha", "con:empreendedorismo"]},
-        {"type": "cobre", "members": ["op:outro-programa", "con:saude"]},
-    ],
-}
-
-
-def test_programa_subgraph_isola_programa_e_serializa():
-    graphs = {"programas": PROGRAMA_CATALOG}
-    sub = mv.programa_subgraph(graphs, "programa:centelha")  # entity_id
-    assert sub is not None
-    mini, node = sub
-    assert node["kind"] == "programa"
-    # sub-grafo = programa + o conceito ligado a ele; o OUTRO programa fica de fora
-    assert {n["id"] for n in mini["nodes"]} == {"op:centelha", "con:empreendedorismo"}
-    s = mv.serialize_opportunity(mini, node)
-    assert "[programa/recorrente]" in s and "mecanismo: subvencao" in s
-    assert "empreendedorismo" in s and "saúde" not in s      # sem vazamento
-    # id inexistente / kind errado → None (fail-safe)
-    assert mv.programa_subgraph(graphs, "programa:none") is None
-    assert mv.programa_subgraph({"investidores": INVEST_CATALOG}, "investidor:acme-ventures") is None
-
-
-def test_investment_offer_subgraph_isola_oferta_e_serializa_facetas():
-    graphs = {"investidores": INVEST_CATALOG}
-    sub = mv.investment_offer_subgraph(graphs, "investidor:acme-ventures")  # entity_id
-    assert sub is not None
-    mini, offer = sub
-    assert offer["kind"] == "investimento"
-    # sub-grafo = oferta + fundo + os 2 conceitos do fundo; o OUTRO fundo fica de fora
-    assert {n["id"] for n in mini["nodes"]} == {
-        "op:acme-ventures-investimento", "ator:acme-ventures", "con:deep-tech", "con:b2b",
-    }
-    s = mv.serialize_opportunity(mini, offer)
-    assert "[investimento/continua]" in s and "mecanismo: equity" in s
-    assert "estágio-alvo: seed, serie-a" in s and "posição (lead/follow): lead" in s
-    assert "ticket: R$ 500.000 – R$ 2.000.000" in s
-    assert "deep-tech" in s and "b2b" in s and "fintech" not in s     # sem vazamento
-    assert "pertence_a" in s and "viabiliza" in s
-
-
-def test_serialize_for_verdict_dispatch_edital_investimento_e_programa():
-    graphs = {
-        "investidores": INVEST_CATALOG, "programas": PROGRAMA_CATALOG, "finep__602": GRAPH,
-    }
-    ed = mv.serialize_for_verdict({"file_key": "finep__602", "paths": []}, graphs)
-    inv = mv.serialize_for_verdict(
-        {"kind": "investimento", "oportunidade_id": "investidor:acme-ventures", "paths": []}, graphs)
-    prog = mv.serialize_for_verdict(
-        {"kind": "programa", "oportunidade_id": "programa:centelha", "paths": []}, graphs)
-    assert ed[0] == "finep__602" and "[edital/prazo]" in ed[1]
-    assert inv[0] == "investidor:acme-ventures" and "[investimento/continua]" in inv[1]
-    assert prog[0] == "programa:centelha" and "[programa/recorrente]" in prog[1]
-    # id inexistente → None (fail-safe, o item é pulado na task)
-    assert mv.serialize_for_verdict(
-        {"kind": "investimento", "oportunidade_id": "investidor:none"}, graphs) is None
-    assert mv.serialize_for_verdict(
-        {"kind": "programa", "oportunidade_id": "programa:none"}, graphs) is None
-
-
-def test_attach_cached_verdicts_entities_investidor_e_programa(monkeypatch):
-    from core.kg import kg_store
-
-    graphs = {"investidores": INVEST_CATALOG, "programas": PROGRAMA_CATALOG}
-    monkeypatch.setattr(kg_store, "load_all_hypergraphs", lambda: graphs)
-    inv_sub = mv.investment_offer_subgraph(graphs, "investidor:acme-ventures")
-    inv_h = mv.verdict_input_hash(mv.serialize_opportunity(inv_sub[0], inv_sub[1]), PROFILE, [])
-    prog_sub = mv.programa_subgraph(graphs, "programa:centelha")
-    prog_h = mv.verdict_input_hash(mv.serialize_opportunity(prog_sub[0], prog_sub[1]), PROFILE, [])
-
-    inv = {"kind": "investidor", "name": "ACME Ventures", "entity_id": "investidor:acme-ventures", "paths": []}
-    prog = {"kind": "programa", "name": "Centelha", "entity_id": "programa:centelha", "paths": []}
-    ict = {"kind": "ict", "name": "SENAI", "paths": []}                                # fora do escopo
-    db = _FakeDb([
-        {"oportunidade_id": "investidor:acme-ventures", "input_hash": inv_h, "verdict": VERDICT},
-        {"oportunidade_id": "programa:centelha", "input_hash": prog_h, "verdict": VERDICT},
-    ])
-
-    misses = mv.attach_cached_verdicts_entities(db, "ws", [inv, prog, ict], PROFILE)
-    assert inv["verdict"] == VERDICT and prog["verdict"] == VERDICT   # ambos anexados do cache
-    assert ict["verdict"] is None                                    # ict sem veredito
-    assert misses == []
-
-    # cache vazio → miss keyed por entity_id, com o discriminador de kind correto
-    db2 = _FakeDb([])
-    misses2 = mv.attach_cached_verdicts_entities(db2, "ws", [dict(inv), dict(prog)], PROFILE)
-    assert {"kind": "investimento", "oportunidade_id": "investidor:acme-ventures", "paths": []} in misses2
-    assert {"kind": "programa", "oportunidade_id": "programa:centelha", "paths": []} in misses2
-    assert len(misses2) == 2
+def test_serialize_for_verdict_resolve_linha(monkeypatch):
+    monkeypatch.setattr(mv, "_entity_row", lambda oid: ROW if oid == "finep__602" else None)
+    out = mv.serialize_for_verdict({"oportunidade_id": "finep__602", "excerpts": EXCERPTS})
+    assert out is not None
+    oid, s = out
+    assert oid == "finep__602"
+    assert "Chamada IA Embarcada" in s
+    assert mv.serialize_for_verdict({"oportunidade_id": "finep__999"}) is None

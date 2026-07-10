@@ -23,6 +23,13 @@ pulado; falha em 1 entidade não derruba o batch (transação por entidade);
 checkpoint/log a cada 5. LLM via `core.llm.llm_client`; embeddings via
 `core.retrieval.embedder` (text-embedding-3-small, 1536d).
 
+match_chunks (Fase 2): o TEXTO armazenado é o silver cru, mas o EMBEDDING é
+contextualizado (`core.contextual_retrieval.contextualize_chunks` — o doc de
+contexto é o próprio conjunto de blocos temáticos do silver do edital). Decisão
+do gate da Fase 1.5: contextual venceu o cru em todas as métricas (MRR
+0.505→0.666). Falha por-chunk degrada p/ embed cru (contrato do
+contextualize_chunks), nunca derruba o ingest.
+
 Uso (SEMPRE com env local — o .env aponta pro remoto):
     DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \\
     OPENAI_API_KEY=... python -m core.kg.gold --limit 5
@@ -294,6 +301,21 @@ def _pack_chunks(blocks: list[dict]) -> list[dict]:
             break
     _flush()
     return chunks[:_CHUNK_CAP]
+
+
+def _embed_match_chunks(chunks: list[dict]) -> list[list[float]]:
+    """Embeddings dos match_chunks com enriquecimento contextual (Fase 2).
+
+    O texto ARMAZENADO segue cru (coluna `text`); só o vetor leva o contexto —
+    mesma convenção de `edital_chunks`. O doc de contexto é a concatenação dos
+    próprios chunks (o recorte temático do silver), exatamente a célula
+    `contextual` que venceu o gate da Fase 1.5."""
+    from core.contextual_retrieval import contextualize_chunks
+    from core.retrieval.embedder import embed_texts
+
+    if not chunks:
+        return []
+    return embed_texts(contextualize_chunks(chunks))
 
 
 # ===========================================================================
@@ -607,7 +629,7 @@ def _ingest_investidores(conn, stats: dict) -> None:
 
 def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
     from core.kg.constraints_producer import produce_from_text
-    from core.retrieval.embedder import embed_query, embed_texts
+    from core.retrieval.embedder import embed_query
 
     path = SILVER_DIR / "programas.json"
     recs = json.loads(path.read_text(encoding="utf-8")).get("programas", []) if path.exists() else []
@@ -617,7 +639,7 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
             tmin, tmax = _ticket_from_range(r.get("ticket_range"))
             constraints, requisitos = produce_from_text(r.get("elegibilidade") or "")
             chunks = _pack_chunks([{"section_path": [r.get("name") or ""], "kind": "paragraph", "text": desc}])
-            chunk_embs = embed_texts([c["text"] for c in chunks]) if chunks else []
+            chunk_embs = _embed_match_chunks(chunks)
             with conn.transaction(), conn.cursor() as cur:
                 eid = _upsert_entity(
                     cur, kind="programa", source="curadoria", native_id=r["id"],
@@ -730,7 +752,7 @@ def _programa_id_map(conn) -> dict[str, str]:
 def _ingest_editais(conn, agency_cache: dict, stats: dict, *, limit: int | None, skip_unchanged: bool) -> None:
     from core.kg.constraints_producer import produce_from_text
     from core.llm.llm_client import make_client
-    from core.retrieval.embedder import embed_query, embed_texts
+    from core.retrieval.embedder import embed_query
 
     model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
     client = make_client(api_key=os.environ["OPENAI_API_KEY"], max_retries=6)
@@ -774,7 +796,7 @@ def _ingest_editais(conn, agency_cache: dict, stats: dict, *, limit: int | None,
             constraints, requisitos = produce_from_text(elig_text)
 
             chunks = _pack_chunks(thematic)
-            chunk_embs = embed_texts([c["text"] for c in chunks]) if chunks else []
+            chunk_embs = _embed_match_chunks(chunks)
             emb = embed_query(description or md["name"])
 
             meta = dict(md["metadata"])

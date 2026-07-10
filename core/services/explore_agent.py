@@ -34,9 +34,10 @@ MATCH COM O PERFIL (find_matching_editais / find_matching_entities)
   ou logo ao abrir uma conversa com perfil, chame **ambas** as ferramentas:
   find_matching_editais + find_matching_entities. O resumo deve mencionar
   tanto editais quanto entidades (investidores/programas) encontrados.
-- Para PARCERIA, CAPITAL ou PROGRAMAS (não editais) — "que fundos investiriam na
-  gente?", "ICTs para parceria?", "programa de aceleração?" — chame
-  find_matching_entities (investidores/programas/ICTs por afinidade).
+- Para CAPITAL ou PROGRAMAS (não editais) — "que fundos investiriam na
+  gente?", "programa de aceleração?" — chame find_matching_entities
+  (investidores/programas por afinidade). Para ICTs (parceria de P&D), use as
+  tools de catálogo (list_icts / oportunidades_por_tema), não o match.
 - CRÍTICO: depois de chamar as tools, a interface JÁ mostra os resultados como
   cards visuais (nome, status, prazo, valor, justificativa) logo abaixo da sua
   mensagem — o usuário vai ver tudo isso de qualquer forma, sem você escrever
@@ -220,25 +221,16 @@ class ExploreAgent:
         tools = self._explore_tools()
         system = EXPLORE_AGENT_SYSTEM
 
-        # Match cross-domínio (hipergrado): só quando há PERFIL. COM workspace
-        # autenticado, reusa os nós duráveis do hipergrado da empresa (mais ricos,
-        # sem re-extrair). SEM workspace (explore público stateless), a tool extrai
-        # os nós do perfil do request (cacheado por hash) como antes. Em ambos os
-        # casos rankeia editais/entidades por afinidade de conteúdo.
-        if profile_text:
+        # Match v3: só quando há PERFIL. COM workspace autenticado, o lado
+        # empresa vem de company_chunks (perfil + library, refresh on-demand);
+        # SEM workspace (explore público stateless), o perfil do request vira
+        # chunks efêmeros (cache por hash). Em ambos os casos o funil rankeia
+        # editais/entidades por afinidade de texto real.
+        if profile_text and profile:
             from core.llm.agent_tools.match_tools import build_match_tools
-            company_nodes = None
-            if workspace_id and db is not None:
-                try:
-                    from core.services.company_corpus import load_company_hypergraph
-                    record = load_company_hypergraph(db, workspace_id)
-                    if record:
-                        company_nodes = record.get("nodes") or None
-                except Exception:  # noqa: BLE001 — fallback à extração efêmera, não derruba o explore
-                    logger.debug("falha ao carregar hipergrado durável da empresa", exc_info=True)
-                    company_nodes = None
             tools = tools + build_match_tools(
-                profile_text, company_nodes=company_nodes, brief=True, profile=profile,
+                profile_text, profile=profile, workspace_id=workspace_id,
+                db=db, brief=True,
             )
             system = system + EXPLORE_MATCH_INSTRUCTION
 
