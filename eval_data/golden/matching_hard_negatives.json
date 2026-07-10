@@ -1,6 +1,6 @@
 {
   "_criterion": "Hard negatives de ELEGIBILIDADE (Stage 1) — spec docs/specs/v3-unified.md §10 Fase 1.5 item (c). Empresa tematicamente forte (Stage 2 deveria rankear o edital alto) mas INELEGÍVEL por um constraint duro real, já extraído em `entities.constraints` no Supabase local pós-fix (WIKI §13.3 + enum-fix em constraints_producer). Só usa os 5 tipos que `core/services/eligibility.py` de fato avalia (porte, sede_uf, faturamento, trl, forma_juridica) — os outros 5 do vocabulário v3 (idade_empresa_meses, cnae, parceria, vinculo_incubacao, investidor_privado) nunca eliminam hoje (sempre 'unknown'), então um hard negative que dependesse só deles não provaria nada.",
-  "_natural_cases_note": "2 dos 5 casos abaixo (ia_digital_mg_x_fapesp18203, semicondutores_x_finep780) NÃO são fabricados — reusam perfis JÁ existentes em matching.json onde o próprio golden de afinidade já lista o edital como positivo por CONTEÚDO. Isso confirma in loco a separação de eixos que o docstring de matching.json declara ('elegibilidade dura é camada SEPARADA, fora deste golden').",
+  "_removed_cases_note": "Re-gate pós-auditoria externa (2026-07-10): removidos os 2 casos in-situ 'forma_juridica_empresa_vs_startup__{ia_digital_mg_x_fapesp18203,semicondutores_x_finep780}'. Eram observações do BUG (eligibility.py comparava forma_juridica por igualdade exata; 'startup' não satisfazia constraint ['empresa']), não hard negatives independentes — o bug foi corrigido (hierarquia de satisfação data-driven em WIKI constraint_vocab.satisfies.forma_juridica), então mantê-los rotulados seria só re-testar o mesmo fix já coberto por tests/test_eligibility.py::test_forma_juridica_startup_satisfies_empresa. Ficam só os 3 casos CONSTRUÍDOS abaixo (sede_uf, faturamento lte, faturamento gte) — não foi inventado substituto.",
   "cases": [
     {
       "id": "sede_uf_errada__medai_x_fapesc65",
@@ -57,22 +57,6 @@
       "expected_stage1": "inelegivel",
       "expected_unsat_tipos": ["faturamento"],
       "note": "Conteúdo (repatriação de pesquisadores) é quase uma paráfrase do objetivo de finep:745 (Conhecimento Brasil), mas o edital exige faturamento >= R$90mi (piso, não teto) — empresa fatura R$2mi. Mesmo tipo de constraint (faturamento) que o caso acima, direção oposta (gte vs lte) — cobre as duas pontas do operador."
-    },
-    {
-      "id": "forma_juridica_empresa_vs_startup__ia_digital_mg_x_fapesp18203",
-      "edital": "fapesp:18203",
-      "profile_ref": "ia_digital_mg",
-      "expected_stage1": "inelegivel",
-      "expected_unsat_tipos": ["sede_uf", "forma_juridica"],
-      "note": "NÃO FABRICADO: fapesp__18203 já é um positivo de afinidade para ia_digital_mg em matching.json. sede_uf exige SP (empresa é MG) E forma_juridica exige 'empresa' (perfil tem tipo_entidade='startup', valor distinto no enum §4.4) — dupla eliminação real, achada ao rodar o Stage 1 sobre o golden de afinidade existente."
-    },
-    {
-      "id": "forma_juridica_empresa_vs_startup__semicondutores_x_finep780",
-      "edital": "finep:780",
-      "profile_ref": "semicondutores",
-      "expected_stage1": "inelegivel",
-      "expected_unsat_tipos": ["forma_juridica"],
-      "note": "NÃO FABRICADO: finep__780 já é positivo de afinidade para semicondutores em matching.json (é literalmente o único hit forte do caso). forma_juridica exige 'empresa'; perfil tem tipo_entidade='startup' — mesma causa-raiz do caso acima (ontologia forma_juridica conflando maturidade/estágio com natureza jurídica; 'startup' e 'empresa' são tratados como mutuamente exclusivos quando no mundo real toda startup registrada JÁ é uma empresa)."
     }
   ]
 }

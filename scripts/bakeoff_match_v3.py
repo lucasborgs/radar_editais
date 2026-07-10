@@ -1,10 +1,14 @@
-"""Bake-off offline v2 vs v3 — Fase 1.5 da spec docs/specs/v3-unified.md (GATE).
+"""Bake-off v3 — Fase 1.5 da spec docs/specs/v3-unified.md (GATE).
 
 Script exploratório, NÃO um harness de produção: não registra suíte em
 core/eval/registry (a suíte real do v3 é da Fase 2). NÃO altera
 hypergraph_match.py nem gold.py. É leitura pura no Supabase local (a única
-escrita do bake-off — o re-ingest de editais para aplicar 2 fixes de dados —
+escrita do bake-off — o re-ingest de editais para aplicar fixes de dados —
 já foi feita separadamente; ver commit da Fase 1.5 no WIKI/constraints_producer).
+
+Pré-beta: o gate mede CORREÇÃO ABSOLUTA do funil v3, não comparação contra o
+v2 (hipergrafos v2 não existem mais em disco — reconstruí-los só para uma
+comparação relativa não vale o custo LLM; ver docs/specs/v3-unified.md).
 
 Pipeline v3 simulado (§7 da spec):
     Stage 0 — SQL "vivo" (status/deadline)
@@ -17,6 +21,11 @@ Uso:
 
     --cells raw,hyde,boost,threshold,hardneg,contextual   (default: todas menos contextual)
     --contextual-confirm   roda a célula contextual mesmo sem --cells listá-la explicitamente
+    --as-of YYYY-MM-DD     data de referência do Stage 0 "vivo" (default: data
+                            real de hoje). Fixar na data de criação do golden
+                            (`matching.json`) evita que staleness (editais que
+                            fecharam DEPOIS do golden ter sido curado) apareça
+                            como falso-negativo de Stage 0/1.
 """
 from __future__ import annotations
 
@@ -42,13 +51,6 @@ logger = logging.getLogger("bakeoff")
 
 GOLDEN_PATH = ROOT / "eval_data" / "golden" / "matching.json"
 HARDNEG_PATH = ROOT / "eval_data" / "golden" / "matching_hard_negatives.json"
-V2_BASELINE_PATH = ROOT / "eval_results" / "20260705_192151_matching.json"
-if not V2_BASELINE_PATH.exists():
-    # eval_results/ é gitignored — não existe no worktree; cai p/ o repo principal
-    # (ver docs/specs/v3-unified.md Fase 1.5: reuso, não re-execução, do run v2).
-    _main_repo_fallback = ROOT.parent.parent.parent / "eval_results" / "20260705_192151_matching.json"
-    if _main_repo_fallback.exists():
-        V2_BASELINE_PATH = _main_repo_fallback
 TOP_K_SUITE = 8
 
 
@@ -93,13 +95,13 @@ def load_editais(conn) -> list[dict]:
     return rows
 
 
-def stage0_alive(entities: list[dict]) -> tuple[list[dict], list[dict]]:
-    """SQL 'vivo' replicado em Python (mesma condição do WHERE do Stage 0)."""
+def stage0_alive(entities: list[dict], as_of: date) -> tuple[list[dict], list[dict]]:
+    """SQL 'vivo' replicado em Python (mesma condição do WHERE do Stage 0),
+    parametrizado pela data de referência `as_of` (default histórico: hoje)."""
     alive, dead = [], []
-    today = date.today()
     for e in entities:
         ok_status = e["status"] is None or e["status"] in ("aberta", "ativa")
-        ok_deadline = e["deadline"] is None or e["deadline"] >= today
+        ok_deadline = e["deadline"] is None or e["deadline"] >= as_of
         (alive if (ok_status and ok_deadline) else dead).append(e)
     return alive, dead
 
@@ -246,52 +248,6 @@ def rank_metrics(scores: dict[str, float], relevant_fk: set[str], neutral_fk: se
 
 
 # ---------------------------------------------------------------------------
-# v2 baseline (reuso do eval_results mais recente — hipergrafos v2 não existem
-# mais em disco; rebuild custaria LLM$ novo só para uma comparação. Ver handoff.)
-# ---------------------------------------------------------------------------
-
-def v2_baseline(golden: dict) -> dict:
-    if not V2_BASELINE_PATH.exists():
-        return {"error": f"{V2_BASELINE_PATH} não encontrado"}
-    data = json.loads(V2_BASELINE_PATH.read_text(encoding="utf-8"))
-    cases = golden["cases"]
-    neutral_fk = set(golden.get("neutral", []))
-    per_case = {}
-    for case, item in zip(cases, data["item_results"], strict=True):
-        relevant_fk = set(case["relevant"])
-        ranked_fk = item["output"].get("ranked", [])
-        m: dict = {}
-        if not relevant_fk:
-            noise = [fk for fk in ranked_fk[:TOP_K_SUITE] if fk not in relevant_fk and fk not in neutral_fk]
-            m["noise_at_suite_k"] = len(noise)
-        else:
-            for k in (5, TOP_K_SUITE):
-                topk = set(ranked_fk[:k])
-                m[f"recall_at_{k}"] = round(len(relevant_fk & topk) / len(relevant_fk), 3)
-            m["recall_at_10"] = "n/d (execução armazenada limitada a top_k=8)"
-            rr = 0.0
-            for i, fk in enumerate(ranked_fk, start=1):
-                if fk in relevant_fk:
-                    rr = 1.0 / i
-                    break
-            m["mrr"] = round(rr, 3)
-            noise = [fk for fk in ranked_fk[:TOP_K_SUITE] if fk not in relevant_fk and fk not in neutral_fk]
-            m["noise_at_suite_k"] = len(noise)
-        per_case[case["company"]] = m
-    return {
-        "source_file": str(V2_BASELINE_PATH.name),
-        "note": (
-            "Reexecução do v2 NÃO foi feita nesta sessão — data/knowledge_graph/hypergraphs/ "
-            "está vazio (0 arquivos) neste ambiente; reconstruir custaria chamadas LLM novas "
-            "(2+/chunk x ~150 editais) só para produzir um número comparável. Reusado o run "
-            "mais recente já registrado (2026-07-05) sobre o MESMO golden."
-        ),
-        "aggregate_mean_recall_at_8_original_run": data.get("aggregate", {}).get("mean_recall_at_k"),
-        "per_case": per_case,
-    }
-
-
-# ---------------------------------------------------------------------------
 # Célula: threshold sweep (precision/recall) — pool de (case, entity) v3 cru
 # ---------------------------------------------------------------------------
 
@@ -315,19 +271,11 @@ def threshold_sweep(pooled: list[tuple[float, int]]) -> list[dict]:
 # Main
 # ---------------------------------------------------------------------------
 
-def run(cells: set[str]) -> dict:
-    golden = load_golden()
-    neutral_fk = set(golden.get("neutral", []))
-    conn = psycopg.connect(_dsn())
-
-    entities = load_editais(conn)
-    alive, dead = stage0_alive(entities)
-    logger.info("Stage 0: %d/%d editais/programas vivos", len(alive), len(entities))
-
-    report: dict = {"stage0": {"alive": len(alive), "dead": len(dead)}, "cells": {}}
-
-    # ---- (a) Stage 0+1 recall + causas de perda -----------------------------
-    stage01_rows = []
+def _stage0_1_recall_report(entities: list[dict], alive: list[dict], golden: dict) -> dict:
+    """Recall Stage0+1 (sobre os positivos do golden) + causa de CADA perda,
+    para um dado conjunto `alive` (já filtrado por `stage0_alive` num `as_of`)."""
+    alive_fk = {_file_key(e["native_id"]) for e in alive}
+    rows = []
     for case in golden["cases"]:
         profile = profile_from_dict(golden["profiles"][case["company"]])
         relevant_fk = set(case["relevant"])
@@ -339,9 +287,9 @@ def run(cells: set[str]) -> dict:
             native = fk.replace("__", ":", 1)
             entry = next((e for e in entities if e["native_id"] == native), None)
             if entry is None:
-                stage01_rows.append({"company": case["company"], "edital": fk, "causa": "AUSENTE em entities (gap de dado)"})
+                rows.append({"company": case["company"], "edital": fk, "causa": "AUSENTE em entities (gap de dado)"})
                 continue
-            if fk not in {_file_key(e["native_id"]) for e in alive}:
+            if fk not in alive_fk:
                 causa = f"Stage0 morto (status={entry['status']!r}, deadline={entry['deadline']})"
             elif fk not in survivors_fk:
                 v = verdicts.get(native, {})
@@ -349,17 +297,32 @@ def run(cells: set[str]) -> dict:
             else:
                 causa = None
             if causa:
-                stage01_rows.append({"company": case["company"], "edital": fk, "causa": causa})
+                rows.append({"company": case["company"], "edital": fk, "causa": causa})
     total_positivos = sum(len(c["relevant"]) for c in golden["cases"])
-    perdidos = len(stage01_rows)
-    report["stage0_1_recall"] = {
+    perdidos = len(rows)
+    return {
         "total_positivos_golden": total_positivos,
         "perdidos": perdidos,
         "recall_pct": round((total_positivos - perdidos) / total_positivos, 3) if total_positivos else None,
-        "detalhe": stage01_rows,
+        "detalhe": rows,
     }
 
-    # ---- (b) ranking v3 cru + v2 baseline -----------------------------------
+
+def run(cells: set[str], as_of: date) -> dict:
+    golden = load_golden()
+    neutral_fk = set(golden.get("neutral", []))
+    conn = psycopg.connect(_dsn())
+
+    entities = load_editais(conn)
+    alive, dead = stage0_alive(entities, as_of)
+    logger.info("Stage 0 (as_of %s): %d/%d vivos", as_of, len(alive), len(entities))
+
+    report: dict = {"stage0": {"as_of": str(as_of), "alive": len(alive), "dead": len(dead)}, "cells": {}}
+
+    # ---- (a) Stage 0+1 recall + causas de perda -----------------------------
+    report["stage0_1_recall"] = {"as_of": str(as_of), **_stage0_1_recall_report(entities, alive, golden)}
+
+    # ---- (b) ranking v3 cru --------------------------------------------------
     if "raw" in cells:
         alive_ids = [e["id"] for e in alive]
         match_chunks = load_match_chunks(conn, alive_ids)
@@ -384,7 +347,6 @@ def run(cells: set[str]) -> dict:
                     continue
                 pooled_for_threshold.append((s, 1 if fk in relevant_fk else 0))
         report["cells"]["v3_raw"] = raw_results
-        report["cells"]["v2_baseline"] = v2_baseline(golden)
 
         if "threshold" in cells:
             report["cells"]["threshold_sweep"] = threshold_sweep(pooled_for_threshold)
@@ -497,13 +459,16 @@ def run(cells: set[str]) -> dict:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Bake-off offline v2 vs v3 (Fase 1.5, GATE)")
+    ap = argparse.ArgumentParser(description="Bake-off v3 (Fase 1.5, GATE — correção absoluta, sem comparação v2)")
     ap.add_argument("--cells", default="raw,boost,hyde,threshold,hardneg",
                      help="raw,boost,hyde,threshold,hardneg,contextual (vírgula)")
     ap.add_argument("--out", default=None, help="path do JSON de saída (default: stdout)")
+    ap.add_argument("--as-of", default=None,
+                     help="data de referência (YYYY-MM-DD) do Stage 0 'vivo'; default = hoje real")
     args = ap.parse_args()
     cells = set(c.strip() for c in args.cells.split(",") if c.strip())
-    report = run(cells)
+    as_of = date.fromisoformat(args.as_of) if args.as_of else date.today()
+    report = run(cells, as_of)
     out_str = json.dumps(report, ensure_ascii=False, indent=2, default=str)
     if args.out:
         from pathlib import Path
