@@ -73,24 +73,83 @@ re-executável.
 
 ---
 
-## 2. Radar — funil de match em 4 estágios
+## 2. Radar — AI core em query time (funil v3 + retrieval + explore + escrita)
 
 Match sobre **texto real** (trechos da empresa × trechos da oportunidade),
 nunca sobre conceitos abstratos extraídos.
 
 ```mermaid
-flowchart TB
-  P["Perfil da empresa + documentos da library<br/>(chunkados por workspace; HyDE expande<br/>perfis ralos no cold start)"]
-  P --> S0["Stage 0 — Vivo<br/>prazo futuro ou fluxo contínuo (determinístico)"]
-  S0 --> S1["Stage 1 — Elegibilidade dura<br/>constraints × perfil · inelegível ELIMINA<br/>desconhecido NUNCA elimina"]
-  S1 --> S2["Stage 2 — Afinidade semântica<br/>melhor pareamento por trecho da empresa<br/>(sum-of-max) + boost de setores · sem LLM"]
-  S2 --> S3["Stage 3 — Precisão (top 5-10)<br/>veredito LLM lendo os trechos pareados<br/>+ ficha da oportunidade (async, cacheado)"]
-  S3 --> CARDS["Cards com explicação por trecho real<br/>(matched_excerpts) + trilha investidor<br/>(tese × perfil, gate de estágio/setor)"]
+---
+config:
+  layout: elk
+---
+flowchart LR
+ subgraph COMPANY["Lado empresa · company_chunks"]
+    direction TB
+        CC["company_chunks (RLS por workspace)<br>origin: profile | library_doc | hyde<br>refresh on-demand com diff determinístico<br>(sem mudança = 1 SELECT, zero embeds)<br>HyDE só no cold start (perfil ralo, sem docs)"]
+  end
+ subgraph FUNIL["Funil de match v3 (4 estágios) · match_v3"]
+    direction TB
+        E0["Estágio 0 — Vivo (SQL)<br>entities kind∈{edital,programa}<br>deadline MANDA (≥ as_of passa; NULL =<br>fluxo contínuo, status decide; status<br>congelado nunca mata prazo futuro)<br>determinístico, zero LLM"]
+        E1["Estágio 1 — Elegibilidade dura<br>eligibility · constraints × perfil<br>sat / unsat / unknown · unsat ELIMINA<br>unknown NUNCA elimina · zero LLM"]
+        E2["Estágio 2 — Afinidade<br>sum-of-max por chunk da empresa,<br>exposto como média 0..1<br>company_chunks × match_chunks<br>(contextuais, pgvector) · boost setores ×1.1<br>piso 0.52 calibrado no golden · sem LLM"]
+        E3["Estágio 3 — Veredito LLM top 5-10<br>match_verdict · gpt-4o-mini (tier 3)<br>lê matched_excerpts + linha de entities<br>(constraints, requisitos, ticket, prazo)<br>rerank opcional (RERANK_BACKEND)<br>async + cache (match_verdicts, prompt v3)"]
+  end
+ INV["Trilha investidor (paralela)<br>cosseno perfil × entities.embedding<br>kind=investidor · fund_status=ativo<br>gates estágio/setor só quando<br>os dois lados declaram"]
+ subgraph RET["Retrieval (RAG da escrita) · retriever"]
+        HYDE["HyDE · pseudo-doc via LLM (default)"]
+        DENSE["Dense · pgvector<br>(edital_chunks contextuais, lazy)"]
+        SPARSE["Sparse · BM25 (rank_bm25)"]
+        RRF["RRF merge · fts_weight=0.5"]
+        BOOST["primary_boost 1.5 + metadata_boost"]
+        RERANK["rerank · cross-encoder mmarco-mMiniLMv2<br>fallback gpt-4o-mini / RRF puro"]
+        TOPK["top-k chunks"]
+  end
+ subgraph EXPLORE["Mapeamento · ExploreAgent (ReAct, rota única)"]
+        EA["ExploreAgent · LangGraph"]
+        TOOLS["tools (SQL via entity_catalog):<br>search_entities (semântica, entities.embedding)<br>related_by_tags (GIN tecnologias_tags)<br>get_node_neighborhood (BFS entity_relationships)<br>find_matching_editais/entities (motor v3 como tool)"]
+  end
+ subgraph FRONT["⚡ Frontend · estado local"]
+        FE["profile_diff → DiffCard<br>✓ Aceitar → isRadarReady()<br>perfil no localStorage<br>cards: matched_excerpts (trechos reais<br>empresa↔edital) + chips de setores"]
+  end
+ subgraph WRITE["Escrita · runtime agêntico"]
+        WS["WritingSession → LangGraph (agent_graph)<br>RAG via retrieve_chunks · scope=[edital_id]<br>ficha do edital via entity_catalog<br>(exclusoes · publico_alvo · constraints)"]
+        FT["_first_turn_with_generation()<br>batch 8 seções + descrição do usuário<br>retorna draft completo de uma vez"]
+        CKL["ChecklistService · 3 passes paralelos<br>compliance · qualidade · completude<br>compliance_flags inline em /writing/turn"]
+        SCOP["scope_classifier · gpt-4o-mini<br>cosmética vs conceitual<br>se conceitual → ripple_suggestion"]
+  end
+    Q["Query / CompanyProfile<br>(localStorage)"] --> CC & E0
+    CC --> E2
+    E0 --> E1
+    E1 --> E2
+    E2 --> E3
+    Q --> INV
+    E3 --> RANK["Ranking final com veredito<br>reordena só dentro do top-K"]
+    INV --> RANK
+    HYDE --> DENSE
+    DENSE --> RRF
+    SPARSE --> RRF
+    RRF --> BOOST
+    BOOST --> RERANK
+    RERANK --> TOPK
+    TOPK -. "RAG · retrieve_chunks" .-> WS
+    EA --> TOOLS
+    TOOLS -. "match como tool" .-> FUNIL
+    EA -. "responde + profile_diff" .-> FRONT
+    FRONT -. "isRadarReady()" .-> Q
+    Q -. "profile threading<br>para ExploreAgent tools" .-> EA
+    RANK -. "edital_id<br>usuário clica 'Começar proposta'" .-> WS
+    WS -- "turn_count=0 + sections vazias" --> FT
+    FT -. background .-> CKL
+    WS -- "turnos seguintes" --> CKL
+    WS -- "save_draft (force=False)" --> SCOP
+    SCOP -- "depth≤1 (D9)" --> WS
 ```
 
 Qualidade medida por gate absoluto (golden + hard negatives de elegibilidade);
 parâmetros calibrados por bake-off: embeddings contextuais dos trechos de match
-(venceram o cru por medição), agregação sum-of-max, boost de setores.
+(venceram o cru por medição, MRR 0.505→0.666), agregação sum-of-max, boost de
+setores. Baseline v3: MRR 0.809 · r@10 0.643 · hard negatives 3/3.
 
 ---
 
