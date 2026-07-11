@@ -164,13 +164,11 @@ def writing_start(
     # Fundos/programas não encontrados no JSON curado prosseguem sem dados do nó
     # (WritingSession tolera contexto vazio — os builders retornam "" graciosamente).
     if req.edital_id.startswith("investidor:"):
-        from core.kg import kg_store
-        if req.edital_id not in {i["id"] for i in kg_store.load_investidores()}:
-            logger.warning("writing/start: fundo '%s' não encontrado em investidores.json — sessão prossegue sem dados do fundo", req.edital_id)
+        if entity_catalog.get_investidor(req.edital_id) is None:
+            logger.warning("writing/start: fundo '%s' não encontrado em entities — sessão prossegue sem dados do fundo", req.edital_id)
     elif req.edital_id.startswith("programa:"):
-        from core.kg import kg_store
-        if req.edital_id not in {p["id"] for p in kg_store.load_programas()}:
-            logger.warning("writing/start: programa '%s' não encontrado em programas.json — sessão prossegue sem dados do programa", req.edital_id)
+        if entity_catalog.get_programa(req.edital_id) is None:
+            logger.warning("writing/start: programa '%s' não encontrado em entities — sessão prossegue sem dados do programa", req.edital_id)
     else:
         if entity_catalog.get_edital(req.edital_id) is None:
             raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
@@ -343,9 +341,9 @@ def writing_list_sessions(
 def _attach_target_titles(sessions: list[dict]) -> None:
     """Preenche `edital_title` em cada sessão a partir do alvo (edital ou fundo).
 
-    Resolve eventos (editais/desafios/programas) via wiki_matcher e entidades
-    (`investidor:<slug>`) via kg_store.load_investidores. Falha graciosa: erro
-    de carga deixa as sessões sem título (o front mostra o id)."""
+    Resolve eventos (editais/desafios/programas) e entidades (`investidor:<slug>`)
+    via entity_catalog/SQL. Falha graciosa: erro de carga deixa as sessões sem
+    título (o front mostra o id)."""
     if not sessions:
         return
 
@@ -353,14 +351,13 @@ def _attach_target_titles(sessions: list[dict]) -> None:
     titles: dict[str, str] = {}
 
     investor_ids = {i for i in ids if i.startswith("investidor:")}
-    if investor_ids:
+    for iid in investor_ids:
         try:
-            from core.kg import kg_store
-            for inv in kg_store.load_investidores():
-                if inv["id"] in investor_ids and inv.get("name"):
-                    titles[inv["id"]] = inv["name"]
+            fund = entity_catalog.get_investidor(iid)
+            if fund and fund.get("name"):
+                titles[iid] = fund["name"]
         except Exception:
-            pass  # sem títulos de fundo — front cai no id
+            pass  # sem título de fundo — front cai no id
 
     for eid in ids - investor_ids:
         try:

@@ -34,9 +34,24 @@ import unicodedata
 from pathlib import Path
 
 from config import OBSIDIAN_VAULT_DIR
-from core.kg import hypergraph_catalog
+from core.kg import entity_catalog as hypergraph_catalog
 from core.kg.kg_store import load_all_hypergraphs
-from core.llm.agent_tools.explore_tools import build_entity_index
+
+
+def build_entity_index(graphs: dict[str, dict]) -> dict[tuple[str, str], list[tuple[str, dict]]]:
+    """Índice (type_lower, name_lower) → [(file_key, node)] para wikilinks nativos.
+
+    Exportador legado do vault Obsidian — o único consumidor da leitura de
+    hipergrado que restou (o runtime migrou p/ SQL no PR-B v3). Inline aqui p/ não
+    reter a função no explore_tools; `load_all_hypergraphs` já entrega grafos v2."""
+    idx: dict[tuple[str, str], list[tuple[str, dict]]] = {}
+    for fk, g in graphs.items():
+        for n in g.get("nodes", []):
+            nm = (n.get("name") or "").strip().lower()
+            tp = (n.get("type") or "").strip().lower()
+            if nm and tp:
+                idx.setdefault((tp, nm), []).append((fk, n))
+    return idx
 
 # =============================================================================
 # SCHEMA v2 — mapa (type, kind/dim) → (pasta, emoji, rótulo)

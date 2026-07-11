@@ -1,12 +1,12 @@
-"""ExploreAgent — chat exploratório sobre o hipergrado (catálogo + match).
+"""ExploreAgent — chat exploratório sobre o catálogo SQL (entities) + match.
 
-Rota ÚNICA: agente ReAct multi-step com tools que leem o hipergrado direto
-(core.kg.hypergraph_catalog / kg_store) — sem index.json/wiki, sem GraphService.
-As tools cobrem leitura (list_editais, get_edital, get_node_neighborhood,
-oportunidades_por_tema, list_icts/investidores), match com perfil
+Rota ÚNICA: agente ReAct multi-step com tools que leem o catálogo gold direto
+(core.kg.entity_catalog / SQL) — sem hipergrado, sem index.json/wiki. As tools
+cobrem leitura (list_editais, get_edital, explore_opportunity, list_icts/
+investidores), mapeamento do ecossistema (search_entities, related_by_tags,
+get_node_neighborhood — §8 da spec v3-unified), match com perfil
 (find_matching_editais / find_matching_entities) e memória entre sessões
-(exploration_log). As rotas legacy factual/reasoning (index.json + 1 LLM call) foram
-removidas no Sprint 3 — o agente, com get_node_neighborhood, cobre o caso factual.
+(exploration_log).
 """
 from __future__ import annotations
 
@@ -89,18 +89,20 @@ COMO USAR AS FERRAMENTAS DE LEITURA
 - list_investidores → captação privada: fundos com tese num tema.
 - get_edital → resumo de um edital específico (após explore_opportunity ou
   quando o ID já aparece na pergunta): objetivo, mecanismo, elegíveis, temas.
-- get_node_neighborhood → leitura NATIVA do hipergrado para um nó (edital, tema,
-  tecnologia, ICT...). Use para perguntas FACTUAIS sobre um edital
-  (prazo/status/valor) e SEMÂNTICAS estruturais ("quais tecnologias o edital
-  cobre?", "o que ele exige?", "que parcerias prevê?") — devolve as relações
-  N-árias com vizinhos rotulados por tipo. Ative cross_source=True para
-  atravessar entre subgrafos (edital → ICT → temas → outros editais).
-- Para ICTs ligadas a um edital específico, use get_node_neighborhood no edital
-  com cross_source=True (as arestas parceria_com/viabiliza trazem as ICTs, e a
-  travessia cross-source alcança os temas que essas ICTs dominam no catálogo).
-  IMPORTANTE: quando o usuário perguntar sobre ICTs parceiras de um edital,
-  use get_node_neighborhood nesse edital e liste os NOMES das ICTs na resposta
-  — não se limite a descrever as áreas delas genericamente.
+- search_entities → busca SEMÂNTICA (por significado) no ecossistema. Use para
+  "quais atores atuam em visão computacional?", "quem trabalha com hidrogênio
+  verde?", ou quando os filtros de tema não bastam. Filtre por kind (edital,
+  ict, investidor, programa, agencia).
+- related_by_tags → entidades que compartilham tecnologias/temas com uma dada
+  (ex.: "editais parecidos com o finep:589"). É a relação semântica implícita.
+- get_node_neighborhood → vizinhança ESTRUTURAL de um nó via as arestas
+  determinísticas do catálogo (operado_por, subordinado_a, exige_parceria_com,
+  credenciada_por). Use para saber QUEM opera um edital, a qual PROGRAMA pertence,
+  que ICT exige, ou quais unidades uma agência credencia.
+- Para ICTs ligadas a um edital, use get_node_neighborhood no edital (aresta
+  exige_parceria_com traz as ICTs). IMPORTANTE: quando o usuário perguntar sobre
+  ICTs parceiras de um edital, liste os NOMES das ICTs na resposta — não se
+  limite a descrever as áreas delas genericamente.
 
 QUANDO PARAR DE USAR FERRAMENTAS
 - Após cobrir todas as partes da pergunta (ou todos os todos) com base nos

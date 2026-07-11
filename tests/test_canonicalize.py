@@ -186,28 +186,6 @@ def test_build_canon_records_validated_ids():
     }
 
 
-def test_bfs_degree_cap_prioritizes_entity_edges():
-    # Super-nó com 30 arestas: o cap limita a expansão e as arestas que tocam
-    # Oportunidade/Ator entram primeiro (guardrail de travessia do PR3).
-    from core.llm.agent_tools.explore_tools import _bfs_subgraph
-
-    nodes = [{"id": "con:hub", "type": "Conceito", "dim": "tema", "name": "hub"}]
-    edges = []
-    for i in range(25):  # 25 arestas Conceito-Conceito (baixa prioridade)
-        nodes.append({"id": f"con:n{i}", "type": "Conceito", "dim": "tema", "name": f"n{i}"})
-        edges.append({"type": "aplica_em", "members": ["con:hub", f"con:n{i}"]})
-    for i in range(5):  # 5 arestas com Oportunidade (alta prioridade)
-        nodes.append({"id": f"op:e{i}", "type": "Oportunidade", "kind": "edital", "name": f"e{i}"})
-        edges.append({"type": "abrange_tema", "members": ["op:e" + str(i), "con:hub"]})
-    graph = {"nodes": nodes, "edges": edges}
-    idx = {n["id"]: n for n in nodes}
-
-    collected, visited = _bfs_subgraph(graph, idx, "con:hub", depth=1, max_edges=100, degree_cap=10)
-    assert len(collected) == 10  # cap por nó, não as 30
-    # as 5 arestas de entidade vêm primeiro
-    assert all(e["type"] == "abrange_tema" for e in collected[:5])
-
-
 # ── KG v2 resíduos PR-B: Frente 1 (descarte determinístico por classe errada) ──
 
 def test_anti_class_verdict_flags_wrong_class():

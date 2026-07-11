@@ -9,25 +9,16 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from core.kg import kg_store, temporal
+from core.kg import entity_catalog, temporal
 
 
 def _patch_hypergraph(monkeypatch, editais: list[dict]):
-    graphs = {}
-    for e in editais:
-        eid = e.get("id", "")
-        source, _, native = eid.partition(":")
-        graphs[f"{source}__{native}"] = {
-            "nodes": [{
-                "type": "Oportunidade",
-                "kind": "edital",
-                "edital_id": eid,
-                "prazo": e.get("deadline"),
-                "status": e.get("status"),
-            }],
-            "edges": [],
-        }
-    monkeypatch.setattr(kg_store, "load_all_hypergraphs", lambda: graphs)
+    """Stub de entity_catalog.get_entity_temporal (fonte SQL de deadline/status)."""
+    by_id = {
+        e.get("id", ""): {"deadline": e.get("deadline"), "status": e.get("status")}
+        for e in editais
+    }
+    monkeypatch.setattr(entity_catalog, "get_entity_temporal", lambda eid: by_id.get(eid))
 
 
 def _fmt(d: date) -> str:
