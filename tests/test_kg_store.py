@@ -17,7 +17,6 @@ from core.kg import kg_store
 def _isolate_kg(monkeypatch, tmp_path):
     """KG num tmp dir, sem Postgres, caches limpos — testes não tocam dados reais."""
     monkeypatch.setattr(kg_store, "KNOWLEDGE_GRAPH_DIR", tmp_path)
-    monkeypatch.setattr(kg_store, "_HYPERGRAPHS_DIR", tmp_path / "hypergraphs")
     monkeypatch.setattr(kg_store, "_pg_configured", lambda: False)
     monkeypatch.setenv("KG_STORE_BACKEND", "file")
     kg_store._file_cache.clear()
@@ -65,87 +64,6 @@ def test_mtime_invalidation(monkeypatch):
     os.utime(path, (future, future))
 
     assert kg_store.load_index()["editais"][0]["id"] == "b"
-
-
-def test_load_all_hypergraphs_roundtrip():
-    # Grafos JÁ-v2 (tipos consolidados) passam intactos pelo upgrade-on-read
-    # (migrate_to_v2 é no-op quando format + tipos já são v2).
-    graphs = {
-        "finep__1": {
-            "format_version": 2,
-            "source_hash": None,
-            "proveniencia": {},
-            "nodes": [{"type": "Oportunidade", "kind": "edital", "aperture": "prazo",
-                       "id": "op:edital-1", "name": "Edital 1", "prazo": "31/12/2026"}],
-            "edges": [],
-        },
-        "fapesp__2": {
-            "format_version": 2,
-            "source_hash": None,
-            "proveniencia": {},
-            "nodes": [{"type": "Oportunidade", "kind": "edital", "id": "op:edital-2", "name": "Edital 2"}],
-            "edges": [],
-        },
-    }
-    hg_dir = kg_store._HYPERGRAPHS_DIR
-    hg_dir.mkdir(parents=True, exist_ok=True)
-    for fk, g in graphs.items():
-        (hg_dir / f"{fk}.json").write_text(__import__("json").dumps(g), encoding="utf-8")
-
-    loaded = kg_store.load_all_hypergraphs()
-    assert loaded == graphs
-
-
-def test_load_hypergraph_upgrades_v1_on_read():
-    # Um arquivo v1 (sem format_version, tipos v1, arestas por name) é elevado a v2
-    # no load: formato (ids, members-by-id) + consolidação de tipos (KG v2 PR1+PR2).
-    v1 = {
-        "source_hash": "h",
-        "nodes": [
-            {"type": "Edital", "name": "Edital X"},
-            {"type": "Tema", "name": "Robótica"},
-        ],
-        "edges": [{"type": "abrange_tema", "members": ["edital x", "robótica"]}],
-    }
-    hg_dir = kg_store._HYPERGRAPHS_DIR
-    hg_dir.mkdir(parents=True, exist_ok=True)
-    (hg_dir / "finep__v1.json").write_text(__import__("json").dumps(v1), encoding="utf-8")
-
-    g = kg_store.load_hypergraph("finep__v1")
-    assert g["format_version"] == 2
-    # tipos consolidados (Edital→Oportunidade/edital, Tema→Conceito/tema) + ids v2
-    assert {n["id"] for n in g["nodes"]} == {"op:edital-x", "con:robotica"}
-    types = {n["id"]: (n["type"], n.get("kind") or n.get("dim")) for n in g["nodes"]}
-    assert types["op:edital-x"] == ("Oportunidade", "edital")
-    assert types["con:robotica"] == ("Conceito", "tema")
-    # a aresta agora referencia ids v2, não name-strings
-    assert g["edges"][0]["members"] == ["op:edital-x", "con:robotica"]
-
-
-def test_load_hypergraph_upgrades_fresh_v2_extraction_on_read():
-    # Extração FRESCA pós-PR2: o extractor emite TIPOS v2 mas sem format_version/
-    # ids (arestas por name). O upgrade-on-read deve atribuir prefixos v2
-    # (op:/ator:/con:), NUNCA o fallback "no:" — senão a resolução cross-fonte
-    # por id quebra (a mesma ICT teria ator: no catálogo e no: no edital novo).
-    fresh = {
-        "source_hash": "h",
-        "nodes": [
-            {"type": "Oportunidade", "kind": "edital", "name": "Edital Y"},
-            {"type": "Ator", "kind": "ict", "name": "SENAI"},
-            {"type": "Conceito", "dim": "tecnologia", "name": "visão computacional"},
-        ],
-        "edges": [{"type": "parceria_com", "members": ["edital y", "senai"]}],
-    }
-    hg_dir = kg_store._HYPERGRAPHS_DIR
-    hg_dir.mkdir(parents=True, exist_ok=True)
-    (hg_dir / "finep__fresh.json").write_text(__import__("json").dumps(fresh), encoding="utf-8")
-
-    g = kg_store.load_hypergraph("finep__fresh")
-    assert g["format_version"] == 2
-    assert {n["id"] for n in g["nodes"]} == {
-        "op:edital-y", "ator:senai", "con:visao-computacional",
-    }
-    assert g["edges"][0]["members"] == ["op:edital-y", "ator:senai"]
 
 
 def tmp_index_path():

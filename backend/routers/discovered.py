@@ -136,10 +136,14 @@ def _process_edital_pdf(edital_link: str, opp: dict) -> dict:
     edital_id = f"web:{url_hash}"
     try:
         from core.tasks import app
+        # RAG lazy (chunk_edital) + catálogo/match (ingest_promoted_edital): o
+        # promovido segue o MESMO caminho silver→gold do ETL diário, entrando no
+        # match, não só no RAG (spec docs/specs/v3-unified.md §10).
         app.configure_task("chunk_edital").defer(edital_id=edital_id)
-        logger.info("chunk_edital enfileirado para %s", edital_id)
+        app.configure_task("ingest_promoted_edital").defer(edital_id=edital_id)
+        logger.info("chunk_edital + ingest_promoted_edital enfileirados para %s", edital_id)
     except Exception as e:
-        logger.warning("falha ao enfileirar chunk_edital para %s: %s", edital_id, e)
+        logger.warning("falha ao enfileirar processamento de %s: %s", edital_id, e)
 
     return {"url_hash": url_hash, "n_chars": len(text)}
 

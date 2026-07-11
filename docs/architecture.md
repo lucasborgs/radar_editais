@@ -6,10 +6,11 @@ que modelo faz o quê, e como isso é medido — não o CRUD/auth/frontend.
 > **Estado de implementação.** Os diagramas retratam a **arquitetura atual em produção**.
 > O runtime LangGraph com checkpointer Postgres e Store semântico está **implementado e em produção**
 > (migração completa — ver [`docs/components/agents/langgraph-migration.md`](components/agents/langgraph-migration.md) para o histórico).
-> O schema do hipergrado foi consolidado para KG v2 (3 tipos: `Oportunidade`/`Ator`/`Conceito`,
-> supersede os 12 tipos originais). O funil de match tem 3 estágios: filtro duro de elegibilidade
-> → MaxSim → veredito LLM no top-K. Ver [`docs/specs/kg-redesign.md`](specs/kg-redesign.md) para
-> histórico completo das decisões (D1–D16) e registro de divergências PR a PR.
+> O KG migrou para tabelas **gold** relacionais (`entities`/`entity_relationships`/`match_chunks`,
+> migration 036) — o hipergrado N-ário e o produtor hyper-extract foram removidos (v3 PR-C). O
+> funil de match tem 4 estágios (`core/services/match_v3.py`): Stage 0 vivo (SQL) → Stage 1
+> elegibilidade → Stage 2 afinidade sum-of-max (pgvector) → Stage 3 veredito LLM no top-K. Ver
+> [`docs/specs/v3-unified.md`](specs/v3-unified.md) para a spec da migração.
 
 ---
 
@@ -50,17 +51,19 @@ flowchart LR
 - **Vercel**: build do `frontend/` (Next.js 14), aponta pro backend via
   `NEXT_PUBLIC_API_URL=https://api.akapo.com.br`.
 - **Supabase Cloud**: única fonte de dados durável — Postgres (schema + pgvector),
-  Auth, Storage. `KG_STORE_BACKEND=postgres` faz o hipergrado viver em
-  `kg_artifacts` (blob JSONB), não em arquivo — o FS do container não é fonte de
-  verdade durável entre rebuilds.
+  Auth, Storage. O catálogo/match v3 vive nas tabelas gold (migration 036); a
+  tabela legada `kg_artifacts` (blob JSONB, `KG_STORE_BACKEND`) só guarda o ledger
+  do discovery — o drop dela é follow-up pós-deploy (ver handoff PR-C).
 - Runbook completo: [`scripts/deploy.sh`](../scripts/deploy.sh).
 
 ---
 
-## 1. Data plane — Bronze → Hipergrafo v2 → Chunks
+## 1. Data plane — Bronze → Gold → Chunks
 
 Multi-fonte com adapters por fonte; a descoberta web é uma "torneira" que passa
-por gate humano antes de tocar o grafo.
+por gate admin antes de entrar no catálogo. O produtor é `core/kg/gold.py`
+(`ingest_all`), dentro do `run_daily_etl` — a linhagem hyper-extract (hipergrafos)
+foi removida no v3 PR-C.
 
 ```mermaid
 flowchart TB
@@ -69,46 +72,32 @@ flowchart TB
     FAPESP["FAPESP"]
     FAPESC["FAPESC"]
     WEB["Web / Descoberta<br/>core.opportunity_discovery"]
-    CURADOS["Curados (JSON)<br/>investidores · programas<br/>ict_raw"]
+    CURADOS["Catálogos versionados<br/>data/silver/{investidores,programas}.json<br/>+ bronze EMBRAPII (ict)"]
   end
 
-  WEB -->|"torneira"| STAGING["Staging + gate humano<br/>discovery não escreve no KG"]
-  STAGING --> NORM
-  FINEP --> NORM
-  FAPESP --> NORM
-  FAPESC --> NORM
-  CURADOS -->|"rebuild determinístico<br/>rebuild_curadoria.py"| CBUILD
+  WEB -->|"torneira"| STAGING["Staging + gate admin<br/>discovery não escreve no gold"]
+  STAGING -->|"promote (PDF) → ingest_promoted_edital"| SILVER
+  FINEP --> SILVER
+  FAPESP --> SILVER
+  FAPESC --> SILVER
 
-  NORM["Normalizers por fonte (adapter pattern)"] --> HEX
+  SILVER["structurer.py → silver<br/>data/silver/structured_docs/*.jsonl<br/>transcrição verbatim por página (sem LLM de match)"] --> INGEST
 
-  subgraph HEX["hyper_extractor.py<br/>extração N-ária: 3 tipos (v2)<br/>Oportunidade / Ator / Conceito<br/>propriedades: mecanismo, constraints,<br/>macro_temas, requisitos_texto<br/>proveniencia via adapter"]
-    direction LR
-    V2["LLM estruturado<br/>prompts emitem schema v2"]
+  subgraph INGEST["core/kg/gold.py · ingest_all() — incremental (diff por source_hash)"]
+    direction TB
+    MAP["mapeadores determinísticos<br/>metadados · agência (operado_por)<br/>programa (subordinado_a) · ICT (credenciada_por)"]
+    TAG["tagger LLM (gpt-4o-mini)<br/>setores (16) + tecnologias_tags"]
+    CONS["constraints_producer.py<br/>elegibilidade dura {tipo,op,valor}<br/>+ requisitos_texto residual"]
+    EMBN["embedder.py · text-embedding-3-small (1536d)<br/>embed da entidade + match_chunks (contextual)"]
   end
+  CURADOS --> INGEST
 
-  HEX --> HG[("Hipergrados individuais<br/>data/knowledge_graph/hypergraphs/{id}.json<br/>formato v2 (format_version: 2)<br/>IDs estáveis prefixados (op:/ator:/con:)")]
+  INGEST --> GOLD[("entities · entity_relationships · match_chunks<br/>migration 036 · Supabase Postgres + pgvector")]
 
-  subgraph POS["Pós-processo build-time"]
-    CANON["canonicalize_concepts.py<br/>validação + canonicalização LLM<br/>descarta ruído, funde duplicatas<br/>gera macro_temas do vocabulário<br/>controlado (themes_index)"]
-    CONS["extract_constraints.py<br/>gpt-4o-mini extrai constraints<br/>estruturadas {tipo,op,valor}<br/>de requisitos/exclusões textuais"]
-    PROV["backfill_proveniencia.py<br/>URL oficial do bronze → grafo<br/>(determinístico, zero LLM)"]
-  end
-
-  HG --> CANON
-  HG --> CONS
-  HG --> PROV
-  CANON --> HGC["Hipergrados higienizados<br/>(mesmo arquivo, reescrito in-place)"]
-  CONS --> HGC
-  PROV --> HGC
-
-  CBUILD["rebuild_curadoria.py<br/>rebuild determinístico (zero LLM)<br/>D2: investidor → Ator +<br/>Oportunidade(kind=investimento)<br/>D3: programas → Oportunidade(kind=programa)<br/>100% com URL, tese, estágio, ticket"] --> HGC
-
-  HGC --> EMB["embedder.py<br/>text-embedding-3-small (1536d)<br/>embeds nós Conceito,<br/>descrições de Oportunidade/Ator"]
-  EMB --> CACHE[("ecosystem_embeddings.npz<br/>cacheados por hash do texto")]
-
-  HGC --> CHK["chunk_edital · chunker.py (Art./§)"]
+  BRONZE -.->|"chunk_edital (lazy, por engajamento)"| CHK["chunker.py (Art./§)"]
   CHK --> CTX["Contextual Retrieval<br/>core/contextual_retrieval.py"]
-  CTX --> CHKEMB["embedder.py<br/>text-embedding-3-small (1536d,<br/>default por env desde 2026-06-26)"]
+  CHKEMB["embedder.py · text-embedding-3-small (1536d)"]
+  CTX --> CHKEMB
   CHKEMB --> VEC[("edital_chunks<br/>pgvector + tsvector/BM25<br/>para RAG na escrita")]
 ```
 
@@ -120,11 +109,12 @@ flowchart TB
 flowchart TB
   Q["Query / CompanyProfile<br/>(localStorage)"]
 
-  subgraph FUNIL["Funil de match (3 estágios)"]
+  subgraph FUNIL["Funil de match v3 (Stage 0-3) · match_v3.py"]
     direction TB
-    E0["Estágio 0 — Filtro duro<br/>eligibility.py<br/>constraints × perfil<br/>sat / unsat / unknown<br/>determinístico, zero LLM<br/>unknown NUNCA elimina"] --> E1
-    E1["Estágio 1 — Afinidade MaxSim<br/>hypergraph_match.py<br/>cosseno Conceito-empresa ×<br/>Conceito-oportunidade (threshold 0.55)<br/>agregação MaxSim (Σ dos máximos<br/>por nó-empresa)<br/>piso MIN_AGGREGATE_SCORE=1.35<br/>expansão via catálogo (damping 0.30)<br/>sem LLM no ranking"] --> E2
-    E2["Estágio 2 — Veredito LLM top-K<br/>match_verdict.py<br/>gpt-4o-mini (tier 3)<br/>serializa subgrafo + perfil em LN<br/>output estruturado: racional,<br/>red_flags, fit_mecanismo, recomendação<br/>async + cache (match_verdicts table)<br/>card renderiza sem e recebe pronto"]
+    E0["Stage 0 — Vivo (SQL)<br/>entities kind∈{edital,programa}<br/>status aberta + deadline≥hoje (NULL passa)<br/>determinístico, sem semântica"] --> E1
+    E1["Stage 1 — Elegibilidade<br/>eligibility.py · constraints × perfil<br/>unsat elimina · unknown NUNCA elimina"] --> E2
+    E2["Stage 2 — Afinidade (pgvector)<br/>sum-of-max por company_chunk sobre<br/>match_chunks (família ColBERT, nunca max global)<br/>+ boost de setores · piso do golden · sem LLM"] --> E3
+    E3["Stage 3 — Precisão top 5-10<br/>rerank opcional + veredito LLM (match_verdict.py)<br/>lê matched_excerpts + linha de entities<br/>async + cache (match_verdicts table)"]
   end
 
   subgraph RET["Retrieval · retriever.py"]
@@ -140,15 +130,13 @@ flowchart TB
   end
 
   Q --> E0
-  Q --> E1
-  E1 --> E2
-  E2 --> RANK["Ranking final com veredito<br/>reordena só dentro do top-K"]
+  E3 --> RANK["Ranking final com veredito<br/>reordena só dentro do top-K"]
 
   TOPK -.->|"RAG · retrieve_chunks"| WS
 
   subgraph EXPLORE["Descoberta · ExploreAgent"]
     EA["ExploreAgent · 3 rotas<br/>factual → reasoning → agent"]
-    EA --> TOOLS["tools:<br/>resolve_graph_nodes (por id)<br/>neighborhood (BFS cap 20/nó)<br/>serializa propriedades/constraints<br/>(lê hipergrados v2)"]
+    EA --> TOOLS["tools §8 (SQL via entity_catalog):<br/>search_entities (semântico) · related_by_tags<br/>get_node_neighborhood (CTE recursiva)<br/>+ RAG leve sobre description/match_chunks"]
   end
 
   subgraph FRONT["⚡ Frontend · estado local"]
@@ -195,8 +183,8 @@ flowchart TB
 
   subgraph TOOLS["ToolNode — tools por domínio"]
     WT["writing_tools"]
-    ET["explore_tools<br/>resolve por id canônico<br/>neighborhood com BFS cap<br/>serializa constraints/propriedades"]
-    PT["profile_tools<br/>find_matching_editais com profile<br/>threading p/ Estágio 0"]
+    ET["explore_tools §8 (SQL)<br/>search_entities · related_by_tags<br/>get_node_neighborhood (CTE)"]
+    PT["profile_tools<br/>find_matching_editais com profile<br/>threading p/ Stage 0-1"]
     RT["research_tools"]
     PLT["planning_tools"]
     SCT["scratchpad_tools"]
@@ -248,12 +236,10 @@ flowchart LR
     J6["compute_match_verdicts<br/>LLM verdicts no top-K<br/>cache + queueing_lock"]
   end
 
-  subgraph SCRIPTS["Scripts build-time"]
-    S1["migrate_hypergraphs_v2.py<br/>PR1: ids estáveis + migração"]
-    S2["canonicalize_concepts.py<br/>PR3: higiene + canon + macro_temas"]
-    S3["backfill_proveniencia.py<br/>PR4: URL do bronze → grafo"]
-    S4["extract_constraints.py<br/>PR5: constraints de requisitos textuais"]
-    S5["rebuild_curadoria.py<br/>PR4.1: rebuild determinístico curados"]
+  subgraph SCRIPTS["CLI / ops (scripts/)"]
+    S1["core/kg/gold.py · ingest_all (CLI)<br/>catálogo/match gold — roda no run_daily_etl"]
+    S2["reindex_edital / reindex_all<br/>re-chunk RAG (edital_chunks)"]
+    S3["export_to_obsidian<br/>vault Obsidian a partir do gold"]
   end
 
   GATE -.->|"protege merges"| JOBS
@@ -266,8 +252,8 @@ flowchart LR
 
 | Sinal | Onde |
 |---|---|
-| Funil de match 3 estágios — cada estágio com motor diferente (determinístico → geométrico → LLM) e custo crescente | `hypergraph_match.py` (Estágio 0/1) + `match_verdict.py` (Estágio 2, K≪N) — não há LLM no ranking, só no veredito do top-K |
-| Agregação MaxSim substituiu marginsum: evita inflação por nós redundantes, ganho forward-looking para late-interaction | `hypergraph_match.py:_maxsim()` — recalibrado empiricamente no golden (1.35 / 0.60), sweep revelou platô fino antes do precipício |
+| Funil de match v3 (Stage 0-3) — cada estágio com motor diferente (SQL → elegibilidade → pgvector → LLM) e custo crescente | `core/services/match_v3.py` (Stage 0-2) + `match_verdict.py` (Stage 3, K≪N) — não há LLM no ranking, só no veredito do top-K |
+| Stage 2 = sum-of-max por chunk da empresa (família ColBERT, nunca max global) sobre `match_chunks`, evita inflação por trechos redundantes | `match_v3.py` — piso calibrado no golden da Fase 1.5; boost opcional por setores ∩ |
 | Modelo por tradeoff explícito | `llm_router` fast/pro/auto; produtores em free-tier (gemini), agregado em gpt-4o-mini; embedding small para nós, large para chunks |
 | RAG não-ingênuo | BM25+dense via RRF com `fts_weight=0.5` justificado pelo corpus; contextual retrieval; dedup por source; HyDE ativo por default com fallback silencioso |
 | Elegibilidade é estágio determinístico, não raciocínio do agente | `eligibility.py` — constraints tipadas (porte/UF/faturamento/TRL/forma_jurídica) × perfil → sat/unsat/unknown; unknown nunca elimina, gera flag no card |

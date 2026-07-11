@@ -376,20 +376,44 @@ def _load_bronze(source: str) -> list[dict]:
 _FAPESP_ID_RE = re.compile(r"/(\d+)(?:/|$)")
 
 
+def _native_of(source: str, rec: dict) -> str | None:
+    """Chave nativa (stem do silver) de um registro bronze — inverso de
+    `_bronze_record`. None quando o registro não tem a chave da fonte."""
+    if source == "finep":
+        cid = rec.get("chamada_id")
+        return str(cid) if cid is not None else None
+    if source == "fapesc":
+        return rec.get("native_id") or None
+    if source == "web":
+        return rec.get("url_hash") or None
+    if source == "fapesp":
+        m = _FAPESP_ID_RE.search((rec.get("url") or "").rstrip("/"))
+        return m.group(1) if m else None
+    return None
+
+
+def iter_bronze_editais():
+    """Itera `(source, native)` sobre todo edital presente no bronze scraped.
+
+    Enumeração AUTORITATIVA de "quais editais existem agora" — o bronze é o que os
+    scrapers acabaram de materializar, sem depender de artefato derivado (silver,
+    gold ou hipergrado). Usada pelo ETL diário para construir o silver antes do
+    `ingest_all`. Dedup por `(source, native)`."""
+    for source in EDITAL_SOURCES:
+        seen: set[str] = set()
+        for rec in _load_bronze(source):
+            native = _native_of(source, rec)
+            if native and native not in seen:
+                seen.add(native)
+                yield source, native
+
+
 def _bronze_record(source: str, stem: str) -> dict | None:
     """Registro bronze do edital, casado pela chave nativa da fonte."""
     recs = _load_bronze(source)
     for r in recs:
-        if source == "finep" and str(r.get("chamada_id")) == stem:
+        if _native_of(source, r) == stem:
             return r
-        if source == "fapesc" and r.get("native_id") == stem:
-            return r
-        if source == "web" and r.get("url_hash") == stem:
-            return r
-        if source == "fapesp":
-            m = _FAPESP_ID_RE.search((r.get("url") or "").rstrip("/"))
-            if m and m.group(1) == stem:
-                return r
     return None
 
 

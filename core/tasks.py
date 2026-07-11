@@ -688,35 +688,20 @@ def _insert_chunks_psycopg(rows: list[dict]) -> None:
 
 
 def _build_all_silver() -> int:
-    """Materializa o silver (structurer) de todos os editais vigentes, durable-first.
+    """Materializa o silver (structurer) de todos os editais scraped, durable-first.
 
-    Passo EXPLÍCITO do pipeline. Antes o silver nascia como EFEITO COLATERAL do
-    etl_process (síntese de wiki) — que a migração hipergrado vai remover. Aqui o
-    silver vira dependência própria do hipergrado E do RAG, não da wiki. Sem LLM.
-    Enumera pelo índice (como persist_all_current); tolerante a falha por-edital.
-    """
-    from core.kg import kg_store, source_docs  # noqa: PLC0415
-    from core.kg.edital_id import native_id_of, source_of  # noqa: PLC0415
+    Passo EXPLÍCITO do pipeline v3 (spec docs/specs/v3-unified.md §10): bronze →
+    adapter → silver (structurer). Enumera direto do BRONZE (fonte autoritativa dos
+    scrapers), sem depender de artefato derivado (hipergrado/gold). O silver é a
+    ENTRADA do `ingest_all` (gold) e do RAG lazy. Sem LLM; tolerante a falha
+    por-edital."""
+    from core.kg import gold, source_docs  # noqa: PLC0415
     from pipeline.adapters.base import get_adapter  # noqa: PLC0415
 
-    # NOTA: enumera via load_all_hypergraphs (hipergrado). O índice legado
-    # (build_knowledge_graph) e a wiki (etl_process) já foram removidos —
-    # todos os consumidores (hybrid_match_service, explore_agent, eval/matching…)
-    # leem hipergrado direto.
-    editais = []
-    for fk in kg_store.load_all_hypergraphs():
-        if "__" not in fk:
-            continue
-        source, _, native = fk.partition("__")
-        editais.append({"id": f"{source}:{native}"})
     n = 0
-    for e in editais:
-        eid = e.get("id")
-        if not eid:
-            continue
+    for source, native in gold.iter_bronze_editais():
+        eid = f"{source}:{native}"
         try:
-            source = source_of(eid)
-            native = native_id_of(eid)
             docs = source_docs.load(eid) or get_adapter(source).to_documents(native)
             if docs and build_or_load_structured_doc(source, native, docs):
                 n += 1
@@ -828,17 +813,47 @@ async def _run_daily_etl(timestamp: int) -> None:
             )
 
     # -------------------------------------------------------------------
-    # Pós-scraping: persistência durável (fonte, silver, hipergrado) e
-    # regeneração do grafo Obsidian. O índice legado (build_knowledge_graph)
-    # e a síntese de wiki pages (etl_process) foram removidos — todo o
-    # catálogo e match vêm do hipergrado (ver CLAUDE.md).
+    # Pós-scraping (pipeline v3 — spec docs/specs/v3-unified.md §10):
+    #   bronze → adapter → silver (structurer) → ingest_all() (gold +
+    #   embeddings) → Documento Canônico durável → vault Obsidian.
+    # O produtor legado (hipergrado / hyper-extract) foi removido: o catálogo e
+    # o match vêm das tabelas gold (entities/match_chunks, migration 036).
     # -------------------------------------------------------------------
 
-    # 1) Persiste o Documento Canônico durável (§12.3) enquanto o bronze
+    # 1) Silver EXPLÍCITO: materializa data/silver/structured_docs/*.jsonl a
+    #    partir do bronze recém-scraped (structurer, durable-first). É a ENTRADA
+    #    do ingest_all (gold) e do RAG lazy. Sem LLM.
+    try:
+        n_silver = await asyncio.to_thread(_build_all_silver)
+        logger.info("run_daily_etl_task: silver materializado p/ %d editais", n_silver)
+    except Exception as e:
+        logger.error("run_daily_etl_task: falha ao materializar silver: %s", e)
+        step_errors.append(f"materialização do silver: {e}")
+
+    # 2) Gold INCREMENTAL: ingest_all() popula entities/match_chunks a partir do
+    #    silver de (1) + catálogos versionados (data/silver/{investidores,
+    #    programas}.json + bronze EMBRAPII). Diff por source_hash: só re-processa
+    #    edital alterado (2 chamadas LLM leves/edital + embeddings). Precisa de
+    #    OPENAI_API_KEY (tagger/constraints/embeddings) e DATABASE_URL (gold._dsn).
+    if os.getenv("OPENAI_API_KEY") and os.getenv("DATABASE_URL"):
+        try:
+            from core.kg.gold import ingest_all  # noqa: PLC0415
+            counts = await asyncio.to_thread(ingest_all)
+            logger.info("run_daily_etl_task: gold — %s", counts)
+        except Exception as e:
+            logger.error("run_daily_etl_task: falha ao ingerir gold: %s", e)
+            step_errors.append(f"ingestão gold (ingest_all): {e}")
+    else:
+        logger.warning(
+            "run_daily_etl_task: sem OPENAI_API_KEY/DATABASE_URL — ingestão gold pulada",
+        )
+
+    # 3) Persiste o Documento Canônico durável (§12.3) enquanto o bronze
     #    recém-scraped está no disco. O FS do worker não é fonte de verdade
-    #    durável: sem isto, um rebuild de imagem apaga o bronze e o
-    #    chunk_edital (lazy) produz 0 chunks. Barato (extração já é eager;
-    #    sem LLM). Spec: docs/specs/durable-source-docs.md.
+    #    durável: sem isto, um rebuild de imagem apaga o bronze e o chunk_edital
+    #    (lazy) produz 0 chunks. Enumera pelos editais gold de (2) — roda DEPOIS
+    #    do ingest p/ capturar os editais novos. Barato, sem LLM. Spec:
+    #    docs/specs/durable-source-docs.md.
     try:
         from core.kg.source_docs import persist_all_current  # noqa: PLC0415
         n_docs = await asyncio.to_thread(persist_all_current)
@@ -847,39 +862,12 @@ async def _run_daily_etl(timestamp: int) -> None:
         logger.error("run_daily_etl_task: falha ao persistir documentos-fonte: %s", e)
         step_errors.append(f"persistência do Documento Canônico: {e}")
 
-    # 2) Silver EXPLÍCITO: materializa data/silver/structured_docs/*.jsonl de
-    #    todos os editais vigentes (structurer, durable-first). Passo próprio
-    #    desacopla o silver da wiki (removida): hipergrado (3) e RAG dependem
-    #    do silver. Sem LLM.
-    try:
-        n_silver = await asyncio.to_thread(_build_all_silver)
-        logger.info("run_daily_etl_task: silver materializado p/ %d editais", n_silver)
-    except Exception as e:
-        logger.error("run_daily_etl_task: falha ao materializar silver: %s", e)
-        step_errors.append(f"materialização do silver: {e}")
-
-    # 3) Hipergrado por edital + catálogos. Depende do silver de (2). Skip por
-    #    hash: só re-extrai o que mudou. Precisa de OPENAI_API_KEY.
-    if os.getenv("OPENAI_API_KEY"):
-        try:
-            from core.retrieval.hyper_extractor import build_all_hypergraphs  # noqa: PLC0415
-            counts = await asyncio.to_thread(build_all_hypergraphs)
-            logger.info("run_daily_etl_task: hipergrado — %s", counts)
-        except Exception as e:
-            logger.error("run_daily_etl_task: falha ao construir hipergrado: %s", e)
-            step_errors.append(f"construção do hipergrado: {e}")
-    else:
-        logger.warning("run_daily_etl_task: sem OPENAI_API_KEY — hipergrado pulado")
-
-    # 4) Regenera o vault Obsidian a partir do hipergrado unificado. É a MESMA
-    #    fonte de dados do grafo do frontend (GET /graph lê OBSIDIAN_VAULT_DIR),
-    #    então isto atualiza Obsidian e frontend de uma vez. Agnóstico à fonte e
-    #    sem duplicar editais (nomes/wikilinks colon-free consistentes + dedup
-    #    no get_graph). `scripts` é importável como namespace package a partir
-    #    da raiz.
+    # 4) Regenera o vault Obsidian a partir das tabelas gold (entity_catalog +
+    #    entity_relationships). Uso pessoal (Graph View); sem consumidor no app.
+    #    `scripts` é importável como namespace package a partir da raiz.
     try:
         from config import OBSIDIAN_VAULT_DIR  # noqa: PLC0415
-        from scripts.export_to_obsidian import export as export_obsidian  # noqa: PLC0415
+        from scripts.export_to_obsidian import run as export_obsidian  # noqa: PLC0415
         OBSIDIAN_VAULT_DIR.mkdir(parents=True, exist_ok=True)
         await asyncio.to_thread(export_obsidian, OBSIDIAN_VAULT_DIR)
         logger.info("run_daily_etl_task: vault Obsidian / grafo regenerado")
@@ -900,6 +888,35 @@ async def _run_daily_etl(timestamp: int) -> None:
             f"(timestamp={timestamp}, {total_new} editais novos):\n\n"
             + "\n".join(f"- {err}" for err in step_errors),
         )
+
+
+@app.task(name="ingest_promoted_edital", queue="etl")
+async def ingest_promoted_edital_task(edital_id: str) -> None:
+    """Ingesta um edital promovido (gate admin do discovery) no gold pelo MESMO
+    caminho do ETL diário: silver (structurer) → `ingest_all` incremental.
+
+    Enfileirado por POST /discovered-opportunities/{id}/promote quando há bronze
+    imediato (edital_link PDF). Sem isto, o promovido entraria só no RAG
+    (chunk_edital) e nunca no catálogo/match. `ingest_all(sources=["edital"])` é
+    incremental (skip por source_hash): só o edital novo paga LLM/embeddings."""
+    from core.kg import gold, source_docs  # noqa: PLC0415
+    from core.kg.edital_id import native_id_of, source_of  # noqa: PLC0415
+    from pipeline.adapters.base import get_adapter  # noqa: PLC0415
+
+    source = source_of(edital_id)
+    native = native_id_of(edital_id)
+    docs = source_docs.load(edital_id) or get_adapter(source).to_documents(native)
+    if not docs or not build_or_load_structured_doc(source, native, docs):
+        logger.warning("ingest_promoted_edital: silver vazio p/ %s — abortado", edital_id)
+        return
+    if not (os.getenv("OPENAI_API_KEY") and os.getenv("DATABASE_URL")):
+        logger.warning(
+            "ingest_promoted_edital: sem OPENAI_API_KEY/DATABASE_URL — gold pulado p/ %s",
+            edital_id,
+        )
+        return
+    counts = await asyncio.to_thread(gold.ingest_all, sources=["edital"])
+    logger.info("ingest_promoted_edital: %s ingerido no gold — %s", edital_id, counts)
 
 
 # =============================================================================
