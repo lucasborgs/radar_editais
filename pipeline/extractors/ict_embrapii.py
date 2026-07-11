@@ -20,7 +20,7 @@ e juntamos em `areas_raw` (expertise crua, alvo do normalizador fino→macro na
 extração do hipergrado). Contato/endereço vêm do bloco ACF.
 
 Output bronze (bronze_data/ict_raw/embrapii_*.json), shape consumido por
-core/retrieval/hyper_extractor.py:
+core/kg/gold.py (`_ingest_icts` → entities kind=ict):
   name, slug, source='embrapii', kind='embrapii_unit', url, about,
   institution_type, address, contact{responsavel,email,telefone,site},
   areas_raw[list[str]], data_extracao.

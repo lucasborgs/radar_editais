@@ -97,10 +97,10 @@ def _pgvector_tables():
 def _editais_data_gap():
     """Demonstra o gap: kg_artifacts (editais) vazio no cloud vs local."""
     from core.db import get_supabase_service
-    from core.kg import entity_catalog as hypergraph_catalog
+    from core.kg import entity_catalog
     resp = get_supabase_service().table("kg_artifacts").select("key").execute()
     cloud_keys = [r["key"] for r in (resp.data or [])]
-    local_n = hypergraph_catalog.get_stats()["total_editais"]
+    local_n = entity_catalog.get_stats()["total_editais"]
     if not cloud_keys:
         return (f"⚠ kg_artifacts VAZIO no cloud (local tem {local_n} editais) — "
                 f"rodar build com env cloud p/ popular antes dos testers")

@@ -26,12 +26,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core.db import get_supabase_service  # noqa: E402
-from core.kg import entity_catalog as hypergraph_catalog  # noqa: E402
+from core.kg import entity_catalog  # noqa: E402
 from core.tasks import chunk_edital_task  # noqa: E402
 
 
 def _load_ids(source_filter: str | None) -> list[str]:
-    data = hypergraph_catalog.list_editais(limit=500)
+    data = entity_catalog.list_editais(limit=500)
     ids = [e["id"] for e in data if e.get("id")]
     if source_filter:
         ids = [eid for eid in ids if eid.startswith(f"{source_filter}:")]

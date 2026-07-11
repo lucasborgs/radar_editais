@@ -32,7 +32,6 @@ import threading
 import time
 
 from config import KNOWLEDGE_GRAPH_DIR
-from core.kg.migrate_v2 import migrate_to_v2
 
 logger = logging.getLogger(__name__)
 
@@ -41,18 +40,10 @@ _FILES: dict[str, str] = {
     "index": "index.json",
     "index_historico": "index_historico.json",
     "icts": "icts.json",
-    "investidores": "investidores.json",
-    "programas": "programas.json",
     # Estado operacional do pipeline (não-artefato do grafo, mas mesmo seam):
-    # em prod o FS do worker é EFÊMERO — sem durabilidade aqui, cada redeploy
-    # re-sintetiza toda wiki (rate limit) e a Descoberta re-tria URLs já vistas.
+    # em prod o FS do worker é EFÊMERO — sem durabilidade aqui, a Descoberta
+    # re-tria URLs já vistas a cada redeploy.
     "discovery_ledger": ".discovery_ledger.json",
-    # Canon map da higiene de Conceitos (KG v2 PR3, core/kg/canonicalize):
-    # produzido pelo passe de build, reaplicado pelo ingest em extração fresca.
-    "concept_canon": "concept_canon.json",
-    # Canon map da resolução de programas (KG v2 resíduos PR-C):
-    # produzido pelo passe resolve_programas, consumido pelo ingest.
-    "programa_canon": "programa_canon.json",
 }
 
 _TABLE = "kg_artifacts"
@@ -149,124 +140,6 @@ def load_icts() -> list[dict]:
     """Lista de ICTs do `icts.json` (a chave `icts` do blob)."""
     return load("icts", default={}).get("icts", [])
 
-
-def load_investidores() -> list[dict]:
-    """Lista de investidores (Q3) do `investidores.json` — diretório CURADO à mão
-    (espelha load_icts). Entidade fora do ciclo de edital, fora do index.json."""
-    return load("investidores", default={}).get("investidores", [])
-
-
-def load_programas() -> list[dict]:
-    """Lista de programas recorrentes do `programas.json` — diretório CURADO à mão
-    (espelha load_investidores). Entidade fora do ciclo de edital, fora do index.json."""
-    return load("programas", default={}).get("programas", [])
-
-
-
-
-
-# ---------------------------------------------------------------------------
-# Hypergraphs (subgrafo N-ário por edital — Hyper-Extract)
-# ---------------------------------------------------------------------------
-# Paralelo EXATO das wiki pages acima, mesmo motivo: em modo file são arquivos
-# POR-EDITAL (KNOWLEDGE_GRAPH_DIR/hypergraphs/{file_key}.json, file_key =
-# "{source}__{native}"), mas o FS do worker não é fonte de verdade durável —
-# um rebuild de imagem sem volume persistente perderia os subgrafos. Em postgres vivem num único blob kg_artifacts
-# key='hypergraphs' = {file_key: {source_hash, nodes, edges}}, durável.
-_HYPERGRAPH_KEY = "hypergraphs"
-_HYPERGRAPHS_DIR = KNOWLEDGE_GRAPH_DIR / "hypergraphs"
-
-
-def _load_hypergraph_blob_pg() -> dict:
-    """Blob {file_key: hypergraph} do Postgres, cacheado (TTL). {} se ausente."""
-    now = time.monotonic()
-    with _lock:
-        cached = _pg_cache.get(_HYPERGRAPH_KEY)
-        if cached is not None and (now - cached[0]) < _PG_TTL:
-            return cached[1]
-    try:
-        from core.db import get_supabase_service
-        resp = (
-            get_supabase_service()
-            .table(_TABLE).select("blob").eq("key", _HYPERGRAPH_KEY).limit(1).execute()
-        )
-    except Exception as e:
-        logger.warning("kg_store[postgres]: falha ao ler blob hypergraphs: %s", e)
-        return {}
-    rows = resp.data or []
-    blob = rows[0]["blob"] if rows else {}
-    with _lock:
-        _pg_cache[_HYPERGRAPH_KEY] = (now, blob)
-    return blob
-
-
-def load_hypergraph(file_key: str) -> dict | None:
-    """Hypergraph (subgrafo N-ário) de um edital — None se ausente.
-
-    postgres → do blob `hypergraphs`; file → arquivo por-edital. Em postgres, se
-    faltar no blob, cai pro arquivo (cobre transição/dev). Retorna o dict
-    {format_version, source_hash, proveniencia, nodes, edges}. Single source para
-    os consumidores no request-path.
-
-    UPGRADE-ON-READ (PR1 KG v2): normaliza para o formato v2 (`migrate_to_v2`) —
-    blobs/arquivos ainda em v1 e extrações frescas (o extractor só emite v2 no
-    PR2) são migrados em memória, para que os leitores nunca vejam v1. Idempotente
-    e barato para grafos já-v2.
-    """
-    if os.getenv("KG_STORE_BACKEND", "file").lower() == "postgres":
-        graph = _load_hypergraph_blob_pg().get(file_key)
-        if graph is not None:
-            return migrate_to_v2(graph)
-    path = _HYPERGRAPHS_DIR / f"{file_key}.json"
-    if path.exists():
-        try:
-            return migrate_to_v2(json.loads(path.read_text(encoding="utf-8")))
-        except Exception as e:
-            logger.warning("kg_store: falha ao ler hypergraph %s: %s", file_key, e)
-    return None
-
-
-def save_hypergraphs(graphs: dict[str, dict]) -> None:
-    """MERGE de {file_key: hypergraph} no blob `hypergraphs` do Postgres (se configurado).
-
-    Os arquivos por-edital são escritos pelo produtor (Hyper-Extract); aqui só
-    persistimos o blob durável p/ prod. MERGE (não substitui) para que runs
-    parciais não apaguem os demais subgrafos. No-op sem Supabase (modo file puro).
-    """
-    if not graphs or not _pg_configured():
-        return
-    from core.db import get_supabase_service
-    merged = {**_load_hypergraph_blob_pg(), **graphs}
-    get_supabase_service().table(_TABLE).upsert(
-        {"key": _HYPERGRAPH_KEY, "blob": merged}, on_conflict="key"
-    ).execute()
-    with _lock:
-        _pg_cache[_HYPERGRAPH_KEY] = (time.monotonic(), merged)
-    logger.info("kg_store: %d hypergraphs publicados (blob total=%d)", len(graphs), len(merged))
-
-
-def load_all_hypergraphs() -> dict[str, dict]:
-    """Todos os subgrafos do ecossistema como {file_key: hypergraph}.
-
-    postgres → blob `hypergraphs`, completado pelos arquivos locais ausentes
-    (mesma transição de `load_hypergraph`); file → arquivos por-edital no disco.
-    Single source para os consumidores que varrem o grafo inteiro (vizinhança,
-    catálogo, match). Não cacheia além do TTL do blob PG.
-
-    UPGRADE-ON-READ (PR1 KG v2): cada subgrafo é normalizado para v2 via
-    `migrate_to_v2` (idempotente) — ver `load_hypergraph`.
-    """
-    out: dict[str, dict] = {}
-    if os.getenv("KG_STORE_BACKEND", "file").lower() == "postgres":
-        out.update(_load_hypergraph_blob_pg())
-    for p in sorted(_HYPERGRAPHS_DIR.glob("*.json")):
-        if p.stem in out:
-            continue
-        try:
-            out[p.stem] = json.loads(p.read_text(encoding="utf-8"))
-        except Exception as e:
-            logger.warning("kg_store: falha ao ler hypergraph %s: %s", p.stem, e)
-    return {fk: migrate_to_v2(g) for fk, g in out.items()}
 
 
 # ---------------------------------------------------------------------------

@@ -6,7 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Regras de vocabulários, workflows de ingestão e manutenção vivem em [WIKI.md](WIKI.md) (global) e [wikis/](wikis/)`<fonte>.md` (por fonte). O código lê os blocos YAML via [core/kg/schema.py](core/kg/schema.py). **Mudanças em regras → edite os docs, não o código.**
 
-**Nota:** `wiki_schema.py` foi removido (substituído por `schema.py`). O pipeline legacy `build_knowledge_graph` → `index.json` + `etl_process` → `wiki/*.json` foi removido — todo o catálogo e match vêm dos hipergrados em `data/knowledge_graph/hypergraphs/`.
+**Nota:** o produtor legado da linhagem hyper-extract (hipergrafos N-ários,
+`hyper_extractor.py`, wiki pages, `build_knowledge_graph`) foi removido (v3 PR-C).
+Todo o catálogo e match vêm das tabelas **gold** (`entities`/`entity_relationships`/
+`match_chunks`, migration 036), populadas por `core.kg.gold.ingest_all()`.
 
 ## Project Overview
 
@@ -49,10 +52,11 @@ cd frontend && npx tsc --noEmit         # TypeScript check (use this, NOT npm ru
 python -m core.opportunity_discovery       # torneira web (DOU com DISCOVERY_DOU_ENABLED=1)
 ```
 Em prod, scrapers e Descoberta rodam pelos crons do worker (`run_daily_etl`
-03:00 UTC, `discover_opportunities` 04:00 UTC — core/tasks.py). O pipeline de
-build do hipergrado (`hyper_extractor.build_all_hypergraphs` + embed) roda
-dentro do próprio `run_daily_etl`; para rodar manualmente em dev, chame
-`build_all_hypergraphs()` diretamente.
+03:00 UTC, `discover_opportunities` 04:00 UTC — core/tasks.py). O `run_daily_etl`
+é: scrapers → bronze → adapter → silver (structurer) → `core.kg.gold.ingest_all()`
+incremental (diff por `source_hash`) → embeddings. Para rodar a ingestão gold
+manualmente em dev: `DATABASE_URL=…local… OPENAI_API_KEY=… python -m core.kg.gold`
+(`--no-skip` reprocessa tudo).
 
 Discovery web não escreve diretamente no KG — vai para staging com gate humano (`/discovered-opportunities` na UI).
 
@@ -115,26 +119,24 @@ Para diagramas Mermaid detalhados do data plane, AI core, runtime agêntico e ev
 
 ### Data flow
 ```
-Bronze (FINEP/FAPESP/FAPESC raw via adapters por fonte)
-  → pipeline/etl_process.py            (extração + normalização silver)
-  → pipeline/build_knowledge_graph.py  (consolida index + wiki/*.json)
-    → produtores LLM build-time: eligibility_constraints, mechanism, enrichment
+Catálogo/match (gold — v3, produzido pelo run_daily_etl):
+Bronze (FINEP/FAPESP/FAPESC/web raw via adapters por fonte)
+  → core/structurer.py                 (silver: data/silver/structured_docs/*.jsonl)
+  → core/kg/gold.py `ingest_all()`      (incremental, diff por source_hash)
+    → mapeadores determinísticos (metadados, agência, programa)
+    → tagger LLM (setores/tecnologias) + constraints_producer (elegibilidade)
+    → core/retrieval/embedder.py        (embed da entidade + match_chunks)
+  → tabelas entities / entity_relationships / match_chunks (migration 036)
+Catálogos versionados: data/silver/{investidores,programas}.json + bronze EMBRAPII.
 
-─── LEGADO (removido): o pipeline acima foi substituído pelo hypergrado ───
-
-Bronze → core/retrieval/hyper_extractor.py  (hipergrafos N-ários: 3 tipos v2 —
-  Oportunidade/Ator/Conceito)
-  → core/retrieval/embedder.py        (embed dos nós por Edital/Tema/Tecnologia/Aplicação)
-  → data/knowledge_graph/hypergraphs/{id}.json
-
-Edital chunks (para RAG na WritingSession):
+Edital chunks (para RAG na WritingSession — lazy, independente do gold):
   → procrastinate task `chunk_edital` (core/tasks.py)
   → core/retrieval/chunker.py    chunking estrutural por Art./§
   → core/contextual_retrieval.py  injeta contexto de capítulo via LLM
   → core/retrieval/embedder.py   OpenAI text-embedding-3-small
   → tabela edital_chunks (pgvector + tsvector)
 ```
-Paths em `config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR, HYPERGRAPHS_DIR).
+Paths em `config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR).
 
 ### Package layout
 ```
@@ -145,24 +147,24 @@ backend/       api.py (shell: app + middleware + wiring) + routers/ por domínio
 core/          services/ (writing_session, match_v3, company_chunks,
                match_verdict, checklist, content_library, explore_agent,
                eligibility, opportunity_service), kg/ (kg_store, schema, gold,
-               entity_catalog, edital_id, temporal, source_docs,
-               hypergraph_catalog), retrieval/
-               (chunker, embedder, retriever, hyde, hyper_extractor),
+               entity_catalog, constraints_producer, edital_id, temporal,
+               source_docs, canonicalize[anti_class_verdict]), retrieval/
+               (chunker, embedder, retriever, hyde),
                llm/ (llm_client, agent_runtime, agent_graph, agent_tools/),
                eval/ (harness); flat: db, auth, tasks (procrastinate),
                profile_extractor, opportunity_discovery, dou_feeder,
                web_search, contextual_retrieval, reranker, demais serviços
 domain/        CompanyProfile dataclass (user_profile.py)
 pipeline/      ETL multi-fonte (extractors/, adapters/)
-scripts/       CLI: reindex_edital, canonicalize_concepts, dev.sh, deploy.sh
+scripts/       CLI: reindex_edital, reindex_all, export_to_obsidian, dev.sh, deploy.sh
 skills/        playbooks de mecanismo (subvencao, credito, equity) — lidos pelo WritingAgent
 supabase/      migrations/*.sql + config.toml (local CLI)
-data/          bronze/ (raw imutável), silver/ (derivado), knowledge_graph/ (hypergraphs/)
+data/          bronze/ (raw imutável), silver/ (derivado + catálogos versionados)
 ```
 
 ### Core services
 - **Match v3** (`core/services/match_v3.py`) — funil Stage 0 (vivo, deadline manda) → Stage 1 (`eligibility.py`: unsat elimina, unknown nunca) → Stage 2 (sum-of-max por chunk da empresa sobre `company_chunks` × `match_chunks`, boost de setores) → Stage 3 (rerank opcional + veredito LLM async via `match_verdict.py`). Trilha investidor paralela (cosseno perfil × `entities.embedding`). Lado empresa em `core/services/company_chunks.py` (refresh on-demand, RLS por workspace). Payload: `matched_excerpts[]` (trechos reais) + `setores`. Sem LLM no ranking.
-- **ExploreAgent** (`core/services/explore_agent.py`) — 3 rotas: factual → reasoning → agent. Lê hipergrados via `resolve_graph_nodes` + `neighborhood`. Retorna string; o `profile_diff` é extraído pelo router (`backend/routers/explore.py`) via `ProfileExtractor`.
+- **ExploreAgent** (`core/services/explore_agent.py`) — 3 rotas: factual → reasoning → agent. Lê o gold via `entity_catalog`/SQL (tools §8: `search_entities`, `related_by_tags`, `get_node_neighborhood`). Retorna string; o `profile_diff` é extraído pelo router (`backend/routers/explore.py`) via `ProfileExtractor`.
 - **WritingSession** (`core/services/writing_session.py`) — runtime LangGraph (`agent_graph.py`) com checkpointer Postgres durável. RAG via `retrieve_chunks`. Primeiro turno: batch de 8 seções de uma vez (`_first_turn_with_generation`). `save_draft(force=False)` passa pelo Critic (subagente) + scope_classifier antes de persistir.
 - **ChecklistService** (`core/services/checklist_service.py`) — 3 passes paralelos via asyncio.gather: compliance + qualidade + completude.
 - **ContentLibrary** (`core/services/content_library.py`) — CRUD + enrich_content via LLM. Soft-delete via `archived_at`.
@@ -214,20 +216,13 @@ Cada tier tem sua própria env var (ver seção LLM backend acima). Trocar um ti
 ### Discovery staging
 `core/opportunity_discovery.py` escreve em staging (tabela `discovered_opportunities`), não no KG. O gate humano em `/discovered-opportunities` promove/rejeita antes de tocar o pipeline de build.
 
-### Travessia cross-source entre hipergrados
-Fiel ao Hyper-Extract: cada subgrafo (edital, catálogo) é um KA independente. A conexão entre eles é resolvida em tempo de query por matching de `(type, name)` — não há merge físico.
+### KG = tabelas gold (não há mais hipergrado)
+A migração v3 (PRs A–C) eliminou o hipergrado e o produtor hyper-extract. O KG é
+relacional: `entities` + `entity_relationships` + `match_chunks` (migration 036),
+lido por `core/kg/entity_catalog.py`. Match = `core/services/match_v3.py` (Stage
+0-3 sobre as tabelas gold); catálogo/explore = `entity_catalog` + tools §8. A
+travessia cross-source virou join SQL por `entity_relationships` (CTE recursiva em
+`get_node_neighborhood`), não mais BFS por `(type, name)` em subgrafos JSON.
 
-**Camada de resolução de entidade** (`explore_tools.py`):
-- `build_entity_index(graphs)` → índice global `(type, name_lower) → [(file_key, node)]`
-- `resolve_entity(idx, name, type)` → busca no índice
-
-**Multi-source BFS** (`neighborhood()` com `cross_source=True`):
-- BFS normal dentro do subgrafo atual
-- Para cada nó visitado, busca o mesmo `(type, name)` em outros subgrafos
-- Continua BFS neles (mesmo depth), evitando ciclos via `visited_graph_nodes`
-- Flag `cross_source=False` (default) = comportamento idêntico ao anterior
-
-**Match não usa mais o hipergrado** (Fase 2 do v3): `hypergraph_match.py` e o
-caminho de company hypergraph foram deletados — o match é `core/services/match_v3.py`
-sobre as tabelas gold (migration 036). O hipergrado segue servindo SÓ
-catálogo/explore (`hypergraph_catalog`, `explore_tools`) até o PR-B/PR-C.
+**Pós-deploy:** a tabela legada `kg_artifacts` ainda é lida pelo backend v2 em
+prod — o drop dela é follow-up depois que o v3 estiver no ar (ver handoff PR-C).

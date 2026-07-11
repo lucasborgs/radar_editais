@@ -135,71 +135,21 @@ def node_types() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Schema do hipergrado v2 (WIKI.md §6.4) — enums validados no build
+# Constraints de elegibilidade dura (D6/PR5, WIKI.md §6.4) — vocab validado pelo
+# produtor (core/kg/constraints_producer). Único resíduo vivo do antigo bloco de
+# schema do hipergrado, que morreu com a linhagem hyper-extract (v3 PR-C).
 # ---------------------------------------------------------------------------
 
-def hypergraph_schema() -> dict:
-    """Bloco `hypergraph_schema` do WIKI.md (node_types + kinds/dims/apertures/edges)."""
-    return load().get("hypergraph_schema", {})
-
-
-def valid_v2_kinds() -> set[str]:
-    """União de todos os kinds válidos (Oportunidade + Ator) do schema v2."""
-    s = hypergraph_schema()
-    return set(s.get("oportunidade_kinds", [])) | set(s.get("ator_kinds", []))
-
-
-def macro_temas_vocab() -> list[str]:
-    """Vocabulário controlado de macro-temas (D8, KG v2 PR3) — tier estável do
-    two-tier: propriedade `macro_temas[]` da Oportunidade. Versionado no bloco
-    `hypergraph_schema` do WIKI.md (§6.4); mudar o vocabulário = editar o doc."""
-    return hypergraph_schema().get("macro_temas", [])
-
-
 def constraint_tipos() -> list[str]:
-    """Tipos válidos de constraint de elegibilidade dura (D6/PR5), do WIKI §6.4."""
-    return hypergraph_schema().get("constraint_tipos", [])
+    """Tipos válidos de constraint de elegibilidade dura (D6/PR5), do WIKI §6.4
+    (bloco `constraint_enums` — subconjunto que o match valida)."""
+    return load().get("constraint_enums", {}).get("constraint_tipos", [])
 
 
 def constraint_ops() -> list[str]:
-    """Operadores válidos de constraint (in|not_in|lte|gte|exige), do WIKI §6.4."""
-    return hypergraph_schema().get("constraint_ops", [])
-
-
-def validate_v2_node(node: dict) -> str | None:
-    """Valida os enums de um nó v2 contra o WIKI (§6.4). Retorna a violação como
-    string, ou None se ok. Usado como sanity no build (não levanta — loga/coleta)."""
-    s = hypergraph_schema()
-    if not s:  # WIKI sem o bloco → sem validação (não falha)
-        return None
-    t = node.get("type")
-    if t not in s.get("node_types", []):
-        return f"type inválido: {t!r}"
-    if t == "Conceito":
-        if node.get("dim") not in s.get("conceito_dims", []):
-            return f"Conceito com dim inválida: {node.get('dim')!r}"
-    elif t == "Oportunidade":
-        if node.get("kind") not in s.get("oportunidade_kinds", []):
-            return f"Oportunidade com kind inválido: {node.get('kind')!r}"
-        ap = node.get("aperture")
-        if ap is not None and ap not in s.get("apertures", []):
-            return f"aperture inválida: {ap!r}"
-        vocab = s.get("macro_temas")
-        if vocab:
-            fora = [m for m in node.get("macro_temas", []) if m not in vocab]
-            if fora:
-                return f"macro_temas fora do vocabulário: {fora!r}"
-        tipos, ops = s.get("constraint_tipos", []), s.get("constraint_ops", [])
-        if tipos:
-            for c in node.get("constraints", []) or []:
-                if c.get("tipo") not in tipos:
-                    return f"constraint com tipo inválido: {c.get('tipo')!r}"
-                if c.get("op") not in ops:
-                    return f"constraint com op inválido: {c.get('op')!r}"
-    elif t == "Ator":
-        if node.get("kind") not in s.get("ator_kinds", []):
-            return f"Ator com kind inválido: {node.get('kind')!r}"
-    return None
+    """Operadores válidos de constraint (in|not_in|lte|gte|exige), do WIKI §6.4
+    (bloco `constraint_enums`)."""
+    return load().get("constraint_enums", {}).get("constraint_ops", [])
 
 
 def trl_faixas() -> dict:
@@ -265,8 +215,8 @@ def match_sections() -> dict:
 
 def constraint_vocab_v3() -> dict:
     """Bloco `constraint_vocab` (§13.4): tipos + ops de elegibilidade dura do
-    match v3. Usado por `constraints_producer.produce_from_text` (separado do
-    `hypergraph_schema.constraint_tipos` do v2)."""
+    match v3. Usado por `constraints_producer.produce_from_text` (superconjunto do
+    subconjunto `constraint_enums` do §6.4 que o produtor valida)."""
     return load().get("constraint_vocab", {})
 
 

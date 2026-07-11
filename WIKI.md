@@ -589,57 +589,24 @@ slugify_rules:
   fallback: "sem-nome"
 ```
 
-### 6.4 Schema do hipergrado v2 (KG v2)
+### 6.4 Constraints de elegibilidade dura (v3)
 
-O hipergrado N-ário (`data/knowledge_graph/hypergraphs/`, produzido por
-`core/retrieval/hyper_extractor.py`) usa um schema **próprio**, distinto do grafo
-Obsidian acima (§6.1–6.3). Spec: `docs/specs/kg-redesign.md`. **Três** tipos de nó,
-discriminados por `kind` (Oportunidade/Ator) ou `dim` (Conceito):
-
-- **Oportunidade** — a oferta pública (unidade de resultado do radar). Carrega
-  display (`prazo`/`status`/`valor`/`fonte`), `aperture` e as propriedades foldadas
-  na consolidação: `mecanismo[]` (slugs), `requisitos_texto[]`, `exclusoes_texto[]`,
-  `constraints[]` (PR5), `macro_temas[]` (PR3).
-- **Ator** — identidade referenciável (agência, ICT, investidor, corporate). Nunca é
-  card direto do radar; aparece via suas ofertas.
-- **Conceito** — dimensão graduada, comparada por similaridade. `dim` guia a extração
-  e é canonicalizada no PR3. Descritores ex-`Entidade` da migração ficam marcados
-  `origem: entidade_v1` (inertes no match até a higiene do PR3).
-
-Fonte da verdade dos enums (validados no build — valor fora da lista é rejeitado):
+O KG é relacional (tabelas gold `entities`/`entity_relationships`/`match_chunks`,
+migration 036); o hipergrado N-ário e seu schema de nós/arestas morreram com a
+linhagem hyper-extract (v3 PR-C). Spec: `docs/specs/v3-unified.md`. O único
+vocabulário deste bloco ainda vivo é o das **constraints de elegibilidade dura**
+(coluna `entities.constraints`), lido pelo produtor `core/kg/constraints_producer.py`
+via `schema.constraint_tipos()` / `schema.constraint_ops()`. É o SUBCONJUNTO que o
+produtor valida (`_valid`), distinto do vocab completo §13.4 (`constraint_vocab`).
 
 ```yaml
-hypergraph_schema:
-  node_types: [Oportunidade, Ator, Conceito]
-  oportunidade_kinds: [edital, desafio, aceleracao, incubacao, parceria_pd, investimento, programa]
-  ator_kinds: [agencia, fap, ict, corporate, aceleradora, investidor]
-  conceito_dims: [tema, tecnologia, aplicacao]
-  apertures: [prazo, continua, recorrente, fechada]
-  edge_types: [financia, exige, abrange_tema, aplica_em, destina_a, exclui, parceria_com, pertence_a, viabiliza, resolve]
-  # Vocabulário controlado de macro-temas (D8, two-tier): propriedade
-  # `macro_temas[]` da Oportunidade — filtro/UI estável, distinto dos Conceitos
-  # abertos (match fino). Semeado pelo themes_index dos catálogos curados
-  # (6 primeiros) + extensões ancoradas no corpus de editais (PR3, 2026-07-04).
-  # Adicionar valor = editar AQUI (conscientemente); o build valida contra a lista.
-  macro_temas:
-    - tecnologias digitais e conectividade
-    - materiais, química e manufatura avançada
-    - agro - bioeconomia e alimentos
-    - saúde e ciências da vida
-    - energia e transição sustentável
-    - mobilidade e logística
-    - defesa e soberania nacional
-    - meio ambiente, água e saneamento
-    - petróleo, gás e mineração
-    - construção e cidades inteligentes
-  # Elegibilidade DURA (D6/PR5) — propriedade `constraints[]` da Oportunidade:
-  # objetos AVALIÁVEIS `{tipo, op, valor}`, distintos do texto residual
-  # (`requisitos_texto`/`exclusoes_texto`, que só informam). Um constraint se
-  # AVALIA contra o perfil da empresa (sat/unsat/unknown) e vira o Estágio 0 do
-  # match (filtro duro): `unsat` elimina; `unknown` (campo faltando no perfil)
-  # NÃO elimina — marca "elegibilidade não verificada" no card. Supersede a nota
-  # "nunca gate (§D2)" do campo legado `eligibility_constraints` (§4.2, pipeline
-  # de wiki page removido). Semântica por tipo:
+constraint_enums:
+  # Elegibilidade DURA (D6/PR5) — coluna `entities.constraints` (jsonb): objetos
+  # AVALIÁVEIS `{tipo, op, valor}`, distintos do texto residual `requisitos_texto`
+  # (que só informa). Um constraint se AVALIA contra o perfil da empresa
+  # (sat/unsat/unknown) no Stage 1 do match (`core/services/eligibility.py`):
+  # `unsat` elimina; `unknown` (campo faltando no perfil) NUNCA elimina — marca
+  # "elegibilidade não verificada" no card. Semântica por tipo:
   #   porte         op in|not_in   valor=[mei,me,epp,media,grande]  (perfil: tamanho_empresa)
   #   sede_uf       op in|not_in   valor=[SC,SP,…] (UF)             (perfil: uf)
   #   faturamento   op lte|gte     valor=<BRL/ano>                  (perfil: faturamento_anual)
@@ -649,13 +616,6 @@ hypergraph_schema:
   constraint_tipos: [porte, sede_uf, faturamento, trl, forma_juridica, parceria]
   constraint_ops: [in, not_in, lte, gte, exige]
 ```
-
-Mapa de migração dos 12 tipos v1 (mecânico, `core/kg/migrate_v2.consolidate_to_v2_types`):
-`Edital`→`Oportunidade/edital`; `Programa`→`Oportunidade/programa`; `ICT`→`Ator/ict`;
-`Investidor`→`Ator/investidor`; `Tema|Tecnologia|Aplicação`→`Conceito/dim`;
-`Mecanismo`→propriedade `mecanismo[]`; `Requisito`→`requisitos_texto[]`;
-`Exclusão`→`exclusoes_texto[]`; `Fonte`→proveniência (D4); `Entidade`→heurística
-(Ator conhecido → `Ator`; senão `Conceito/tema` marcado `entidade_v1`).
 
 ---
 
@@ -1238,8 +1198,8 @@ faturamento-teto, idade de CNPJ, sede, natureza jurídica, TRL, CNAE, parceria,
 vínculo de incubação, investidor privado). Produzido por
 `constraints_producer.produce_from_text` a partir das seções de elegibilidade do
 silver; avaliado por `eligibility.py` (`unsat` elimina, `unknown` nunca elimina).
-Bloco SEPARADO do `hypergraph_schema.constraint_tipos` (v2) de propósito — o v2
-segue com seu subconjunto até morrer.
+Superconjunto do `constraint_enums` (§6.4), o subconjunto de tipos/ops que o
+produtor valida em `_valid` antes de gravar.
 
 ```yaml
 constraint_vocab:
