@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from core.kg.hypergraph_catalog import list_editais  # noqa: E402
+from core.kg.entity_catalog import list_editais  # noqa: E402
 from core.tasks import chunk_edital_task  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")

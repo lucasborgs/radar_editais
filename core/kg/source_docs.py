@@ -112,16 +112,11 @@ def persist_all_current() -> int:
         logger.info("source_docs.persist_all_current: Supabase ausente — no-op")
         return 0
 
-    from core.kg import kg_store  # tardio: evita ciclo no import do módulo
+    from core.kg import entity_catalog  # tardio: evita ciclo no import do módulo
     from core.kg.edital_id import native_id_of, source_of
     from pipeline.adapters.base import get_adapter
 
-    editais = []
-    for fk in kg_store.load_all_hypergraphs():
-        if "__" not in fk:
-            continue
-        source, _, native = fk.partition("__")
-        editais.append({"id": f"{source}:{native}"})
+    editais = [{"id": c["id"]} for c in entity_catalog.list_editais(limit=10_000)]
     n_ok = 0
     for e in editais:
         edital_id = e.get("id")

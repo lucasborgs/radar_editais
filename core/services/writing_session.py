@@ -887,21 +887,20 @@ class WritingSession:
     def _build_investidor_card_context(self) -> str:
         """Contexto do nó investidor (context-stuffing do nó do KG).
 
-        Carrega o nó de `investidores.json` por id (`investidor:<slug>`) e o
-        serializa em texto pro prompt — tese, temas, setores, estágio, ticket,
+        Carrega o fundo de `entities` (kind=investidor) por id (`investidor:<slug>`)
+        e o serializa em texto pro prompt — tese, temas, setores, estágio, ticket,
         portfólio, co-investidores. Vazio (com aviso) se o fundo não for achado;
         a sessão não quebra — opera só com o perfil da startup.
         """
-        from core.kg import kg_store  # lazy: evita custo no boot do módulo
+        from core.kg import entity_catalog  # lazy: evita custo no boot do módulo
         try:
-            invs = {i["id"]: i for i in kg_store.load_investidores()}
+            fund = entity_catalog.get_investidor(self.edital_id)
         except Exception as e:
-            logger.warning("[%s] load_investidores falhou: %s", self.session_id, e)
+            logger.warning("[%s] get_investidor falhou: %s", self.session_id, e)
             return ""
-        fund = invs.get(self.edital_id)
         if not fund:
             logger.warning(
-                "[%s] fundo %s não encontrado em investidores.json — pitch sem nó-alvo",
+                "[%s] fundo %s não encontrado em entities — pitch sem nó-alvo",
                 self.session_id, self.edital_id,
             )
             return ""
@@ -933,20 +932,20 @@ class WritingSession:
     def _build_programa_context(self) -> str:
         """Bloco de contexto do programa-alvo (context-stuffing de programas.json).
 
-        Carrega o nó de `programas.json` por id (`programa:<slug>`) e o serializa
-        em texto pro prompt — descrição, operador, benefício, ticket, elegibilidade.
-        Vazio (com aviso) se o programa não for achado; a sessão não quebra.
+        Carrega o programa de `entities` (kind=programa) por id (`programa:<slug>`)
+        e o serializa em texto pro prompt — descrição, operador, benefício, ticket,
+        elegibilidade. Vazio (com aviso) se o programa não for achado; a sessão não
+        quebra.
         """
-        from core.kg import kg_store
+        from core.kg import entity_catalog
         try:
-            progs = {p["id"]: p for p in kg_store.load_programas()}
+            prog = entity_catalog.get_programa(self.edital_id)
         except Exception as e:
-            logger.warning("[%s] load_programas falhou: %s", self.session_id, e)
+            logger.warning("[%s] get_programa falhou: %s", self.session_id, e)
             return ""
-        prog = progs.get(self.edital_id)
         if not prog:
             logger.warning(
-                "[%s] programa %s não encontrado em programas.json — proposta sem nó-alvo",
+                "[%s] programa %s não encontrado em entities — proposta sem nó-alvo",
                 self.session_id, self.edital_id,
             )
             return ""

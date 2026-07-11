@@ -185,12 +185,19 @@ NÃO emita constraint para: exigências documentais (plano de trabalho, certidõ
 regular), critérios de mérito/pontuação, prazos, contrapartida financeira, setor/tema \
 (afinidade, não elegibilidade), ou qualquer coisa fora dos 10 tipos acima.
 
-Além das constraints, devolva `requisitos_texto`: uma lista curta (≤6) de frases \
-objetivas em português com as EXIGÊNCIas de elegibilidade relevantes (inclusive as que \
-você NÃO estruturou), para exibição no card. Não repita boilerplate.
+Além das constraints, devolva três listas curtas (≤6 itens cada, frases objetivas em \
+português, sem boilerplate), para exibição no card:
+- `requisitos_texto`: as EXIGÊNCIAS de elegibilidade relevantes (inclusive as que você \
+NÃO estruturou como constraint).
+- `exclusoes`: quem/o que está VEDADO ou EXCLUÍDO da participação (ex.: "vedada a \
+participação de grandes empresas", "não elegível para pessoa física"). [] se o texto \
+não declara exclusões.
+- `publico_alvo`: os TIPOS de proponente ELEGÍVEIS (ex.: "startups", "microempresas \
+(ME)", "empresas de médio porte", "ICTs"). [] se o texto não delimita o público.
 
 Responda JSON: {"constraints": [{"tipo": "...", "op": "...", "valor": ...}], \
-"requisitos_texto": ["..."]}. Listas vazias se nada se encaixa."""
+"requisitos_texto": ["..."], "exclusoes": ["..."], "publico_alvo": ["..."]}. \
+Listas vazias se nada se encaixa."""
 
 
 _UF_ENUM = [
@@ -276,18 +283,35 @@ def _normalize_v3(c: dict) -> dict:
     return c
 
 
+def _clean_list(raw, cap: int = 6) -> list[str]:
+    """Lista de frases não-vazias, dedup preservando ordem, cortada em `cap`."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for r in raw or []:
+        if not isinstance(r, str):
+            continue
+        s = r.strip()
+        if s and s.lower() not in seen:
+            seen.add(s.lower())
+            out.append(s)
+        if len(out) >= cap:
+            break
+    return out
+
+
 def produce_from_text(
     text: str, *, client=None, model: str | None = None
-) -> tuple[list[dict], list[str]]:
-    """Extrai `(constraints, requisitos_texto)` do TEXTO das seções de elegibilidade
-    do silver (entry point v3 — não toca o grafo).
+) -> tuple[list[dict], list[str], list[str], list[str]]:
+    """Extrai `(constraints, requisitos_texto, exclusoes, publico_alvo)` do TEXTO das
+    seções de elegibilidade do silver (entry point v3 — call B do gold, não toca o grafo).
 
-    Fail-open: qualquer erro (sem chave, parse, chamada) → `([], [])` (a entidade
+    UMA chamada LLM produz os quatro (constraints estruturadas + três listas de display).
+    Fail-open: qualquer erro (sem chave, parse, chamada) → `([], [], [], [])` (a entidade
     cai no "unknown não elimina"). CONSERVADOR: constraint inválida/fora do vocab é
     descartada; o texto continua em `requisitos_texto`. Não levanta."""
     text = (text or "").strip()
     if not text:
-        return [], []
+        return [], [], [], []
     try:
         if client is None:
             client, model = _make_llm()
@@ -304,7 +328,7 @@ def produce_from_text(
         data = json.loads(resp.choices[0].message.content)
     except Exception as e:  # noqa: BLE001 — produtor nunca derruba o ingest
         logger.warning("produce_from_text: falha (%s) — sem constraints", e)
-        return [], []
+        return [], [], [], []
 
     tipos, ops, valores = _v3_vocab()
     constraints: list[dict] = []
@@ -317,11 +341,10 @@ def produce_from_text(
         else:
             logger.info("produce_from_text: constraint descartada (fora do vocab): %s", c)
 
-    requisitos = [
-        str(r).strip() for r in (data.get("requisitos_texto") or [])
-        if isinstance(r, str) and str(r).strip()
-    ][:8]
-    return constraints, requisitos
+    requisitos = _clean_list(data.get("requisitos_texto"), cap=8)
+    exclusoes = _clean_list(data.get("exclusoes"))
+    publico_alvo = _clean_list(data.get("publico_alvo"))
+    return constraints, requisitos, exclusoes, publico_alvo
 
 
 def _edital_nodes(graph: dict) -> list[dict]:

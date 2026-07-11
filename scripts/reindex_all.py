@@ -26,7 +26,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core.db import get_supabase_service  # noqa: E402
-from core.kg import hypergraph_catalog  # noqa: E402
+from core.kg import entity_catalog as hypergraph_catalog  # noqa: E402
 from core.tasks import chunk_edital_task  # noqa: E402
 
 

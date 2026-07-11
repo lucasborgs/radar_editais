@@ -969,7 +969,7 @@ async def warm_edital_chunks_task(timestamp: int) -> None:
     paralelismo dele e uma falha isolada não afeta os demais. `timestamp`
     vem do procrastinate periodic (UNIX epoch).
     """
-    from core.kg.hypergraph_catalog import list_editais  # noqa: PLC0415
+    from core.kg.entity_catalog import list_editais  # noqa: PLC0415
 
     cards = list_editais(limit=1000)
     queued = 0

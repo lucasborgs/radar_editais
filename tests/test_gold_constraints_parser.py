@@ -1,9 +1,10 @@
 """Testes do parser de constraints v3 (constraints_producer.produce_from_text).
 
-Entry point ADITIVO da Fase 1: lê o TEXTO das seções de elegibilidade do silver e
-devolve `(constraints, requisitos_texto)` no vocabulário §4.4. Rodam sem LLM real —
+Entry point ADITIVO da Fase 1 (estendido no PR-B): lê o TEXTO das seções de
+elegibilidade do silver e devolve `(constraints, requisitos_texto, exclusoes,
+publico_alvo)` no vocabulário §4.4 — call B única do gold. Rodam sem LLM real —
 um client fake devolve o JSON; testamos validação (fora do vocab é descartado),
-normalização (número/UF/porte/exige) e o contrato fail-open.
+normalização (número/UF/porte/exige), as listas de display e o contrato fail-open.
 """
 from __future__ import annotations
 
@@ -47,7 +48,7 @@ def test_constraints_validas_normalizadas():
         ],
         "requisitos_texto": ["Empresa criada há no máximo 12 meses", "Parceria obrigatória com ICT"],
     }
-    cons, req = cp.produce_from_text("seções de elegibilidade...", client=_client(resp))
+    cons, req, _exc, _pa = cp.produce_from_text("seções de elegibilidade...", client=_client(resp))
     by_tipo = {c["tipo"]: c for c in cons}
 
     assert by_tipo["faturamento"]["valor"] == 4800000          # string → int
@@ -57,6 +58,28 @@ def test_constraints_validas_normalizadas():
     assert by_tipo["sede_uf"]["valor"] == ["SC"]               # UF maiúscula, virou lista
     assert by_tipo["vinculo_incubacao"]["valor"] is True
     assert req == ["Empresa criada há no máximo 12 meses", "Parceria obrigatória com ICT"]
+
+
+def test_exclusoes_e_publico_alvo_extraidos():
+    """Call B devolve também as listas de display exclusoes/publico_alvo (PR-B):
+    limpas, dedup e cortadas em ≤6."""
+    resp = {
+        "constraints": [],
+        "requisitos_texto": [],
+        "exclusoes": ["Vedada a participação de grandes empresas", "vedada a participação de grandes empresas", "Não elegível para pessoa física"],
+        "publico_alvo": ["startups", "microempresas (ME)", ""],
+    }
+    cons, req, exc, pa = cp.produce_from_text("texto", client=_client(resp))
+    assert cons == [] and req == []
+    # dedup case-insensitive + drop de vazio
+    assert exc == ["Vedada a participação de grandes empresas", "Não elegível para pessoa física"]
+    assert pa == ["startups", "microempresas (ME)"]
+
+
+def test_listas_display_default_vazias():
+    """JSON sem as chaves novas → listas vazias (não KeyError)."""
+    cons, req, exc, pa = cp.produce_from_text("texto", client=_client({"constraints": []}))
+    assert (cons, req, exc, pa) == ([], [], [], [])
 
 
 def test_tipo_fora_do_vocab_descartado():
@@ -69,7 +92,7 @@ def test_tipo_fora_do_vocab_descartado():
         ],
         "requisitos_texto": [],
     }
-    cons, req = cp.produce_from_text("texto", client=_client(resp))
+    cons, req, _exc, _pa = cp.produce_from_text("texto", client=_client(resp))
     assert [c["tipo"] for c in cons] == ["faturamento"]
     assert req == []
 
@@ -86,7 +109,7 @@ def test_valor_fora_do_enum_categorico_descartado():
         ],
         "requisitos_texto": [],
     }
-    cons, _req = cp.produce_from_text("texto", client=_client(resp))
+    cons, _req, _exc, _pa = cp.produce_from_text("texto", client=_client(resp))
     assert [c["tipo"] for c in cons] == ["porte"]
     assert cons[0]["valor"] == ["me", "epp"]
 
@@ -103,20 +126,20 @@ def test_sede_uf_fora_do_enum_de_27_ufs_descartado():
         ],
         "requisitos_texto": [],
     }
-    cons, _req = cp.produce_from_text("texto", client=_client(resp))
+    cons, _req, _exc, _pa = cp.produce_from_text("texto", client=_client(resp))
     assert [c["tipo"] for c in cons] == ["faturamento"]
 
 
 def test_sede_uf_variantes_de_nacional_descartadas():
     for variante in ("Brasil", "nacional", "BRA", "todo o territorio nacional"):
         resp = {"constraints": [{"tipo": "sede_uf", "op": "in", "valor": [variante]}], "requisitos_texto": []}
-        cons, _req = cp.produce_from_text("texto", client=_client(resp))
+        cons, _req, _exc, _pa = cp.produce_from_text("texto", client=_client(resp))
         assert cons == [], f"variante {variante!r} deveria ser descartada"
 
 
 def test_sede_uf_valido_continua_emitido():
     resp = {"constraints": [{"tipo": "sede_uf", "op": "in", "valor": ["SC", "SP"]}], "requisitos_texto": []}
-    cons, _req = cp.produce_from_text("texto", client=_client(resp))
+    cons, _req, _exc, _pa = cp.produce_from_text("texto", client=_client(resp))
     assert cons == [{"tipo": "sede_uf", "op": "in", "valor": ["SC", "SP"]}]
 
 
@@ -126,13 +149,13 @@ def test_texto_vazio_nao_chama_llm():
         def __getattr__(self, _):  # qualquer acesso levanta
             raise AssertionError("não deveria chamar o LLM com texto vazio")
 
-    assert cp.produce_from_text("", client=_Boom()) == ([], [])
-    assert cp.produce_from_text("   ", client=_Boom()) == ([], [])
+    assert cp.produce_from_text("", client=_Boom()) == ([], [], [], [])
+    assert cp.produce_from_text("   ", client=_Boom()) == ([], [], [], [])
 
 
 def test_fail_open_em_json_quebrado():
     # JSON inválido → fail-open ([], []), não levanta
-    cons, req = cp.produce_from_text("texto", client=_FakeClient("isto não é json"))
+    cons, req, _exc, _pa = cp.produce_from_text("texto", client=_FakeClient("isto não é json"))
     assert cons == []
     assert req == []
 
@@ -142,6 +165,6 @@ def test_requisitos_limitados_e_higienizados():
         "constraints": [],
         "requisitos_texto": ["  req 1  ", "", "req 2", 123, "req 3", "req 4", "req 5", "req 6", "req 7", "req 8", "req 9"],
     }
-    _cons, req = cp.produce_from_text("texto", client=_client(resp))
+    _cons, req, _exc, _pa = cp.produce_from_text("texto", client=_client(resp))
     assert "req 1" in req and "" not in req and 123 not in req
     assert len(req) <= 8  # teto

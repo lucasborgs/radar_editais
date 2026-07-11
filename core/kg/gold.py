@@ -617,6 +617,11 @@ def _ingest_investidores(conn, stats: dict) -> None:
                         "estagio_alvo": r.get("estagio_alvo") or [],
                         "lead_follow": r.get("lead_follow"), "generalista": r.get("generalista"),
                         "fund_status": r.get("fund_status"), "site": r.get("site"),
+                        # Preservados p/ o card de escrita (pitch p/ fundo) — não
+                        # existem em coluna, só o writing os lê (get_investidor).
+                        "portfolio": list(r.get("portfolio") or []),
+                        "co_investidores": list(r.get("co_investidores") or []),
+                        "tese_themes": list(r.get("tese_themes") or []),
                     },
                     embedding=embed_query(desc or r.get("name") or r["id"]),
                 )
@@ -637,7 +642,7 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
         try:
             desc = _ws(" ".join(x for x in [r.get("descricao"), r.get("beneficio")] if x))
             tmin, tmax = _ticket_from_range(r.get("ticket_range"))
-            constraints, requisitos = produce_from_text(r.get("elegibilidade") or "")
+            constraints, requisitos, exclusoes, publico_alvo = produce_from_text(r.get("elegibilidade") or "")
             chunks = _pack_chunks([{"section_path": [r.get("name") or ""], "kind": "paragraph", "text": desc}])
             chunk_embs = _embed_match_chunks(chunks)
             with conn.transaction(), conn.cursor() as cur:
@@ -656,6 +661,7 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
                         "cadencia": r.get("cadencia"), "beneficio": r.get("beneficio"),
                         "elegibilidade": r.get("elegibilidade"), "estagio_alvo": r.get("estagio_alvo") or [],
                         "site": r.get("site"), "faq_url": r.get("faq_url"),
+                        "exclusoes": exclusoes, "publico_alvo": publico_alvo,
                     },
                     embedding=embed_query(desc or r.get("name") or r["id"]),
                 )
@@ -793,7 +799,7 @@ def _ingest_editais(conn, agency_cache: dict, stats: dict, *, limit: int | None,
             description = (md["descricao_bronze"] or thematic_text)[:_DESC_CHARS]
 
             setores_raw, tags_raw = _tag_edital(thematic_text, client=client, model=model)
-            constraints, requisitos = produce_from_text(elig_text)
+            constraints, requisitos, exclusoes, publico_alvo = produce_from_text(elig_text)
 
             chunks = _pack_chunks(thematic)
             chunk_embs = _embed_match_chunks(chunks)
@@ -801,6 +807,13 @@ def _ingest_editais(conn, agency_cache: dict, stats: dict, *, limit: int | None,
 
             meta = dict(md["metadata"])
             meta["source_hash"] = src_hash
+            # Campos de display do card (call B): exclusoes/publico_alvo vêm do
+            # LLM sobre as seções de elegibilidade. `publico_alvo` (lista tipada)
+            # substitui o `publico_alvo` cru do bronze (string livre) — o card
+            # espera lista; se o LLM não delimitou, cai no bronze como 1 item.
+            bronze_pa = md["metadata"].get("publico_alvo")
+            meta["exclusoes"] = exclusoes
+            meta["publico_alvo"] = publico_alvo or ([str(bronze_pa)] if bronze_pa else [])
 
             with conn.transaction(), conn.cursor() as cur:
                 eid = _upsert_entity(

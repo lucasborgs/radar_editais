@@ -2,9 +2,9 @@
 core/temporal.py — Consciência temporal canônica para prompts (Front 3).
 
 Fonte única do bloco `[CONTEXTO TEMPORAL: ...]` injetado nos prompts de
-match, escrita, brief e critic. Lê `deadline`/`status` do hipergrafo,
-calcula dias restantes contra `date.today()`, e renderiza um bloco de
-texto pronto para prompt.
+match, escrita, brief e critic. Lê `deadline`/`status` do catálogo SQL
+(entities, via entity_catalog), calcula dias restantes contra `date.today()`,
+e renderiza um bloco de texto pronto para prompt.
 
 Função pura de leitura: sem escrita.
 """
@@ -14,23 +14,15 @@ import logging
 from dataclasses import dataclass
 from datetime import date
 
-from core.kg import kg_store
+from core.kg import entity_catalog
 from core.kg.schema import parse_deadline
 
 logger = logging.getLogger(__name__)
 
 
 def _index_entry(edital_id: str) -> dict | None:
-    for fk, graph in kg_store.load_all_hypergraphs().items():
-        if "__" not in fk:
-            continue
-        for n in graph.get("nodes", []):
-            if (
-                n.get("type") == "Oportunidade" and n.get("kind") == "edital"
-                and n.get("edital_id") == edital_id
-            ):
-                return {"deadline": n.get("prazo"), "status": n.get("status")}
-    return None
+    """{deadline (dd/mm/yyyy), status} do edital/programa via SQL, ou None."""
+    return entity_catalog.get_entity_temporal(edital_id)
 
 
 def _reference_date() -> date | None:
