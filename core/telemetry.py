@@ -111,7 +111,7 @@ def llm_span(
 
     Cobre os call sites sem telemetria (F11): _call_openai da WritingSession,
     reflection_service, checklist_service, HyDE, contextual retrieval (1 span por
-    batch) e scope_classifier. Com `model` + usage (via `record_usage` ou
+    batch). Com `model` + usage (via `record_usage` ou
     `span.update(usage_details=...)`), o Langfuse precifica a chamada → custo por
     sessão/workspace vem do metadata propagado pelo caller.
 

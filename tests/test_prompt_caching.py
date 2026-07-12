@@ -148,8 +148,6 @@ def _make_session() -> WritingSession:
     s._source_card_context = ""
     s._programa_context = ""
     s._project_description = None
-    s._ripple_suggestion = None
-    s._ripple_active = False
     s._pending_user_input = None
     s.backend = "anthropic"
     s.model = "claude-sonnet-4-6"

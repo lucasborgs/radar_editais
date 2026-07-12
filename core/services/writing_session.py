@@ -332,10 +332,10 @@ Lista vazia [] se não houver sinal relevante."""
 # =============================================================================
 # MATRIZES DE DEPENDÊNCIA ENTRE SEÇÕES (static, zero LLM)
 # =============================================================================
-# Usadas pelo classificador de escopo (scope_classifier) para determinar quais
-# seções são impactadas quando uma seção conceitual é alterada. A ordem segue
-# o outline padrão — outlines gerados por LLM podem ter nomes diferentes e
-# cair no fallback da matriz estática.
+# Dado estático: quais seções são impactadas quando uma seção é alterada. A
+# ordem segue o outline padrão. O consumidor original (scope_classifier) foi
+# removido no F2; mantidas como referência estrutural para o plan-first do F4
+# (docs/specs/writing-agent-evolution.md).
 
 PROPOSAL_DEPENDENCY_MATRIX: dict[str, list[str]] = {
     "1. Identificação da empresa":         [],
@@ -431,11 +431,6 @@ class WritingSession:
         # First-turn batch generation: descrição do projeto enviada pelo usuário
         # no primeiro turno. Injetada no prompt de geração.
         self._project_description: str | None = None
-        # Ripple correction: quando o classificador de escopo detecta uma mudança
-        # conceitual, armazena a sugestão de ripple para o próximo turno.
-        self._ripple_suggestion: dict | None = None
-        # Flag true durante ripple ativo — bloqueia re-classificação (depth=1).
-        self._ripple_active: bool = False
 
         # F3 — contratos tipados no save: resultados estruturados das tools
         # save_draft (critic verdict + section title), consumidos por
@@ -1250,7 +1245,7 @@ class WritingSession:
                 system=self._writer_system(),
                 initial_messages=[],
                 tools=tools, model=model, provider=provider,
-                max_steps=max_steps or AGENT_MAX_STEPS, reflect_every=3,
+                max_steps=max_steps or AGENT_MAX_STEPS,
                 thread_id=thread_id,
                 resume=user_message,
                 prior_n_msgs=resume_ctx.get("n_msgs", 0),
@@ -1265,7 +1260,7 @@ class WritingSession:
                 system=self._writer_system(),
                 initial_messages=messages,
                 tools=tools, model=model, provider=provider,
-                max_steps=max_steps or AGENT_MAX_STEPS, reflect_every=3,
+                max_steps=max_steps or AGENT_MAX_STEPS,
                 thread_id=thread_id,
                 resume=None,
                 prior_n_msgs=0,
@@ -1334,14 +1329,11 @@ class WritingSession:
                 "success":            True,
                 "error":              None,
                 "tool_trace":         tool_trace,
-                "ripple_suggestion":  self._ripple_suggestion,
                 "truncated":          False,  # interrupt = pausa deliberada, não teto
             }
 
         # Turno completou (fresh sem interrupt OU resume que fechou a pergunta).
         assistant_text = result.final_text or ""
-        ripple = self._ripple_suggestion
-        self._ripple_suggestion = None  # consumido
         self._history.append({"role": "user",      "content": user_message})
         self._history.append({"role": "assistant", "content": assistant_text})
         self._persist_turn(user_turn_index, "user", user_message, section_hint)
@@ -1359,7 +1351,6 @@ class WritingSession:
             "success":            True,
             "error":              None,
             "tool_trace":         tool_trace,
-            "ripple_suggestion":  ripple,
             # PR6.2 (F10): turno cortado no teto de passos deixa de ser invisível
             # — o front mostra aviso discreto ("continue a conversa").
             "truncated":          result.stop_reason == "max_steps",
@@ -1429,7 +1420,7 @@ class WritingSession:
             build_section_messages=self._build_generation_section_messages,
             sections=targets,
             tools=tools, model=model, provider=provider,
-            max_steps=2, reflect_every=0, temperature=0.3,
+            max_steps=2, temperature=0.3,
             thread_id=thread_id,
             verify_saved=lambda section: bool(
                 self._doc_sections.get(section, "").strip()

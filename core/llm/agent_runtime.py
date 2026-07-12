@@ -122,25 +122,8 @@ class AgentResult:
 
 
 # =============================================================================
-# Reflexão dinâmica — constantes compartilhadas com o grafo (agent_graph)
+# Rodada final forçada — constante compartilhada com o grafo (agent_graph)
 # =============================================================================
-
-_REFLECT_PROMPT = (
-    "[Reflexão interna — não é mensagem do usuário] "
-    "Antes de continuar: em 2 frases, o que você já aprendeu com as buscas feitas? "
-    "O que ainda precisa para responder bem ao pedido do usuário?"
-)
-
-# Follow-up forçado quando a resposta à reflexão acima veio sem tool_calls: sem
-# isso, o texto da reflexão (uma nota interna) vaza como se fosse a resposta
-# final ao usuário — a causa raiz de respostas tipo "Aprendi que X, preciso Y"
-# aparecendo no chat em vez de uma resposta de verdade. Ver agent_graph._build_graph.
-_REFLECT_FOLLOWUP_PROMPT = (
-    "[Continuação interna — não é mensagem do usuário] "
-    "O texto anterior foi sua reflexão PRIVADA, não a resposta ao usuário. Agora "
-    "AJA de verdade: se ainda falta algo, chame a tool necessária; se você já tem "
-    "o suficiente, escreva agora a resposta COMPLETA para o usuário."
-)
 
 # Rodada final forçada quando max_steps é atingido logo após uma rodada de tools
 # (o loop terminaria ali sem o modelo nunca escrever uma resposta — texto vazio
@@ -151,12 +134,6 @@ _FINALIZE_PROMPT = (
     "tem, escreva agora a melhor resposta possível ao usuário — mesmo que parcial, "
     "nunca deixe de responder."
 )
-
-# Reflexão dinâmica (spec 08): sinais leves (sem LLM) que antecipam a reflexão
-# antes do teto reflect_every. `reflect_every` vira piso de frequência; entre
-# tetos, só rodadas com sinal disparam — rodadas triviais não geram reflexão à toa.
-_REFLECT_CHAR_THRESHOLD = int(os.getenv("REFLECT_CHAR_THRESHOLD", "12000"))
-_PLAN_TOOL_NAMES = {"write_todos"}  # mudança de plano → vale sintetizar
 
 
 # =============================================================================
@@ -243,7 +220,6 @@ async def run_agent_async(
     provider: Provider = "anthropic",
     max_steps: int = 8,
     on_step: Callable[[TraceStep], None] | None = None,
-    reflect_every: int | None = None,
     span_name: str | None = None,
     temperature: float | None = None,
     openai_base_url: str | None = None,
@@ -255,8 +231,8 @@ async def run_agent_async(
 
     Mantém a assinatura/contrato histórico — todos os call sites (run_agent sync,
     run_subagent, writing/explore/profile) continuam idênticos. A implementação
-    do grafo (nós agent/tools/reflect, cap, reflexão dinâmica, telemetria) vive
-    em `agent_graph`; aqui só delegamos.
+    do grafo (nós agent/tools/finalize, cap, telemetria) vive em `agent_graph`;
+    aqui só delegamos.
 
     Args:
         system: instrução de sistema.
@@ -265,7 +241,6 @@ async def run_agent_async(
         model / provider: modelo e provider ("openai" | "anthropic").
         max_steps: teto de chamadas LLM (evita loop infinito).
         on_step: callback opcional por TraceStep.
-        reflect_every: teto de cadência da reflexão dinâmica (None/0 desliga).
         span_name: rótulo do span raiz (run_subagent passa f"subagent.{name}").
         temperature: repassada à factory do ChatModel.
         openai_base_url / openai_api_key: overrides do endpoint OpenAI-compat
@@ -285,7 +260,6 @@ async def run_agent_async(
         provider=provider,
         max_steps=max_steps,
         on_step=on_step,
-        reflect_every=reflect_every,
         span_name=span_name,
         temperature=temperature,
         openai_base_url=openai_base_url,
@@ -303,7 +277,6 @@ def run_agent(
     provider: Provider = "anthropic",
     max_steps: int = 8,
     on_step: Callable[[TraceStep], None] | None = None,
-    reflect_every: int | None = None,
     span_name: str | None = None,
     temperature: float | None = None,
     openai_base_url: str | None = None,
@@ -328,7 +301,6 @@ def run_agent(
             provider=provider,
             max_steps=max_steps,
             on_step=on_step,
-            reflect_every=reflect_every,
             span_name=span_name,
             temperature=temperature,
             openai_base_url=openai_base_url,

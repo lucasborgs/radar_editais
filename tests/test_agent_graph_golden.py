@@ -2,9 +2,9 @@
 
 Pós-Etapa 2 o grafo é o único runtime; estes testes exercitam o loop + tradutor
 de contrato com um chat model scriptado (zero rede): no-tool, 1-tool, tool-error,
-max_steps (com trace completo), reflexão, cap central, degradação por erro de
-modelo, span_name. Equivalência ao runtime legado foi provada na Etapa 1 (antes
-de o legado ser aposentado) e está congelada nas asserções diretas abaixo.
+max_steps (com trace completo), anti-leak estrutural (F2), cap central, degradação
+por erro de modelo, span_name. Equivalência ao runtime legado foi provada na Etapa
+1 (antes de o legado ser aposentado) e está congelada nas asserções diretas abaixo.
 """
 from __future__ import annotations
 
@@ -59,13 +59,13 @@ def _graph_msg(turn: dict) -> AIMessage:
     )
 
 
-def _run_graph(monkeypatch, turns, tools, *, max_steps=8, reflect_every=None):
+def _run_graph(monkeypatch, turns, tools, *, max_steps=8):
     scripted = ScriptedChatModel(responses=[_graph_msg(t) for t in turns])
     monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: scripted)
     result = asyncio.run(run_agent_graph_async(
         system="sys", initial_messages=[{"role": "user", "content": "vai"}],
         tools=tools, model="m", provider="anthropic",
-        max_steps=max_steps, reflect_every=reflect_every,
+        max_steps=max_steps,
     ))
     return result, scripted
 
@@ -157,39 +157,55 @@ def test_max_steps_stop_reason(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Reflexão / cap / degradação / span_name
+# Anti-leak estrutural (F2) / cap / degradação / span_name
 # ---------------------------------------------------------------------------
 
-def test_reflection_node_injects_prompt(monkeypatch):
+def test_no_internal_human_message_injected_in_turn(monkeypatch):
+    """F2 — a classe do bug de vazamento morre por CONSTRUÇÃO, não por prompt.
+
+    Num turno normal (agent→tools→agent), o grafo NÃO injeta nenhuma HumanMessage
+    interna no meio do raciocínio (os nós reflect/reflect_followup foram deletados).
+    A única HumanMessage no histórico é a mensagem original do usuário; nenhuma nota
+    marcada como "não é mensagem do usuário" aparece — logo não há nota interna que
+    possa vazar como resposta final."""
     @tool
     def search(q: str) -> str:
         """Busca."""
-        return "ok"
+        return "resultado da busca"
 
     turns = [
         {"text": "buscando", "tool_calls": [{"id": "a", "name": "search", "args": {"q": "x"}}],
          "usage": {"input_tokens": 10, "output_tokens": 2}},
-        # Resposta À REFLEXÃO sem tool_calls — é uma nota interna, não pode virar
-        # a resposta final (por isso NÃO termina o turno; ver reflect_followup).
-        {"text": "Aprendi que X, ainda preciso de Y", "tool_calls": [],
+        {"text": "resposta final ao usuário", "tool_calls": [],
          "usage": {"input_tokens": 10, "output_tokens": 2}},
-        {"text": "pronto", "tool_calls": [], "usage": {"input_tokens": 10, "output_tokens": 2}},
     ]
-    graph, scripted = _run_graph(monkeypatch, turns, [search], reflect_every=1)
-    # 2ª chamada ao modelo deve conter o prompt de reflexão injetado pelo nó reflect.
-    second_call_msgs = scripted._received[1]
-    assert any(
-        isinstance(m, HumanMessage) and "Reflexão interna" in str(m.content)
-        for m in second_call_msgs
-    ), "nó reflect não injetou o prompt de reflexão"
-    # 3ª chamada deve conter o follow-up forçado (a reflexão sozinha não termina o turno).
-    third_call_msgs = scripted._received[2]
-    assert any(
-        isinstance(m, HumanMessage) and "Continuação interna" in str(m.content)
-        for m in third_call_msgs
-    ), "reflect_followup não forçou mais uma rodada após a reflexão sem tool_calls"
-    # A resposta final ao usuário é a da 3ª chamada, NUNCA o texto da reflexão.
-    assert graph.final_text == "pronto"
+    graph, scripted = _run_graph(monkeypatch, turns, [search])
+    # O histórico visto pela última chamada do modelo é o estado completo do turno.
+    all_msgs = scripted._received[-1]
+    human = [m for m in all_msgs if isinstance(m, HumanMessage)]
+    assert len(human) == 1, "só a mensagem original do usuário deve ser HumanMessage"
+    assert human[0].content == "vai"
+    assert not any(
+        "não é mensagem do usuário" in str(m.content) for m in all_msgs
+    ), "nenhuma nota interna (reflect/finalize) deve ser injetada num turno normal"
+    assert graph.final_text == "resposta final ao usuário"
+
+
+def test_graph_topology_has_no_reflect_or_prune_nodes(monkeypatch):
+    """F2 — a topologia final do grafo é START→agent→{END,tools}; tools→{finalize,
+    agent}; finalize→agent_final→END. Sem reflect/reflect_followup/manage_memory."""
+    @tool
+    def noop(x: str = "") -> str:
+        """noop."""
+        return x
+
+    scripted = ScriptedChatModel(responses=[])
+    compiled = ag._build_graph(scripted, [noop], max_steps=8)
+    node_names = set(compiled.get_graph().nodes.keys())
+    assert {"agent", "agent_final", "tools", "finalize"} <= node_names
+    assert not (
+        {"reflect", "reflect_followup", "manage_memory"} & node_names
+    ), f"nós deletados no F2 ainda presentes: {node_names}"
 
 
 def test_graph_caps_tool_result(monkeypatch):

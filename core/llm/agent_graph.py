@@ -1,15 +1,17 @@
 """Runtime ReAct sobre LangGraph (StateGraph) — runtime único em produção.
 
-`run_agent_async` delega inteiramente a este grafo de 3 nós (agent / tools /
-reflect), traduzindo o estado final de volta para o contrato `AgentResult` sem
-tocar em nenhum call site. O loop hand-rolled legado foi removido (migração
-concluída — ver docs/components/agents/langgraph-migration.md).
+`run_agent_async` delega inteiramente a este grafo (agent / tools / finalize),
+traduzindo o estado final de volta para o contrato `AgentResult` sem tocar em
+nenhum call site. O loop hand-rolled legado foi removido (migração concluída —
+ver docs/components/agents/langgraph-migration.md).
 
 Decisões fechadas:
   • Cap de iterações = contador `llm_calls` em state (paridade exata com
     `for ... range(max_steps)`), NÃO `recursion_limit`. Este vira só backstop.
-  • Reflexão = nó dedicado condicional entre `tools` e `agent` (visível no trace),
-    não `pre_model_hook` (que só existe no prebuilt do qual saímos).
+  • Sem poda intra-turno nem nó de reflexão (F2): o contexto por turno é limitado
+    por `max_steps × caps por tool` (TOOL_RESULT_CHAR_CAP), então cabe sem poda.
+    A classe do bug de vazamento da reflexão morre por construção — não há mais
+    HumanMessage interna injetada no meio do turno (só o `finalize` em max_steps).
 
 Em produção: telemetria via `langfuse.langchain.CallbackHandler`, checkpointer
 `AsyncPostgresSaver` durável (interrupt/resume), e tools LangChain nativas.
@@ -30,7 +32,6 @@ from langchain_core.messages import (
     AIMessage,
     AnyMessage,
     HumanMessage,
-    RemoveMessage,
     SystemMessage,
     ToolMessage,
 )
@@ -44,10 +45,6 @@ from typing_extensions import TypedDict
 from core.llm.agent_runtime import (
     _FINALIZE_PROMPT,
     _MAX_RETRIES,
-    _PLAN_TOOL_NAMES,
-    _REFLECT_CHAR_THRESHOLD,
-    _REFLECT_FOLLOWUP_PROMPT,
-    _REFLECT_PROMPT,
     _TIMEOUT,
     TOOL_RESULT_CHAR_CAP,
     AgentResult,
@@ -68,9 +65,6 @@ class AgentState(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
     llm_calls: int
     tool_rounds: int
-    rounds_since_reflect: int
-    chars_since_reflect: int
-    reflect_pending: bool
     documents: dict[str, str]
 
 
@@ -137,7 +131,6 @@ def _build_graph(
     lc_tools: list[BaseTool],
     *,
     max_steps: int,
-    reflect_every: int | None,
     checkpointer=None,
 ):
     bound = model.bind_tools(lc_tools) if lc_tools else model
@@ -164,19 +157,6 @@ def _build_graph(
     def should_continue(state: AgentState) -> str:
         last = state["messages"][-1]
         if not getattr(last, "tool_calls", None):
-            # A reflexão (`reflect` node) é uma nota INTERNA, não uma resposta ao
-            # usuário. Se o modelo respondeu ao _REFLECT_PROMPT sem chamar tool,
-            # essa nota vazaria como se fosse a resposta final — força mais uma
-            # rodada em vez de encerrar aqui (bug real: "Aprendi que X, preciso Y"
-            # aparecendo no chat em vez de uma resposta de verdade).
-            msgs = state["messages"]
-            just_reflected = (
-                len(msgs) >= 2
-                and isinstance(msgs[-2], HumanMessage)
-                and msgs[-2].content == _REFLECT_PROMPT
-            )
-            if just_reflected and state["llm_calls"] < max_steps:
-                return "reflect_followup"
             return END  # fim natural do turno
         return "tools"
 
@@ -185,30 +165,15 @@ def _build_graph(
         tmsgs = out["messages"]
         # Cap central (movido do bridge na Etapa 2): trunca cada tool-result acima
         # do orçamento antes de ir ao histórico. Caps por-tool (writing_tools) já
-        # podem ter agido antes; este é o teto de segurança final.
+        # podem ter agido antes; este é o teto de segurança final. Sem poda
+        # intra-turno (F2): o histórico cresce no máximo max_steps × este cap.
         for m in tmsgs:
             m.content = _cap(
                 str(m.content), TOOL_RESULT_CHAR_CAP, tool_name=getattr(m, "name", None),
             )
-        chars = sum(len(str(m.content)) for m in tmsgs)
-        rsr = state["rounds_since_reflect"] + 1
-        csr = state["chars_since_reflect"] + chars
-        # Sinais leves de reflexão dinâmica (spec 08, espelha o loop legado).
-        had_error = any(
-            str(m.content).startswith(("Erro:", "Erro ao executar")) for m in tmsgs
-        )
-        plan_changed = any(getattr(m, "name", None) in _PLAN_TOOL_NAMES for m in tmsgs)
-        big_output = csr >= _REFLECT_CHAR_THRESHOLD
-        hit_ceiling = bool(reflect_every) and rsr >= reflect_every
-        do_reflect = bool(reflect_every) and (
-            had_error or plan_changed or big_output or hit_ceiling
-        )
         return {
             "messages": tmsgs,
             "tool_rounds": state["tool_rounds"] + 1,
-            "rounds_since_reflect": rsr,
-            "chars_since_reflect": csr,
-            "reflect_pending": do_reflect,
             "documents": state.get("documents", {}),
         }
 
@@ -217,25 +182,10 @@ def _build_graph(
         # executadas — já rodaram no nó `tools` — e só então o teto corta).
         # Vai para `finalize` (não END direto): sem isso o turno termina no
         # ToolMessage da última tool, sem o modelo nunca escrever uma resposta —
-        # texto vazio pro usuário (bug real, achado ao validar o fix de reflect).
+        # texto vazio pro usuário (bug real, achado ao validar a rodada final).
         if state["llm_calls"] >= max_steps:
             return "finalize"
-        return "reflect" if state.get("reflect_pending") else "agent"
-
-    def reflect(state: AgentState) -> dict:
-        return {
-            "messages": [HumanMessage(content=_REFLECT_PROMPT)],
-            "rounds_since_reflect": 0,
-            "chars_since_reflect": 0,
-            "reflect_pending": False,
-            "documents": state.get("documents", {}),
-        }
-
-    def reflect_followup(state: AgentState) -> dict:
-        return {
-            "messages": [HumanMessage(content=_REFLECT_FOLLOWUP_PROMPT)],
-            "documents": state.get("documents", {}),
-        }
+        return "agent"
 
     def finalize(state: AgentState) -> dict:
         return {
@@ -243,62 +193,20 @@ def _build_graph(
             "documents": state.get("documents", {}),
         }
 
-    def manage_memory(state: AgentState) -> dict:
-        msgs = state["messages"]
-        if not msgs:
-            return {"messages": []}
-
-        last_ai_idx = -1
-        for i in range(len(msgs) - 1, -1, -1):
-            if isinstance(msgs[i], AIMessage):
-                last_ai_idx = i
-                break
-
-        if last_ai_idx < 0:
-            return {"messages": []}
-
-        keep: set[int] = set()
-        for i, m in enumerate(msgs):
-            if isinstance(m, (SystemMessage, HumanMessage)):
-                keep.add(i)
-        for i in range(last_ai_idx, len(msgs)):
-            keep.add(i)
-
-        removes = [
-            RemoveMessage(id=m.id)
-            for i, m in enumerate(msgs)
-            if i not in keep and getattr(m, "id", None)
-        ]
-
-        if not removes:
-            return {"messages": []}
-
-        logger.debug(
-            "manage_memory: pruning %d message(s), keeping %d of %d",
-            len(removes), len(keep), len(msgs),
-        )
-        return {"messages": removes}
-
     g = StateGraph(AgentState)
     g.add_node("agent", agent)
     g.add_node("agent_final", agent_final)
     g.add_node("tools", tools)
-    g.add_node("reflect", reflect)
-    g.add_node("reflect_followup", reflect_followup)
     g.add_node("finalize", finalize)
-    g.add_node("manage_memory", manage_memory)
     g.add_edge(START, "agent")
     g.add_conditional_edges(
         "agent", should_continue,
-        {END: END, "tools": "tools", "reflect_followup": "reflect_followup"},
+        {END: END, "tools": "tools"},
     )
     g.add_conditional_edges(
         "tools", after_tools,
-        {"finalize": "finalize", "reflect": "reflect", "agent": "manage_memory"},
+        {"finalize": "finalize", "agent": "agent"},
     )
-    g.add_edge("manage_memory", "agent")
-    g.add_edge("reflect", "manage_memory")
-    g.add_edge("reflect_followup", "agent")
     g.add_edge("finalize", "agent_final")
     g.add_edge("agent_final", END)
     return g.compile(checkpointer=checkpointer)
@@ -431,7 +339,6 @@ async def run_agent_graph_async(
     provider: Provider = "anthropic",
     max_steps: int = 8,
     on_step: Callable[[TraceStep], None] | None = None,
-    reflect_every: int | None = None,
     span_name: str | None = None,
     temperature: float | None = None,
     openai_base_url: str | None = None,
@@ -459,7 +366,7 @@ async def run_agent_graph_async(
     # bound to a different event loop". `False` corta a herança: subagente nunca
     # persiste nem toca o checkpointer do pai.
     graph = _build_graph(
-        chat, tools, max_steps=max_steps, reflect_every=reflect_every, checkpointer=False,
+        chat, tools, max_steps=max_steps, checkpointer=False,
     )
 
     init: AgentState = {
@@ -469,9 +376,6 @@ async def run_agent_graph_async(
         ],
         "llm_calls": 0,
         "tool_rounds": 0,
-        "rounds_since_reflect": 0,
-        "chars_since_reflect": 0,
-        "reflect_pending": False,
         "documents": {},
     }
 
@@ -890,7 +794,6 @@ async def _writing_turn_async(
     model: str,
     provider: Provider,
     max_steps: int,
-    reflect_every: int | None,
     thread_id: str,
     checkpointer,
     resume: Any | None,
@@ -907,7 +810,7 @@ async def _writing_turn_async(
         openai_base_url=openai_base_url, openai_api_key=openai_api_key,
     )
     graph = _build_graph(
-        chat, tools, max_steps=max_steps, reflect_every=reflect_every,
+        chat, tools, max_steps=max_steps,
         checkpointer=checkpointer,
     )
     config: dict[str, Any] = {
@@ -925,9 +828,6 @@ async def _writing_turn_async(
             ],
             "llm_calls": 0,
             "tool_rounds": 0,
-            "rounds_since_reflect": 0,
-            "chars_since_reflect": 0,
-            "reflect_pending": False,
             "documents": {},
         }
 
@@ -999,7 +899,6 @@ def run_writing_turn(
     model: str,
     provider: Provider = "anthropic",
     max_steps: int = 8,
-    reflect_every: int | None = None,
     thread_id: str,
     resume: Any | None = None,
     prior_n_msgs: int = 0,
@@ -1025,7 +924,6 @@ def run_writing_turn(
         model=model,
         provider=provider,
         max_steps=max_steps,
-        reflect_every=reflect_every,
         thread_id=thread_id,
         checkpointer=checkpointer,
         resume=resume,
@@ -1126,9 +1024,6 @@ async def _generate_section(
             ],
             "llm_calls": 0,
             "tool_rounds": 0,
-            "rounds_since_reflect": 0,
-            "chars_since_reflect": 0,
-            "reflect_pending": False,
             "documents": {},
         }
         config: dict[str, Any] = {"recursion_limit": 3 * max_steps + 5}
@@ -1179,7 +1074,6 @@ async def _generation_turn_async(
     model: str,
     provider: Provider,
     max_steps: int,
-    reflect_every: int | None,
     thread_id: str,
     verify_saved: Callable[[str], bool] | None,
     auto_save: Callable[[str, str], None] | None = None,
@@ -1197,7 +1091,7 @@ async def _generation_turn_async(
     # O mesmo grafo compilado é compartilhado pelos runs concorrentes (o estado
     # vive no invoke, não no grafo).
     inner = _build_graph(
-        chat, tools, max_steps=max_steps, reflect_every=reflect_every, checkpointer=False,
+        chat, tools, max_steps=max_steps, checkpointer=False,
     )
 
     concurrency = _generation_concurrency()
@@ -1279,7 +1173,6 @@ def run_generation_turn(
     model: str,
     provider: Provider = "anthropic",
     max_steps: int = 8,
-    reflect_every: int | None = None,
     thread_id: str,
     verify_saved: Callable[[str], bool] | None = None,
     auto_save: Callable[[str, str], None] | None = None,
@@ -1304,7 +1197,6 @@ def run_generation_turn(
         model=model,
         provider=provider,
         max_steps=max_steps,
-        reflect_every=reflect_every,
         thread_id=thread_id,
         verify_saved=verify_saved,
         auto_save=auto_save,
