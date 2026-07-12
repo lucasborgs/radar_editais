@@ -57,6 +57,8 @@ def _make_session() -> WritingSession:
     s._programa_context = ""
     s._project_description = None
     s._pending_user_input = None
+    s._plan = None
+    s._plan_pending_confirmation = False
     s._tool_results = []
     s._critic_block_count = 0
     s._critic_pass_count = 0

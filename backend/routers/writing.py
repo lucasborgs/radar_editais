@@ -105,6 +105,10 @@ class WritingTurnResponse(BaseModel):
     failed_sections: list[str] = []
     # Sinaliza que um draft completo foi gerado neste turno
     draft_ready: bool = False
+    # F4: plano gerado no 1º turno (plan-first). Presente quando o primeiro
+    # turno propõe um plano em vez de gerar diretamente.
+    plan: dict | None = None
+    plan_pending: bool = False
     # PR6.2 (F10): turno cortado no teto de passos do agente (stop_reason ==
     # "max_steps") — o front mostra aviso discreto ("continue a conversa").
     truncated: bool = False

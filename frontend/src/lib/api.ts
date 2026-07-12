@@ -358,6 +358,20 @@ export const sendWritingTurn = (
     }),
   });
 
+export interface WritingGenerateResponse {
+  session_id: string;
+  sections_done: string[];
+  failed_sections: string[];
+  success: boolean;
+  generation_critic_annotations?: Record<string, Record<string, unknown>>;
+}
+
+export const generateWritingProposal = (sessionId: string) =>
+  apiFetch<WritingGenerateResponse>(`/writing/${sessionId}/generate`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+
 export const startSectionChat = (sessionId: string, sectionTitle: string) =>
   apiFetch<SectionStartResponse>("/writing/section-start", {
     method: "POST",
@@ -473,6 +487,8 @@ export interface WritingDocument {
   session_id: string;
   edital_id: string;
   sections: DocumentSection[];
+  plan?: Record<string, unknown> | null;
+  plan_pending?: boolean;
 }
 
 export const getWritingDocument = (sessionId: string) =>

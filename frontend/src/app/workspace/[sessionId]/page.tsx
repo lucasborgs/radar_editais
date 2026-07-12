@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import {
   getWritingDocument,
   sendWritingTurn,
+  generateWritingProposal,
   saveDocumentSection,
   getLibraryItems,
   getEditalById,
@@ -97,6 +98,10 @@ export default function WorkspacePage() {
   const [highlighted, setHighlighted] = useState<Set<string>>(new Set());
   const undoSnapshots = useRef<Record<string, string>>({});
 
+  // F4: plan-first — plano pendente de confirmação
+  const [planPending, setPlanPending] = useState<Record<string, unknown> | null>(null);
+  const [generating, setGenerating] = useState(false);
+
   const chatRef = useRef<WorkspaceChatHandle>(null);
   const scrollToSectionRef = useRef<(title: string) => void>(() => {});
 
@@ -120,6 +125,12 @@ export default function WorkspacePage() {
     setSections(next);
     setEditalId(doc.edital_id);
     setMode(modeFromEditalId(doc.edital_id));
+    // F4: restaura estado do plano pendente
+    if (doc.plan_pending && doc.plan) {
+      setPlanPending(doc.plan);
+    } else if (!doc.plan_pending) {
+      setPlanPending(null);
+    }
     return { sections: next, editalId: doc.edital_id };
   }, [sessionId]);
 
@@ -319,6 +330,11 @@ export default function WorkspacePage() {
       try {
         const res = await sendWritingTurn(sessionId, message || content, sectionHint);
 
+        // F4: detecta plano pendente de confirmação
+        if (res.plan_pending && res.plan) {
+          setPlanPending(res.plan);
+        }
+
         const editedSections = Array.from(
           new Set(
             (res.tool_trace ?? [])
@@ -348,7 +364,7 @@ export default function WorkspacePage() {
           },
         ]);
 
-        if (res.draft_ready || (res.sections_done?.length ?? 0) > 0) {
+        if (res.draft_ready || (res.sections_done?.length ?? 0) > 0 || res.plan_pending) {
           setMobileTab("doc");
           try {
             await reloadDocument();
@@ -381,6 +397,31 @@ export default function WorkspacePage() {
     },
     [sessionId, working, reloadDocument, wsMode],
   );
+
+  // F4: gera a proposta completa após confirmação do plano
+  const handleGenerateFromPlan = useCallback(async () => {
+    if (!sessionId || generating) return;
+    setGenerating(true);
+    try {
+      const res = await generateWritingProposal(sessionId);
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: res.sections_done.length > 0
+          ? `Proposta gerada com ${res.sections_done.length} seção(ões): ${res.sections_done.join(", ")}.${res.failed_sections.length ? `\nNão consegui: ${res.failed_sections.join(", ")}.` : ""}`
+          : "Não consegui gerar nenhuma seção.",
+        timestamp: nowTime(),
+      }]);
+      setPlanPending(null);
+      setMobileTab("doc");
+      try {
+        await reloadDocument();
+      } catch { /* ignore */ }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao gerar proposta.");
+    } finally {
+      setGenerating(false);
+    }
+  }, [sessionId, generating, reloadDocument]);
 
   const registerScrollTo = useCallback((fn: (title: string) => void) => {
     scrollToSectionRef.current = fn;
@@ -626,6 +667,102 @@ export default function WorkspacePage() {
           />
         </div>
       </div>
+
+      {/* F4: plano pendente de confirmação */}
+      {planPending && !generating && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="max-w-2xl w-full mx-4 bg-white rounded-lg shadow-xl border border-border max-h-[80vh] flex flex-col">
+            <div className="p-5 border-b border-border">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-semibold text-content-primary font-sans">
+                  {String((planPending as Record<string, unknown>).title ?? "Plano da Proposta")}
+                </h2>
+              </div>
+              <p className="text-xs text-content-secondary font-sans mt-1">
+                Revise o plano antes de gerar a proposta completa.
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* Mismatch warnings */}
+              {Array.isArray((planPending as Record<string, unknown>).mismatch_warnings) &&
+               ((planPending as Record<string, unknown>).mismatch_warnings as string[]).length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-amber-800 font-sans mb-1">{String.fromCodePoint(9888)} Alertas de Misfit</p>
+                  <ul className="space-y-1">
+                    {((planPending as Record<string, unknown>).mismatch_warnings as string[]).map((w, i) => (
+                      <li key={i} className="text-xs text-amber-700 font-sans flex gap-1">
+                        <span className="shrink-0">{String.fromCodePoint(8226)}</span>
+                        {w}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {/* Seções do plano */}
+              {Array.isArray((planPending as Record<string, unknown>).sections) &&
+               ((planPending as Record<string, unknown>).sections as Record<string, unknown>[]).map((sec, i) => (
+                <div key={i} className="border border-border rounded-lg p-3">
+                  <h3 className="text-sm font-semibold text-content-primary font-sans mb-1">
+                    {String(sec.title ?? "")}
+                  </h3>
+                  {Array.isArray(sec.coverage) && (sec.coverage as string[]).length > 0 && (
+                    <ul className="space-y-0.5 mb-1">
+                      {(sec.coverage as string[]).map((c, j) => (
+                        <li key={j} className="text-xs text-content-secondary font-sans flex gap-1">
+                          <span className="text-primary shrink-0">{String.fromCodePoint(8594)}</span>
+                          {c}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {Array.isArray(sec.missing_info) && (sec.missing_info as string[]).length > 0 && (
+                    <div className="mt-1">
+                      <p className="text-xs text-amber-600 font-sans">Info faltante:</p>
+                      <ul className="space-y-0.5">
+                        {(sec.missing_info as string[]).map((m, j) => (
+                          <li key={j} className="text-xs text-amber-600 font-sans flex gap-1">
+                            <span className="shrink-0">{String.fromCodePoint(9888)}</span>
+                            {m}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {/* Perguntas críticas */}
+              {Array.isArray((planPending as Record<string, unknown>).critical_questions) &&
+               ((planPending as Record<string, unknown>).critical_questions as string[]).length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-blue-800 font-sans mb-1">Perguntas Críticas</p>
+                  <ul className="space-y-1">
+                    {((planPending as Record<string, unknown>).critical_questions as string[]).map((q, i) => (
+                      <li key={i} className="text-xs text-blue-700 font-sans flex gap-1">
+                        <span className="shrink-0">?</span>
+                        {q}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-border flex gap-3 justify-end">
+              <button
+                onClick={() => setPlanPending(null)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-content-secondary font-sans hover:bg-white/60 transition-colors"
+              >
+                Dispensar
+              </button>
+              <button
+                onClick={() => void handleGenerateFromPlan()}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white font-sans hover:bg-primary-dark transition-colors"
+              >
+                Gerar Proposta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {exportOpen && (
         <ExportModal

@@ -46,6 +46,9 @@ export interface WritingStartResponse {
   // get_info também devolve isto ao retomar uma sessão.
   pending_user_input?: PendingUserInput | null;
   turn_count?: number;
+  // F4: plano gerado no 1º turno (plan-first), exposto também em get_info.
+  plan?: Record<string, unknown> | null;
+  plan_pending?: boolean;
 }
 
 // Sprint 2 do Cenário B: agente pode pedir info ao usuário via tool dedicada.
@@ -90,6 +93,10 @@ export interface WritingTurnResponse {
   generation_critic_annotations?: Record<string, Record<string, unknown>>;
   // True quando um draft completo foi gerado neste turno
   draft_ready?: boolean;
+  // F4: plano proposto no 1º turno (plan-first). Presente quando o backend
+  // gerou um plano e aguarda confirmação do usuário.
+  plan?: Record<string, unknown> | null;
+  plan_pending?: boolean;
   // PR6.2: turno cortado no teto de passos do agente — mostrar aviso discreto.
   truncated?: boolean;
 }

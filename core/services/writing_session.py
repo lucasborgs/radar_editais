@@ -326,6 +326,54 @@ Lista vazia [] se não houver sinal relevante."""
 
 
 # =============================================================================
+# PROMPT — PLAN-FIRST (F4)
+# =============================================================================
+# Gera um plano estruturado para o 1º turno: outline + por-seção (cobertura,
+# ancora no edital, info faltante) + perguntas críticas. Substitui o roteamento
+# por keyword do F0. Usa as matrizes de dependência como dado estático.
+# 1-shot LLM direto (sem grafo), reusa _save_plan/_plan do four-phase-workflow.
+
+PLAN_SYSTEM = """Você é um estrategista de propostas de fomento à inovação.
+Dado o PERFIL DA EMPRESA, o CARD DO EDITAL e o OUTLINE da proposta, produza
+um plano detalhado de proposta.
+
+Para cada seção do outline, especifique:
+1. O que cobrir (1-2 bullets do escopo)
+2. Que dado do edital ancora cada afirmação (trecho ou requisito do card)
+3. Que informação da empresa ainda falta e precisará ser preenchida
+
+Além disso, liste PERGUNTAS CRÍTICAS — informações que o usuário precisa
+fornecer ou esclarecer antes da redação final.
+
+Analise também se há MISFIT entre a empresa e o edital: pontos em que a
+empresa claramente não atende requisitos do edital, ou em que o escopo do
+projeto não se alinha ao objetivo do edital. Se houver, sinalize no campo
+`mismatch_warnings` — mesmo que o usuário não tenha pedido.
+
+Responda APENAS JSON válido com esta estrutura exata:
+{
+  "title": "str — título completo da proposta",
+  "sections": [
+    {
+      "id": "str — slug (ex: identificacao)",
+      "title": "str — título exato da seção",
+      "coverage": ["str — o que cobrir nesta seção"],
+      "edital_anchor": "str — que dado do edital ancora (trecho do card)",
+      "missing_info": ["str — info da empresa que falta"]
+    }
+  ],
+  "critical_questions": ["str — perguntas ao usuário"],
+  "mismatch_warnings": ["str — alertas de misfit, se houver"]
+}
+
+Regras:
+- Seções: use EXATAMENTE os títulos do outline fornecido — não invente nem renomeie.
+- Mismatch: seja honesto. Se a empresa não se encaixa, DIGA no plano.
+- Se não houver misfit, deixe mismatch_warnings vazio [].
+- critical_questions: máximo 5 perguntas. Foque no que realmente falta."""
+
+
+# =============================================================================
 # MATRIZES DE DEPENDÊNCIA ENTRE SEÇÕES (static, zero LLM)
 # =============================================================================
 # Dado estático: quais seções são impactadas quando uma seção é alterada. A
@@ -502,6 +550,9 @@ class WritingSession:
             self._plan = self._merge_adjustments(plan, user_adjustments)
         else:
             self._plan = None
+        # F4: flag que indica plano pendente de confirmação (1º turno gerou
+        # plano, aguardando usuário confirmar para disparar geração).
+        self._plan_pending_confirmation = False
 
         # Ids dos items anexados explicitamente — guardados pra dedup contra
         # o retrieval automático da biblioteca em turn() (normalizados lower).
@@ -709,6 +760,10 @@ class WritingSession:
         self._doc_sections = dict(drafts) if isinstance(drafts, dict) else {}
         plan_data = self._doc_sections.pop("__plan__", None)
         self._plan = plan_data if isinstance(plan_data, dict) else None
+        pending = row.get("pending_user_input")
+        self._plan_pending_confirmation = (
+            isinstance(pending, dict) and pending.get("type") == "plan_confirmation"
+        )
         critic_data = self._doc_sections.pop("_critic_annotations", None)
         self._generation_critic_annotations = (
             critic_data if isinstance(critic_data, dict) else {}
@@ -1063,6 +1118,9 @@ class WritingSession:
             "created_at":         self.created_at,
             # PR1: plano de proposta gerado pelo Planning node.
             "plan": self._plan,
+            # F4: plano pendente de confirmação (1º turno gerou plano,
+            # aguardando usuário confirmar para disparar geração).
+            "plan_pending": self._plan_pending_confirmation,
             # Sprint 2 do Cenário B: se há pergunta pendente do agente, frontend
             # renderiza prompt destacado ao retomar a sessão (não só após turn).
             # Só expõe {field, prompt} — thread_id/n_msgs são internos do resume.
@@ -1084,8 +1142,10 @@ class WritingSession:
         agente falhar (stop_reason=error), retorna erro amigável — sem cair
         em legacy.
 
-        First-turn especial (D1): se turn_count==0 e seções vazias, desvia
-        para geração em lote com a descrição do usuário como contexto extra.
+        F4 (plan-first): se turn_count==0 e seções vazias, gera um plano
+        estruturado (outline + cobertura por seção + perguntas críticas).
+        Geração completa só após confirmação explícita (via botão ou
+        /writing/{id}/generate). Roteamento por keyword eliminado.
         """
         # First-turn detection: nenhum turno anterior, seções vazias, e
         # NÃO há pending_user_input (que indicaria um interrupt aguardando
@@ -1094,51 +1154,6 @@ class WritingSession:
         if self._turn_count == 0 and not isinstance(pending, dict) \
                and self._all_sections_empty():
             return self._first_turn_with_generation(user_message)
-
-        # Se o usuário pede "escreva a proposta" em turno posterior e ainda
-        # há seções vazias, roteia para geração em lote (mesmo mecanismo do
-        # first-turn, sem descrição extra do usuário — o perfil + edital bastam).
-        if not isinstance(pending, dict):
-            has_empty = any(
-                not self._doc_sections.get(t, "").strip()
-                for t in self._proposal_outline
-            )
-            if has_empty:
-                write_intent = [
-                    "escreva a proposta", "escreva uma proposta",
-                    "gere a proposta", "faça um rascunho",
-                    "complete o draft", "preencha o draft",
-                    "complete a proposta", "gerar proposta",
-                ]
-                text = user_message.strip().lower()
-                if any(kw in text for kw in write_intent):
-                    logger.info(
-                        "[%s] Turno %d: comando de escrita — gerando seções restantes",
-                        self.session_id, self._turn_count,
-                    )
-                    outcome = self.generate_full_proposal(record_turn=True)
-                    self._schedule_checklist_async()
-                    done = outcome.get("sections_done", [])
-                    failed = outcome.get("failed_sections", [])
-                    parts = []
-                    if done:
-                        parts.append(f"Gerei {len(done)} seção(ões): {', '.join(done)}.")
-                    if failed:
-                        parts.append(
-                            f"Não consegui fechar: {', '.join(failed)} — "
-                            "tente novamente ou trabalhe-as no chat."
-                        )
-                    if not parts:
-                        parts.append("Todas as seções já foram preenchidas.")
-                    return {
-                        "session_id": self.session_id,
-                        "assistant_message": " ".join(parts),
-                        "draft_content": None,
-                        "sections_done": done,
-                        "failed_sections": failed,
-                        "turn_number": self._turn_count,
-                        "success": True,
-                    }
 
         self._turn_count += 1
         user_turn_index = self._turn_count
@@ -1683,11 +1698,37 @@ class WritingSession:
             logger.warning("[%s] _build_generation_section_messages: retrieve_chunks falhou para '%s': %s",
                            self.session_id, section, e)
 
+        # F4: injeta contexto do plano por seção (coverage, missing_info, edital_anchor)
+        if self._plan:
+            plan_sections = self._plan.get("sections", [])
+            for ps in plan_sections:
+                if ps.get("title") == section or ps.get("id", "").lower() in section.lower():
+                    plan_lines = ["PLANO PARA ESTA SEÇÃO (gerado na etapa anterior):"]
+                    cov = ps.get("coverage", [])
+                    if cov:
+                        plan_lines.append("O que cobrir:")
+                        for c in cov:
+                            plan_lines.append(f"  - {c}")
+                    anchor = ps.get("edital_anchor", "")
+                    if anchor:
+                        plan_lines.append(f"Âncora no edital: {anchor}")
+                    missing = ps.get("missing_info", [])
+                    if missing:
+                        plan_lines.append("Info faltante (preencha com o perfil ou ignore):")
+                        for m in missing:
+                            plan_lines.append(f"  - {m}")
+                    messages.append({
+                        "role": "user",
+                        "content": "\n".join(plan_lines),
+                    })
+                    break
+
         messages.append({
             "role": "user",
             "content": (
                 f"Escreva agora a seção \"{section}\" COMPLETA, pronta para revisão. "
                 f"Fundamente afirmações nos chunks fornecidos (use o chunk_id para citar). "
+                f"Siga o plano proposto para esta seção. "
                 f"Responda em formato JSON: {{\"content\": \"seção em markdown\", "
                 f"\"citations\": [{{\"chunk_id\": \"...\", \"claim\": \"o que sustenta\"}}]}}. "
                 f"APENAS o JSON, sem markdown envolvente."
@@ -1745,97 +1786,141 @@ class WritingSession:
             for t in self._proposal_outline
         )
 
-    def _is_vague_description(self, message: str) -> bool:
-        """Gate de densidade: descrição muito vaga aborta first-turn generation
-        e cai no modo conversacional normal.
+    def _generate_plan_first_turn(self) -> dict:
+        """Gera um plano estruturado via LLM 1-shot (F4).
 
-        Reconhece três tipos de entrada:
-        1. Descrição do projeto (ex.: "minha empresa faz soluções de IA...")
-           → batch generation
-        2. Comando de escrita (ex.: "faça um rascunho completo da proposta")
-           → batch generation
-        3. Pergunta/discussão (ex.: "quero discutir a melhor configuração...")
-           → modo conversacional (tratado como vague)
+        Compõe contexto com perfil + card + outline + matrizes de dependência,
+        chama LLM com PLAN_SYSTEM, persiste via _save_plan e retorna o plano
+        como pending de confirmação. Sem keyword routing — plano é sempre
+        proposto no 1º turno; geração só após confirmação explícita.
         """
-        text = message.strip().lower()
-        # Comandos explícitos de escrita disparam batch generation mesmo com
-        # poucos caracteres — o agente tem contexto do edital + perfil para
-        # escrever sem descrição inline.
-        write_intent = [
-            "rascunho", "proposta completa", "escreva a proposta",
-            "gere a proposta", "draft completo", "primeira versão",
+        dep_matrix = (
+            json.dumps(PITCH_DEPENDENCY_MATRIX, ensure_ascii=False, indent=2)
+            if self.mode == "pitch"
+            else json.dumps(PROPOSAL_DEPENDENCY_MATRIX, ensure_ascii=False, indent=2)
+        )
+        outline_str = "\n".join(f"- {t}" for t in self._proposal_outline)
+        user_text = (
+            f"PERFIL DA EMPRESA:\n{self._profile_context}\n\n"
+            f"CARD DO EDITAL:\n{self._source_card_context or '(indisponível)'}\n\n"
+            f"OUTLINE DA PROPOSTA:\n{outline_str}\n\n"
+            f"MATRIZ DE DEPENDÊNCIA ENTRE SEÇÕES:\n{dep_matrix}\n\n"
+            f"Gere o plano desta proposta."
+        )
+        messages = [
+            {"role": "system", "content": PLAN_SYSTEM},
+            {"role": "user", "content": user_text},
         ]
-        if any(kw in text.lower() for kw in write_intent):
-            return False
-        # Perguntas e intenção de discussão → modo conversacional
-        discuss_intent = [
-            "quero discutir", "gostaria de discutir", "quero conversar",
-            "o que você acha", "qual a melhor", "como funciona",
-            "me explique", "me ajuda", "pode me ajudar",
-            "quero entender", "estou em dúvida",
-        ]
-        if any(kw in text for kw in discuss_intent):
-            return True
-        # Pergunta curta → modo conversacional
-        if text.startswith(("o que", "como", "qual", "quais", "quem",
-                            "quando", "onde", "por que", "porque")):
-            return True
-        if len(text) < 50:
-            return True
-        keywords = [
-            "projeto", "sistema", "tecnologia", "solução", "plataforma",
-            "aplicativo", "software", "ferramenta", "produto", "processo",
-            "desenvolvimento", "implementação", "pesquisa", "inovação",
-            "criar", "construir", "desenvolver", "implementar",
-        ]
-        return not any(kw in text.lower() for kw in keywords)
-
-    def _first_turn_with_generation(self, user_message: str) -> dict:
-        """Processa o primeiro turno com geração em lote.
-
-        Se a descrição do usuário for muito vaga, cai no modo conversacional
-        normal (o agente fará perguntas para extrair escopo).
-        """
-        if self._is_vague_description(user_message):
-            logger.info(
-                "[%s] First-turn: descrição vaga (%d chars) → modo conversacional",
-                self.session_id, len(user_message),
+        success, raw, _ = self._call_llm(messages, temperature=0.3, max_tokens=2000)
+        if not success or not raw:
+            logger.warning(
+                "[%s] plan-first: LLM falhou ao gerar plano — fallback para conversacional",
+                self.session_id,
             )
-            logger.info("tripwire: first_turn_routing decision=conversational session=%s chars=%d",
-                        self.session_id, len(user_message))
-            return self._turn_agent(user_message, None, 1)
+            return {}
+
+        plan = {}
+        text = raw.strip()
+        if "```" in text:
+            text = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
+        try:
+            plan = json.loads(text)
+        except json.JSONDecodeError as e:
+            logger.warning("[%s] plan-first: parse JSON falhou: %s — raw=%s",
+                           self.session_id, e, raw[:200])
+            return {}
+
+        plan.setdefault("sections", [])
+        plan.setdefault("critical_questions", [])
+        plan.setdefault("mismatch_warnings", [])
+        plan.setdefault("title", "Proposta")
+
+        self._plan = plan
+        self._save_plan()
+        self._plan_pending_confirmation = True
 
         logger.info(
-            "[%s] First-turn: gerando proposta completa a partir da descrição (%d chars)",
+            "[%s] plan-first: plano gerado — %d seções, %d perguntas críticas",
+            self.session_id, len(plan.get("sections", [])),
+            len(plan.get("critical_questions", [])),
+        )
+        logger.info("tripwire: first_turn_routing decision=plan_proposed session=%s",
+                    self.session_id)
+        return plan
+
+    def _first_turn_with_generation(self, user_message: str) -> dict:
+        """Processa o primeiro turno: gera plano estruturado (F4).
+
+        Sempre gera um plano (não há mais roteamento por keyword).
+        O plano é persistido e retornado como pending de confirmação.
+        A geração completa só acontece após o usuário confirmar o plano.
+        """
+        logger.info(
+            "[%s] First-turn (F4): gerando plano a partir da descrição (%d chars)",
             self.session_id, len(user_message),
         )
-        logger.info("tripwire: first_turn_routing decision=batch_generation session=%s chars=%d",
-                    self.session_id, len(user_message))
-
         self._project_description = user_message
 
-        logger.info("[%s] First-turn: chamando generate_full_proposal com %d seções",
-                     self.session_id, len(self._proposal_outline))
-        # Batch generation (sync, sem registrar turno genérico)
-        outcome = self.generate_full_proposal(record_turn=False)
-        logger.info("[%s] First-turn: geração concluída — done=%d failed=%d",
-                     self.session_id,
-                     len(outcome.get("sections_done", [])),
-                     len(outcome.get("failed_sections", [])))
+        plan = self._generate_plan_first_turn()
 
-        # Agenda checklist em background (não bloqueia a resposta)
-        self._schedule_checklist_async()
+        if not plan:
+            logger.info(
+                "[%s] First-turn: plano vazio — fallback conversacional",
+                self.session_id,
+            )
+            logger.info("tripwire: first_turn_routing decision=plan_fallback_conversational "
+                        "session=%s", self.session_id)
+            return self._turn_agent(user_message, None, 1)
 
-        # Registra turno com a mensagem real do usuário
-        self._record_first_turn(user_message, outcome)
+        # Persiste o turno com a mensagem do usuário e o plano como resposta
+        self._turn_count += 1
+        idx = self._turn_count
+        questions = plan.get("critical_questions", [])
+        mismatches = plan.get("mismatch_warnings", [])
+        parts = []
+        n_sec = len(plan.get("sections", []))
+        parts.append(
+            f"## Plano da Proposta\n\n"
+            f"Estruturei um plano com **{n_sec} seções** para a sua proposta."
+        )
+        if mismatches:
+            parts.append("\n\n### ⚠ Alertas de Misfit\n" + "\n".join(f"- {m}" for m in mismatches))
+        parts.append("\n\n### Seções")
+        for sec in plan.get("sections", []):
+            title = sec.get("title", "(sem título)")
+            cov = sec.get("coverage", [])
+            missing = sec.get("missing_info", [])
+            lines = [f"\n**{title}**"]
+            if cov:
+                for c in cov:
+                    lines.append(f"- {c}")
+            if missing:
+                for m in missing:
+                    lines.append(f"  ⚠ Info faltante: {m}")
+            parts.append("\n".join(lines))
+        if questions:
+            parts.append("\n\n### Perguntas Críticas\n" + "\n".join(f"- {q}" for q in questions))
+        parts.append(
+            "\n\n---\n"
+            "Revise o plano acima. Quando estiver pronto, clique em **Gerar Proposta** "
+            "para que eu escreva o rascunho completo."
+        )
+        assistant_msg = "".join(parts)
+
+        self._history.append({"role": "user", "content": user_message})
+        self._history.append({"role": "assistant", "content": assistant_msg})
+        self._persist_turn(idx, "user", user_message, None)
+        self._persist_turn(idx, "assistant", assistant_msg, None)
 
         return {
             "session_id": self.session_id,
-            "assistant_message": self._first_turn_summary(outcome),
+            "assistant_message": assistant_msg,
             "draft_content": None,
-            "sections_done": outcome.get("sections_done", []),
-            "failed_sections": outcome.get("failed_sections", []),
-            "turn_number": 1,
+            "sections_done": [],
+            "failed_sections": [],
+            "plan": plan,
+            "plan_pending": True,
+            "turn_number": self._turn_count,
             "success": True,
         }
 
@@ -2193,6 +2278,8 @@ class WritingSession:
                 for t in self._proposal_outline
             ],
             "generation_critic_annotations": self._generation_critic_annotations,
+            "plan": self._plan,
+            "plan_pending": self._plan_pending_confirmation,
         }
 
     def set_section_content(self, section_title: str, content: str) -> None:
@@ -2733,6 +2820,7 @@ def get_session_document(
     outline = row.get("proposal_outline") or []
     drafts = row.get("section_drafts") or {}
     critic_annotations = drafts.pop("_critic_annotations", {})
+    plan_data = drafts.pop("__plan__", None)
     return {
         "session_id": row["id"],
         "edital_id": row["edital_id"],
@@ -2741,6 +2829,11 @@ def get_session_document(
             for t in outline
         ],
         "generation_critic_annotations": critic_annotations,
+        "plan": plan_data if isinstance(plan_data, dict) else None,
+        "plan_pending": (
+            plan_data is not None
+            and not any(drafts.get(t, "").strip() for t in outline)
+        ),
     }
 
 
