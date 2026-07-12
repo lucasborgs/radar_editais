@@ -137,12 +137,18 @@ def test_compliance_skipped_when_no_requirements(llm_calls):
 
     assert "compliance" not in llm_calls          # passe LLM não disparou
     assert "quality" in llm_calls
-    assert "completeness" in llm_calls
+    # F5: completude é determinística (zero-LLM) — não chama _call_llm
+    assert "completeness" not in llm_calls
     # resultado sintético, shape preservado
     assert review["compliance"]["score"] == 100
     assert review["compliance"]["issues"] == []
     assert review["compliance"]["skipped"] == "no_requirements"
     assert review["error"] is None
+    # completude determinística: Metodologia vazia → empty
+    meta_section = next(
+        s for s in review["completeness"]["sections"] if s["title"] == "Metodologia"
+    )
+    assert meta_section["status"] == "empty"
 
 
 # ---------------------------------------------------------------------------
@@ -183,11 +189,13 @@ def test_all_three_passes_run_for_partial_proposal(llm_calls):
         proposal=proposal, edital_requirements=requirements, outline=outline,
     ))
 
-    assert set(llm_calls) == {"compliance", "quality", "completeness"}
+    # F5: completude é determinística (zero-LLM) — não chama _call_llm
+    assert set(llm_calls) == {"compliance", "quality"}
     # achados reais dos passes propagam
     assert review["compliance"]["score"] == 40
     assert review["quality"]["overall_score"] == 70
-    assert review["completeness"]["missing_sections"] == ["Objetivos"]
+    # completude determinística: Metodologia vazia → empty
+    assert "Metodologia" in review["completeness"]["missing_sections"]
     assert review["error"] is None
 
 
@@ -227,9 +235,12 @@ def test_force_all_passes_flag_disables_triage(llm_calls):
         force_all_passes=True,
     ))
 
-    # force_all reativa a completude que o gate teria pulado → os 3 rodam
-    assert set(llm_calls) == {"compliance", "quality", "completeness"}
+    # force_all reativa a completude que o gate teria pulado → o passe roda,
+    # mas é determinístico (zero-LLM, F5) — não aparece em llm_calls.
+    assert set(llm_calls) == {"compliance", "quality"}
     assert "skipped" not in review["compliance"]
+    # completude determinística: seção com "Completo." (curta) → shallow
+    assert review["completeness"]["sections"][0]["status"] == "shallow"
     assert "skipped" not in review["completeness"]
 
 
@@ -244,7 +255,8 @@ def test_force_all_passes_env_disables_triage(llm_calls, monkeypatch):
         outline=outline,
     ))
 
-    assert set(llm_calls) == {"compliance", "quality", "completeness"}
+    # F5: completude determinística — não chama LLM
+    assert set(llm_calls) == {"compliance", "quality"}
 
 
 # ---------------------------------------------------------------------------
@@ -255,12 +267,14 @@ def test_completeness_runs_when_a_section_is_placeholder(llm_calls):
     outline = ["Objetivos", "Metodologia"]
     proposal = _doc({"Objetivos": "Completo.", "Metodologia": ""})  # placeholder
 
-    _run(cs.auto_review_checklist(
+    review = _run(cs.auto_review_checklist(
         proposal=proposal,
         edital_requirements=[{"id": "r", "requirement": "x"}],
         outline=outline,
     ))
-    assert "completeness" in llm_calls
+    # F5: completude determinística — não chama LLM, mas roda e detecta empty
+    assert "completeness" not in llm_calls
+    assert review["completeness"]["sections"][1]["status"] == "empty"
 
 
 def test_completeness_runs_when_outline_section_missing_from_doc(llm_calls):
@@ -268,12 +282,14 @@ def test_completeness_runs_when_outline_section_missing_from_doc(llm_calls):
     outline = ["Objetivos", "Orçamento"]
     proposal = _doc({"Objetivos": "Completo."})
 
-    _run(cs.auto_review_checklist(
+    review = _run(cs.auto_review_checklist(
         proposal=proposal,
         edital_requirements=[{"id": "r", "requirement": "x"}],
         outline=outline,
     ))
-    assert "completeness" in llm_calls
+    # F5: completude determinística — detecta "Orçamento" como ausente
+    assert "completeness" not in llm_calls
+    assert "Orçamento" in review["completeness"]["missing_sections"]
 
 
 def test_completeness_gate_stays_conservative_when_outline_empty(llm_calls):
@@ -351,5 +367,6 @@ def test_pass_failure_is_captured_as_error(monkeypatch):
     assert review["error"] is not None
     assert any(e["pass"] == "quality" for e in review["error"])
     assert review["quality"] == cs._FALLBACK_QUALITY
-    # completude rodou e retornou normalmente
-    assert review["completeness"]["overall_score"] == 80
+    # F5: completude determinística — seção vazia → empty
+    assert review["completeness"]["sections"][0]["status"] == "empty"
+    assert review["completeness"]["overall_score"] == 0

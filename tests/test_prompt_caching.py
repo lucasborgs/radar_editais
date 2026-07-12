@@ -149,6 +149,8 @@ def _make_session() -> WritingSession:
     s._programa_context = ""
     s._project_description = None
     s._pending_user_input = None
+    s._playbook_writer_block = ""  # F5: vazio — nenhum mecanismo resolvido
+    s._playbook_monitor_block = ""  # F5: vazio
     s.backend = "anthropic"
     s.model = "claude-sonnet-4-6"
     return s

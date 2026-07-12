@@ -104,30 +104,9 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
     — a WritingSession persiste o estado final via update no Postgres.
     """
 
-    # mechanism (+ source) do edital → habilita a tool load_skill (spec 05): o
-    # Redator PUXA o playbook de escrita do instrumento sob demanda (lente + padrões
-    # de tom/estrutura), em vez de regra dura — que vem de search_edital (RAG).
-    # Resolve uma vez por sessão. Pitch (nó do fundo, sem edital) → mechanism=equity.
-    _skill_mechanism = ""
-    _skill_source = ""
-    if getattr(session, "mode", "proposal") == "pitch":
-        _skill_mechanism = "equity"  # gênero outbound roteado ao agente de pitch (D4)
-    else:
-        # Agência (overlay de fonte) = prefixo do edital_id; o campo `source` da wiki
-        # é proveniência de ingestão (etl_process/web), não a agência.
-        try:
-            from core.kg.edital_id import source_of
-            _skill_source = source_of(session.edital_id)
-        except Exception:
-            _skill_source = ""
-        try:
-            from core.kg import entity_catalog
-            card = entity_catalog.get_edital(session.edital_id)
-            if card:
-                _skill_mechanism = str(card.get("mechanism", "") or "")
-        except Exception as e:
-            logger.debug("load_skill: falha ao resolver mechanism de %s: %s",
-                         getattr(session, "edital_id", "?"), e)
+    # F5: mechanism resolution foi movida para WritingSession._resolve_playbook()
+    # (prefixo estável). A tool load_skill foi removida — o playbook agora é
+    # injetado sempre no prefixo, não via pull opcional.
 
     @tool
     def search_edital(
@@ -483,28 +462,6 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
     # mecanismo de planejamento do Redator (spec 04 removeu plan_writing_session,
     # que duplicava com uma chamada LLM extra). Persistência cross-turn dos todos
     # fica fora de escopo (ver spec).
-    @tool
-    def load_skill() -> str:
-        """Carrega o PLAYBOOK DE ESCRITA deste instrumento: a lente do avaliador e
-        os padrões de tom/estrutura que aprovam neste mecanismo (+ praxe da fonte).
-
-        Use antes de redigir, para escrever como um especialista naquele
-        instrumento. NÃO traz regra dura (prazo, contrapartida %, rubricas, TRL
-        exigido) — isso vem de search_edital (edital). Puxa só quando a seção pede.
-        """
-        from core.skills import load_playbook
-        playbook = load_playbook(_skill_mechanism, _skill_source)
-        content = playbook.for_writer()
-        if not content.strip():
-            return (
-                "Sem playbook de escrita específico para este instrumento; "
-                "siga o perfil da empresa e os dados do edital (search_edital)."
-            )
-        label = playbook.mechanism or "genérico"
-        if playbook.source:
-            label += f" · {playbook.source}"
-        return f"PLAYBOOK DE ESCRITA ({label}):\n{content}"
-
     from core.llm.agent_tools.match_tools import build_match_tools
     from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
     from core.llm.agent_tools.research_tools import build_research_tools
@@ -534,7 +491,6 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
     return [
         search_edital,
         read_exact_chunk,
-        load_skill,
         search_library,
         read_section,
         read_full_proposal,

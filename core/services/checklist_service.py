@@ -310,38 +310,75 @@ async def _pass_quality(
 async def _pass_completeness(
     proposal: str,
     outline: list[str],
-    client,
-    model: str,
-    span_meta: dict | None = None,
+    client=None,  # noqa: ARG001 — mantido para compatibilidade de interface
+    model: str = "",  # noqa: ARG001 — mantido para compatibilidade de interface
+    span_meta: dict | None = None,  # noqa: ARG001
 ) -> dict:
-    """Pass 3 — completude das seções."""
+    """Pass 3 — completude determinística das seções (F5: zero LLM).
+
+    Para cada seção do outline, verifica estruturalmente:
+      - "empty"   → seção ausente ou só placeholder [A preencher]
+      - "shallow" → presente mas muito curta (< 200 chars)
+      - "adequate" → presente com conteúdo substancial
+    missing_sections é derivado dos status "empty".
+    overall_score = proporção de seções adequate/thorough.
+
+    A assinatura mantém `client` e `model` por compatibilidade com a chamada
+    em `auto_review_checklist` que passa esses args posicionalmente.
+    """
     if not outline:
         return {"sections": [], "missing_sections": [], "overall_score": 0}
 
-    outline_text = "\n".join(f"- {t}" for t in outline)
-    data = await _call_llm(
-        client,
-        model,
-        _COMPLETENESS_SYSTEM,
-        _COMPLETENESS_USER.format(document=proposal[:6000], outline=outline_text),
-        max_tokens=2000,
-        span_name="checklist.completeness",
-        span_meta=span_meta,
-    )
-    sections = data.get("sections") or []
-    if not isinstance(sections, list):
-        sections = []
-    missing = data.get("missing_sections") or []
-    if not isinstance(missing, list):
-        missing = []
-    try:
-        score = int(data.get("overall_score", 0))
-    except (TypeError, ValueError):
-        score = 0
+    _shallow_threshold = 200
+
+    blocks: dict[str, str] = {}
+    current_title: str | None = None
+    current_body: list[str] = []
+    for line in proposal.splitlines():
+        header = re.match(r"^\s*##\s+(.*\S)\s*$", line)
+        if header:
+            if current_title is not None:
+                blocks[current_title] = "\n".join(current_body).strip()
+            current_title = header.group(1).strip().lower()
+            current_body = []
+        elif current_title is not None:
+            current_body.append(line)
+    if current_title is not None:
+        blocks[current_title] = "\n".join(current_body).strip()
+
+    sections_out: list[dict] = []
+    missing: list[str] = []
+    adequate_count = 0
+
+    for title in outline:
+        body = blocks.get(title.strip().lower(), "")
+        cleaned = _PLACEHOLDER_PATTERN.sub("", body).strip()
+        cleaned = cleaned.strip("*").strip()
+
+        if not cleaned:
+            status = "empty"
+            suggestion = "Seção ausente ou vazia — preencha com o conteúdo solicitado."
+            missing.append(title)
+        elif len(cleaned) < _shallow_threshold:
+            status = "shallow"
+            suggestion = "Seção muito curta — desenvolva com mais detalhes e evidências."
+        else:
+            status = "adequate"
+            suggestion = ""
+            adequate_count += 1
+
+        sections_out.append({
+            "title": title,
+            "status": status,
+            "suggestion": suggestion,
+        })
+
+    overall_score = int((adequate_count / len(outline)) * 100) if outline else 0
+
     return {
-        "sections": sections,
+        "sections": sections_out,
         "missing_sections": missing,
-        "overall_score": max(0, min(100, score)),
+        "overall_score": max(0, min(100, overall_score)),
     }
 
 

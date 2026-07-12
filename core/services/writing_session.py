@@ -172,10 +172,6 @@ COMO USAR AS FERRAMENTAS
   de memória — se a tool não achar nada relevante, diga isso ao usuário em vez
   de sugerir instituições reais sem fonte. Não confundir com search_edital
   (requisitos formais DESTE edital).
-- load_skill → antes de redigir, puxe o playbook de escrita do instrumento (a lente
-  do avaliador e os padrões de tom/estrutura que aprovam naquele mecanismo). NÃO traz
-  regra dura (prazo, contrapartida, rubricas) — essa vem de search_edital. Pull
-  granular: chame quando for escrever, não no geral.
 - write_todos → no início de uma sessão ou tarefa com múltiplas etapas, planeje
   a ordem estratégica das seções (priorize as que desbloqueiam outras ou têm
   maior impacto na aprovação) e registre como todos; atualize os status conforme
@@ -549,6 +545,14 @@ class WritingSession:
         # [edital_id] silenciosamente (KG indisponível ≠ sessão quebrada).
         self._scope_edital_ids: list[str] = self._resolve_edital_scope()
 
+        # F5: resolve o playbook (skills/playbook) do mecanismo na construção.
+        # Reusa a lógica de resolução de mechanism que antes alimentava a tool
+        # load_skill (writing_tools.py:107-129). O bloco for_writer vai no
+        # prefixo estável; for_monitor vai no checklist automático.
+        self._playbook_writer_block: str = ""
+        self._playbook_monitor_block: str = ""
+        self._resolve_playbook()
+
         logger.info(
             "WritingSession %s | edital=%s | %d seções | turnos=%d | %s/%s",
             self.session_id, self.edital_id, len(self._proposal_outline),
@@ -559,6 +563,41 @@ class WritingSession:
         """Apenas o edital primário. Análogos pertencem à fase de descoberta
         (ExploreAgent), não à escrita (spec explore-routing.md Fase 1)."""
         return [self.edital_id]
+
+    def _resolve_playbook(self) -> None:
+        """Resolve o playbook do mecanismo da sessão e popula os blocos
+        for_writer (prefixo) e for_monitor (checklist automático).
+
+        Reusa a lógica de resolução de mechanism + source que antes alimentava
+        a tool load_skill (writing_tools.py:107-129). Se o mechanism não
+        resolver (sem source, sem card), ambos os blocos ficam vazios —
+        degrade limpo (F5 §5-F5.1).
+        """
+        mechanism = ""
+        source = ""
+        if self.mode == "pitch":
+            mechanism = "equity"
+        else:
+            try:
+                from core.kg.edital_id import source_of
+                source = source_of(self.edital_id)
+            except Exception:
+                source = ""
+            try:
+                from core.kg import entity_catalog
+                card = entity_catalog.get_edital(self.edital_id)
+                if card:
+                    mechanism = str(card.get("mechanism", "") or "")
+            except Exception:
+                pass
+
+        if not mechanism:
+            return
+
+        from core.skills import load_playbook
+        playbook = load_playbook(mechanism, source if source else None)
+        self._playbook_writer_block = playbook.for_writer()
+        self._playbook_monitor_block = playbook.for_monitor()
 
     # ------------------------------------------------------------------
     # Acesso lazy ao texto completo dos PDFs (fallback)
@@ -1400,7 +1439,7 @@ class WritingSession:
         logger.info("[%s] generate_full_proposal: %d seções para gerar (agente simplificado)",
                     self.session_id, len(targets))
 
-        # Toolset reduzido para lote: agent só pesquisa (search_edital + load_skill).
+        # Toolset reduzido para lote: agent só pesquisa (search_edital).
         # save_draft removido — WS gera e salva via auto_save (JSON structured output).
         blocked = {
             "read_exact_chunk", "read_section", "read_full_proposal", "request_user_info",
@@ -1604,6 +1643,15 @@ class WritingSession:
             "role": "user",
             "content": f"OUTLINE COMPLETO DA PROPOSTA (para coerência entre seções):\n{outline_str}",
         })
+
+        # F5: for_writer do playbook — estável por sessão, entra antes do tail
+        # dinâmico (temporal) para manter o máximo do prefixo cacheável.
+        # Degrade limpo: bloco vazio se mechanism não resolver.
+        if self._playbook_writer_block:
+            messages.append({
+                "role": "user",
+                "content": f"PLAYBOOK DE ESCRITA:\n{self._playbook_writer_block}",
+            })
 
         # Tail dinâmico: temporal depois do prefixo estável (PR2 §2.1).
         if self._temporal_block:
@@ -1865,7 +1913,7 @@ class WritingSession:
                 proposal=proposal_text,
                 edital_requirements=requirements,
                 outline=self._proposal_outline,
-                playbook_context="",
+                playbook_context=self._playbook_monitor_block,
                 workspace_id=self.workspace_id,
                 session_id=self.session_id,
             )
@@ -1991,10 +2039,19 @@ class WritingSession:
         if self._history_summary:
             messages.append({"role": "user", "content": self._history_summary})
 
+        # F5: for_writer do playbook — estável por sessão, entra ANTES do
+        # breakpoint de cache (Breakpoint 2 abaixo) para o bloco entrar no
+        # prefixo cacheável. ~1.5k tokens estáveis; degrade limpo se vazio.
+        if self._playbook_writer_block:
+            messages.append({
+                "role": "user",
+                "content": f"PLAYBOOK DE ESCRITA:\n{self._playbook_writer_block}",
+            })
+
         # Breakpoint 2 (PR2 §2.2): fim do prefixo estável entre turnos — a última
-        # mensagem entre perfil/card/programa/library/summary. O history vem depois
-        # (append-mostly): o cache incremental da Anthropic reaproveita o maior
-        # prefixo comum entre turnos a partir daqui.
+        # mensagem entre perfil/card/programa/library/summary/playbook. O history
+        # vem depois (append-mostly): o cache incremental da Anthropic reaproveita
+        # o maior prefixo comum entre turnos a partir daqui.
         messages[-1]["cache_hint"] = True
 
         messages.extend(self._history)
