@@ -840,6 +840,7 @@ def memory_search(workspace_id: str, query: str, *, limit: int = 6) -> list[dict
     `{"insight","level","score"}` (vazia se Store off/sem query/falha)."""
     store = _get_memory_store()
     if store is None or not (query or "").strip():
+        logger.info("tripwire: memory_search hits=0 reason=store_or_query_absent ws=%s", workspace_id)
         return []
     try:
         items = _run_on_bg_loop(
@@ -847,6 +848,7 @@ def memory_search(workspace_id: str, query: str, *, limit: int = 6) -> list[dict
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("memory_search falhou (ws=%s): %s", workspace_id, e)
+        logger.warning("tripwire: memory_search hits=0 reason=error ws=%s error=%s", workspace_id, e)
         return []
     out: list[dict] = []
     for it in items or []:
@@ -856,6 +858,7 @@ def memory_search(workspace_id: str, query: str, *, limit: int = 6) -> list[dict
             "level": val.get("level"),
             "score": getattr(it, "score", None),
         })
+    logger.info("tripwire: memory_search hits=%d ws=%s", len(out), workspace_id)
     return out
 
 
@@ -1121,12 +1124,16 @@ async def _generate_section(
         n_calls = sum(1 for m in msgs if isinstance(m, AIMessage) and m.tool_calls)
         logger.info("generation: seção '%s' concluída (%d steps, %d tool calls)",
                     section, len(msgs), n_calls)
+        if n_calls == 0:
+            logger.warning("tripwire: generation_tools_zero section=%s n_calls=0", section)
         stop = _derive_stop_reason(final, max_steps)
         result = _messages_to_agent_result(msgs, stop)
         if on_result is not None:
             on_result(result)
         ok = verify_saved(section) if verify_saved else (result.stop_reason != "error")
-        if not ok and auto_save is not None:
+        if ok and verify_saved:
+            logger.info("tripwire: generation_path path=agent section=%s", section)
+        elif not ok and auto_save is not None:
             # Safety net: tenta extrair texto do agente (raro — só se o modelo
             # produziu draft como texto puro em vez de tool_call). O caminho
             # principal de salvamento é o fallback universal na WritingSession.
@@ -1137,6 +1144,7 @@ async def _generate_section(
             if texts:
                 best = max(texts, key=len)
                 logger.info("generation: auto_save: '%s' (%d chars)", section, len(best))
+                logger.info("tripwire: generation_path path=auto_save section=%s chars=%d", section, len(best))
                 auto_save(section, best)
                 ok = verify_saved(section) if verify_saved else True
         if not ok:

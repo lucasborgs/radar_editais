@@ -116,7 +116,7 @@ def test_suites_registered():
     from core.eval.registry import SUITES
     assert set(SUITES) == {
         "matching", "rag", "writing", "extraction",
-        "opportunity_type", "triage",
+        "opportunity_type", "triage", "writing_v2",
         "profile_extractor", "reranker", "structurer",
     }
 

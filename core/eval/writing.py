@@ -9,12 +9,15 @@ latência) viram scores também — instrumentação do harness de agente no mes
 
 Pré-requisitos (toca DB + LLM): SUPABASE_*, OPENAI/ANTHROPIC e EVAL_WORKSPACE_ID
 (workspace onde as sessões de eval são criadas).
+
+F0 (2026-07-12): eval_cases_v2.json = golden §4 com 4 famílias.
 """
 from __future__ import annotations
 
 import json
 import logging
 import os
+import re
 import time
 from typing import Any
 
@@ -24,6 +27,7 @@ from core.eval.harness import Evaluation, Suite, get_input
 logger = logging.getLogger(__name__)
 
 FIXTURE = ROOT / "tests" / "fixtures" / "eval_cases.json"
+FIXTURE_V2 = ROOT / "tests" / "fixtures" / "eval_cases_v2.json"
 
 
 def _build_profile(raw: dict):
@@ -131,6 +135,7 @@ def task(*, item: Any, **_) -> dict:
         "n_tool_calls": n_tool_calls,
         "latency_ms": round(latency_ms, 1),
         "section": saved_title or section_hint,
+        "draft": draft,
         "n_claims": grounding.n_claims,
         "n_grounded": grounding.n_grounded,
         "pct_grounded": round(grounding.pct_grounded, 3),
@@ -204,6 +209,162 @@ def _prereqs() -> str | None:
         return "fixture tests/fixtures/eval_cases.json ausente"
     return None
 
+
+# ---------------------------------------------------------------------------
+# Evaluadores do Golden §4 (F0)
+# ---------------------------------------------------------------------------
+
+
+def _trigram_overlap(a: str, b: str) -> float:
+    """Fração de trigramas de `b` contidos em `a` (0..1)."""
+    if len(a) < 3 or len(b) < 3:
+        return 0.0
+    tri_a = {a[i:i+3] for i in range(len(a) - 2)}
+    tri_b = {b[i:i+3] for i in range(len(b) - 2)}
+    if not tri_b:
+        return 0.0
+    return len(tri_a & tri_b) / len(tri_b)
+
+
+def eval_section_hallucination(*, output, metadata=None, **_) -> Evaluation | None:
+    """Flag se o conteúdo do rascunho contém seções que NÃO estão no outline
+    do edital — medido por overlap de trigramas com os títulos de seção
+    conhecidos. 0 = sem alucinação, 1+ = seções suspeitas."""
+    if not isinstance(output, dict):
+        return None
+    section = output.get("section", "")
+    content = output.get("draft", "")
+    if not content:
+        return None
+    n_extra = 0
+    lines = [ln.strip() for ln in content.split("\n") if ln.strip()]
+    for line in lines:
+        if line.startswith("#") and len(line) > 5:
+            overlap = _trigram_overlap(section, line)
+            if overlap < 0.3:
+                n_extra += 1
+    return {"name": "section_hallucination", "value": n_extra,
+            "comment": f"{n_extra} heading(s) fora do outline"}
+
+
+def eval_user_edit_preserved(*, output, metadata=None, **_) -> Evaluation | None:
+    """Família 3: verifica se a edição do usuário (edit_intent) está
+    presente no rascunho final. None se não for caso de user edit."""
+    if not isinstance(output, dict) or not metadata:
+        return None
+    edit_intent = metadata.get("edit_intent", "")
+    if not edit_intent:
+        return None
+    draft = output.get("draft", "")
+    preserved = edit_intent.lower() in draft.lower()
+    return {"name": "user_edit_preserved", "value": preserved,
+            "comment": "preservou" if preserved else "perdeu edição do usuário"}
+
+
+def eval_misfit_honesty(*, output, metadata=None, **_) -> Evaluation | None:
+    """Família 2: o agente RECUSOU educadamente (true) ou tentou fabricar
+    alinhamento (false). None se não for caso misfit."""
+    if not isinstance(output, dict) or not metadata:
+        return None
+    familia = metadata.get("familia")
+    if familia != 2:
+        return None
+    draft = output.get("draft", "")
+    recusa = bool(re.search(
+        r"(não atende|incompatível|não é adequado|não se alinha|não se enquadra"
+        r"|lamentamos informar|não podemos|fora do escopo|impossível|não é possível"
+        r"|recusamos)", draft.lower()
+    ))
+    return {"name": "misfit_honesty", "value": recusa,
+            "comment": "recusou" if recusa else "aceitou (provável alucinação)"}
+
+
+def eval_tools0_sections(*, output, **_) -> Evaluation | None:
+    """Flag se alguma seção foi gerada sem tool calls (possível bypass do
+    agente). 0 = todas usaram tools, >0 = seções suspect."""
+    if not isinstance(output, dict):
+        return None
+    # O output atual não expõe tools-por-seção no task().
+    # F0: valor sentinela — em fases posteriores será populado.
+    return {"name": "tools0_sections", "value": None,
+            "comment": "não disponível na task atual (F0)"}
+
+
+# ---------------------------------------------------------------------------
+# load_data para eval_cases_v2 (golden §4)
+# ---------------------------------------------------------------------------
+
+_N_RUNS = 3
+
+
+def load_data_v2() -> list[dict]:
+    if not FIXTURE_V2.exists():
+        return []
+    data = json.loads(FIXTURE_V2.read_text(encoding="utf-8"))
+    profiles = data.get("profiles", {})
+    items = []
+    for case in data.get("cases", []):
+        raw = profiles.get(case["profile"])
+        if raw is None:
+            continue
+        # Decisão B2 (F0): edital_ids_extra no metadata é planejamento —
+        # a task() atual cria WritingSession só com edital_id primário.
+        # F1 vai wirear o batch multi-edital; até lá, baseline mede só singleton.
+        familia = case.get("familia")
+        item = {
+            "input": {
+                "profile": raw,
+                "edital_id": case["edital_id"],
+                "instruction": case["instruction"],
+                "section": case.get("section"),
+                "max_turns": case.get("max_turns", 4),
+            },
+            "expected_output": None,
+            "metadata": {
+                "case_id": case["id"],
+                "edital_id": case["edital_id"],
+                "familia": familia,
+                "edit_intent": case.get("edit_intent", ""),
+                "edital_ids_extra": case.get("edital_ids_extra", []),
+            },
+        }
+        # N-runs: replica cada caso N vezes para estabilidade métrica
+        for _ in range(_N_RUNS):
+            items.append(item)
+    return items
+
+
+def _prereqs_v2() -> str | None:
+    for var in ("SUPABASE_URL", "SUPABASE_SERVICE_KEY"):
+        if not os.getenv(var):
+            return f"requer {var} (sessões + retrieval)"
+    if not (os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")):
+        return "requer OPENAI_API_KEY ou ANTHROPIC_API_KEY (agente + juízes)"
+    if not os.getenv("EVAL_WORKSPACE_ID"):
+        return "requer EVAL_WORKSPACE_ID (workspace de eval para as sessões)"
+    if not FIXTURE_V2.exists():
+        return "fixture tests/fixtures/eval_cases_v2.json ausente"
+    return None
+
+
+SUITE_WRITING_V2 = Suite(
+    name="writing_v2",
+    description="Golden §4: 4 famílias (bem-casados, misfit, user edit, batch E2E) + N-runs.",
+    load_data=load_data_v2,
+    task=task,
+    evaluators=[
+        eval_save, eval_grounding, eval_n_claims, eval_factual_errors,
+        eval_coherence, eval_tool_calls,
+        eval_section_hallucination, eval_user_edit_preserved,
+        eval_misfit_honesty, eval_tools0_sections,
+    ],
+    prereqs=_prereqs_v2,
+)
+
+
+# ---------------------------------------------------------------------------
+# Suíte original (backward compat)
+# ---------------------------------------------------------------------------
 
 SUITE = Suite(
     name="writing",

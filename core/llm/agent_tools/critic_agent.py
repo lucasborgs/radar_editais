@@ -387,6 +387,7 @@ def run_critic(
 
     if result.stop_reason == "error":
         logger.warning("critic [%s]: sub-agente falhou (error) — aprovando por fallback", session_id)
+        logger.warning("tripwire: critic_fail_open reason=subagent_error session=%s approved=true", session_id)
         return CriticResult(approved=True, feedback="Revisão indisponível: erro no sub-agente.")
 
     # Observabilidade: steps por decisão (a spec quer média de retrieves para
@@ -404,6 +405,7 @@ def run_critic(
             "critic [%s]: %d steps, parse do veredito falhou (%s) — aprovando por fallback",
             session_id, n_steps, e,
         )
+        logger.warning("tripwire: critic_fail_open reason=parse_error session=%s approved=true", session_id)
         return CriticResult(approved=True, feedback=f"Revisão indisponível: {e}")
 
     approved = bool(data.get("approved", True))

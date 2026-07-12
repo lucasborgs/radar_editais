@@ -1399,6 +1399,8 @@ class WritingSession:
         if outcome.failed_sections:
             logger.info("[%s] generate_full_proposal: fallback para %d seções",
                         self.session_id, len(outcome.failed_sections))
+            logger.info("tripwire: generation_path path=fallback_llm session=%s n_sections=%d",
+                        self.session_id, len(outcome.failed_sections))
             from core.llm.llm_client import make_client
             from core.retrieval.retriever import retrieve_chunks
             sys_prompt = self._generation_system()
@@ -1621,12 +1623,16 @@ class WritingSession:
                 "[%s] First-turn: descrição vaga (%d chars) → modo conversacional",
                 self.session_id, len(user_message),
             )
+            logger.info("tripwire: first_turn_routing decision=conversational session=%s chars=%d",
+                        self.session_id, len(user_message))
             return self._turn_agent(user_message, None, 1)
 
         logger.info(
             "[%s] First-turn: gerando proposta completa a partir da descrição (%d chars)",
             self.session_id, len(user_message),
         )
+        logger.info("tripwire: first_turn_routing decision=batch_generation session=%s chars=%d",
+                    self.session_id, len(user_message))
 
         self._project_description = user_message
 

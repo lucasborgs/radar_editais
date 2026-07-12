@@ -350,6 +350,12 @@ def load_playbook(
             merged.setdefault(name, []).append(body)
 
     sections = {name: "\n\n".join(parts) for name, parts in merged.items()}
+    if sections:
+        logger.info("tripwire: playbook_loaded mechanism=%s source=%s n_sections=%d confidence=%s",
+                     mech, src or "(none)", len(sections), confidence)
+    else:
+        logger.warning("tripwire: playbook_missing mechanism=%s source=%s confidence=%s",
+                       mech, src or "(none)", confidence)
     return Playbook(
         mechanism=mech,
         source=src or None,

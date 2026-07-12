@@ -28,6 +28,7 @@ SUITES: dict[str, Suite] = {
     profile_extractor.SUITE.name: profile_extractor.SUITE,
     reranker.SUITE.name: reranker.SUITE,
     structurer.SUITE.name: structurer.SUITE,
+    writing.SUITE_WRITING_V2.name: writing.SUITE_WRITING_V2,
 }
 
 

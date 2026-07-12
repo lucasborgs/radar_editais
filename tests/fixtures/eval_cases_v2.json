@@ -1,0 +1,177 @@
+{
+  "_comment": "Golden §4 (F0): 4 famílias de teste para o agente de escrita.",
+  "_familias": {
+    "1": "6 bem-casados (fit forte perfil↔edital, cópia do eval_cases.json original)",
+    "2": "2 misfit (perfil incompatível com o edital — agente deve RECUSAR)",
+    "3": "2 user edit (usuário edita seção após primeira redação — agente preserva)",
+    "4": "2 batch E2E (múltiplos editais numa sessão — agente cobre todos)"
+  },
+  "_limitacoes_F0": {
+    "familia_3": "A task() atual executa uma instrução composta (redija + edite) num único turno. O agente precisa seguir a instrução inteira de uma vez — não há replay/edição explícita em dois turnos. O baseline foi colhido com essa limitação; métricas user_edit_preserved devem ser interpretadas como 'o agente seguiu instrução composta', não como 'preservou edição em turno separado'.",
+    "familia_4": "FIXME(F1): a task() atual cria a WritingSession apenas com o edital_id primário. edital_ids_extra está no metadata para planejamento, mas a sessão ignora o 2º edital. O cenário 'cobre AMBOS os editais' só será real após F1 (batch multi-edital). Baseline F0 mede só o edital primário — métricas familia 4 devem ser lidas como 'singleton', não como batch E2E."
+  },
+  "profiles": {
+    "espectra": {
+      "nome": "Espectra Agro Sensoriamento",
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "ME",
+      "uf": "PR",
+      "capital_social": 350000,
+      "trl": 5,
+      "one_liner": "Tecnologias hiperespectrais embarcadas em drones e plataformas terrestres para classificação e detecção não-destrutiva de qualidade e adulteração em cadeias agroindustriais de alimentos.",
+      "solution_summary": "Sensores e câmeras hiperespectrais integrados a modelos de visão computacional que classificam produtos agroindustriais e detectam, de forma não-destrutiva, adulterações, vida útil restante e conformidade com especificações do comprador ao longo da cadeia.",
+      "descricao_atividades": "Desenvolvimento de hardware de sensoriamento hiperespectral e software de classificação para a cadeia agroindustrial; serviços de inspeção de qualidade não-destrutiva para indústrias de alimentos e cooperativas.",
+      "portfolio_projetos": "Piloto de classificação hiperespectral de grãos em cooperativa no Paraná; detecção não-destrutiva de adulteração em laticínios com indústria em MG.",
+      "equipe_resumo": "2 engenheiros de visão computacional, 1 PhD em sensoriamento óptico, 2 engenheiros eletrônicos, 1 engenheiro de alimentos.",
+      "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "pesquisa_colaborativa"]
+    },
+    "tratorbr": {
+      "nome": "TratorBR Máquinas Agrícolas",
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "ME",
+      "uf": "PE",
+      "capital_social": 400000,
+      "trl": 5,
+      "one_liner": "Trator compacto de baixo custo e conjunto de implementos agrícolas para mecanização da agricultura familiar, voltado a aumentar a oferta de alimentos.",
+      "solution_summary": "Desenvolvimento de um pacote tecnológico de mecanização — trator de pequeno porte acessível mais implementos obrigatórios (plantadeira, arado, pulverizador, roçadeira, sulcador e carreta) — projetado para as condições e a escala da agricultura familiar, com transferência da tecnologia ao final do projeto.",
+      "descricao_atividades": "Engenharia e fabricação de tratores compactos e implementos agrícolas de baixo custo; testes de campo e adequação à mecanização da pequena produção familiar de alimentos.",
+      "portfolio_projetos": "Protótipo de trator compacto de 25 cv testado com cooperativa de agricultura familiar no agreste de PE; conjunto de implementos validado em lavoura de mandioca e feijão.",
+      "equipe_resumo": "3 engenheiros mecânicos, 1 engenheiro agrônomo, 2 projetistas de implementos, 1 especialista em mecanização agrícola.",
+      "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "pesquisa_colaborativa"]
+    },
+    "biotecstartup": {
+      "nome": "BioTec Startup",
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "MEI",
+      "uf": "SP",
+      "capital_social": 50000,
+      "trl": 3,
+      "one_liner": "Plataforma de bioinformática para descoberta de novos fármacos a partir de compostos naturais da biodiversidade brasileira.",
+      "solution_summary": "Pipeline computacional de triagem virtual (docking+molecular dynamics) acoplado a ensaios in vitro de baixo custo para acelerar a descoberta de candidatos a fármacos de origem natural, com foco em doenças negligenciadas.",
+      "descricao_atividades": "P&D em bioinformática, química computacional e biologia molecular; triagem virtual de bibliotecas de compostos naturais; ensaios enzimáticos e celulares de média escala.",
+      "portfolio_projetos": "Prova de conceito de triagem virtual de alcaloides da biodiversidade brasileira contra alvo de Leishmania; parceria com laboratório acadêmico em SP.",
+      "equipe_resumo": "1 bioinformata (fundador, PhD), 1 biólogo molecular, 1 cientista de dados.",
+      "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "pesquisa_colaborativa"]
+    },
+    "agrosoftsys": {
+      "nome": "AgroSoft Sistemas",
+      "tipo_entidade": "empresa",
+      "tamanho_empresa": "ME",
+      "uf": "RS",
+      "capital_social": 200000,
+      "trl": 6,
+      "one_liner": "Software de gestão de precisão para agricultura familiar com sensoriamento IoT de baixo custo e dashboards mobile-offline.",
+      "solution_summary": "Plataforma SaaS + dispositivos IoT de baixo custo para coleta, processamento e visualização de dados agrícolas — clima, solo, irrigação — adaptada para agricultura familiar com conectividade intermitente; dashboards offline-first com sincronização assíncrona.",
+      "descricao_atividades": "Desenvolvimento de hardware IoT de baixo custo (sensores de umidade, temperatura, pH) e software mobile/web para agricultura familiar; testes de campo em cooperativas do RS.",
+      "portfolio_projetos": "Piloto de sensor de umidade do solo com transmissão LoRa em 5 propriedades familiares no RS; dashboard web com previsão de irrigação baseada em modelo empírico.",
+      "equipe_resumo": "2 engenheiros de software, 1 engenheiro eletrônico, 1 agrônomo.",
+      "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "pesquisa_colaborativa"]
+    }
+  },
+  "cases": [
+    {
+      "id": "v2_familia1_espectra_finep774_descricao",
+      "familia": 1,
+      "profile": "espectra",
+      "edital_id": "finep:774",
+      "section": "2. Descrição do projeto",
+      "instruction": "Redija a descrição do projeto ancorando nos temas e exigências do edital. Salve o rascunho."
+    },
+    {
+      "id": "v2_familia1_espectra_finep774_justificativa",
+      "familia": 1,
+      "profile": "espectra",
+      "edital_id": "finep:774",
+      "section": "3. Justificativa",
+      "instruction": "Escreva a justificativa conectando o sensoriamento hiperespectral da cadeia agroindustrial ao foco do edital. Salve quando concluir."
+    },
+    {
+      "id": "v2_familia1_espectra_finep774_metodologia",
+      "familia": 1,
+      "profile": "espectra",
+      "edital_id": "finep:774",
+      "section": "5. Metodologia",
+      "instruction": "Descreva a metodologia ancorando nas exigências técnicas do edital. Salve quando fechar."
+    },
+    {
+      "id": "v2_familia1_tratorbr_finep769_objetivo",
+      "familia": 1,
+      "profile": "tratorbr",
+      "edital_id": "finep:769",
+      "section": "2. Objetivo do projeto",
+      "instruction": "Redija o objetivo do projeto alinhado ao foco do edital. Salve o rascunho."
+    },
+    {
+      "id": "v2_familia1_tratorbr_finep769_justificativa",
+      "familia": 1,
+      "profile": "tratorbr",
+      "edital_id": "finep:769",
+      "section": "3. Justificativa",
+      "instruction": "Escreva a justificativa relacionando o pacote de mecanização (trator + implementos) aos temas e requisitos do edital. Salve quando concluir."
+    },
+    {
+      "id": "v2_familia1_tratorbr_finep769_metodologia",
+      "familia": 1,
+      "profile": "tratorbr",
+      "edital_id": "finep:769",
+      "section": "4. Metodologia",
+      "instruction": "Descreva a metodologia ancorando nas exigências do edital. Salve quando fechar."
+    },
+    {
+      "id": "v2_familia2_biotec_finep769_misfit",
+      "familia": 2,
+      "profile": "biotecstartup",
+      "edital_id": "finep:769",
+      "section": "2. Objetivo do projeto",
+      "instruction": "Redija o objetivo do projeto para este edital de trator e implementos agrícolas. NOTA: se o perfil da empresa for incompatível com o edital, RECUSE educadamente.",
+      "max_turns": 2
+    },
+    {
+      "id": "v2_familia2_agrosoft_finep774_misfit",
+      "familia": 2,
+      "profile": "agrosoftsys",
+      "edital_id": "finep:774",
+      "section": "2. Descrição do projeto",
+      "instruction": "Redija a descrição do projeto para este edital de sensoriamento hiperespectral. NOTA: se o perfil da empresa não se alinhar ao escopo tecnológico do edital, RECUSE educadamente.",
+      "max_turns": 2
+    },
+    {
+      "id": "v2_familia3_espectra_user_edit",
+      "familia": 3,
+      "profile": "espectra",
+      "edital_id": "finep:774",
+      "section": "2. Descrição do projeto",
+      "instruction": "Redija a descrição do projeto. Depois substitua a primeira frase por 'NOSSO PROJETO VISA APLICAR SENSORIAMENTO HIPERESPECTRAL PARA CLASSIFICAÇÃO DE GRÃOS.' e peça ao agente para incorporar a edição mantendo o resto.",
+      "max_turns": 4,
+      "edit_intent": "NOSSO PROJETO VISA APLICAR SENSORIAMENTO HIPERESPECTRAL PARA CLASSIFICAÇÃO DE GRÃOS."
+    },
+    {
+      "id": "v2_familia3_tratorbr_user_edit",
+      "familia": 3,
+      "profile": "tratorbr",
+      "edital_id": "finep:769",
+      "section": "2. Objetivo do projeto",
+      "instruction": "Redija o objetivo do projeto. Depois altere o título para 'OBJETIVO: TRATOR COMPACTO PARA AGRICULTURA FAMILIAR NO NORDESTE' e instrua o agente a preservar essa mudança.",
+      "max_turns": 4,
+      "edit_intent": "OBJETIVO: TRATOR COMPACTO PARA AGRICULTURA FAMILIAR NO NORDESTE"
+    },
+    {
+      "id": "v2_familia4_espectra_batch",
+      "familia": 4,
+      "profile": "espectra",
+      "edital_id": "finep:774",
+      "edital_ids_extra": ["finep:800"],
+      "section": "2. Descrição do projeto",
+      "instruction": "Considere os editais finep:774 e finep:800. Redija uma descrição de projeto que atenda a AMBOS os editais simultaneamente. Salve o rascunho."
+    },
+    {
+      "id": "v2_familia4_tratorbr_batch",
+      "familia": 4,
+      "profile": "tratorbr",
+      "edital_id": "finep:769",
+      "edital_ids_extra": ["finep:801"],
+      "section": "2. Objetivo do projeto",
+      "instruction": "Considere os editais finep:769 e finep:801. Redija um objetivo de projeto que cubra AMBOS os editais. Salve o rascunho."
+    }
+  ]
+}
