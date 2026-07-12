@@ -213,6 +213,7 @@ class CriticResult:
     approved: bool
     issues: list[str] = field(default_factory=list)
     feedback: str = ""
+    fail_open: bool = False
 
 
 def build_critic_tools(session, section_title: str):
@@ -388,7 +389,7 @@ def run_critic(
     if result.stop_reason == "error":
         logger.warning("critic [%s]: sub-agente falhou (error) — aprovando por fallback", session_id)
         logger.warning("tripwire: critic_fail_open reason=subagent_error session=%s approved=true", session_id)
-        return CriticResult(approved=True, feedback="Revisão indisponível: erro no sub-agente.")
+        return CriticResult(approved=True, feedback="Revisão indisponível: erro no sub-agente.", fail_open=True)
 
     # Observabilidade: steps por decisão (a spec quer média de retrieves para
     # calibração — média > 1.5 retrieves indica retrieve inicial fraco).
@@ -406,7 +407,7 @@ def run_critic(
             session_id, n_steps, e,
         )
         logger.warning("tripwire: critic_fail_open reason=parse_error session=%s approved=true", session_id)
-        return CriticResult(approved=True, feedback=f"Revisão indisponível: {e}")
+        return CriticResult(approved=True, feedback=f"Revisão indisponível: {e}", fail_open=True)
 
     approved = bool(data.get("approved", True))
     logger.info("critic [%s]: %d steps, approved=%s", session_id, n_steps, approved)

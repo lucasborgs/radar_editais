@@ -346,8 +346,19 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
             content: markdown bem formatado, pronto para persistir
             force: True para salvar sem revisão do critic
         """
+        # Helper local: todo caminho de retorno anexa exatamente um entry em
+        # _tool_results, mantendo a invariante 1:1 com _consume_save_draft_result
+        # (F3, B1). Early-returns de validação e erro usam sentinela (None/None).
+        def _r(entry_title, entry_verdict, text):
+            session._tool_results.append({
+                "section_title": entry_title,
+                "critic_result": entry_verdict,
+            })
+            return text
+
         if not content.strip():
-            return (
+            return _r(
+                None, None,
                 "Erro: content vazio. save_draft só persiste rascunhos com texto. "
                 "Se quer limpar a seção, peça confirmação ao usuário primeiro."
             )
@@ -366,12 +377,14 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                 outline_str = ", ".join(
                     f"'{t}'" for t in session._proposal_outline[:8]
                 )
-                return (
+                return _r(
+                    None, None,
                     f"Erro: seção '{section_title}' não está no outline. "
                     f"Use uma dessas: {outline_str}..."
                 )
 
         # Critic review — só pula se force=True (decisão explícita do usuário).
+        critic_verdict = None
         if not force:
             from core import telemetry
             from core.llm.agent_tools.critic_agent import run_critic
@@ -379,15 +392,25 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
             # não é garantido no thread pool do LangGraph para tools síncronas.
             _trace_ctx = telemetry.current_trace_context()
             critic = run_critic(content, target_title, session, trace_context=_trace_ctx)
+            critic_verdict = {
+                "approved": critic.approved,
+                "issues": critic.issues,
+                "feedback": critic.feedback,
+            }
+            if critic.fail_open:
+                session._critic_fail_open_count += 1
             if not critic.approved:
+                session._critic_block_count += 1
                 issues_str = "\n".join(f"• {issue}" for issue in critic.issues)
-                return (
+                return _r(
+                    target_title, critic_verdict,
                     f"Critic encontrou {len(critic.issues)} problema(s) antes de salvar:\n"
                     f"{issues_str}\n\n"
                     f"Diagnóstico: {critic.feedback}\n\n"
                     "Revise o rascunho e tente save_draft novamente, ou chame "
                     "save_draft com force=True para salvar mesmo assim."
                 )
+            session._critic_pass_count += 1
 
         # Captura conteúdo ANTIGO antes de sobrescrever (para o scope classifier)
         old_content = session._doc_sections.get(target_title, "")
@@ -396,7 +419,7 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
             session.set_section_content(target_title, content)
         except Exception as e:
             logger.warning("[%s] save_draft falhou: %s", session.session_id, e)
-            return f"Erro ao salvar rascunho: {e}"
+            return _r(target_title, critic_verdict, f"Erro ao salvar rascunho: {e}")
 
         suffix = "" if force else " (aprovado pelo critic)"
 
@@ -417,7 +440,8 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                     session.session_id, e,
                 )
 
-        return (
+        return _r(
+            target_title, critic_verdict,
             f"Rascunho salvo em '{target_title}' ({len(content)} chars){suffix}. "
             "Continue a conversa ou prossiga para a próxima seção."
         )

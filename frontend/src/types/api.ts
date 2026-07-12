@@ -65,6 +65,9 @@ export interface ToolTraceEntry {
   // W-D1: título normalizado da seção persistida — presente só em entradas
   // save_draft bem-sucedidas. A co-edição do workspace usa p/ highlight + undo.
   saved_section?: string;
+  // F3: veredito estruturado do critic (approved, issues, feedback) — presente
+  // em entradas save_draft que passaram pelo critic.
+  critic_result?: Record<string, unknown>;
 }
 
 export interface WritingTurnResponse {

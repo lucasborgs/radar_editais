@@ -432,6 +432,16 @@ class WritingSession:
         # Flag true durante ripple ativo — bloqueia re-classificação (depth=1).
         self._ripple_active: bool = False
 
+        # F3 — contratos tipados no save: resultados estruturados das tools
+        # save_draft (critic verdict + section title), consumidos por
+        # _extract_tool_trace. Resetado a cada turno.
+        self._tool_results: list[dict] = []
+
+        # Contadores de critic por sessão (resetados no recarregamento).
+        self._critic_block_count: int = 0
+        self._critic_pass_count: int = 0
+        self._critic_fail_open_count: int = 0
+
         if session_id:
             # Retomar sessão existente — carrega tudo do Postgres.
             self.session_id = session_id
@@ -1165,27 +1175,24 @@ class WritingSession:
         updated = (self._doc_sections or {}).get(section_title, "")
         was_updated = updated != current
 
-        # Extrai feedback estruturado do Critic do tool_trace (save_draft)
+        # Extrai feedback estruturado do Critic do tool_trace (F3: via critic_result,
+        # sem grepar strings de tool output).
         critic_feedback = None
         trace = result.get("tool_trace") or []
         for entry in trace:
-            if entry.get("name") == "save_draft" and isinstance(entry.get("output"), str):
-                out = entry["output"]
-                if "Critic encontrou" in out:
-                    lines = out.split("\n")
-                    critic_feedback = {
-                        "approved": False,
-                        "blocked": True,
-                        "issues": [ln.strip("• ") for ln in lines if ln.strip().startswith("•")],
-                        "feedback": next((ln.strip() for ln in lines if "Diagnóstico:" in ln), "").replace("Diagnóstico: ", ""),
-                    }
-                elif "aprovado pelo critic" in out:
-                    critic_feedback = {"approved": True, "blocked": False, "issues": [], "feedback": ""}
+            if entry.get("name") == "save_draft" and entry.get("critic_result"):
+                cr = entry["critic_result"]
+                critic_feedback = {
+                    "approved": cr.get("approved", True),
+                    "blocked": not cr.get("approved", True),
+                    "issues": cr.get("issues", []),
+                    "feedback": cr.get("feedback", ""),
+                }
 
         return {
             "section_updated": was_updated,
             "new_content": updated if was_updated else None,
-            "critic_feedback": critic_feedback or trace,
+            "critic_feedback": critic_feedback,
             "options": ["approve", "refazer_novamente", "voltar"],
             "error": None,
         }
@@ -1215,6 +1222,8 @@ class WritingSession:
         from core.llm.agent_runtime import resolve_agent_provider
         from core.llm.agent_tools import build_writing_tools
 
+        # F3: limpa resultados estruturados de tools do turno anterior
+        self._tool_results = []
         tools = build_writing_tools(self)
         provider, model = resolve_agent_provider("anthropic", ANTHROPIC_MODEL_AGENT)
 
@@ -1260,6 +1269,21 @@ class WritingSession:
         # Reconstrói tool_use trace para persistência: [{id, name, input, output}]
         # pareando tool_use blocks com seus tool_result subsequentes no `steps`.
         tool_trace = self._extract_tool_trace(result.steps)
+
+        # F3: tripwire de critic counters por turno
+        n_blocks = sum(
+            1 for e in tool_trace
+            if e.get("critic_result") and e["critic_result"].get("approved") is False
+        )
+        n_passes = sum(
+            1 for e in tool_trace
+            if e.get("critic_result") and e["critic_result"].get("approved") is True
+        )
+        if n_blocks or n_passes:
+            logger.info(
+                "tripwire: critic_turn_summary session=%s blocks=%d passes=%d fail_opens=%d",
+                self.session_id, n_blocks, n_passes, self._critic_fail_open_count,
+            )
 
         # tokens: soma input+output das chamadas LLM DESTE turno-run (o delta do
         # thread — não dobra a contagem do turno que perguntou no caso de resume).
@@ -1758,13 +1782,14 @@ class WritingSession:
                 "[%s] Compliance background falhou: %s", self.session_id, e,
             )
 
-    @staticmethod
-    def _extract_tool_trace(steps: list) -> list[dict]:
+    def _extract_tool_trace(self, steps: list) -> list[dict]:
         """Extrai trace persistível dos steps do grafo (run_writing_turn).
 
         Pareia tool_use (vindos do step llm) com tool_result (vindos do step tool)
         por ordem — o grafo garante que a sequência é llm → tool* → llm → ...
         e que cada tool_use é seguido por um step tool com o mesmo nome.
+
+        Consome resultados estruturados de save_draft (F3) de `self._tool_results`.
         """
         # Mapa tool_use_id → input (vem dos steps kind="llm" em tool_uses)
         use_inputs: dict[str, dict] = {}
@@ -1792,34 +1817,23 @@ class WritingSession:
                     "input": s.input,
                     "output": s.output,
                 }
-                # W-D1: para o workspace (co-edição), expõe o título da seção
-                # EFETIVAMENTE salva por save_draft. O input.section_title é o que
-                # o agente pediu (pode estar não-normalizado); a fonte de verdade
-                # é o título normalizado do outline que a tool ecoa no output
-                # ("Rascunho salvo em '<título>' ..."). Só presente em saves
-                # bem-sucedidos — critic bloqueado / erro / título inválido não
-                # geram seção tocada e ficam sem o campo.
+                # F3: dados estruturados de save_draft (saved_section + critic_result
+                # vindos de session._tool_results, sem regex sobre a string).
                 if s.name == "save_draft":
-                    saved = WritingSession._parse_saved_section(s.output)
-                    if saved:
-                        entry["saved_section"] = saved
+                    self._consume_save_draft_result(entry)
                 trace.append(entry)
         return trace
 
-    # Output de save_draft em sucesso: "Rascunho salvo em '<título>' (<n> chars)...".
-    # Extrai o título normalizado entre aspas simples logo após "salvo em".
-    _SAVED_SECTION_RE = re.compile(r"Rascunho salvo em '([^']+)'")
-
-    @staticmethod
-    def _parse_saved_section(output: str) -> str | None:
-        """Título da seção persistida, extraído do retorno de save_draft.
-
-        Devolve None quando o output não indica um save bem-sucedido (critic
-        bloqueou, content vazio, título fora do outline, exceção)."""
-        if not output:
-            return None
-        m = WritingSession._SAVED_SECTION_RE.search(output)
-        return m.group(1) if m else None
+    def _consume_save_draft_result(self, entry: dict) -> None:
+        """Lê o primeiro resultado pendente de save_draft em _tool_results
+        e preenche entry com saved_section e critic_result estruturados."""
+        if not self._tool_results:
+            return
+        data = self._tool_results.pop(0)
+        if data.get("section_title"):
+            entry["saved_section"] = data["section_title"]
+        if data.get("critic_result") is not None:
+            entry["critic_result"] = data["critic_result"]
 
     def _save_pending_user_input(self, value: dict | None) -> None:
         """Persiste writing_sessions.pending_user_input (best-effort)."""

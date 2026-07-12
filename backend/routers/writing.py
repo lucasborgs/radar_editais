@@ -84,6 +84,9 @@ class ToolTraceEntry(BaseModel):
     # W-D1: presente só em entradas save_draft bem-sucedidas — título normalizado
     # da seção persistida (usado pela co-edição do workspace p/ highlight + undo).
     saved_section: str | None = None
+    # F3: veredito estruturado do critic (approved, issues, feedback) — presente
+    # em entradas save_draft que passaram pelo critic.
+    critic_result: dict | None = None
 
 
 class WritingTurnResponse(BaseModel):

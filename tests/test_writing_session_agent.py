@@ -59,6 +59,10 @@ def _make_session() -> WritingSession:
     s._ripple_suggestion = None
     s._ripple_active = False
     s._pending_user_input = None
+    s._tool_results = []
+    s._critic_block_count = 0
+    s._critic_pass_count = 0
+    s._critic_fail_open_count = 0
     s.backend = "anthropic"
     s.model = "claude-sonnet-4-6"
     return s
@@ -91,7 +95,8 @@ def test_extract_tool_trace_pairs_use_with_result():
             usage={"input_tokens": 150, "output_tokens": 8},
         ),
     ]
-    trace = WritingSession._extract_tool_trace(steps)
+    s = _make_session()
+    trace = s._extract_tool_trace(steps)
     assert len(trace) == 1
     assert trace[0]["id"] == "tu_1"
     assert trace[0]["name"] == "search_edital"
@@ -121,7 +126,8 @@ def test_extract_tool_trace_multiple_tools_same_name():
             input={"query": "TRL"}, output="TRL 5-9",
         ),
     ]
-    trace = WritingSession._extract_tool_trace(steps)
+    s = _make_session()
+    trace = s._extract_tool_trace(steps)
     assert len(trace) == 2
     assert trace[0]["id"] == "tu_1"
     assert trace[1]["id"] == "tu_2"
@@ -136,12 +142,13 @@ def test_extract_tool_trace_empty_when_no_tools():
             usage={},
         ),
     ]
-    assert WritingSession._extract_tool_trace(steps) == []
+    s = _make_session()
+    assert s._extract_tool_trace(steps) == []
 
 
-def test_extract_tool_trace_save_draft_exposes_saved_section():
-    """W-D1: save_draft bem-sucedido carrega `saved_section` com o título
-    NORMALIZADO (do output da tool), não o que o agente digitou no input."""
+def test_extract_tool_trace_save_draft_exposes_saved_section_and_critic_result():
+    """F3: save_draft bem-sucedido carrega `saved_section` e `critic_result`
+    estruturados de _tool_results, sem regex."""
     steps = [
         TraceStep(
             kind="llm", text="vou salvar",
@@ -156,15 +163,21 @@ def test_extract_tool_trace_save_draft_exposes_saved_section():
                    "Continue a conversa ou prossiga para a próxima seção.",
         ),
     ]
-    trace = WritingSession._extract_tool_trace(steps)
+    s = _make_session()
+    s._tool_results.append({
+        "section_title": "2. Metodologia",
+        "critic_result": {"approved": True, "issues": [], "feedback": ""},
+    })
+    trace = s._extract_tool_trace(steps)
     assert len(trace) == 1
     assert trace[0]["name"] == "save_draft"
     assert trace[0]["saved_section"] == "2. Metodologia"
+    assert trace[0]["critic_result"] == {"approved": True, "issues": [], "feedback": ""}
 
 
 def test_extract_tool_trace_save_draft_blocked_has_no_saved_section():
-    """Quando o critic bloqueia (output não começa com 'Rascunho salvo'),
-    a entrada NÃO carrega saved_section — nenhuma seção foi tocada."""
+    """F3: quando o critic bloqueia, a estrutura é a mesma — `saved_section`
+    e `critic_result` vêm de _tool_results (que registraram o bloqueio)."""
     steps = [
         TraceStep(
             kind="llm", text="",
@@ -178,9 +191,68 @@ def test_extract_tool_trace_save_draft_blocked_has_no_saved_section():
             output="Critic encontrou 1 problema(s) antes de salvar:\n• Vago demais.",
         ),
     ]
-    trace = WritingSession._extract_tool_trace(steps)
+    s = _make_session()
+    s._tool_results.append({
+        "section_title": "2. Metodologia",
+        "critic_result": {"approved": False, "issues": ["Vago demais."], "feedback": ""},
+    })
+    trace = s._extract_tool_trace(steps)
+    assert len(trace) == 1
+    assert trace[0]["saved_section"] == "2. Metodologia"
+    assert trace[0]["critic_result"]["approved"] is False
+    assert "Vago demais." in trace[0]["critic_result"]["issues"]
+
+
+def test_extract_tool_trace_save_draft_missing_tool_results():
+    """_extract_tool_trace não quebra se _tool_results estiver vazio
+    (fallback seguro — não savou, não tem estrutura)."""
+    steps = [
+        TraceStep(
+            kind="tool", name="save_draft",
+            input={"section_title": "x", "content": "y"},
+            output="Critic encontrou 1 problema(s) antes de salvar:\n• Vago demais.",
+        ),
+    ]
+    s = _make_session()
+    trace = s._extract_tool_trace(steps)
     assert len(trace) == 1
     assert "saved_section" not in trace[0]
+    assert "critic_result" not in trace[0]
+
+
+def test_extract_tool_trace_multi_save_draft_fifo_invariant():
+    """F3-B1: dois save_draft no mesmo turno, 1º com título inválido.
+    O 1º (falho) não recebe saved_section do 2º (sucesso). A invariante 1:1
+    é mantida por todos os caminhos de retorno da tool."""
+    s = _make_session()
+    s._tool_results = [
+        {"section_title": None, "critic_result": None},  # sentinela do 1º (título inválido)
+        {"section_title": "2. Descrição",
+         "critic_result": {"approved": True, "issues": [], "feedback": ""}},
+    ]
+    steps = [
+        TraceStep(kind="llm", text="", usage={}, tool_uses=[
+            {"id": "tu_1", "name": "save_draft",
+             "input": {"section_title": "Secao Inexistente", "content": "x"}},
+            {"id": "tu_2", "name": "save_draft",
+             "input": {"section_title": "2. Descrição", "content": "real"}},
+        ]),
+        TraceStep(kind="tool", name="save_draft",
+                  input={"section_title": "Secao Inexistente", "content": "x"},
+                  output="Título 'Secao Inexistente' não está no outline..."),
+        TraceStep(kind="tool", name="save_draft",
+                  input={"section_title": "2. Descrição", "content": "real"},
+                  output="Rascunho salvo em '2. Descrição' (4 chars) (aprovado pelo critic)"),
+    ]
+    trace = s._extract_tool_trace(steps)
+    assert len(trace) == 2
+    # 1º save_draft: falhou (título inválido) — sem saved_section
+    assert trace[0]["name"] == "save_draft"
+    assert "saved_section" not in trace[0], "1º save (falho) não deve ter saved_section"
+    # 2º save_draft: sucesso — saved_section e critic_result presentes
+    assert trace[1]["name"] == "save_draft"
+    assert trace[1]["saved_section"] == "2. Descrição"
+    assert trace[1]["critic_result"]["approved"] is True
 
 
 # ============================================================================
