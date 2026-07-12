@@ -15,6 +15,21 @@ com salvaguardas.
 Trigger principal (ADR §4.3): a cada 5 outcomes (aprovada/reprovada/submetida)
 acumulados em application_log desde a última reflexão. Por enquanto exposed
 como task on-demand — periodicidade entra na pipeline de jobs futura.
+
+F6 (2026-07, D3 — congelamento da memória auto-escrita): TODA a escrita em
+`reflection_insights` por este módulo (`reflect_workspace` / `synthesize_patterns`)
+fica desligada por default sob a flag `AUTO_MEMORY_WRITE=0`. A decisão D3
+espelha agentes de codificação de produção (Claude Code/Cursor/opencode):
+nenhum insight é extraído e injetado silenciosamente sem revisão humana. A
+LEITURA continua intacta (`load_active_insights`, `search_insights_for_tool`)
+— apenas insights já curados (à mão, se houver) são servidos.
+
+Religamento pós-beta (emodelo "Cursor Memories", spec futura — NÃO
+implementado nesta fase): a extração volta ativa, mas cada insight só é
+injetado após aprovação humana (fila de curadoria), com TTL/decay e spans
+de read-write desde o dia 1. Espelha o padrão LangMem/Letta/OEP-SSGM de
+anti-poisoning. O religamento será uma spec separada; o código da escrita é
+preservado aqui exatamente para esse reuso.
 """
 from __future__ import annotations
 
@@ -131,6 +146,24 @@ def _make_client():
     return make_client(api_key=os.environ["OPENAI_API_KEY"]), os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
+def _auto_memory_write_enabled() -> bool:
+    """Gate autoritativo da escrita auto-gerada em reflection_insights (F6, D3).
+
+    Default DELIBERADAMENTE OFF ("0"): a memória auto-escrita está congelada no
+    pré-beta — ver docstring do módulo e §5-F6 da spec. Qualquer caminho que
+    insere em reflection_insights via LLM-extraction (reflect_workspace,
+    synthesize_patterns, _persist_session_signals) DEVE checar esta função antes
+    de chamar a LLM, e o mesmo default ("0") vale em TODOS os pontos (core,
+    backend, tests). A leitura (load_active_insights, memory_search,
+    search_insights_for_tool) NÃO é gateada — insights curados à mão seguem
+    servidos.
+
+    Religamento pós-beta: setar AUTO_MEMORY_WRITE=1 reativa a escrita; o modelo
+    "Cursor Memories" (fila de curadoria + TTL) será spec futura.
+    """
+    return os.getenv("AUTO_MEMORY_WRITE", "0") == "1"
+
+
 def _project_to_store(
     workspace_id: str,
     *,
@@ -201,6 +234,12 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
     `synthesize_patterns`. Sem essa separação, cada reflexão zerava o level 2 e
     a memória de longo prazo nunca acumulava corpus de level 1.
 
+    F6 (D3): sob `AUTO_MEMORY_WRITE=0` (default) esta função é NO-OP — não
+    carrega outcomes nem chama LLM. Retorna `skipped_reason=
+    "auto_memory_write_disabled"`. A leitura de insights já curados
+    (`load_active_insights`) não é afetada. Ver docstring do módulo para o
+    religamento pós-beta (fila de curadoria + TTL/decay).
+
     Returns:
         dict com chaves:
           - outcomes_considered (int)
@@ -208,6 +247,17 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
           - confidence (str)
           - skipped_reason (str) se a reflexão não foi gerada
     """
+    if not _auto_memory_write_enabled():
+        logger.info(
+            "reflect_workspace: AUTO_MEMORY_WRITE=0 — no-op (ws=%s). "
+            "Escrita congelada (F6/D3); leitura intacta.", workspace_id,
+        )
+        return {
+            "outcomes_considered": 0,
+            "observations_inserted": 0,
+            "confidence": None,
+            "skipped_reason": "auto_memory_write_disabled",
+        }
     outcomes = _load_outcomes(db, workspace_id)
     if len(outcomes) < MIN_OUTCOMES_FOR_REFLECTION:
         return {
@@ -345,6 +395,11 @@ def synthesize_patterns(db: Client, workspace_id: str) -> dict:
     nos 3 guardas (high + >=5 outcomes + |delta|<=5) é materializado; o resto
     fica no fluxo manual /me/weights/pending.
 
+    F6 (D3): sob `AUTO_MEMORY_WRITE=0` (default) esta função é NO-OP — não
+    carrega level 1 nem chama LLM. Retorna `skipped_reason=
+    "auto_memory_write_disabled"`. A leitura de insights já curados não é
+    afetada. Ver docstring do módulo para o religamento pós-beta.
+
     Returns:
         dict com chaves:
           - level1_considered (int)
@@ -354,6 +409,19 @@ def synthesize_patterns(db: Client, workspace_id: str) -> dict:
           - auto_applied (list) — mudanças de peso auto-aplicadas
           - skipped_reason (str) se a síntese não foi gerada
     """
+    if not _auto_memory_write_enabled():
+        logger.info(
+            "synthesize_patterns: AUTO_MEMORY_WRITE=0 — no-op (ws=%s). "
+            "Escrita congelada (F6/D3); leitura intacta.", workspace_id,
+        )
+        return {
+            "level1_considered": 0,
+            "patterns_inserted": 0,
+            "weight_suggestions": [],
+            "confidence": None,
+            "auto_applied": [],
+            "skipped_reason": "auto_memory_write_disabled",
+        }
     level1 = _load_active_level1(db, workspace_id)
     if len(level1) < MIN_LEVEL1_FOR_SYNTHESIS:
         return {
@@ -480,6 +548,10 @@ def load_active_insights(db: Client, workspace_id: str, max_total: int = 6) -> l
     Prioriza level 2 (padrões) e cai para level 1 (observações) se faltar.
     Fonte da verdade é `deactivated_at IS NULL` (Gap 3b). A coluna `active`
     legacy é mantida sincronizada via trigger pra leitores antigos.
+
+    F6 (D3): caminho de LEITURA — NÃO é gateado por AUTO_MEMORY_WRITE. Serve
+    insights curados à mão (se houver) mesmo com a escrita congelada. Tripwire
+    F0/F6: loga o número de hits (span de leitura barato).
     """
     result = (
         db.table("reflection_insights")
@@ -491,7 +563,9 @@ def load_active_insights(db: Client, workspace_id: str, max_total: int = 6) -> l
         .limit(max_total)
         .execute()
     )
-    return result.data or []
+    out = result.data or []
+    logger.info("tripwire: load_active_insights n=%d ws=%s", len(out), workspace_id)
+    return out
 
 
 def search_insights_for_tool(db: Client, workspace_id: str, query: str = "") -> str:

@@ -262,7 +262,18 @@ async def reflect_workspace_task(workspace_id: str) -> None:
     A task self-gateia em MIN_OUTCOMES_FOR_REFLECTION (pula se há poucos
     outcomes) e supersede o lote de insights anterior, então é seguro
     enfileirar a cada outcome.
+
+    F6 (D3): short-circuit defensivo sob AUTO_MEMORY_WRITE=0 (default), antes
+    de importar reflection_service.
     """
+    from core.reflection_service import _auto_memory_write_enabled
+    if not _auto_memory_write_enabled():
+        logger.info(
+            "reflect_workspace_task: AUTO_MEMORY_WRITE=0 — no-op (ws=%s). "
+            "Escrita congelada (F6/D3); leitura intacta.", workspace_id,
+        )
+        return
+
     from core.reflection_service import reflect_workspace
 
     db = get_supabase_service()
@@ -292,7 +303,18 @@ async def synthesize_patterns_task(workspace_id: str) -> None:
 
     Self-gateia em MIN_LEVEL1_FOR_SYNTHESIS (pula se há poucas observações
     ativas), então é seguro enfileirar livremente.
+
+    F6 (D3): short-circuit defensivo sob AUTO_MEMORY_WRITE=0 (default), antes
+    de importar reflection_service.
     """
+    from core.reflection_service import _auto_memory_write_enabled
+    if not _auto_memory_write_enabled():
+        logger.info(
+            "synthesize_patterns_task: AUTO_MEMORY_WRITE=0 — no-op (ws=%s). "
+            "Escrita congelada (F6/D3); leitura intacta.", workspace_id,
+        )
+        return
+
     from core.reflection_service import synthesize_patterns
 
     db = get_supabase_service()
@@ -317,7 +339,17 @@ async def synthesize_patterns_cron(timestamp: int) -> None:
     A própria task self-gateia (pula workspaces com poucas observações ativas),
     então enfileirar todos é barato. `timestamp` vem do procrastinate periodic
     (UNIX epoch).
+
+    F6 (D3): sob AUTO_MEMORY_WRITE=0 (default), short-circuit sem nem buscar
+    os workspaces — evita N no-op enqueue (defensivo sobre o gate do worker).
     """
+    from core.reflection_service import _auto_memory_write_enabled
+    if not _auto_memory_write_enabled():
+        logger.info(
+            "synthesize_patterns_cron: AUTO_MEMORY_WRITE=0 — no-op (ts=%d). "
+            "Escrita congelada (F6/D3).", timestamp,
+        )
+        return
     db = get_supabase_service()
 
     fetch = await asyncio.to_thread(

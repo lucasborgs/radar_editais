@@ -44,6 +44,12 @@ async def update_application_status(
     `reflect_workspace_task` — fecha o loop de reflexão longitudinal, que antes
     só rodava on-demand. A task self-gateia em MIN_OUTCOMES_FOR_REFLECTION,
     então enfileirar a cada outcome é seguro (pula sozinha se ainda há poucos).
+
+    F6 (D3 — congelamento da memória auto-escrita): sob AUTO_MEMORY_WRITE=0
+    (default), o auto-defer enfileira a task, mas ela se torna no-op no worker
+    (gate em core/tasks.py + reflection_service.reflect_workspace). O defer
+    em si não é removido para manter a arquitetura de eventos; o congelamento
+    está no executor, não no trigger.
     """
     if payload.status not in _VALID_STATUS_TRANSITIONS:
         raise HTTPException(

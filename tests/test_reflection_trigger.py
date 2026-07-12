@@ -10,13 +10,26 @@ Cobre o fechamento do loop de reflexão (Gap 1 — level 1 e level 2 separados):
 
 O auto-trigger em si (PUT /applications/{id}/status -> defer) é validado em
 nível de endpoint/integração; aqui focamos na lógica de síntese, sem rede.
+
+F6 (D3 — congelamento da memória auto-escrita): um autouse fixture seta
+AUTO_MEMORY_WRITE=1 para preservar a intenção original dos testes (exercitar
+a lógica de escrita). Testes separados provam o no-op sob a flag off.
 """
 from __future__ import annotations
 
 import json
 from types import SimpleNamespace
 
+import pytest
+
 import core.reflection_service as rs
+
+
+@pytest.fixture(autouse=True)
+def _enable_auto_memory_write(monkeypatch: pytest.MonkeyPatch) -> None:
+    """F6 (D3): re-ativa a escrita automática para preservar a intenção dos
+    testes originais (exercitar a lógica de síntese sob AUTO_MEMORY_WRITE=1)."""
+    monkeypatch.setenv("AUTO_MEMORY_WRITE", "1")
 
 
 class _FakeTable:
@@ -200,3 +213,31 @@ def test_synthesize_generates_level2_and_supersedes_only_level2(monkeypatch):
     # O supersede carrega a reason específica da síntese.
     upd = next(p for (t, m, p) in db.log if t == "reflection_insights" and m == "update")
     assert upd.get("deactivation_reason") == "superseded by synthesize_patterns"
+
+
+# =============================================================================
+# F6 (D3) — no-op sob AUTO_MEMORY_WRITE=0 (default)
+# =============================================================================
+
+
+def test_reflect_noop_when_auto_memory_write_off(monkeypatch):
+    """Sob AUTO_MEMORY_WRITE=0 (default), reflect_workspace é no-op."""
+    # Garante que a flag está OFF (não deve setar).
+    monkeypatch.delenv("AUTO_MEMORY_WRITE", raising=False)
+    # Se a LLM fosse chamada, _patch_llm não foi invocada — test falharia.
+    db = _FakeDb([_outcome(1), _outcome(2), _outcome(3)])
+    res = rs.reflect_workspace(db, "ws-1")
+    assert res["skipped_reason"] == "auto_memory_write_disabled"
+    assert res["observations_inserted"] == 0
+    # Nenhuma escrita em reflection_insights.
+    assert not [x for x in db.log if x[0] == "reflection_insights"]
+
+
+def test_synthesize_noop_when_auto_memory_write_off(monkeypatch):
+    """Sob AUTO_MEMORY_WRITE=0 (default), synthesize_patterns é no-op."""
+    monkeypatch.delenv("AUTO_MEMORY_WRITE", raising=False)
+    db = _FakeDb([], level1=[_level1(1), _level1(2), _level1(3)])
+    res = rs.synthesize_patterns(db, "ws-1")
+    assert res["skipped_reason"] == "auto_memory_write_disabled"
+    assert res["patterns_inserted"] == 0
+    assert not [x for x in db.log if x[0] == "reflection_insights"]

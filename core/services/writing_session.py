@@ -41,7 +41,7 @@ from pathlib import Path
 import requests
 
 from config import FINEP_PDFS_DIR
-from core.reflection_service import load_active_insights
+from core.reflection_service import _auto_memory_write_enabled, load_active_insights
 from core.retrieval.retriever import (
     format_chunks_for_prompt,
     retrieve_chunks,
@@ -295,6 +295,11 @@ Responda apenas com o resumo."""
 # a sessão. Roda em PARALELO com COMPRESS_SYSTEM sobre os mesmos turnos. Enquanto
 # o resumo captura "o que foi dito" (alimenta o próximo turno), este captura
 # "o que deu atrito" (alimenta o aprendizado de longo prazo via reflection_insights).
+#
+# F6 (2026-07, D3 — congelamento da memória auto-escrita): este prompt é
+# PRESERVADO (não deletado) mas a extração+sinal só roda quando
+# AUTO_MEMORY_WRITE=1 (default 0). Ver `_compress_history`. A LEITURA de
+# insights curados (load_active_insights/memory_search) não é afetada.
 SIGNAL_SYSTEM = """Você analisa uma sessão de escrita de proposta para captação de recursos.
 A partir dos turnos abaixo, extraia SINAL sobre o processo de escrita — onde houve
 atrito e onde fluiu bem. Não resuma o conteúdo; foque no processo.
@@ -2118,7 +2123,27 @@ class WritingSession:
         # Ambos os caminhos são síncronos (self._call_llm), então usamos
         # ThreadPoolExecutor (2 workers), não asyncio. O future do sinal é
         # isolado: qualquer falha nele NÃO pode afetar a compressão narrativa.
+        #
+        # F6 (2026-07, D3 — congelamento da memória auto-escrita): o signal
+        # (Prompt B) SÓ é submetido quando AUTO_MEMORY_WRITE=1 (default 0). Sob
+        # a flag off, apenas o narrative_future roda — 1 chamada LLM por
+        # compressão em vez de 2, sem tocar em reflection_insights. A extração
+        # (extract_session_signal/_persist_session_signals) permanece como
+        # método para o religamento pós-beta (ver docstring do módulo
+        # reflection_service). Tripwire: caminho de geração usado.
         from concurrent.futures import ThreadPoolExecutor
+
+        auto_memory_on = _auto_memory_write_enabled()
+        logger.info(
+            "tripwire: compress_history signal_path=%s session=%s",
+            "on" if auto_memory_on else "off(self-frozen)", self.session_id,
+        )
+
+        if not auto_memory_on:
+            # Caminho congelado (F6): só narrativa, sem sinal/projeção.
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                pool.submit(self._compress_narrative, to_compress).result()
+            return
 
         with ThreadPoolExecutor(max_workers=2) as pool:
             narrative_future = pool.submit(self._compress_narrative, to_compress)
@@ -2165,7 +2190,19 @@ class WritingSession:
         Retorna lista de `{"insight", "kind", "evidence"}`. NUNCA propaga exceção:
         falha de LLM ou de parse vira `[]` — a compressão não pode quebrar o turno.
         O insert em reflection_insights é responsabilidade de `_persist_session_signals`.
+
+        F6 (D3): self-gate defensivo — sob AUTO_MEMORY_WRITE=0 (default) retorna
+        `[]` sem chamar LLM. O gate autoritativo está em `_compress_history`
+        (não submete o signal_future), mas este método permanece seguro mesmo se
+        chamado diretamente. Religamento pós-beta: ver docstring de
+        `core.reflection_service`.
         """
+        if not _auto_memory_write_enabled():
+            logger.info(
+                "tripwire: extract_session_signal skip=auto_memory_write_disabled session=%s",
+                self.session_id,
+            )
+            return []
         if not turns:
             return []
         turns_text = "\n".join(
@@ -2217,8 +2254,20 @@ class WritingSession:
 
         level=1 (observação), confidence='low' (extração heurística — conservador).
         Retorna o número de rows inseridas. Best-effort: loga e retorna 0 em falha.
+
+        F6 (D3): self-gate defensivo — sob AUTO_MEMORY_WRITE=0 (default) retorna 0
+        sem tocar no DB. O gate autoritativo está em `_compress_history`/`
+        extract_session_signal`; este método não é o gate único, mas garante
+        que nenhuma escrita vaze mesmo se chamado diretamente. A leitura de
+        insights curados não é afetada.
         """
         if not signals:
+            return 0
+        if not _auto_memory_write_enabled():
+            logger.info(
+                "tripwire: _persist_session_signals skip=auto_memory_write_disabled session=%s n=%d",
+                self.session_id, len(signals),
+            )
             return 0
         rows = [
             {
@@ -2288,12 +2337,18 @@ class WritingSession:
         workspace, gerados periodicamente pelo `reflect_workspace_task`. Falhas
         de leitura (tabela vazia, RLS, DB offline) viram fallback silencioso —
         a WritingSession opera sem insights e loga em debug.
+
+        F6 (D3): caminho de LEITURA — NÃO gateado. Tripwire abaixo.
         """
         try:
             insights = load_active_insights(self._db, workspace_id, max_total=6)
         except Exception as e:
             logger.debug("Falha ao carregar reflection_insights: %s", e)
+            logger.info("tripwire: static_reflection_block n=0 reason=load_failed ws=%s", workspace_id)
             return ""
+        logger.info(
+            "tripwire: static_reflection_block n=%d ws=%s", len(insights), workspace_id,
+        )
         return self._format_reflection_block(insights)
 
     def _build_reflection_context_for_turn(
@@ -2315,6 +2370,11 @@ class WritingSession:
             block = self._format_reflection_block(hits)
             if block:
                 return block
+        # Tripwire F6: fallback para o bloco estático (insights curados).
+        logger.info(
+            "tripwire: reflection_block_fallback=static ws=%s section=%s",
+            self.workspace_id, section_hint,
+        )
         return self._reflection_insights_context
 
     # ------------------------------------------------------------------

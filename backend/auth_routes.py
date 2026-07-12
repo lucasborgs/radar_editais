@@ -174,6 +174,12 @@ def trigger_reflection(request: Request, user_id: CurrentUserId, db: DbClient):
     Inline (não via fila procrastinate) para retornar o resultado imediatamente
     ao usuário. Custo: 1 chamada LLM (~1500 tokens). Se nenhum outcome
     qualificado existir (< 5), retorna skipped sem chamar LLM.
+
+    F6 (D3 — congelamento): sob AUTO_MEMORY_WRITE=0 (default), este endpoint
+    torna-se no-op — retorna skipped_reason="auto_memory_write_disabled" sem
+    chamar LLM. O gate está em `reflect_workspace` (o código não muda aqui
+    para manter o contrato da API). O religamento pós-beta (fila de curadoria
+    + TTL) está registrado na docstring do módulo reflection_service.
     """
     from core.reflection_service import reflect_workspace
     workspace = _ensure_workspace(user_id, db)
@@ -193,6 +199,11 @@ async def trigger_synthesis(user_id: CurrentUserId, db: DbClient):
     Vai pela fila procrastinate porque a síntese é uma etapa de longo prazo
     (não precisa de retorno imediato) e self-gateia se houver poucas
     observações ativas.
+
+    F6 (D3 — congelamento): sob AUTO_MEMORY_WRITE=0 (default), a task
+    enfileirada torna-se no-op no worker (gate em synthesize_patterns_task
+    + synthesize_patterns). O defer ainda acontece para manter o contrato
+    da API; o congelamento está no executor, não no trigger.
     """
     workspace = _ensure_workspace(user_id, db)
     try:
