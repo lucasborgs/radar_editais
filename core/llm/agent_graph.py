@@ -17,8 +17,10 @@ Em produção: telemetria via `langfuse.langchain.CallbackHandler`, checkpointer
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
+import re
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -1072,6 +1074,24 @@ def _generation_concurrency() -> int:
         return 4
 
 
+def _try_parse_generation_json(text: str) -> dict | None:
+    """Tenta extrair {content, citations} da resposta do LLM.
+
+    Aceita JSON puro ou envolvido em ```json ... ```. Retorna dict ou None."""
+    if not text:
+        return None
+    raw = text.strip()
+    if "```" in raw:
+        raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("`").strip()
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict) or not data.get("content", "").strip():
+        return None
+    return data
+
+
 async def _generate_section(
     inner_graph,
     section: str,
@@ -1090,17 +1110,15 @@ async def _generate_section(
     persistida?), não a fala do agente — o save_draft é a fonte de verdade. Sem
     callback, cai em "stop_reason != error".
 
-    `auto_save(section, text)`: fallback chamado quando verify_saved falha mas o
-    agente produziu texto na última resposta — garante que conteúdo gerado não
-    seja perdido mesmo que o LLM esqueça de chamar save_draft.
+    `auto_save(section, text)`: F1 — parseia a última resposta do agente como
+    JSON `{content, citations}`, extrai `content` e persiste via callback. Se o
+    parse falhar ou o content for vazio, a seção é marcada como failed e cai no
+    fallback universal da WritingSession.
 
     Isolamento por seção: QUALQUER exceção vira False (seção → failed_sections)
     sem derrubar o lote — o fallback universal da WritingSession cobre o resto."""
     try:
         logger.info("generation: iniciando seção '%s'", section)
-        # Sem provider aqui (= sem cache_control): o batch de geração usa OpenAI
-        # por default (prefix caching automático) — no-op deliberado (spec PR2).
-        # `_to_lc_messages` ainda consome eventual `cache_hint` defensivamente.
         init: AgentState = {
             "messages": [
                 SystemMessage(content=system),
@@ -1113,8 +1131,6 @@ async def _generate_section(
             "reflect_pending": False,
             "documents": {},
         }
-        # Propaga os callbacks (handler Langfuse) do run para o agente interno →
-        # spans por-seção aninhados sob o span da geração (Etapa 6).
         config: dict[str, Any] = {"recursion_limit": 3 * max_steps + 5}
         if callbacks:
             config["callbacks"] = callbacks
@@ -1131,22 +1147,21 @@ async def _generate_section(
         if on_result is not None:
             on_result(result)
         ok = verify_saved(section) if verify_saved else (result.stop_reason != "error")
+
         if ok and verify_saved:
-            logger.info("tripwire: generation_path path=agent section=%s", section)
+            logger.info("tripwire: generation_path path=structured section=%s", section)
         elif not ok and auto_save is not None:
-            # Safety net: tenta extrair texto do agente (raro — só se o modelo
-            # produziu draft como texto puro em vez de tool_call). O caminho
-            # principal de salvamento é o fallback universal na WritingSession.
-            texts = [
-                str(m.content).strip().strip('"\'')
-                for m in msgs if isinstance(m, AIMessage) and len(str(m.content or "")) > 20
-            ]
-            if texts:
-                best = max(texts, key=len)
-                logger.info("generation: auto_save: '%s' (%d chars)", section, len(best))
-                logger.info("tripwire: generation_path path=auto_save section=%s chars=%d", section, len(best))
-                auto_save(section, best)
+            # F1: contrato quote-first — parseia JSON {content, citations}
+            last_text = result.final_text or ""
+            parsed = _try_parse_generation_json(last_text)
+            if parsed and parsed.get("content", "").strip():
+                content = parsed["content"]
+                logger.info("tripwire: generation_path path=structured section=%s", section)
+                auto_save(section, content)
                 ok = verify_saved(section) if verify_saved else True
+            else:
+                logger.info("tripwire: generation_path path=fallback_raw section=%s", section)
+
         if not ok:
             logger.info("generation: '%s' → fallback na WS", section)
         return ok

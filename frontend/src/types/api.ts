@@ -86,6 +86,8 @@ export interface WritingTurnResponse {
   // Geração em lote: seções concluídas / falhas
   sections_done?: string[];
   failed_sections?: string[];
+  // F1: anotações do critic pós-save no batch de geração — {section: {approved, issues, feedback}}
+  generation_critic_annotations?: Record<string, Record<string, unknown>>;
   // True quando um draft completo foi gerado neste turno
   draft_ready?: boolean;
   // PR6.2: turno cortado no teto de passos do agente — mostrar aviso discreto.

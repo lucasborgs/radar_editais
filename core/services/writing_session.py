@@ -66,6 +66,11 @@ OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 # agente com tools (search_edital, save_draft com critic, etc.). Modelo e
 # orçamento de passos configuráveis via env.
 ANTHROPIC_MODEL_AGENT = os.getenv("ANTHROPIC_MODEL_AGENT", "claude-sonnet-4-6")
+# GENERATION_MODEL (D1 — F1): modelo do batch de geração. Default gpt-4o-mini
+# (barato; o retrieval determinístico + contrato quote-first compensam). Preparando
+# BYOK: env separada do AGENT_*/CRITIC_* tiers para swap independente.
+# Trocar aqui NÃO afeta o modelo do chat (turn()), nem o critic, nem embeddings.
+GENERATION_MODEL = os.getenv("GENERATION_MODEL", "gpt-4o-mini")
 # Folga para buscar + escrever + salvar + 1 retry do critic no MESMO turno
 # (o agente deve fechar a seção num turno só — ver WRITER_AGENT_SYSTEM).
 AGENT_MAX_STEPS = int(os.getenv("AGENT_MAX_STEPS", "10"))
@@ -252,20 +257,20 @@ LIMITES
 
 GENERATION_WRITER_SYSTEM = """Você é um especialista em redação de propostas para editais de fomento no Brasil, operando em MODO GERAÇÃO EM LOTE.
 
-Você recebe UMA seção por vez e deve pesquisar o edital para fundamentá-la. NÃO há conversa com o usuário — ele revisará depois.
+Você recebe UMA seção por vez com contexto do edital já injetado. NÃO há conversa com o usuário — ele revisará depois.
 
 VOCÊ TEM ACESSO AO CARD DA FONTE nas mensagens abaixo (CARD DA FONTE:). Ele contém objetivo, requisitos, exclusões, mecanismo, temas, tecnologias, público-alvo e entidades elegíveis. USE-O como referência primária — busca search_edital apenas para complementar.
 
 COMO TRABALHAR
 1. Leia o CARD DA FONTE antes de qualquer tool call.
 2. Faça NO MÁXIMO 1 busca com search_edital para dados não cobertos pelo card.
-3. Opcionalmente use load_skill para o playbook de escrita do instrumento.
-4. Escreva a seção completa e bem estruturada em Markdown na sua resposta final.
-5. O sistema salvará automaticamente o conteúdo que você produziu.
+3. Escreva a seção completa e bem estruturada em Markdown.
+4. Responda APENAS com JSON no formato: {"content": "seção em markdown", "citations": [{"chunk_id": "id-do-chunk", "claim": "o que este chunk sustenta"}]}.
+5. O chunk_id deve ser exatamente o id do chunk fornecido no contexto.
 
 DIRETRIZES
 - Seja propositivo ("faremos", não "poderíamos") e específico.
-- Ancore afirmações no que search_edital retornou; não invente requisitos.
+- Ancore afirmações nos chunks fornecidos; não invente requisitos.
 - NÃO invente dados numéricos (CNPJ, valores, TRL). Preencha com o que há no perfil.
 - NÃO copie rótulos internos ("[Trecho N]", nomes de PDF) para o texto final."""
 
@@ -441,6 +446,11 @@ class WritingSession:
         self._critic_block_count: int = 0
         self._critic_pass_count: int = 0
         self._critic_fail_open_count: int = 0
+
+        # F1 — anotações do critic pós-save no batch de geração. {section: dict}
+        # Preenchido em generate_full_proposal; persistido em section_drafts
+        # sob chave _critic_annotations.
+        self._generation_critic_annotations: dict[str, dict] = {}
 
         if session_id:
             # Retomar sessão existente — carrega tudo do Postgres.
@@ -665,6 +675,10 @@ class WritingSession:
         self._doc_sections = dict(drafts) if isinstance(drafts, dict) else {}
         plan_data = self._doc_sections.pop("__plan__", None)
         self._plan = plan_data if isinstance(plan_data, dict) else None
+        critic_data = self._doc_sections.pop("_critic_annotations", None)
+        self._generation_critic_annotations = (
+            critic_data if isinstance(critic_data, dict) else {}
+        )
         pending = row.get("pending_user_input")
         self._pending_user_input = pending if isinstance(pending, dict) else None
         self._loaded_created_at = row.get("created_at") or datetime.utcnow().isoformat()
@@ -1370,9 +1384,11 @@ class WritingSession:
 
         `record_turn`: False quando chamado do first-turn flow.
         """
-        from core.llm.agent_graph import run_generation_turn
+        from core.llm.agent_graph import _try_parse_generation_json, run_generation_turn
         from core.llm.agent_runtime import resolve_agent_provider
         from core.llm.agent_tools import build_writing_tools
+        from core.llm.agent_tools.critic_agent import run_critic
+        from core.llm.llm_client import make_client
 
         targets = sections if sections is not None else [
             t for t in self._proposal_outline
@@ -1386,6 +1402,7 @@ class WritingSession:
                 "sections_done": [],
                 "failed_sections": [],
                 "document": self.get_document(),
+                "generation_critic_annotations": {},
                 "success": True,
             }
 
@@ -1393,14 +1410,14 @@ class WritingSession:
                     self.session_id, len(targets))
 
         # Toolset reduzido para lote: agent só pesquisa (search_edital + load_skill).
-        # save_draft removido — WS gera e salva no fallback universal.
+        # save_draft removido — WS gera e salva via auto_save (JSON structured output).
         blocked = {
             "read_exact_chunk", "read_section", "read_full_proposal", "request_user_info",
             "save_draft", "search_library", "recall_company_learnings",
             "deep_research", "write_todos",
         }
         tools = [t for t in build_writing_tools(self) if t.name not in blocked]
-        provider, model = resolve_agent_provider("openai", "gpt-4o-mini")
+        provider, model = resolve_agent_provider("openai", GENERATION_MODEL)
         thread_id = f"{self.workspace_id}:{self.session_id}:generation"
         logger.info("[%s] generate_full_proposal: provider=%s model=%s tools=%d",
                     self.session_id, provider, model, len(tools))
@@ -1424,14 +1441,12 @@ class WritingSession:
                     self.session_id,
                     len(outcome.sections_done), len(outcome.failed_sections))
 
-        # Fallback para seções que o agente não salvou: gera com LLM direto.
+        # Fallback único (F1): LLM cru com o MESMO contrato JSON.
         if outcome.failed_sections:
             logger.info("[%s] generate_full_proposal: fallback para %d seções",
                         self.session_id, len(outcome.failed_sections))
-            logger.info("tripwire: generation_path path=fallback_llm session=%s n_sections=%d",
+            logger.info("tripwire: generation_path path=fallback_raw session=%s n_sections=%d",
                         self.session_id, len(outcome.failed_sections))
-            from core.llm.llm_client import make_client
-            from core.retrieval.retriever import retrieve_chunks
             sys_prompt = self._generation_system()
             outline_str = "\n".join(f"- {t}" for t in self._proposal_outline)
             client = make_client()
@@ -1439,44 +1454,55 @@ class WritingSession:
 
             for section in outcome.failed_sections:
                 try:
-                    query = section.split(". ", 1)[-1] if ". " in section else section
+                    query = section
+                    if self._project_description:
+                        query = f"{section}: {self._project_description}"
                     chunks = retrieve_chunks(
                         self._db, self._scope_edital_ids, query=query, k=5, rerank=False,
                     )
-                    context = ""
+                    context_lines: list[str] = []
                     if chunks:
-                        lines: list[str] = []
-                        for c in chunks:
+                        context_lines.append("CONTEXTO DO EDITAL PARA ESTA SEÇÃO (trechos rotulados por chunk_id):")
+                        for i, c in enumerate(chunks, start=1):
+                            cid = c.get("id", f"chunk_{i}")
                             text = c.get("text", "").strip()
-                            src = c.get("source_file", c.get("section", ""))
+                            src = c.get("section", c.get("source_file", ""))
                             if text:
-                                lines.append(f"[{src}]\n{text}")
-                        context = "\n\n".join(lines)
+                                context_lines.append(f"[chunk_id: {cid}] ({src})")
+                                context_lines.append(text)
 
+                    context_block = "\n\n".join(context_lines) if context_lines else ""
                     prompt = (
                         f"PERFIL DA EMPRESA:\n{self._profile_context}\n\n"
                         f"OUTLINE COMPLETO DA PROPOSTA:\n{outline_str}\n\n"
-                        f"CONTEXTO DO EDITAL PARA ESTA SEÇÃO:\n{context}\n\n"
+                        f"{context_block}\n\n"
                         f"Escreva agora a seção \"{section}\" COMPLETA, pronta para "
                         f"revisão, em markdown bem formatado. NÃO invente dados "
-                        f"numéricos (CNPJ, valores, TRL). Escreva APENAS o conteúdo "
-                        f"da seção, sem metadados."
+                        f"numéricos (CNPJ, valores, TRL). "
+                        f"Responda em formato JSON: {{\"content\": \"seção em markdown\", "
+                        f"\"citations\": [{{\"chunk_id\": \"...\", \"claim\": \"...\"}}]}}."
                     )
-                    logger.info("[%s] generation: fallback LLM — '%s' (%d chars context)",
-                                self.session_id, section, len(context))
+                    logger.info("[%s] generation: fallback LLM — '%s' (%d chars)",
+                                self.session_id, section, len(context_block))
                     resp = client.chat.completions.create(
-                        model="gpt-4o-mini", messages=[
+                        model=GENERATION_MODEL, messages=[
                             {"role": "system", "content": sys_prompt},
                             {"role": "user", "content": prompt},
                         ],
                         temperature=0.3, max_tokens=4096,
                     )
-                    text = (resp.choices[0].message.content or "").strip()
-                    if text:
-                        self.set_section_content(section, text)
+                    raw = (resp.choices[0].message.content or "").strip()
+                    parsed = _try_parse_generation_json(raw)
+                    if parsed and parsed.get("content", "").strip():
+                        self.set_section_content(section, parsed["content"])
                         outcome.sections_done.append(section)
                         logger.info("[%s] generation: fallback ✓ '%s' (%d chars)",
-                                    self.session_id, section, len(text))
+                                    self.session_id, section, len(parsed["content"]))
+                    elif raw:
+                        self.set_section_content(section, raw)
+                        outcome.sections_done.append(section)
+                        logger.info("[%s] generation: fallback (texto cru) ✓ '%s' (%d chars)",
+                                    self.session_id, section, len(raw))
                     else:
                         still_failed.append(section)
                 except Exception as e:
@@ -1490,6 +1516,56 @@ class WritingSession:
             logger.info("[%s] generate_full_proposal: agente salvou todas as seções",
                         self.session_id)
 
+        # F1: critic pós-save como anotação (D2) — roda DEPOIS de persistir, nunca bloqueia.
+        self._generation_critic_annotations = {}
+        for section in outcome.sections_done:
+            try:
+                content = self._doc_sections.get(section, "").strip()
+                if not content:
+                    continue
+                # Captura trace_context do thread atual para aninhamento Langfuse
+                trace_ctx = None
+                try:
+                    from core import telemetry
+                    trace_ctx = telemetry.get_current_trace_context()
+                except Exception:
+                    pass
+                cr = run_critic(content, section, self, trace_context=trace_ctx)
+                self._generation_critic_annotations[section] = {
+                    "approved": cr.approved,
+                    "issues": cr.issues,
+                    "feedback": cr.feedback,
+                    "fail_open": cr.fail_open,
+                }
+                if not cr.approved:
+                    self._critic_block_count += 1
+                elif cr.fail_open:
+                    self._critic_fail_open_count += 1
+                else:
+                    self._critic_pass_count += 1
+            except Exception as e:
+                logger.warning("[%s] generation: critic annotation falhou para '%s': %s",
+                               self.session_id, section, e)
+                self._generation_critic_annotations[section] = {
+                    "approved": True,
+                    "issues": [],
+                    "feedback": f"Anotação indisponível: {e}",
+                    "fail_open": True,
+                }
+
+        # Persiste anotações do critic no section_drafts (JSONB, chave _critic_annotations).
+        try:
+            drafts = dict(self._doc_sections)
+            drafts["_critic_annotations"] = self._generation_critic_annotations
+            self._db.table("writing_sessions").update({
+                "section_drafts": drafts,
+            }).eq("id", self.session_id).execute()
+        except Exception as e:
+            logger.warning(
+                "[%s] Falha ao persistir generation critic annotations: %s",
+                self.session_id, e,
+            )
+
         if record_turn:
             self._record_generation_turn(outcome)
 
@@ -1498,15 +1574,21 @@ class WritingSession:
             "sections_done": outcome.sections_done,
             "failed_sections": outcome.failed_sections,
             "document": self.get_document(),
+            "generation_critic_annotations": self._generation_critic_annotations,
             "success": not outcome.failed_sections,
         }
 
     def _build_generation_section_messages(self, section: str) -> list[dict]:
         """Mensagens iniciais do agente interno para UMA seção no modo geração.
 
+        F1: retrieval determinístico por seção — injeta top-k chunks do edital
+        rotulados com chunk_id ANTES do comando de escrita. search_edital continua
+        disponível para complemento. O comando final instrui o JSON structured
+        output {content, citations} com referências aos chunk_ids injetados.
+
         Espelha o prefixo estável de `_build_agent_initial_messages` (perfil,
         alvo, biblioteca, outline) — idêntico entre seções para preservar prompt
-        caching — e fecha com um comando DIRETO de escrita da seção. Sem histórico
+        caching — e fecha com chunks + comando de escrita. Sem histórico
         de conversa (não há diálogo no batch); com consciência do outline completo
         para coerência entre seções. O bloco temporal fica no tail dinâmico (muda
         diariamente — `hoje é {today}`/days_remaining — e invalidaria o prefixo).
@@ -1536,12 +1618,40 @@ class WritingSession:
         if self._temporal_block:
             messages.append({"role": "user", "content": self._temporal_block})
 
+        # F1: retrieval determinístico por seção — chunks rotulados com chunk_id.
+        try:
+            query = section
+            if self._project_description:
+                query = f"{section}: {self._project_description}"
+            chunks = retrieve_chunks(
+                self._db, self._scope_edital_ids, query=query, k=5, rerank=False,
+            )
+            if chunks:
+                chunk_lines: list[str] = [
+                    "CONTEXTO DO EDITAL PARA ESTA SEÇÃO (trechos rotulados por chunk_id):"
+                ]
+                for i, c in enumerate(chunks, start=1):
+                    cid = c.get("id", f"chunk_{i}")
+                    text = c.get("text", "").strip()
+                    src = c.get("section", c.get("source_file", ""))
+                    chunk_lines.append(f"[chunk_id: {cid}] ({src})")
+                    chunk_lines.append(text)
+                messages.append({
+                    "role": "user",
+                    "content": "\n\n".join(chunk_lines),
+                })
+        except Exception as e:
+            logger.warning("[%s] _build_generation_section_messages: retrieve_chunks falhou para '%s': %s",
+                           self.session_id, section, e)
+
         messages.append({
             "role": "user",
             "content": (
                 f"Escreva agora a seção \"{section}\" COMPLETA, pronta para revisão. "
-                f"Fundamente afirmações via search_edital (1-2 buscas bastam) e ao "
-                f"terminar persista com save_draft usando o título exato \"{section}\"."
+                f"Fundamente afirmações nos chunks fornecidos (use o chunk_id para citar). "
+                f"Responda em formato JSON: {{\"content\": \"seção em markdown\", "
+                f"\"citations\": [{{\"chunk_id\": \"...\", \"claim\": \"o que sustenta\"}}]}}. "
+                f"APENAS o JSON, sem markdown envolvente."
             ),
         })
         return messages
@@ -2034,15 +2144,20 @@ class WritingSession:
                 {"title": t, "content": self._doc_sections.get(t, "")}
                 for t in self._proposal_outline
             ],
+            "generation_critic_annotations": self._generation_critic_annotations,
         }
 
     def set_section_content(self, section_title: str, content: str) -> None:
         self._doc_sections[section_title] = content
         try:
-            # JSONB merge: read-modify-write. supabase-py não tem operador jsonb_set,
-            # mas o objeto é pequeno (poucas seções) — escrever inteiro é seguro.
+            # Preserva anotações do critic (F1) que vivem em _doc_sections só durante
+            # geração — a persistência delas é feita explicitamente em
+            # generate_full_proposal via chave _critic_annotations no JSONB.
+            drafts = dict(self._doc_sections)
+            if self._generation_critic_annotations:
+                drafts["_critic_annotations"] = self._generation_critic_annotations
             self._db.table("writing_sessions").update({
-                "section_drafts": self._doc_sections,
+                "section_drafts": drafts,
             }).eq("id", self.session_id).execute()
         except Exception as e:
             logger.warning(
@@ -2569,6 +2684,7 @@ def get_session_document(
         return None
     outline = row.get("proposal_outline") or []
     drafts = row.get("section_drafts") or {}
+    critic_annotations = drafts.pop("_critic_annotations", {})
     return {
         "session_id": row["id"],
         "edital_id": row["edital_id"],
@@ -2576,6 +2692,7 @@ def get_session_document(
             {"title": t, "content": drafts.get(t, "")}
             for t in outline
         ],
+        "generation_critic_annotations": critic_annotations,
     }
 
 
