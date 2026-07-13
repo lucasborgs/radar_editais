@@ -81,7 +81,6 @@ export interface OportunidadeDetail {
   macro_temas: string[];
   themes: string[];
   technologies: string[];
-  aplicacoes: string[];
   programs: string[];
   publico_alvo: string[];
   eligible_entities: string[];

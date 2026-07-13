@@ -36,7 +36,7 @@ CARD_KEYS = {
     "id", "source", "title", "status", "deadline", "themes", "technologies",
     "programs", "publico_alvo", "fonte_recurso", "opportunity_type", "official_url",
     "aperture", "macro_temas", "kind", "objective", "mecanismo", "mechanism",
-    "eligible_entities", "key_requirements", "aplicacoes", "exclusoes", "value",
+    "eligible_entities", "key_requirements", "exclusoes", "value",
     "icts", "investidores", "constraints", "document_urls", "collected_at",
 }
 
@@ -91,7 +91,7 @@ class TestCardMapping:
         assert set(card) == CARD_KEYS
 
     def test_previously_empty_fields_now_populated(self):
-        """exclusoes/publico_alvo/eligible_entities/aplicacoes — antes sempre [] no
+        """exclusoes/publico_alvo/eligible_entities — antes sempre [] no
         SQL, agora vêm de metadata (call B) e das tags (§ PR-B)."""
         card = entity_catalog._row_to_card(
             _edital_row(), programs={}, icts={"uuid-1": ["ICT Y"]}, agencies={"uuid-1": ["FINEP"]},
@@ -99,7 +99,6 @@ class TestCardMapping:
         assert card["exclusoes"] == ["Vedado a grandes"]
         assert card["publico_alvo"] == ["startups", "microempresas"]
         assert card["eligible_entities"] == ["startups", "microempresas"]  # == publico_alvo
-        assert card["aplicacoes"] == ["ia embarcada", "nlp"]               # das tecnologias_tags
         assert card["icts"] == ["ICT Y"]
         assert card["fonte_recurso"] == ["FINEP"]
 
@@ -133,7 +132,6 @@ class TestCardMapping:
         assert card["status"] == "ABERTA"           # ativa → ABERTA
         assert card["publico_alvo"] == ["startups"]
         assert card["exclusoes"] == ["pessoa física"]
-        assert card["aplicacoes"] == ["ideacao"]
         assert card["official_url"] == "https://c.org"
         assert card["fonte_recurso"] == ["FINEP"]
 
@@ -215,7 +213,6 @@ class TestSqlBackendContract:
             assert set(card) == CARD_KEYS
             assert isinstance(card["exclusoes"], list)
             assert isinstance(card["publico_alvo"], list)
-            assert isinstance(card["aplicacoes"], list)
 
     def test_get_edital_roundtrip(self):
         sample = entity_catalog.list_editais(limit=3)

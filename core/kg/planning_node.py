@@ -90,8 +90,6 @@ def _format_edital_context(edital_id: str | None) -> str:
         lines.append("Temas: " + ", ".join(card["themes"]))
     if card.get("technologies"):
         lines.append("Tecnologias: " + ", ".join(card["technologies"]))
-    if card.get("aplicacoes"):
-        lines.append("Aplicações: " + ", ".join(card["aplicacoes"]))
     if card.get("key_requirements"):
         lines.append("Requisitos-chave:")
         for r in card["key_requirements"]:

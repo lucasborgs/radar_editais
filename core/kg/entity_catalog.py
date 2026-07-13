@@ -17,7 +17,7 @@ Dois regimes de acesso ao Postgres (mesma fronteira do resto do v3):
 Mapeamento gold → shape legado de `edital_card(full=True)` (contrato lido por
 writing_session/planning_node/checklist/frontend):
   title←name · deadline (dd/mm/yyyy — formato que `schema.parse_deadline` lê) ·
-  objective←description · themes←setores · technologies/aplicacoes←tecnologias_tags ·
+  objective←description · themes←setores · technologies←tecnologias_tags ·
   aperture←formato · mecanismo←[mecanismo] · fonte_recurso←arestas `operado_por` ·
   programs←`subordinado_a` · icts←`exige_parceria_com` · value←ticket_min/max ·
   status←recomputado do deadline · publico_alvo/eligible_entities←metadata.publico_alvo ·
@@ -183,9 +183,6 @@ def _row_to_card(
         # eligible_entities == _publico_alvo).
         "eligible_entities": publico_alvo,
         "key_requirements": list(row.get("requisitos_texto") or []),
-        # Sem dimensão `aplicacao` no schema gold: as tags de tecnologia ocupam o
-        # papel (§ mapeamento PR-B) — o card não fica vazio para o planning_node.
-        "aplicacoes": tags,
         "exclusoes": _as_list(meta.get("exclusoes")),
         "value": _value_display(row),
         "icts": icts.get(eid, []),
@@ -280,7 +277,6 @@ def _curated_card(row: dict, *, agencies: dict[str, list[str]]) -> dict:
         "macro_temas": [],
         "themes": list(row.get("setores") or []),
         "technologies": tags,
-        "aplicacoes": tags,
         "programs": [],
         "publico_alvo": _as_list(meta.get("publico_alvo")),
         "eligible_entities": _as_list(meta.get("publico_alvo")),

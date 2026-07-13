@@ -305,7 +305,6 @@ export default function OportunidadeDetailPage() {
       <div className="flex flex-wrap gap-4 mb-4">
         <TagCard title="Temas" tags={detail.themes} />
         <TagCard title="Tecnologias" tags={detail.technologies} />
-        <TagCard title="Aplicações" tags={detail.aplicacoes} />
         <TagCard title="Programas" tags={detail.programs} />
         <TagCard title="Público-alvo" tags={detail.eligible_entities.length ? detail.eligible_entities : detail.publico_alvo} />
         <TagCard title="ICTs relacionadas" tags={detail.icts} />

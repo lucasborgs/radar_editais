@@ -35,7 +35,6 @@ from core.kg import entity_catalog
 _ENTITY_FOLDERS: dict[str, tuple[str, str, str, str]] = {
     "temas": ("🏷️", "Tema", "Temas", "tema"),
     "tecnologias": ("🔧", "Tecnologia", "Tecnologias", "tecnologia"),
-    "aplicacoes": ("🎯", "Aplicação", "Aplicações", "aplicacao"),
     "programas": ("📋", "Programa", "Programas", "programa"),
     "icts": ("🔬", "ICT", "ICTs", "ict"),
     "investidores": ("💼", "Investidor", "Investidores", "investidor"),
@@ -130,13 +129,6 @@ def _edital_note(card: dict, full: dict | None, subfolder: str) -> str:
         lines.append("## Tecnologias\n")
         for t in card["technologies"]:
             lines.append(f"- [[{subfolder}/tecnologias/{_slugify(t)}|{t}]]")
-        lines.append("")
-
-    # Aplicações
-    if full and full.get("aplicacoes"):
-        lines.append("## Aplicações\n")
-        for a in full["aplicacoes"]:
-            lines.append(f"- 🎯 [[{subfolder}/aplicacoes/{_slugify(a)}|{a}]]")
         lines.append("")
 
     # Programas (subordinado_a)
@@ -311,8 +303,6 @@ def run(vault_path: Path, subfolder: str = "radar-editais") -> None:
             _add("temas", t, c)
         for t in c.get("technologies", []):
             _add("tecnologias", t, c)
-        for a in full.get("aplicacoes", []):
-            _add("aplicacoes", a, c)
         for p in c.get("programs", []):
             _add("programas", p, c)
         for i in full.get("icts", []):
