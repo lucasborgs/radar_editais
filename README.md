@@ -15,7 +15,7 @@ flowchart LR
     DESC[Descoberta Web<br/>crawler + gate admin] -->|promote| SILVER
     SILVER --> GOLD
 
-    GOLD[("Gold — Catálogo<br/>Postgres · entidades<br/>match_chunks · edital_chunks")]
+    GOLD[("Gold — Catálogo<br/>Postgres · entidades<br/>match_chunks")]
 
     %% Spoke 1: Match
     subgraph MATCH["① Radar — Match"]
@@ -28,9 +28,21 @@ flowchart LR
 
     GOLD -->|entidades + match_chunks| MATCH
 
+    %% Ingest pipeline (on demand)
+    subgraph INGEST["Pré-processamento (sob demanda)"]
+        EDITAL_RAW[Edital raw] --> CHUNKER[Chunker estrutural<br/>Art. / §]
+        CHUNKER --> CR[Contextual Retrieval<br/>LLM injeta contexto do capítulo]
+        CR --> EMBED[Embedder<br/>text-embedding-3-small]
+    end
+
+    GOLD -.->|edital raw| INGEST
+    EMBED --> EC
+
+    EC[(edital_chunks<br/>pgvector + tsvector)]
+
     %% Spoke 2: Writing + RAG
     subgraph ESCRITA["② Escrita Assistida"]
-        EC[edital_chunks] --> HYDE[HyDE]
+        EC --> HYDE[HyDE]
         EC --> BM25
         HYDE --> DENSE[pgvector]
         DENSE --> RRF[RRF]
@@ -41,7 +53,6 @@ flowchart LR
     end
 
     RANK -->|ranking| ESCRITA
-    GOLD -.->|edital_chunks| ESCRITA
 
     %% Spoke 3: Explore
     subgraph EXPLORE["③ Explore — Mapa"]
@@ -51,7 +62,7 @@ flowchart LR
 
     GOLD -->|entidades| HG
 
-    style GOLD fill:#e6f3ff,stroke:#0066cc,stroke-width:2px
+    style GOLD fill:#e6f3ff,stroke:#0066cc,stroke-width:2px,color:#000
 ```
 
 - **Descoberta**: crawler web (DOU + afins) → staging com gate humano. Promovido → silver → gold como qualquer edital de agência.
