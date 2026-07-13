@@ -10,32 +10,65 @@ oportunidades de fomento público — editais, programas e investidores — em r
 
 ```mermaid
 flowchart LR
-    subgraph T["Fontes"]
+    subgraph Fontes
         AG[Agências FINEP/FAPESP/FAPESC] --> B[(Bronze)]
         WEB[Descoberta web + gate admin] --> B
         CUR[Curadoria ICTs/investidores] --> B
     end
-    B --> HEX[hyper_extractor<br/>hipergrafo N-ário via LLM]
-    B --> CH[chunker + contextual retrieval<br/>edital_chunks pgvector]
-    HEX --> KG[(Postgres<br/>entidades · relações<br/>trechos de match)]
-    CH --> PG[(pgvector + tsvector)]
-    KG --> M[Funil v3: elegibilidade<br/>→ MaxSim → veredito LLM]
-    KG --> EA[ExploreAgent<br/>LangGraph ReAct]
-    KG --> WS[WritingSession<br/>ficha do edital]
-    PG --> WS
-    M & EA & WS --> API[FastAPI routers]
+
+    B --> HEX[hyper_extractor via LLM]
+    B --> CHUNK[chunker + contextual retrieval]
+
+    HEX --> HG[(Hipergrafo N-ário<br/>Oportunidade · Ator · Conceito)]
+    HG --> ENT[(Postgres<br/>entidades · match_chunks)]
+
+    CHUNK --> PG[(pgvector + tsvector<br/>edital_chunks)]
+
+    ENT --> E0["E0: Vivo (SQL)"]
+    E0 --> E1["E1: Elegibilidade"]
+    E1 --> E2["E2: MaxSim (zero LLM)"]
+    E2 --> E3["E3: Veredito gpt-4o-mini"]
+    E3 --> RANK[Ranking Final]
+
+    ENT --> INV[Investidor · cosseno]
+    INV --> RANK
+
+    PG --> HYDE[HyDE] --> DENSE[Dense pgvector]
+    PG --> SPARSE[BM25]
+    DENSE --> RRF[RRF merge]
+    SPARSE --> RRF
+    RRF --> BOOST[Boost 1.5x] --> RERANK[Rerank] --> TK[top-k]
+
+    TK --> WS[WritingSession<br/>RAG + LangGraph]
+    ENT --> WS
+    RANK --> WS
+
+    ENT --> EA[ExploreAgent]
+    EA --> TOOLS[Tools: search · tags · BFS · match]
+    TOOLS -.-> E2
+
+    EA -.-> FRONT[Frontend · profile_diff]
+    FRONT -.-> Q[CompanyProfile]
+    Q --> CHUNK
+    Q --> E0
+
+    WS --> API[FastAPI]
+    EA --> API
     API --> FE[Next.js 14]
-    WK[worker procrastinate] -.-> HEX & CH & WEB & M & WS
+
+    WK[worker procrastinate] -.-> HEX & CHUNK & WEB
 ```
 
 - **Match**: funil determinístico de 4 estágios — vigência (SQL) → elegibilidade
-  → afinidade MaxSim (zero LLM) → veredito gpt-4o-mini no top-K
-- **Explore**: agente ReAct com busca semântica, BFS em hipergrafo e o match
-  como ferramenta
-- **Escrita**: sessões LangGraph com checkpointer Postgres, RAG híbrida (densa +
-  BM25 + rerank), checklist paralelo 3-passos
+  → MaxSim (zero LLM) → veredito gpt-4o-mini no top-K. Trilha investidor
+  paralela por cosseno de tese.
+- **Explore**: agente ReAct com busca semântica, BFS em hipergrafo,
+  entidades por tags e o motor de match como ferramenta.
+- **Escrita**: sessões LangGraph com checkpointer Postgres durável, RAG híbrida
+  (HyDE + pgvector + BM25 + RRF + rerank), ficha da oportunidade via catálogo
+  de entidades, checklist paralelo 3-passos.
 - **Runtime**: 5 tiers de LLM independentes por env var (embedding, contextual,
-  extração, explore, escrita)
+  extração, explore, escrita).
 
 ## Stack
 
