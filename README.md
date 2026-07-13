@@ -10,65 +10,55 @@ oportunidades de fomento público — editais, programas e investidores — em r
 
 ```mermaid
 flowchart LR
-    subgraph Fontes
-        AG[Agências FINEP/FAPESP/FAPESC] --> B[(Bronze)]
-        WEB[Descoberta web + gate admin] --> B
-        CUR[Curadoria ICTs/investidores] --> B
+    %% Input channels → hub
+    FONTES[Agências<br/>FINEP/FAPESP/FAPESC] --> SILVER[Silver<br/>extração + normalização]
+    DESC[Descoberta Web<br/>crawler + gate admin] -->|promote| SILVER
+    SILVER --> GOLD
+
+    GOLD[("Gold — Catálogo<br/>Postgres · entidades<br/>match_chunks · edital_chunks")]
+
+    %% Spoke 1: Match
+    subgraph MATCH["① Radar — Match"]
+        PERFIL[Perfil Empresa] --> S0[Stage 0: Vigência]
+        S0 --> S1[Stage 1: Elegibilidade]
+        S1 --> S2[Stage 2: MaxSim · zero LLM]
+        S2 --> S3[Stage 3: Veredito gpt-4o-mini]
+        S3 --> RANK[Ranking + Trilha Investidor]
     end
 
-    B --> HEX[hyper_extractor via LLM]
-    B --> CHUNK[chunker + contextual retrieval]
+    GOLD -->|entidades + match_chunks| MATCH
 
-    HEX --> HG[(Hipergrafo N-ário<br/>Oportunidade · Ator · Conceito)]
-    HG --> ENT[(Postgres<br/>entidades · match_chunks)]
+    %% Spoke 2: Writing + RAG
+    subgraph ESCRITA["② Escrita Assistida"]
+        EC[edital_chunks] --> HYDE[HyDE]
+        EC --> BM25
+        HYDE --> DENSE[pgvector]
+        DENSE --> RRF[RRF]
+        BM25 --> RRF
+        RRF --> RERANK[Rerank] --> TK[Top-k]
+        TK --> WS[WritingSession LangGraph]
+        WS --> DRAFT[Rascunho + Citações]
+    end
 
-    CHUNK --> PG[(pgvector + tsvector<br/>edital_chunks)]
+    RANK -->|ranking| ESCRITA
+    GOLD -.->|edital_chunks| ESCRITA
 
-    ENT --> E0["E0: Vivo (SQL)"]
-    E0 --> E1["E1: Elegibilidade"]
-    E1 --> E2["E2: MaxSim (zero LLM)"]
-    E2 --> E3["E3: Veredito gpt-4o-mini"]
-    E3 --> RANK[Ranking Final]
+    %% Spoke 3: Explore
+    subgraph EXPLORE["③ Explore — Mapa"]
+        HG[Hipergrafo N-ário<br/>Oportunidade · Ator · Conceito] --> EA[ExploreAgent ReAct]
+        EA --> RESP[Respostas → profile_diff]
+    end
 
-    ENT --> INV[Investidor · cosseno]
-    INV --> RANK
+    GOLD -->|entidades| HG
 
-    PG --> HYDE[HyDE] --> DENSE[Dense pgvector]
-    PG --> SPARSE[BM25]
-    DENSE --> RRF[RRF merge]
-    SPARSE --> RRF
-    RRF --> BOOST[Boost 1.5x] --> RERANK[Rerank] --> TK[top-k]
-
-    TK --> WS[WritingSession<br/>RAG + LangGraph]
-    ENT --> WS
-    RANK --> WS
-
-    ENT --> EA[ExploreAgent]
-    EA --> TOOLS[Tools: search · tags · BFS · match]
-    TOOLS -.-> E2
-
-    EA -.-> FRONT[Frontend · profile_diff]
-    FRONT -.-> Q[CompanyProfile]
-    Q --> CHUNK
-    Q --> E0
-
-    WS --> API[FastAPI]
-    EA --> API
-    API --> FE[Next.js 14]
-
-    WK[worker procrastinate] -.-> HEX & CHUNK & WEB
+    style GOLD fill:#e6f3ff,stroke:#0066cc,stroke-width:2px
 ```
 
-- **Match**: funil determinístico de 4 estágios — vigência (SQL) → elegibilidade
-  → MaxSim (zero LLM) → veredito gpt-4o-mini no top-K. Trilha investidor
-  paralela por cosseno de tese.
-- **Explore**: agente ReAct com busca semântica, BFS em hipergrafo,
-  entidades por tags e o motor de match como ferramenta.
-- **Escrita**: sessões LangGraph com checkpointer Postgres durável, RAG híbrida
-  (HyDE + pgvector + BM25 + RRF + rerank), ficha da oportunidade via catálogo
-  de entidades, checklist paralelo 3-passos.
-- **Runtime**: 5 tiers de LLM independentes por env var (embedding, contextual,
-  extração, explore, escrita).
+- **Descoberta**: crawler web (DOU + afins) → staging com gate humano. Promovido → silver → gold como qualquer edital de agência.
+- **Radar (Match)**: funil determinístico de 4 estágios — vigência (SQL) → elegibilidade → MaxSim (zero LLM) → veredito gpt-4o-mini no top-K. Trilha investidor paralela por cosseno de tese.
+- **Explore**: agente ReAct com busca semântica, BFS em hipergrafo, entidades por tags e o motor de match como ferramenta.
+- **Escrita**: sessões LangGraph com checkpointer Postgres durável, RAG híbrida (HyDE + pgvector + BM25 + RRF + rerank), ficha da oportunidade via catálogo, checklist paralelo 3-passos.
+- **Runtime**: 5 tiers de LLM independentes por env var (embedding, contextual, extração, explore, escrita).
 
 ## Stack
 
