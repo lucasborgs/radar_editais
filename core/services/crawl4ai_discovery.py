@@ -12,6 +12,7 @@ import io
 import os
 import time
 from typing import Any
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from core.net_guard import safe_get
 from core.services.discovery_evidence import (
@@ -42,6 +43,12 @@ def _document_links(result: Any) -> list[dict[str, str]]:
     seen: set[str] = set()
     for item in candidates:
         url = str((item or {}).get("href") or (item or {}).get("url") or "").strip()
+        # Alguns portais usam uma página de download cujo query-param aponta
+        # para o PDF canônico. Preferir o artefato final evita persistir HTML
+        # como se fosse regulamento (caso real FAPEMIG).
+        query_url = (parse_qs(urlsplit(url).query).get("url") or [""])[0]
+        if ".pdf" in unquote(query_url).lower():
+            url = unquote(query_url)
         label = str((item or {}).get("text") or "").strip()
         if not url or url in seen or ".pdf" not in f"{url} {label}".lower():
             continue
