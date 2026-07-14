@@ -1,6 +1,6 @@
 # Spec — Radar Fase 2: urgência, filtros e comparação
 
-**Status:** proposta — aguardando aprovação · **Data:** 2026-07-14
+**Status:** implementada — aguardando QA manual · **Data:** 2026-07-14
 
 **Documento-pai:** [radar-initiative.md](radar-initiative.md).
 

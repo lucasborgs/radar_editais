@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { STATUS_CONFIG } from "@/lib/constants";
 import type { EditalStatus } from "@/types/edital";
 import type { MatchedEdital, MatchedExcerpt } from "@/lib/api";
+import { deadlineUrgency, urgencyLabel, type DeadlineUrgency } from "@/lib/radar-utils";
 import { VerdictBlock } from "./VerdictBlock";
 
 function ScoreRing({ score }: { score: number }) {
@@ -62,12 +63,17 @@ export function SetorChips({ setores }: { setores?: string[] }) {
 export function MatchedEditalCard({
   edital,
   onStartWriting,
+  onCompare,
+  isCompared = false,
 }: {
   edital: MatchedEdital;
   onStartWriting: (source: string, id: string) => void;
+  onCompare?: () => void;
+  isCompared?: boolean;
 }) {
   const statusKey = (edital.status?.toUpperCase() as EditalStatus) ?? "Desconhecido";
   const statusCfg = STATUS_CONFIG[statusKey] ?? { label: edital.status ?? "—", className: "" };
+  const urgency: DeadlineUrgency = deadlineUrgency(edital.prazo);
 
   return (
     <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm font-sans">
@@ -94,6 +100,14 @@ export function MatchedEditalCard({
             )}
             <SetorChips setores={edital.setores} />
           </div>
+          {(urgency === "closing" || urgency === "soon" || urgency === "continuous" || urgency === "confirm") && (
+            <p className={cn(
+              "mt-1 text-[11px] font-medium",
+              urgency === "closing" ? "text-red-600 dark:text-red-300" : "text-content-secondary",
+            )}>
+              {urgencyLabel(edital.prazo)}
+            </p>
+          )}
         </div>
       </div>
 
@@ -117,12 +131,22 @@ export function MatchedEditalCard({
         </div>
       )}
 
-      <button
-        onClick={() => onStartWriting(edital.source, edital.edital_id)}
-        className="mt-2 w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
-      >
-        Escrever proposta →
-      </button>
+      <div className="mt-2 flex gap-2">
+        {onCompare && (
+          <button
+            onClick={onCompare}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-content-primary hover:bg-app-bg"
+          >
+            {isCompared ? "Remover comparação" : "Comparar"}
+          </button>
+        )}
+        <button
+          onClick={() => onStartWriting(edital.source, edital.edital_id)}
+          className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+        >
+          Escrever proposta →
+        </button>
+      </div>
     </div>
   );
 }
