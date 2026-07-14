@@ -1,6 +1,8 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      target: app
     container_name: radar-app
     ports:
       - "8000:8000"
@@ -11,9 +13,13 @@ services:
     restart: unless-stopped
 
   worker:
-    build: .
+    build:
+      context: .
+      target: worker
     container_name: radar-worker
     env_file: .env
+    environment:
+      DISCOVERY_CRAWL4AI_ENABLED: "1"
     volumes:
       - ./data:/app/data
     command: python -m procrastinate --app=core.tasks.app worker
