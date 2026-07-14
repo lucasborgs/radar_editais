@@ -4,8 +4,10 @@ export type DeadlineUrgency = "closing" | "soon" | "future" | "continuous" | "co
 export type DeadlineFilter = "all" | "closing" | "soon" | "continuous";
 export type EligibilityFilter = "all" | "elegivel" | "nao_verificada";
 export type EditalOrder = "affinity" | "deadline";
+export type RadarTrail = "edital" | "programa" | "investidor";
 
 export interface RadarFilters {
+  trails: RadarTrail[];
   setores: string[];
   eligibility: EligibilityFilter;
   deadline: DeadlineFilter;
@@ -13,6 +15,7 @@ export interface RadarFilters {
 }
 
 export const DEFAULT_RADAR_FILTERS: RadarFilters = {
+  trails: ["edital", "programa", "investidor"],
   setores: [],
   eligibility: "all",
   deadline: "all",
