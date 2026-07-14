@@ -24,7 +24,7 @@ Explorar uma ideia/projeto
 
 | Ordem | Entrega | Spec | Estado | Dependências | Critério de conclusão |
 |---:|---|---|---|---|---|
-| 1 | Radar explícito e explicável | [radar-frontdoor.md](radar-frontdoor.md) | proposta | match v3, perfil, auth opcional, cards existentes | rota `/radar`, contrato determinístico e jornadas anônima/autenticada aprovadas |
+| 1 | Radar explícito e explicável | [radar-frontdoor.md](radar-frontdoor.md) | implementada — aguardando revisão/QA manual | match v3, perfil, auth opcional, cards existentes | rota `/radar`, contrato determinístico e jornadas anônima/autenticada aprovadas |
 | 2 | Urgência, filtros e comparação | `radar-fase-2.md` | não iniciada | entrega 1 e contrato estável de cards | usuário filtra, prioriza por prazo e compara oportunidades sem reinterpretar ranking |
 | 3 | Operação da descoberta | `discovery-operations.md` | não iniciada | staging, tasks de promoção, ingest gold e RAG | promoção observável por etapa, reprocessável e auditável |
 | 4 | Explorer de projetos | `explorer-project-canvas.md` | não iniciada | decisão de modelo de dados/memória, entrega 1 | hipótese de projeto evolui para perfil/Radar por ação explícita do usuário |
