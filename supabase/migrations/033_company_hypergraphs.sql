@@ -24,6 +24,7 @@ alter table public.company_hypergraphs enable row level security;
 
 -- RLS: o dono do workspace lê o próprio hipergrado (a escrita é via service-role na
 -- task, que bypassa RLS — mesma postura de content_items/enrich).
+drop policy if exists "company_hypergraph_select_own" on public.company_hypergraphs;
 create policy "company_hypergraph_select_own" on public.company_hypergraphs
     for select using (
         workspace_id in (select id from public.workspaces where user_id = auth.uid())

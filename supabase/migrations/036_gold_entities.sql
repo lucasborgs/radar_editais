@@ -68,6 +68,7 @@ create index if not exists idx_entities_embedding
 
 alter table public.entities enable row level security;
 -- Catálogo público: leitura para authenticated; escrita só via service-role.
+drop policy if exists "entities_read_authenticated" on public.entities;
 create policy "entities_read_authenticated" on public.entities
   for select to authenticated using (true);
 
@@ -87,6 +88,7 @@ create index if not exists idx_er_source on public.entity_relationships(source_i
 create index if not exists idx_er_target on public.entity_relationships(target_id);
 
 alter table public.entity_relationships enable row level security;
+drop policy if exists "entity_relationships_read_authenticated" on public.entity_relationships;
 create policy "entity_relationships_read_authenticated" on public.entity_relationships
   for select to authenticated using (true);
 
@@ -109,6 +111,7 @@ create index if not exists idx_match_chunks_embedding
   on public.match_chunks using hnsw (embedding vector_cosine_ops);
 
 alter table public.match_chunks enable row level security;
+drop policy if exists "match_chunks_read_authenticated" on public.match_chunks;
 create policy "match_chunks_read_authenticated" on public.match_chunks
   for select to authenticated using (true);
 
@@ -134,6 +137,7 @@ create index if not exists idx_company_chunks_embedding
 alter table public.company_chunks enable row level security;
 -- RLS "own" por workspace_id (mesmo padrão de writing_sessions/reflection_insights):
 -- o tenant só lê/escreve linhas dos workspaces que possui.
+drop policy if exists "company_chunks_own" on public.company_chunks;
 create policy "company_chunks_own" on public.company_chunks
   for all
   using (

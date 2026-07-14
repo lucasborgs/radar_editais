@@ -25,6 +25,7 @@ alter table public.match_verdicts enable row level security;
 
 -- RLS: o dono do workspace lê os próprios vereditos (a escrita é via service-role
 -- na task do worker, que bypassa RLS — mesma postura de company_hypergraphs/033).
+drop policy if exists "match_verdicts_select_own" on public.match_verdicts;
 create policy "match_verdicts_select_own" on public.match_verdicts
     for select using (
         workspace_id in (select id from public.workspaces where user_id = auth.uid())
