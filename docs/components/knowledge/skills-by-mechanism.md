@@ -29,8 +29,9 @@ a competência de transformar o fato do grafo na narrativa que aprova.
 **Substrato (destino):** o conhecimento mora no **nó do KG** (mecanismo/fonte como
 nós com wiki_page — "o grafo é a fonte de conhecimento", à la LLM-wiki). Arquivos
 `skills/*.md` em git são o **bootstrap** (tier-0) para autorar a competência agora.
-**Evolução por uso (learning loop)** → parado no [BACKLOG](../BACKLOG.md) até haver
-usuários/outcomes reais.
+**Evolução por uso (learning loop)** → congelada no
+[backlog técnico](../../BACKLOG.md#manter-a-escrita-automática-de-memória-congelada-até-haver-evidência-real)
+até haver outcomes reais e curadoria compartilhada.
 
 ## Problema (o que estava errado)
 

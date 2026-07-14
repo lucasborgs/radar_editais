@@ -102,12 +102,12 @@ bumps da lib). O worker/backend conecta via `DATABASE_URL` como role `postgres`
 procrastinate seria invasivo demais pré-beta. Pós-fix: anon recebe
 `42501 permission denied` na tabela e no RPC; o owner segue lendo/escrevendo.
 
-> **⚠️ PENDÊNCIA DE DEPLOY (P0).** Em 2026-07-02 a suíte apontada ao projeto
-> **remoto** ainda reprova em `test_procrastinate_surface_negada` — ou seja, o
-> furo **está aberto em produção/staging**: a migration 034 foi aplicada só no
-> Supabase local. **Antes do beta externo: `supabase db push`** (aplica 034 +
-> 032/033 pendentes no remoto). Enquanto não subir, a fila de jobs segue legível
-> e mutável pela anon key em produção.
+> **Estado remoto:** em 2026-07-02 a migration 034 ainda não estava aplicada no
+> ambiente remoto então testado. O Git não comprova o ledger atual do Supabase;
+> antes do próximo deploy, confirme com `supabase migration list` e repita
+> `test_procrastinate_surface_negada` se a 034 ainda estiver pendente. Esta
+> verificação externa está registrada em [`docs/BACKLOG.md`](../BACKLOG.md), sem
+> afirmar que o estado observado em 2026-07-02 continua vigente.
 
 ## S2 — Scoping nos handlers
 

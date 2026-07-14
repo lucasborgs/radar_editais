@@ -357,7 +357,8 @@ edital — o flag só sinaliza ao agente "provavelmente vale sugerir parceiros
 proativamente". Ele nunca bloqueia nada. Por isso os erros são de **baixo custo**:
 falso-negativo → o agente não sugere proativamente, mas a tool segue disponível;
 falso-positivo → um empurrão proativo errado, que é *sugestão*, não compromisso
-(ver guard-rail em [docs/spec_ict_phase_c.md](docs/spec_ict_phase_c.md)).
+(ver o registro histórico em
+[docs/features/ict-phase-c.md](docs/features/ict-phase-c.md)).
 
 Vieses/limites assumidos: (1) **FINEP-enviesado** — depende de "ICT/coexecutora/
 arranjo"; para FAPESP é efetivamente sempre `false`. (2) Heurística, sem
@@ -367,7 +368,8 @@ pode exigir ICT como *executora*). (3) Exigência só em anexo não coletado →
 falso-negativo estrutural. **Decisão consciente:** não tunar os patterns às cegas
 agora; revisitar só quando o flag virar load-bearing (UI filtrar/ordenar por ele,
 ou seleção de parceiro virar fluxo primário) — aí rotular amostra + medir
-precisão/recall, e considerar classificador LLM. Ver `docs/BACKLOG.md`. Patterns
+precisão/recall, e considerar classificador LLM. Esta decisão está registrada em
+[`docs/BACKLOG.md`](docs/BACKLOG.md#decisões-atuais-que-não-são-backlog). Patterns
 vivem aqui (regra), não no `.py` — tune sem deploy.
 
 ```yaml
