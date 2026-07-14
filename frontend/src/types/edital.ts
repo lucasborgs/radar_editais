@@ -1,4 +1,4 @@
-// Tipos alinhados com a API v2 (FINEP-only, KG-based)
+// Tipos legados ainda consumidos pelas telas de editais; o backend os projeta do gold SQL.
 
 export type EditalStatus = "ABERTA" | "ENCERRADA" | "Desconhecido";
 
@@ -12,7 +12,7 @@ export interface TrlRange {
   max: number | null;
 }
 
-// Entrada mínima do index.json (list endpoint)
+// Entrada mínima do endpoint de listagem de editais.
 export interface EditalEntry {
   id: string;
   title: string;
@@ -29,7 +29,7 @@ export interface EditalEntry {
   n_facts: number;
 }
 
-// Card rico (knowledge_graph/cards/{id}.json) — detail endpoint
+// Card rico projetado pelo detail endpoint.
 export interface EditalCard extends EditalEntry {
   objective: string | null;
   mechanism: "subvencao" | "reembolsavel" | "investimento" | "misto" | null;
@@ -47,7 +47,7 @@ export interface EditalCard extends EditalEntry {
 }
 
 // ── Ficha unificada por Oportunidade (KG v2 / PR8) ──────────────────────────
-// Payload de `GET /oportunidades/{id}` (hypergraph_catalog.get_opportunity).
+// Payload de `GET /oportunidades/{id}` (`entity_catalog.get_opportunity`).
 // Unidade = SEMPRE Oportunidade (D1): edital, programa ou investimento sob um
 // tipo só. Campos curated-only (estagio_alvo/ticket_range/lead_follow) são
 // opcionais. Substitui o EditalCard v1 (value_range/key_facts/link) na ficha.

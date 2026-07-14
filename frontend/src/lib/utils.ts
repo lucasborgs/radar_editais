@@ -38,7 +38,7 @@ export function daysUntil(isoString: string | null | undefined): number | null {
 
 /** Tenta parsear texto de prazo (dd/mm/aaaa, dd.mm.aaaa, aaaa-mm-dd, pt-BR escrito)
  *  e retorna data formatada dd/mm/aaaa, ou null se não-parseável.
- *  Espelha _parse_deadline do backend (hypergraph_catalog.py). */
+ *  Espelha a normalização de prazo exposta pelo catálogo gold do backend. */
 export function parseDeadline(raw: string): string | null {
   if (!raw) return null;
   const s = raw.trim();
