@@ -212,7 +212,7 @@ def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, mode
         # tema_livre: sinal de demanda fora do vocab (consumido por core.vocab_lint).
         "tema_livre": "; ".join(t for t in tema_livre if isinstance(t, str)),
         # opportunity_type (Fase B): tipo-evento classificado pela LLM. Default
-        # edital (chamada pública padrão); build_knowledge_graph o carrega ao índice.
+        # edital (chamada pública padrão); a promoção o encaminha ao ingest gold.
         "opportunity_type": (data.get("opportunity_type") or "edital").strip().lower(),
         "agency": agency or "",
         "fonte": agency or "Web (descoberta)",

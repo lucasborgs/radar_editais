@@ -13,9 +13,8 @@ Vantagens vs. scraping anterior:
   • Documentos retornados embutidos com URLs absolutas — sem detecção HTML
   • Sem dependência de seletores CSS frágeis
 
-Compatibilidade: mantém o mesmo shape de output do scraper anterior para que
-`pipeline/etl_finep_cards.py`, `etl_finep_facts.py` e `build_knowledge_graph.py`
-não precisem mudar.
+Compatibilidade: mantém o shape de output do scraper anterior, consumido pelo
+Source Adapter FINEP e pelo ingest gold.
 
 Modos:
     extract(include_historical=False)  — só `situacao=aberta` (default)
@@ -135,7 +134,7 @@ class FINEPScraper(BaseScraper):
         """
         chamada_id = str(raw.get("databaseId") or "")
         liferay_id = raw.get("id")
-        # Normaliza status para caixa alta (esquema do build_knowledge_graph + wiki_schema)
+        # Normaliza status para caixa alta (contrato bronze da fonte).
         situacao_raw = (raw.get("situacao") or {}).get("name") or "Desconhecido"
         status_map = {
             "Aberta": "ABERTA",

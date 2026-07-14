@@ -1,6 +1,7 @@
 # Spec — Arquitetura Hipergrado
 
-Status: **aprovada** · 2026-06-28 · escopo: substituir match por schema fixo por match baseado em hipergrafos N-ários extraídos via Hyper-Extract; eliminar wiki_pages e todo o pipeline ETL de síntese LLM; match como tool do ExploreAgent via path search puro
+Status: **histórica, substituída** por [`v3-unified.md`](v3-unified.md) ·
+implementada em 2026-06-30 e aposentada pela migração gold v3.
 
 > **Atualização pós-implementação (2026-06-30 — fechamento):** Sprints 0, 1, 2 e 3 implementados. A implementação **divergiu da spec em pontos-chave** — ver a seção [Previsto → Realizado](#previsto--realizado) abaixo. O texto original abaixo dela é o **plano**; a seção registra o que de fato foi feito e por quê.
 

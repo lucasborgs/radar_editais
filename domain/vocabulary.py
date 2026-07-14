@@ -6,7 +6,8 @@ A canonicalização sofisticada (agrupamento por sinônimo, mapping pra taxonomi
 vive em WIKI.md como schema autoritativo e pode ser implementada incrementalmente
 adicionando o `_SYNONYMS` map abaixo.
 
-Chamada por `pipeline.build_knowledge_graph._build_editais` no campo `themes`.
+Usada por `core.vocab_lint` para normalizar evidências antes de propor alterações
+humanas no vocabulário autoritativo.
 """
 from __future__ import annotations
 

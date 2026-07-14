@@ -31,10 +31,9 @@ from config import FINEP_PDFS_DIR  # noqa: E402
 from core.db import get_supabase_service  # noqa: E402
 from core.tasks import chunk_edital_task  # noqa: E402
 
-# Cost reference (May 2026): text-embedding-3-large is $0.13 / 1M tokens.
-# At ~800 tokens/chunk and typically 30-80 chunks/edital → ~24k-64k tokens
-# per indexing run = $0.003 - $0.008 per edital. Cheap enough that --force is
-# safe; we only skip already-indexed editais to save on round-trips, not $.
+# Historical cost estimate retained for the CLI's existing output contract.
+# The active model is configured through EMBEDDING_MODEL; treat this figure as
+# indicative rather than as current provider pricing.
 EMBEDDING_COST_PER_1M_TOKENS = 0.13
 TOKENS_PER_CHUNK_ESTIMATE = 800
 

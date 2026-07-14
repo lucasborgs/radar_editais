@@ -1,6 +1,7 @@
 # Spec — Match Evolution (KG Split + EntityMatcher Unification)
 
-Status: **proposta** · 2026-06-24 · escopo: fatiar o monolito `KGMatchService` (GraphService + ExploreAgent), unificar `InvestorMatch` + `ProgramaMatch` num `EntityMatcher` genérico, consolidar endpoints de exploração pública
+Status: **supersedida** pela linhagem v3, consolidada em
+[`v3-unified.md`](v3-unified.md) · 2026-06-24 · registro de proposta.
 
 ---
 

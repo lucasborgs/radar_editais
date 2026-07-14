@@ -1,6 +1,6 @@
 # Isolamento multi-tenant — inventário e leak-test
 
-Status: 2026-07-02 · origem: [pre-beta-verification.md](../specs/pre-beta-verification.md)
+Status: atualizado em 2026-07-14 · origem: [pre-beta-verification.md](../specs/pre-beta-verification.md)
 Frente 1 (P0). Este doc é o **entregável de inventário**: tabela × política
 efetiva, as quatro superfícies de defesa, e o furo P0 encontrado + corrigido.
 
@@ -20,7 +20,7 @@ Usuário autenticado do workspace **B** tentando ler/escrever estado do workspac
 
 ## S1 — Inventário tabela × política (schema `public`)
 
-Autoritativo, lido do Postgres **após** a migration 034. Todas as tabelas `public`
+Autoritativo, lido do Postgres após as migrations versionadas. Todas as tabelas `public`
 têm **RLS habilitada** (nenhuma órfã sem RLS). Colunas: policy efetiva e comando
 coberto (`[*]`=ALL, `[r]`=SELECT, `[a]`=INSERT, `[w]`=UPDATE, `[d]`=DELETE).
 
@@ -39,7 +39,7 @@ coberto (`[*]`=ALL, `[r]`=SELECT, `[a]`=INSERT, `[w]`=UPDATE, `[d]`=DELETE).
 | `research_findings` | own `[*]` | `workspace_id ∈ …` |
 | `exploration_log` | own `[*]` | `workspace_id ∈ …` |
 | `weight_change_log` | own `[*]` | `workspace_id ∈ …` |
-| `company_hypergraphs` | select own `[r]` | leitura no próprio; escrita só service-role (task) |
+| `company_chunks` | own `[*]` | `workspace_id ∈ …` |
 | `user_feedback` | own `[*]` | `user_id = auth.uid()` |
 
 ### Leitura compartilhada (globais por design — não é leak)
@@ -49,6 +49,9 @@ Dado não-tenant, legível por qualquer `authenticated`; escrita só service-rol
 | Tabela | Política |
 |---|---|
 | `edital_chunks` | `read_authenticated [r]` |
+| `entities` | `read_authenticated [r]` |
+| `entity_relationships` | `read_authenticated [r]` |
+| `match_chunks` | `read_authenticated [r]` |
 | `discovered_opportunities` | `read_authenticated [r]` |
 | `web_sources` | `read_authenticated [r]` |
 | `playbook_overlays` | `read_authenticated [r]` (overlay global, destilado cross-tenant) |
@@ -63,6 +66,8 @@ Escrita/leitura só via service-role (backend/worker). `authenticated` lê 0 lin
 | `kg_artifacts` | blobs do KG (016) |
 | `edital_source_docs` | Documento Canônico durável (032) |
 | `pipeline_errors` | trilha de erro do ETL (007) |
+| `discovery_promotion_runs` | estado técnico da promoção (038) |
+| `discovery_promotion_events` | auditoria append-only da promoção (038) |
 
 ### Fora do PostgREST por construção (schema `agent_memory`)
 

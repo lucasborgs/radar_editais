@@ -350,12 +350,14 @@ def retrieve_chunks(
 
     Tuning do default
     -----------------
-    Default `fts_weight=0.3` (não 0.5) porque, no corpus FINEP, o dense
+    Default `fts_weight=0.5`, calibrado para dar o mesmo peso às listas dense e
+    sparse no RRF. No corpus FINEP, o dense
     captura literalidade técnica do regulamento (vocabulário fixo: "valor
     solicitado", "ICT", "subvenção"), enquanto o FTS premia chunks de FAQ
     por densidade de paráfrase. Em paridade (0.5), FAQs ganham o RRF por
     aparecerem em ambos retrievers — empurrando o regulamento fora do
-    top-k. 0.3 mantém o FTS como complemento sem deixá-lo dominar.
+    top-k; os boosts de metadados e o reranker preservam o sinal regulatório sem
+    alterar o equilíbrio base entre os braços.
 
     Example:
         chunks = retrieve_chunks(

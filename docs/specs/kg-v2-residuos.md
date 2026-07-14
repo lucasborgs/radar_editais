@@ -1,6 +1,7 @@
 # Spec — KG v2: resíduos de qualidade + ranking unificado
 
-Status: **aprovada** · 2026-07-05 · escopo: segunda demão de qualidade pós-redesign (higiene, resolução de programas, granularidade, cobertura) + ranking decrescente unificado no radar + regras de elegibilidade como dado curado
+Status: **histórica, substituída** por [`v3-unified.md`](v3-unified.md) ·
+registro de qualidade do hipergrado v2, não descrição do runtime atual.
 
 > Continuação de [`kg-redesign.md`](kg-redesign.md) (8 PRs implementados). Esta spec trata o que o
 > diagnóstico pós-implementação (2026-07-05) mediu como resíduo — nada aqui é falha de arquitetura;

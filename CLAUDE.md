@@ -33,7 +33,7 @@ python -m procrastinate --app=core.tasks.app worker   # background job worker
 ### Tests
 ```bash
 pytest                                          # run all tests
-pytest tests/test_hybrid_match_eligibility.py  # single file
+pytest tests/test_match_v3.py                  # single file
 pytest -k "test_name"                          # single test by name
 pytest -x                                      # stop on first failure
 ```
@@ -45,7 +45,7 @@ ruff check .                            # linting (CI enforced)
 ruff check . --fix                      # auto-fix what's fixable
 cd frontend && npx tsc --noEmit         # TypeScript check (use this, NOT npm run build, when dev server is up)
 ```
-`mypy` has ~575 existing errors and is advisory only — it does NOT block CI.
+`mypy` is advisory only and does NOT block CI.
 
 ### Data pipeline
 ```bash
@@ -66,7 +66,9 @@ python -m core.eval matching        # roda uma suíte (Langfuse Experiment se co
 python -m core.eval all              # todas as suítes registradas
 python -m core.eval matching --no-push --limit 1   # fallback local, subconjunto (debug)
 ```
-Suítes: `matching`, `rag`, `writing`, `extraction` (e mais 7) — todas em `core/eval/`,
+Suítes: `matching`, `rag`, `writing`, `writing_v2`, `extraction`,
+`opportunity_type`, `triage`, `profile_extractor`, `reranker` e `structurer` —
+todas em `core/eval/`,
 registro em `core/eval/registry.py`. Cada uma é uma `Suite`: `task` roda o pipeline real,
 `evaluators` reaproveitam `core/*_eval.py`. Com `LANGFUSE_*` no ambiente vira
 Experiment (scores comparáveis entre commits); senão grava `eval_results/*.json`.
@@ -148,7 +150,7 @@ core/          services/ (writing_session, match_v3, company_chunks,
                match_verdict, checklist, content_library, explore_agent,
                eligibility, opportunity_service), kg/ (kg_store, schema, gold,
                entity_catalog, constraints_producer, edital_id, temporal,
-               source_docs, canonicalize[anti_class_verdict]), retrieval/
+               source_docs, canonicalize), retrieval/
                (chunker, embedder, retriever, hyde),
                llm/ (llm_client, agent_runtime, agent_graph, agent_tools/),
                eval/ (harness); flat: db, auth, tasks (procrastinate),
@@ -164,15 +166,15 @@ data/          bronze/ (raw imutável), silver/ (derivado + catálogos versionad
 
 ### Core services
 - **Match v3** (`core/services/match_v3.py`) — funil Stage 0 (vivo, deadline manda) → Stage 1 (`eligibility.py`: unsat elimina, unknown nunca) → Stage 2 (sum-of-max por chunk da empresa sobre `company_chunks` × `match_chunks`, boost de setores) → Stage 3 (rerank opcional + veredito LLM async via `match_verdict.py`). Trilha investidor paralela (cosseno perfil × `entities.embedding`). Lado empresa em `core/services/company_chunks.py` (refresh on-demand, RLS por workspace). Payload: `matched_excerpts[]` (trechos reais) + `setores`. Sem LLM no ranking.
-- **ExploreAgent** (`core/services/explore_agent.py`) — 3 rotas: factual → reasoning → agent. Lê o gold via `entity_catalog`/SQL (tools §8: `search_entities`, `related_by_tags`, `get_node_neighborhood`). Retorna string; o `profile_diff` é extraído pelo router (`backend/routers/explore.py`) via `ProfileExtractor`.
-- **WritingSession** (`core/services/writing_session.py`) — runtime LangGraph (`agent_graph.py`) com checkpointer Postgres durável. RAG via `retrieve_chunks`. Primeiro turno: batch de 8 seções de uma vez (`_first_turn_with_generation`). `save_draft(force=False)` passa pelo Critic (subagente) + scope_classifier antes de persistir.
+- **ExploreAgent** (`core/services/explore_agent.py`) — 3 rotas: factual → reasoning → agent. Lê o gold via `entity_catalog`/SQL (busca semântica, tags compartilhadas e relações estruturais). Retorna string; o `profile_diff` é extraído pelo router (`backend/routers/explore.py`) via `ProfileExtractor`.
+- **WritingSession** (`core/services/writing_session.py`) — runtime LangGraph (`agent_graph.py`) com checkpointer Postgres durável. RAG via `retrieve_chunks`. Primeiro turno: batch de 8 seções de uma vez (`_first_turn_with_generation`). `save_draft(force=False)` passa pelo Critic (subagente) antes de persistir.
 - **ChecklistService** (`core/services/checklist_service.py`) — 3 passes paralelos via asyncio.gather: compliance + qualidade + completude.
 - **ContentLibrary** (`core/services/content_library.py`) — CRUD + enrich_content via LLM. Soft-delete via `archived_at`.
 
 ### LLM runtime (core/llm/)
 - **agent_runtime.py** — contrato `AgentResult`/`TraceStep`, `run_agent`/`run_agent_async`, `run_subagent`. Delega inteiramente ao grafo LangGraph; o loop hand-rolled foi removido.
 - **agent_graph.py** — `StateGraph` ReAct (agent → tools → manage_memory → reflect → agent). Checkpointer Postgres. `interrupt()` para human-in-the-loop. Memória cross-session via PostgresStore.
-- **agent_tools/** — tools LangChain nativas por domínio: `writing_tools`, `explore_tools`, `profile_tools`, `research_tools`, `planning_tools`, `scratchpad_tools`, `critic_agent`, `scope_classifier`.
+- **agent_tools/** — tools LangChain nativas por domínio: `writing_tools`, `explore_tools`, `profile_tools`, `research_tools`, `planning_tools`, `scratchpad_tools`, `critic_agent`.
 - **llm_client.py** — factory `make_client`/`make_async_client` com timeout/retry. **Todos os módulos usam esta factory** em vez de instanciar `OpenAI()` diretamente.
 
 ### Retrieval pipeline (core/retrieval/)
@@ -186,12 +188,12 @@ BM25 + dense via RRF (`fts_weight=0.5`, `DEFAULT_FTS_WEIGHT` em retriever.py). H
 
 ### API surface (backend/routers/ — wiring em backend/api.py)
 ```
-GET  /stats, /editais, /editais/{id}, /editais/{id}/sections
-POST /match, /chat, /analyze, /draft
+GET  /stats, /editais, /editais/{id}, /opportunities, /oportunidades/{id}
+POST /frontdoor/turn, /explore, /radar/matches, /match/verdicts
 POST /writing/start, /writing/turn, /writing/section-start
-GET  /writing/sessions, /writing/sessions/{id}/document
+GET  /writing/sessions, /writing/{id}/document
 POST /writing/{id}/checklist/auto-review
-GET  /discovered-opportunities, POST /discovered-opportunities/{id}/promote, POST /discovered-opportunities/{id}/reject
+GET  /discovered-opportunities, POST /discovered-opportunities/{id}/promote|reject
 GET  /me, PUT /me/profile, PUT /me/preferences
 GET/POST/PUT/DELETE /library, POST /library/{id}/archive
 ```
@@ -202,10 +204,12 @@ Next.js 14 + TypeScript + TailwindCSS + Radix UI. API client at `frontend/src/li
 ## Key Gotchas
 
 ### Imports
-The package is installed via `pip install -e .`. All imports are absolute (`from core.services.hybrid_match_service import HybridMatchService`). Never add `sys.path` hacks.
+The package is installed via `pip install -e .`. All imports are absolute (`from core.services.match_v3 import find_matching_opportunities`). Never add `sys.path` hacks.
 
-### LLM enrichment cache
-`.enrichment_cache.json` at root prevents re-calling LLM on unchanged editais. Delete to force re-enrichment.
+### Ingestão incremental gold
+`core.kg.gold.ingest_all()` compara `source_hash` no Postgres e não reprocessa
+entidades inalteradas. Use `python -m core.kg.gold --no-skip` para uma
+reingestão deliberada.
 
 ### Trocar modelo LLM
 Cada tier tem sua própria env var (ver seção LLM backend acima). Trocar um tier não afeta os outros. Modelos com dimensão de embedding diferente de 1536 exigem migração da coluna `vector(1536)` — não trocar sem eval.
@@ -216,13 +220,13 @@ Cada tier tem sua própria env var (ver seção LLM backend acima). Trocar um ti
 ### Discovery staging
 `core/opportunity_discovery.py` escreve em staging (tabela `discovered_opportunities`), não no KG. O gate humano em `/discovered-opportunities` promove/rejeita antes de tocar o pipeline de build.
 
-### KG = tabelas gold (não há mais hipergrado)
-A migração v3 (PRs A–C) eliminou o hipergrado e o produtor hyper-extract. O KG é
-relacional: `entities` + `entity_relationships` + `match_chunks` (migration 036),
-lido por `core/kg/entity_catalog.py`. Match = `core/services/match_v3.py` (Stage
-0-3 sobre as tabelas gold); catálogo/explore = `entity_catalog` + tools §8. A
-travessia cross-source virou join SQL por `entity_relationships` (CTE recursiva em
-`get_node_neighborhood`), não mais BFS por `(type, name)` em subgrafos JSON.
+### KG = tabelas gold
+O KG ativo é relacional: `entities` + `entity_relationships` + `match_chunks`
+(migration 036), lido por `core/kg/entity_catalog.py`. Match =
+`core/services/match_v3.py`; catálogo/explore = `entity_catalog` + tools de
+exploração. A vizinhança estrutural percorre `entity_relationships`; não há mais
+hipergrafo JSON nem resolução cross-source por `(type, name)`.
 
-**Pós-deploy:** a tabela legada `kg_artifacts` ainda é lida pelo backend v2 em
-prod — o drop dela é follow-up depois que o v3 estiver no ar (ver handoff PR-C).
+`core/kg/kg_store.py` permanece por compatibilidade operacional do ledger de
+Descoberta e das ferramentas de vocabulário. Não é o backend do catálogo ou do
+match v3.

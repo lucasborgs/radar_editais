@@ -8,8 +8,8 @@ por chunk, 150-token overlap, 80 min, 1500 max.
 Função pura: recebe blocos, retorna lista de dicts. Sem I/O, sem PDF, sem
 conhecimento de fonte. A discoverya/extração vive em `pipeline/adapters/<source>.py`.
 
-Token counting: tiktoken (cl100k_base — o tokenizer do text-embedding-3-large,
-cujo budget de 8192 é o que o chunk não pode estourar). A heurística antiga
+Token counting: tiktoken (`cl100k_base`, compatível com a família
+text-embedding-3; o modelo padrão é `text-embedding-3-small`). A heurística antiga
 (palavras × 1.3) subestimava brutalmente tabelas Markdown (muitos pipes/traços,
 poucas "palavras") — um chunk de tabela podia passar 2-3× do budget real,
 diluindo a representação. Fallback para a heurística se o tiktoken estiver

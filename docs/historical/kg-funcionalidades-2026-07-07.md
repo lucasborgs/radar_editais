@@ -2,6 +2,10 @@
 
 > Registro da discussão sobre o papel do Grafo de Conhecimento no Radar de Editais.
 > 2026-07-07
+>
+> **Registro histórico:** esta análise documenta o hipergrado v2 que foi
+> substituído pelo catálogo gold relacional. A arquitetura atual está em
+> [`docs/architecture.md`](../architecture.md).
 
 ## Contexto
 

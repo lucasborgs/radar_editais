@@ -22,8 +22,8 @@ from core.kg import schema
 
 logger = logging.getLogger(__name__)
 
-# Modelo do produtor — build-time, desacoplado do OPENAI_MODEL global (mesma
-# razão do CANON_MODEL/HYPER_EXTRACT_MODEL: artefato de build estável).
+# Modelo do produtor — build-time, desacoplado do OPENAI_MODEL global para que
+# o artefato permaneça estável entre execuções.
 CONSTRAINTS_MODEL = os.environ.get("CONSTRAINTS_MODEL", "gpt-4o-mini")
 
 # Vocabulário de porte (ordinal) — o produtor expande "até X" para o conjunto.

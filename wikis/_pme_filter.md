@@ -4,17 +4,16 @@ Estende [WIKI.md](../WIKI.md). Define os sinais usados por
 [core/pme_filter.py](../core/pme_filter.py) para decidir se uma chamada serve
 PME/startup (`accept`), é puramente acadêmica (`reject`), ou ambígua (`unclear`).
 
-**Onde mora:** L1 (Source Adapter), antes do download de PDFs. Aplicado por
-`build_knowledge_graph` antes de inserir em `index.json` / `index_historico.json`.
+**Onde mora:** utilitário puro `core/pme_filter.py`, preservado para
+classificação explícita em tooling e testes. Não é um gate implícito do ingest
+gold.
 
-**Política de rejeitados:** descartados completamente. Bronze é gravado (audit
-+ válvula pra re-avaliar se whitelist mudar), mas wiki page nem mínima é
-criada. Consequência consciente: perdemos memória longitudinal de fomento
-acadêmico — ver §1 do WIKI.md.
+**Política de dados:** a função só retorna `accept`/`reject`/`unclear`; o caller
+decide o destino. Ela não escreve nem remove bronze, silver ou gold.
 
 **Mudou regra? Edita este doc, código se adapta.** O leitor está em
-`core.wiki_schema.pme_filter_rules()`. Drift entre doc e código é detectado
-por `tests/test_wiki_schema_consistency.py`.
+`core.kg.schema.pme_filter_rules()`. O comportamento é coberto por
+`tests/test_pme_filter.py`.
 
 ---
 
@@ -94,8 +93,7 @@ Algoritmo de `is_target_relevant(metadata) -> Literal["accept","reject","unclear
 
 1. **Computa `search_text`** = lowercase + strip de acentos da concatenação de
    campos do metadata: `titulo`, `modalidade`, `programa`, `categoria`,
-   `descricao_resumo` (os que existirem). Vai pro mesmo formato do `_normalize_key`
-   já usado em `build_knowledge_graph._extract_canonicals`.
+   `descricao_resumo` (os que existirem).
 
 2. **Sinal de programa**: se algum alias de `programas_pme_canonicos.keys()`
    bate como palavra no `search_text` (regex `\b{alias}\b`, sem early-break) →
@@ -112,11 +110,8 @@ Algoritmo de `is_target_relevant(metadata) -> Literal["accept","reject","unclear
    (sinal 2), mesmo que "bolsa" apareça — porque os sinais 2 e 3 disparam
    independentemente e accept tem precedência.
 
-6. **Sem sinal nenhum** (nem accept, nem exclusor): **unclear**. Registrar
-   contagem para revisão manual; tratar como reject por enquanto (vai pro
-   bronze-only). Se taxa unclear > 10% após 3 fontes, adicionar fallback
-   LLM-mini (Fase 1.5, ver
-   [project_multi_fonte_fase1](../../.claude/projects/-Users-lucasborges-radar-editais/memory/project_multi_fonte_fase1.md)).
+6. **Sem sinal nenhum** (nem accept, nem exclusor): **unclear**. O caller deve
+   tratar o resultado explicitamente.
 
 ---
 

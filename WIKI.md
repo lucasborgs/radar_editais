@@ -1,26 +1,35 @@
-# Radar de Editais — Wiki Schema
+# Radar de Editais — Schema e vocabulários
 
-Este documento é o **schema autoritativo** do sistema. Ele define o que é uma wiki page, como o grafo é construído, que vocabulários são aceitos, e que workflows a LLM deve seguir ao ingerir fontes, responder perguntas e manter a wiki.
+Este documento é o **schema autoritativo** dos vocabulários e contratos de
+ingestão. O catálogo ativo é o gold relacional (`entities`,
+`entity_relationships`, `match_chunks`); blocos anteriores ao v3 permanecem
+identificados como compatibilidade somente quando ainda são lidos por
+`core/kg/schema.py` ou por ferramentas locais.
 
-O código consome este doc em runtime via `core.wiki_schema`. Qualquer divergência entre doc e código é detectada pelo validador de consistência (`tests/test_wiki_schema_consistency.py`). **Se você mudar regras aqui, o código se adapta automaticamente.** Se você mudar código sem atualizar o doc, o teste quebra.
+O código consome os blocos YAML deste doc em runtime via `core.kg.schema`; os
+testes de schema e vocabulário cobrem os accessors ativos. **Mudanças de regra
+devem começar aqui**, e não em constantes paralelas no código.
 
 ---
 
 ## 1. Propósito
 
-O Radar de Editais é uma **plataforma de inteligência e automação de escrita para fomento à inovação**. Diferente de sistemas RAG tradicionais, opera como um **Ecossistema de Conhecimento Cumulativo** baseado no padrão Andrej Karpathy LLM Wiki.
-
-Cada edital (vigente ou encerrado) vira uma **wiki page** (JSON estruturado). As wiki pages + metadados do índice compõem um **knowledge graph** navegável (JSON + vault Obsidian). Matching, escrita e análise operam sobre as wiki pages, não sobre texto bruto.
+O Radar de Editais é uma **plataforma de inteligência e automação de escrita
+para fomento à inovação**. Bronze imutável e documentos silver alimentam o
+catálogo gold relacional. O match usa trechos reais em `match_chunks`; a escrita
+usa `edital_chunks`; catálogo e Explore consultam entidades e relações SQL.
 
 O sistema atende dois propósitos:
 
 **Operação (foco no proponente).** Matching de alta precisão entre perfil de PMEs e editais **vigentes** (inicialmente FINEP), mais assistente de escrita baseado em contextos históricos e técnicos validados.
 
-**Inteligência (foco longitudinal).** Memória de longo prazo sobre a evolução das agências de fomento. Os editais encerrados **não são descartados** — compõem o corpus histórico usado para analisar mudanças de critérios, heurísticas de aprovação "não escritas" (extraídas via feedback loops) e tendências tecnológicas ao longo dos anos.
+**Inteligência (foco longitudinal).** Editais encerrados permanecem no bronze e
+no silver reconstruível; a vigência é aplicada no Stage 0 do match, não por um
+índice JSON separado.
 
-> **Escopo do corpus histórico:** apenas editais que **algum dia foram do escopo PME/startup** entram no histórico. Editais nunca-elegíveis (pesquisa acadêmica pura, bolsas individuais) são filtrados em L1 antes de virar wiki page — bronze é gravado para audit, mas nem wiki page mínima é criada. Ver `wikis/_pme_filter.md`.
-
-Implicação de design: o pipeline preserva wiki pages de editais encerrados mesmo após deleção dos PDFs originais; a dimensão temporal é mantida como tag `ano/<pub_year>` (§6.1.1) para permitir consultas longitudinais.
+> **Classificação PME/startup:** as regras do utilitário explícito vivem em
+> `wikis/_pme_filter.md`. O helper é puro e não altera o destino dos dados sem
+> um caller que aplique a decisão.
 
 > **Arquitetura de camadas:** o vocabulário oficial das camadas, a fronteira
 > agnóstico/individualizado e o contrato de Documento Canônico estão em **§12**.
@@ -32,12 +41,12 @@ Implicação de design: o pipeline preserva wiki pages de editais encerrados mes
 
 | Artefato | Path | Descrição |
 |---|---|---|
-| Índice vigente | `knowledge_graph/index.json` | Editais com prazo futuro (usado para matching) |
-| Índice histórico | `knowledge_graph/index_historico.json` | Todos os editais já scraped |
-| Wiki page | `knowledge_graph/wiki/{id}.json` | Uma por edital, gerada pela LLM |
-| Cache de ingestão | `knowledge_graph/wiki/.etl_process_cache.json` | Hash MD5 por edital (evita reprocessar) |
-| Doc estruturado (silver) | `silver_data/structured_docs/{source}/{id}.jsonl` | Linearização limpa + rotulada dos PDFs (1 passada LLM/página). Insumo compartilhado da wiki (Ramo A) e do chunkeamento RAG (Ramo B). Ver §11 |
-| Vault Obsidian | `data/hyper_extract_output_v2/vault/` | Espelho Markdown do grafo, exportado sob demanda via `scripts/export_to_obsidian.py` |
+| Bronze | `data/bronze/` | Captura imutável por fonte e documentos oficiais |
+| Doc estruturado (silver) | `data/silver/structured_docs/{source}/{id}.jsonl` | Blocos estruturais usados pelo gold e pelo RAG lazy. Ver §11 |
+| Catálogo gold | Postgres: `entities`, `entity_relationships`, `match_chunks` | Catálogo, relações e trechos do match v3 |
+| Chunks de escrita | Postgres: `edital_chunks` | Contexto híbrido da WritingSession, criado sob demanda |
+| Estado da descoberta | Postgres: `discovered_opportunities`, `discovery_promotion_runs` | Staging e execução do gate humano |
+| Vault Obsidian | `data/hyper_extract_output_v2/vault/` | Espelho Markdown do gold, regenerado pelo ETL diário ou via `scripts/export_to_obsidian.py` |
 
 ---
 
@@ -49,16 +58,21 @@ Cada fonte tem um schema específico em `wikis/<fonte>.md` que **estende** este 
 |---|---|---|
 | FINEP | [wikis/finep.md](wikis/finep.md) | ativo (v1) |
 | FAPESP | [wikis/fapesp.md](wikis/fapesp.md) | ativo (v1) |
-| FAPERJ | `wikis/faperj.md` | planejado (Fase 2 — portal em migração) |
-| EMBRAPII | `wikis/embrapii.md` | planejado |
+| FAPESC | [wikis/fapesc.md](wikis/fapesc.md) | ativo (v1) |
+| Web | regras globais §12.4 + [wikis/_discovery.md](wikis/_discovery.md) | ativo, com gate humano |
+| EMBRAPII | extractor curado `pipeline/extractors/ict_embrapii.py` | ativo para ICTs |
 
 ---
 
-## 4. Schema da wiki page
+## 4. Schema legado de wiki page (compatibilidade)
+
+Este bloco não produz o catálogo v3. Ele é preservado porque alguns accessors e
+ferramentas locais ainda leem seus vocabulários; novos consumidores devem usar
+os contratos gold do §13.
 
 Uma wiki page é um JSON com três grupos de campos:
 
-### 4.1 Campos herdados do índice
+### 4.1 Campos herdados do índice legado
 
 Copiados literalmente de `index.json` / `index_historico.json`. Não são inferidos pela LLM.
 
@@ -389,7 +403,7 @@ bucket) — ver spec 2.2.
 
 ---
 
-## 6. Schema do grafo
+## 6. Vocabulários do grafo legado e constraints ativas
 
 ### 6.1 Tipos de nó
 
@@ -645,11 +659,13 @@ Motivação: status bruto do portal nem sempre é confiável; prazo futuro é ev
 
 ---
 
-## 8. Workflows
+## 8. Workflow legado de síntese (não executado pelo pipeline v3)
 
 ### 8.1 Ingestão (prompt de extração)
 
-Prompt base usado por `pipeline/etl_process.py`. Fontes podem sobrescrever em `wikis/<fonte>.md`.
+Prompt histórico preservado como referência de vocabulário. O pipeline v3 usa o
+structurer (§11) e os produtores de `core/kg/gold.py`; `pipeline/etl_process.py`
+foi removido.
 
 ```yaml
 extraction_prompt: |
@@ -728,8 +744,6 @@ llm_params:
 
 ### 8.3 Feedback loop
 
-Ver [docs/wiki_feedback_loop.md](docs/wiki_feedback_loop.md). Lições aprendidas de propostas finalizadas entram em `wiki_page.lessons_learned` com `confidence`.
-
 ---
 
 ## 9. Convenções
@@ -760,18 +774,18 @@ Por `link`. Primeiro arquivo bronze lido (ordem alfabética) vence.
 ## 10. Como adicionar uma nova fonte
 
 1. Criar `wikis/<fonte>.md` espelhando a estrutura de `wikis/finep.md`.
-2. Escrever scraper em `pipeline/extractors/<fonte>.py` produzindo JSON bronze em `bronze_data/<fonte>_raw/`.
-3. Se o scraper retorna campos que mapeiam 1:1 para o schema comum, não precisa tocar em `build_knowledge_graph.py`. Caso contrário, adicionar adaptador na seção `bronze_mapping` do doc da fonte.
-4. Rodar validador: `pytest tests/test_wiki_schema_consistency.py`.
-5. Rodar pipeline: campos do schema comum são produzidos automaticamente; campos fonte-específicos vêm do doc da fonte.
+2. Escrever scraper em `pipeline/extractors/<fonte>.py` produzindo JSON bronze em `data/bronze/<fonte>_raw/`.
+3. Escrever o `SourceAdapter` correspondente e registrá-lo em §12.4.
+4. Cobrir os vocabulários/accessors afetados com testes direcionados.
+5. Validar o caminho bronze → silver → `core.kg.gold.ingest_all()`.
 
 ---
 
 ## 11. Documento estruturado (camada silver)
 
-Artefato intermediário entre o bronze (PDFs crus) e os dois consumidores: a
-síntese da wiki page (**Ramo A**, `etl_process`) e o chunkeamento RAG
-(**Ramo B**, `chunker`). Uma única passada LLM sobre os PDFs serve aos dois.
+Artefato intermediário entre o bronze e dois consumidores: a ingestão gold
+(`core.kg.gold`) e o chunkeamento RAG (`chunker`). Uma única estruturação dos
+documentos serve aos dois.
 
 **Invariante — a camada é "burra":** ela só lineariza, limpa e rotula
 estrutura. **Não** sintetiza (não infere `objective`/`mechanism` — isso é §4.2)
@@ -797,7 +811,7 @@ structured_doc_schema:
     kind:         { type: "enum",      desc: "tipo do elemento (ver kinds)" }
     text:         { type: "str",       desc: "texto limpo, verbatim, sem artefato de layout" }
   kinds: [heading, paragraph, table, list, signature, boilerplate]
-  meta_sidecar:                       # silver_data/structured_docs/{source}/{id}.meta.json
+  meta_sidecar:                       # data/silver/structured_docs/{source}/{id}.meta.json
     silver_version:           "str — versão do schema do bloco (bump = re-roda A e B)"
     structurer_prompt_version: "str — versão do prompt §11.3"
     structurer_model:         "str — modelo usado"
@@ -972,20 +986,19 @@ source_adapters:
 > HTML **cru**; o adapter re-limpa por run (`base.html_to_text`), o que permite
 > trocar o extrator sem re-fetch. Cada URL = 1 edital `web:<url_hash>`.
 
-### 12.5 Onde o código viola isto hoje
+### 12.5 Fronteira implementada
 
-Débito conhecido, a ser pago no rename (Fase 2). O structurer faz `pdfplumber`
-— extração é trabalho de L1, não de L2. `_SOURCE = "finep"` e
-`FINEP_PDFS_DIR` em etl_process/tasks fixam a fonte. O alvo: extração migra
-pro Source Adapter; L2/L3 passam a consumir Documento Canônico, source-neutro.
+Os adapters resolvem PDF/HTML e entregam o Documento Canônico; o structurer e o
+chunker operam sobre esse contrato sem selecionar a fonte. `core/tasks.py`
+descobre as fontes pelo registry e encaminha o silver ao ingest gold.
 
 ## 13. Vocabulários gold v3 (spec `docs/specs/v3-unified.md`)
 
 Blocos lidos por `core/kg/schema.py` (accessors `setores_taxonomia()`,
 `tag_normalization()`, `match_sections()`, `constraint_vocab_v3()`) e aplicados
 no ingest gold (`core/kg/gold.py`). **Mudou a regra → edite estes blocos, não o
-código.** Estes vocabulários pertencem ao pipeline v3 (aditivo); os blocos v2
-(`§5.9`, `§6.4`) seguem intocados enquanto o match v2 estiver vivo.
+código.** Estes são os vocabulários do pipeline ativo. Blocos anteriores
+permanecem apenas quando um accessor de compatibilidade ainda os consome.
 
 ### 13.1 Taxonomia de setores (`setores_taxonomia`, §4.3)
 

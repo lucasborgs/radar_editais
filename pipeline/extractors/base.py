@@ -84,8 +84,8 @@ class BaseScraper(ABC):
         # Hash de conteúdo estável, excluindo data_extracao. Inclui status,
         # prazo e o conjunto de documentos além de URL/título/descrição: uma
         # rerratificação que muda só o prazo (ou anexa/atualiza um PDF) PRECISA
-        # gerar um novo bronze — senão build_knowledge_graph lê metadados velhos
-        # e o edital fica com vigência/prazo desatualizados (requisito 2).
+        # gerar um novo bronze — senão o ingest gold lê metadados velhos e o
+        # edital fica com vigência/prazo desatualizados.
         def _item_fingerprint(item: dict) -> str:
             docs = "|".join(sorted(item.get("pdf_legendas") or item.get("pdf_urls") or []))
             # `descricao` (FINEP) ou `texto_cru` (FAPESP) — fontes diferentes

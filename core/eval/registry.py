@@ -1,7 +1,7 @@
 """Registro das suítes de avaliação. Adicionar uma suíte = uma linha aqui.
 
-matching (hipergrado), rag (retriever) e writing (agente de escrita), todas
-wired end-to-end reaproveitando core/{matching,rag,writing}_eval.py.
+matching (gold v3), rag (retriever) e writing (agente de escrita), além das
+suítes especializadas registradas abaixo. Todas exercitam o pipeline real.
 """
 from __future__ import annotations
 

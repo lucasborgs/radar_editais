@@ -141,7 +141,7 @@ async def enrich_content_task(item_id: str) -> None:
 
 @app.task(name="embed_content", queue="default", retry=UNIT_TASK_RETRY)
 async def embed_content_task(item_id: str) -> None:
-    """Gera embedding text-embedding-3-large (1536d) para um content_item.
+    """Gera embedding com o modelo configurado em `EMBEDDING_MODEL` (1536d).
 
     Embeds: title + summary + content (concatenados; importante manter title
     no início porque carrega sinal forte). Roda após enrich_content_task —

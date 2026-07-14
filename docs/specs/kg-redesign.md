@@ -1,6 +1,7 @@
 # Spec — KG v2: Oportunidade/Ator/Conceito + funil de match
 
-Status: **aprovada** · 2026-07-03 · escopo: consolidar os 12 tipos de nó em 3 entidades + propriedades + constraints; canonicalizar descritores; funil de match com filtro duro de elegibilidade, agregação MaxSim e veredito LLM no top-K; proveniência/URL ponta a ponta; ficha por oportunidade no frontend
+Status: **histórica, substituída** por [`v3-unified.md`](v3-unified.md) ·
+implementada no hipergrado v2 e posteriormente aposentada pela migração gold.
 
 > Origem: exploração de redesign de 2026-07-03 (segunda opinião independente + levantamento empírico do corpus + pesquisa de literatura). Supersede a parte de match de `match-evolution.md` (já superada pelos sprints do hipergrafo) e revisa premissas da `hypergraph-architecture.md` (o schema 12 nós/10 arestas e a premissa "elegibilidade é raciocínio do agente, sem estágio separado").
 >

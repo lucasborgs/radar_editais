@@ -1,6 +1,10 @@
 # Relatório de Diagnóstico — Radar de Editais
 
 > Gerado em 2026-06-25. Baseado em auditoria completa de código fonte, análise arquitetural e code review do branch `main`.
+>
+> **Registro histórico:** este diagnóstico antecede as migrações v3 e não
+> descreve o runtime atual. Para a arquitetura vigente, consulte
+> [`docs/architecture.md`](../architecture.md).
 
 ---
 

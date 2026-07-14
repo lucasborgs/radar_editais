@@ -1,6 +1,7 @@
 # Spec: Lazy chunking (estilo NotebookLM)
 
-Status: proposta · 2026-06-26 · reverte comportamento eager do cron
+Status: **implementada** · 2026-06-26 · chunking de escrita permanece lazy e
+independente do ingest gold.
 
 ## Decisão
 

@@ -2,9 +2,9 @@
 Filtro determinístico PME — decide se uma chamada serve PME/startup
 (accept), é puramente acadêmica (reject) ou ambígua (unclear).
 
-Aplicado em L1 (Source Adapter) antes de baixar PDFs. Rejeitados não viram
-wiki page (nem mínima); bronze é preservado para audit. Regras autoritativas
-em `wikis/_pme_filter.md`; leitor em `core.kg.schema.pme_filter_rules()`.
+Utilitário puro preservado para classificação explícita em tooling e testes;
+não é um gate implícito do ingest gold. Regras autoritativas em
+`wikis/_pme_filter.md`; leitor em `core.kg.schema.pme_filter_rules()`.
 
 Função pura: recebe `metadata` (dict agnóstico à fonte), retorna decisão.
 Sem I/O, sem LLM, sem efeito colateral.
@@ -23,8 +23,7 @@ _SEARCH_FIELDS = ("titulo", "modalidade", "programa", "categoria", "descricao_re
 
 
 def _normalize(s: str) -> str:
-    """Lowercase + strip de acentos (NFD). Mesma convenção do
-    `_normalize_key` em `pipeline/build_knowledge_graph.py`."""
+    """Lowercase + strip de acentos (NFD)."""
     nfd = unicodedata.normalize("NFD", s or "")
     return "".join(c for c in nfd if unicodedata.category(c) != "Mn").lower().strip()
 

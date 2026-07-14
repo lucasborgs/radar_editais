@@ -20,15 +20,14 @@ cat <<'EOF'
 
 ════════════════════════════════════════════════════════════════════════════
 1) SUPABASE CLOUD — schema
-   a. Aplicar TODAS as migrations (supabase/migrations/001..035):
+   a. Aplicar TODAS as migrations versionadas em supabase/migrations/:
         supabase link --project-ref <ref>
         supabase db push
       (003 = schema do procrastinate → habilita o worker;
-       016 = kg_artifacts → KG vive no Postgres, não em arquivo;
-       033 = company_hypergraphs; 035 = match_verdicts.)
-   b. O hipergrado é populado pelo próprio cron diário do worker
-      (run_daily_etl, 03:00 UTC) a partir do bronze scraped — não há mais
-      script de populate manual.
+       035 = match_verdicts; 036 = catálogo gold relacional;
+       037 remove company_hypergraphs; 038 = estado da promoção da Descoberta.)
+   b. O catálogo gold é populado pelo cron diário do worker
+      (run_daily_etl, 03:00 UTC) via core.kg.gold.ingest_all().
 
 ════════════════════════════════════════════════════════════════════════════
 2) CLOUDFLARE TUNNEL — cloudflared/config.yml (gitignored, credenciais sensíveis)
@@ -80,7 +79,7 @@ ENV — referência (.env na raiz, lido por app+worker via env_file no compose)
      OPENAI_API_KEY  DATABASE_URL(pooler Supabase)  SUPABASE_URL
      SUPABASE_ANON_KEY  SUPABASE_SERVICE_KEY  SUPABASE_JWT_SECRET
   CONFIG          (app + worker):
-     LLM_BACKEND=openai   OPENAI_MODEL=gpt-4o-mini   KG_STORE_BACKEND=postgres
+     LLM_BACKEND=openai   OPENAI_MODEL=gpt-4o-mini
      EMBEDDING_MODEL=text-embedding-3-small   RETRIEVAL_EMBEDDING_COLUMN=embedding
   CONFIG          (app only):
      FRONTEND_URL=<vercel>          # CORS

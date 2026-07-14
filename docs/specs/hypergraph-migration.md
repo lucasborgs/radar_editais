@@ -1,6 +1,6 @@
 # Spec: Migração Hypergraph → SQL Relacional
 
-- **Status:** Aprovada
+- **Status:** Concluída e incorporada por [`v3-unified.md`](v3-unified.md)
 - **Data:** 2026-07-09
 - **Autores:** Lucas + Claude
 

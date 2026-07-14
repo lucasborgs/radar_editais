@@ -1,7 +1,11 @@
-# System Spec — Radar de Editais
+# System Spec — Radar de Editais (registro histórico)
 
 > Reverse-spec gerada em 2026-06-22 por auditoria automatizada (5 agentes paralelos).
-> Reflete o estado **atual** da codebase — inclui legados e código morto detectados.
+>
+> **Registro histórico:** este inventário antecede as migrações gold v3 e
+> contém nomes e fluxos removidos. Para o sistema vigente, consulte
+> [`docs/architecture.md`](../architecture.md), [`README.md`](../../README.md) e
+> [`AGENTS.md`](../../AGENTS.md).
 
 ---
 

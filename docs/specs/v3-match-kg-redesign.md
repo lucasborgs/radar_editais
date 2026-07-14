@@ -1,6 +1,7 @@
 # Spec — v3: Dissociação Match / KG / RAG
 
-Status: **proposta** · 2026-07-07 · escopo: separar as 4 funções conflitantes do hypergraph (match, navegação, catálogo, modelo canônico) em 3 camadas ortogonais: **match via RAG sobre silver chunks**, **KG topológico para navegação do agente**, **filtros determinísticos sobre metadados gold**.
+Status: **supersedida** por [`v3-unified.md`](v3-unified.md) · 2026-07-07 ·
+registro da proposta inicial, não descrição do runtime atual.
 
 ---
 

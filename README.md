@@ -59,7 +59,7 @@ flowchart LR
 
     %% Spoke 3: Explore
     subgraph EXPLORE["③ Explore — Mapa"]
-        HG[Hipergrafo N-ário<br/>Oportunidade · Ator · Conceito] --> EA[ExploreAgent ReAct]
+        HG[Grafo relacional<br/>entidades · relações · tags] --> EA[ExploreAgent ReAct]
         EA --> RESP[Respostas → profile_diff]
     end
 
@@ -70,7 +70,7 @@ flowchart LR
 
 - **Descoberta**: busca web e adapters dedicados → evidências canônicas → staging com gate humano. A versão promovida é congelada em bronze web e segue para silver → gold como qualquer edital de agência; Crawl4AI é um enriquecimento opcional do worker, não substitui adapters nem o pipeline nativo.
 - **Radar (Match)**: funil determinístico de 4 estágios — vigência (SQL) → elegibilidade → MaxSim (zero LLM) → veredito gpt-4o-mini no top-K. Trilha investidor paralela por cosseno de tese.
-- **Explore**: agente ReAct com busca semântica, BFS em hipergrafo, entidades por tags e o motor de match como ferramenta.
+- **Explore**: agente ReAct com busca semântica, vizinhança nas relações gold, entidades por tags e o motor de match como ferramenta.
 - **Escrita**: sessões LangGraph com checkpointer Postgres durável, RAG híbrida (HyDE + pgvector + BM25 + RRF + rerank), ficha da oportunidade via catálogo, checklist paralelo 3-passos.
 - **Runtime**: 5 tiers de LLM independentes por env var (embedding, contextual, extração, explore, escrita).
 
@@ -102,7 +102,7 @@ domain/      CompanyProfile (dataclass)
 pipeline/    ETL multi-fonte (extractors + adapters)
 frontend/    Next.js 14
 supabase/    Migrações + config CLI
-docs/        architecture.md, ROADMAP, specs, BACKLOG
+docs/        arquitetura atual, specs, componentes e registros históricos
 wikis/       Schema/vocabulários por fonte (doc-as-config)
 ```
 

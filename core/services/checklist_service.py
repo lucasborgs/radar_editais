@@ -2,8 +2,8 @@
 ChecklistService — extrai requisitos obrigatórios do edital e roda auto-review em 3 passes paralelas.
 
 Fontes de requisitos (em ordem de prioridade):
-  1. wiki_page.key_requirements  — gerados pelo etl_finep_cards.py
-  2. Fatos Tier 1 que contêm verbos de obrigatoriedade
+  1. ficha gold da oportunidade (`entity_catalog.get_opportunity`)
+  2. requisitos textuais que contêm verbos de obrigatoriedade
 
 Auto-review (LLM):
   Pass 1 — Compliance:      requisitos obrigatórios do edital cobertos?
@@ -204,7 +204,7 @@ def build_checklist(edital_id: str) -> list[dict]:
                         "source": "key_requirements",
                     })
     except Exception as e:
-        logger.warning("Erro ao ler hypergraph card %s: %s", edital_id, e)
+        logger.warning("Erro ao ler ficha gold %s: %s", edital_id, e)
 
     return items
 

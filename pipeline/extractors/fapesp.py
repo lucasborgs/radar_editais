@@ -8,8 +8,8 @@ normativo do edital inline (estratégia §12.4 `html_body`).
 
 Spike validado em 2026-05-29 — ver memory: project_multi_fonte_fase1.
 
-Output bronze: JSON com chamadas no shape esperado pelo build_knowledge_graph
-(pelo bronze_mapping em wikis/fapesp.md):
+Output bronze: JSON com chamadas no contrato da fonte documentado em
+`wikis/fapesp.md`, consumido pelo Source Adapter:
   titulo, url, data_limite (yyyy-mm-dd), status (ABERTA|FLUXO_CONTINUO),
   modalidades (string), areas (string), texto_cru, fluxo_continuo (bool),
   fonte, data_extracao.
