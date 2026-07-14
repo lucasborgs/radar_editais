@@ -38,7 +38,6 @@ data/knowledge_graph/wiki/
 data/knowledge_graph/index.json
 data/knowledge_graph/index_historico.json
 data/knowledge_graph/health_check_log.jsonl
-data/knowledge_graph/.filter_rejections.jsonl
 data/knowledge_graph/**/.etl_process_cache.json
 data/knowledge_graph/icts.json
 data/knowledge_graph/.ict_theme_map_cache.json

@@ -189,7 +189,8 @@ def test_build_report_with_proposal():
     # diff _SYNONYMS (lowercased)
     assert '"quântica e fotônica": "saúde e ciências da vida",' in report
     # 5. checklist com gates
-    assert "test_wiki_schema_consistency" in report
+    assert "tests/test_vocab_lint.py tests/test_gold_mappers.py" in report
+    assert "python -m core.kg.gold --no-skip" in report
     assert "core.eval matching" in report
 
 

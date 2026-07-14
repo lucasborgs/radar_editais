@@ -11,7 +11,8 @@ DECIDE. O lint NUNCA aplica mudanças — ele só:
 
 O doc (WIKI.md §5.9) é o DONO do vocabulário: a aplicação é manual (editar o
 doc; opcionalmente _SYNONYMS em domain/vocabulary.py) e fica gated pelo
-validador `tests/test_wiki_schema_consistency.py` + evals de não-regressão.
+testes de accessors/consumidores (`test_vocab_lint.py`, `test_gold_mappers.py`)
++ evals de não-regressão.
 
 Barra de evidência: tema novo só com >=3 evidências independentes; sinônimo só
 com equivalência semântica clara a um tema EXISTENTE; na dúvida, não propor.
@@ -394,9 +395,9 @@ def build_report(evidence: dict, proposal: dict | None) -> str:
           "bloco `tema_vocab` acima.",
           "2. [ ] Se houver sinônimos: acrescentar as entradas em "
           "`domain/vocabulary._SYNONYMS`.",
-          "3. [ ] `python -m pytest tests/test_wiki_schema_consistency.py` "
-          "(doc × código não divergem).",
-          "4. [ ] Rebuild: `python pipeline/build_knowledge_graph.py`.",
+          "3. [ ] `python -m pytest tests/test_vocab_lint.py tests/test_gold_mappers.py` "
+          "(doc × accessors/consumidores não divergem).",
+          "4. [ ] Reingestão deliberada: `python -m core.kg.gold --no-skip`.",
           "5. [ ] Gate de não-regressão: `python -m core.eval matching --no-push` "
           "e a suíte `opportunity_type`.",
           ""]
