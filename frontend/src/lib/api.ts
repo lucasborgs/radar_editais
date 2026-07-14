@@ -253,6 +253,22 @@ export interface MatchedEntity {
   verdict?: MatchVerdict | null;             // veredito, chaveado por entity_id
 }
 
+export interface RadarMatchesResponse {
+  matched_editais: MatchedEdital[];
+  matched_programas: MatchedEntity[];
+  matched_investidores: MatchedEntity[];
+  meta: {
+    ranking: "affinity";
+    uses_workspace_chunks: boolean;
+  };
+}
+
+export const getRadarMatches = (profile: CompanyProfile) =>
+  apiFetch<RadarMatchesResponse>("/radar/matches", {
+    method: "POST",
+    body: JSON.stringify({ profile }),
+  });
+
 export const frontdoorTurn = (
   message: string,
   history: KGChatMessage[],

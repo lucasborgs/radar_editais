@@ -1,6 +1,6 @@
 # Spec — Radar como porta de entrada
 
-**Status:** aprovada para implementação · **Data:** 2026-07-13  
+**Status:** concluída · **Data:** 2026-07-14
 **Escopo da primeira entrega:** Radar explícito, explicável e acionável.  
 **Fora do escopo desta entrega:** alterar ranking/embeddings/elegibilidade, comparação, timeline de prazo, estados operacionais da descoberta e canvas de projeto do Explorer.
 

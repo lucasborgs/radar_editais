@@ -56,11 +56,14 @@ export function FrontDoorHeader({
   return (
     <header className="shrink-0 border-b border-border bg-surface">
       <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-        <span className="text-sm font-semibold text-content-primary font-sans">
+        <Link href="/" className="text-sm font-semibold text-content-primary font-sans">
           Radar de Editais
-        </span>
+        </Link>
 
         <div className="flex items-center gap-1">
+          <Link href="/radar" className="rounded-lg px-3 py-1.5 text-sm font-sans text-content-primary hover:bg-app-bg transition-colors">
+            Radar
+          </Link>
           {!isAuthed && (
             <Link
               href="/login"

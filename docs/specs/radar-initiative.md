@@ -24,7 +24,7 @@ Explorar uma ideia/projeto
 
 | Ordem | Entrega | Spec | Estado | Dependências | Critério de conclusão |
 |---:|---|---|---|---|---|
-| 1 | Radar explícito e explicável | [radar-frontdoor.md](radar-frontdoor.md) | proposta | match v3, perfil, auth opcional, cards existentes | rota `/radar`, contrato determinístico e jornadas anônima/autenticada aprovadas |
+| 1 | Radar explícito e explicável | [radar-frontdoor.md](radar-frontdoor.md) | concluída — 2026-07-14 | match v3, perfil, auth opcional, cards existentes | rota `/radar`, contrato determinístico e jornadas anônima/autenticada aprovadas |
 | 2 | Urgência, filtros e comparação | `radar-fase-2.md` | não iniciada | entrega 1 e contrato estável de cards | usuário filtra, prioriza por prazo e compara oportunidades sem reinterpretar ranking |
 | 3 | Operação da descoberta | `discovery-operations.md` | não iniciada | staging, tasks de promoção, ingest gold e RAG | promoção observável por etapa, reprocessável e auditável |
 | 4 | Explorer de projetos | `explorer-project-canvas.md` | não iniciada | decisão de modelo de dados/memória, entrega 1 | hipótese de projeto evolui para perfil/Radar por ação explícita do usuário |
@@ -68,3 +68,12 @@ Explorar uma ideia/projeto
 - Recomendações ou previsão de aprovação.
 - Memória automática não revisada para o Explorer.
 - Mudança da ontologia gold ou do funil de match v3.
+
+## Backlog de hardening transversal
+
+- **Documentos de entrada:** definir um limite de caracteres/tokens para o texto
+  extraído de anexos antes da chamada ao LLM. O limite atual é de tamanho do
+  arquivo (10 MB), não do texto extraído. A spec filha deve decidir truncamento
+  ou sumarização previsível, mensagem ao usuário, telemetria de tamanho e testes
+  com documentos longos. Abrange extração de perfil, biblioteca e contexto de
+  escrita.
