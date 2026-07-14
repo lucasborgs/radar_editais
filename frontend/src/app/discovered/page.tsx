@@ -8,6 +8,7 @@ import {
   getDiscoveredOpportunities,
   promoteDiscoveredOpportunity,
   rejectDiscoveredOpportunity,
+  retryDiscoveredPromotion,
   updateDiscoveredEditalLink,
   type DiscoveredOpportunity,
   ApiError,
@@ -139,6 +140,20 @@ export default function DiscoveredPage() {
       await reload();
     } catch (e: unknown) {
       toast.error(e instanceof ApiError ? e.message : "Erro ao salvar");
+    } finally {
+      setActingOn(null);
+    }
+  }
+
+  async function handleRetry(opp: DiscoveredOpportunity, stage: "fetch" | "silver" | "radar" | "rag") {
+    if (!token) return;
+    setActingOn(opp.id);
+    try {
+      await retryDiscoveredPromotion(opp.id, stage, token);
+      toast.success(`Retry de ${stage} enfileirado`);
+      await reload();
+    } catch (e: unknown) {
+      toast.error(e instanceof ApiError ? e.message : "Erro ao repetir etapa");
     } finally {
       setActingOn(null);
     }
@@ -309,6 +324,34 @@ export default function DiscoveredPage() {
                 <div className="text-[10px] text-content-secondary font-sans">
                   {opp.reviewed_at && `Revisado em ${new Date(opp.reviewed_at).toLocaleString("pt-BR")}`}
                   {opp.edital_link && ` · Link: ${opp.edital_link}`}
+                </div>
+              )}
+
+              {opp.promotion_run && (
+                <div className="rounded-lg border border-border/70 bg-surface/50 px-3 py-2 text-xs font-sans space-y-1">
+                  <p className="font-medium text-content-primary">
+                    Ingestão: {({
+                      awaiting_fetch: "aguardando coleta",
+                      processing: "processando",
+                      ready: "disponível no Radar e RAG",
+                      partial_failure: "falha parcial",
+                      failed: "falhou",
+                      queued: "na fila",
+                    } as Record<string, string>)[opp.promotion_run.status] || opp.promotion_run.status}
+                  </p>
+                  <p className="text-content-secondary">
+                    Radar: {opp.promotion_run.stages.radar_ready?.status === "ready" ? "disponível" : "pendente"}
+                    {" · "}RAG: {opp.promotion_run.stages.rag_ready?.status === "ready" ? "disponível" : "pendente"}
+                  </p>
+                  {opp.promotion_run.status !== "ready" && opp.status === "promoted" && (
+                    <div className="flex gap-2 pt-1">
+                      {opp.promotion_run.route === "web_source" && (
+                        <button onClick={() => handleRetry(opp, "fetch")} disabled={actingOn === opp.id} className="text-primary hover:underline disabled:opacity-40">Repetir coleta</button>
+                      )}
+                      <button onClick={() => handleRetry(opp, "radar")} disabled={actingOn === opp.id} className="text-primary hover:underline disabled:opacity-40">Repetir Radar</button>
+                      <button onClick={() => handleRetry(opp, "rag")} disabled={actingOn === opp.id} className="text-primary hover:underline disabled:opacity-40">Repetir RAG</button>
+                    </div>
+                  )}
                 </div>
               )}
             </li>

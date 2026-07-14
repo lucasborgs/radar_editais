@@ -33,6 +33,7 @@ from config import BRONZE_DIR
 from core.auth import AdminUserId
 from core.db import get_supabase_service
 from core.net_guard import safe_get, safe_head
+from core.services import discovery_promotion
 from core.services.discovery_materializer import materialize_approved_evidence
 from core.web_identity import normalize_web_url, web_url_hash
 
@@ -143,10 +144,12 @@ def _process_edital_pdf(edital_link: str, opp: dict) -> dict:
         app.configure_task("chunk_edital").defer(edital_id=edital_id)
         app.configure_task("ingest_promoted_edital").defer(edital_id=edital_id)
         logger.info("chunk_edital + ingest_promoted_edital enfileirados para %s", edital_id)
+        jobs_enqueued = True
     except Exception as e:
         logger.warning("falha ao enfileirar processamento de %s: %s", edital_id, e)
+        jobs_enqueued = False
 
-    return {"url_hash": url_hash, "n_chars": len(text)}
+    return {"url_hash": url_hash, "n_chars": len(text), "jobs_enqueued": jobs_enqueued}
 
 
 def _process_approved_evidence(opp: dict) -> dict | None:
@@ -160,9 +163,11 @@ def _process_approved_evidence(opp: dict) -> dict | None:
         from core.tasks import app
         app.configure_task("chunk_edital").defer(edital_id=edital_id)
         app.configure_task("ingest_promoted_edital").defer(edital_id=edital_id)
+        jobs_enqueued = True
     except Exception as e:
         logger.warning("falha ao enfileirar evidência promovida %s: %s", edital_id, e)
-    return {"edital_id": edital_id, "materialized_evidence": True}
+        jobs_enqueued = False
+    return {"edital_id": edital_id, "materialized_evidence": True, "jobs_enqueued": jobs_enqueued}
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────
@@ -179,7 +184,19 @@ def list_discovered(user_id: AdminUserId, include_reviewed: bool = False):
         cutoff = (datetime.now(timezone.utc) - timedelta(days=TTL_DAYS)).isoformat()
         q = q.eq("status", "pending").gte("created_at", cutoff)
     res = q.order("created_at", desc=True).execute()
-    return {"opportunities": res.data or []}
+    opportunities = res.data or []
+    if include_reviewed and opportunities:
+        ids = [row["id"] for row in opportunities]
+        runs = (db.table("discovery_promotion_runs")
+                .select("id,discovered_opportunity_id,route,status,edital_id,stages,updated_at")
+                .in_("discovered_opportunity_id", ids).order("started_at", desc=True).execute()).data or []
+        latest: dict[str, dict] = {}
+        for run in runs:
+            latest.setdefault(run["discovered_opportunity_id"], run)
+        for row in opportunities:
+            if row["id"] in latest:
+                row["promotion_run"] = latest[row["id"]]
+    return {"opportunities": opportunities}
 
 
 class PromoteBody(BaseModel):
@@ -219,8 +236,18 @@ def promote_discovered(opp_id: str, user_id: AdminUserId, body: PromoteBody | No
         "reviewed_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    evidence_result = _process_approved_evidence(opp)
-    if evidence_result:
+    raw = opp.get("raw") or {}
+    has_evidence = bool(isinstance(raw, dict) and raw.get("evidence_package"))
+    route = "evidence_package" if has_evidence else ("direct_pdf" if edital_link and _is_pdf_url(edital_link) else "web_source")
+    expected_edital_id = None
+    if route == "evidence_package":
+        package = raw["evidence_package"]
+        canonical = (package.get("identity") or {}).get("canonical_url") or package.get("canonical_url") or opp["url"]
+        expected_edital_id = f"web:{web_url_hash(canonical)}"
+    elif route == "direct_pdf":
+        expected_edital_id = f"web:{web_url_hash(edital_link)}"
+
+    if has_evidence:
         promoted_url = opp["url"]
         web_source_id = None
     elif edital_link and _is_pdf_url(edital_link):
@@ -245,19 +272,102 @@ def promote_discovered(opp_id: str, user_id: AdminUserId, body: PromoteBody | No
 
     if web_source_id:
         update["promoted_web_source_id"] = web_source_id
-    db.table("discovered_opportunities").update(update).eq("id", opp_id).execute()
 
-    if evidence_result:
-        process_result = evidence_result
-    elif edital_link and _is_pdf_url(edital_link):
-        process_result = _process_edital_pdf(edital_link, opp)
+    try:
+        evidence_version = int((raw.get("evidence_package") or {}).get("version") or 1)
+        promotion_run = discovery_promotion.create_run(
+            db, opportunity_id=opp_id, route=route, edital_id=expected_edital_id,
+            web_source_id=web_source_id, evidence_version=evidence_version,
+        )
+    except Exception as exc:
+        logger.exception("não foi possível criar promotion run para %s", opp_id)
+        raise HTTPException(status_code=503, detail="Auditoria da promoção indisponível; tente novamente") from exc
+
+    try:
+        if has_evidence:
+            process_result = _process_approved_evidence(opp)
+        elif edital_link and _is_pdf_url(edital_link):
+            process_result = _process_edital_pdf(edital_link, opp)
+        if process_result:
+            artifact = {"edital_id": process_result.get("edital_id") or expected_edital_id}
+            promotion_run = discovery_promotion.update_stage(db, promotion_run, "bronze_ready", "ready", artifact=artifact)
+            if process_result.get("jobs_enqueued"):
+                discovery_promotion.update_stage(db, promotion_run, "silver_ready", "running", artifact=artifact)
+                discovery_promotion.update_stage(db, promotion_run, "radar_ready", "running", artifact=artifact)
+                discovery_promotion.update_stage(db, promotion_run, "rag_ready", "running", artifact=artifact)
+            else:
+                discovery_promotion.update_stage(db, promotion_run, "radar_ready", "failed", error="jobs nativos não enfileirados")
+                discovery_promotion.update_stage(db, promotion_run, "rag_ready", "failed", error="jobs nativos não enfileirados")
+    except Exception as exc:
+        discovery_promotion.update_stage(db, promotion_run, "bronze_ready", "failed", error=exc)
+        raise HTTPException(status_code=400, detail="Não foi possível materializar a evidência aprovada") from exc
+
+    db.table("discovered_opportunities").update(update).eq("id", opp_id).execute()
 
     resp = {"promoted": True, "url": promoted_url}
     if process_result:
         resp["edital_processed"] = process_result
     if web_source_id:
         resp["web_source_id"] = web_source_id
+    resp["promotion_run"] = {"id": promotion_run["id"], "status": promotion_run["status"], "route": route}
     return resp
+
+
+@router.get("/{opp_id}/promotion", summary="Estado técnico da promoção aprovada")
+def get_promotion(opp_id: str, user_id: AdminUserId):
+    """Detalhe administrativo seguro: estados, artefatos e linha do tempo."""
+    db = get_supabase_service()
+    run = discovery_promotion.latest_run(db, opp_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Nenhuma promoção encontrada")
+    return {"run": run, "events": discovery_promotion.events_for_run(db, run["id"])}
+
+
+class RetryPromotionBody(BaseModel):
+    stage: str
+
+
+@router.post("/{opp_id}/promotion/retry", summary="Repete uma etapa da promoção")
+def retry_promotion(opp_id: str, user_id: AdminUserId, body: RetryPromotionBody):
+    """Retry explícito e estreito; reaproveita bronze/evidência já aprovados."""
+    stage = body.stage.strip().lower()
+    if stage not in {"fetch", "silver", "radar", "rag"}:
+        raise HTTPException(status_code=422, detail="Etapa inválida para retry")
+    db = get_supabase_service()
+    opp_result = db.table("discovered_opportunities").select("id,status").eq("id", opp_id).maybe_single().execute()
+    opp = opp_result.data if opp_result else None
+    if not opp or opp.get("status") != "promoted":
+        raise HTTPException(status_code=409, detail="Retry exige uma oportunidade já promovida")
+    run = discovery_promotion.latest_run(db, opp_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Execução de promoção não encontrada")
+
+    try:
+        from core.tasks import app
+        if stage == "fetch":
+            if run.get("route") != "web_source":
+                raise HTTPException(status_code=409, detail="Retry de coleta só se aplica a URL pendente")
+            discovery_promotion.update_stage(db, run, "bronze_ready", "running", actor="operator")
+            app.configure_task("fetch_discovery_promotion").defer(promotion_run_id=run["id"])
+        elif stage in {"silver", "radar"}:
+            edital_id = run.get("edital_id")
+            if not edital_id:
+                raise HTTPException(status_code=409, detail="Ainda não há conteúdo coletado para reprocessar")
+            discovery_promotion.update_stage(db, run, "silver_ready", "running", actor="operator")
+            discovery_promotion.update_stage(db, run, "radar_ready", "running", actor="operator")
+            app.configure_task("ingest_promoted_edital").defer(edital_id=edital_id)
+        else:
+            edital_id = run.get("edital_id")
+            if not edital_id:
+                raise HTTPException(status_code=409, detail="Ainda não há conteúdo coletado para reprocessar")
+            discovery_promotion.update_stage(db, run, "rag_ready", "running", actor="operator")
+            app.configure_task("chunk_edital").defer(edital_id=edital_id, force=True)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("falha ao enfileirar retry %s para %s", stage, opp_id)
+        raise HTTPException(status_code=503, detail="Não foi possível enfileirar o retry") from exc
+    return {"retried": True, "stage": stage, "promotion_run_id": run["id"]}
 
 
 class RejectBody(BaseModel):

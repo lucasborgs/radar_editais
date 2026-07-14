@@ -578,6 +578,8 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
         await asyncio.to_thread(
             lambda: db.table("edital_chunks").delete().eq("edital_id", edital_id).execute()
         )
+        from core.services.discovery_promotion import mark_by_edital  # noqa: PLC0415
+        mark_by_edital(edital_id, "rag_ready", "failed", error="nenhum chunk foi produzido")
         return
 
     texts = [c["text"] for c in chunks]
@@ -593,6 +595,8 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
                 "chunk_edital_task: edital=%s inalterado e íntegro (hash=%s) — skip re-embed",
                 edital_id, content_hash[:8],
             )
+            from core.services.discovery_promotion import mark_by_edital  # noqa: PLC0415
+            mark_by_edital(edital_id, "rag_ready", "ready")
             return
 
     logger.info(
@@ -674,6 +678,8 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
         "chunk_edital_task: edital=%s indexado com %d chunks (%s → coluna %s)",
         edital_id, len(rows), EMBEDDING_MODEL, RETRIEVAL_EMBEDDING_COLUMN,
     )
+    from core.services.discovery_promotion import mark_by_edital  # noqa: PLC0415
+    mark_by_edital(edital_id, "rag_ready", "ready")
 
 
 def _insert_chunks_psycopg(rows: list[dict]) -> None:
@@ -940,15 +946,62 @@ async def ingest_promoted_edital_task(edital_id: str) -> None:
     docs = source_docs.load(edital_id) or get_adapter(source).to_documents(native)
     if not docs or not build_or_load_structured_doc(source, native, docs):
         logger.warning("ingest_promoted_edital: silver vazio p/ %s — abortado", edital_id)
+        from core.services.discovery_promotion import mark_by_edital  # noqa: PLC0415
+        mark_by_edital(edital_id, "silver_ready", "failed", error="documento silver vazio")
+        mark_by_edital(edital_id, "radar_ready", "failed", error="documento silver vazio")
         return
     if not (os.getenv("OPENAI_API_KEY") and os.getenv("DATABASE_URL")):
         logger.warning(
             "ingest_promoted_edital: sem OPENAI_API_KEY/DATABASE_URL — gold pulado p/ %s",
             edital_id,
         )
+        from core.services.discovery_promotion import mark_by_edital  # noqa: PLC0415
+        mark_by_edital(edital_id, "silver_ready", "ready")
+        mark_by_edital(edital_id, "radar_ready", "failed", error="ambiente gold não configurado")
         return
     counts = await asyncio.to_thread(gold.ingest_all, sources=["edital"])
     logger.info("ingest_promoted_edital: %s ingerido no gold — %s", edital_id, counts)
+    from core.services.discovery_promotion import mark_by_edital  # noqa: PLC0415
+    mark_by_edital(edital_id, "silver_ready", "ready")
+    mark_by_edital(edital_id, "radar_ready", "ready")
+
+
+@app.task(name="fetch_discovery_promotion", queue="etl", retry=UNIT_TASK_RETRY)
+async def fetch_discovery_promotion_task(promotion_run_id: str) -> None:
+    """Busca UMA URL já aprovada para o retry explícito de ``fetch``.
+
+    Reusa o WebScraper e o mesmo bronze/adaptador ``web``. Não usa Crawl4AI,
+    não mexe em fontes dedicadas e não aceita URL vinda do cliente.
+    """
+    from core.services import discovery_promotion  # noqa: PLC0415
+    from pipeline.extractors.web import WebScraper  # noqa: PLC0415
+
+    db = get_supabase_service()
+    result = db.table("discovery_promotion_runs").select("*").eq("id", promotion_run_id).maybe_single().execute()
+    run = result.data if result else None
+    if not run or run.get("route") != "web_source":
+        logger.warning("fetch_discovery_promotion: run inválido %s", promotion_run_id)
+        return
+    opp_result = (db.table("discovered_opportunities").select("url,title")
+                  .eq("id", run["discovered_opportunity_id"]).maybe_single().execute())
+    opp = opp_result.data if opp_result else None
+    if not opp:
+        discovery_promotion.update_stage(db, run, "bronze_ready", "failed", error="oportunidade ausente")
+        return
+    scraper = WebScraper(max_urls=1)
+    row = await asyncio.to_thread(scraper._fetch_one, opp["url"], opp.get("title"))
+    if not row:
+        discovery_promotion.update_stage(db, run, "bronze_ready", "failed", error="coleta não retornou conteúdo")
+        return
+    await asyncio.to_thread(scraper._save, [row], "web_promoted_fetch")
+    edital_id = f"web:{row['url_hash']}"
+    run = discovery_promotion.set_edital_id(db, run, edital_id)
+    discovery_promotion.update_stage(db, run, "bronze_ready", "ready", artifact={"edital_id": edital_id})
+    discovery_promotion.update_stage(db, run, "silver_ready", "running", artifact={"edital_id": edital_id})
+    discovery_promotion.update_stage(db, run, "radar_ready", "running", artifact={"edital_id": edital_id})
+    discovery_promotion.update_stage(db, run, "rag_ready", "running", artifact={"edital_id": edital_id})
+    await app.configure_task("chunk_edital").defer_async(edital_id=edital_id)
+    await app.configure_task("ingest_promoted_edital").defer_async(edital_id=edital_id)
 
 
 # =============================================================================

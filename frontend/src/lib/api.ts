@@ -786,6 +786,16 @@ export interface DiscoveredOpportunity {
   created_at: string;
   reviewed_at: string | null;
   promoted_web_source_id: string | null;
+  promotion_run?: PromotionRun;
+}
+
+export interface PromotionRun {
+  id: string;
+  route: "web_source" | "direct_pdf" | "evidence_package";
+  status: "awaiting_fetch" | "processing" | "ready" | "partial_failure" | "failed" | "queued";
+  edital_id?: string | null;
+  stages: Record<string, { status: string; updated_at?: string }>;
+  updated_at: string;
 }
 
 export const getDiscoveredOpportunities = (token: string, includeReviewed?: boolean) =>
@@ -826,6 +836,13 @@ export const updateDiscoveredEditalLink = (id: string, editalLink: string, token
       method: "PATCH",
       body: JSON.stringify({ edital_link: editalLink }),
     },
+    token,
+  );
+
+export const retryDiscoveredPromotion = (id: string, stage: "fetch" | "silver" | "radar" | "rag", token: string) =>
+  apiFetch<{ retried: boolean; stage: string; promotion_run_id: string }>(
+    `/discovered-opportunities/${id}/promotion/retry`,
+    { method: "POST", body: JSON.stringify({ stage }) },
     token,
   );
 

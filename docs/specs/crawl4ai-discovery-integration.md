@@ -1,6 +1,6 @@
 # Spec — Integração Crawl4AI na Descoberta
 
-**Status:** proposta — aguardando aprovação · **Data:** 2026-07-14
+**Status:** implementada — rollout do coletor sob flag · **Data:** 2026-07-14
 
 **Antecedente:** [crawl4ai-evaluation-v2.md](crawl4ai-evaluation-v2.md).
 
@@ -120,3 +120,23 @@ versão do pacote.
 4. Ligar a promoção ao pacote congelado e aos jobs nativos.
 5. Integrar a observabilidade/retry da spec de operação da descoberta e executar
    evals de extração, RAG e matching antes de rollout por flag.
+
+## 9. Implementação entregue
+
+- `DiscoveryEvidencePackage` é serializado em `raw.evidence_package` para toda
+  descoberta nova; a variante legada produz o mesmo contrato quando o extra
+  não está instalado.
+- `DISCOVERY_CRAWL4AI_ENABLED=1` habilita o enriquecimento apenas no worker da
+  descoberta. O import é tardio, portanto Crawl4AI não entrou nas dependências
+  padrão do backend. Falhas retornam à evidência legada e ficam registradas no
+  pacote, sem publicar conteúdo pendente.
+- A promoção materializa a versão aprovada em bronze `web` e grava a página e
+  os PDFs selecionados como Documento Canônico em `edital_source_docs` quando
+  há banco. Em seguida enfileira, sem modificar suas assinaturas, os jobs
+  `ingest_promoted_edital` e `chunk_edital`.
+- A migration 038, os endpoints administrativos de detalhe/retry e a tela
+  `/discovered` separam a prontidão do Radar da prontidão do RAG. A coleta de
+  uma URL pendente só vira bronze por um retry explícito que reutiliza o
+  `WebScraper` existente.
+- O rollout recomendado é manter a flag desligada, aplicar a migration, validar
+  uma fonte genérica no staging e só então habilitá-la no worker de descoberta.

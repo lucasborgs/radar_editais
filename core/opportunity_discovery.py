@@ -199,7 +199,7 @@ def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, mode
     # url/url_hash dão a identidade `web:<url_hash>` (mesma de páginas manuais);
     # texto_cru é o corpo pro chunking; verificacao=provisorio marca a origem
     # automática. `agency` sobrevive como campo (futura graduação Fase C).
-    return {
+    record = {
         "url": normalize_web_url(hit.url),
         "url_hash": web_url_hash(hit.url),
         "title": data.get("titulo") or hit.title,
@@ -219,6 +219,11 @@ def _extract(hit: websearch.SearchHit, page_text: str, agency: str, client, mode
         "verificacao": "provisorio",
         "data_extracao": datetime.now(timezone.utc).date().isoformat(),
     }
+    # Mesmo sem o extra Crawl4AI, toda oportunidade nova carrega uma versão
+    # congelável e serializável das evidências que sustentaram a extração.
+    from core.services.discovery_evidence import build_evidence_package
+    record["evidence_package"] = build_evidence_package(record)
+    return record
 
 
 # =============================================================================
@@ -591,6 +596,14 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         agency = getattr(h, "agency", "") or verdict["agency"]
         rec = _extract(h, page_text, agency, ext_client, ext_model)
         if rec:
+            # Crawl4AI é capacidade opcional do worker, nunca requisito do
+            # backend. Uma falha preserva o pacote legado e não bloqueia a fila.
+            if os.getenv("DISCOVERY_CRAWL4AI_ENABLED", "0") == "1":
+                try:
+                    from core.services.crawl4ai_discovery import enrich_record
+                    rec["evidence_package"] = enrich_record(rec)
+                except Exception as exc:  # extra ausente ou falha inesperada
+                    logger.warning("descoberta: enriquecimento Crawl4AI falhou (%s): %s", h.url, exc)
             records.append(rec)
         # rec=None (falha de extração) NÃO toca o ledger: não entra no cache
         # negativo (só a triagem grava rejeição) nem no dedup positivo (o

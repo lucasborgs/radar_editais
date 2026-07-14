@@ -1,6 +1,6 @@
 # Spec — Operação da descoberta
 
-**Status:** proposta — aguardando aprovação · **Data:** 2026-07-14
+**Status:** implementada para as rotas de promoção e retry · **Data:** 2026-07-14
 
 **Documento-pai:** [radar-initiative.md](radar-initiative.md).
 
