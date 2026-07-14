@@ -12,7 +12,10 @@ oportunidades de fomento público — editais, programas e investidores — em r
 flowchart LR
     %% Input channels → hub
     FONTES[Agências<br/>FINEP/FAPESP/FAPESC] --> SILVER[Silver<br/>extração + normalização]
-    DESC[Descoberta Web<br/>crawler + gate admin] -->|promote| SILVER
+    DESC[Descoberta Web<br/>busca + adapters] --> EVID[Evidências canônicas<br/>Crawl4AI opcional no worker]
+    EVID --> GATE[Staging + gate admin]
+    GATE -->|promote| BRONZE[Bronze web<br/>versão aprovada]
+    BRONZE --> SILVER
     SILVER --> GOLD
 
     GOLD[("Gold — Catálogo<br/>Postgres · entidades<br/>match_chunks")]
@@ -65,7 +68,7 @@ flowchart LR
     style GOLD fill:#e6f3ff,stroke:#0066cc,stroke-width:2px,color:#000
 ```
 
-- **Descoberta**: crawler web (DOU + afins) → staging com gate humano. Promovido → silver → gold como qualquer edital de agência.
+- **Descoberta**: busca web e adapters dedicados → evidências canônicas → staging com gate humano. A versão promovida é congelada em bronze web e segue para silver → gold como qualquer edital de agência; Crawl4AI é um enriquecimento opcional do worker, não substitui adapters nem o pipeline nativo.
 - **Radar (Match)**: funil determinístico de 4 estágios — vigência (SQL) → elegibilidade → MaxSim (zero LLM) → veredito gpt-4o-mini no top-K. Trilha investidor paralela por cosseno de tese.
 - **Explore**: agente ReAct com busca semântica, BFS em hipergrafo, entidades por tags e o motor de match como ferramenta.
 - **Escrita**: sessões LangGraph com checkpointer Postgres durável, RAG híbrida (HyDE + pgvector + BM25 + RRF + rerank), ficha da oportunidade via catálogo, checklist paralelo 3-passos.

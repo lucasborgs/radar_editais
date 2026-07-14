@@ -44,12 +44,14 @@ EMBRAPII, 17 investidores e 10 programas curados à mão (versionados no repo).
 flowchart TB
   subgraph FONTES["Fontes"]
     AG["Agências (FINEP/FAPESP/FAPESC)<br/>scrapers diários"]
-    WEB["Web · Descoberta"]
+    WEB["Web · Descoberta<br/>busca + adapters"]
     CUR["Curadoria versionada<br/>investidores · programas · ICTs"]
   end
 
-  WEB --> GATE["Staging + gate admin<br/>(promote/reject)"]
-  GATE -->|promote| SILVER
+  WEB --> EVID["Evidências canônicas<br/>Crawl4AI opcional no worker"]
+  EVID --> GATE["Staging + gate admin<br/>(promote/reject)"]
+  GATE -->|promote| BRONZE["Bronze web<br/>versão aprovada"]
+  BRONZE --> SILVER
   AG --> SILVER["Silver — transcrição estrutural<br/>verbatim, por seção (LLM leve por página)"]
 
   SILVER --> INGEST["Ingestão gold (incremental, diária)<br/>· metadados determinísticos<br/>· tagger LLM: setores (16) + tags de tecnologia<br/>· extração de elegibilidade (constraints + exclusões + público-alvo)<br/>· embeddings da entidade e dos trechos de match"]
@@ -126,11 +128,18 @@ Duas superfícies sobre o mesmo catálogo:
 
 ## 5. Descoberta
 
-Torneira de novas oportunidades da web (DOU e afins) → triagem → **staging com
-gate humano** (admin promove ou rejeita). O promote injeta a oportunidade no
-mesmo caminho silver → ingest do plano de dados — ela entra no catálogo, no
-match e no RAG como qualquer edital de agência. Descoberta nunca escreve
-diretamente no catálogo.
+Torneira de novas oportunidades da web (DOU e afins) → triagem → pacote
+canônico de evidências → **staging com gate humano** (admin promove ou rejeita).
+O pacote preserva a proveniência da página, de documentos oficiais e de adapters;
+o Crawl4AI é um enriquecimento opcional, executado apenas no worker, para cobrir
+conteúdo dinâmico, links e lacunas de evidência. Ele não substitui scrapers ou
+adapters dedicados.
+
+O `promote` materializa a versão aprovada em bronze `web`, de forma auditável, e
+reutiliza o `WebScraper` para o caminho silver → ingest do plano de dados. A
+oportunidade então entra no catálogo, no match e no RAG como qualquer edital de
+agência. Descoberta nunca escreve diretamente no catálogo; falhas no
+enriquecimento permanecem isoladas no staging e não publicam conteúdo pendente.
 
 ---
 
