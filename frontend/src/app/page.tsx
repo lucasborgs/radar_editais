@@ -394,9 +394,18 @@ export default function FrontDoorPage() {
     };
   }, [hydrated, isAuthed, getToken]);
 
-  // Evita que um duplo clique em "Aceitar" dispare efeitos de perfil duas vezes
-  // antes de o React re-renderizar o card como aplicado.
-  const decidingDiffs = useRef(new Set<number>());
+  // Uma entrada de diff só pode ser decidida uma vez. O WeakSet mantém o
+  // bloqueio mesmo se o primeiro aceite terminar antes do React re-renderizar o
+  // card como aplicado (caso típico de clique duplo em fluxo anônimo).
+  const decidedDiffEntries = useRef(new WeakSet<object>());
+  const radarReadyMessage = "Perfil atualizado. Seu **Radar** está pronto para mostrar as oportunidades mais aderentes.";
+  const appendRadarReadyMessage = useCallback(() => {
+    setEntries((prev) => {
+      const last = prev[prev.length - 1];
+      if (last?.kind === "msg" && last.role === "assistant" && last.content === radarReadyMessage) return prev;
+      return [...prev, { kind: "msg", role: "assistant", content: radarReadyMessage }];
+    });
+  }, []);
 
   // ── Turno de conversa ───────────────────────────────────────────────────────
   const send = useCallback(
@@ -487,8 +496,8 @@ export default function FrontDoorPage() {
   const decideDiff = useCallback(
     async (index: number, accepted: boolean, finalItems?: ProfileDiffItem[]) => {
       const entry = entries[index];
-      if (!entry || entry.kind !== "diff" || decidingDiffs.current.has(index)) return;
-      decidingDiffs.current.add(index);
+      if (!entry || entry.kind !== "diff" || decidedDiffEntries.current.has(entry)) return;
+      decidedDiffEntries.current.add(entry);
 
       try {
         setEntries((prev) =>
@@ -532,14 +541,7 @@ export default function FrontDoorPage() {
         // O Radar é a superfície de resultados. Não disparamos um match oculto
         // no chat: ele produzia narrativa sem os cards e podia duplicar respostas.
         if (isRadarReady(next)) {
-          setEntries((prev) => [
-            ...prev,
-            {
-              kind: "msg",
-              role: "assistant",
-              content: "Perfil atualizado. Seu **Radar** está pronto para mostrar as oportunidades mais aderentes.",
-            },
-          ]);
+          appendRadarReadyMessage();
         } else {
           const msg = missingForRadar(next);
           if (msg) {
@@ -547,10 +549,11 @@ export default function FrontDoorPage() {
           }
         }
       } finally {
-        decidingDiffs.current.delete(index);
+        // O bloqueio é permanente para esta entrada; uma nova conversa cria
+        // novas entradas e pode ser decidida normalmente.
       }
     },
-    [entries, profile, persistProfile, isAuthed, sessionId, getToken],
+    [entries, profile, persistProfile, isAuthed, sessionId, getToken, appendRadarReadyMessage],
   );
 
   // ── Barra de status: editar perfil (diff manual com todos os campos) ────────
@@ -566,16 +569,9 @@ export default function FrontDoorPage() {
     async (updates: Partial<CompanyProfile>) => {
       const next = { ...profile, ...updates } as CompanyProfile;
       await persistProfile(next);
-      setEntries((prev) => [
-        ...prev,
-        {
-          kind: "msg",
-          role: "assistant",
-          content: "Perfil atualizado. Seu **Radar** está pronto para mostrar as oportunidades mais aderentes.",
-        },
-      ]);
+      appendRadarReadyMessage();
     },
-    [profile, persistProfile],
+    [profile, persistProfile, appendRadarReadyMessage],
   );
 
   // Botão "Escrever proposta →" no MatchedEditalCard. Perfil incompleto →
