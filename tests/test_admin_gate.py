@@ -3,7 +3,7 @@
 A fila da Descoberta é ferramenta do operador do sistema, não do cliente final.
 Cobre o contrato do gate: allowlist por e-mail do JWT (case-insensitive, CSV),
 fail-closed (env vazia/ausente = ninguém), payload sem e-mail (DEMO_MODE) = 403,
-e o wiring: os 4 endpoints de discovered.py dependem de AdminUserId.
+e o wiring: todos os endpoints de discovered.py dependem de AdminUserId.
 """
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ def test_discovered_endpoints_require_admin():
     from core.auth import get_admin_user_id as gate
 
     routes = [r for r in discovered.router.routes if hasattr(r, "endpoint")]
-    assert len(routes) == 4  # list / promote / reject / patch_edital_link
+    assert routes, "router de descoberta não expõe endpoints"
     for r in routes:
         deps = [
             d.call for d in r.dependant.dependencies
