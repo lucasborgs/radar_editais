@@ -2,7 +2,25 @@
 
 **Status:** implementada — rollout do coletor sob flag · **Data:** 2026-07-14
 
-**Antecedente:** [crawl4ai-evaluation-v2.md](crawl4ai-evaluation-v2.md).
+**Antecedente:** bake-off local de 2026-07-13, deliberadamente não versionado.
+
+### Resultado do bake-off
+
+A hipótese de substituir todos os adapters por um extrator universal foi
+**reprovada pelos critérios definidos no próprio experimento**:
+
+- 6/6 URLs completaram, mas nenhuma atingiu a classe `high`;
+- 0/6 descrições chegaram ao piso de 500 caracteres;
+- 5/6 preencheram ao menos três seções;
+- a latência média do v2 foi 26,2 s/URL, acima do teto de 15 s; e
+- houve corrupção factual em campo financeiro: na amostra FAPEMIG, valores como
+  `R$ 500.000,00`/`15%` viraram `R$ 50.000.000,00`/`1.500%`.
+
+A comparação com adapters dedicados também não tinha golden humano nem
+persistia vereditos por campo; portanto, não sustentava remoção dos scrapers.
+A decisão implementada abaixo é propositalmente mais estreita: Crawl4AI coleta
+markdown e links de documentos como **evidência opcional**, sob flag e gate
+humano, sem fazer a extração LLM/BM25 do experimento e sem substituir adapters.
 
 ## 1. Resultado
 

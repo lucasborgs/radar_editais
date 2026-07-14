@@ -21,20 +21,6 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
 
 ## Pendências verificadas
 
-### Confirmar o ledger de migrations no Supabase remoto antes do próximo deploy
-
-- **Evidência local:** o repositório versiona migrations até
-  `038_discovery_promotion_runs.sql`; a migration
-  `034_procrastinate_lockdown.sql` fecha a superfície da fila do worker.
-- **Incerteza preservada:** o repositório não prova quais migrations já foram
-  aplicadas ao projeto remoto. Em 2026-07-14, `supabase migration list` não pôde
-  consultar o projeto porque não havia `SUPABASE_ACCESS_TOKEN` na sessão.
-- **Gatilho:** qualquer deploy que aplique schema ou abertura de acesso externo.
-- **Validação:** executar `supabase migration list`, revisar divergências e então
-  usar o runbook de `scripts/deploy.sh`. Se a 034 estiver pendente, repetir o
-  leak-test direcionado de `tests/test_tenant_isolation.py` após aplicá-la.
-- **Tipo:** estado externo não verificado; não implica mudança de código.
-
 ### Manter a escrita automática de memória congelada até haver evidência real
 
 - **Evidência atual:** `AUTO_MEMORY_WRITE=0` é o default em
@@ -56,8 +42,9 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
 - **Evidência atual:** catálogo e match usam as tabelas gold, mas
   `core/opportunity_discovery.py` ainda usa `kg_store` para o
   `discovery_ledger` e consulta `load_index()` na deduplicação; `core/vocab_lint.py`
-  também lê `index.json`/`index_historico.json` por esse seam. Os testes
-  `tests/test_kg_store.py` cobrem esses contratos.
+  também lê `index.json`/`index_historico.json` por esse seam. Não há outros
+  consumidores de produção/tooling no repositório; `load_icts()` aparece apenas
+  nos testes. `tests/test_kg_store.py` cobre os contratos ainda expostos.
 - **Motivo do adiamento:** remover `kg_store`, `kg_artifacts` ou os helpers de
   índice agora alteraria deduplicação/observabilidade da Descoberta e quebraria
   tooling offline. Não são arquivos mortos.

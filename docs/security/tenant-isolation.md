@@ -102,12 +102,12 @@ bumps da lib). O worker/backend conecta via `DATABASE_URL` como role `postgres`
 procrastinate seria invasivo demais pré-beta. Pós-fix: anon recebe
 `42501 permission denied` na tabela e no RPC; o owner segue lendo/escrevendo.
 
-> **Estado remoto:** em 2026-07-02 a migration 034 ainda não estava aplicada no
-> ambiente remoto então testado. O Git não comprova o ledger atual do Supabase;
-> antes do próximo deploy, confirme com `supabase migration list` e repita
-> `test_procrastinate_surface_negada` se a 034 ainda estiver pendente. Esta
-> verificação externa está registrada em [`docs/BACKLOG.md`](../BACKLOG.md), sem
-> afirmar que o estado observado em 2026-07-02 continua vigente.
+> **Estado remoto verificado em 2026-07-14:** o ledger contém as migrations
+> `001`–`038`, incluindo a 034. Consulta read-only ao catálogo confirmou RLS nas
+> quatro tabelas `procrastinate_*` e ausência de `SELECT`/`DELETE` para
+> `anon`/`authenticated`; uma leitura REST usando a anon key retornou 401. O
+> leak-test completo ainda requer `SUPABASE_JWT_SECRET`, não presente nos envs
+> locais, mas a superfície específica corrigida pela 034 está fechada.
 
 ## S2 — Scoping nos handlers
 

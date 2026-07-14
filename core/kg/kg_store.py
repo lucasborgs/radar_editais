@@ -1,20 +1,25 @@
-"""core/kg_store.py — fonte única dos artefatos do knowledge graph.
+"""Compatibilidade para o ledger da Descoberta e artefatos JSON legados.
 
-Centraliza leitura/escrita dos blobs do grafo (`index.json`,
-`index_historico.json`, `icts.json`). Todos os consumidores lêem via
-esta camada, nunca diretamente do disco.
+O catálogo e o match ativos usam as tabelas gold SQL; este módulo não é mais a
+fonte do knowledge graph. Há dois consumidores fora dos testes:
+
+* ``core.opportunity_discovery`` persiste ``discovery_ledger`` e ainda consulta
+  ``index.json`` para complementar a deduplicação por URL;
+* ``core.vocab_lint`` lê ``index.json``/``index_historico.json`` como corpus
+  offline de evidências.
+
+``load_icts`` e a chave ``icts`` não têm consumidor vivo fora dos testes, mas
+permanecem enquanto o seam legado for removido como uma unidade.
 
 Backends de LEITURA (env `KG_STORE_BACKEND`):
   • "file" (default)  — lê `data/knowledge_graph/*.json`. Dev + ETL local.
   • "postgres"        — lê a tabela `kg_artifacts` (JSONB) no Supabase.
-                        Caminho de produção: o request-path deixa de depender
-                        de arquivos locais.
+                        Usado em produção para tornar o ledger durável.
 
 ESCRITA (`save`): sempre grava o arquivo local (dev/inspeção e consumidores
 em modo file) e, quando o Supabase está configurado, faz `upsert` na tabela
-— assim um `run_all.py` local publica o dado para a prod sem redeploy. Falha
-de upsert com credencial presente PROPAGA (publicar dado não pode falhar em
-silêncio).
+Falha de upsert com credencial presente PROPAGA: perder o ledger faria URLs já
+avaliadas voltarem à triagem após um redeploy.
 
 Caching:
   • modo file     — invalida por mtime (espelha o comportamento legado: um
