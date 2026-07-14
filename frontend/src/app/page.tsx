@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
@@ -394,35 +394,9 @@ export default function FrontDoorPage() {
     };
   }, [hydrated, isAuthed, getToken]);
 
-  // ── Match no chat (após perfil completo) ────────────────────────────────────
-  // Pós-Sprint 3 o radar legacy saiu: o match emerge pelo CHAT. Disparamos um
-  // turno automático e o ExploreAgent narra os editais + parceiros via as tools
-  // find_matching_editais / find_matching_entities (hipergrado, prosa com
-  // justificativa). O turno é persistido pelo POST /explore quando autenticado.
-  const runMatch = useCallback(
-    async (p: CompanyProfile) => {
-      if (sending) return; // evita 2 turnos de match concorrentes (double-fire)
-      setSending(true);
-      try {
-        const { answer, truncated, session_id } = await frontdoorTurn(
-          "Quais editais e parceiros (ICTs, investidores, programas) combinam com o meu perfil? Liste os mais relevantes com a justificativa de cada match.",
-          toApiHistory(entries),
-          p.nome ? p : null,
-          sessionId,
-        );
-        if (session_id) bindSession(session_id);
-        setEntries((prev) => [
-          ...prev,
-          { kind: "msg", role: "assistant", content: answer, truncated: truncated || undefined },
-        ]);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Não consegui buscar oportunidades.");
-      } finally {
-        setSending(false);
-      }
-    },
-    [entries, sessionId, bindSession, sending],
-  );
+  // Evita que um duplo clique em "Aceitar" dispare efeitos de perfil duas vezes
+  // antes de o React re-renderizar o card como aplicado.
+  const decidingDiffs = useRef(new Set<number>());
 
   // ── Turno de conversa ───────────────────────────────────────────────────────
   const send = useCallback(
@@ -513,58 +487,70 @@ export default function FrontDoorPage() {
   const decideDiff = useCallback(
     async (index: number, accepted: boolean, finalItems?: ProfileDiffItem[]) => {
       const entry = entries[index];
-      if (!entry || entry.kind !== "diff") return;
+      if (!entry || entry.kind !== "diff" || decidingDiffs.current.has(index)) return;
+      decidingDiffs.current.add(index);
 
-      setEntries((prev) =>
-        prev.map((e, i) =>
-          i === index && e.kind === "diff"
-            ? { ...e, status: accepted ? "accepted" : "dismissed", items: finalItems ?? e.items }
-            : e,
-        ),
-      );
+      try {
+        setEntries((prev) =>
+          prev.map((e, i) =>
+            i === index && e.kind === "diff"
+              ? { ...e, status: accepted ? "accepted" : "dismissed", items: finalItems ?? e.items }
+              : e,
+          ),
+        );
 
-      // Espelha a decisão no servidor quando a entrada está persistida (PATCH
-      // payload — status pending→accepted/dismissed). Fire-and-forget: falha
-      // não bloqueia o aceite local.
-      if (isAuthed && sessionId && entry.entryId) {
-        void (async () => {
-          try {
-            const token = await getToken();
-            if (token) {
-              await updateConversationEntry(
-                sessionId,
-                entry.entryId!,
-                {
-                  items: finalItems ?? entry.items,
-                  status: accepted ? "accepted" : "dismissed",
-                  origin: entry.origin ?? "turn",
-                },
-                token,
-              );
+        // Espelha a decisão no servidor quando a entrada está persistida (PATCH
+        // payload — status pending→accepted/dismissed). Fire-and-forget: falha
+        // não bloqueia o aceite local.
+        if (isAuthed && sessionId && entry.entryId) {
+          void (async () => {
+            try {
+              const token = await getToken();
+              if (token) {
+                await updateConversationEntry(
+                  sessionId,
+                  entry.entryId!,
+                  {
+                    items: finalItems ?? entry.items,
+                    status: accepted ? "accepted" : "dismissed",
+                    origin: entry.origin ?? "turn",
+                  },
+                  token,
+                );
+              }
+            } catch (err) {
+              console.warn("Falha ao persistir decisão do diff:", err);
             }
-          } catch (err) {
-            console.warn("Falha ao persistir decisão do diff:", err);
-          }
-        })();
-      }
-
-      if (!accepted) return;
-
-      const next = applyDiff(profile, finalItems ?? entry.items);
-      await persistProfile(next);
-
-      // Aceite é o trigger do match — se o perfil ficou rodável, o agente narra
-      // as oportunidades no chat (pós-Sprint 3, sem radar legacy).
-      if (isRadarReady(next)) {
-        await runMatch(next);
-      } else {
-        const msg = missingForRadar(next);
-        if (msg) {
-          setEntries((prev) => [...prev, { kind: "msg", role: "assistant", content: msg }]);
+          })();
         }
+
+        if (!accepted) return;
+
+        const next = applyDiff(profile, finalItems ?? entry.items);
+        await persistProfile(next);
+
+        // O Radar é a superfície de resultados. Não disparamos um match oculto
+        // no chat: ele produzia narrativa sem os cards e podia duplicar respostas.
+        if (isRadarReady(next)) {
+          setEntries((prev) => [
+            ...prev,
+            {
+              kind: "msg",
+              role: "assistant",
+              content: "Perfil atualizado. Seu **Radar** está pronto para mostrar as oportunidades mais aderentes.",
+            },
+          ]);
+        } else {
+          const msg = missingForRadar(next);
+          if (msg) {
+            setEntries((prev) => [...prev, { kind: "msg", role: "assistant", content: msg }]);
+          }
+        }
+      } finally {
+        decidingDiffs.current.delete(index);
       }
     },
-    [entries, profile, persistProfile, runMatch, isAuthed, sessionId, getToken],
+    [entries, profile, persistProfile, isAuthed, sessionId, getToken],
   );
 
   // ── Barra de status: editar perfil (diff manual com todos os campos) ────────
@@ -575,14 +561,21 @@ export default function FrontDoorPage() {
     ]);
   }, [profile]);
 
-  // ── Etapa 2: aplicar campos do UnlockCard → persiste + re-roda o match ───────
+  // ── Etapa 2: aplicar campos do UnlockCard → persiste + orienta ao Radar ────
   const handleUnlockApply = useCallback(
     async (updates: Partial<CompanyProfile>) => {
       const next = { ...profile, ...updates } as CompanyProfile;
       await persistProfile(next);
-      await runMatch(next);
+      setEntries((prev) => [
+        ...prev,
+        {
+          kind: "msg",
+          role: "assistant",
+          content: "Perfil atualizado. Seu **Radar** está pronto para mostrar as oportunidades mais aderentes.",
+        },
+      ]);
     },
-    [profile, persistProfile, runMatch],
+    [profile, persistProfile],
   );
 
   // Botão "Escrever proposta →" no MatchedEditalCard. Perfil incompleto →
