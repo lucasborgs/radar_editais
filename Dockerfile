@@ -38,10 +38,13 @@ CMD uvicorn backend.api:app --host 0.0.0.0 --port ${PORT:-8000}
 # worker para não aumentar a imagem nem a superfície da API síncrona.
 FROM base AS worker
 
+# Compartilhado entre a instalação (root) e o processo do worker (app).
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
 RUN pip install --no-cache-dir crawl4ai \
     && python -m playwright install --with-deps chromium \
     && useradd -m -u 1000 app \
-    && chown -R app:app /app
+    && chown -R app:app /app /ms-playwright
 USER app
 
 CMD python -m procrastinate --app=core.tasks.app worker
