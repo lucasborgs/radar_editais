@@ -41,6 +41,30 @@ Isso preserva o caminho nativo para conteúdo promovido, mas a decisão
 chunks ficaram disponíveis nem onde uma falha ocorreu. Também não há uma forma
 operacional de repetir somente a etapa necessária.
 
+### Relação com a avaliação Crawl4AI
+
+A avaliação em [crawl4ai-eval.md](crawl4ai-eval.md) atua **antes** desta
+spec: ela compara alternativas para buscar, renderizar e extrair uma URL antes
+de o achado ser gravado no staging. Esta entrega começa somente após o registro
+estar em `discovered_opportunities` e um operador o aprovar.
+
+As duas linhas devem compartilhar um contrato de evidência, não uma
+implementação acoplada:
+
+- o extrator vencedor (pipeline atual, Crawl4AI ou alternativa determinística)
+  deve entregar URL canônica, texto recuperável, links de PDF/documentos,
+  qualidade de extração e metadados de coleta;
+- staging preserva referências a esses artefatos para revisão, mas nenhum deles
+  é publicado antes da aprovação; e
+- a promoção escolhe explicitamente quais documento(s) aprovados alimentam
+  bronze, silver, gold/Radar e chunks/RAG, registrando-os no run.
+
+**Gate de implementação:** concluir a avaliação Crawl4AI e decidir o extrator
+de produção antes de instrumentar a rota `web_source`. A rota `direct_pdf`, o
+modelo de execução, a auditoria e a separação Radar/RAG permanecem válidos para
+qualquer extrator. Não se deve substituir scrapers dedicados, adicionar
+dependência Crawl4AI ou alterar a torneira como efeito colateral desta spec.
+
 ## 3. Decisões propostas
 
 | # | Decisão |
