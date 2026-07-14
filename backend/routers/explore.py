@@ -89,6 +89,33 @@ def _explore_limit(key: str) -> str:
     return "3/minute"
 
 
+def _match_cards_intro(editais: list[dict], entities: list[dict]) -> str:
+    """Texto canônico para resultados que já serão exibidos como cards.
+
+    O agente usa uma chamada de tool própria para raciocinar; os cards são
+    recalculados pelo motor v3 para a UI. A introdução não pode usar a contagem
+    da tool do agente, pois ela pode ter outro ``top_k`` que o payload visual.
+    """
+    funding = len(editais) + sum(item.get("kind") == "programa" for item in entities)
+    capital = sum(item.get("kind") == "investidor" for item in entities)
+
+    parts: list[str] = []
+    if funding:
+        noun = "oportunidade de fomento" if funding == 1 else "oportunidades de fomento"
+        parts.append(f"{funding} {noun}")
+    if capital:
+        noun = "potencial parceiro de capital" if capital == 1 else "potenciais parceiros de capital"
+        parts.append(f"{capital} {noun}")
+
+    if not parts:
+        return "Não encontrei oportunidades com afinidade suficiente no momento."
+    listed = " e ".join(parts)
+    return (
+        f"Encontrei {listed} com afinidade ao perfil. Os cards abaixo mostram "
+        "as evidências e, quando necessário, critérios de elegibilidade a confirmar."
+    )
+
+
 @router.post(
     "/explore",
     summary="Chat exploratório + extração de perfil (auth opcional)",
@@ -162,6 +189,10 @@ def explore(
             ]
             entity_dicts.sort(key=lambda m: m.get("affinity", 0), reverse=True)
             result["matched_entities"] = entity_dicts
+            # Os cards são a fonte de verdade visual. Substitui a narração do
+            # agente por uma introdução calculada do mesmo payload para não
+            # prometer quantidades diferentes do que a UI exibe.
+            result["answer"] = _match_cards_intro(result["matched_editais"], entity_dicts)
         except Exception as e:
             logger.warning("explore: falha ao extrair matched_editais: %s", e)
 
@@ -171,7 +202,7 @@ def explore(
             workspace_id = get_workspace_id(db, user_id)
             profile_diff_list = diff if diff else None
             persisted = persist_frontdoor_turn(
-                db, workspace_id, message, answer, profile_diff_list, req.session_id,
+                db, workspace_id, message, result["answer"], profile_diff_list, req.session_id,
                 matched_editais=result.get("matched_editais"),
                 matched_entities=result.get("matched_entities"),
             )
