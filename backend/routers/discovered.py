@@ -33,6 +33,7 @@ from config import BRONZE_DIR
 from core.auth import AdminUserId
 from core.db import get_supabase_service
 from core.net_guard import safe_get, safe_head
+from core.services.discovery_materializer import materialize_approved_evidence
 from core.web_identity import normalize_web_url, web_url_hash
 
 logger = logging.getLogger(__name__)
@@ -148,6 +149,22 @@ def _process_edital_pdf(edital_link: str, opp: dict) -> dict:
     return {"url_hash": url_hash, "n_chars": len(text)}
 
 
+def _process_approved_evidence(opp: dict) -> dict | None:
+    """Materializa evidência já aprovada e usa os jobs nativos sem re-fetch."""
+    raw = opp.get("raw") or {}
+    evidence = raw.get("evidence_package") if isinstance(raw, dict) else None
+    if not evidence:
+        return None
+    edital_id = materialize_approved_evidence(opp, evidence)
+    try:
+        from core.tasks import app
+        app.configure_task("chunk_edital").defer(edital_id=edital_id)
+        app.configure_task("ingest_promoted_edital").defer(edital_id=edital_id)
+    except Exception as e:
+        logger.warning("falha ao enfileirar evidência promovida %s: %s", edital_id, e)
+    return {"edital_id": edital_id, "materialized_evidence": True}
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────
 
 
@@ -202,7 +219,11 @@ def promote_discovered(opp_id: str, user_id: AdminUserId, body: PromoteBody | No
         "reviewed_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    if edital_link and _is_pdf_url(edital_link):
+    evidence_result = _process_approved_evidence(opp)
+    if evidence_result:
+        promoted_url = opp["url"]
+        web_source_id = None
+    elif edital_link and _is_pdf_url(edital_link):
         promoted_url = edital_link
         web_source_id = None
     elif edital_link:
@@ -226,7 +247,9 @@ def promote_discovered(opp_id: str, user_id: AdminUserId, body: PromoteBody | No
         update["promoted_web_source_id"] = web_source_id
     db.table("discovered_opportunities").update(update).eq("id", opp_id).execute()
 
-    if edital_link and _is_pdf_url(edital_link):
+    if evidence_result:
+        process_result = evidence_result
+    elif edital_link and _is_pdf_url(edital_link):
         process_result = _process_edital_pdf(edital_link, opp)
 
     resp = {"promoted": True, "url": promoted_url}
