@@ -114,7 +114,7 @@ GEMINI_API_KEY=            # AI Studio (free) — só para editais públicos; nu
 # Tier 4: Agente explore (writing usa sempre OpenAI ou Anthropic)
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL_AGENT=claude-sonnet-4-6
-AGENT_PROFILE_EXTRACTOR_DEFAULT_ENABLED=false
+AGENT_PROFILE_EXTRACTOR_DEFAULT_ENABLED=false  # experimental; não promover sem eval
 
 # Tier 5: Agente de escrita (base_url sobrescreve endpoint; ZDR/pago apenas)
 # AGENT_OPENAI_BASE_URL=https://api.deepseek.com/v1
@@ -231,6 +231,13 @@ Cada tier tem sua própria env var (ver seção LLM backend acima). Trocar um ti
 
 ### Reranker opcional
 `sentence-transformers` não está nas deps padrão (evita torch em prod). Para usar `RERANK_BACKEND=cross-encoder`, instalar `pip install -e ".[rerank]"`. Em prod, usar `RERANK_BACKEND=llm` (gpt-4o-mini) ou deixar sem rerank (RRF puro).
+
+### Ciclo de vida de capacidades
+Flags default off não são automaticamente código morto. A classificação entre
+ativa, opcional, experimental e dormente, incluindo gates de memória,
+ProfileExtractor, CNPJ e embeddings locais, vive em
+[`docs/reference/capability-lifecycle.md`](docs/reference/capability-lifecycle.md).
+Não ative capacidades experimentais ou dormentes apenas porque o wiring existe.
 
 ### Discovery staging
 `core/opportunity_discovery.py` escreve em staging (tabela `discovered_opportunities`), não no KG. O gate humano em `/discovered-opportunities` promove/rejeita antes de tocar o pipeline de build.

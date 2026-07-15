@@ -204,13 +204,12 @@ class ProfileExtractor:
         return text[:12000], title
 
     def extract(self, url: str, agent_enabled: bool = False) -> ExtractResult:
-        """Dispatcher: agente (Sprint 4 do Cenário B) ou pipeline legacy.
+        """Dispatcher: agente experimental ou pipeline determinístico padrão.
 
-        Quando `agent_enabled=True`, roda o agente Anthropic com 4 tools
-        (fetch_page, list_links_matching, lookup_cnpj, submit_profile).
-        Caso contrário, mantém o pipeline original (1 fetch da home + 1 LLM
-        call). O caller (endpoint /profile/extract) decide o flag conforme
-        env var AGENT_PROFILE_EXTRACTOR_DEFAULT_ENABLED.
+        Quando `agent_enabled=True`, roda o agente com fetch, navegação e submit;
+        `lookup_cnpj` só entra com seu próprio gate. Caso contrário, usa 1 fetch
+        da home + 1 chamada LLM. O caller decide o flag por
+        `AGENT_PROFILE_EXTRACTOR_DEFAULT_ENABLED`.
         """
         if agent_enabled:
             return self._extract_agent(url)

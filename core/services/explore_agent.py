@@ -173,7 +173,7 @@ class ExploreAgent:
         )
 
     def _explore_tools(self) -> list:
-        """Tools do agente de explore: leitura do hipergrado, e
+        """Tools do agente de explore: leitura do catálogo gold e
         opcionalmente deep_research (subagente web)."""
         from core.llm.agent_tools import build_explore_tools
 
@@ -195,7 +195,7 @@ class ExploreAgent:
         db=None,
         profile: dict | None = None,
     ) -> tuple[str, dict]:
-        """Pipeline agente: run_agent + tools de leitura do hipergrado,
+        """Pipeline agente: run_agent + tools de leitura do catálogo gold,
         planejamento e (gated) deep_research — montadas em `_explore_tools`.
         Retorna `(answer, meta)`; meta carrega stop_reason/truncated."""
         from core.llm.agent_runtime import resolve_agent_provider, run_agent

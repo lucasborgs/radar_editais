@@ -224,7 +224,7 @@ class PlaybookLayer:
     sections: dict[str, str] = field(default_factory=dict)
 
 
-# ── 4ª camada: learned overlays do banco (Item 3) ────────────────────────────
+# ── Camada dormente: learned overlays do banco ───────────────────────────────
 # Lidos via service-role (tabela GLOBAL/cross-workspace, sem RLS — ver
 # migration 024). TODO acesso ao banco é GUARDADO: qualquer falha (sem DB
 # configurado, query quebra, sem linhas) → retorna [] e o loader cai no caminho
@@ -321,7 +321,7 @@ def load_playbook(
     Camadas, na ordem de aplicação (merge POR SEÇÃO; cada camada adiciona/acumula):
         git base (mechanism/<mech>.md)
           + git source (source/<src>/global.md + source/<src>/<mech>.md)
-          + learned overlays do banco (playbook_overlays)  ← 4ª camada (Item 3)
+          + learned overlays do banco (playbook_overlays)  ← reader dormente
 
     Backward-compat: `include_overlays` é keyword-only e default True, mas o acesso
     ao banco é totalmente GUARDADO (`_load_overlays` devolve [] em qualquer falha).
@@ -344,7 +344,7 @@ def load_playbook(
             if body:
                 merged.setdefault(name, []).append(body)
 
-    # 4ª camada: learned overlays do banco, mergeados DEPOIS das camadas git.
+    # Reader dormente: se existirem overlays, entram DEPOIS das camadas git.
     if include_overlays and mech:
         for name, body in _load_overlays(mech, src):
             merged.setdefault(name, []).append(body)

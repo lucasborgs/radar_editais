@@ -68,3 +68,6 @@ cada assunto; não substitui os documentos indicados.
 
 O ciclo de vida, os critérios de classificação e o plano de reconciliação estão
 na [`spec de autoridade documental`](specs/document-authority.md).
+
+Estados de capacidades opcionais, experimentais e dormentes estão em
+[`reference/capability-lifecycle.md`](reference/capability-lifecycle.md).
