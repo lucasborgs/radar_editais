@@ -10,7 +10,7 @@ latência) viram scores também — instrumentação do harness de agente no mes
 Pré-requisitos (toca DB + LLM): SUPABASE_*, OPENAI/ANTHROPIC e EVAL_WORKSPACE_ID
 (workspace onde as sessões de eval são criadas).
 
-F0 (2026-07-12): eval_cases_v2.json = golden §4 com 4 famílias.
+F0 (2026-07-12): writing_v2.json = golden §4 com 4 famílias.
 """
 from __future__ import annotations
 
@@ -26,8 +26,8 @@ from core.eval.harness import Evaluation, Suite, get_input
 
 logger = logging.getLogger(__name__)
 
-FIXTURE = ROOT / "tests" / "fixtures" / "eval_cases.json"
-FIXTURE_V2 = ROOT / "tests" / "fixtures" / "eval_cases_v2.json"
+GOLDEN = ROOT / "eval_data" / "golden" / "writing.json"
+GOLDEN_V2 = ROOT / "eval_data" / "golden" / "writing_v2.json"
 
 
 def _build_profile(raw: dict):
@@ -37,9 +37,9 @@ def _build_profile(raw: dict):
 
 
 def load_data() -> list[dict]:
-    if not FIXTURE.exists():
+    if not GOLDEN.exists():
         return []
-    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    data = json.loads(GOLDEN.read_text(encoding="utf-8"))
     profiles = data.get("profiles", {})
     items = []
     for case in data.get("cases", []):
@@ -205,8 +205,8 @@ def _prereqs() -> str | None:
         return "requer OPENAI_API_KEY ou ANTHROPIC_API_KEY (agente + juízes)"
     if not os.getenv("EVAL_WORKSPACE_ID"):
         return "requer EVAL_WORKSPACE_ID (workspace de eval para as sessões)"
-    if not FIXTURE.exists():
-        return "fixture tests/fixtures/eval_cases.json ausente"
+    if not GOLDEN.exists():
+        return "golden eval_data/golden/writing.json ausente"
     return None
 
 
@@ -298,9 +298,9 @@ _N_RUNS = 3
 
 
 def load_data_v2() -> list[dict]:
-    if not FIXTURE_V2.exists():
+    if not GOLDEN_V2.exists():
         return []
-    data = json.loads(FIXTURE_V2.read_text(encoding="utf-8"))
+    data = json.loads(GOLDEN_V2.read_text(encoding="utf-8"))
     profiles = data.get("profiles", {})
     items = []
     for case in data.get("cases", []):
@@ -342,9 +342,16 @@ def _prereqs_v2() -> str | None:
         return "requer OPENAI_API_KEY ou ANTHROPIC_API_KEY (agente + juízes)"
     if not os.getenv("EVAL_WORKSPACE_ID"):
         return "requer EVAL_WORKSPACE_ID (workspace de eval para as sessões)"
-    if not FIXTURE_V2.exists():
-        return "fixture tests/fixtures/eval_cases_v2.json ausente"
+    if not GOLDEN_V2.exists():
+        return "golden eval_data/golden/writing_v2.json ausente"
     return None
+
+
+def _expected_cases(path, *, repeats: int = 1) -> int:
+    if not path.exists():
+        return 0
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return len(data.get("cases", [])) * repeats
 
 
 SUITE_WRITING_V2 = Suite(
@@ -359,6 +366,9 @@ SUITE_WRITING_V2 = Suite(
         eval_misfit_honesty, eval_tools0_sections,
     ],
     prereqs=_prereqs_v2,
+    classification="experimental",
+    dataset_paths=[GOLDEN_V2],
+    expected_cases=lambda: _expected_cases(GOLDEN_V2, repeats=_N_RUNS),
 )
 
 
@@ -374,4 +384,6 @@ SUITE = Suite(
     evaluators=[eval_save, eval_grounding, eval_n_claims, eval_factual_errors,
                 eval_coherence, eval_tool_calls],
     prereqs=_prereqs,
+    dataset_paths=[GOLDEN],
+    expected_cases=lambda: _expected_cases(GOLDEN),
 )

@@ -1,7 +1,7 @@
 {
   "_comment": "Golden §4 (F0): 4 famílias de teste para o agente de escrita.",
   "_familias": {
-    "1": "6 bem-casados (fit forte perfil↔edital, cópia do eval_cases.json original)",
+    "1": "6 bem-casados (fit forte perfil↔edital, cópia do golden writing.json)",
     "2": "2 misfit (perfil incompatível com o edital — agente deve RECUSAR)",
     "3": "2 user edit (usuário edita seção após primeira redação — agente preserva)",
     "4": "2 batch E2E (múltiplos editais numa sessão — agente cobre todos)"
