@@ -235,6 +235,7 @@ O trabalho de coerência estará concluído quando:
 | Modelo mental e superfície do usuário | [`user-mental-model.md`](user-mental-model.md) | vigente |
 | Avaliação e operação | [`evaluation-operations.md`](evaluation-operations.md) | aprovada |
 | Convergência de runtime e dados | [`data-plane-convergence.md`](data-plane-convergence.md) | vigente |
+| Capacidades dormentes | [`dormant-capabilities.md`](dormant-capabilities.md) | proposta |
 
-Os demais eixos só recebem uma spec quando o eixo anterior tiver sido executado
-e reconciliado, salvo bloqueio comprovado ou independência explícita.
+Esta é a última filha prevista. A spec-guia só será reconciliada como vigente
+depois que esta execução for concluída e validada.
