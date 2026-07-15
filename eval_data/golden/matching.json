@@ -1,6 +1,7 @@
 {
-  "_criterion": "Afinidade de CONTEÚDO (Tema/Tecnologia/Aplicação batem). Elegibilidade dura (mecanismo/região/porte/TRL) é camada SEPARADA, fora deste golden. Ver core/services/hypergraph_match.py (AFFINITY_TYPES).",
+  "_criterion": "Afinidade de CONTEÚDO (tema, tecnologia e aplicação). Elegibilidade dura é avaliada separadamente pelos hard negatives do Stage 1; ranking é o Stage 2 de core/services/match_v3.py.",
   "_how_built": "8 perfis sintéticos spanning o corpus (30 editais). Candidatos por juiz LLM independente (1 call/empresa, cards no prompt), curados à mão. Guarda-chuva (editais que listam muitos setores) = neutro: não conta como acerto nem como ruído.",
+  "_label_policy": "Cada resultado exibido no top-8 deve ser relevante, neutro defensável ou confirmed_irrelevant. Ausência de rótulo significa unjudged, nunca falso positivo. O gate exige zero confirmed_irrelevant exibido e zero unjudged.",
   "neutral": [
     "finep__612",
     "finep__745",
@@ -369,62 +370,70 @@
       "company": "iflorestal",
       "relevant": [
         "finep__762",
-        "finep__782",
-        "finep__783"
-      ]
+      "finep__782",
+      "finep__783"
+    ],
+    "confirmed_irrelevant": []
     },
     {
       "company": "ia_digital_mg",
       "relevant": [
         "finep__779",
-        "finep__784",
-        "fapesp__18203"
-      ]
+      "finep__784",
+      "fapesp__18203"
+    ],
+    "confirmed_irrelevant": []
     },
     {
       "company": "biofarma_saude",
       "relevant": [
         "finep__773",
         "finep__781",
-        "finep__757",
-        "finep__774"
-      ]
+      "finep__757",
+      "finep__774"
+    ],
+    "confirmed_irrelevant": []
     },
     {
       "company": "agritech_maquinas",
       "relevant": [
         "finep__739",
         "finep__769",
-        "finep__783",
-        "finep__774"
-      ]
+      "finep__783",
+      "finep__774"
+    ],
+    "confirmed_irrelevant": []
     },
     {
       "company": "energia_hidrogenio",
       "relevant": [
         "finep__760",
         "finep__772",
-        "finep__771",
-        "finep__782"
-      ]
+      "finep__771",
+      "finep__782"
+    ],
+    "confirmed_irrelevant": []
     },
     {
       "company": "semicondutores",
       "relevant": [
-        "finep__780",
-        "fapesp__18203"
-      ]
+      "finep__780",
+      "fapesp__18203"
+    ],
+    "confirmed_irrelevant": []
     },
     {
       "company": "defesa_robotica",
       "relevant": [
-        "finep__775",
-        "finep__774"
-      ]
+      "finep__775",
+      "finep__774"
+    ],
+    "confirmed_irrelevant": []
     },
     {
       "company": "fintech_saas",
-      "relevant": []
+    "relevant": [],
+    "confirmed_irrelevant": []
     }
   ]
 }

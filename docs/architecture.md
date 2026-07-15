@@ -174,6 +174,7 @@ JSON inclui manifesto de commit, datasets, modelos, configuração e
 comparabilidade. Regra do projeto: gates medem **correção absoluta**, nunca
 paridade com arquiteturas anteriores.
 
-`extraction` é gate ativo. `matching` permanece candidato: os pisos de MRR,
-recall e hard negatives estão declarados, mas não bloqueiam até que o limite de
-`noise@8` seja aprovado e o contrato seja promovido explicitamente.
+`extraction` é gate ativo. `matching` permanece candidato: além dos pisos de
+MRR, recall e hard negatives, seu contrato exige zero falsos positivos
+confirmados e zero resultados sem julgamento no top-8. Resultado não rotulado
+não é tratado como erro do match, mas impede aprovação até revisão humana.

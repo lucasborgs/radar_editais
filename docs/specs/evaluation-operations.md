@@ -84,7 +84,7 @@ Uma pessoa técnica deve conseguir responder, a partir de um resultado oficial:
 
 | Suíte | Estado | Pode bloquear após esta execução? | Razão |
 |---|---|---:|---|
-| `matching` | candidata a gate | sim, depois de completar o contrato | já possui pisos aceitos para MRR, recall e hard negatives; falta critério de noise e completude |
+| `matching` | candidata a gate | sim, depois de completar o contrato | critérios aceitos; falta julgar integralmente o top-8 e obter rodada aprovada |
 | `extraction` | gate | sim | baseline aceito aplicado; golden curado e completude obrigatórios |
 | `rag` | diagnóstica | não | métricas existentes, sem threshold atual aceito |
 | `writing` | diagnóstica | não | juízes e métricas úteis, sem contrato bloqueante |
@@ -231,15 +231,25 @@ Critérios já aceitos e preservados:
 - média de recall@10 ≥ 0,55; e
 - todos os hard negatives de elegibilidade corretos.
 
+Decisão aceita em 2026-07-15: falsos positivos não fazem parte normal da lista.
+O contrato distingue:
+
+- `false_positives_at_8`: somente resultados explicitamente julgados
+  irrelevantes; o limite é exatamente zero; e
+- `unjudged_at_8`: resultados ainda sem julgamento. Não são chamados de falsos
+  positivos, mas o limite também é zero para que o gate não aprove ambiguidade.
+
 Antes de ativar o gate, a execução deve:
 
-1. definir e submeter à aprovação o limite de `noise@8`, sem derivá-lo
-   automaticamente de runs históricas incompatíveis;
+1. classificar todo resultado exibido no top-8 como relevante, neutro defensável
+   ou irrelevante confirmado;
 2. fixar o número/ids esperados de casos de ranking e hard negatives;
 3. tratar oportunidade ausente, snapshot vazio e erro de embedding como erro de
-   execução; e
+   execução;
 4. registrar `AS_OF`, `MIN_AFFINITY`, dimensões/modelo de embedding e hashes dos
-   dois goldens no manifesto.
+   dois goldens no manifesto; e
+5. satisfazer simultaneamente MRR, recall, hard negatives, zero falsos positivos
+   confirmados e zero resultados sem julgamento.
 
 Até esses quatro pontos estarem concluídos, `matching` permanece candidata e
 não pode se autodeclarar aprovada.
@@ -322,7 +332,8 @@ simultaneamente o novo critério e a aprovação do pipeline sem revisão explí
 
 ### Etapa 3 — Gates candidatos
 
-1. completar e aprovar o contrato de matching, incluindo `noise@8`;
+1. completar o contrato de matching com zero falsos positivos e cobertura total
+   de julgamentos no top-8;
 2. tornar extraction estrito quanto a golden e raws;
 3. ativar apenas os gates completos; e
 4. manter as demais suítes diagnósticas.
@@ -388,8 +399,9 @@ Implementado:
   distintos;
 - gate de extraction com piso `presence_accuracy >= 0,95`, golden estrito e
   raws históricos FAPESP reproduzíveis;
-- matching classificado como candidato, com três critérios já aceitos, sem
-  decisão enquanto `noise@8` não tiver limite aprovado;
+- matching classificado como candidato, com cinco critérios aceitos: MRR,
+  recall, hard negatives, zero falsos positivos confirmados e zero resultados
+  sem julgamento no top-8;
 - goldens de escrita movidos para `eval_data/golden/` e corpora sem consumidor
   movidos, sem exclusão, para `eval_data/historical/`; e
 - relatório limitado a runs de manifesto compatível e à direção declarada de
@@ -397,9 +409,13 @@ Implementado:
 
 Evidência local de 2026-07-15, não publicada:
 
-- matching: 11/11 casos, sem erro; MRR `0,673`, recall@10 `0,5237`, noise@8
-  médio `4,5` e hard negatives `3/3`. Permanece candidato porque recall ficou
-  abaixo de `0,55` e não existe limite aceito de noise;
+- matching v1: 11/11 casos, sem erro; MRR `0,673`, recall@10 `0,5237`, antiga
+  métrica ambígua de noise@8 `4,5` e hard negatives `3/3`. A métrica v1 contava
+  todo não rotulado como falso positivo e foi substituída pelo contrato v2;
+- matching v2: 11/11 casos, sem erro; MRR `0,673`, recall@10 `0,5237`, falsos
+  positivos confirmados `0`, resultados ainda sem julgamento no top-8 `4,5` em
+  média e hard negatives `3/3`. O zero de falsos positivos não aprova a suíte,
+  porque os não julgados e o recall ainda reprovam seus critérios;
 - extraction, primeira rodada: `error` por três raws FAPESP omitidos pelo índice
   do snapshot mais recente;
 - extraction após compor snapshots bronze históricos: 10/10 casos, sem erro,
