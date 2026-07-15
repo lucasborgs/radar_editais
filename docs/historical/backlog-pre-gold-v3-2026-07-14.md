@@ -19,7 +19,7 @@
 
 ### 🔴 P0 DEPLOY — `supabase db push` (migration 034 fecha leak da fila procrastinate)
 
-- **O quê:** a [migration 034](../supabase/migrations/034_procrastinate_lockdown.sql)
+- **O quê:** a [migration 034](../../supabase/migrations/034_procrastinate_lockdown.sql)
   (RLS + REVOKE nas tabelas/funções `procrastinate*`) foi aplicada e verificada só no
   Supabase **local**. O leak-test apontado ao **remoto** ainda REPROVA
   (`tests/test_tenant_isolation.py::...::test_procrastinate_surface_negada`) — ou seja,
@@ -537,7 +537,7 @@
 - **Status:** aberto (desenho fechado, não construído).
 
 ### ProfileExtractor — `faturamento_anual` raramente extraído do texto
-- **O quê:** o `extract_from_text`/`_call_llm` ([core/profile_extractor.py](../core/profile_extractor.py))
+- **O quê:** o `extract_from_text`/`_call_llm` ([core/profile_extractor.py](../../core/profile_extractor.py))
   extrai bem `uf`/`ano_fundacao` mas perde `faturamento_anual` mesmo quando o texto
   o afirma. **Evidência (walkthrough 2026-06-06):** proposta com "Faturamento anual
   R$ 2 milhões" → `uf='SP'` e `ano_fundacao=2019` vieram `high`, mas
@@ -546,7 +546,7 @@
   a cadeia UI/save foi fechada (o campo flui de ponta a ponta), o gargalo restante é
   só a extração. Mitigação atual: o usuário digita no campo novo do onboarding.
 - **Ponto de entrada:** prompt `_EXTRACT_SYSTEM`/`_EXTRACT_USER` e o schema de saída em
-  [core/profile_extractor.py](../core/profile_extractor.py) — instruir a capturar valores
+  [core/profile_extractor.py](../../core/profile_extractor.py) — instruir a capturar valores
   monetários (R$ X milhões → número) e normalizar a escala. Medir com um caso de golden
   de extração de perfil (não existe ainda — criar fixture mínima).
 - **Status:** aberto (qualidade de extração, não wiring).
@@ -572,7 +572,7 @@
   - **`confidence` numérico** por campo (monitoramento/active-learning).
   - **CNAE / consórcio** como pares perfil↔edital.
   - **Versionar retificação ("Aditivo 01")**: atualizar campo específico vs reprocessar.
-- **Onde:** [spec_extraction_schema.md](spec_extraction_schema.md), domain/edital_extraction.py,
+- **Onde:** [spec_extraction_schema.md](extraction-schema.md), domain/edital_extraction.py,
   domain/user_profile.py. **Status:** aberto.
 
 ### Eval — sincronizar golden como Langfuse Dataset
@@ -725,7 +725,7 @@
   que `search_library` o use ao escrever a seção de parceria — com proveniência.
 - **Por que adiado:** Fase C.1 (matchmaking) entrega o valor central; a escrita é
   extensão. Depende de UI (botão "selecionar parceiro" na tela do grafo).
-- **Onde:** [spec_ict_phase_c.md](spec_ict_phase_c.md) peça 4 / fase C.2.
+- **Onde:** [spec_ict_phase_c.md](ict-phase-c.md) peça 4 / fase C.2.
 - **Ponto de entrada:** endpoint `POST /library/from-ict` + reuso de
   `create_item`/`enrich_content_task`/`search_library` (tudo já existe).
 - **Guard-rail (não violar):** o Redator **não** recebe `find_ict_partners` nem lê
@@ -739,7 +739,7 @@
 - **Por que adiado:** PNIPE é grande e ruidoso (toda a infraestrutura de C&T do
   país) → exige estratégia de filtro/paginação antes de entrar no grafo. EMBRAPII
   (Fase A) já provou o tipo de nó end-to-end.
-- **Onde:** [spec_ict_mapping.md](spec_ict_mapping.md) Fase B.
+- **Onde:** [spec_ict_mapping.md](ict-mapping.md) Fase B.
 - **Ponto de entrada:** `pipeline/extractors/ict_pnipe.py` (espelha
   `ict_embrapii.py`); dedup cross-source já existe em `build_ict_graph` (por nome
   normalizado). Verificar se a busca é client-side (pode exigir Playwright).
@@ -765,7 +765,7 @@
   no `SCRAPER_REGISTRY`/§12.4 (sai de `web:provisorio` → `<fonte>:verificado`). O
   campo `agency` já é preservado no bronze web para alimentar isto. Ledger
   file-based pode graduar para Supabase se virar multi-worker.
-- **Onde:** [spec_descoberta_oportunidades.md](spec_descoberta_oportunidades.md).
+- **Onde:** [spec_descoberta_oportunidades.md](discovery-opportunities.md).
 
 ### DeepResearch — Fases B e C (Fase A feita)
 - **Feito (Fase A):** `core/web_search.py` (port Tavily REST), `core/deep_research.py`
@@ -780,7 +780,7 @@
   (`RESEARCH_FINDINGS_MAX_PENDING=50`) + TTL 30d (filtro no GET).
 - **Fase C (aberto):** decay por tipo (`web_research` com meia-vida menor) + tool no
   Explorador + eval anti-fabricação (casos cuja resposta certa é "não encontrei").
-- **Onde:** [spec_deepresearch.md](spec_deepresearch.md).
+- **Onde:** [spec_deepresearch.md](deep-research-design.md).
 - **Pré-requisito de uso:** configurar `TAVILY_API_KEY` (e `WEB_SEARCH_BACKEND=tavily`,
   default). Sem chave, a tool degrada com mensagem.
 
@@ -1139,7 +1139,7 @@ de fora — nenhum bloqueia o que foi entregue.
 
 - **O quê:** como o ecossistema de conhecimento (nós de mecanismo/fonte + skills)
   evolui pelo uso. Motor JÁ existe no tier-empresa: outcome (`aprovada/reprovada` em
-  applications) → `reflect_workspace` ([reflection_service.py](../core/reflection_service.py))
+  applications) → `reflect_workspace` ([reflection_service.py](../../core/reflection_service.py))
   com `MIN_OUTCOMES_FOR_REFLECTION=3` + `confidence` low/med/high + `evidence_ids`
   (provenance) → auto-insert (privado, blast radius 1). Falta levantar o mesmo motor
   a **dois tiers compartilhados** (overlay de fonte, base de mecanismo).
@@ -1166,7 +1166,7 @@ de fora — nenhum bloqueia o que foi entregue.
 
 - **O quê:** redesenho do subsistema de "skills" do Redator/Monitor. Hoje são
   keyed por fonte (`skills/<source>_compliance.md`) e misturam regra dura (que é do
-  edital/RAG) com tácito. Spec completa em [docs/specs/skills-by-mechanism.md](specs/skills-by-mechanism.md):
+  edital/RAG) com tácito. Spec completa em [docs/specs/skills-by-mechanism.md](skills-by-mechanism.md):
   separar **normativo (RAG)** de **tácito (playbook)**; keying por **mecanismo**
   (campo já estruturado) + overlays de fonte; **seções-nomeadas = tipos =
   roteamento** pros consumidores que já existem (Redator↔escrita/tom,

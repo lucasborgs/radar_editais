@@ -568,23 +568,23 @@ O codebase principal tem apenas 3 ocorrências relevantes:
 ## 13. Documentação Relacionada
 
 ### Visão Geral
-- [Arquitetura AI (diagramas Mermaid)](architecture.md) — data plane, matching dual, runtime agêntico, eval loop
+- [Arquitetura AI (diagramas Mermaid)](../architecture.md) — data plane, matching dual, runtime agêntico, eval loop
 
 ### Por Componente Técnico (`docs/components/`)
-- **Agentes:** [LangGraph migration](components/agents/langgraph-migration.md) · [Deep research](components/agents/deep-research.md) · [Memory architecture](components/agents/memory-architecture.md) · [Auditoria agêntica (00-09)](components/agents/README.md)
-- **Matching:** [Embedding bake-off](components/matching/embedding-bakeoff.md)
-- **Knowledge/Playbooks:** [Knowledge evolution](components/knowledge/knowledge-evolution.md) · [Skills by mechanism](components/knowledge/skills-by-mechanism.md) · [Playbook authoring guide](components/knowledge/playbook-authoring-guide.md)
-- **Frontend:** [Chat-first architecture](components/frontend/chat-first-architecture.md)
-- **Infra:** [Demo cost profile](components/infra/demo-cost-profile.md)
+- **Agentes:** [LangGraph migration](langgraph-migration.md) · [Deep research](deep-research-design.md) · [Memory architecture](memory-architecture-2026-06.md) · [Auditoria agêntica (00-09)](agent-audit-2026-06-13.md)
+- **Matching:** [Embedding bake-off](embedding-bakeoff.md)
+- **Knowledge/Playbooks:** [Knowledge evolution](knowledge-evolution.md) · [Skills by mechanism](skills-by-mechanism.md) · [Playbook authoring guide](../reference/playbook-authoring.md)
+- **Frontend:** [Chat-first architecture](chat-first-architecture.md)
+- **Infra:** [Demo cost profile](demo-cost-profile.md)
 
 ### Features Ativas / WIP (`docs/features/`)
-- [FrontDoor UX](features/frontdoor-ux.md) · [Workspace UX](features/workspace-ux.md) · [ICT Fase C](features/ict-phase-c.md)
-- [Robustez match+escrita](features/robustez-match-escrita.md) · [Eligibility constraints](features/eligibility-constraints.md)
-- [Discovery Parte C (FAPs)](features/discovery-opportunities.md) · [Explore grounded](features/explore-grounded-comparison.md)
+- [FrontDoor UX](frontdoor-ux.md) · [Workspace UX](workspace-ux.md) · [ICT Fase C](ict-phase-c.md)
+- [Robustez match+escrita](robustez-match-escrita.md) · [Eligibility constraints](eligibility-constraints.md)
+- [Discovery Parte C (FAPs)](discovery-opportunities.md) · [Explore grounded](explore-grounded-comparison.md)
 
 ### Histórico / ADRs (`docs/historical/`)
-- [Multi-quadrante (ADR)](historical/spec-multi-quadrante.md) · [Agent patterns](historical/spec-agent-patterns.md) · [Mechanism scope decisions (ADR)](historical/mechanism-scope-decisions.md)
-- [Extraction schema v2](historical/extraction-schema.md) · [ICT mapping base](historical/ict-mapping.md) · [KG entity wiki pages](historical/kg-entity-wiki-pages.md)
-- [Backend reorg](historical/refactor-backend.md) · [DOU feeder](historical/dou-feeder.md) · [Onboarding input UX](historical/onboarding-input-ux.md)
+- [Multi-quadrante (ADR)](spec-multi-quadrante.md) · [Agent patterns](spec-agent-patterns.md) · [Mechanism scope decisions (ADR)](mechanism-scope-decisions.md)
+- [Extraction schema v2](extraction-schema.md) · [ICT mapping base](ict-mapping.md) · [KG entity wiki pages](kg-entity-wiki-pages.md)
+- [Backend reorg](refactor-backend.md) · [DOU feeder](dou-feeder.md) · [Onboarding input UX](onboarding-input-ux.md)
 
 *Gerado por auditoria de 6 agentes paralelos em 2026-06-22. Para atualizar: re-rodar os agentes e mergear findings.*

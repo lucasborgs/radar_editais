@@ -18,19 +18,19 @@
 ## Front 1 — Aposentar o path legacy de escrita
 
 ### Problema
-Todo o grounding que torna a escrita confiável (critic, coerência interna, tools `search_edital`/`read_section`, `save_draft` com gate) **só roda quando `workspaces.agent_writing_enabled = true`** — e o default é **OFF** ([writing_session.py:838](../core/writing_session.py#L838)). Em produção, a escrita cai no **legacy 1-shot por regex `<draft>`** ([writing_session.py:94](../core/writing_session.py#L94)), **sem critic, sem coerência, sem grounding por tool**. A segurança construída está inerte. Além disso, manter dois paths gera comportamento bimodal e duplica prompts (`WRITER_SYSTEM` vs `WRITER_AGENT_SYSTEM`).
+Todo o grounding que torna a escrita confiável (critic, coerência interna, tools `search_edital`/`read_section`, `save_draft` com gate) **só roda quando `workspaces.agent_writing_enabled = true`** — e o default é **OFF** ([writing_session.py:838](../../core/services/writing_session.py#L838)). Em produção, a escrita cai no **legacy 1-shot por regex `<draft>`** ([writing_session.py:94](../../core/services/writing_session.py#L94)), **sem critic, sem coerência, sem grounding por tool**. A segurança construída está inerte. Além disso, manter dois paths gera comportamento bimodal e duplica prompts (`WRITER_SYSTEM` vs `WRITER_AGENT_SYSTEM`).
 
 ### Design
 Remover o path legacy e tornar o agente o único fluxo de escrita.
 
 **Remover** (após verificar uso compartilhado):
-- `_turn_legacy` e o branch `if self._use_agent()` no dispatcher `turn()` ([writing_session.py:609,624](../core/writing_session.py#L624)).
-- `_split_draft`, `_DRAFT_RE` ([writing_session.py:94-98](../core/writing_session.py#L94)) e a convenção `<draft>`/`[COMPLETAR:]`.
-- `WRITER_SYSTEM` legacy e o `_build_messages` legacy ([writing_session.py:128,1103](../core/writing_session.py#L128)). **Atenção:** `OUTLINE_SYSTEM` e `COMPRESS_SYSTEM` podem ser compartilhados (plano/compressão) — confirmar antes de remover.
-- Coluna/flag `agent_writing_enabled`: migração SQL para dropar a coluna; remover `_use_agent`, o cache `_use_agent_cached`, e [scripts/agent_rollout.py](../scripts/agent_rollout.py) (parte de writing).
+- `_turn_legacy` e o branch `if self._use_agent()` no dispatcher `turn()` ([writing_session.py:609,624](../../core/services/writing_session.py#L624)).
+- `_split_draft`, `_DRAFT_RE` ([writing_session.py:94-98](../../core/services/writing_session.py#L94)) e a convenção `<draft>`/`[COMPLETAR:]`.
+- `WRITER_SYSTEM` legacy e o `_build_messages` legacy ([writing_session.py:128,1103](../../core/services/writing_session.py#L128)). **Atenção:** `OUTLINE_SYSTEM` e `COMPRESS_SYSTEM` podem ser compartilhados (plano/compressão) — confirmar antes de remover.
+- Coluna/flag `agent_writing_enabled`: migração SQL para dropar a coluna; remover `_use_agent`, o cache `_use_agent_cached`, e scripts/agent_rollout.py (parte de writing).
 - Env vars `AGENT_WRITING_*` que só serviam o gate.
 
-**Manter como kill-switch técnico:** o `resolve_agent_provider` já dá fallback de provider; o "fallback" agora é de modelo/provider, não de path. Se o agente falhar (`stop_reason == "error"`), retorna erro amigável ([writing_session.py:765](../core/writing_session.py#L765)) — sem cair em legacy.
+**Manter como kill-switch técnico:** o `resolve_agent_provider` já dá fallback de provider; o "fallback" agora é de modelo/provider, não de path. Se o agente falhar (`stop_reason == "error"`), retorna erro amigável ([writing_session.py:765](../../core/services/writing_session.py#L765)) — sem cair em legacy.
 
 ### Pré-requisito de segurança (gate da remoção)
 **Não remover o legacy sem antes ter o eval harness do Front 1.5 verde.** A remoção é irreversível; precisamos de evidência de que o agente entrega ≥ a qualidade do legacy.
@@ -48,7 +48,7 @@ Remover o path legacy e tornar o agente o único fluxo de escrita.
 ## Front 1.5 — Eval harness de escrita (habilitador do Front 1)
 
 ### Problema
-[scripts/eval_agent_writing.py](../scripts/eval_agent_writing.py) é um stub (TODO). Sem métrica, aposentar o legacy é fé, não engenharia. Também precisamos endurecer a confiabilidade do writer no tool-loop (observado: o agente às vezes não chama `save_draft` num turno).
+scripts/eval_agent_writing.py é um stub (TODO). Sem métrica, aposentar o legacy é fé, não engenharia. Também precisamos endurecer a confiabilidade do writer no tool-loop (observado: o agente às vezes não chama `save_draft` num turno).
 
 ### Design
 Harness que, sobre um conjunto fixo de (perfil, edital, instrução de seção), roda o agente e mede — usando a **rúbrica de seção** já definida:
@@ -71,7 +71,7 @@ Conjunto-semente: perfil iFlorestal + `finep:612` + 2-3 outros editais com chunk
 ## Front 2 — Validar e endurecer o HybridMatch
 
 ### Problema
-Nunca validamos se o `/match` rankeia bem — é o topo do funil. Se erra o edital, todo o resto (brief, escrita) é desperdício. O HybridMatch ([hybrid_match_service.py:542](../core/hybrid_match_service.py#L542)) é Stage 1 determinístico (elegibilidade/TRL/tema/mecanismo/contrapartida) + Stage 2 LLM temático, com pesos em `matching_weights`.
+Nunca validamos se o `/match` rankeia bem — é o topo do funil. Se erra o edital, todo o resto (brief, escrita) é desperdício. O HybridMatch (hybrid_match_service.py:542) é Stage 1 determinístico (elegibilidade/TRL/tema/mecanismo/contrapartida) + Stage 2 LLM temático, com pesos em `matching_weights`.
 
 ### Design
 **(a) Validação com rúbrica.** Rodar `/match` com o perfil iFlorestal (e 1-2 perfis sintéticos contrastantes) e julgar o top-K por edital:
@@ -80,7 +80,7 @@ Medir precisão@K e se `finep:612` (fit forte) aparece no topo.
 
 **(b) Endurecimentos identificados:**
 - **Vigência:** já corrigida no runtime (Front entregue). Garantir que o eval cobre.
-- **Fallback "sem elegíveis":** hoje, se ninguém passa o Stage 1, devolve top sem filtro ([hybrid_match_service.py:563](../core/hybrid_match_service.py#L563)) — pode recomendar inelegível. Spec: sinalizar explicitamente "nenhum elegível" em vez de mascarar.
+- **Fallback "sem elegíveis":** hoje, se ninguém passa o Stage 1, devolve top sem filtro (hybrid_match_service.py:563) — pode recomendar inelegível. Spec: sinalizar explicitamente "nenhum elegível" em vez de mascarar.
 - **Transparência:** garantir que `match_dimensions` explica o score (já existe; validar no eval).
 - **KGMatch:** permanece só no `explore` (vitrine). Não é o matcher de produção; não investir agora.
 
@@ -124,7 +124,7 @@ Fonte única: helper `temporal_context(edital_id)` lendo `index.json` + `wiki pa
 ## Front 4 — Reranker no RAG de escrita
 
 ### Problema
-`retrieve_chunks` funde dense + FTS via RRF (k=60, `fts_weight=0.3`) e devolve top-k direto ([retriever.py:169](../core/retriever.py#L169)) — **sem reranker**. O critic e o escritor só são tão bons quanto os chunks que chegam; um RRF puro pode rankear mal em queries sutis.
+`retrieve_chunks` funde dense + FTS via RRF (k=60, `fts_weight=0.3`) e devolve top-k direto ([retriever.py:169](../../core/retrieval/retriever.py#L169)) — **sem reranker**. O critic e o escritor só são tão bons quanto os chunks que chegam; um RRF puro pode rankear mal em queries sutis.
 
 ### Design
 Inserir um estágio de rerank entre a fusão RRF e o corte top-k:

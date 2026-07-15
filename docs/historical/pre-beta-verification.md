@@ -1,7 +1,7 @@
 # Spec: Verificação pré-beta — leak-test multi-tenant + regressão de grounding
 
 > **Registro histórico:** investigação concluída. O inventário de isolamento
-> vigente está em [`docs/security/tenant-isolation.md`](../security/tenant-isolation.md)
+> vigente está em [`docs/reference/tenant-isolation.md`](../reference/tenant-isolation.md)
 > e gates externos adiados estão em [`docs/BACKLOG.md`](../BACKLOG.md).
 
 Status original: proposta · 2026-07-02 · origem: priorização pós-hardening (conversa

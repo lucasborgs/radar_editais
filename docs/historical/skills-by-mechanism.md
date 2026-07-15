@@ -30,7 +30,7 @@ a competência de transformar o fato do grafo na narrativa que aprova.
 nós com wiki_page — "o grafo é a fonte de conhecimento", à la LLM-wiki). Arquivos
 `skills/*.md` em git são o **bootstrap** (tier-0) para autorar a competência agora.
 **Evolução por uso (learning loop)** → congelada no
-[backlog técnico](../../BACKLOG.md#manter-a-escrita-automática-de-memória-congelada-até-haver-evidência-real)
+[backlog técnico](../BACKLOG.md#manter-a-escrita-automática-de-memória-congelada-até-haver-evidência-real)
 até haver outcomes reais e curadoria compartilhada.
 
 ## Problema (o que estava errado)
@@ -53,14 +53,14 @@ até haver outcomes reais e curadoria compartilhada.
   `skills/<source>_compliance.md` antigos foram removidos (craft tácito migrou p/
   `source/finep/global.md`; regra dura é RAG). Critic intocado.
 - `mechanism` **já é campo estruturado** de todo edital — `MATCH_FIELDS`
-  ([wiki_schema.py:46](../../core/kg/wiki_schema.py)), extraído no Stage 1.
+  (wiki_schema.py:46), extraído no Stage 1.
 - **Distribuição real (41 editais):** `subvencao`=13, `investimento`=5, `None`=23
   (**todos os 21 da web** + 2 FINEP). Vocabulário limpo onde existe; **web 100%
   vazio** — o extrator da Descoberta ([opportunity_discovery._extract](../../core/opportunity_discovery.py))
   não preenche `mechanism`.
 - **Consumidores já existem (chave do desenho):** Redator (gera) ·
   ComplianceMonitor (paralelo, advisory, **já carrega skill** —
-  [compliance_monitor.py:107](../../core/compliance_monitor.py)) · Critic (gate
+  compliance_monitor.py:107) · Critic (gate
   duro no save, **só contradição**, intencionalmente estreito —
   [critic_agent.py:32](../../core/llm/agent_tools/critic_agent.py)) · Checklist (3
   passes). A tool `load_skill` do Redator (spec 05) é o caminho de pull.

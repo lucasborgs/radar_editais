@@ -10,9 +10,9 @@ O sistema modela "mecanismos de fomento" em **dois vocabulários que se cruzam n
 match**: o lado do edital (`card.mechanism ∈ {subvencao, reembolsavel, investimento,
 misto}`, vocab WIKI.md §5.1) e o lado do perfil (`tipos_financiamento_interesse`,
 escolhido no onboarding). A ponte é o `_MECHANISM_MAP`
-([hybrid_match_service.py:57](../../core/services/hybrid_match_service.py#L57)), que
+(hybrid_match_service.py:57), que
 alimenta a dimensão **mecanismo** (15 de 100 pts no Stage 1 —
-[`_score_mecanismo`:292](../../core/services/hybrid_match_service.py#L292)).
+`_score_mecanismo`:292).
 
 As 3 decisões (racional completo em `project_mechanism_scope_decisions` na memória)
 **reduzem e reclassificam** esse eixo:
@@ -46,7 +46,7 @@ vira trilha paralela; EMBRAPII/ICT vira camada de parceria sobre o match.
   mecanismo (não 0) para não afundar, e (b) o radar os agrupa no cluster "capital de
   risco" junto dos investidores.
 - **D2 — switch de investidor:** **always-on** — o radar já chama `match_investidores`
-  sempre ([radar_service.py:202](../../core/services/radar_service.py#L202)). O switch
+  sempre (radar_service.py:202). O switch
   "busca também capital de risco?" **só revela/coleta os campos Q3/Q4** (estagio,
   mrr_arr, round_alvo_brl, cap_table_resumo, tracao_resumo) para melhorar a qualidade do
   match — **não** gateia os resultados.
@@ -88,7 +88,7 @@ caminho de scoring e podem ir depois, em paralelo.
 
 ## Estado atual
 - `_MECHANISM_MAP["credito_reembolsavel"] = {"reembolsavel", "misto"}`
-  ([hybrid_match_service.py:59](../../core/services/hybrid_match_service.py#L59)).
+  (hybrid_match_service.py:59).
 - UI: `FINANCIAMENTO_OPTIONS` em
   [profileFields.ts:23](../../frontend/src/components/frontdoor/profileFields.ts#L23).
 - Tipo: union `TipoFinanciamento` em [profile.ts:5](../../frontend/src/types/profile.ts#L5).
@@ -133,21 +133,21 @@ mandatório por regra.
 
 ## Estado atual
 - `_MECHANISM_MAP["investimento_direto"] = {"investimento", "misto"}`
-  ([:60](../../core/services/hybrid_match_service.py#L60)) — **está no map mas NÃO na UI nem
+  (:60) — **está no map mas NÃO na UI nem
   na union** (`profileFields.ts`/`profile.ts` não o listam). Resíduo de scoring sem entrada
   de seleção.
 - Infra de investidor **já existe e já está ligada**:
   - `match_investidores(profile, top_k)`
-    ([investor_match.py:112](../../core/services/investor_match.py#L112)) — match-por-tese,
+    (investor_match.py:112) — match-por-tese,
     sem gate.
-  - `POST /match/investidores` ([matching.py:53](../../backend/routers/matching.py#L53)).
+  - `POST /match/investidores` ([matching.py:53](../../core/eval/matching.py#L53)).
   - O radar **já inclui investidores incondicionalmente**
-    ([radar_service.py:202](../../core/services/radar_service.py#L202)); `_entity_item`
-    normaliza ([:76](../../core/services/radar_service.py#L76)).
+    (radar_service.py:202); `_entity_item`
+    normaliza (:76).
   - Campos Q3/Q4 no perfil: `estagio`, `mrr_arr`, `round_alvo_brl`, `cap_table_resumo`,
     `tracao_resumo` ([user_profile.py:54-58](../../domain/user_profile.py#L54);
     backend `common.py:52`; extrator `profile_extractor.py:140`).
-  - Frontend renderiza investidor no radar ([RadarCard.tsx](../../frontend/src/components/frontdoor/RadarCard.tsx), `opportunity_type="investidor"`, botão `onPitch`).
+  - Frontend renderiza investidor no radar (RadarCard.tsx, `opportunity_type="investidor"`, botão `onPitch`).
 - **5 editais `mechanism='investimento'`** (FIPs + Investimento em Startups) hoje casam só
   via `investimento_direto`/`matching_embrapii`.
 
@@ -162,7 +162,7 @@ mandatório por regra.
 | Camada | Arquivo | Mudança |
 |---|---|---|
 | Scoring | `hybrid_match_service.py:60` | remove `investimento_direto` do `_MECHANISM_MAP` |
-| Scoring | `_score_mecanismo` ([:292](../../core/services/hybrid_match_service.py#L292)) | quando `card_mechanism == "investimento"` e nenhuma opção do perfil casa → retornar **neutro** (`w/2`), espelhando a regra "card sem mechanism → neutro" ([:298](../../core/services/hybrid_match_service.py#L298)). Evita 0 silencioso nos FIPs |
+| Scoring | `_score_mecanismo` (:292) | quando `card_mechanism == "investimento"` e nenhuma opção do perfil casa → retornar **neutro** (`w/2`), espelhando a regra "card sem mechanism → neutro" (:298). Evita 0 silencioso nos FIPs |
 | Radar (display) | `radar_service.py` (`_event_item`/`merge_radar`) | derivar um rótulo de cluster "capital de risco" para itens com `payload.mechanism == "investimento"`, ao lado de `kind_class="entidade"` (investidor). **Não muda score/RRF** — é agrupamento de display |
 | UI | novo controle no front-door/perfil | switch "busca também capital de risco?"; ON → mostra os inputs Q3/Q4 (specs já existem em `profileFields.ts:47-68`); estado persistido no perfil (campo derivado ou flag local) |
 | UI | `RadarCard.tsx` | renderizar o cluster "capital de risco" (investidores + editais de investimento) sob um cabeçalho próprio |
@@ -194,16 +194,16 @@ não regride além do esperado (eles devem cair levemente, não sumir).
 
 ## Estado atual
 - `_MECHANISM_MAP["matching_embrapii"] = {"investimento", "misto"}`
-  ([:62](../../core/services/hybrid_match_service.py#L62)); opção `matching_embrapii` **está
+  (:62); opção `matching_embrapii` **está
   na UI e na union** (`profileFields.ts:24`, `profile.ts:6`, comentário em
   `user_profile.py:49`, doc do extrator).
 - Arquitetura ICT já meio-construída (`project_ict_mapping`):
   - Nó `ict` no KG; `ict_schema()` em WIKI.md §6.1.2
-    ([wiki_schema.py:259](../../core/kg/wiki_schema.py#L259)).
+    (wiki_schema.py:259).
   - `core/ict_match.py::find_partners(edital_id)`
-    ([:93](../../core/ict_match.py#L93)) — ranking determinístico por overlap de tema.
+    (:93) — ranking determinístico por overlap de tema.
   - `requires_ict_partner` (campo derivado da entry, WIKI.md §5.10) +
-    `ict_requirement_patterns()` ([wiki_schema.py:280](../../core/kg/wiki_schema.py#L280)).
+    `ict_requirement_patterns()` (wiki_schema.py:280).
   - Tool `find_ict_partners` no Explorador
     ([explore_tools.py:260](../../core/llm/agent_tools/explore_tools.py#L260)).
 - **ICTs só afloram no chat de explore** — nunca no `/match` nem no radar.

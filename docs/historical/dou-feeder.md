@@ -1,11 +1,11 @@
 # spec_dou_feeder.md — Feeder DOU/INLABS (Descoberta, Fase A)
 
 > **Status:** módulo IMPLEMENTADO e validado ao vivo (2026-06-09) —
-> [core/dou_feeder.py](../core/dou_feeder.py). Wiring no `discover_opportunities()`
+> [core/dou_feeder.py](../../core/dou_feeder.py). Wiring no `discover_opportunities()`
 > **FEITO** (2026-06-10, atrás de `DISCOVERY_DOU_ENABLED`; §6). Ativação em prod
 > via **shadow-run** (§9). Credenciais em `.env` (`INLABS_EMAIL`/`INLABS_PASSWORD`),
 > carregadas por `load_dotenv()` (já em `backend/api.py` e `core/tasks.py`).
-> Persona: deep-tech early-stage. Ref. arquitetural: [spec_multi_quadrante.md](spec_multi_quadrante.md) §3.3.
+> Persona: deep-tech early-stage. Ref. arquitetural: [spec_multi_quadrante.md](spec-multi-quadrante.md) §3.3.
 
 ---
 
@@ -83,7 +83,7 @@ content = Texto (HTML stripado)   ← JÁ é o corpo completo; dispensa full-fet
 
 ## 6. Wiring no `discover_opportunities()` (PENDENTE — aditivo)
 
-Mudança mínima em [core/opportunity_discovery.py](../core/opportunity_discovery.py):
+Mudança mínima em [core/opportunity_discovery.py](../../core/opportunity_discovery.py):
 
 1. **Segundo gerador de candidatos**, ao lado do loop Tavily, atrás de flag:
    ```python

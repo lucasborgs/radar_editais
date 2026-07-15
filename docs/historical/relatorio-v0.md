@@ -10,9 +10,9 @@
 
 ## Resumo Executivo
 
-- **Não há orquestrador externo (LangGraph/CrewAI).** O sistema usa um *harness* genérico próprio ([core/agent_runtime.py](../core/agent_runtime.py)) — loop ReAct provider-agnóstico (OpenAI/Anthropic) com tools inferidas via Pydantic. Três agentes o usam (WritingSession, KGMatch.explore, ProfileExtractor), **mas todos estão atrás de feature flags com default OFF** — em produção rodam os pipelines determinísticos 1-shot. O investimento em agentes está *dark-launched*.
-- **A arquitetura de memória é genuinamente sofisticada e bem documentada** (6 camadas em [docs/memory_architecture.md](memory_architecture.md)), com filosofia explícita "AI drafts, humans decide" que **bloqueia deliberadamente** auto-aplicação de aprendizado (pesos de matching só mudam por aprovação humana via [core/weight_approval.py](../core/weight_approval.py)).
-- **A camada "vigente" é correta no design mas frágil na operação.** [pipeline/build_knowledge_graph.py](../pipeline/build_knowledge_graph.py) separa `index.json` (vigentes) de `index_historico.json` (todos), mas **o cron diário NÃO reconstrói o índice** — só roda scrapers e re-chunka editais. O `reference_date` carimbado pode ficar stale relativo ao bronze. **(P0)**
+- **Não há orquestrador externo (LangGraph/CrewAI).** O sistema usa um *harness* genérico próprio ([core/agent_runtime.py](../../core/llm/agent_runtime.py)) — loop ReAct provider-agnóstico (OpenAI/Anthropic) com tools inferidas via Pydantic. Três agentes o usam (WritingSession, KGMatch.explore, ProfileExtractor), **mas todos estão atrás de feature flags com default OFF** — em produção rodam os pipelines determinísticos 1-shot. O investimento em agentes está *dark-launched*.
+- **A arquitetura de memória é genuinamente sofisticada e bem documentada** (6 camadas em [docs/memory_architecture.md](memory-architecture-2026-06.md)), com filosofia explícita "AI drafts, humans decide" que **bloqueia deliberadamente** auto-aplicação de aprendizado (pesos de matching só mudam por aprovação humana via core/weight_approval.py).
+- **A camada "vigente" é correta no design mas frágil na operação.** pipeline/build_knowledge_graph.py separa `index.json` (vigentes) de `index_historico.json` (todos), mas **o cron diário NÃO reconstrói o índice** — só roda scrapers e re-chunka editais. O `reference_date` carimbado pode ficar stale relativo ao bronze. **(P0)**
 - **A "memória longitudinal de agências de fomento" está essencialmente ausente.** Existe `index_historico.json`, `pub_year` e o audit trail `application_events`, mas **nenhum componente raciocina sobre evolução temporal de agências**. A missão de "inteligência" é servida apenas por dados brutos arquivados, sem síntese. **(P0)**
 - **Riscos de grounding concentram-se na escrita:** o ComplianceMonitor avalia a *mensagem do usuário*, não o texto gerado; a auto-review de 3 passes que avalia o documento é *on-demand*. O catálogo (`knowledge_graph/`) e PDFs vivem em **disco local, não em storage** — SPOF e risco de inconsistência multi-instância.
 
@@ -20,13 +20,13 @@
 
 | Gatilho | Mecanismo | Local |
 |---|---|---|
-| **API REST** | FastAPI + slowapi (rate limit por usuário/IP) | [backend/api.py](../backend/api.py) |
-| **Cron** | procrastinate `@app.periodic(cron="0 3 * * *")` → `run_daily_etl_task` | [core/tasks.py:378](../core/tasks.py#L378) |
-| **Jobs assíncronos** | `enrich_content`, `embed_content`, `chunk_edital`, `reflect_workspace` | [core/tasks.py](../core/tasks.py) |
-| **CLI** | `run_all`, `reindex_edital`, `agent_rollout`, `build_knowledge_graph` | [scripts/](../scripts/), [pipeline/](../pipeline/) |
+| **API REST** | FastAPI + slowapi (rate limit por usuário/IP) | [backend/api.py](../../backend/api.py) |
+| **Cron** | procrastinate `@app.periodic(cron="0 3 * * *")` → `run_daily_etl_task` | [core/tasks.py:378](../../core/tasks.py#L378) |
+| **Jobs assíncronos** | `enrich_content`, `embed_content`, `chunk_edital`, `reflect_workspace` | [core/tasks.py](../../core/tasks.py) |
+| **CLI** | `run_all`, `reindex_edital`, `agent_rollout`, `build_knowledge_graph` | [scripts/](../../scripts), [pipeline/](../../pipeline) |
 | **Webhooks** | Nenhum | — |
 
-**Orquestrador:** o loop em [core/agent_runtime.py:462](../core/agent_runtime.py#L462) (`run_agent`) — ReAct puro (`LLM → tool_use* → tool_result → LLM`) até `end_turn`, `max_steps` (6–12) ou `error`. **Sem Plan-and-Execute, sem Reflexion intra-loop, sem replanejamento.** Tools nunca lançam exceção para o loop (capturam tudo e devolvem string-erro).
+**Orquestrador:** o loop em [core/agent_runtime.py:462](../../core/llm/agent_runtime.py#L462) (`run_agent`) — ReAct puro (`LLM → tool_use* → tool_result → LLM`) até `end_turn`, `max_steps` (6–12) ou `error`. **Sem Plan-and-Execute, sem Reflexion intra-loop, sem replanejamento.** Tools nunca lançam exceção para o loop (capturam tudo e devolvem string-erro).
 
 **Máquinas de estado:**
 1. `application_log.status`: `matched → brief_gerado → proposta_iniciada → submetida → em_analise → aprovada/reprovada/desistiu` (transições majoritariamente manuais; trigger DB `log_application_event` faz audit imutável).
@@ -44,9 +44,9 @@
 | **5. Síntese** | `reflection_insights` | `reflect_workspace` (on-demand) | `load_active_insights` (≤6, L2 prioritário) |
 | **6. Outcomes** | `application_log` + `application_events` | brief/writing/`PUT status` | consumido por reflection |
 
-- **Working memory:** ordem deliberada em [_build_messages](../core/writing_session.py#L1090) — estável primeiro (cache), variável por turno depois.
-- **Embeddings:** OpenAI `text-embedding-3-large` **1536d hardcoded** ([embedder.py:21](../core/embedder.py#L21)).
-- **Recuperação híbrida:** RRF k=60, boost 1.5 no primário, `fts_weight=0.3`, dedup `max_per_source=2` ([retriever.py:169](../core/retriever.py#L169)).
+- **Working memory:** ordem deliberada em [_build_messages](../../core/services/writing_session.py#L1090) — estável primeiro (cache), variável por turno depois.
+- **Embeddings:** OpenAI `text-embedding-3-large` **1536d hardcoded** ([embedder.py:21](../../core/retrieval/embedder.py#L21)).
+- **Recuperação híbrida:** RRF k=60, boost 1.5 no primário, `fts_weight=0.3`, dedup `max_per_source=2` ([retriever.py:169](../../core/retrieval/retriever.py#L169)).
 - **Longitudinal:** existe como **dado** (`index_historico.json`, `pub_year`, `application_events`), **não como inteligência** — `reflection_insights` é por empresa, não por agência. **Lacuna central vs a missão.**
 
 ## 3. Inventário de Tools
@@ -60,14 +60,14 @@
 
 ## 4. Motor de Recuperação e Matching
 
-- **Perfil PME:** [CompanyProfile](../domain/user_profile.py) → `workspaces.profile`. `is_complete()` exige 8 campos.
-- **Indexação:** `index.json` (entries leves) + `wiki/<id>.json` (rico: `objective`, `mechanism`, `trl_range`, `value_range`, `key_requirements`, `proposal_sections`), sintetizado por [etl_process.py](../pipeline/etl_process.py).
+- **Perfil PME:** [CompanyProfile](../../domain/user_profile.py) → `workspaces.profile`. `is_complete()` exige 8 campos.
+- **Indexação:** `index.json` (entries leves) + `wiki/<id>.json` (rico: `objective`, `mechanism`, `trl_range`, `value_range`, `key_requirements`, `proposal_sections`), sintetizado por etl_process.py.
 - **Dois algoritmos coexistindo:**
   1. **HybridMatchService** (`/match`, `/opportunity/brief`): Stage 1 determinístico (elegibilidade 30 + temático 25 + TRL 20 + mecanismo 15 + contrapartida 10; pesos `matching_weights` TTL 60s) + Stage 2 LLM temático. Final = `0.6·det + 0.4·temático`.
   2. **KGMatchService** ("Karpathy-style"): LLM lê índice inteiro + perfil → ranking. **Sem embeddings.**
 - **ADR M9:** matching/brief **não usam RAG** — só wiki pages. RAG é exclusivo da escrita.
 - **Vigência:** `vigente = status==ABERTA AND not deadline_expired`. `load_bronze` usa só o arquivo mais recente. `reference_date` carimbado. **Mas o cron não reconstrói o índice** → janela de staleness.
-- **Sem reranker dedicado.** Filtro PME determinístico ([core/pme_filter.py](../core/pme_filter.py)) pré-índice.
+- **Sem reranker dedicado.** Filtro PME determinístico ([core/pme_filter.py](../../core/pme_filter.py)) pré-índice.
 
 ## 5. Loops de Reflexão
 
@@ -146,35 +146,35 @@ flowchart TD
 
 | ID | Arquivo | Papel | Linhas | Score | Issues críticas |
 |----|---------|-------|--------|-------|-----------------|
-| P01 | [writing_session.py](../core/writing_session.py#L128) | WRITER_SYSTEM (legacy) | 128–141 | 6/16 | D5,D6,D7,D8 fracos |
-| P02 | [writing_session.py](../core/writing_session.py#L148) | WRITER_AGENT_SYSTEM | 148–184 | 9/16 | D7,D8 ausentes |
-| P03 | [writing_session.py](../core/writing_session.py#L123) | OUTLINE_SYSTEM | 123–126 | 7/16 | D5,D6,D7 fracos |
-| P04 | [writing_session.py](../core/writing_session.py#L186) | COMPRESS_SYSTEM | 186–188 | 6/16 | D4 frouxo, D8 risco |
-| P05 | [kg_match_service.py](../core/kg_match_service.py#L28) | MATCH (KG) sys+user | 28–149 | 11/16 | D3 overflow, D7 parcial |
-| P06 | [kg_match_service.py](../core/kg_match_service.py#L44) | EXPLORE legacy | 44–67 | 8/16 | D3 overflow, D4 |
-| P07 | [kg_match_service.py](../core/kg_match_service.py#L74) | EXPLORE_AGENT_SYSTEM | 74–111 | 11/16 | D7,D8 ausentes |
-| P08 | [hybrid_match_service.py](../core/hybrid_match_service.py#L369) | STAGE2 temático | 369–398 | 9/16 | D5,D7 fracos |
-| P09 | [profile_extractor.py](../core/profile_extractor.py#L22) | EXTRACT legacy | 22–40 | 8/16 | D6,D7 ausentes |
-| P10 | [profile_extractor.py](../core/profile_extractor.py#L47) | EXTRACTOR_AGENT_SYSTEM | 47–90 | 9/16 | D7,D8 ausentes |
-| P11 | [reflection_service.py](../core/reflection_service.py#L40) | REFLECT sys+user | 40–87 | 14/16 | D7 parcial |
-| P12 | [compliance_monitor.py](../core/compliance_monitor.py#L34) | MONITOR sys+user | 34–62 | 10/16 | D7 ausente; alvo errado |
-| P13 | [checklist_service.py](../core/checklist_service.py#L48) | COMPLIANCE pass | 48–75 | 10/16 | D7,D8 ausentes |
-| P14 | [checklist_service.py](../core/checklist_service.py#L77) | QUALITY pass | 77–103 | 8/16 | D5,D6,D7 fracos |
-| P15 | [checklist_service.py](../core/checklist_service.py#L105) | COMPLETENESS pass | 105–138 | 8/16 | D5,D7 fracos |
-| P16 | [opportunity_brief_service.py](../core/opportunity_brief_service.py#L36) | BRIEF sys+user | 36–70 | 10/16 | D5,D8 fracos |
-| P17 | [content_library.py](../core/content_library.py#L22) | ENRICH sys+user | 22–48 | 8/16 | D6,D7 ausentes |
-| P18 | [WIKI.md](../WIKI.md#L375) | extraction_prompt (wiki) | 375–414 | 10/16 | D7 ausente (vigência!) |
-| P19 | [WIKI.md](../WIKI.md#L538) | structurer_prompt (silver) | 538–590 | 10/16 | D6/D7/D8 n/a |
-| P20 | [writing_tools.py](../core/agent_tools/writing_tools.py) | Tool descriptions (6) | — | 11/16 | D7 ausente |
-| P21 | [explore_tools.py](../core/agent_tools/explore_tools.py) | Tool descriptions (4) | — | 10/16 | D7 ausente |
-| P22 | [profile_tools.py](../core/agent_tools/profile_tools.py) | Tool descriptions (4) | — | 11/16 | D8 n/a |
+| P01 | [writing_session.py](../../core/services/writing_session.py#L128) | WRITER_SYSTEM (legacy) | 128–141 | 6/16 | D5,D6,D7,D8 fracos |
+| P02 | [writing_session.py](../../core/services/writing_session.py#L148) | WRITER_AGENT_SYSTEM | 148–184 | 9/16 | D7,D8 ausentes |
+| P03 | [writing_session.py](../../core/services/writing_session.py#L123) | OUTLINE_SYSTEM | 123–126 | 7/16 | D5,D6,D7 fracos |
+| P04 | [writing_session.py](../../core/services/writing_session.py#L186) | COMPRESS_SYSTEM | 186–188 | 6/16 | D4 frouxo, D8 risco |
+| P05 | kg_match_service.py | MATCH (KG) sys+user | 28–149 | 11/16 | D3 overflow, D7 parcial |
+| P06 | kg_match_service.py | EXPLORE legacy | 44–67 | 8/16 | D3 overflow, D4 |
+| P07 | kg_match_service.py | EXPLORE_AGENT_SYSTEM | 74–111 | 11/16 | D7,D8 ausentes |
+| P08 | hybrid_match_service.py | STAGE2 temático | 369–398 | 9/16 | D5,D7 fracos |
+| P09 | [profile_extractor.py](../../core/profile_extractor.py#L22) | EXTRACT legacy | 22–40 | 8/16 | D6,D7 ausentes |
+| P10 | [profile_extractor.py](../../core/profile_extractor.py#L47) | EXTRACTOR_AGENT_SYSTEM | 47–90 | 9/16 | D7,D8 ausentes |
+| P11 | [reflection_service.py](../../core/reflection_service.py#L40) | REFLECT sys+user | 40–87 | 14/16 | D7 parcial |
+| P12 | compliance_monitor.py | MONITOR sys+user | 34–62 | 10/16 | D7 ausente; alvo errado |
+| P13 | [checklist_service.py](../../core/services/checklist_service.py#L48) | COMPLIANCE pass | 48–75 | 10/16 | D7,D8 ausentes |
+| P14 | [checklist_service.py](../../core/services/checklist_service.py#L77) | QUALITY pass | 77–103 | 8/16 | D5,D6,D7 fracos |
+| P15 | [checklist_service.py](../../core/services/checklist_service.py#L105) | COMPLETENESS pass | 105–138 | 8/16 | D5,D7 fracos |
+| P16 | opportunity_brief_service.py | BRIEF sys+user | 36–70 | 10/16 | D5,D8 fracos |
+| P17 | [content_library.py](../../core/services/content_library.py#L22) | ENRICH sys+user | 22–48 | 8/16 | D6,D7 ausentes |
+| P18 | [WIKI.md](../../WIKI.md#L375) | extraction_prompt (wiki) | 375–414 | 10/16 | D7 ausente (vigência!) |
+| P19 | [WIKI.md](../../WIKI.md#L538) | structurer_prompt (silver) | 538–590 | 10/16 | D6/D7/D8 n/a |
+| P20 | [writing_tools.py](../../core/llm/agent_tools/writing_tools.py) | Tool descriptions (6) | — | 11/16 | D7 ausente |
+| P21 | [explore_tools.py](../../core/llm/agent_tools/explore_tools.py) | Tool descriptions (4) | — | 10/16 | D7 ausente |
+| P22 | [profile_tools.py](../../core/llm/agent_tools/profile_tools.py) | Tool descriptions (4) | — | 11/16 | D8 n/a |
 
 *Rubrica: 0–2 por dimensão (D1–D8), máx 16. Scores >12 são raros e justificados individualmente.*
 
 ## Avaliações Detalhadas
 
 ### P01 — WRITER_SYSTEM (escritor legacy)
-**Arquivo:** [writing_session.py:128](../core/writing_session.py#L128) · **Papel:** escrita (1-shot) · **Score: 6/16**
+**Arquivo:** [writing_session.py:128](../../core/services/writing_session.py#L128) · **Papel:** escrita (1-shot) · **Score: 6/16**
 
 | Dim | Score | Achado |
 |---|---|---|
@@ -191,7 +191,7 @@ flowchart TD
 > Acrescentar: *"Antes de afirmar qualquer requisito formal do edital (prazo, valor, TRL, contrapartida, elegibilidade), use somente os TRECHOS DO EDITAL fornecidos. Se a informação não estiver nos trechos, escreva `[VERIFICAR NO EDITAL: <campo>]` em vez de afirmar. Nunca cite número, data ou nome de programa que não apareça no contexto."* — e padronizar a tag de rascunho com fence explícito (`<draft seção="...">`) para o parser não depender de heurística.
 
 ### P02 — WRITER_AGENT_SYSTEM
-**Arquivo:** [writing_session.py:148](../core/writing_session.py#L148) · **Papel:** escrita (agente) · **Score: 9/16**
+**Arquivo:** [writing_session.py:148](../../core/services/writing_session.py#L148) · **Papel:** escrita (agente) · **Score: 9/16**
 
 | Dim | Score | Achado |
 |---|---|---|
@@ -208,7 +208,7 @@ flowchart TD
 > Injetar no prefixo um bloco `[CONTEXTO TEMPORAL: hoje é {reference_date}. O edital {id} encerra em {deadline} ({dias_restantes} dias). Se o prazo já passou, avise o usuário e NÃO prossiga sem confirmação.]` e instruir: *"Ao mencionar prazos, sempre relativize à data de hoje."*
 
 ### P05 — MATCH (KGMatchService)
-**Arquivo:** [kg_match_service.py:28](../core/kg_match_service.py#L28) · **Papel:** matching · **Score: 11/16**
+**Arquivo:** kg_match_service.py:28 · **Papel:** matching · **Score: 11/16**
 
 | Dim | Score | Achado |
 |---|---|---|
@@ -225,14 +225,14 @@ flowchart TD
 > Migrar para o path agente (`list_editais`/`get_edital`) em produção — elimina o overflow. Enquanto isso, acrescentar: *"Os campos status, deadline e id devem ser COPIADOS verbatim do catálogo; nunca recalcule ou estime. Se um edital não estiver no catálogo, não o inclua."*
 
 ### P07 — EXPLORE_AGENT_SYSTEM
-**Arquivo:** [kg_match_service.py:74](../core/kg_match_service.py#L74) · **Papel:** vitrine pública · **Score: 11/16**
+**Arquivo:** kg_match_service.py:74 · **Papel:** vitrine pública · **Score: 11/16**
 
 Destaques: **D3 2/2** (sem catálogo no prompt — busca via tools, resolve o overflow do P05/P06) e **D5 2/2** ("todo dado citado precisa ter vindo de uma chamada de ferramenta nesta conversa"). Fraquezas: D7 1/2 ("abertos hoje" sem variável de data), D8 0/2.
 
 **Recomendação (D7):** mesma injeção de `reference_date` do P02; instruir o agente a chamar `list_editais(status="ABERTA")` e tratar "hoje" como a data injetada, não conhecimento do modelo.
 
 ### P11 — REFLECT (ReflectionService) ⭐
-**Arquivo:** [reflection_service.py:40](../core/reflection_service.py#L40) · **Papel:** síntese longitudinal · **Score: 14/16**
+**Arquivo:** [reflection_service.py:40](../../core/reflection_service.py#L40) · **Papel:** síntese longitudinal · **Score: 14/16**
 
 | Dim | Score | Achado |
 |---|---|---|
@@ -248,31 +248,31 @@ Destaques: **D3 2/2** (sem catálogo no prompt — busca via tools, resolve o ov
 **Único prompt que cumpre a missão de inteligência longitudinal** — porém **por empresa, não por agência** (ver gap P0 da Parte I). É o template a replicar para `agency_insights`.
 
 ### P12 — MONITOR (ComplianceMonitor)
-**Arquivo:** [compliance_monitor.py:34](../core/compliance_monitor.py#L34) · **Papel:** compliance inline · **Score: 10/16**
+**Arquivo:** compliance_monitor.py:34 · **Papel:** compliance inline · **Score: 10/16**
 
-Forte em D2/D4/D5 (rubrica ok/at_risk/violation conservadora; "violation só com evidência clara"; retorna só ≠ ok). **Falha de design, não de prompt:** avalia a *mensagem do usuário*, não o texto gerado pelo LLM — não detecta alucinação na proposta. D7 0/2 (não vê prazos). Skills por fonte ([skills/*_compliance.md](../skills/)) são anexadas ao system — bom mecanismo de procedural memory.
+Forte em D2/D4/D5 (rubrica ok/at_risk/violation conservadora; "violation só com evidência clara"; retorna só ≠ ok). **Falha de design, não de prompt:** avalia a *mensagem do usuário*, não o texto gerado pelo LLM — não detecta alucinação na proposta. D7 0/2 (não vê prazos). Skills por fonte ([skills/*_compliance.md](../../skills)) são anexadas ao system — bom mecanismo de procedural memory.
 
 **Recomendação (alvo/D2):** rodar um segundo pass do monitor sobre o `draft_content` gerado, não só sobre o input do usuário.
 
 ### P16 — BRIEF (OpportunityBrief)
-**Arquivo:** [opportunity_brief_service.py:36](../core/opportunity_brief_service.py#L36) · **Score: 10/16**
+**Arquivo:** opportunity_brief_service.py:36 · **Score: 10/16**
 
 Destaque D2 ("NÃO seja diplomático demais — se o ajuste é fraco, diga") e a instrução de **riscos não-óbvios** ("TRL declarado vs comprovável", "contrapartida que a empresa sinaliza mas pode não ter") — proto-grounding sofisticado. D5 1/2 (pede análise de risco mas sem constraint de fonte). D8 0/2.
 
 ### P18 — extraction_prompt (síntese de wiki page)
-**Arquivo:** [WIKI.md:375](../WIKI.md#L375) · **Papel:** geração de memória semântica · **Score: 10/16**
+**Arquivo:** [WIKI.md:375](../../WIKI.md#L375) · **Papel:** geração de memória semântica · **Score: 10/16**
 
 Forte: D2 (regras por campo), D4 (JSON + 6–12 seções + tipos), D5 ("null se não mencionado" por campo). **D3 mitigado** por `model_char_budgets` (truncagem typed por modelo). **D7 0/2 é o achado mais grave:** a wiki page é a fonte autoritativa de `deadline`/`value_range`/`trl_range` para matching e compliance, mas a síntese **não carimba nem valida vigência** — uma wiki page nunca "expira" sozinha.
 
 **Recomendação (D7):** adicionar campos `extracted_at` e `deadline_confidence` ao schema, e instruir: *"Se o documento não contém prazo de submissão explícito, marque deadline=null e deadline_confidence='ausente' — não infira de datas de publicação."*
 
 ### P19 — structurer_prompt (silver)
-**Arquivo:** [WIKI.md:538](../WIKI.md#L538) · **Score: 10/16**
+**Arquivo:** [WIKI.md:538](../../WIKI.md#L538) · **Score: 10/16**
 
 **Melhor prompt anti-alucinação do sistema (D5 2/2):** *"NÃO resuma, NÃO interprete, NÃO invente. Preserve o texto VERBATIM."* D2 cirúrgico (regras de `section_path`/`kind` precisas). D6/D7/D8 não aplicáveis (é segmentação determinística com estado `carry_section_path`). Per-página → sem overflow.
 
 ### P20–P22 — Descrições de Tools
-**Arquivos:** [writing_tools.py](../core/agent_tools/writing_tools.py), [explore_tools.py](../core/agent_tools/explore_tools.py), [profile_tools.py](../core/agent_tools/profile_tools.py) · **Score: 10–11/16**
+**Arquivos:** [writing_tools.py](../../core/llm/agent_tools/writing_tools.py), [explore_tools.py](../../core/llm/agent_tools/explore_tools.py), [profile_tools.py](../../core/llm/agent_tools/profile_tools.py) · **Score: 10–11/16**
 
 Tool descriptions **são prompts** (o modelo as lê para decidir). Qualidade alta e consistente: cada uma define quando usar, **quando NÃO usar** (ex.: `search_edital`: "NÃO use para ler a proposta — use read_section"), e orientação de erro acionável. Padrão "erro-como-string" guia o modelo no próximo passo. Fraqueza transversal: nenhuma menciona prazo/vigência (D7).
 
@@ -280,7 +280,7 @@ Tool descriptions **são prompts** (o modelo as lê para decidir). Qualidade alt
 
 ### 3A — Hierarquia e Consistência
 - **Não há master system prompt** do qual os demais herdem. Cada serviço define o seu. Resultado: repetição de "especialista em fomento à inovação no Brasil" em P05/P08/P16 com fraseado ligeiramente diferente, e duplicação de `WRITER_SYSTEM`/`WRITER_AGENT_SYSTEM`.
-- **Vocabulário de domínio consistente** (edital, proponente, PME, fomento, vigente, TRL, subvenção, contrapartida) — forte ponto positivo; o schema autoritativo em [WIKI.md](../WIKI.md) ancora os termos.
+- **Vocabulário de domínio consistente** (edital, proponente, PME, fomento, vigente, TRL, subvenção, contrapartida) — forte ponto positivo; o schema autoritativo em [WIKI.md](../../WIKI.md) ancora os termos.
 - **Sem contradições graves** entre estágios, mas o legacy e o agente coexistem com instruções divergentes sobre a mesma tarefa (tag `<draft>` vs tool `save_draft`) — risco de comportamento bimodal conforme o flag.
 
 ### 3B — Mapa de Fragilidade

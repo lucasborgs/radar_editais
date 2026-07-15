@@ -2,7 +2,7 @@
 
 > **Objetivo:** capturar editais/chamadas/desafios de fomento que surgem espalhados pelo Brasil (FAPs estaduais, ministérios, SEBRAE, fundações, programas pontuais) — fontes desconhecidas e de formato arbitrário — via descoberta web diária, e integrá-los ao KG para que entrem nos fluxos de match e escrita.
 > **Base:** branch a criar a partir de `ict-mapping`/`main`. **Data:** 2026-06-03. Reusa `core/web_search.py` (DeepResearch Fase A).
-> **Pré-leitura:** [spec_deepresearch.md](spec_deepresearch.md) (infra de busca), WIKI.md §10 (adicionar fonte), §12.3/§12.4 (Documento Canônico / Source Adapter), §5.9 (tema vocab), §5.10.
+> **Pré-leitura:** [spec_deepresearch.md](deep-research-design.md) (infra de busca), WIKI.md §10 (adicionar fonte), §12.3/§12.4 (Documento Canônico / Source Adapter), §5.9 (tema vocab), §5.10.
 
 ## Princípio: integrar o KG, com dimensão de confiança (não com gate bloqueante)
 
@@ -48,7 +48,7 @@ Não sabemos quais fontes existem nem quando publicam; e o que for achado precis
 chegar ao KG para servir a match/escrita.
 
 ### Design
-Task diária (procrastinate, ao lado de `run_daily_etl` em [core/tasks.py](../core/tasks.py)):
+Task diária (procrastinate, ao lado de `run_daily_etl` em [core/tasks.py](../../core/tasks.py)):
 1. **Descoberta:** para cada query do vocabulário (novo bloco no doc — ex.: "edital
    inovação 2026 FAP", "chamada fomento PME", "desafio de inovação aberto"),
    `web_search` (Tavily) → candidatos (URL, título, snippet).
@@ -96,7 +96,7 @@ dar ao humano o controle de confiança.
   verificada — confira a fonte"), possivelmente em balde separado ou ranqueados
   abaixo dos verificados.
 - **Escrita:** writable, mas o agente/UI avisa que a fonte é não-verificada; o
-  grounding anti-fabricação ([spec_robustez](spec_robustez_match_escrita.md))
+  grounding anti-fabricação ([spec_robustez](robustez-match-escrita.md))
   continua valendo. **Caveat:** provisório extraído só de snippet tem texto pobre
   → grounding fraco; quando possível, puxar o documento real do edital para os
   `edital_chunks` (chunk_edital), senão a escrita fica rasa.

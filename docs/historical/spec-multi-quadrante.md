@@ -260,7 +260,7 @@ faz match em produção:
 | `HybridMatchService` | 2 stages: **Stage 1** determinístico (Pandas, pontua 6 dims/100, **elimina** < 25 = gate) → **Stage 2** LLM temático nos sobreviventes | `/match` + `core/eval/matching` (**produção**) |
 | `KGMatchService.match()` | 1-shot: índice inteiro + perfil num prompt, LLM rankeia tudo (score-gestalt 0-10, sem gate, sem embeddings) | **dormente** — nenhum endpoint de match o chama; a classe serve `explore`/`get_graph`/`resolve_scope` |
 
-> Nota: o sumário de `/match` ([api.py:414](../backend/api.py)) ainda diz
+> Nota: o sumário de `/match` ([api.py:414](../../backend/api.py)) ainda diz
 > "Karpathy-style" — string stale da época em que o KG era o matcher. Hoje quem
 > roda ali é o HybridMatch.
 
@@ -307,7 +307,7 @@ grafo já existentes (`resolve_scope`, `_find_analogue_ids`, `get_graph_neighbor
 são o ponto de partida do traversal.
 
 **Impacto em `matching_weights` (ADR A5):** hoje os pesos
-([hybrid_match_service.py:80](../core/hybrid_match_service.py)) são 6 dimensões de
+(hybrid_match_service.py:80) são 6 dimensões de
 evento. Entidade tem dimensões diferentes (tese/estágio/setor/ticket) → **perfil
 de pesos próprio por `kind_class`**. O cache (hoje keyed em `workspace_id`) passa
 a `(workspace_id, kind_class)`. `_ELIMINATION_THRESHOLD` fica **event-only** —
@@ -428,11 +428,11 @@ a estrutura existente:
 | # | Invariante | Por quê |
 |---|---|---|
 | ① | **investidor NÃO entra no `index.json`** — artefato próprio `investidores.json` (espelha `icts.json`); o radar junta na **leitura** (match/UI) | `index.json` alimenta `temporal.by_status` + stats; misturar entidade quebra os dois |
-| ② | **NÃO renomear `EditalExtraction`** ([edital_extraction.py:80](../domain/edital_extraction.py)) — ela é o schema de EVENTO (+campos opcionais); `InvestorEntity` é model separado | classe load-bearing; rename = 69 arquivos |
+| ② | **NÃO renomear `EditalExtraction`** ([edital_extraction.py:80](../../domain/edital_extraction.py)) — ela é o schema de EVENTO (+campos opcionais); `InvestorEntity` é model separado | classe load-bearing; rename = 69 arquivos |
 | ③ | **`node_type` ≠ `kind_class`** — desafio/programa são pastas novas no grafo mas **andam no pipeline de evento existente** (mesma tabela/índice/temporal), distinguidos por campo `opportunity_type` | "tipos separados" é decisão de grafo/UI, não de pipeline; eles *são* editais estruturalmente |
 | ④ | **Zero migração de banco** — `edital_id` é `text` prefixado sem FK → tratar como `opportunity_id` genérico (`petrobras:x`, `investidor:kptl`) | nome da tabela vira dívida de nomenclatura, não problema estrutural |
 | ⑤ | **Precedente `ict` cobre só dados+ponte** — match-ranking, escrita-pitch e card de UI de investidor são **net-new** (isolados, mas novos) | ICT nunca teve match-to-user nem escrita; não subestimar investidor |
-| ⑥ | **Frontend: grafo estende barato** (lista hardcoded em [KnowledgeGraph.tsx:56](../frontend/src/components/KnowledgeGraph.tsx) + `NODE_STYLE`), **card de match de investidor é net-new** (`KGMatchResult` assume status/deadline) | |
+| ⑥ | **Frontend: grafo estende barato** (lista hardcoded em KnowledgeGraph.tsx:56 + `NODE_STYLE`), **card de match de investidor é net-new** (`KGMatchResult` assume status/deadline) | |
 
 **Consequência:** editais fica intocado **por construção** → baseline de eval
 0.95 protegida por arquitetura, não por disciplina. Arquivos tocados (aditivos):

@@ -17,9 +17,9 @@ O sistema tem **três superfícies de input**, todas alimentando o `CompanyProfi
    legacy (1 fetch + 1 LLM) ou agente
    ([profile_extractor.py:201](../../core/profile_extractor.py#L201)).
 2. **Conversa do front-door** — `POST /frontdoor/turn`
-   ([frontdoor.py:69](../../backend/routers/frontdoor.py#L69)) →
+   (frontdoor.py:69) →
    `KGMatchService.explore_turn` devolve resposta + `profile_updates` numa só
-   chamada ([kg_match_service.py:758](../../core/services/kg_match_service.py#L758)),
+   chamada (kg_match_service.py:758),
    virando um `profile_diff` que o `DiffCard` deixa o humano aceitar/editar.
 3. **Edição manual** — `/perfil` ([perfil/page.tsx](../../frontend/src/app/perfil/page.tsx)),
    campos tipados por [profileFields.ts](../../frontend/src/components/frontdoor/profileFields.ts).
@@ -32,7 +32,7 @@ de match não têm fonte automática nenhuma:
 
 | Dimensão (peso) | Campo do perfil | Fonte hoje |
 |---|---|---|
-| **mecanismo (15)** | `tipos_financiamento_interesse` | **nenhuma** — só multiselect manual; vazio → nota neutra `w/2` ([hybrid_match_service.py:303](../../core/services/hybrid_match_service.py#L303)) |
+| **mecanismo (15)** | `tipos_financiamento_interesse` | **nenhuma** — só multiselect manual; vazio → nota neutra `w/2` (hybrid_match_service.py:303) |
 | **contrapartida (parte)** | `capital_social` | **nenhuma** — só edição manual; órfão |
 | **elegibilidade dura** | `uf` · `ano_fundacao` · `faturamento_anual` | extract (uf/ano fracos; faturamento ~nunca no site) |
 
@@ -47,7 +47,7 @@ em **2 camadas**.
 | 1 | `tipos_financiamento_interesse` — inferir vs perguntar | **Inferir + confirmar.** Função determinística infere candidatos por `porte`+`faturamento`+`trl`+`tipo_entidade`; entram **pré-selecionados** no review da Etapa 1; humano confirma/desmarca. Zero pergunta na Etapa 1. |
 | 2 | Etapa 1 — porta de entrada | **Hero de URL antes do chat.** A home vira "Cole o site da sua empresa" → extract → matches. O chat segue acessível, abaixo/depois. |
 | 3 | `parceria_ict` no perfil | **Não adicionar agora (backlog).** Mantém só o lado-edital (`find_partners` anexa candidatas ao `/match`); usuário decide caso a caso no card. Evita campo órfão sem consumidor de scoring. |
-| 4 | `capital_social` | **Perguntar na Etapa 2 quando relevante** — condicional: só quando o radar mostra edital com contrapartida **E** porte é MEI/ME (onde `capital_social ≥ 500k` vira o jogo, [hybrid_match_service.py:337](../../core/services/hybrid_match_service.py#L337)). |
+| 4 | `capital_social` | **Perguntar na Etapa 2 quando relevante** — condicional: só quando o radar mostra edital com contrapartida **E** porte é MEI/ME (onde `capital_social ≥ 500k` vira o jogo, hybrid_match_service.py:337). |
 
 ## Princípios invariantes
 
@@ -106,10 +106,10 @@ ETAPA 2 — assertividade (quando o usuário quer "destravar mais matches")
 
 ## Estado atual
 - Sem fonte automática. Vazio → `_score_mecanismo` retorna neutro `w/2`
-  ([hybrid_match_service.py:303](../../core/services/hybrid_match_service.py#L303)).
+  (hybrid_match_service.py:303).
 - Só 2 valores no escopo (PR #29): `subvencao_nao_reembolsavel`,
   `pesquisa_colaborativa` ([profile.ts:3](../../frontend/src/types/profile.ts#L3),
-  [_MECHANISM_MAP](../../core/services/hybrid_match_service.py#L62)).
+  _MECHANISM_MAP).
 - O extract já **retorna** o campo no payload
   ([profile.py:46](../../backend/routers/profile.py#L46)) — hoje sempre vazio.
 
@@ -234,7 +234,7 @@ faltantes de maior impacto, em ordem fixa de alavanca:
 2. **`faturamento_anual`** — gateia elegibilidade dura; ~nunca vem do site.
 3. **`capital_social`** — **condicional**: só aparece se o radar atual tem ≥1 edital
    com `counterpart_required` **E** `porte ∈ {MEI, ME}` (onde `≥500k` muda o score,
-   [hybrid_match_service.py:337](../../core/services/hybrid_match_service.py#L337)).
+   hybrid_match_service.py:337).
    Fora dessa condição, não pergunta (porte já cobre contrapartida).
 4. **Anexar proposta antiga** → `portfolio_projetos` + narrativa
    (`/profile/extract-from-document`, já existe; login-gated → `GateCard`).
@@ -280,7 +280,7 @@ preenchido com mais frequência.
 # Decisão 4 — `parceria_ict`: NÃO adicionar agora (backlog)
 
 Mantém só o lado-edital: `find_partners(edital_id)`
-([ict_match.py:93](../../core/ict_match.py#L93)) anexa ICTs candidatas ao `/match`
+(ict_match.py:93) anexa ICTs candidatas ao `/match`
 (complemento da spec `mechanism-scope-decisions` D3). O perfil **não** carrega
 "tem/quer parceria ICT?" — o usuário decide caso a caso no card de match.
 

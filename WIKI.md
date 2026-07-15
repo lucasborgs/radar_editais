@@ -362,7 +362,7 @@ proativamente". Ele nunca bloqueia nada. Por isso os erros são de **baixo custo
 falso-negativo → o agente não sugere proativamente, mas a tool segue disponível;
 falso-positivo → um empurrão proativo errado, que é *sugestão*, não compromisso
 (ver o registro histórico em
-[docs/features/ict-phase-c.md](docs/features/ict-phase-c.md)).
+[docs/historical/ict-phase-c.md](docs/historical/ict-phase-c.md)).
 
 Vieses/limites assumidos: (1) **FINEP-enviesado** — depende de "ICT/coexecutora/
 arranjo"; para FAPESP é efetivamente sempre `false`. (2) Heurística, sem
@@ -391,7 +391,8 @@ toda entry do índice (default `false`).
 ### 5.11 Confiança da fonte (`verificacao`)
 
 Campo do edital indicando o nível de confiança da origem (item 2.2 — descoberta
-de oportunidades, ver [docs/spec_descoberta_oportunidades.md](docs/spec_descoberta_oportunidades.md)):
+de oportunidades, ver
+[discovery-opportunities.md](docs/historical/discovery-opportunities.md)):
 
 ```yaml
 verificacao_values: [verificado, provisorio]

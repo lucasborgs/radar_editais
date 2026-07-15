@@ -3,7 +3,7 @@
 `run_agent_async` delega inteiramente a este grafo (agent / tools / finalize),
 traduzindo o estado final de volta para o contrato `AgentResult` sem tocar em
 nenhum call site. O loop hand-rolled legado foi removido (migração concluída —
-ver docs/components/agents/langgraph-migration.md).
+ver docs/historical/langgraph-migration.md).
 
 Decisões fechadas:
   • Cap de iterações = contador `llm_calls` em state (paridade exata com

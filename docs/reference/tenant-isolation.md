@@ -1,8 +1,9 @@
 # Isolamento multi-tenant — inventário e leak-test
 
-Status: atualizado em 2026-07-14 · origem: [pre-beta-verification.md](../specs/pre-beta-verification.md)
-Frente 1 (P0). Este doc é o **entregável de inventário**: tabela × política
-efetiva, as quatro superfícies de defesa, e o furo P0 encontrado + corrigido.
+**Status:** referência vigente · **Verificado em:** 2026-07-14 · origem:
+[`pre-beta-verification.md`](../historical/pre-beta-verification.md), Frente 1
+(P0). Este doc é o inventário de tabela × política efetiva, das quatro
+superfícies de defesa e do furo P0 encontrado e corrigido.
 
 Suíte que verifica tudo aqui: [`tests/test_tenant_isolation.py`](../../tests/test_tenant_isolation.py).
 

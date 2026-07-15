@@ -1,7 +1,7 @@
 # Perfil demo/custo — trocar qualidade por custo, só onde o eval verifica
 
 **Objetivo:** rodar a versão demo mais barata possível **sem degradar às cegas**.
-A premissa do bake-off ([llm-embedding-bakeoff.md](llm-embedding-bakeoff.md)) vale aqui:
+A premissa do bake-off ([llm-embedding-bakeoff.md](embedding-bakeoff.md)) vale aqui:
 cada ponto de LLM/embedding é trocável por env; **só promovemos um modelo mais barato
 onde uma suíte de eval confirma que ele não piora** (≥ baseline). Onde o gate não é
 confiável ou não rodou, fica no **modelo confiável** — e isso é registrado como

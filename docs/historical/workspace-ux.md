@@ -2,7 +2,7 @@
 
 > Decisões de produto registradas em **2026-06-11** (Lucas + sessão de spec).
 > Escopo: a **1b** do ROADMAP — o workspace pós-seleção onde a proposta (ou
-> pitch) é elaborada. Sucede a 1a ([spec_frontdoor_ux.md](spec_frontdoor_ux.md)):
+> pitch) é elaborada. Sucede a 1a ([spec_frontdoor_ux.md](frontdoor-ux.md)):
 > o "Começar proposta" do front-door abre isto aqui.
 
 ## 1. Objetivo

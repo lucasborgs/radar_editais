@@ -1,6 +1,6 @@
 # Nota de arquitetura — reorg do backend (#3-backend)
 
-> Esboço de alvos para a **Fase 2 do [ROADMAP](ROADMAP.md)**: aplicar boas práticas
+> Esboço de alvos para a **Fase 2 do ROADMAP**: aplicar boas práticas
 > de arquitetura na base **antes** do rewrite do frontend. NÃO é um plano fechado —
 > é a marcha pra a conversa de execução não inventar. **Princípio guia:** o código
 > hoje FUNCIONA e tem seams bons (não é um resgate); a reorg é sobre **legibilidade,

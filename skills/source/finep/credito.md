@@ -26,7 +26,8 @@
     operacional e conversão de caixa**.
 - **Capacidade de execução e histórico pesam explicitamente** na FINEP — conecte o
   pleito à trajetória real da empresa (mesma praxe da subvenção, aqui em chave de
-  solvência, não de absorção de P&D). Ver [skills/mechanism/credito.md](../../mechanism/credito.md).
+  solvência, não de absorção de P&D). Ver o
+  [playbook base arquivado](../../mechanism/_archived/credito.md).
 
 <!-- Nota: taxa/indexador, prazo, carência, % e tipo de garantia, índices de corte,
      ROB/porte e rubricas elegíveis NÃO entram aqui — são fato do edital vigente (RAG). -->

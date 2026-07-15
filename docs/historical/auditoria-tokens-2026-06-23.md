@@ -83,7 +83,7 @@ class AgentState(TypedDict):
 
 ### 2.2 Como as ToolMessages são apensadas
 
-No nó `tools` ([agent_graph.py:155-184](core/llm/agent_graph.py)):
+No nó `tools` ([agent_graph.py:155-184](../../core/llm/agent_graph.py)):
 
 ```python
 async def tools(state: AgentState) -> dict:
@@ -121,7 +121,7 @@ O nó `reflect` **adiciona** uma mensagem ao histórico — não comprime nem re
 
 ### 2.4 Histórico Cross-Turno da WritingSession
 
-O `thread_id` da escrita usa `user_turn_index` ([writing_session.py](core/services/writing_session.py)):
+O `thread_id` da escrita usa `user_turn_index` ([writing_session.py](../../core/services/writing_session.py)):
 
 ```python
 thread_id = f"{self.workspace_id}:{self.session_id}:{user_turn_index}"
@@ -141,7 +141,7 @@ initial_messages por turno =
   [turno N user_message]        ← mensagem atual
 ```
 
-A `COMPRESS_THRESHOLD = 10` ([writing_session.py:75](core/services/writing_session.py)) comprime apenas APÓS 10 turnos. Turnos 1–9: histórico bruto cresce sem teto na `initial_messages`.
+A `COMPRESS_THRESHOLD = 10` ([writing_session.py:75](../../core/services/writing_session.py)) comprime apenas APÓS 10 turnos. Turnos 1–9: histórico bruto cresce sem teto na `initial_messages`.
 
 ### Diagnóstico — Crescimento Exponencial do Contexto
 
@@ -231,7 +231,7 @@ def recall_company_learnings(topic: str = "") -> str:
 
 Sem `_cap()` no retorno. Workspaces com muitos insights acumulados podem gerar outputs não controlados que escapam ao `TOOL_RESULT_CHAR_CAP` do nó `tools`.
 
-> **Nota:** o cap central no nó `tools` ([agent_graph.py:162](core/llm/agent_graph.py)) aplica `_cap` sobre `m.content` depois que o ToolNode executa, então o backstop existe — mas o log de disparo não está disponível sem dados de prod.
+> **Nota:** o cap central no nó `tools` ([agent_graph.py:162](../../core/llm/agent_graph.py)) aplica `_cap` sobre `m.content` depois que o ToolNode executa, então o backstop existe — mas o log de disparo não está disponível sem dados de prod.
 
 ---
 
@@ -239,18 +239,18 @@ Sem `_cap()` no retorno. Workspaces com muitos insights acumulados podem gerar o
 
 | Componente | Arquivo | Modelo | Tipo | Input Estimado | Risco de Loop |
 |---|---|---|---|---|---|
-| Writing Agent (por step) | [writing_session.py](core/services/writing_session.py) | `claude-sonnet-4-6` | **Stateful** (checkpointer/turn) | 8K–30K tokens/step | Médio (max_steps=8) |
-| Critic Sub-agent | [critic_agent.py](core/llm/agent_tools/critic_agent.py) | `gpt-4o` | Stateless (max_steps=3) | 3K–10K tokens | **ALTO** — dispara em todo `save_draft` |
-| WritingSession Compress | [writing_session.py](core/services/writing_session.py) | `gpt-4o-mini` | Stateless 1-shot | 2K–4K tokens | Baixo (só no turno 10+) |
-| WritingSession Signal | [writing_session.py](core/services/writing_session.py) | `gpt-4o-mini` | Stateless 1-shot | 2K–4K tokens | Baixo |
-| ChecklistService (3 passes paralelos) | [checklist_service.py](core/services/checklist_service.py) | `gemini-2.5-flash` / `gpt-4o-mini` | Stateless paralelo | 4K–12K por pass = **12K–36K total** | Médio (chamada manual) |
-| Explore/KGMatch Agent | [kg_match_service.py](core/services/kg_match_service.py) | `claude-sonnet-4-6` | Stateless por turno | 3K–8K/turn | Baixo |
-| Profile Extractor Agent | [profile_extractor.py](core/profile_extractor.py) | `claude-sonnet-4-6` | Stateless | 3K–12K | Baixo (1× por submit) |
-| Edital Extractor | [edital_extractor.py](core/edital_extractor.py) | `gpt-4o` / `gemini-2.5-flash` | Stateless | 5K–20K por edital | **ALTO** (batch em pipeline) |
-| ContextualRetrieval | [contextual_retrieval.py](core/contextual_retrieval.py) | `gpt-4o-mini` | Stateless por chunk | 400–800 tokens/chunk | **ALTO** (1 call/chunk no reindex) |
-| Deep Research (sub-agent) | [research_tools.py](core/llm/agent_tools/research_tools.py) | `anthropic`/`openai` | Stateless (max_steps=5) | 2K–8K | Médio (por chamada no turno) |
-| HybridMatch Stage 2 | [hybrid_match_service.py](core/services/hybrid_match_service.py) | `gemini-2.5-flash` / `gpt-4o-mini` | Stateless | 3K–6K por empresa | Baixo (1× por match) |
-| ETL Enrichment | [etl_process.py](pipeline/etl_process.py) | `gemini-2.5-flash` | Stateless batch | 2K–5K por edital | **ALTO** (todos editais no pipeline) |
+| Writing Agent (por step) | [writing_session.py](../../core/services/writing_session.py) | `claude-sonnet-4-6` | **Stateful** (checkpointer/turn) | 8K–30K tokens/step | Médio (max_steps=8) |
+| Critic Sub-agent | [critic_agent.py](../../core/llm/agent_tools/critic_agent.py) | `gpt-4o` | Stateless (max_steps=3) | 3K–10K tokens | **ALTO** — dispara em todo `save_draft` |
+| WritingSession Compress | [writing_session.py](../../core/services/writing_session.py) | `gpt-4o-mini` | Stateless 1-shot | 2K–4K tokens | Baixo (só no turno 10+) |
+| WritingSession Signal | [writing_session.py](../../core/services/writing_session.py) | `gpt-4o-mini` | Stateless 1-shot | 2K–4K tokens | Baixo |
+| ChecklistService (3 passes paralelos) | [checklist_service.py](../../core/services/checklist_service.py) | `gemini-2.5-flash` / `gpt-4o-mini` | Stateless paralelo | 4K–12K por pass = **12K–36K total** | Médio (chamada manual) |
+| Explore/KGMatch Agent | kg_match_service.py | `claude-sonnet-4-6` | Stateless por turno | 3K–8K/turn | Baixo |
+| Profile Extractor Agent | [profile_extractor.py](../../core/profile_extractor.py) | `claude-sonnet-4-6` | Stateless | 3K–12K | Baixo (1× por submit) |
+| Edital Extractor | [edital_extractor.py](../../core/edital_extractor.py) | `gpt-4o` / `gemini-2.5-flash` | Stateless | 5K–20K por edital | **ALTO** (batch em pipeline) |
+| ContextualRetrieval | [contextual_retrieval.py](../../core/contextual_retrieval.py) | `gpt-4o-mini` | Stateless por chunk | 400–800 tokens/chunk | **ALTO** (1 call/chunk no reindex) |
+| Deep Research (sub-agent) | [research_tools.py](../../core/llm/agent_tools/research_tools.py) | `anthropic`/`openai` | Stateless (max_steps=5) | 2K–8K | Médio (por chamada no turno) |
+| HybridMatch Stage 2 | hybrid_match_service.py | `gemini-2.5-flash` / `gpt-4o-mini` | Stateless | 3K–6K por empresa | Baixo (1× por match) |
+| ETL Enrichment | etl_process.py | `gemini-2.5-flash` | Stateless batch | 2K–5K por edital | **ALTO** (todos editais no pipeline) |
 
 ### 4.1 Pontos de Multiplicação Silenciosa de Custo
 

@@ -5,7 +5,7 @@
 > `tests/test_wiki_schema_consistency.py` **verde** no mesmo commit. Aplicar o
 > diff no WIKI.md sem o código que trata os `node_types` novos quebra o validador
 > e o `build_knowledge_graph`. Este doc é a ponte entre
-> [spec_multi_quadrante.md](spec_multi_quadrante.md) (arquitetura) e a 1ª PR.
+> [spec_multi_quadrante.md](spec-multi-quadrante.md) (arquitetura) e a 1ª PR.
 > Honra as 6 invariantes de de-risk (§6-bis da spec): **aditivo, nunca rename**.
 
 ---
@@ -137,7 +137,7 @@ link_types:
 
 > **Custo de rename de link_type:** `edital_has_theme → opportunity_has_theme` toca
 > `build_knowledge_graph` (emissão) e `_find_analogue_ids`/`resolve_scope` (que
-> casam por `folder`, não pelo nome do link — ver [kg_match_service.py:534](../core/kg_match_service.py)).
+> casam por `folder`, não pelo nome do link — ver kg_match_service.py:534).
 > Verificar se o nome do link é load-bearing em algum parse antes de renomear; se
 > for, **manter o nome `edital_has_*` e só alargar `from`** (menor risco).
 

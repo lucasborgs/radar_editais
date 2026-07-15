@@ -2,7 +2,7 @@
 
 > **Objetivo:** adicionar ao KG as instituições de C&T (ICTs) que muitos editais FINEP/FAPESP exigem como parceiras, para que o sistema possa sugerir parceiros compatíveis por afinidade temática. ICT **não lança** edital — apenas participa de projetos.
 > **Base:** branch `test-integration`. **Data:** 2026-06-03.
-> **Pré-leitura:** [WIKI.md §6 (schema do grafo)](../WIKI.md), [WIKI.md §10 (adicionar fonte)](../WIKI.md), [WIKI.md §12.4 (source adapters)](../WIKI.md).
+> **Pré-leitura:** [WIKI.md §6 (schema do grafo)](../../WIKI.md), [WIKI.md §10 (adicionar fonte)](../../WIKI.md), [WIKI.md §12.4 (source adapters)](../../WIKI.md).
 
 ## Premissa que muda o desenho
 
@@ -29,7 +29,7 @@ Não há aresta direta edital↔ICT. Editais exigem *uma* ICT (não uma nomeada)
 
 ## Schema (mudança de doc primeiro — CLAUDE.md)
 
-Toda mudança abaixo vai em [WIKI.md](../WIKI.md) **antes** do código, validada por [tests/test_wiki_schema_consistency.py](../tests/test_wiki_schema_consistency.py).
+Toda mudança abaixo vai em [WIKI.md](../../WIKI.md) **antes** do código, validada por tests/test_wiki_schema_consistency.py.
 
 ### Novo tipo de nó (§6.1)
 ```yaml
@@ -76,7 +76,7 @@ link_types:
 ### Bronze
 Extractors novos, fora do fluxo de edital. Saída em `bronze_data/ict_raw/`.
 
-- `pipeline/extractors/ict_embrapii.py` — lista [nossas-unidades](https://embrapii.org.br/nossas-unidades/#filter-units) → segue para páginas individuais (ex.: `/unidades/<slug>/`). Estruturado, baixo volume. Reusa `BaseScraper` ([pipeline/extractors/base.py](../pipeline/extractors/base.py)).
+- `pipeline/extractors/ict_embrapii.py` — lista [nossas-unidades](https://embrapii.org.br/nossas-unidades/#filter-units) → segue para páginas individuais (ex.: `/unidades/<slug>/`). Estruturado, baixo volume. Reusa `BaseScraper` ([pipeline/extractors/base.py](../../pipeline/extractors/base.py)).
 - `pipeline/extractors/ict_pnipe.py` — [pnipe.mcti.gov.br/search](https://pnipe.mcti.gov.br/search). Metadados ricos por lab (Sobre, Endereço, Contato, área de atuação, principais técnicas). **Alto volume e ruidoso** → exige estratégia de filtro (por área/UF) e paginação. Fase B.
 
 Schema bronze (comum às duas fontes):
@@ -90,10 +90,10 @@ Schema bronze (comum às duas fontes):
 ```
 
 ### Silver/normalização
-1 passo LLM por ICT (leve — é metadado HTML, não PDF): `areas_raw + techniques_raw → themes` (slugs canônicos do vocabulário de `tema`) + `summary`. Reaproveita o cliente/padrão de [core/content_library.py](../core/content_library.py) `_enrich`/[core/structurer.py](../core/structurer.py). Cache por hash do bronze (não re-chamar LLM em ICT inalterada).
+1 passo LLM por ICT (leve — é metadado HTML, não PDF): `areas_raw + techniques_raw → themes` (slugs canônicos do vocabulário de `tema`) + `summary`. Reaproveita o cliente/padrão de [core/content_library.py](../../core/services/content_library.py) `_enrich`/[core/structurer.py](../../core/structurer.py). Cache por hash do bronze (não re-chamar LLM em ICT inalterada).
 
 ### KG build
-[pipeline/build_knowledge_graph.py](../pipeline/build_knowledge_graph.py): adicionar nós `ict` + arestas `ict_has_expertise` ao `index.json` e gerar wiki pages em `icts/`. Os nós `tema` referenciados passam a listar ICTs (`aggregator_lists_ict`).
+pipeline/build_knowledge_graph.py: adicionar nós `ict` + arestas `ict_has_expertise` ao `index.json` e gerar wiki pages em `icts/`. Os nós `tema` referenciados passam a listar ICTs (`aggregator_lists_ict`).
 
 ### Dedup
 Mesma instituição pode aparecer em EMBRAPII **e** PNIPE. Dedup por nome normalizado + (quando houver) CNPJ. Preferir o registro mais rico; manter `source` como lista se aparecer em ambos.
@@ -104,7 +104,7 @@ Mesma instituição pode aparecer em EMBRAPII **e** PNIPE. Dedup por nome normal
 
 Com os nós no grafo:
 - Tag `requires_ict_partner` no edital + interseção `edital.themes ∩ ict.themes` → ranking de parceiros sugeridos.
-- Nova tool de exploração `find_ict_partners(edital_id)` em [core/agent_tools/explore_tools.py](../core/agent_tools/explore_tools.py) (espelha `find_analogues`), para o `KGMatchService` sugerir ICTs.
+- Nova tool de exploração `find_ict_partners(edital_id)` em [core/agent_tools/explore_tools.py](../../core/llm/agent_tools/explore_tools.py) (espelha `find_analogues`), para o `KGMatchService` sugerir ICTs.
 
 Especificar em spec separada após a ingestão estar verde.
 

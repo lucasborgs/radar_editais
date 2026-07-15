@@ -2,7 +2,7 @@
 
 > **Objetivo:** transformar os nós ICT (Fase A) de catálogo em **matchmaking**: dado um edital que exige parceiro, sugerir ICTs candidatas por afinidade temática; e, quando o humano escolher um parceiro, deixá-lo fundamentar a escrita — sem nunca fabricar a parceria.
 > **Base:** branch `ict-mapping` (Fase A: schema + EMBRAPII + `icts.json`, 86/90 ICTs com ponte). **Data:** 2026-06-03.
-> **Pré-leitura:** [spec_ict_mapping.md](spec_ict_mapping.md) (Fases A/B), [spec_deepresearch.md](spec_deepresearch.md) (gate de learning reaproveitado na peça 4).
+> **Pré-leitura:** [spec_ict_mapping.md](ict-mapping.md) (Fases A/B), [spec_deepresearch.md](deep-research-design.md) (gate de learning reaproveitado na peça 4).
 
 ## Decisões travadas
 
@@ -18,7 +18,7 @@
 No match, "esta ICT *poderia* ser parceira" é recomendação — o humano avalia. Na
 escrita, "nosso parceiro é X" é compromisso factual. Se o Redator puxasse uma ICT
 por afinidade temática e a escrevesse na proposta, **fabricaria uma parceria** —
-o que [spec_robustez](spec_robustez_match_escrita.md) e o Grantable proíbem. Por
+o que [spec_robustez](robustez-match-escrita.md) e o Grantable proíbem. Por
 isso a ICT entra na escrita **apenas** pela porta da decisão humana (peça 4),
 nunca pela porta da sugestão (peças 2/3).
 
@@ -48,7 +48,7 @@ ict_requirement_patterns:
   (`edital_chunks`) > silver estruturado > `descricao`/`texto_cru` do bronze.
   Regex no bronze sozinho tem falso-negativo (exigência costuma estar no PDF) —
   documentar a limitação; é heurística MVP.
-- Aplicado em [pipeline/build_knowledge_graph.py](../pipeline/build_knowledge_graph.py)
+- Aplicado em pipeline/build_knowledge_graph.py
   (`_build_editais`/`_normalize_*`); grava `requires_ict_partner: bool` na entry
   do `index.json`. É **propriedade/tag**, não nó (§6.1.1).
 
@@ -79,7 +79,7 @@ def find_partners(edital_id: str, k: int = 5) -> list[PartnerSuggestion]:
     # 4. retorna top-k: {id, name, kind, themes_match, contact, url}
 ```
 - `icts.json` carregado com cache por mtime (espelha `_load_index` do
-  [kg_match_service.py](../core/kg_match_service.py)).
+  kg_match_service.py).
 - Determinístico. Sem embeddings, sem LLM (MVP macro-tema).
 - Se `edital.themes` vazio ou sem interseção → retorna `[]` com motivo (não força
   match ruim — coerente com o conservadorismo do normalizador da Fase A).
@@ -100,7 +100,7 @@ O agente de match (KGMatch.explore) não consegue sugerir parceiros na tela
 conversacional do grafo.
 
 ### Design
-Tool em [core/agent_tools/explore_tools.py](../core/agent_tools/explore_tools.py),
+Tool em [core/agent_tools/explore_tools.py](../../core/llm/agent_tools/explore_tools.py),
 espelhando `find_analogues`:
 ```python
 @tool
@@ -131,7 +131,7 @@ A proposta precisa nomear e descrever o parceiro escolhido. Mas o Redator não
 pode escolher o parceiro — isso é compromisso, não sugestão.
 
 ### Design
-Reaproveita o **gate de learning** do DeepResearch ([spec_deepresearch.md](spec_deepresearch.md) peça B):
+Reaproveita o **gate de learning** do DeepResearch ([spec_deepresearch.md](deep-research-design.md) peça B):
 
 ```
 Match/grafo (KG global)      Humano escolhe          Escrita (memória de projeto)
@@ -142,9 +142,9 @@ Match/grafo (KG global)      Humano escolhe          Escrita (memória de projet
 - Na tela do grafo, ao listar parceiros, o usuário pode **importar** a ICT
   escolhida: `create_item(workspace_id, title=<ict.name>, type_='ict_partner',
   content=<about+areas_raw+contact>, source_url=<ict.url>, enrich=True)`
-  ([content_library.py:166](../core/content_library.py#L166)) — `enrich`/`embed`
+  ([content_library.py:166](../../core/services/content_library.py#L166)) — `enrich`/`embed`
   já existem (ADR M8).
-- A partir daí, `search_library` ([writing_tools.py](../core/agent_tools/writing_tools.py))
+- A partir daí, `search_library` ([writing_tools.py](../../core/llm/agent_tools/writing_tools.py))
   surfa o parceiro durante a escrita, com proveniência (`source_url`), como
   qualquer fato de projeto.
 - **Guard-rail (o ponto da spec):** o Redator **não** recebe `find_ict_partners`

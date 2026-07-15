@@ -2,7 +2,7 @@
 
 > **Objetivo:** permitir que o usuário peça um dado/informação da internet sem sair da interface; o agente busca, sintetiza **com fonte**, e o resultado só vira conhecimento persistente do projeto após o usuário confirmar.
 > **Base:** branch `test-integration`. **Data:** 2026-06-03.
-> **Enquadramento (CoALA):** grounding externo (busca) → working memory (turno) → **gate do usuário** → learning na memória semântica **do projeto** ([docs/historical/COALA.md](historical/COALA.md)). Converge com a filosofia Grantable ("AI finds, humans learn").
+> **Enquadramento (CoALA):** grounding externo (busca) → working memory (turno) → **gate do usuário** → learning na memória semântica **do projeto** ([docs/historical/COALA.md](COALA.md)). Converge com a filosofia Grantable ("AI finds, humans learn").
 
 ## Decisões travadas
 
@@ -46,12 +46,12 @@ class SearchHit:
 
 def web_search(query: str, k: int = 5) -> list[SearchHit]: ...
 ```
-Backend Tavily atrás de `WEB_SEARCH_BACKEND` (default `tavily`) + `TAVILY_API_KEY`. Falha graciosa: sem chave → tool retorna string de erro (loop nunca quebra, padrão [agent_runtime](../core/agent_runtime.py)).
+Backend Tavily atrás de `WEB_SEARCH_BACKEND` (default `tavily`) + `TAVILY_API_KEY`. Falha graciosa: sem chave → tool retorna string de erro (loop nunca quebra, padrão [agent_runtime](../../core/llm/agent_runtime.py)).
 
 ### Subagente DeepResearch
 `core/agent_tools/research_tools.py`:
 - `build_research_subagent_tool()` → retorna um `Tool` cujo `func` roda um `run_agent` interno.
-- Tools internas: `web_search` (Tavily) + `fetch_page` (reusa [core/agent_tools/profile_tools.py](../core/agent_tools/profile_tools.py)).
+- Tools internas: `web_search` (Tavily) + `fetch_page` (reusa [core/agent_tools/profile_tools.py](../../core/llm/agent_tools/profile_tools.py)).
 - `max_steps` baixo (≈5): Tavily já devolve `content`, então muitas perguntas não precisam de `fetch_page`.
 - **System prompt anti-fabricação:** sintetize **apenas** o que está nas fontes; toda afirmação mapeia a uma fonte retornada; se não achou, responda "não encontrei evidência" — nunca preencher de memória.
 
@@ -59,8 +59,8 @@ Backend Tavily atrás de `WEB_SEARCH_BACKEND` (default `tavily`) + `TAVILY_API_K
 A tool devolve ao agente chamador uma **string formatada** com a resposta + bloco de fontes (URL + trecho), e expõe no `TraceStep`/telemetria um payload estruturado `{answer, sources[]}` para o frontend montar o painel de "fontes pendentes".
 
 ### Exposição
-- Tool no **Redator** ([core/agent_tools/writing_tools.py](../core/agent_tools/writing_tools.py)) — o caso "preciso de um dado pra escrever esta seção".
-- Tool no **Explorador** ([core/agent_tools/explore_tools.py](../core/agent_tools/explore_tools.py)) — opcional, fase 2.
+- Tool no **Redator** ([core/agent_tools/writing_tools.py](../../core/llm/agent_tools/writing_tools.py)) — o caso "preciso de um dado pra escrever esta seção".
+- Tool no **Explorador** ([core/agent_tools/explore_tools.py](../../core/llm/agent_tools/explore_tools.py)) — opcional, fase 2.
 - **Não** é um agente top-level que o usuário invoca à parte (fragmentaria o contexto da sessão).
 
 ---
@@ -68,15 +68,15 @@ A tool devolve ao agente chamador uma **string formatada** com a resposta + bloc
 ## Ação de learning (gate → ContentLibrary)
 
 Reusa o que já existe — **delta de implementação pequeno**:
-- `create_item(db, workspace_id, title, type_='web_research', content, tags, source_url=<fonte>, enrich=True)` ([core/content_library.py:166](../core/content_library.py#L166)).
+- `create_item(db, workspace_id, title, type_='web_research', content, tags, source_url=<fonte>, enrich=True)` ([core/content_library.py:166](../../core/services/content_library.py#L166)).
 - `enrich_content_task` (procrastinate) preenche summary/key_facts/themes/embedding async — **já existe** (ADR M8).
 - Depois disso, o fato é recuperável via `search_library` em turnos futuros.
 
 ### Frescor / decay
-O decay já roda: `effective_importance = importance_score * exp(-(now - last_referenced_at)/half_life)` ([content_library.py:290](../core/content_library.py#L290)). Extensão: **meia-vida por `type`** — `web_research` recebe `half_life` menor que documento interno da empresa (fato web envelhece mais rápido). Pequena mudança na fórmula de decay para parametrizar por tipo.
+O decay já roda: `effective_importance = importance_score * exp(-(now - last_referenced_at)/half_life)` ([content_library.py:290](../../core/services/content_library.py#L290)). Extensão: **meia-vida por `type`** — `web_research` recebe `half_life` menor que documento interno da empresa (fato web envelhece mais rápido). Pequena mudança na fórmula de decay para parametrizar por tipo.
 
 ### Proveniência no uso
-Quando o Redator usa um item `web_research`, a citação aponta para `source_url`, não para "a empresa afirma". O fato continua sujeito ao regime de grounding por-claim do [spec de robustez](spec_robustez_match_escrita.md) — é **claim externo com fonte**, não verdade interna.
+Quando o Redator usa um item `web_research`, a citação aponta para `source_url`, não para "a empresa afirma". O fato continua sujeito ao regime de grounding por-claim do [spec de robustez](robustez-match-escrita.md) — é **claim externo com fonte**, não verdade interna.
 
 ---
 
