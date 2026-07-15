@@ -90,8 +90,9 @@ pip install -e . && supabase start
 uvicorn backend.api:app --reload --port 8000
 ```
 
-Setup completo, testes, lint, eval: [`CLAUDE.md`](CLAUDE.md). Diagramas
-detalhados: [`docs/architecture.md`](docs/architecture.md).
+Setup completo, testes, lint e eval: [`AGENTS.md`](AGENTS.md). Diagramas
+detalhados: [`docs/architecture.md`](docs/architecture.md). Índice da
+documentação: [`docs/README.md`](docs/README.md).
 
 ## Estrutura
 
@@ -102,7 +103,7 @@ domain/      CompanyProfile (dataclass)
 pipeline/    ETL multi-fonte (extractors + adapters)
 frontend/    Next.js 14
 supabase/    Migrações + config CLI
-docs/        arquitetura atual, specs, componentes e registros históricos
+docs/        índice, arquitetura atual, specs, referências e histórico
 wikis/       Schema/vocabulários por fonte (doc-as-config)
 ```
 

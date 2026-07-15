@@ -1,0 +1,53 @@
+# Documentação — Radar de Editais
+
+Este é o índice de leitura do sistema. Ele aponta para a fonte autoritativa de
+cada assunto; não substitui os documentos indicados.
+
+## Comece pela sua pergunta
+
+| Quero entender… | Leia | Autoridade |
+|---|---|---|
+| o produto e como iniciá-lo | [`README.md`](../README.md) | proposta e início rápido |
+| setup, comandos, validação e cuidados de manutenção | [`AGENTS.md`](../AGENTS.md) | runbook técnico |
+| runtime, dados, agentes, deploy e avaliação | [`architecture.md`](architecture.md) | arquitetura implementada |
+| vocabulários, ingestão e regras por fonte | [`WIKI.md`](../WIKI.md) e [`wikis/`](../wikis/) | domínio lido pelo código |
+| trabalho técnico adiado com evidência | [`BACKLOG.md`](BACKLOG.md) | backlog técnico atual |
+| mudanças propostas ou contratos vigentes | [`specs/`](specs/) | specs correntes |
+| operação e subsistemas atuais | [`reference/`](reference/) | referência derivada |
+| decisões e arquiteturas anteriores | [`historical/`](historical/) | registro sem autoridade atual |
+| contrato visual do frontend | [`DESIGN_SYSTEM.md`](../frontend/DESIGN_SYSTEM.md) | design system implementado |
+
+## Trilhas de leitura
+
+### Produto
+
+1. [`README.md`](../README.md)
+2. [`system-coherence.md`](specs/system-coherence.md)
+3. specs correntes da capacidade de interesse em [`specs/`](specs/)
+
+### Técnico
+
+1. [`AGENTS.md`](../AGENTS.md)
+2. [`architecture.md`](architecture.md)
+3. [`WIKI.md`](../WIKI.md)
+4. referências e specs do subsistema afetado
+
+### Operador
+
+1. comandos e configuração em [`AGENTS.md`](../AGENTS.md)
+2. deploy e jobs em [`architecture.md`](architecture.md)
+3. operação da Descoberta em
+   [`discovery-operations.md`](specs/discovery-operations.md)
+4. gates externos adiados em [`BACKLOG.md`](BACKLOG.md)
+
+## Regras de autoridade
+
+- regras de negócio começam em `WIKI.md`/`wikis/`;
+- código, migrations e manifests provam o runtime existente, que deve estar
+  fielmente descrito em `architecture.md`;
+- uma spec expressa intenção até ser implementada e reconciliada;
+- referências explicam contratos atuais sem redefini-los; e
+- documentos históricos preservam contexto, mas não governam o presente.
+
+O ciclo de vida, os critérios de classificação e o plano de reconciliação estão
+na [`spec de autoridade documental`](specs/document-authority.md).

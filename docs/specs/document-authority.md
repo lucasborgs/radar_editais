@@ -1,6 +1,6 @@
 # Spec — Autoridade documental
 
-**Status:** proposta · **Data:** 2026-07-14
+**Status:** em implementação · **Data:** 2026-07-14
 **Documento-pai:** [`system-coherence.md`](system-coherence.md)
 **Perfis afetados:** usuário técnico e operador
 **Impacto:** baixo; organização e documentação, sem mudança de runtime

@@ -1,5 +1,9 @@
 # Radar de Editais — Schema e vocabulários
 
+> **Autoridade:** regras de domínio e vocabulários consumidos pelo código. Para
+> runtime e demais documentos, consulte o
+> [índice da documentação](docs/README.md).
+
 Este documento é o **schema autoritativo** dos vocabulários e contratos de
 ingestão. O catálogo ativo é o gold relacional (`entities`,
 `entity_relationships`, `match_chunks`); blocos anteriores ao v3 permanecem

@@ -1,5 +1,9 @@
 # Arquitetura — Radar de Editais
 
+> **Autoridade:** runtime e fluxos implementados. Para regras de domínio, use
+> [`WIKI.md`](../WIKI.md); para o mapa completo, use o
+> [índice da documentação](README.md).
+
 O produto conecta empresas early-stage/PME a oportunidades de fomento público
 brasileiro através de **quatro funcionalidades**: **Radar** (match
 empresa↔oportunidade), **Escrita assistida** (propostas com RAG sobre o edital),

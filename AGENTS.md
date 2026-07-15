@@ -2,6 +2,8 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
+Índice e autoridade da documentação: [docs/README.md](docs/README.md).
+
 ## Schema autoritativo
 
 Regras de vocabulários, workflows de ingestão e manutenção vivem em [WIKI.md](WIKI.md) (global) e [wikis/](wikis/)`<fonte>.md` (por fonte). O código lê os blocos YAML via [core/kg/schema.py](core/kg/schema.py). **Mudanças em regras → edite os docs, não o código.**
