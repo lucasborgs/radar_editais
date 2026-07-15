@@ -227,9 +227,12 @@ O trabalho de coerência estará concluído quando:
 - executar migrações de dados; e
 - definir antecipadamente a implementação completa dos cinco eixos.
 
-## 12. Próxima decisão
+## 12. Specs filhas
 
-Após aprovação desta guia, a primeira spec filha deve tratar **autoridade
-documental**: inventariar documentos correntes, vigentes e históricos; definir
-um índice de leitura; e mover apenas conteúdo comprovadamente concluído ou
-substituído, sem reescrever história nem alterar runtime.
+| Eixo | Spec | Estado |
+|---|---|---|
+| Autoridade documental | [`document-authority.md`](document-authority.md) | vigente |
+| Modelo mental e superfície do usuário | [`user-mental-model.md`](user-mental-model.md) | aprovada |
+
+Os demais eixos só recebem uma spec quando o eixo anterior tiver sido executado
+e reconciliado, salvo bloqueio comprovado ou independência explícita.
