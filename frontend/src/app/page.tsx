@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
@@ -15,20 +16,15 @@ import { Composer } from "@/components/frontdoor/Composer";
 import { DiffCard } from "@/components/frontdoor/DiffCard";
 import { GateCard } from "@/components/frontdoor/GateCard";
 import { ProfileIncompleteCard } from "@/components/frontdoor/ProfileIncompleteCard";
-import { MatchedEditalCard } from "@/components/frontdoor/MatchedEditalCard";
-import { MatchedEntityCard } from "@/components/frontdoor/MatchedEntityCard";
 import { UrlHero } from "@/components/frontdoor/UrlHero";
 import { UnlockCard } from "@/components/frontdoor/UnlockCard";
 import {
   frontdoorTurn,
-  fetchMatchVerdicts,
   getMe,
   saveProfile,
-  startWritingSession,
   extractProfileFromDocument,
   getConversation,
   updateConversationEntry,
-  type MatchVerdict,
   type ProfileDiffItem,
 } from "@/lib/api";
 const PLANNING_CTX_KEY = "planning_context";
@@ -48,10 +44,8 @@ import {
   diffFromProfile,
   diffFromExtracted,
   entriesFromServer,
-  mergeRadar,
   profileCompleteness,
   isRadarReady,
-  isCompleteForWriting,
   missingForRadar,
   missingHighImpact,
   type TranscriptEntry,
@@ -153,7 +147,6 @@ function Bubble({
 export default function FrontDoorPage() {
   const { session, getToken, signOut } = useAuth();
   const isAuthed = !!session;
-  const router = useRouter();
 
   const [profile, setProfile] = useState<CompanyProfile>(EMPTY_PROFILE);
   const [entries, setEntries] = useState<TranscriptEntry[]>([]);
@@ -206,52 +199,6 @@ export default function FrontDoorPage() {
     setHydrated(true);
   }, []);
 
-  // ── Veredito LLM do match (Estágio 2, KG v2 PR7) ────────────────────────────
-  // A task computa async; o card renderiza sem veredito e o recebe aqui.
-  // Chave = `${source}__${edital_id}` (file_key do hipergrado).
-  const applyVerdicts = useCallback(
-    (verdicts: Record<string, MatchVerdict | null>) => {
-      setEntries((prev) =>
-        prev.map((e) =>
-          e.kind === "radar"
-            ? {
-                ...e,
-                matchedEditais: e.matchedEditais.map((m) => {
-                  const v = verdicts[`${m.source}__${m.edital_id}`];
-                  return v && !m.verdict ? { ...m, verdict: v } : m;
-                }),
-                // PR8.1: veredito das ofertas de investimento, chaveado por entity_id.
-                matchedEntities: e.matchedEntities.map((m) => {
-                  const v = m.entity_id ? verdicts[m.entity_id] : null;
-                  return v && !m.verdict ? { ...m, verdict: v } : m;
-                }),
-              }
-            : e,
-        ),
-      );
-    },
-    [],
-  );
-
-  // Poll cache-only (zero LLM no request) até os pendentes chegarem — 3
-  // tentativas espaçadas cobrem pickup da fila + chamadas do tier 3.
-  const pollVerdicts = useCallback(
-    (ids: string[], attempt = 0) => {
-      if (!isAuthed || ids.length === 0 || attempt >= 3) return;
-      window.setTimeout(async () => {
-        try {
-          const { verdicts } = await fetchMatchVerdicts(ids);
-          applyVerdicts(verdicts);
-          const missing = ids.filter((id) => !verdicts[id]);
-          if (missing.length > 0) pollVerdicts(missing, attempt + 1);
-        } catch {
-          // silencioso: o card funciona sem veredito
-        }
-      }, [4000, 8000, 16000][attempt]);
-    },
-    [isAuthed, applyVerdicts],
-  );
-
   // Retomada de conversa frontdoor (logado): carrega o transcript do servidor.
   // Espera o auth resolver — se o usuário for mesmo anônimo, o efeito nunca
   // dispara e a home fica como conversa nova.
@@ -267,31 +214,6 @@ export default function FrontDoorPage() {
         const serverEntries = entriesFromServer(detail.entries);
         setEntries(serverEntries);
         bindSession(detail.session_id);
-        // Snapshot persiste SEM veredito (decisão PR7): re-hidrata os cards
-        // restaurados com uma chamada cache-only, sem retry.
-        const ids = Array.from(
-          new Set(
-            serverEntries
-              .filter((e) => e.kind === "radar")
-              .flatMap((e) => [
-                ...e.matchedEditais.map((m) => `${m.source}__${m.edital_id}`),
-                ...e.matchedEntities
-                  .filter(
-                    (m) =>
-                      (m.kind === "investidor" || m.kind === "programa") && m.entity_id,
-                  )
-                  .map((m) => m.entity_id!),
-              ]),
-          ),
-        );
-        if (ids.length > 0) {
-          try {
-            const { verdicts } = await fetchMatchVerdicts(ids);
-            if (alive) applyVerdicts(verdicts);
-          } catch {
-            // silencioso: cards restauram sem veredito
-          }
-        }
       } catch {
         if (alive) toast.error("Não consegui retomar esta conversa.");
       }
@@ -299,7 +221,7 @@ export default function FrontDoorPage() {
     return () => {
       alive = false;
     };
-  }, [hydrated, isAuthed, resumeId, getToken, bindSession, applyVerdicts]);
+  }, [hydrated, isAuthed, resumeId, getToken, bindSession]);
 
   // Persiste transcript a cada mudança (depois de hidratar).
   useEffect(() => {
@@ -398,7 +320,8 @@ export default function FrontDoorPage() {
   // bloqueio mesmo se o primeiro aceite terminar antes do React re-renderizar o
   // card como aplicado (caso típico de clique duplo em fluxo anônimo).
   const decidedDiffEntries = useRef(new WeakSet<object>());
-  const radarReadyMessage = "Perfil atualizado. Seu **Radar** está pronto para mostrar as oportunidades mais aderentes.";
+  const radarReadyMessage =
+    "Perfil atualizado. Seu **Radar** está pronto para mostrar as oportunidades mais aderentes. [Abrir o Radar →](/radar)";
   const appendRadarReadyMessage = useCallback(() => {
     setEntries((prev) => {
       const last = prev[prev.length - 1];
@@ -462,23 +385,6 @@ export default function FrontDoorPage() {
           }
           return next;
         });
-        // Estágio 2 (PR7/PR8.1 + KG v2 resíduos PR-A): vereditos pendentes chegam
-        // async — poll cache-only. Editais chaveados por file_key; ofertas de
-        // investimento e programas por entity_id (ICT fica sem veredito).
-        const pendingVerdicts = [
-          ...(matched_editais ?? [])
-            .filter((m) => !m.verdict)
-            .map((m) => `${m.source}__${m.edital_id}`),
-          ...(matched_entities ?? [])
-            .filter(
-              (m) =>
-                (m.kind === "investidor" || m.kind === "programa") &&
-                m.entity_id &&
-                !m.verdict,
-            )
-            .map((m) => m.entity_id!),
-        ];
-        if (pendingVerdicts.length > 0) pollVerdicts(pendingVerdicts);
       } catch (e) {
         setEntries((prev) => prev.filter((m) => m !== userEntry));
         setInput(trimmed);
@@ -489,7 +395,7 @@ export default function FrontDoorPage() {
         setSending(false);
       }
     },
-    [entries, sending, profile, sessionId, bindSession, pollVerdicts],
+    [entries, sending, profile, sessionId, bindSession],
   );
 
   // ── Aceite/descarte de um diff (por índice no transcript) ───────────────────
@@ -572,66 +478,6 @@ export default function FrontDoorPage() {
       appendRadarReadyMessage();
     },
     [profile, persistProfile, appendRadarReadyMessage],
-  );
-
-  // Botão "Escrever proposta →" no MatchedEditalCard. Perfil incompleto →
-  // ProfileIncompleteCard; autenticado → inicia a writing session e navega;
-  // anônimo → gate de login.
-  const handleStartWriting = useCallback(
-    async (source: string, editalId: string) => {
-      const { ok, missing } = isCompleteForWriting(profile);
-      if (!ok) {
-        setEntries((prev) => [...prev, { kind: "profile_incomplete", missingFields: missing }]);
-        return;
-      }
-      if (!isAuthed) {
-        setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
-        return;
-      }
-      try {
-        const token = await getToken();
-        if (!token) {
-          setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
-          return;
-        }
-        const res = await startWritingSession(`${source}:${editalId}`, profile, undefined);
-        if (res.session_id) {
-          router.push(`/workspace/${res.session_id}`);
-        }
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Não consegui iniciar a proposta.");
-      }
-    },
-    [isAuthed, profile, getToken, router],
-  );
-
-  // Botão "Escrever pitch/proposta →" no MatchedEntityCard.
-  const handleStartWritingEntity = useCallback(
-    async (entityId: string, mode: "proposal" | "pitch") => {
-      const { ok, missing } = isCompleteForWriting(profile);
-      if (!ok) {
-        setEntries((prev) => [...prev, { kind: "profile_incomplete", missingFields: missing }]);
-        return;
-      }
-      if (!isAuthed) {
-        setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
-        return;
-      }
-      try {
-        const token = await getToken();
-        if (!token) {
-          setEntries((prev) => [...prev, { kind: "gate", action: "proposta" }]);
-          return;
-        }
-        const res = await startWritingSession(entityId, profile, mode);
-        if (res.session_id) {
-          router.push(`/workspace/${res.session_id}`);
-        }
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Não consegui iniciar.");
-      }
-    },
-    [isAuthed, profile, getToken, router],
   );
 
   // ── Anexo (📎) ──────────────────────────────────────────────────────────────
@@ -824,32 +670,23 @@ export default function FrontDoorPage() {
             case "profile_incomplete":
               return <ProfileIncompleteCard key={i} missingFields={entry.missingFields} />;
             case "radar": {
-              // KG v2 resíduos PR-A / R6: lista única intercalada por afinidade
-              // decrescente (mergeRadar é o único lugar com a ordenação); um `map`
-              // só decide o card por item. Sem agrupamento por kind.
-              const radarItems = mergeRadar(entry.matchedEditais, entry.matchedEntities);
-              if (radarItems.length === 0) return null;
+              const total = entry.matchedEditais.length + entry.matchedEntities.length;
+              if (total === 0) return null;
               return (
-                <div key={i} className="flex flex-col gap-2 pt-1 pb-2">
-                  <p className="text-xs font-medium text-content-secondary px-4">
-                    Oportunidades com afinidade
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    {radarItems.map((it) =>
-                      it.kind === "edital" ? (
-                        <MatchedEditalCard
-                          key={it.sortId}
-                          edital={it.edital}
-                          onStartWriting={handleStartWriting}
-                        />
-                      ) : (
-                        <MatchedEntityCard
-                          key={it.sortId}
-                          entity={it.entity}
-                          onStartWriting={handleStartWritingEntity}
-                        />
-                      ),
-                    )}
+                <div key={i} className="px-4 pb-2 pt-1">
+                  <div className="rounded-xl border border-primary/25 bg-primary/5 p-4">
+                    <p className="text-sm font-semibold text-content-primary">
+                      Seu Radar encontrou {total} {total === 1 ? "aderência" : "aderências"}
+                    </p>
+                    <p className="mt-1 text-sm text-content-secondary">
+                      Veja a ordem completa, evidências, elegibilidade, filtros e comparação no Radar.
+                    </p>
+                    <Link
+                      href="/radar"
+                      className="mt-3 inline-flex rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+                    >
+                      Abrir o Radar →
+                    </Link>
                   </div>
                 </div>
               );

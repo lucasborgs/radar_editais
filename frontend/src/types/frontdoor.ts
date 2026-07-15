@@ -53,10 +53,9 @@ export interface ProfileIncompleteEntry {
   missingFields: string[];
 }
 
-// Cards de match (editais/entidades com afinidade ao perfil) inline no
-// transcript — entry_kind='radar' já reservado pela migration 020, nunca
-// tinha sido escrito. Persiste igual msg/diff (sessionStorage +, logado,
-// session_turns) — sobrevive a trocar de aba/fechar o browser.
+// Snapshot de match devolvido durante Explorar. A entrada preserva o contrato e
+// o histórico, mas a home mostra apenas uma prévia; a experiência completa vive
+// em /radar.
 export interface RadarEntry {
   kind: "radar";
   matchedEditais: MatchedEdital[];
@@ -189,52 +188,6 @@ export function entriesFromServer(entries: ConversationEntry[]): TranscriptEntry
     }
   }
   return out;
-}
-
-// ── Ranking unificado do radar (KG v2 resíduos PR-A) ─────────────────────────
-// Item do radar já discriminado por tipo, pronto p/ um `map` só no render
-// (edital → MatchedEditalCard; entidade → MatchedEntityCard).
-export type RadarItem =
-  | { kind: "edital"; affinity: number; sortId: string; edital: MatchedEdital }
-  | {
-      kind: MatchedEntity["kind"];
-      affinity: number;
-      sortId: string;
-      entity: MatchedEntity;
-    };
-
-// ÚNICO lugar com a lógica de ordenação do radar (R6): funde editais + entidades
-// numa lista intercalada por AFINIDADE decrescente (escala 0..1 do motor v3,
-// comparável entre os dois), com desempate estável por id. Sem agrupamento por
-// kind — programa de afinidade alta fica acima de edital de afinidade baixa.
-// Usado tanto no turno fresco quanto na retomada de conversa (ambos chegam como
-// duas listas), então o mesmo caminho vale para os dois. NÃO usa `verdict` na
-// ordenação: a geometria rankeia, o veredito é sinalização no card.
-export function mergeRadar(
-  matchedEditais: MatchedEdital[],
-  matchedEntities: MatchedEntity[],
-): RadarItem[] {
-  const items: RadarItem[] = [
-    ...matchedEditais.map(
-      (edital): RadarItem => ({
-        kind: "edital",
-        affinity: edital.affinity,
-        sortId: `edital:${edital.source}__${edital.edital_id}`,
-        edital,
-      }),
-    ),
-    ...matchedEntities.map(
-      (entity): RadarItem => ({
-        kind: entity.kind,
-        affinity: entity.affinity,
-        sortId: entity.entity_id ?? `${entity.kind}:${entity.name}`,
-        entity,
-      }),
-    ),
-  ];
-  return items.sort(
-    (a, b) => b.affinity - a.affinity || a.sortId.localeCompare(b.sortId),
-  );
 }
 
 // Serializa só as mensagens p/ o `history` enviado ao /frontdoor/turn (o backend
