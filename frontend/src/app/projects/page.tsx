@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { JourneyNavigation } from "@/components/layout/JourneyNavigation";
 import { Skeleton } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { listWritingSessions, type WritingSessionSummary } from "@/lib/api";
@@ -65,10 +65,12 @@ export default function ProjectsPage() {
   );
 
   return (
-    <DashboardLayout title="Projetos">
-      <div className="mx-auto max-w-4xl space-y-6">
+    <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:py-10">
+      <JourneyNavigation active="projects" />
+      <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-semibold text-content-primary">Propostas e pitches</h2>
+          <p className="text-sm font-semibold text-primary">Projetos</p>
+          <h1 className="mt-1 text-2xl font-semibold text-content-primary">Propostas e pitches</h1>
           <p className="mt-1 text-sm text-content-secondary">
             Retome o trabalho iniciado a partir de uma oportunidade escolhida no Radar.
           </p>
@@ -126,6 +128,6 @@ export default function ProjectsPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </main>
   );
 }

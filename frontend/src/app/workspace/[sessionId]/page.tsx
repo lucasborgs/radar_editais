@@ -160,8 +160,8 @@ export default function WorkspacePage() {
           const welcome = anyContent
             ? "Pronto para revisar a proposta. Edite as seções à esquerda ou continue conversando no chat."
             : next.length > 0
-              ? "Plano de proposta carregado. Converse para começar a preencher cada seção.\n\n" + WELCOME_BY_MODE[wsMode]
-              : WELCOME_BY_MODE[wsMode];
+              ? "Plano de proposta carregado. Converse para começar a preencher cada seção.\n\n" + WELCOME_BY_MODE.explorer
+              : WELCOME_BY_MODE.explorer;
           setMessages([{ role: "assistant", content: welcome, timestamp: nowTime() }]);
         }
       } catch (e) {

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MatchedEditalCard } from "@/components/frontdoor/MatchedEditalCard";
 import { MatchedEntityCard } from "@/components/frontdoor/MatchedEntityCard";
+import { JourneyNavigation } from "@/components/layout/JourneyNavigation";
 import { getRadarMatches, startWritingSession, type RadarMatchesResponse } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
@@ -30,10 +31,6 @@ function LoadingCards() {
 
 function FilterButton({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
   return <button type="button" onClick={onClick} className={`rounded-full border px-2.5 py-1 text-xs font-medium ${active ? "border-primary bg-primary text-white" : "border-border text-content-secondary hover:bg-app-bg"}`}>{children}</button>;
-}
-
-function RadarNavigation() {
-  return <nav aria-label="Jornadas principais" className="mb-8 flex items-center justify-between border-b border-border pb-3 text-sm"><Link href="/" className="font-semibold text-content-primary">Radar Editais</Link><div className="flex items-center gap-1"><Link href="/" className="rounded-lg px-3 py-1.5 text-content-secondary hover:bg-surface hover:text-content-primary">Explorar</Link><span aria-current="page" className="rounded-lg bg-primary/10 px-3 py-1.5 font-medium text-primary">Radar</span><Link href="/projects" className="rounded-lg px-3 py-1.5 text-content-secondary hover:bg-surface hover:text-content-primary">Projetos</Link></div></nav>;
 }
 
 function ComparisonPanel({ editais, onRemove, onStartWriting }: { editais: RadarMatchesResponse["matched_editais"]; onRemove: (id: string) => void; onStartWriting: (edital: RadarMatchesResponse["matched_editais"][number]) => void }) {
@@ -90,10 +87,10 @@ export default function RadarPage() {
     catch (cause) { toast.error(cause instanceof Error ? cause.message : "Não consegui iniciar agora."); }
   }, [profile, router, user]);
 
-  if (!hydrated || authLoading) return <main className="mx-auto min-h-screen max-w-4xl px-4 py-10"><RadarNavigation /><LoadingCards /></main>;
-  if (!ready) return <main className="mx-auto min-h-screen max-w-2xl px-4 py-10"><RadarNavigation /><div className="mt-24 rounded-xl border border-border bg-surface p-6"><p className="text-sm font-semibold text-primary">Seu Radar</p><h1 className="mt-2 text-2xl font-semibold text-content-primary">Conte o que sua empresa faz.</h1><p className="mt-2 text-content-secondary">Com o nome e uma descrição das atividades, encontramos oportunidades por afinidade de escopo — não por promessa de aprovação.</p><Link href="/" className="mt-5 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90">Explorar e completar perfil →</Link></div></main>;
+  if (!hydrated || authLoading) return <main className="mx-auto min-h-screen max-w-4xl px-4 py-10"><JourneyNavigation active="radar" /><LoadingCards /></main>;
+  if (!ready) return <main className="mx-auto min-h-screen max-w-2xl px-4 py-10"><JourneyNavigation active="radar" /><div className="mt-24 rounded-xl border border-border bg-surface p-6"><p className="text-sm font-semibold text-primary">Seu Radar</p><h1 className="mt-2 text-2xl font-semibold text-content-primary">Conte o que sua empresa faz.</h1><p className="mt-2 text-content-secondary">Com o nome e uma descrição das atividades, encontramos oportunidades por afinidade de escopo — não por promessa de aprovação.</p><Link href="/" className="mt-5 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90">Explorar e completar perfil →</Link></div></main>;
 
-  return <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:py-10"><RadarNavigation /><header className="mb-8 flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-semibold text-primary">Radar</p><h1 className="text-2xl font-semibold text-content-primary">Oportunidades para {profile.nome}</h1><p className="mt-1 max-w-2xl text-sm text-content-secondary">A ordem reflete afinidade entre trechos do seu perfil e do escopo de cada oportunidade. Confira as evidências e a elegibilidade antes de decidir.</p></div><button type="button" onClick={() => void loadRadar()} disabled={loading} className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-content-primary hover:bg-app-bg disabled:opacity-50">{loading ? "Atualizando…" : "Atualizar"}</button></header>
+  return <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:py-10"><JourneyNavigation active="radar" /><header className="mb-8 flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-semibold text-primary">Radar</p><h1 className="text-2xl font-semibold text-content-primary">Oportunidades para {profile.nome}</h1><p className="mt-1 max-w-2xl text-sm text-content-secondary">A ordem reflete afinidade entre trechos do seu perfil e do escopo de cada oportunidade. Confira as evidências e a elegibilidade antes de decidir.</p></div><button type="button" onClick={() => void loadRadar()} disabled={loading} className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-content-primary hover:bg-app-bg disabled:opacity-50">{loading ? "Atualizando…" : "Atualizar"}</button></header>
     {loading && !data && <LoadingCards />}
     {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"><p>{error}</p><button type="button" onClick={() => void loadRadar()} className="mt-2 font-medium underline">Tentar novamente</button></div>}
     {data && !hasResults && !loading && <div className="rounded-xl border border-border bg-surface p-5 text-sm"><p className="font-medium text-content-primary">Ainda não encontramos oportunidades com afinidade suficiente.</p><p className="mt-1 text-content-secondary">Detalhe atividades, tecnologia, mercado ou projetos no seu perfil para ampliar o sinal.</p><Link href="/" className="mt-3 inline-block text-primary hover:underline">Refinar perfil em Explorar →</Link></div>}
