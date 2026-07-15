@@ -31,8 +31,8 @@ flowchart LR
 
     GOLD -->|entidades + match_chunks| MATCH
 
-    %% Ingest pipeline (on demand)
-    subgraph INGEST["Pré-processamento (sob demanda)"]
+    %% Índice de escrita: aquecimento periódico + garantia sob demanda
+    subgraph INGEST["Pré-processamento (aquecido + sob demanda)"]
         EDITAL_RAW[Edital raw] --> CHUNKER[Chunker estrutural<br/>Art. / §]
         CHUNKER --> CR[Contextual Retrieval<br/>LLM injeta contexto do capítulo]
         CR --> EMBED[Embedder<br/>text-embedding-3-small]

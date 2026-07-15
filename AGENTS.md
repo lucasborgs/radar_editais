@@ -137,12 +137,16 @@ Bronze (FINEP/FAPESP/FAPESC/web raw via adapters por fonte)
   → tabelas entities / entity_relationships / match_chunks (migration 036)
 Catálogos versionados: data/silver/{investidores,programas}.json + bronze EMBRAPII.
 
-Edital chunks (para RAG na WritingSession — lazy, independente do gold):
+Documento Canônico durável (fronteira comum dos adapters):
+  → `core/kg/source_docs.py` persiste em `edital_source_docs` (disco é fallback local)
+
+Edital chunks (para RAG na WritingSession — índice independente do gold):
   → procrastinate task `chunk_edital` (core/tasks.py)
   → core/retrieval/chunker.py    chunking estrutural por Art./§
   → core/contextual_retrieval.py  injeta contexto de capítulo via LLM
   → core/retrieval/embedder.py   OpenAI text-embedding-3-small
   → tabela edital_chunks (pgvector + tsvector)
+  → aquecimento diário 05:00 UTC + ensure/prefetch sob demanda (mesmo produtor idempotente)
 ```
 Paths em `config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR).
 
@@ -188,6 +192,7 @@ BM25 + dense via RRF (`fts_weight=0.5`, `DEFAULT_FTS_WEIGHT` em retriever.py). H
 
 ### Background jobs (procrastinate — core/tasks.py)
 - `chunk_edital_task` — chunking + contextual retrieval + embedding de um edital
+- `warm_edital_chunks_task` (05:00 UTC) — aquece idempotentemente o corpus de escrita do catálogo
 - `enrich_content_task` / `embed_content` — enriquecimento LLM ao upload da library
 - `reflect_workspace` / `synthesize_patterns` — memória cross-session (Store)
 - `run_daily_etl` (03:00 UTC) / `discover_opportunities` (04:00 UTC)

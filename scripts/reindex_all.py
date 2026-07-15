@@ -2,7 +2,7 @@
 """
 Reindex editais de TODAS as fontes no `edital_chunks` (RAG).
 
-Lê os IDs do index.json (editais vigentes) e chama `chunk_edital_task`
+Lê os IDs do catálogo gold relacional e chama `chunk_edital_task`
 para cada um. O `chunk_edital_task` é source-agnostic — despacha para o
 adapter correto (finep/fapesp/web/fapesc) via prefixo do edital_id.
 
@@ -88,7 +88,7 @@ async def _process_one(db, edital_id: str, queue: bool, force: bool) -> dict:
 async def _main_async(args: argparse.Namespace) -> int:
     targets = _load_ids(args.source)
     if not targets:
-        print("[reindex_all] Nenhum edital encontrado no hipergrafo")
+        print("[reindex_all] Nenhum edital encontrado no catálogo gold")
         return 1
 
     db = get_supabase_service()

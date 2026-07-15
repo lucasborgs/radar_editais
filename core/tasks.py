@@ -717,8 +717,8 @@ def _insert_chunks_psycopg(rows: list[dict]) -> None:
 # =============================================================================
 # Daily ETL — Pipeline #28
 # =============================================================================
-# Procrastinate periodic: cron diário 03:00 UTC roda scrapers ativos +
-# enfileira chunk_edital para editais novos. Falhas são tipadas e
+# Procrastinate periodic: cron diário 03:00 UTC roda scrapers ativos, materializa
+# silver/gold, persiste documentos canônicos e atualiza o vault. Falhas são tipadas e
 # persistidas em pipeline_errors (taxonomia ADR §3.7).
 #
 # Para mudar o horário: ajuste o cron expression (formato padrão crontab).
@@ -731,7 +731,7 @@ def _build_all_silver() -> int:
     Passo EXPLÍCITO do pipeline v3 (spec docs/specs/v3-unified.md §10): bronze →
     adapter → silver (structurer). Enumera direto do BRONZE (fonte autoritativa dos
     scrapers), sem depender de artefato derivado (hipergrado/gold). O silver é a
-    ENTRADA do `ingest_all` (gold) e do RAG lazy. Sem LLM; tolerante a falha
+    ENTRADA do `ingest_all` (gold) e do RAG de escrita. Sem LLM; tolerante a falha
     por-edital."""
     from core.kg import gold, source_docs  # noqa: PLC0415
     from pipeline.adapters.base import get_adapter  # noqa: PLC0415
@@ -751,7 +751,7 @@ def _build_all_silver() -> int:
 @app.periodic(cron="0 3 * * *")
 @app.task(name="run_daily_etl", queue="etl")
 async def run_daily_etl_task(timestamp: int) -> None:
-    """Cron diário (3am UTC): roda scrapers ativos e dispara chunking.
+    """Cron diário (3am UTC): atualiza fontes, silver, gold e artefatos derivados.
 
     Wrapper fino de `_run_daily_etl` com o contrato de alerta (spec
     hardening-pre-beta 4.3): falha TOTAL do cron → 1 e-mail de alerta +
@@ -782,8 +782,8 @@ async def _run_daily_etl(timestamp: int) -> None:
       1. Roda o scraper (captura novos editais em data/bronze/)
       2. Falhas tipadas (TimeoutError, ParseError, etc.) viram rows em
          pipeline_errors via log_pipeline_error
-      3. Para cada edital novo detectado, enfileira chunk_edital_task
-         (não roda inline — workers picam de outra fila)
+      3. Após os scrapers, converge os documentos em silver → gold e persiste
+         o Documento Canônico durável
 
     Falhas de scraper/etapa não derrubam a run (cada bloco tem try/except
     próprio), mas são acumuladas em `step_errors` e viram UM e-mail agregado
@@ -820,10 +820,9 @@ async def _run_daily_etl(timestamp: int) -> None:
                 "run_daily_etl_task: %s — %d resultados", display_name, new_count,
             )
 
-            # Chunking é LAZY (spec docs/specs/lazy-chunking.md): o ETL NÃO chunka
-            # mais todo edital scraped. Os chunks (RAG fino) nascem sob demanda
-            # quando o usuário engaja o edital (prefetch no brief / writing-start).
-            # O cron segue só scrape + build KG (tier grosso: navegação/match).
+            # O cron das 03:00 não produz edital_chunks. O corpus de escrita é
+            # aquecido pelo cron dedicado das 05:00 e também garantido por
+            # ensure/prefetch quando o usuário engaja um edital.
 
         except PipelineError as e:
             await asyncio.to_thread(
@@ -860,7 +859,7 @@ async def _run_daily_etl(timestamp: int) -> None:
 
     # 1) Silver EXPLÍCITO: materializa data/silver/structured_docs/*.jsonl a
     #    partir do bronze recém-scraped (structurer, durable-first). É a ENTRADA
-    #    do ingest_all (gold) e do RAG lazy. Sem LLM.
+    #    do ingest_all (gold) e do RAG de escrita. Sem LLM.
     try:
         n_silver = await asyncio.to_thread(_build_all_silver)
         logger.info("run_daily_etl_task: silver materializado p/ %d editais", n_silver)
@@ -889,7 +888,7 @@ async def _run_daily_etl(timestamp: int) -> None:
     # 3) Persiste o Documento Canônico durável (§12.3) enquanto o bronze
     #    recém-scraped está no disco. O FS do worker não é fonte de verdade
     #    durável: sem isto, um rebuild de imagem apaga o bronze e o chunk_edital
-    #    (lazy) produz 0 chunks. Enumera pelos editais gold de (2) — roda DEPOIS
+    #    produz 0 chunks. Enumera pelos editais gold de (2) — roda DEPOIS
     #    do ingest p/ capturar os editais novos. Barato, sem LLM. Spec:
     #    docs/specs/durable-source-docs.md.
     try:
@@ -1051,7 +1050,7 @@ async def discover_opportunities_task(timestamp: int) -> None:
 
 
 # ============================================================================
-# Warm-up do corpus RAG — eager chunking (reversão operacional do lazy/PR #44)
+# Warm-up do corpus RAG — aquecimento periódico, complementar ao sob demanda
 # ============================================================================
 # Racional (adendo eager na spec hardening-pre-beta): o catálogo é pequeno
 # (~30 editais) e o gate de content_hash do chunk_edital torna re-runs quase

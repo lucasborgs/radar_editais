@@ -46,9 +46,10 @@ no silver reconstruível; a vigência é aplicada no Stage 0 do match, não por 
 | Artefato | Path | Descrição |
 |---|---|---|
 | Bronze | `data/bronze/` | Captura imutável por fonte e documentos oficiais |
-| Doc estruturado (silver) | `data/silver/structured_docs/{source}/{id}.jsonl` | Blocos estruturais usados pelo gold e pelo RAG lazy. Ver §11 |
+| Documento canônico | Postgres: `edital_source_docs` (fallback no bronze local) | Conteúdo durável e agnóstico de fonte entregue pelos adapters |
+| Doc estruturado (silver) | `data/silver/structured_docs/{source}/{id}.jsonl` | Blocos estruturais usados pelo gold e pelo RAG de escrita. Ver §11 |
 | Catálogo gold | Postgres: `entities`, `entity_relationships`, `match_chunks` | Catálogo, relações e trechos do match v3 |
-| Chunks de escrita | Postgres: `edital_chunks` | Contexto híbrido da WritingSession, criado sob demanda |
+| Chunks de escrita | Postgres: `edital_chunks` | Contexto da WritingSession, aquecido diariamente e garantido sob demanda |
 | Estado da descoberta | Postgres: `discovered_opportunities`, `discovery_promotion_runs` | Staging e execução do gate humano |
 | Vault Obsidian | `data/hyper_extract_output_v2/vault/` | Espelho Markdown do gold, regenerado pelo ETL diário ou via `scripts/export_to_obsidian.py` |
 
@@ -68,62 +69,17 @@ Cada fonte tem um schema específico em `wikis/<fonte>.md` que **estende** este 
 
 ---
 
-## 4. Schema legado de wiki page (compatibilidade)
+## 4. Representação atual e histórico de wiki pages
 
-Este bloco não produz o catálogo v3. Ele é preservado porque alguns accessors e
-ferramentas locais ainda leem seus vocabulários; novos consumidores devem usar
-os contratos gold do §13.
+O catálogo atual não produz nem consome wiki pages JSON. Editais, programas,
+investidores e ICTs são entidades do gold relacional; seus contratos ativos
+estão no §13 e na implementação de `core/kg/gold.py`.
 
-Uma wiki page é um JSON com três grupos de campos:
-
-### 4.1 Campos herdados do índice legado
-
-Copiados literalmente de `index.json` / `index_historico.json`. Não são inferidos pela LLM.
-
-```yaml
-wiki_page_inherited_fields:
-  - id               # string, ID único da chamada
-  - title            # string
-  - status           # enum (ver §5.3)
-  - deadline         # string "dd/mm/yyyy" ou ""
-  - pub_date         # string "dd/mm/yyyy" ou ""
-  - pub_year         # int (yyyy) ou "desconhecido" se pub_date vazio/inválido — dimensão temporal do grafo (§6)
-  - link             # URL do portal
-  - themes           # list[str], temas canonicalizados
-  - publico_alvo     # list[str]
-  - fonte_recurso    # list[str], siglas canônicas (ver §5.4)
-```
-
-### 4.2 Campos gerados pela LLM
-
-Extraídos dos PDFs e metadados via prompt (§8.1). Devem aparecer em toda wiki page, mesmo que `null`.
-
-```yaml
-wiki_page_synthesized_fields:
-  objective:               { type: "str",       nullable: true,  desc: "síntese 2-3 frases" }
-  mechanism:               { type: "enum",      nullable: true,  values_ref: "§5.1" }
-  eligible_entities:       { type: "list[str]", default: [],     desc: "tipos de proponentes aceitos" }
-  value_range:             { type: "obj",       shape: "{min_brl: int|null, max_brl: int|null}" }
-  trl_range:               { type: "obj",       shape: "{min: int|null, max: int|null}", range: "[1, 9]" }
-  required_certifications: { type: "list[str]", default: [] }
-  counterpart_required:    { type: "bool",      default: false }
-  key_requirements:        { type: "list[str]", max_items: 5, desc: "requisitos concretos e verificáveis" }
-  eligibility_constraints: { type: "list[obj]", default: [], shape: "{type: enum(region|company_age|revenue|cnae|consortium), description: str, evidence: str|null}", desc: "restrições organizacionais duras tipadas — contexto p/ re-rank soft, nunca gate (§D2)" }
-  key_facts:               { type: "list[str]", max_items: 5, desc: "fatos mais relevantes para decisão" }
-  proposal_sections:       { type: "list[str]", min_items: 6, max_items: 12, desc: "seções obrigatórias da proposta" }
-```
-
-### 4.3 Campos meta
-
-```yaml
-wiki_page_meta_fields:
-  generated_at: { type: "str",  format: "yyyy-mm-dd" }
-  source:       { type: "enum", values: ["etl_process", "metadata_only"], legacy_values: ["facts+metadata"] }
-```
-
-`legacy_values`: valores de `source` produzidos por versões anteriores do pipeline. Wiki pages com esses valores podem não ter todos os campos do schema atual. Serão sobrescritas quando o edital correspondente for reprocessado (cache miss por hash).
-
-`source = "metadata_only"` indica wiki page mínima (sem PDFs disponíveis → sem chamada LLM → campos synthesized todos default).
+O schema das wiki pages e os índices JSON pertencem à linhagem hyper-extract,
+removida no v3. A descrição histórica foi preservada em
+[`docs/historical/kg-entity-wiki-pages.md`](docs/historical/kg-entity-wiki-pages.md)
+e [`docs/historical/hypergraph-architecture.md`](docs/historical/hypergraph-architecture.md).
+Esses documentos não são autoridade de runtime.
 
 ---
 
@@ -191,11 +147,11 @@ fontes_canonicas:
 
 Split de valores multi-fonte por: `;` `|`. **Não** usar `,` (aparece legitimamente dentro de nomes de temas, ex.: `"Agricultura, agronegócio e saúde animal"`) nem `/` no splitter global (tratado pelo normalizador: `FINEP/FNDCT` → extrai ambas as siglas da mesma string via regex `\b{sigla}\b` case-insensitive, **sem** early-break).
 
-Fragmentos que não casam com nenhuma canônica, nem com §5.6, nem com §5.7 são descartados silenciosamente. Contexto regulatório não-financiador (ex.: `"conforme Resolução nº 918/2023 da ANP"`) fica preservado em `key_facts` / `key_requirements` da wiki page, não no grafo.
+Fragmentos que não casam com nenhuma canônica, nem com §5.6, nem com §5.7 são descartados silenciosamente. Contexto regulatório não-financiador (ex.: `"conforme Resolução nº 918/2023 da ANP"`) permanece no texto estruturado e nos requisitos textuais do gold, não vira relação.
 
 ### 5.5 Públicos canônicos
 
-Lista fechada de tipos de proponente aceitos. Modificadores em parênteses (ex.: `"(Fundações)"`, `"(Pública ou Privada)"`) são descartados — a especificidade fica em `key_requirements` da wiki page.
+Lista fechada de tipos de proponente aceitos. Modificadores em parênteses (ex.: `"(Fundações)"`, `"(Pública ou Privada)"`) são descartados — a especificidade permanece em `requisitos_texto` e nos chunks de evidência.
 
 ```yaml
 publicos_canonicos:
@@ -238,7 +194,7 @@ Extração na mesma string de `fonte_recurso` bruta, após §5.4. Case-insensiti
 
 ### 5.7 Drop-list de modalidades
 
-Termos que aparecem no campo `fonte_recurso` do portal mas **não são fontes** — são modalidades financeiras (já cobertas pela tag `mechanism`, §5.1 / §6.1.1). Descartados silenciosamente pelo normalizador.
+Termos que aparecem no campo `fonte_recurso` do portal mas **não são fontes** — são modalidades financeiras (já cobertas por `mechanism`, §5.1). Descartados silenciosamente pelo normalizador.
 
 ```yaml
 modalidades_drop_list:
@@ -260,7 +216,7 @@ Match: lowercase + strip de acentos + comparação por substring. Uma string bru
 
 ### 5.8 Faixas TRL
 
-O campo `trl_range: {min, max}` (§4.2) é numérico (1-9). Colapsa-se em 3 faixas semânticas, usadas como **tag** do edital (`trl/<faixa>`) e dimensão de matching/filtro — não como nó de grafo (§6.1.1). Um edital recebe a tag de todas as faixas que sobrepõem seu range.
+O campo `trl_range: {min, max}` é numérico (1-9). Colapsa-se em 3 faixas semânticas usadas como dimensão de matching/filtro, não como entidade do gold (§6.1). Um edital recebe todas as faixas que sobrepõem seu range.
 
 ```yaml
 trl_faixas:
@@ -347,46 +303,12 @@ modelo_vocab: [equity, no-equity]
 
 ### 5.10 Exigência de parceria com ICT (`requires_ict_partner`)
 
-Campo booleano **derivado** na entry do edital (`index.json`), indicando se o
-edital exige parceria com ICT (§6.1.2) — o gatilho do matchmaking de parceiros
-(Fase C, `core/ict_match`). **Heurística por regex** (MVP): aplica os patterns
-abaixo sobre o texto do edital (título + descrição + texto integral dos PDFs/
-`texto_cru`). Mira **linguagem de obrigatoriedade/arranjo**, não mera menção —
-"ICT" aparece em boilerplate de quase todo edital FINEP; o que marca é exigir
-ICT como executora/coexecutora ou no arranjo.
-
-**Semântica (não tratar como ground-truth):** o flag é um **hint de
-proatividade, não um gate**. A tool `find_ict_partners` funciona para qualquer
-edital — o flag só sinaliza ao agente "provavelmente vale sugerir parceiros
-proativamente". Ele nunca bloqueia nada. Por isso os erros são de **baixo custo**:
-falso-negativo → o agente não sugere proativamente, mas a tool segue disponível;
-falso-positivo → um empurrão proativo errado, que é *sugestão*, não compromisso
-(ver o registro histórico em
-[docs/historical/ict-phase-c.md](docs/historical/ict-phase-c.md)).
-
-Vieses/limites assumidos: (1) **FINEP-enviesado** — depende de "ICT/coexecutora/
-arranjo"; para FAPESP é efetivamente sempre `false`. (2) Heurística, sem
-ground-truth — o pattern [1] faz quase todo o trabalho; "falsos-positivos" como a
-FAQ "a ICT pode ser coexecutora? Não" não são confirmáveis sem rótulo (o edital
-pode exigir ICT como *executora*). (3) Exigência só em anexo não coletado →
-falso-negativo estrutural. **Decisão consciente:** não tunar os patterns às cegas
-agora; revisitar só quando o flag virar load-bearing (UI filtrar/ordenar por ele,
-ou seleção de parceiro virar fluxo primário) — aí rotular amostra + medir
-precisão/recall, e considerar classificador LLM. Esta decisão está registrada em
-[`docs/BACKLOG.md`](docs/BACKLOG.md#decisões-atuais-que-não-são-backlog). Patterns
-vivem aqui (regra), não no `.py` — tune sem deploy.
-
-```yaml
-ict_requirement_patterns:
-  - 'obrigat[óo]ri[ao][^.]{0,60}(ICT|institui[çc][ãa]o de ci[êe]ncia)'
-  - '(dever[áa]|exig[ei]\w*|necess[áa]ri[ao])[^.]{0,80}(parceria|coopera[çc][ãa]o|coexecu\w*)[^.]{0,40}(ICT|institui[çc][ãa]o de ci[êe]ncia)'
-  - 'em (parceria|coopera[çc][ãa]o) com[^.]{0,30}(uma? )?ICT'
-  - '\bICT\b[^.]{0,30}coexecutora?'
-  - 'participa[çc][ãa]o (obrigat[óo]ria|m[íi]nima) de[^.]{0,30}(uma? )?ICT'
-```
-
-`requires_ict_partner` é **propriedade do edital**, não nó (§6.1.1). Presente em
-toda entry do índice (default `false`).
+Campo de decisão do contrato `EditalExtraction`, usado pela suíte de avaliação
+de extração. Quando o texto afirmar a exigência, o valor deve vir acompanhado
+de estado `stated` e evidência verbatim; quando não afirmar, o extrator deve se
+abster (`absent`, valor/evidência nulos). O campo não é gate do match nem relação
+gold. O histórico da antiga heurística e da sugestão proativa de parceiros está
+em [`docs/historical/ict-phase-c.md`](docs/historical/ict-phase-c.md).
 
 ### 5.11 Confiança da fonte (`verificacao`)
 
@@ -395,103 +317,45 @@ de oportunidades, ver
 [discovery-opportunities.md](docs/historical/discovery-opportunities.md)):
 
 ```yaml
-verificacao_values: [verificado, provisorio]
+verificacao_values: [verificado, provisorio, promovido]
 ```
 
 - **`verificado`** — fonte confiável: FINEP, FAPESP e fontes graduadas a extractor
   próprio (§12.4). **Default** para tudo que vem do `SCRAPER_REGISTRY`.
-- **`provisorio`** — descoberta da web aberta, extraída por LLM e ainda não
-  verificada por humano. Entra no KG (matchável/writable) mas **rotulada**; a
-  verificação humana sobe para `verificado` ou remove (não-bloqueante).
+- **`provisorio`** — descoberta da web aberta ainda em staging/bronze, antes da
+  decisão humana. Não entra no catálogo nem no match enquanto não for promovida.
+- **`promovido`** — descoberta aprovada pelo gate humano e encaminhada ao mesmo
+  fluxo silver → gold das fontes fixas.
 
-Propriedade do edital, não nó (§6.1.1). Presente em toda entry do índice (default
-`verificado`). Match e escrita devem distinguir provisório de verificado (rótulo/
-bucket) — ver spec 2.2.
+É metadado de proveniência, não entidade (§6.1). Fontes fixas usam
+`verificado`; itens provisórios permanecem fora das superfícies de produto.
 
 ---
 
-## 6. Vocabulários do grafo legado e constraints ativas
+## 6. Entidades, relações e constraints ativas
 
-### 6.1 Tipos de nó
+### 6.1 Entidades do gold relacional
 
-Cada tipo de nó vira uma subpasta no vault Obsidian e um grupo no `graph.json`.
+O catálogo representa `edital`, `programa`, `investidor`, `ict` e `agencia` em
+`entities`. Relações estruturais vivem em `entity_relationships`; propriedades
+de baixa cardinalidade como mecanismo, ano, TRL e público permanecem atributos
+da entidade, não entidades autônomas. O vault Obsidian é apenas uma projeção
+regenerável desse gold, sem autoridade sobre o catálogo ou o match.
 
-**Critério nó vs tag:** um tipo é **nó** só se for hub de navegação (pivota-se por ele
-para *descobrir* editais) **e** tiver identidade própria. Enums de baixa cardinalidade
-que apenas *filtram* — `mechanism`, `ano`, `trl_faixa`, `publico-alvo` — são **tags** no
-frontmatter do edital (§6.1.1), não nós, para não poluir o grafo com mega-hubs sem
-semântica. `publico-alvo` (startup/empresa/ICT/universidade) é categórico de baixa
-cardinalidade: segue como sinal de match (`publico_alvo` no card, §5.5) mas NÃO é nó.
-Política vale para todas as fontes.
+`source` identifica a origem operacional do edital (`finep:589`); não deve ser
+confundido com `fonte_recurso`, que identifica quem financia.
 
-```yaml
-node_types:
-  edital:
-    folder: editais
-    tags: [finep, edital, "<status_tag>", "mecanismo/<mechanism>", "tema/<slug>", "subprograma/<slug>", "trl/<faixa>", "ano/<pub_year>", "publico-alvo/<slug>"]
-    emoji: "<status_emoji>"
-  desafio:            # Q2 — open innovation / obrigação regulatória (evento, mesmo pipeline do edital)
-    folder: desafios
-    tags: [desafio, "<status_tag>", "tema/<slug>", "setor/<slug>", "ancora/<slug>", "trl/<faixa>", "ano/<pub_year>"]
-    emoji: "🎯"
-  programa:           # Q4 — aceleração / incubação (evento, batch/cohort)
-    folder: programas
-    tags: [programa, "<status_tag>", "tema/<slug>", "setor/<slug>", "modelo/<equity|no-equity>", "ano/<pub_year>"]
-    emoji: "🚀"
-  tema:
-    folder: temas
-    tags: [finep, tema]
-    emoji: "🏷️"
-  subprograma:
-    folder: subprogramas
-    tags: [finep, subprograma]
-    emoji: "🏛️"
-  fonte:
-    folder: fontes
-    tags: [fonte]
-    emoji: "💰"
-  ict:
-    folder: icts
-    tags: [ict, "kind/<kind>", "tema/<slug>"]
-    emoji: "🔬"
-  investidor:
-    folder: investidores
-    tags: [investidor, "estagio/<slug>", "tese/<slug>", "setor/<slug>"]
-    emoji: "💸"
-  home:
-    folder: ""
-    tags: [finep, home]
-    emoji: "📡"
-```
-
-`fonte` = **agência/instituição de origem** do edital (FINEP, FAPESP, …),
-derivada do `source` do id prefixado (`finep:589` → FINEP). Todo edital pertence
-a exatamente uma → é o eixo de agrupamento de um grafo multi-fonte e garante que
-nenhum edital fique órfão. NÃO confundir com `fonte_recurso` (quem paga: FNDCT,
-Petrobras, BNDES…), que é outro eixo, frequentemente vazio, e não vira nó.
-
-Tags fonte-específicas (ex.: `finep`) vêm de `wikis/<fonte>.md`.
-
-#### 6.1.1 Dimensões rebaixadas a tag
-
-`mechanism` (§5.1), `ano` (derivado de `pub_date`) e `trl_faixa` (§5.8) **não são
-nós**. São propriedades do edital, expressas como tag no frontmatter
-(`mecanismo/<key>`, `ano/<pub_year>`, `trl/<faixa>`) e consumidas pelo matching/filtro —
-nunca como wikilink/aresta. `ano` sem `pub_date` parseável → tag `ano/desconhecido`.
-
-#### 6.1.2 Nó `ict` (fora do ciclo de edital)
+#### 6.1.2 Entidade `ict` (fora do ciclo de edital)
 
 ICTs (Instituições de Ciência e Tecnologia) são **parceiras** que muitos editais
 FINEP/FAPESP exigem para viabilizar a candidatura. **Uma ICT não lança edital** —
-apenas participa de projetos. Logo, o nó `ict` **não** flui pelo ETL de edital
+apenas participa de projetos. Logo, a entidade `ict` **não** flui pelo ETL de edital
 (sem PDF, status, mechanism, vigência) e **não** entra no `SCRAPER_REGISTRY`.
-Tem pipeline de ingestão e artefato próprios (`icts.json`), e se liga ao grafo de
-editais **pela ponte do nó `tema`**: `edital --edital_has_theme--> tema
-<--ict_has_expertise-- ict`. **Não há aresta direta edital↔ICT** — o casamento
-"este edital pede parceiro; estas ICTs têm a expertise" é computado por interseção
-de `tema` (slugs compartilhados, §6.3). Editais exigem *uma* ICT, não uma nomeada;
-por isso a obrigatoriedade vira tag `requires_ict_partner` no edital (derivada na
-extração), nunca aresta.
+O ingest lê os arquivos curados `data/bronze/ict_raw/embrapii_*.json`, materializa
+`entities(kind=ict)` e a relação `credenciada_por` com a EMBRAPII. Afinidade entre
+edital e ICT é calculada por setores e tecnologias compartilhados; não existe
+relação direta edital↔ICT. Quando um edital exige parceria com uma ICT, essa
+exigência é uma constraint do edital, não uma relação com uma ICT específica.
 
 A definição legal de "ICT" é ampla; o campo `kind` absorve a variação
 (unidade EMBRAPII, laboratório PNIPE, instituto, universidade) sem exigir
@@ -499,7 +363,7 @@ taxonomia perfeita.
 
 ```yaml
 ict_schema:
-  artifact: "knowledge_graph/icts.json"
+  artifact: "data/bronze/ict_raw/embrapii_*.json"
   id_format: "<source>:<slug>"          # ex.: embrapii:inteligencia-artificial-ceia-ufg
   node_fields: [id, name, kind, source, url, about, address, contact, areas_raw, themes, themes_proposed, summary, brings_cofinancing]
   required_fields: [id, name, kind, source, themes]
@@ -507,27 +371,28 @@ ict_schema:
   sources: [embrapii, pnipe]
   notes:
     - "themes: temas CANÔNICOS de edital (mesma representação de edital.themes — rótulos, não slugs) que a ICT cobre. É a ponte: edital.themes ∩ ict.themes."
-    - "O alvo do mapeamento é o vocabulário de temas EMERGENTE do index.json (não há vocab fixo; canonicalize_themes é stub). Mapeamento fino→macro é LLM."
+    - "O ingest normaliza áreas cruas para as taxonomias gold de setores e tecnologias (§13)."
     - "areas_raw: rótulos de expertise crus da fonte (EMBRAPII: action_lines + tech_skills). Display + matching fino futuro."
     - "themes_proposed: áreas que não casaram com nenhum tema de edital — candidatas à expansão do vocabulário (não entram em themes nem na ponte)."
     - "brings_cofinancing: bool. ICT cujo ARRANJO aporta recurso não-reembolsável ao projeto (Unidade EMBRAPII: ~1/3 do custo do projeto vem do aporte EMBRAPII). É o que dispara o selo 'pode trazer co-financiamento' no complemento do match. Default false; derivado true para source=='embrapii'. Generaliza além do kind (um lab PNIPE não traz). Opcional (não em required_fields) — ICTs antigas sem o campo seguem válidas."
     - "contact: dict {responsavel, email, telefone, site, ...} (campos opcionais)."
-    - "icts.json espelha index.json: {icts: [...], total_icts, themes_index, themes_proposed_index, last_updated}."
+    - "O artefato bronze é a entrada curada; a representação consumida pelo produto vive em entities."
 ```
 
-#### 6.1.3 Nó `investidor` (entidade, fora do ciclo de edital)
+#### 6.1.3 Entidade `investidor` (fora do ciclo de edital)
 
 Fundos/anjos/corporate venture (Q3). Como a `ict` (§6.1.2), é **entidade fora do
 ciclo de edital**: sem PDF/status/mechanism/vigência, NÃO flui pelo ETL de evento
-nem por `core/temporal.py`, tem artefato próprio (`investidores.json`) e se liga ao
-grafo de editais pela **ponte do nó `tema`** (`edital.themes ∩ investidor.tese_themes`,
-interseção por slug). Populado por **curadoria manual** (~30-50 fundos, decisão
+nem por regras temporais. A curadoria versionada vive em
+`data/silver/investidores.json` e é materializada em `entities(kind=investidor)`.
+O match usa a afinidade semântica entre o perfil da empresa e a entidade, além
+dos atributos normalizados. Populado por **curadoria manual** (~30-50 fundos, decisão
 spec_multi_quadrante §8 #3), não descoberta automática. Valores PLANOS (o wrapper
 `Extracted` de `domain/investor_entity` é só do caminho de extração-LLM futuro).
 
 ```yaml
 investidor_schema:
-  artifact: "knowledge_graph/investidores.json"
+  artifact: "data/silver/investidores.json"
   id_format: "investidor:<slug>"        # ex.: investidor:kptl
   node_fields: [id, name, tese, tese_themes, setores, estagio_alvo, ticket_range, lead_follow, portfolio, co_investidores, site, contato, generalista, fund_status, tese_keywords, anti_tese, verificado_em, source_urls]
   required_fields: [id, name, tese_themes, setores, estagio_alvo]
@@ -538,21 +403,21 @@ investidor_schema:
     - "fund_status: ativo|captando|dormante — frescor da ENTIDADE (análogo do status do edital; fundo dormante = ruído). verificado_em + source_urls: proveniência do enriquecimento."
     - "tese_keywords: texto livre FINO (análogo do areas_raw da ICT) p/ match além dos 7 temas grossos. anti_tese: o que o fundo NÃO faz (poder de REJEITAR no match)."
     - "co_investidores: semente da Camada B induzida (rede de fundos, BACKLOG) — inerte no MVP."
-    - "investidores.json espelha icts.json: {investidores:[...], total_investidores, themes_index, last_updated}. NÃO entra no index.json (invariante de-risk ①)."
+    - "O JSON versionado é a entrada curada; a representação consumida pelo produto vive em entities."
 ```
 
-#### 6.1.4 Nó `programa` (entidade recorrente, fora do ciclo de edital)
+#### 6.1.4 Entidade `programa` (recorrente, fora do ciclo de edital)
 
 Programas de fomento RECORRENTES (aceleração/incubação/subvenção/fundo que se
 repetem por edição — ex.: Centelha, BNDES Garagem, InovAtiva). Como `investidor`
-(§6.1.3), é **entidade fora do ciclo de edital**: artefato próprio
-(`programas.json`), NÃO entra no index.json, liga-se ao grafo pela ponte do nó
-`tema`. Populado por **curadoria manual** (não descoberta). DISTINTO do
+(§6.1.3), é **entidade fora do ciclo de edital**. A curadoria versionada vive em
+`data/silver/programas.json`; o ingest materializa a entidade e a relação
+`operado_por` com a agência responsável. Populado por **curadoria manual** (não descoberta). DISTINTO do
 `opportunity_type=programa` (um evento datado): aqui é o programa-âncora ESTÁVEL.
 
 ```yaml
 programa_schema:
-  artifact: "knowledge_graph/programas.json"
+  artifact: "data/silver/programas.json"
   id_format: "programa:<slug>"          # ex.: programa:centelha
   node_fields: [id, name, operador, tipo, descricao, formato, cadencia, beneficio, ticket_range, tese_themes, setores, estagio_alvo, elegibilidade, site, faq_url, source_urls, status, verificado_em]
   required_fields: [id, name, operador, tipo, estagio_alvo]
@@ -562,42 +427,19 @@ programa_schema:
     - "tese_themes ⊆ tema_vocab (§5.9; [] se multissetorial); setores ⊆ setor_vocab; estagio_alvo ⊆ estagio_vocab (§5.9.1). Mesma ponte do investidor (edital.themes ∩ programa.tese_themes)."
     - "status: ativo|dormante — frescor da entidade (dormante = ruído). verificado_em + source_urls: proveniência da curadoria."
     - "faq_url: P&R oficial do programa — alvo de retrieval valioso p/ escrita conversacional."
-    - "programas.json espelha investidores.json: {programas:[...], total_programas, themes_index, last_updated}. NÃO entra no index.json (invariante de-risk ①)."
+    - "O JSON versionado é a entrada curada; a representação consumida pelo produto vive em entities."
 ```
 
-### 6.2 Tipos de link
+### 6.2 Relações estruturais
 
-Expressos como wikilinks Markdown. Formato: `[[{subfolder}/{node_folder}/{slug}|{label}]]`.
+As relações ativas em `entity_relationships` são `operado_por` (edital ou
+programa → agência), `subordinado_a` (edital → programa) e `credenciada_por`
+(ICT → agência). O catálogo tolera `exige_parceria_com` em dados compatíveis,
+mas o produtor atual representa a exigência genérica como constraint, pois não
+há uma ICT específica como alvo. Wikilinks do vault são projeções de leitura geradas por
+`scripts/export_to_obsidian.py`, não contratos do data plane.
 
-```yaml
-link_types:
-  edital_has_theme:
-    from: edital
-    to: tema
-    section: "## Temas"
-  edital_has_subprograma:
-    from: edital
-    to: subprograma
-    section: "## Subprograma"
-  edital_has_fonte:
-    from: edital
-    to: fonte
-    section: "## Fonte"
-  aggregator_lists_edital:
-    from: [tema, subprograma, fonte, home]
-    to: edital
-    section: "## Editais"
-  ict_has_expertise:
-    from: ict
-    to: tema
-    section: "## Áreas de Atuação"
-  aggregator_lists_ict:
-    from: [tema]
-    to: ict
-    section: "## ICTs"
-```
-
-### 6.3 Slugify
+### 6.3 Normalização de identificadores
 
 ```yaml
 slugify_rules:
@@ -666,90 +508,14 @@ Motivação: status bruto do portal nem sempre é confiável; prazo futuro é ev
 
 ---
 
-## 8. Workflow legado de síntese (não executado pelo pipeline v3)
+## 8. Histórico do workflow de síntese
 
-### 8.1 Ingestão (prompt de extração)
-
-Prompt histórico preservado como referência de vocabulário. O pipeline v3 usa o
-structurer (§11) e os produtores de `core/kg/gold.py`; `pipeline/etl_process.py`
-foi removido.
-
-```yaml
-extraction_prompt: |
-  Você é um especialista em editais de fomento à inovação no Brasil.
-
-  Leia os documentos abaixo de uma chamada pública e produza a wiki page estruturada em JSON.
-
-  ---
-  METADADOS (do portal web):
-  {metadata}
-
-  ---
-  DOCUMENTOS (PDFs da chamada):
-  {documents}
-
-  ---
-  Produza APENAS o JSON abaixo, sem markdown ou texto extra:
-
-  {{
-    "objective": "síntese em 2-3 frases do que este edital financia e para quem",
-    "mechanism": "subvencao|reembolsavel|investimento|misto|null",
-    "themes": ["tecnologias digitais e conectividade"],
-    "publico_alvo": ["startups", "empresas"],
-    "eligible_entities": ["empresas", "startups", "ICTs"],
-    "value_range": {{"min_brl": null, "max_brl": null}},
-    "trl_range": {{"min": null, "max": null}},
-    "required_certifications": [],
-    "counterpart_required": false,
-    "key_requirements": ["máx 5 requisitos concretos e objetivos"],
-    "eligibility_constraints": [{{"type": "region|company_age|revenue|cnae|consortium", "description": "restrição em texto curto", "evidence": "trecho verbatim do edital que afirma a restrição"}}],
-    "key_facts": ["5 fatos mais relevantes para uma empresa decidir se candidatar"],
-    "proposal_sections": [
-      "1. Título e identificação do projeto",
-      "2. ..."
-    ]
-  }}
-
-  Regras:
-  - mechanism: classifique pelo mecanismo financeiro principal
-  - themes: use APENAS os temas canônicos abaixo ([] se nenhum se aplicar):
-    "agro - bioeconomia e alimentos", "energia e transição sustentável",
-    "espaço - defesa e segurança", "materiais, química e manufatura avançada",
-    "mobilidade e logística", "saúde e ciências da vida",
-    "tecnologias digitais e conectividade"
-  - publico_alvo: use APENAS os valores canônicos abaixo ([] se não determinável):
-    "empresas", "startups", "ICTs", "instituições de pesquisa",
-    "universidades", "cooperativas", "gestores de FIP"
-  - trl_range: inteiros 1-9, null se não mencionado
-  - value_range: valores em reais como inteiros, null se não mencionado
-  - key_requirements: máx 5 itens, cada um autocontido e verificável
-  - eligibility_constraints: SÓ restrições organizacionais duras explícitas (sede em UF/região,
-    idade/tempo de constituição da empresa, faturamento, CNAE, exigência de consórcio). `evidence`
-    = trecho verbatim do edital. Lista vazia [] se o texto não afirmar nenhuma — não inferir.
-  - key_facts: os 5 fatos que uma empresa usaria para decidir se vale candidatar
-  - proposal_sections: seções obrigatórias da proposta na ordem exigida pelo edital,
-    extraídas das instruções de inscrição e formulários. Se o edital não especificar
-    estrutura, derive do objeto e dos critérios de avaliação. Entre 6 e 12 seções.
-```
-
-Parâmetros da chamada LLM:
-
-```yaml
-llm_params:
-  temperature: 0.1
-  max_tokens: 1500
-  model_char_budgets:
-    gemini-2.5-flash: 3600000   # 900k tokens × 4 chars
-    gpt-4o-mini:      320000    # 80k tokens × 4 chars
-```
-
-### 8.2 Atualização
-
-- **Cache** por hash MD5 de `(metadata_do_index + conteúdo_concatenado_dos_PDFs)`. Reprocessa quando hash muda (retificação, aditivo).
-- **Modo histórico**: processa apenas editais sem wiki page existente.
-- **Flag `--skip-cache`**: força reprocessamento.
-
-### 8.3 Feedback loop
+O produtor de wiki pages (`etl_process.py` / `build_knowledge_graph`) foi
+removido e não integra o data plane atual. O registro arquitetural completo
+está em [`docs/historical/kg-entity-wiki-pages.md`](docs/historical/kg-entity-wiki-pages.md)
+e [`docs/historical/hypergraph-migration.md`](docs/historical/hypergraph-migration.md).
+O prompt e as regras de atualização dessa linhagem permanecem apenas nesses
+documentos históricos; os produtores ativos estão descritos nos §§11–13.
 
 ---
 
@@ -795,8 +561,8 @@ Artefato intermediário entre o bronze e dois consumidores: a ingestão gold
 documentos serve aos dois.
 
 **Invariante — a camada é "burra":** ela só lineariza, limpa e rotula
-estrutura. **Não** sintetiza (não infere `objective`/`mechanism` — isso é §4.2)
-e **não** fatia (não decide tamanho de chunk — isso é política do Ramo B). Todo
+estrutura. **Não** sintetiza `objective`/`mechanism` e **não** fatia (não decide
+tamanho de chunk — isso pertence aos produtores especializados). Todo
 campo opinativo aqui reacopla A e B e invalida os caches independentes (§11.4).
 Code review deve barrar qualquer campo que não seja estrutura fiel.
 
@@ -942,12 +708,12 @@ em qualquer camada ≥ L2.
 
 | Camada | Nome oficial | Escopo | Conteúdo |
 |---|---|---|---|
-| L0 | `raw` (bronze) | **por fonte** | dump cru do scraper em `bronze_data/{source}_raw/` |
+| L0 | `raw` (bronze) | **por fonte** | dump cru do scraper em `data/bronze/{source}_raw/` |
 | L1 | **Source Adapter** | **por fonte** | converte raw → Documento Canônico. FINEP: lê PDFs. FAPESP: `texto_cru` |
-| — | **Documento Canônico** | **fronteira** | contrato agnóstico (§12.3) |
+| — | **Documento Canônico** | **fronteira** | contrato agnóstico (§12.3), persistido em `edital_source_docs` com fallback local |
 | L2 | `structured` (silver) | agnóstico | blocos do structurer — detalhe em §11 |
-| L3a | **Knowledge gold** | agnóstico | wiki page (§4) + grafo (§6) |
-| L3b | **Retrieval gold** | agnóstico | `edital_chunks` (chunk + embedding) |
+| L3a | **Catálogo gold relacional** | agnóstico | `entities` + `entity_relationships` |
+| L3b | **Índices de recuperação** | agnóstico | `match_chunks` para Radar; `edital_chunks` para WritingSession |
 
 ### 12.3 Contrato do Documento Canônico
 
@@ -995,9 +761,12 @@ source_adapters:
 
 ### 12.5 Fronteira implementada
 
-Os adapters resolvem PDF/HTML e entregam o Documento Canônico; o structurer e o
-chunker operam sobre esse contrato sem selecionar a fonte. `core/tasks.py`
-descobre as fontes pelo registry e encaminha o silver ao ingest gold.
+Os adapters resolvem PDF/HTML e entregam o Documento Canônico; `source_docs`
+persiste esse conteúdo de forma durável, e o structurer e o chunker operam sobre
+o mesmo contrato sem selecionar a fonte. `core/tasks.py` descobre as fontes pelo
+registry, encaminha o silver ao ingest gold e aquece `edital_chunks` às 05:00 UTC.
+Os pontos de entrada de brief/escrita também garantem o chunking sob demanda,
+como fallback de disponibilidade.
 
 ## 13. Vocabulários gold v3 (spec `docs/specs/v3-unified.md`)
 
@@ -1007,7 +776,7 @@ no ingest gold (`core/kg/gold.py`). **Mudou a regra → edite estes blocos, não
 código.** Estes são os vocabulários do pipeline ativo. Blocos anteriores
 permanecem apenas quando um accessor de compatibilidade ainda os consome.
 
-### 13.1 Taxonomia de setores (`setores_taxonomia`, §4.3)
+### 13.1 Taxonomia de setores (`setores_taxonomia`)
 
 Taxonomia FECHADA de 16 setores. 1-3 por entidade; fallback `Multissetorial`.
 Nunca é hard filter no match — só facet de catálogo e boost opcional de ranking.
@@ -1109,7 +878,7 @@ setores_taxonomia:
     fintech: Finanças
 ```
 
-### 13.2 Normalização de tags (`tag_normalization`, §4.3)
+### 13.2 Normalização de tags (`tag_normalization`)
 
 Passe DETERMINÍSTICO aplicado a TODA `tecnologias_tags` de TODA fonte
 (`gold.normalize_tags`): lowercase, trim, singular simples, mapa de sinônimos.

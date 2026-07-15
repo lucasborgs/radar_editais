@@ -93,9 +93,8 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
 - `domain.vocabulary.canonicalize_themes` é um normalizador parcial usado pelo
   vocab lint; novos sinônimos só entram com evidência do corpus e atualização do
   vocabulário autoritativo em `WIKI.md`.
-- `requires_ict_partner` continua sendo sinal extraído e não um gate de
-  elegibilidade. Ajustar sua heurística só faz sentido com amostra rotulada e se
-  o sinal se tornar determinante no produto.
+- `requires_ict_partner` permanece no contrato avaliado de extração e não é gate
+  de elegibilidade nem sinal consumido pelo match atual.
 
 ## Resultado da reconciliação de 2026-07-14
 

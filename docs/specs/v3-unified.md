@@ -285,7 +285,7 @@ Substituição concreta das arestas semânticas — 4 tools sobre SQL (via `enti
 - **PR-B** (catálogo + explore): explore_tools (tools §8), opportunity_service, source_docs, temporal, routers explore/catalog. **Não migrar `hypergraph_match.py`** — ele morre na Fase 5, migrá-lo é retrabalho.
 - **PR-C** (verdict + tasks): match_verdict, tasks.py.
 
-**Fase 4 — Pipeline diário + discovery** (1 PR): `run_daily_etl` = scrapers → bronze → adapter → silver (structurer) → `ingest_all()` incremental (diff por `source_hash`) → embeddings. Substitui `build_all_hypergraphs`. Promote do discovery (admin-only) entra no mesmo caminho silver→gold. `chunk_edital` (writing) permanece lazy.
+**Fase 4 — Pipeline diário + discovery** (1 PR): `run_daily_etl` = scrapers → bronze → adapter → silver (structurer) → `ingest_all()` incremental (diff por `source_hash`) → embeddings. Substitui `build_all_hypergraphs`. Promote do discovery (admin-only) entra no mesmo caminho silver→gold. O `chunk_edital` da escrita é produzido separadamente; no runtime atual, há aquecimento diário e garantia sob demanda.
 
 **Fase 5 — Limpeza** (1 PR): deletar tudo da lista "Morre" (§9), remover flags, atualizar WIKI.md/AGENTS.md/architecture.md, eval matching aponta só para v3.
 

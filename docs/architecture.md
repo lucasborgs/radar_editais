@@ -54,28 +54,31 @@ flowchart TB
 
   WEB --> EVID["Evidências canônicas<br/>Crawl4AI opcional no worker"]
   EVID --> GATE["Staging + gate admin<br/>(promote/reject)"]
-  GATE -->|promote| BRONZE["Bronze web<br/>versão aprovada"]
-  BRONZE --> SILVER
-  AG --> SILVER["Silver — transcrição estrutural<br/>verbatim, por seção (LLM leve por página)"]
+  GATE -->|promote| BRONZE["Bronze<br/>evidência por fonte"]
+  AG --> BRONZE
+  BRONZE --> CDOC[("Documento Canônico<br/>edital_source_docs · fallback local")]
+  CDOC --> SILVER["Silver — transcrição estrutural<br/>verbatim, por seção (LLM leve por página)"]
 
   SILVER --> INGEST["Ingestão gold (incremental, diária)<br/>· metadados determinísticos<br/>· tagger LLM: setores (16) + tags de tecnologia<br/>· extração de elegibilidade (constraints + exclusões + público-alvo)<br/>· embeddings da entidade e dos trechos de match"]
   CUR --> INGEST
 
   INGEST --> KG[("Catálogo de conhecimento (Postgres)<br/>entidades · relações · trechos de match")]
 
-  SILVER -.->|"sob demanda, quando o usuário<br/>engaja com um edital"| RAGCHUNKS[("Chunks de escrita<br/>contextuais + busca híbrida")]
+  CDOC -.->|"cron 05:00 + ensure/prefetch<br/>sob demanda"| RAGCHUNKS[("Chunks de escrita<br/>contextuais + busca híbrida")]
 ```
 
 **Entidades** (5 tipos): edital, programa, investidor, ICT, agência — com
 setores (taxonomia fechada de 16), tags de tecnologia (folksonomia
 normalizada), metadados de vigência/ticket e constraints de elegibilidade.
-**Relações** (4, determinísticas): operado_por, subordinado_a,
-exige_parceria_com, credenciada_por. Relações semânticas emergem em tempo de
+O produtor gold materializa três relações determinísticas: `operado_por`,
+`subordinado_a` e `credenciada_por`. O catálogo ainda tolera a relação opcional
+`exige_parceria_com` em dados compatíveis, mas a exigência atual é extraída como
+constraint do edital, sem apontar para uma ICT específica. Relações semânticas emergem em tempo de
 consulta (tags compartilhadas + busca vetorial), não são mantidas como arestas.
 
-LLM aparece em **dois pontos** do plano de dados (tagger + extração de
-elegibilidade, ambos no ingest) — todo o resto é determinístico e
-re-executável.
+No gold, LLM aparece no tagger e na extração de elegibilidade. No índice de
+escrita, contextual retrieval injeta contexto de capítulo antes dos embeddings;
+as demais transformações são determinísticas e reexecutáveis.
 
 ---
 
@@ -106,7 +109,7 @@ Sessão de escrita conversacional sobre um edital: primeiro turno gera o
 rascunho completo (batch de seções), turnos seguintes iteram com o usuário.
 
 - **RAG sobre o edital**: busca híbrida (densa + BM25 + rerank) nos chunks
-  contextuais, criados sob demanda no primeiro engajamento.
+  contextuais, aquecidos diariamente e garantidos sob demanda no engajamento.
 - **Ficha da oportunidade** no contexto do agente: prazos, valores,
   elegibilidade, exclusões e público-alvo vindos do catálogo.
 - **Guardrails**: Critic (subagente) + classificador de escopo antes de

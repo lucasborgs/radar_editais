@@ -54,7 +54,7 @@ def load(source: str | None = None) -> dict:
 # ---------------------------------------------------------------------------
 
 def iso_to_br_date(value: str | None) -> str:
-    """ISO yyyy-mm-dd → dd/mm/yyyy (WIKI.md §4.1). Já-BR passa direto."""
+    """ISO yyyy-mm-dd → dd/mm/yyyy (WIKI.md §9.3). Já-BR passa direto."""
     if not value:
         return ""
     s = str(value).strip()
@@ -77,14 +77,6 @@ def parse_deadline(value: str | None) -> date | None:
         return datetime.strptime(value.strip(), "%d/%m/%Y").date()
     except ValueError:
         return None
-
-
-def parse_pub_year(pub_date: str | None) -> int | str:
-    """Ano de \"dd/mm/yyyy\". Fallback: `unknown_label` em WIKI.md."""
-    d = parse_deadline(pub_date)
-    if d:
-        return d.year
-    return node_types().get("ano", {}).get("unknown_label", "desconhecido")
 
 
 # ---------------------------------------------------------------------------
@@ -115,23 +107,8 @@ def structurer_prompt() -> str:
 # Vocabulários
 # ---------------------------------------------------------------------------
 
-def mechanism_label(key: str | None) -> str:
-    if not key:
-        return ""
-    return load().get("mechanism", {}).get(key, key)
-
-
-def status_info(status: str) -> dict:
-    vocab = load().get("status", {})
-    return vocab.get(status) or vocab.get("Desconhecido", {"emoji": "⚪", "tag": "desconhecido", "order": 9})
-
-
 def tema_vocab() -> list[str]:
     return load().get("tema_vocab", [])
-
-
-def node_types() -> dict:
-    return load().get("node_types", {})
 
 
 # ---------------------------------------------------------------------------
@@ -164,15 +141,6 @@ def trl_range_to_faixas(trl_min: int | None, trl_max: int | None) -> list[str]:
         if max(trl_min, faixa["min"]) <= min(trl_max, faixa["max"]):
             out.append(key)
     return out
-
-
-def wiki_page_fields(source: str | None = None) -> dict:
-    s = load(source)
-    return {
-        "inherited":   s.get("wiki_page_inherited_fields", []),
-        "synthesized": s.get("wiki_page_synthesized_fields", {}),
-        "meta":        s.get("wiki_page_meta_fields", {}),
-    }
 
 
 # ---------------------------------------------------------------------------

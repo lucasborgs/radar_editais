@@ -7,8 +7,9 @@
 O filesystem do worker não é fonte de verdade durável: todo rebuild de imagem (deploy de código
 OU mudança de env var) apaga `data/bronze/` e os PDFs FINEP (`FINEP_PDFS_DIR`).
 
-O `chunk_edital` (lazy — spec [lazy-chunking.md](lazy-chunking.md)) lê o
-conteúdo-fonte via adapters, que leem o **disco**:
+O `chunk_edital` (aquecido diariamente e também garantido sob demanda; ver
+[data-plane-convergence.md](data-plane-convergence.md)) lê o conteúdo-fonte via
+adapters, com preferência pelo seam durável:
 
 - `finep` → PDFs de `FINEP_PDFS_DIR/<id>/` (pdfplumber per-página)
 - `web` → HTML cru de `bronze/web_raw/*.json`
@@ -17,19 +18,19 @@ conteúdo-fonte via adapters, que leem o **disco**:
 Resultado: após qualquer redeploy, o conteúdo some → `chunk_edital` roda, o
 adapter não acha fonte e produz **0 chunks** (job "succeeded" com 0). Já mordeu
 2×: 31 editais web perdidos e, após a troca de `OPENAI_API_KEY` do worker, os
-PDFs FINEP wipados → lazy-chunking produzindo 0.
+PDFs FINEP removidos → chunking produzindo 0.
 
 ## Insight
 
-O texto **já é extraído eager** no momento do scrape (FINEP grava `pdf_texts` no
-download; FAPESP/FAPESC gravam `texto_cru`; web guarda `html`). O que é *lazy* é
-só o caro (structurer-LLM + embedding). O problema **não é re-buscar a fonte** —
+O texto **já é extraído** no momento do scrape (FINEP grava `pdf_texts` no
+download; FAPESP/FAPESC gravam `texto_cru`; web guarda `html`). O processamento
+caro (contextualização e embedding) é idempotente e pode ocorrer no aquecimento
+ou sob demanda. O problema **não é re-buscar a fonte** —
 é que o texto extraído é gravado **só no disco efêmero**.
 
 Logo: persistir o **Documento Canônico** (§12.3 — o contrato agnóstico de fonte:
 `[{doc_name, units}]`) num seam durável, **gravado no scrape (disco fresco)**,
-elimina a dependência de disco no chunk. Não adiciona custo de extração (já é
-eager) nem fere o lazy (LLM/embed seguem on-demand).
+elimina a dependência de disco no chunk. Não adiciona custo de extração.
 
 Descartado: **re-fetch on-demand** (re-baixar PDF/URL no chunk) — exigiria
 tornar `pdf_urls`/`edital_pdf_url` duráveis E realocar o fetch dos scrapers, e
@@ -70,8 +71,8 @@ Disco vira **cache/fallback**, não dependência.
 
 ### Invariantes preservadas
 
-- **Lazy chunking**: structurer-LLM + embedding seguem on-demand. Só a extração
-  (já eager) é persistida.
+- **Chunking híbrido**: o mesmo produtor idempotente atende ao aquecimento diário
+  e ao ensure/prefetch sob demanda. Só a extração de origem é persistida aqui.
 - **Silver cache** (`structurer._source_hash`): hash é content-based sobre o
   Documento Canônico — o durável guarda exatamente o que o adapter produz, então
   o hash bate e o cache silver continua válido.

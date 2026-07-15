@@ -1,7 +1,7 @@
 """Promote do discovery (admin) → catálogo/match via silver+gold (PR-C v3).
 
 O promovido (edital_link PDF) segue o MESMO caminho silver→gold do ETL diário: o
-endpoint enfileira `chunk_edital` (RAG lazy) E `ingest_promoted_edital` (gold),
+endpoint enfileira `chunk_edital` (RAG) E `ingest_promoted_edital` (gold),
 e a task de ingest constrói o silver e chama `gold.ingest_all`. Sem rede/LLM/DB.
 """
 from __future__ import annotations

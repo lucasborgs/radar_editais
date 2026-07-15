@@ -19,7 +19,7 @@ writing_session/planning_node/checklist/frontend):
   title←name · deadline (dd/mm/yyyy — formato que `schema.parse_deadline` lê) ·
   objective←description · themes←setores · technologies←tecnologias_tags ·
   aperture←formato · mecanismo←[mecanismo] · fonte_recurso←arestas `operado_por` ·
-  programs←`subordinado_a` · icts←`exige_parceria_com` · value←ticket_min/max ·
+  programs←`subordinado_a` · icts←relação opcional `exige_parceria_com` · value←ticket_min/max ·
   status←recomputado do deadline · publico_alvo/eligible_entities←metadata.publico_alvo ·
   exclusoes←metadata.exclusoes · constraints←constraints (call B do gold, §6).
 """

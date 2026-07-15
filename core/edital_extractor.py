@@ -1,8 +1,7 @@
-"""Extrator de editais — texto bruto da fonte → `EditalExtraction` (schema v2).
+"""Extrator avaliado de editais — texto bruto da fonte → `EditalExtraction`.
 
-Semente do extrator de PRODUÇÃO (Fase 3): a mesma função serve (a) ao bootstrap
-do golden, (b) à suíte de avaliação `extraction`, e (c) — quando promovido — ao
-ETL, substituindo os normalizadores hand-written.
+A função serve ao bootstrap do golden e à suíte `extraction`. O ingest gold
+atual possui produtores próprios e não chama este módulo.
 
 Princípios do schema (ver domain/edital_extraction.py): abstenção explícita,
 `evidence` verbatim, `inferred` proibido em campos de elegibilidade, `themes`

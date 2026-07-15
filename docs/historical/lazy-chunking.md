@@ -1,7 +1,11 @@
-# Spec: Lazy chunking (estilo NotebookLM)
+# Histórico — Lazy chunking (estilo NotebookLM)
 
-**Status:** vigente · **Data:** 2026-06-26 · chunking de escrita permanece lazy e
-independente do ingest gold.
+**Status:** histórico · **Data:** 2026-06-26 · **Substituída por:**
+[`data-plane-convergence.md`](../specs/data-plane-convergence.md)
+
+Esta decisão registra a fase em que o corpus de escrita era exclusivamente
+lazy. O runtime atual combina aquecimento diário às 05:00 UTC com
+ensure/prefetch sob demanda.
 
 ## Decisão
 

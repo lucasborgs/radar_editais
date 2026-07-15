@@ -1,7 +1,7 @@
 """
 Testes do helper de identidade cross-source (core/edital_id.py).
 
-Cobre make_id, parse_id, source_of, native_id_of, wiki_page_path, iter_wiki_pages.
+Cobre make_id, parse_id, source_of, native_id_of e o roundtrip do contrato.
 """
 from __future__ import annotations
 
@@ -13,14 +13,11 @@ sys.path.insert(0, str(ROOT))
 
 import pytest  # noqa: E402
 
-from config import KG_WIKI_DIR  # noqa: E402
 from core.kg.edital_id import (  # noqa: E402
-    iter_wiki_pages,
     make_id,
     native_id_of,
     parse_id,
     source_of,
-    wiki_page_path,
 )
 
 # =============================================================================
@@ -66,67 +63,6 @@ def test_parse_id_rejects_unprefixed(bad_eid: str):
     """Hard cut pós-Épico B: id sem prefixo é erro explícito, não fallback."""
     with pytest.raises(ValueError, match="sem prefixo"):
         parse_id(bad_eid)
-
-
-# =============================================================================
-# wiki_page_path
-# =============================================================================
-
-def test_wiki_page_path_uses_source_subfolder():
-    path = wiki_page_path("finep:782")
-    assert path == KG_WIKI_DIR / "finep" / "782.json"
-
-
-def test_wiki_page_path_for_alternative_source():
-    path = wiki_page_path("fapesp:18064")
-    assert path == KG_WIKI_DIR / "fapesp" / "18064.json"
-
-
-def test_wiki_page_path_does_not_check_existence(tmp_path: Path, monkeypatch):
-    """wiki_page_path é função pura — não toca disco, só monta o path."""
-    # Independente de existência, retorna o path esperado.
-    p = wiki_page_path("finep:nao-existe")
-    assert p.name == "nao-existe.json"
-    assert p.parent.name == "finep"
-
-
-# =============================================================================
-# iter_wiki_pages
-# =============================================================================
-
-def test_iter_wiki_pages_ignores_dotfiles(tmp_path: Path, monkeypatch):
-    """iter_wiki_pages NÃO retorna .etl_process_cache.json e similares."""
-    fake_kg = tmp_path / "wiki"
-    (fake_kg / "finep").mkdir(parents=True)
-    (fake_kg / "finep" / "782.json").write_text("{}", encoding="utf-8")
-    (fake_kg / "finep" / "601.json").write_text("{}", encoding="utf-8")
-    (fake_kg / ".etl_process_cache.json").write_text("{}", encoding="utf-8")
-
-    monkeypatch.setattr("core.kg.edital_id.KG_WIKI_DIR", fake_kg)
-
-    paths = iter_wiki_pages()
-    names = sorted(p.name for p in paths)
-    assert names == ["601.json", "782.json"]
-
-
-def test_iter_wiki_pages_filter_by_source(tmp_path: Path, monkeypatch):
-    fake_kg = tmp_path / "wiki"
-    (fake_kg / "finep").mkdir(parents=True)
-    (fake_kg / "fapesp").mkdir(parents=True)
-    (fake_kg / "finep" / "782.json").write_text("{}", encoding="utf-8")
-    (fake_kg / "fapesp" / "18064.json").write_text("{}", encoding="utf-8")
-
-    monkeypatch.setattr("core.kg.edital_id.KG_WIKI_DIR", fake_kg)
-
-    assert len(iter_wiki_pages()) == 2
-    assert len(iter_wiki_pages("finep")) == 1
-    assert len(iter_wiki_pages("fapesp")) == 1
-    assert len(iter_wiki_pages("bndes")) == 0  # source ausente → []
-
-
-def test_iter_wiki_pages_returns_empty_when_dir_missing(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("core.kg.edital_id.KG_WIKI_DIR", tmp_path / "does-not-exist")
-    assert iter_wiki_pages() == []
 
 
 # =============================================================================
