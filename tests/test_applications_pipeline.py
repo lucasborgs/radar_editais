@@ -5,8 +5,7 @@ Foca na lógica pura de junção/serialização (sem rede/HTTP):
   - progress_pct a partir da writing_session (preenchidas/total);
   - edital_title cai para None quando o card não existe.
 
-O wiki page lookup é file-based e cacheado; mockamos `get_edital_by_id` para
-isolar a serialização do estado do grafo em disco.
+Mockamos o card do catálogo para isolar a serialização do acesso ao gold.
 """
 from __future__ import annotations
 

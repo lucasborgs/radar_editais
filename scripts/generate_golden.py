@@ -28,6 +28,7 @@ import random
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -38,7 +39,8 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv()
 
 import psycopg  # noqa: E402
-from openai import OpenAI  # noqa: E402
+
+from core.llm.llm_client import make_client  # noqa: E402
 
 GOLDEN_DIR = ROOT / "eval_data" / "golden"
 DEFAULT_PER_EDITAL = 8
@@ -121,7 +123,7 @@ Regras:
 Pergunta:"""
 
 
-def _generate_query(client: OpenAI, model: str, chunk: dict) -> str:
+def _generate_query(client: Any, model: str, chunk: dict) -> str:
     """Pede UMA pergunta natural que o chunk responde."""
     text = (chunk.get("text") or "").strip()[:3000]
     if not text:
@@ -215,7 +217,7 @@ def main() -> int:
     GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
     out_path = GOLDEN_DIR / f"{args.source}.json"
 
-    client = OpenAI()
+    client = make_client()
     existing = _load_existing(out_path) if args.append else None
     existing_queries = list(existing["queries"]) if existing else []
     start_idx = len(existing_queries) + 1

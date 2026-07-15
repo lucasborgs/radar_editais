@@ -38,7 +38,7 @@ _FAILED_PAGES_ALERT_RATIO = 0.2
 
 
 # =============================================================================
-# CLIENTE LLM (mesmo contrato de kg_match_service / etl_process)
+# CLIENTE LLM (factory canônica compartilhada pelos produtores atuais)
 # =============================================================================
 
 def _make_client():

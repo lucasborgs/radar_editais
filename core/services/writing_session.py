@@ -12,8 +12,8 @@ Fluxo:
   1. __init__: lê (ou cria) a row em writing_sessions, carrega turnos e estado.
                Documentos do edital (PDFs) e library_items são re-derivados em
                disco/Supabase a cada construção — não persistimos esse contexto.
-               O outline da proposta vem do DB se já estiver salvo; senão,
-               wiki page; senão, LLM (1 chamada).
+               O outline da proposta vem do DB se já estiver salvo; senão, de
+               um plano informado ou da LLM sobre os documentos (1 chamada).
   2. turn: Writer LLM recebe prefixo estático (perfil + documentos) + histórico
            + mensagem. Cada turno produz dois INSERTs em session_turns
            (user, assistant). A compressão de histórico, quando dispara,
@@ -570,11 +570,11 @@ class WritingSession:
         # carregados eagerly. A injeção é feita por turno via retrieve_chunks
         # sobre `edital_chunks` (índice gerado por chunk_edital_task). O
         # atributo `_documents_text` é resolvido sob demanda apenas se o
-        # fallback de geração de outline precisar dele (caso raro — a maioria
-        # dos editais já tem outline persistido em wiki page ou DB).
+        # fallback de geração de outline precisar dele (caso raro — sessões já
+        # iniciadas têm o outline persistido no DB).
         self._documents_text_cache: str | None = None
 
-        # Outline: plano vindo do Planning → pitch default → DB/wiki/LLM.
+        # Outline: DB já carregado → plano do Planning → pitch default → LLM.
         if not self._proposal_outline:
             if self._plan:
                 sections = self._plan.get("sections", [])
@@ -658,8 +658,8 @@ class WritingSession:
     def _documents_text(self) -> str:
         """Carrega PDFs do edital sob demanda. Usado apenas quando
         `_generate_outline` precisa do texto integral para criar o outline da
-        proposta — fluxo raro, pois a maioria dos editais já tem outline em
-        wiki page. NÃO use em `_build_messages` (substituído por RAG)."""
+        proposta — fluxo raro, pois sessões existentes persistem o outline no
+        DB. NÃO use em `_build_messages` (substituído por RAG)."""
         if self._documents_text_cache is None:
             self._documents_text_cache = self._load_documents(self.edital_id)
         return self._documents_text_cache

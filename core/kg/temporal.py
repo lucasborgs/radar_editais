@@ -47,11 +47,10 @@ class TemporalContext:
 
 
 def temporal_context(edital_id: str) -> TemporalContext | None:
-    """Monta o TemporalContext de um edital lendo índice + wiki page.
+    """Monta o TemporalContext lendo o edital no catálogo gold relacional.
 
-    Retorna None se o edital não existir em nenhuma das fontes (não dá pra
-    afirmar nada temporal sobre ele). Deadline é buscado primeiro no índice
-    (sempre fresco no build) e, se ausente, na wiki page.
+    Retorna None se a entidade não existir, pois nesse caso não há fonte
+    autoritativa para afirmar seu estado temporal.
     """
     entry = _index_entry(edital_id)
 
