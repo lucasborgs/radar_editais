@@ -1,6 +1,6 @@
 # Spec-guia — Coerência sistêmica
 
-**Status:** proposta · **Data:** 2026-07-14
+**Status:** aprovada · **Data:** 2026-07-14
 **Função deste documento:** fixar propósito, invariantes e critérios para as
 specs executáveis de redução de complexidade. Esta spec não autoriza alterações
 de comportamento por si só.
