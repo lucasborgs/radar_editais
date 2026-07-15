@@ -1,6 +1,6 @@
 # Spec Unificada — v3: Dissociação Match / KG / RAG (revisão 2)
 
-- **Status:** Implementada (Fases 0–5 concluídas em 2026-07-11; arquitetura vigente)
+- **Status:** vigente (Fases 0–5 concluídas em 2026-07-11)
 - **Data:** 2026-07-09
 - **Autores:** Lucas + Claude
 - **Substitui:** `v3-match-kg-redesign.md` (2026-07-07), `hypergraph-migration.md` (2026-07-09) e a revisão 1 desta spec

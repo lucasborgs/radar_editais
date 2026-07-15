@@ -1,6 +1,10 @@
 # Spec: Hardening pré-beta externo + otimização de custo/latência
 
-Status: proposta · 2026-07-01 · origem: auditoria de 3 frentes (runtime LLM,
+> **Registro histórico:** plano de hardening executado em lotes e reconciliado
+> com a implementação. Pendências técnicas vivas estão em
+> [`docs/BACKLOG.md`](../BACKLOG.md).
+
+Status original: proposta · 2026-07-01 · origem: auditoria de 3 frentes (runtime LLM,
 pipeline/match, backend/segurança) + benchmark contra o Hermes Unified.
 
 ## Contexto e decisões de produto (2026-07-01)

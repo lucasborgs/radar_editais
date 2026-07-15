@@ -1,8 +1,8 @@
 # Spec — Operação da descoberta
 
-**Status:** implementada para as rotas de promoção e retry · **Data:** 2026-07-14
+**Status:** vigente para as rotas de promoção e retry · **Data:** 2026-07-14
 
-**Documento-pai:** [radar-initiative.md](radar-initiative.md).
+**Documento-pai:** [system-coherence.md](system-coherence.md).
 
 ## 1. Resultado de produto
 

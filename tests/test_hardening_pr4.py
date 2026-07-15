@@ -1,6 +1,6 @@
 """Testes do PR4 (hardening pré-beta): resiliência de background + alertas.
 
-Cobre os três eixos da spec (docs/specs/hardening-pre-beta.md §PR4):
+Cobre os três eixos da spec histórica (docs/historical/hardening-pre-beta.md §PR4):
   4.1 retry= com backoff exponencial nas tasks UNITÁRIAS — e AUSENTE nos
       wrappers de cron (cron re-roda no dia seguinte; falha vira alerta);
   4.2 falha TRANSIENTE de triagem não vira rejeição persistente no ledger

@@ -1,7 +1,7 @@
 # Spec — Match Evolution (KG Split + EntityMatcher Unification)
 
 Status: **supersedida** pela linhagem v3, consolidada em
-[`v3-unified.md`](v3-unified.md) · 2026-06-24 · registro de proposta.
+[`v3-unified.md`](../specs/v3-unified.md) · 2026-06-24 · registro de proposta.
 
 ---
 
@@ -450,7 +450,7 @@ Fase 4 depende de Fase 3, e Fase 5 depende de tudo.
 ## Fora de escopo
 
 - Unificação de `list_editais`/`get_edital_by_id`/`get_stats` com `HybridMatchService` — duplicação aceita por D6
-- ExploreAgent com memória (exploration_log) — spec separada (ver `docs/specs/agentic-evolution.md` Fase 3A)
+- ExploreAgent com memória (exploration_log) — spec separada (ver `docs/historical/agentic-evolution.md` Fase 3A)
 - Deep research no ExploreAgent — gated por env `EXPLORE_DEEP_RESEARCH_ENABLED`, mantido
 - Métricas de uso do /explore — adicionar ao dashboard de telemetria após merge
 - Unificação de `HybridMatchService` com `EntityMatcher` — paradigmas diferentes (2 estágios vs Karpathy), manter separados

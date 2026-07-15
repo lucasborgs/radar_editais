@@ -1,6 +1,6 @@
 # Spec — KG v2: resíduos de qualidade + ranking unificado
 
-Status: **histórica, substituída** por [`v3-unified.md`](v3-unified.md) ·
+Status: **histórica, substituída** por [`v3-unified.md`](../specs/v3-unified.md) ·
 registro de qualidade do hipergrado v2, não descrição do runtime atual.
 
 > Continuação de [`kg-redesign.md`](kg-redesign.md) (8 PRs implementados). Esta spec trata o que o

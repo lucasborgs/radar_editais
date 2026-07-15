@@ -1,8 +1,8 @@
 # Spec — Radar Fase 2: urgência, filtros e comparação
 
-**Status:** concluída · **Data:** 2026-07-14
+**Status:** vigente · **Data:** 2026-07-14
 
-**Documento-pai:** [radar-initiative.md](radar-initiative.md).
+**Documento-pai:** [system-coherence.md](system-coherence.md).
 
 ## 1. Resultado de produto
 

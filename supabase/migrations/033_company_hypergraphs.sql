@@ -1,5 +1,5 @@
 -- 033: Hipergrado da EMPRESA durável por workspace (Sprint 2 — Company corpus).
--- Spec: docs/specs/hypergraph-architecture.md (§ Lado empresa).
+-- Spec histórica: docs/historical/hypergraph-architecture.md (§ Lado empresa).
 --
 -- Hoje o match (find_matching_editais) re-extrai os nós da empresa do texto do
 -- perfil a cada sessão (cache efêmero por processo). Esta tabela persiste o

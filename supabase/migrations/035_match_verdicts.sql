@@ -1,5 +1,5 @@
 -- 035: cache de vereditos LLM do match (KG v2 PR7 / Estágio 2 do funil).
--- Spec: docs/specs/kg-redesign.md (§PR7).
+-- Spec histórica: docs/historical/kg-redesign.md (§PR7).
 --
 -- O veredito (racional de afinidade + red flags + fit de mecanismo + recomendação)
 -- é computado async pela task `compute_match_verdicts` e cacheado por par

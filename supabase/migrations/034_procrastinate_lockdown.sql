@@ -1,6 +1,6 @@
 -- 034: trava a maquinaria do procrastinate contra o PostgREST (2026-07-02)
 --
--- FURO P0 (leak-test pré-beta, docs/specs/pre-beta-verification.md — Frente 1/S1):
+-- FURO P0 (leak-test pré-beta, docs/historical/pre-beta-verification.md — Frente 1/S1):
 -- o schema do procrastinate (migration 003, gerado pela lib) vive em `public` e,
 -- por default do Supabase, `anon` e `authenticated` recebem GRANT ALL nas tabelas
 -- + EXECUTE em todas as funções. Como `public` é servido pelo PostgREST, a fila

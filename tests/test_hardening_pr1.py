@@ -1,6 +1,6 @@
 """PR1 (hardening-pre-beta): net_guard anti-SSRF, caps de input, DEMO_MODE guard.
 
-Spec: docs/specs/hardening-pre-beta.md (F5, F6, F8).
+Spec histórica: docs/historical/hardening-pre-beta.md (F5, F6, F8).
 """
 from __future__ import annotations
 

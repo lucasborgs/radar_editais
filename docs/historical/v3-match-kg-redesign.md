@@ -1,6 +1,6 @@
 # Spec — v3: Dissociação Match / KG / RAG
 
-Status: **supersedida** por [`v3-unified.md`](v3-unified.md) · 2026-07-07 ·
+Status: **supersedida** por [`v3-unified.md`](../specs/v3-unified.md) · 2026-07-07 ·
 registro da proposta inicial, não descrição do runtime atual.
 
 ---

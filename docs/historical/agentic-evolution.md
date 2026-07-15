@@ -1,6 +1,9 @@
 # Spec — Evolução Arquitetural Agêntica
 
-Status: **proposta** · 2026-06-22 · escopo: migração de "1 agente + pipelines funcionais" para "4 agentes com papéis distintos + sub-agentes compartilhados"
+> **Registro histórico:** proposta parcialmente absorvida e parcialmente
+> superada pelo runtime atual. Consulte [`docs/architecture.md`](../architecture.md).
+
+Status original: **proposta** · 2026-06-22 · escopo: migração de "1 agente + pipelines funcionais" para "4 agentes com papéis distintos + sub-agentes compartilhados"
 
 ---
 

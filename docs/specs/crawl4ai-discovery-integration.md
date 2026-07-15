@@ -1,6 +1,6 @@
 # Spec — Integração Crawl4AI na Descoberta
 
-**Status:** implementada — rollout do coletor sob flag · **Data:** 2026-07-14
+**Status:** vigente — rollout do coletor sob flag · **Data:** 2026-07-14
 
 **Antecedente:** bake-off local de 2026-07-13, deliberadamente não versionado.
 

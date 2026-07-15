@@ -1,6 +1,6 @@
 # Spec: Lazy chunking (estilo NotebookLM)
 
-Status: **implementada** · 2026-06-26 · chunking de escrita permanece lazy e
+**Status:** vigente · **Data:** 2026-06-26 · chunking de escrita permanece lazy e
 independente do ingest gold.
 
 ## Decisão

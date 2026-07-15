@@ -1,6 +1,10 @@
 # Spec — First-Turn Generation + Correction Scope Detection
 
-Status: **proposta** · 2026-06-25 · escopo: dois aprimoramentos na WritingSession — (A) primeiro
+> **Registro histórico:** a geração em lote do primeiro turno permanece ativa;
+> o `scope_classifier` e o ripple descritos na parte B foram removidos. Consulte
+> [`docs/architecture.md`](../architecture.md).
+
+Status original: **proposta** · 2026-06-25 · escopo: dois aprimoramentos na WritingSession — (A) primeiro
 turno gera draft completo + compliance de uma vez, (B) detecção de escopo de correção com ripple
 automático
 

@@ -3,7 +3,11 @@
 **Versão:** 1.0  
 **Data:** 2026-07-05  
 **Autores:** Lucas Borges, Claude Code  
-**Status:** Design Review  
+> **Registro histórico:** plano que originou o workspace multi-modo. Os detalhes
+> de implementação abaixo incluem nomes substituídos; o runtime vigente está em
+> [`docs/architecture.md`](../architecture.md).
+
+**Status original:** Design Review
 
 ---
 
@@ -653,4 +657,3 @@ Response: {
 - ✅ **Web search:** Apenas em Intake se `EXPLORE_DEEP_RESEARCH_ENABLED=true`; Planning/Execution não acionam web (foco em RAG + hipergrado)
 - ✅ **Chars por seção:** 500-1000 palavras (~2-5k chars); seções longas são auto-chunked para RAG
 - ✅ **Error handling:** Veja seção 4.6 (timeouts = fallback gracioso, parse fails = approve_with_flag)
-

@@ -1,6 +1,10 @@
 # Spec — Edital Card como InjectedState no WritingAgent
 
-Status: **proposta** · 2026-06-30 · escopo: injetar o card completo do edital (`edital_card(full=True)`) como estado inicial do grafo do WritingAgent, antes de qualquer tool call ou RAG.
+> **Registro histórico:** o conceito de card foi implementado por
+> `_source_card_context`, mas não pelo desenho de `state.documents` descrito
+> abaixo. Consulte [`docs/architecture.md`](../architecture.md).
+
+Status original: **proposta** · 2026-06-30 · escopo: injetar o card completo do edital (`edital_card(full=True)`) como estado inicial do grafo do WritingAgent, antes de qualquer tool call ou RAG.
 
 ---
 

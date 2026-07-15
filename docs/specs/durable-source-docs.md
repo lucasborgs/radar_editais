@@ -1,6 +1,6 @@
 # Documento Canônico durável (robustez contra disco efêmero)
 
-Status: implementado 2026-06-27. Migration 032.
+**Status:** vigente · **Data:** 2026-06-27 · **Migration:** 032
 
 ## Problema-raiz
 

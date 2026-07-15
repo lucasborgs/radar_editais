@@ -1,11 +1,10 @@
 # Spec — Radar como porta de entrada
 
-**Status:** concluída · **Data:** 2026-07-14
-**Escopo da primeira entrega:** Radar explícito, explicável e acionável.  
+**Status:** vigente · **Data:** 2026-07-14
+**Escopo da primeira entrega:** Radar explícito, explicável e acionável.
 **Fora do escopo desta entrega:** alterar ranking/embeddings/elegibilidade, comparação, timeline de prazo, estados operacionais da descoberta e canvas de projeto do Explorer.
 
-**Documento-pai:** [radar-initiative.md](radar-initiative.md) mantém o mapa
-das entregas, dependências e specs futuras desta iniciativa.
+**Documento-pai:** [system-coherence.md](system-coherence.md).
 
 ---
 

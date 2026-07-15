@@ -1,6 +1,10 @@
 # Spec: Verificação pré-beta — leak-test multi-tenant + regressão de grounding
 
-Status: proposta · 2026-07-02 · origem: priorização pós-hardening (conversa
+> **Registro histórico:** investigação concluída. O inventário de isolamento
+> vigente está em [`docs/security/tenant-isolation.md`](../security/tenant-isolation.md)
+> e gates externos adiados estão em [`docs/BACKLOG.md`](../BACKLOG.md).
+
+Status original: proposta · 2026-07-02 · origem: priorização pós-hardening (conversa
 Fable 5). Complementa [hardening-pre-beta.md](hardening-pre-beta.md) — aquela
 spec adiciona defesas; esta VERIFICA que o isolamento e a qualidade existentes
 de fato seguram, antes do beta externo.

@@ -1,6 +1,10 @@
 # Spec — ExploreAgent com Rota Factual (Routing)
 
-Status: **implementado** · 2026-06-24 · Fase 0 (classificador + factual route) e Fase 1 (WritingSession sem resolve_scope) concluídas. Fase 2 (eval) pendente de API keys.
+> **Registro histórico:** o dispatcher de três rotas descrito abaixo foi
+> substituído pelo caminho único `_explore_agent`. Consulte
+> [`docs/architecture.md`](../architecture.md).
+
+Status original: **implementado** · 2026-06-24 · Fase 0 (classificador + factual route) e Fase 1 (WritingSession sem resolve_scope) concluídas. Fase 2 (eval) pendente de API keys.
 
 ---
 

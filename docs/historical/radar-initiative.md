@@ -1,6 +1,10 @@
 # Iniciativa — Radar como porta de entrada
 
-**Status:** ativa · **Data:** 2026-07-13  
+> **Registro histórico:** iniciativa que originou as superfícies atuais do
+> Radar. O enquadramento de produto vigente, com três capacidades igualmente
+> relevantes, está em [`system-coherence.md`](../specs/system-coherence.md).
+
+**Status original:** ativa · **Data:** 2026-07-13
 **Função deste documento:** mapa de produto e dependências. Não autoriza
 implementação sozinho; cada entrega só começa com sua spec filha aprovada.
 
@@ -24,9 +28,9 @@ Explorar uma ideia/projeto
 
 | Ordem | Entrega | Spec | Estado | Dependências | Critério de conclusão |
 |---:|---|---|---|---|---|
-| 1 | Radar explícito e explicável | [radar-frontdoor.md](radar-frontdoor.md) | concluída — 2026-07-14 | match v3, perfil, auth opcional, cards existentes | rota `/radar`, contrato determinístico e jornadas anônima/autenticada aprovadas |
-| 2 | Urgência, filtros e comparação | [radar-fase-2.md](radar-fase-2.md) | concluída — 2026-07-14 | entrega 1 e contrato estável de cards | usuário filtra, prioriza por prazo e compara oportunidades sem reinterpretar ranking |
-| 3 | Operação da descoberta | [discovery-operations.md](discovery-operations.md) + [integração Crawl4AI](crawl4ai-discovery-integration.md) | implementada (rollout do Crawl sob flag) | staging, evidências aprovadas, tasks de promoção, ingest gold e RAG | promoção observável por etapa, reprocessável e auditável |
+| 1 | Radar explícito e explicável | [radar-frontdoor.md](../specs/radar-frontdoor.md) | concluída — 2026-07-14 | match v3, perfil, auth opcional, cards existentes | rota `/radar`, contrato determinístico e jornadas anônima/autenticada aprovadas |
+| 2 | Urgência, filtros e comparação | [radar-fase-2.md](../specs/radar-fase-2.md) | concluída — 2026-07-14 | entrega 1 e contrato estável de cards | usuário filtra, prioriza por prazo e compara oportunidades sem reinterpretar ranking |
+| 3 | Operação da descoberta | [discovery-operations.md](../specs/discovery-operations.md) + [integração Crawl4AI](../specs/crawl4ai-discovery-integration.md) | implementada (rollout do Crawl sob flag) | staging, evidências aprovadas, tasks de promoção, ingest gold e RAG | promoção observável por etapa, reprocessável e auditável |
 | 4 | Explorer de projetos | `explorer-project-canvas.md` | não iniciada | decisão de modelo de dados/memória, entrega 1 | hipótese de projeto evolui para perfil/Radar por ação explícita do usuário |
 
 ## Regras de dependência

@@ -1,5 +1,8 @@
 # Repository polish
 
+> **Registro histórico:** escopo concluído da revisão conservadora executada em
+> 2026-07-14. Não autoriza trabalho atual.
+
 ## Objetivo
 
 Executar uma revisão conservadora de qualidade pré-feedback externo para que o

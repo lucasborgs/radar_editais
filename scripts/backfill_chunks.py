@@ -1,7 +1,7 @@
 """Backfill do corpus de RAG: chunka + embeda os editais do catálogo inteiro.
 
 Companheiro one-time do cron `warm_edital_chunks` (eager chunking — reversão
-operacional do lazy/PR #44; ver adendo na spec docs/specs/hardening-pre-beta.md).
+operacional do lazy/PR #44; ver adendo em docs/historical/hardening-pre-beta.md).
 Roda a MESMA task do runtime (`chunk_edital_task`) diretamente, sem worker,
 então o gate de content_hash vale: editais já indexados e inalterados são
 pulados sem custo. Re-rodar é sempre seguro.

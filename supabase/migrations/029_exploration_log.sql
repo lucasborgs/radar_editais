@@ -1,6 +1,6 @@
 -- 029: exploration_log — memória do ExploreAgent entre sessões (Fase 3A)
 --
--- Spec: docs/specs/agentic-evolution.md §Fase 3A. O ExploreAgent (KGMatchService
+-- Spec histórica: docs/historical/agentic-evolution.md §Fase 3A. O ExploreAgent (KGMatchService
 -- modo agent_enabled) é stateless por turno: quando o cliente volta numa nova
 -- sessão, o agente não lembra que já recomendou/descartou um edital antes. Esta
 -- tabela persiste essas decisões por workspace; no início de cada sessão do

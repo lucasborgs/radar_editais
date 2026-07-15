@@ -1,4 +1,4 @@
-"""Leak-test de isolamento multi-tenant (pré-beta) — docs/specs/pre-beta-verification.md.
+"""Leak-test de isolamento multi-tenant (pré-beta) — docs/historical/pre-beta-verification.md.
 
 Modelo de ameaça: um usuário autenticado do workspace B tentando ler/escrever
 estado do workspace A. Ataca as quatro superfícies, cada uma com sua defesa:
@@ -272,7 +272,7 @@ class TestS1PostgRESTRLS:
         authenticated — nem SELECT na tabela nem RPC de controle de fila.
 
         Antes do fix: anon lia `args` (workspace_id/payloads cross-tenant) e
-        deletava jobs. Ver docs/specs/pre-beta-verification.md Frente 1."""
+        deletava jobs. Ver docs/historical/pre-beta-verification.md Frente 1."""
         db_b = get_supabase_user(two_tenants["jwt_b"])
         with pytest.raises(APIError):
             db_b.table("procrastinate_jobs").select("*").execute()
