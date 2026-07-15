@@ -64,8 +64,6 @@ const ICON_PATHS = {
     "M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z",
   chat: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z",
   profile: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
-  settings:
-    "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z",
   dots: "M5 12h.01M12 12h.01M19 12h.01",
   discovered:
     "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm4-12l-6 2-2 6 6-2 2-6z",
@@ -88,7 +86,6 @@ const UTILITY_ITEMS: { href: string; label: string; d: string; adminOnly?: boole
   { href: "/library", label: "Arquivos", d: ICON_PATHS.files },
   // Fila da Descoberta é ferramenta do operador (ADMIN_EMAILS), não do cliente.
   { href: "/discovered", label: "Descobertas", d: ICON_PATHS.discovered, adminOnly: true },
-  { href: "/settings", label: "Configurações", d: ICON_PATHS.settings },
 ];
 
 // ── Componente ─────────────────────────────────────────────────────────────────

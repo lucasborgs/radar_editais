@@ -100,8 +100,6 @@ export const getMe = (token: string) =>
     user_id: string;
     workspace_id: string;
     profile: Partial<CompanyProfile>;
-    preferences?: UserPreferences;
-    contribute_to_global_weights?: boolean;
     // Operador do sistema (ADMIN_EMAILS no backend) — controla ferramentas de
     // gestão na UI (ex.: fila da Descoberta).
     is_admin?: boolean;
@@ -718,21 +716,6 @@ export const updateApplicationStatus = (
   apiFetch<{ success: boolean }>(`/applications/${id}/status`, {
     method: "PUT",
     body: JSON.stringify({ status, feedback_notas }),
-  }, token);
-
-// ── User preferences ───────────────────────────────────────
-
-export interface UserPreferences {
-  contribute_to_global_weights: boolean;
-}
-
-export const getMyPreferences = (token: string) =>
-  apiFetch<UserPreferences>("/me/preferences", undefined, token);
-
-export const updateMyPreferences = (prefs: Partial<UserPreferences>, token: string) =>
-  apiFetch<UserPreferences>("/me/preferences", {
-    method: "PUT",
-    body: JSON.stringify(prefs),
   }, token);
 
 // ── Research findings (Item 2, Fase B do deep_research) ────

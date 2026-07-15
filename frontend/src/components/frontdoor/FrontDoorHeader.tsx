@@ -19,7 +19,6 @@ const AUTHED_LINKS: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/oportunidades", label: "Ecossistema" },
   // Fila da Descoberta é ferramenta do operador (ADMIN_EMAILS), não do cliente.
   { href: "/discovered", label: "Descobertas", adminOnly: true },
-  { href: "/settings", label: "Configurações" },
 ];
 
 export function FrontDoorHeader({

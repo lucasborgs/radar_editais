@@ -82,7 +82,7 @@ export interface WritingTurnResponse {
   success: boolean;
   error?: string;
   error_type?: string;
-  // Presentes APENAS quando workspace tem agent_writing_enabled=true.
+  // Metadados do runtime agêntico de escrita.
   pending_user_input?: PendingUserInput | null;
   tool_trace?: ToolTraceEntry[];
   compliance_flags?: Array<Record<string, unknown>>;
