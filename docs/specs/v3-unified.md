@@ -287,7 +287,7 @@ Substituição concreta das arestas semânticas — 4 tools sobre SQL (via `enti
 
 **Fase 4 — Pipeline diário + discovery** (1 PR): `run_daily_etl` = scrapers → bronze → adapter → silver (structurer) → `ingest_all()` incremental (diff por `source_hash`) → embeddings. Substitui `build_all_hypergraphs`. Promote do discovery (admin-only) entra no mesmo caminho silver→gold. `chunk_edital` (writing) permanece lazy.
 
-**Fase 5 — Limpeza** (1 PR): deletar tudo da lista "Morre" (§9), remover flags, atualizar WIKI.md/CLAUDE.md/architecture.md, eval matching aponta só para v3.
+**Fase 5 — Limpeza** (1 PR): deletar tudo da lista "Morre" (§9), remover flags, atualizar WIKI.md/AGENTS.md/architecture.md, eval matching aponta só para v3.
 
 ## 11. Riscos e mitigações
 

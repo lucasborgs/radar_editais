@@ -1,6 +1,6 @@
 # Spec — Autoridade documental
 
-**Status:** em implementação · **Data:** 2026-07-14
+**Status:** vigente · **Data:** 2026-07-14
 **Documento-pai:** [`system-coherence.md`](system-coherence.md)
 **Perfis afetados:** usuário técnico e operador
 **Impacto:** baixo; organização e documentação, sem mudança de runtime
@@ -264,3 +264,23 @@ O eixo de autoridade documental estará concluído quando:
 7. referências vigentes estiverem separadas de registros históricos;
 8. todos os links locais estiverem válidos; e
 9. nenhuma alteração de documentação tiver mudado runtime ou regra de negócio.
+
+## 12. Resultado da execução
+
+Concluído em 2026-07-14:
+
+- `docs/README.md` tornou-se o índice de leitura por pergunta e perfil;
+- `AGENTS.md` tornou-se o único runbook de manutenção e `CLAUDE.md` foi removido;
+- 15 planos mistos ou substituídos saíram de `docs/specs/`, restando nove specs
+  com status e autoridade explícitos;
+- todo o conteúdo de `docs/features/` e `docs/components/` foi reconciliado;
+- referências vigentes foram concentradas em `docs/reference/`;
+- auditorias, pesquisas e planos superados foram preservados em
+  `docs/historical/` com índice e sem autoridade atual;
+- links históricos para destinos existentes foram recalculados; alvos removidos
+  deixaram de ser links sem reescrever o relato; e
+- nenhum contrato de runtime, schema, API, migration ou produto foi alterado.
+
+Não permaneceram documentos em `docs/specs/`, `docs/features/` ou
+`docs/components/` por incerteza. O material local de avaliação protegido
+permaneceu não rastreado.
