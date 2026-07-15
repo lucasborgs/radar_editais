@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import json
 import unicodedata
+from pathlib import Path
+
+import pytest
 
 from config import ROOT
 
@@ -16,8 +19,13 @@ def _jsonl(path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
+_finep_golden = ROOT / "data/silver/structured_docs/finep/745.jsonl"
+_fapesc_golden = ROOT / "data/silver/structured_docs/fapesc/31-2026.jsonl"
+
+
+@pytest.mark.skipif(not _finep_golden.exists(), reason="structured docs não gerados (rode o structurer primeiro)")
 def test_finep_golden_usa_terceira_rerratificacao_vigente():
-    blocks = _jsonl(ROOT / "data/silver/structured_docs/finep/745.jsonl")
+    blocks = _jsonl(_finep_golden)
     current = [
         b for b in blocks
         if "3ª_rerratificação_-_Regulamento_rerratificado.pdf" == b.get("doc")
@@ -31,8 +39,9 @@ def test_finep_golden_usa_terceira_rerratificacao_vigente():
     assert "servicos de terceiros" not in text
 
 
+@pytest.mark.skipif(not _fapesc_golden.exists(), reason="structured docs não gerados (rode o structurer primeiro)")
 def test_fapesc_golden_cobre_as_quatro_familias_e_thresholds():
-    blocks = _jsonl(ROOT / "data/silver/structured_docs/fapesc/31-2026.jsonl")
+    blocks = _jsonl(_fapesc_golden)
     section4 = [
         b for b in blocks
         if (b.get("section_path") or [""])[0].startswith("4.")
