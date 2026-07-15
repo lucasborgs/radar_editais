@@ -60,15 +60,3 @@ def get_supabase_user(jwt: str) -> Client:
             pass
 
     return client
-
-
-# -----------------------------------------------------------------------------
-# Compatibilidade retroativa
-# -----------------------------------------------------------------------------
-# DEPRECATED: prefira `get_supabase_service()` em código novo.
-# Mantido para que pipelines/jobs/scripts antigos continuem funcionando sem
-# alterações. Rotas FastAPI NÃO devem usar este alias — use a dependência
-# `DbClient`/`get_db` em core/auth.py para obter um cliente per-request
-# autenticado com o JWT do usuário.
-def get_supabase() -> Client:
-    return get_supabase_service()

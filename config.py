@@ -24,9 +24,6 @@ FINEP_PDFS_DIR = BRONZE_DIR / "finep_pdfs"
 # ferramentas locais de vocabulário; catálogo e match v3 vivem no Postgres gold.
 KNOWLEDGE_GRAPH_DIR = ROOT / "data" / "knowledge_graph"
 
-# Compatibilidade com ferramentas que ainda inspecionam wiki pages históricas.
-KG_WIKI_DIR = KNOWLEDGE_GRAPH_DIR / "wiki"
-
 # Vault Obsidian unificado dentro do projeto (raiz do vault).
 # As notas vivem em OBSIDIAN_VAULT_DIR/<subfolder>/ (subfolder = "radar-editais").
 # Gerado pelo ETL diário ou sob demanda por scripts/export_to_obsidian.py.
