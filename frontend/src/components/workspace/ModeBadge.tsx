@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
 type Mode = "explorer" | "plan" | "escrita";
 
 const MODE_LABELS: Record<Mode, string> = {
-  explorer: "/explorer",
-  plan: "/plan",
-  escrita: "/escrita",
+  explorer: "Contexto",
+  plan: "Plano",
+  escrita: "Escrita",
 };
 
 const MODE_STYLES: Record<Mode, string> = {
@@ -26,7 +26,7 @@ export function ModeBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium font-mono leading-none",
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium font-sans leading-none",
         MODE_STYLES[mode],
         className,
       )}

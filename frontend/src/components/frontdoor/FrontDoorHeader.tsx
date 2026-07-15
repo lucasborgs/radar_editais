@@ -15,7 +15,6 @@ import { cn } from "@/lib/utils";
  */
 const AUTHED_LINKS: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/library", label: "Biblioteca" },
-  { href: "/sessions", label: "Sessões" },
   { href: "/pipeline", label: "Pipeline" },
   { href: "/oportunidades", label: "Ecossistema" },
   // Fila da Descoberta é ferramenta do operador (ADMIN_EMAILS), não do cliente.
@@ -55,8 +54,9 @@ export function FrontDoorHeader({
   return (
     <header className="shrink-0 border-b border-border bg-surface">
       <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-        <Link href="/" className="text-sm font-semibold text-content-primary font-sans">
-          Radar de Editais
+        <Link href="/" aria-label="Radar de Editais" className="text-sm font-semibold text-content-primary font-sans">
+          <span className="hidden sm:inline">Radar de Editais</span>
+          <span className="sm:hidden">RE</span>
         </Link>
 
         <div className="flex items-center gap-1">
@@ -65,6 +65,9 @@ export function FrontDoorHeader({
           </Link>
           <Link href="/radar" className="rounded-lg px-3 py-1.5 text-sm font-sans text-content-primary hover:bg-app-bg transition-colors">
             Radar
+          </Link>
+          <Link href="/projects" className="rounded-lg px-3 py-1.5 text-sm font-sans text-content-primary hover:bg-app-bg transition-colors">
+            Projetos
           </Link>
           {!isAuthed && (
             <Link

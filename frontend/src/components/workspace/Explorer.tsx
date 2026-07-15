@@ -13,7 +13,7 @@ function loadCollapsed(): boolean {
 }
 
 /**
- * Explorer retrátil do workspace.
+ * Painel retrátil de estrutura do projeto.
  *
  * Expandido: árvore "Proposta" (seções do outline, ✓ quando tem conteúdo,
  * ⚠︎n quando o auto-review encontrou findings) + grupo "Anexos" (library_items
@@ -65,7 +65,7 @@ export function Explorer({
       <div className="w-11 shrink-0 border-r border-border bg-white flex flex-col items-center py-3 gap-1">
         <button
           onClick={toggle}
-          title="Expandir explorer"
+          title="Expandir estrutura"
           className="w-8 h-8 flex items-center justify-center rounded-lg text-content-secondary hover:bg-gray-50 transition-colors"
         >
           ☰
@@ -106,11 +106,11 @@ export function Explorer({
       {/* topo: título + colapsar */}
       <div className="h-9 shrink-0 px-3 flex items-center justify-between border-b border-border">
         <span className="text-[10px] font-semibold text-content-secondary font-sans uppercase tracking-wide">
-          Explorer
+          Estrutura
         </span>
         <button
           onClick={toggle}
-          title="Colapsar explorer"
+          title="Colapsar estrutura"
           className="text-content-secondary hover:text-content-primary transition-colors text-sm leading-none"
         >
           «

@@ -7,8 +7,8 @@ import { modeLabel } from "./types";
 import { ModeBadge } from "./ModeBadge";
 
 /**
- * Header fino do workspace: nome do edital/alvo + badge do modo
- * (Proposta/Pitch) + completude do documento + voltar ao radar.
+ * Header fino do projeto: nome do edital/alvo + badge do modo
+ * (Proposta/Pitch) + completude do documento + retorno aos projetos.
  */
 export function WorkspaceHeader({
   title,
@@ -28,11 +28,11 @@ export function WorkspaceHeader({
   return (
     <header className="h-12 shrink-0 border-b border-border bg-white flex items-center gap-3 px-4">
       <Link
-        href="/"
+        href="/projects"
         className="text-xs font-sans text-content-secondary hover:text-content-primary transition-colors shrink-0"
-        title="Voltar ao radar"
+        title="Voltar aos projetos"
       >
-        ← Radar
+        ← Projetos
       </Link>
 
       {wsMode && <ModeBadge mode={wsMode} />}

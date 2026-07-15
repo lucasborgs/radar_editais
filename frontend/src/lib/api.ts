@@ -602,6 +602,9 @@ export interface WritingSessionSummary {
   session_id: string;
   edital_id: string;
   edital_title?: string;
+  // Rows anteriores à migration 020 podem não expor kind; nesse caso são
+  // sessões de escrita por compatibilidade.
+  kind?: "frontdoor" | "writing";
   status: "active" | "completed" | "abandoned";
   turn_count: number;
   created_at: string;

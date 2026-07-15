@@ -44,6 +44,12 @@ function nowTime(): string {
   return new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+const WELCOME_BY_MODE: Record<"explorer" | "plan" | "escrita", string> = {
+  explorer: "🧭 Contexto ativado (`/explorer`). Tire dúvidas sobre o edital. Quando quiser planejar, digite `/plan`.",
+  plan: "📋 Plano ativado (`/plan`). Estruture a proposta. Para escrever, digite `/escrita`.",
+  escrita: "✍️ Escrita ativada (`/escrita`). Desenvolva sua proposta. Para dúvidas sobre o edital, digite `/explorer`.",
+};
+
 export default function WorkspacePage() {
   const params = useParams();
   const sessionId = Array.isArray(params.sessionId) ? params.sessionId[0] : params.sessionId;
@@ -65,12 +71,6 @@ export default function WorkspacePage() {
   const [savingSection, setSavingSection] = useState<string | null>(null);
   const [refining, setRefining] = useState<string | null>(null);
   const [wsMode, setWsMode] = useState<"explorer" | "plan" | "escrita">("explorer");
-
-  const WELCOME_BY_MODE: Record<string, string> = {
-    explorer: "🧭 Modo /explorer ativado. Tire dúvidas sobre o edital. Quando quiser planejar, digite /plan.",
-    plan: "📋 Modo /plan ativado. Planeje a estrutura da proposta. Para escrever, digite /escrita.",
-    escrita: "✍️ Modo /escrita ativado. Escreva sua proposta. Para dúvidas sobre o edital, digite /explorer.",
-  };
 
   function parseCommand(input: string): { command?: "explorer" | "plan" | "escrita"; message: string } {
     const match = input.trim().match(/^\/(explorer|plan|escrita|help)\b/);
@@ -185,7 +185,7 @@ export default function WorkspacePage() {
     getLibraryItems(token).then(setAttachments).catch(() => setAttachments([]));
   }, [token]);
 
-  // ── Explorer: navegação e anexos ──────────────────────────────────────────
+  // ── Estrutura: navegação e anexos ─────────────────────────────────────────
   const handleSelectSection = useCallback((title: string) => {
     scrollToSectionRef.current(title);
     setMobileTab("doc");
@@ -497,7 +497,7 @@ export default function WorkspacePage() {
     return (
       <div className="h-screen flex items-center justify-center bg-app-bg">
         <p className="text-sm text-content-secondary font-sans">
-          Faça login para abrir o workspace.
+          Faça login para abrir o projeto.
         </p>
       </div>
     );
@@ -508,8 +508,8 @@ export default function WorkspacePage() {
       <div className="h-screen flex items-center justify-center bg-app-bg px-6">
         <div className="text-center max-w-sm">
           <p className="text-sm text-content-primary font-sans mb-2">{loadError}</p>
-          <a href="/sessions" className="text-sm text-primary font-sans hover:underline">
-            ← Voltar para sessões
+          <a href="/projects" className="text-sm text-primary font-sans hover:underline">
+            ← Voltar para Projetos
           </a>
         </div>
       </div>
@@ -537,12 +537,12 @@ export default function WorkspacePage() {
         sessionId={sessionId}
       />
 
-            {/* Mobile: abas Documento | Chat + drawer do explorer (só quando editor visível) */}
+      {/* Mobile: abas Documento | Chat + drawer da estrutura */}
       {wsMode === "escrita" && sections.length > 0 && (
         <div className="md:hidden flex items-center border-b border-border bg-white">
           <button
             onClick={() => setMobileDrawer(true)}
-            title="Abrir explorer"
+            title="Abrir estrutura"
             className="px-3 py-2 text-content-secondary hover:text-content-primary transition-colors"
           >
             ☰
@@ -565,7 +565,7 @@ export default function WorkspacePage() {
       )}
 
       <div className="flex-1 flex min-h-0">
-        {/* Explorer — sidebar no desktop (sempre que houver seções) */}
+        {/* Estrutura — sidebar no desktop (sempre que houver seções) */}
         {sections.length > 0 && (
           <div className="hidden md:flex">
             <Explorer
@@ -581,11 +581,11 @@ export default function WorkspacePage() {
           </div>
         )}
 
-        {/* Explorer — drawer overlay no mobile */}
+        {/* Estrutura — drawer overlay no mobile */}
         {mobileDrawer && sections.length > 0 && (
           <div className="md:hidden fixed inset-0 z-40 flex">
             <button
-              aria-label="Fechar explorer"
+              aria-label="Fechar estrutura"
               onClick={() => setMobileDrawer(false)}
               className="absolute inset-0 bg-black/40"
             />

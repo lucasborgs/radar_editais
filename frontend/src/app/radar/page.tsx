@@ -33,7 +33,7 @@ function FilterButton({ active, children, onClick }: { active: boolean; children
 }
 
 function RadarNavigation() {
-  return <nav aria-label="Jornadas principais" className="mb-8 flex items-center justify-between border-b border-border pb-3 text-sm"><Link href="/" className="font-semibold text-content-primary">Radar Editais</Link><div className="flex items-center gap-1"><Link href="/" className="rounded-lg px-3 py-1.5 text-content-secondary hover:bg-surface hover:text-content-primary">Explorar</Link><span aria-current="page" className="rounded-lg bg-primary/10 px-3 py-1.5 font-medium text-primary">Radar</span></div></nav>;
+  return <nav aria-label="Jornadas principais" className="mb-8 flex items-center justify-between border-b border-border pb-3 text-sm"><Link href="/" className="font-semibold text-content-primary">Radar Editais</Link><div className="flex items-center gap-1"><Link href="/" className="rounded-lg px-3 py-1.5 text-content-secondary hover:bg-surface hover:text-content-primary">Explorar</Link><span aria-current="page" className="rounded-lg bg-primary/10 px-3 py-1.5 font-medium text-primary">Radar</span><Link href="/projects" className="rounded-lg px-3 py-1.5 text-content-secondary hover:bg-surface hover:text-content-primary">Projetos</Link></div></nav>;
 }
 
 function ComparisonPanel({ editais, onRemove, onStartWriting }: { editais: RadarMatchesResponse["matched_editais"]; onRemove: (id: string) => void; onStartWriting: (edital: RadarMatchesResponse["matched_editais"][number]) => void }) {

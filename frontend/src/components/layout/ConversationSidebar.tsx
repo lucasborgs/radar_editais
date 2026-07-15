@@ -24,20 +24,18 @@ import {
   type ConversationSummary,
 } from "@/lib/api";
 
-// ── Dois destinos (spec chat-first, decisão 2026-06-13) ───────────────────────
-// O sidebar separa as duas superfícies de primeira classe: "Descobrir"
-// (conversas de discovery/match — kind=frontdoor) e "Escrever" (propostas —
-// kind=writing). Dentro de cada seção, mais recentes primeiro (a API já ordena
-// por updated_at desc). Substitui o agrupamento por data.
-type Section = "Descobrir" | "Escrever";
-const SECTION_ORDER: Section[] = ["Descobrir", "Escrever"];
+// Histórico secundário: conversas feitas em Explorar e projetos de escrita.
+// Os destinos primários ficam estáveis acima; aqui entram apenas retomadas
+// recentes, ordenadas por updated_at desc pela API.
+type Section = "Explorar" | "Projetos recentes";
+const SECTION_ORDER: Section[] = ["Explorar", "Projetos recentes"];
 const SECTION_KIND: Record<Section, ConversationSummary["kind"]> = {
-  Descobrir: "frontdoor",
-  Escrever: "writing",
+  Explorar: "frontdoor",
+  "Projetos recentes": "writing",
 };
 const SECTION_EMPTY: Record<Section, string> = {
-  Descobrir: "Nenhuma conversa de descoberta ainda.",
-  Escrever: "Nenhuma proposta em andamento.",
+  Explorar: "Nenhuma conversa ainda.",
+  "Projetos recentes": "Nenhum projeto em andamento.",
 };
 
 // ── Ícones (stroke 1.75, alinhados ao restante do app) ─────────────────────────
@@ -73,11 +71,14 @@ const ICON_PATHS = {
     "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm4-12l-6 2-2 6 6-2 2-6z",
   radar:
     "M12 3a9 9 0 109 9M12 7a5 5 0 105 5M12 11a1 1 0 100 2M12 12l6.5-6.5",
+  projects:
+    "M4 7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V7z",
 } as const;
 
 const PRIMARY_ITEMS = [
   { href: "/", label: "Explorar", d: ICON_PATHS.discovered },
   { href: "/radar", label: "Radar", d: ICON_PATHS.radar },
+  { href: "/projects", label: "Projetos", d: ICON_PATHS.projects },
 ] as const;
 
 const UTILITY_ITEMS: { href: string; label: string; d: string; adminOnly?: boolean }[] = [
@@ -189,7 +190,7 @@ export function ConversationSidebar() {
     [titles],
   );
 
-  // Filtro client-side por título + partição em Descobrir/Escrever (por kind).
+  // Filtro client-side por título + partição por capacidade (via kind).
   // Sempre renderiza as duas seções (mesmo vazias) para os destinos serem
   // estáveis — exceto quando há busca, aí só mostra seções com resultado.
   const sections = useMemo(() => {
