@@ -1,6 +1,6 @@
 # Spec-guia — Coerência sistêmica
 
-**Status:** aprovada · **Data:** 2026-07-14
+**Status:** vigente · **Data:** 2026-07-14 · **Reconciliada:** 2026-07-15
 **Função deste documento:** fixar propósito, invariantes e critérios para as
 specs executáveis de redução de complexidade. Esta spec não autoriza alterações
 de comportamento por si só.
@@ -235,7 +235,8 @@ O trabalho de coerência estará concluído quando:
 | Modelo mental e superfície do usuário | [`user-mental-model.md`](user-mental-model.md) | vigente |
 | Avaliação e operação | [`evaluation-operations.md`](evaluation-operations.md) | aprovada |
 | Convergência de runtime e dados | [`data-plane-convergence.md`](data-plane-convergence.md) | vigente |
-| Capacidades dormentes | [`dormant-capabilities.md`](dormant-capabilities.md) | proposta |
+| Capacidades dormentes | [`dormant-capabilities.md`](dormant-capabilities.md) | vigente |
 
-Esta é a última filha prevista. A spec-guia só será reconciliada como vigente
-depois que esta execução for concluída e validada.
+Os cinco eixos foram especificados, executados e reconciliados. Pendências que
+dependem de uso real ou serviços externos permanecem explicitamente nos seus
+gates, sem reabrir esta sequência de simplificação.

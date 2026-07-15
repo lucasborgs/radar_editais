@@ -1,6 +1,6 @@
 # Spec — Ciclo de vida de capacidades dormentes
 
-**Status:** proposta · **Data:** 2026-07-15
+**Status:** vigente · **Data:** 2026-07-15
 **Documento-pai:** [`system-coherence.md`](system-coherence.md)
 **Perfis afetados:** usuário de produto, usuário técnico e operador
 **Impacto:** médio; remove superfícies comprovadamente sem efeito e explicita o
@@ -55,7 +55,7 @@ Capacidades dormentes devem declarar responsável pela ativação, pré-condiç�
 custo/risco, evidência exigida e fallback. Nenhuma deve parecer disponível ao
 usuário de produto antes de produzir o efeito prometido.
 
-## 3. Classificação proposta
+## 3. Classificação vigente
 
 ### 3.1 Ativas ou opcionais — preservar como estão
 
@@ -126,8 +126,8 @@ A UI, endpoint e coluna armazenam uma preferência para um processamento que nã
 existe. O banco possui zero opt-ins e não há consumidor fora do próprio CRUD.
 Manter a superfície cria uma promessa factual falsa ao usuário.
 
-Proposta: remover o toggle da UI, o endpoint dedicado, os tipos associados e a
-coluna por migration. Uma futura aprendizagem global deve introduzir um novo
+Executado: o toggle da UI, o endpoint dedicado, os tipos associados e a coluna
+foram removidos pela migration 039. Uma futura aprendizagem global deve introduzir um novo
 consentimento, ligado ao processamento real e descrito no momento da coleta; não
 deve herdar silenciosamente esta preferência.
 
@@ -195,3 +195,14 @@ deve herdar silenciosamente esta preferência.
 4. capacidades opcionais não são confundidas com código morto;
 5. memória histórica e seams de laboratório permanecem utilizáveis; e
 6. a quinta spec-filha e a spec-guia podem ser reconciliadas como vigentes.
+
+## 10. Evidência de execução
+
+- migration 039 remove apenas `agent_explore_enabled` e
+  `contribute_to_global_weights`; as migrations históricas permanecem intactas;
+- a página `/settings`, seus links e o CRUD de preferência foram removidos;
+- o inventário vigente está em
+  [`docs/reference/capability-lifecycle.md`](../reference/capability-lifecycle.md);
+- escrita automática de memória, meta-reflexão, ProfileExtractor agêntico,
+  CNPJ e embeddings locais não foram ativados nem removidos; e
+- os 37 insights históricos e os readers de memória/playbook foram preservados.
