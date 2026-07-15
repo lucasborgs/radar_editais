@@ -87,6 +87,10 @@ def skip_keywords(source: str) -> list[str]:
     return load(source).get("skip_keywords", [])
 
 
+def document_authority_overrides(source: str) -> dict:
+    return load(source).get("document_authority_overrides", {})
+
+
 # ---------------------------------------------------------------------------
 # Documento estruturado (silver — WIKI.md §11)
 # ---------------------------------------------------------------------------

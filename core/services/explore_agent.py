@@ -87,6 +87,9 @@ COMO USAR AS FERRAMENTAS DE LEITURA
   IMPORTANTE: quando perguntarem sobre ICTs para parceria, liste os NOMES
   das ICTs explicitamente — não apenas descrições genéricas.
 - list_investidores → captação privada: fundos com tese num tema.
+- get_investidor → ficha completa de um fundo nomeado: tese, verticais/setores,
+  estágio, ticket, portfólio e fonte. É obrigatória para perguntas factuais
+  sobre um investidor específico.
 - get_edital → resumo de um edital específico (após explore_opportunity ou
   quando o ID já aparece na pergunta): objetivo, mecanismo, elegíveis, temas.
 - search_entities → busca SEMÂNTICA (por significado) no ecossistema. Use para
@@ -142,12 +145,14 @@ class ExploreAgent:
         workspace_id: str | None = None,
         db=None,
         profile: dict | None = None,
+        route_decision=None,
     ) -> str:
         """Roteia todo pedido para o agente multi-step (rota única pós-Sprint 3)."""
         answer, _meta = self.explore_with_meta(
             message, history, edital_ids, node_id, node_type,
             has_profile=has_profile, profile_text=profile_text,
             workspace_id=workspace_id, db=db, profile=profile,
+            route_decision=route_decision,
         )
         return answer
 
@@ -163,13 +168,27 @@ class ExploreAgent:
         workspace_id: str | None = None,
         db=None,
         profile: dict | None = None,
+        route_decision=None,
     ) -> tuple[str, dict]:
         """Como `explore`, mas devolve também metadados do run: `stop_reason` e
         `truncated` (= cortado no teto de passos, PR6.2/F10) — o router expõe
         `truncated` no response para o front avisar o usuário."""
+        if route_decision is None:
+            from core.services.explore_routing import (
+                RouteContext,
+                classify_ambiguous_route,
+                route_message,
+            )
+            target_type = node_type or ("edital" if edital_ids else None)
+            target_id = node_id or (edital_ids[0] if edital_ids else None)
+            route_decision = route_message(RouteContext(
+                message=message, target_type=target_type, target_id=target_id,
+                has_profile=has_profile, workspace_id=workspace_id,
+            ), ambiguous_classifier=classify_ambiguous_route)
         return self._explore_agent(
             message, history, edital_ids, node_id, node_type,
             profile_text=profile_text, workspace_id=workspace_id, db=db, profile=profile,
+            route_decision=route_decision,
         )
 
     def _explore_tools(self) -> list:
@@ -194,10 +213,36 @@ class ExploreAgent:
         workspace_id: str | None = None,
         db=None,
         profile: dict | None = None,
+        route_decision=None,
     ) -> tuple[str, dict]:
         """Pipeline agente: run_agent + tools de leitura do catálogo gold,
         planejamento e (gated) deep_research — montadas em `_explore_tools`.
         Retorna `(answer, meta)`; meta carrega stop_reason/truncated."""
+        if (
+            route_decision is not None
+            and route_decision.intent.value == "EDITAL_FACT_ENUMERATIVE"
+            and route_decision.target_id
+            and os.getenv("EXPLORE_FACTUAL_RAG_ENABLED", "true").lower() == "true"
+        ):
+            try:
+                from core.services.factual_synthesis import synthesize_enumerative_answer
+
+                answer = synthesize_enumerative_answer(
+                    route_decision.target_id, message,
+                )
+                return answer, {
+                    "stop_reason": "end_turn",
+                    "truncated": False,
+                    "called_match": False,
+                    "route_decision": route_decision.to_dict(),
+                    "called_tools": ["search_edital_factual"],
+                }
+            except Exception as exc:  # degrada para o agente/tool já existente
+                logger.warning(
+                    "síntese factual enumerativa falhou (%s): %s; usando ReAct",
+                    route_decision.target_id, exc,
+                )
+
         from core.llm.agent_runtime import resolve_agent_provider, run_agent
 
         messages: list[dict] = []
@@ -222,6 +267,42 @@ class ExploreAgent:
 
         tools = self._explore_tools()
         system = EXPLORE_AGENT_SYSTEM
+        if route_decision is not None:
+            route_payload = route_decision.to_dict()
+            system += (
+                "\n\nROTA DETERMINADA PELA POLÍTICA (não reclassifique e não "
+                f"emita redirect): {route_payload}. Use somente ferramentas "
+                "compatíveis com essa rota."
+            )
+            if (
+                route_decision.intent.value in {"EDITAL_FACT", "EDITAL_FACT_ENUMERATIVE"}
+                and route_decision.target_id
+                and os.getenv("EXPLORE_FACTUAL_RAG_ENABLED", "true").lower() == "true"
+            ):
+                from core.llm.agent_tools.factual_tools import build_factual_tools
+                tools += build_factual_tools(
+                    route_decision.target_id, route_decision.retrieval_profile,
+                )
+                system += (
+                    " Para esta rota, chame search_edital_factual antes de responder. "
+                    "Não use get_edital como substituto e não use editais análogos. "
+                    "Em listas, cubra todas as subseções recuperadas. Cite documento, "
+                    "versão/data, seção e página; declare ausência de autoridade."
+                )
+            elif (
+                route_decision.intent.value == "ENTITY_FACT"
+                and route_decision.target_type == "investidor"
+                and route_decision.target_id
+            ):
+                # A rota já resolveu tipo e ID; deixar tools genéricas no set
+                # permite ao LLM ignorar o contrato e chamar vizinhança/busca.
+                # Para fato de fundo nomeado, a única fonte compatível é a
+                # ficha estruturada completa.
+                tools = [tool for tool in tools if tool.name == "get_investidor"]
+                system += (
+                    " Para esta rota, chame obrigatoriamente get_investidor com "
+                    f"investidor_id={route_decision.target_id!r} antes de responder."
+                )
 
         # Match v3: só quando há PERFIL. COM workspace autenticado, o lado
         # empresa vem de company_chunks (perfil + library, refresh on-demand);
@@ -267,11 +348,15 @@ class ExploreAgent:
             and s.name in ("find_matching_editais", "find_matching_entities")
             for s in result.steps
         )
+        called_tools = [s.name for s in result.steps if s.kind == "tool" and s.name]
         meta = {
             "stop_reason": result.stop_reason,
             "truncated": result.stop_reason == "max_steps",
             "called_match": called_match,
         }
+        if route_decision is not None:
+            meta["route_decision"] = route_decision.to_dict()
+            meta["called_tools"] = called_tools
         if result.stop_reason == "error":
             logger.error("explore agent: stop_reason=error após %d steps", len(result.steps))
             return (

@@ -95,6 +95,17 @@ def test_hash_muda_com_conteudo():
     assert source_docs.canonical_hash(a) != source_docs.canonical_hash(b)
 
 
+def test_hash_muda_com_autoridade_e_active_documents_filtra_historico():
+    active = {"doc_name": "A", "units": ["x"],
+              "metadata": {"authority_state": "vigente"}}
+    old = {"doc_name": "B", "units": ["y"],
+           "metadata": {"authority_state": "superseded"}}
+    assert source_docs.canonical_hash([active]) != source_docs.canonical_hash([
+        {**active, "metadata": {"authority_state": "superseded"}},
+    ])
+    assert source_docs.active_documents([active, old]) == [active]
+
+
 # ---------------------------------------------------------------------------
 # load
 # ---------------------------------------------------------------------------

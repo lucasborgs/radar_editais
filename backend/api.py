@@ -12,9 +12,9 @@ routers raiz auth_routes/library_routes; dependências compartilhadas em
 backend/common.py; rate limiting em backend/rate_limit.py.
 """
 
-from dotenv import load_dotenv
+from core.environment import assert_runtime_environment, load_environment_profile
 
-load_dotenv()
+load_environment_profile()
 
 
 import logging
@@ -47,6 +47,7 @@ from core.logging_config import request_id_var, setup_logging
 
 setup_logging()
 logger = logging.getLogger(__name__)
+assert_runtime_environment("backend API")
 
 
 def _guard_demo_mode() -> None:

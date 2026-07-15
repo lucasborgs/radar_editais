@@ -26,11 +26,17 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core.db import get_supabase_service  # noqa: E402
+from core.environment import assert_database_target  # noqa: E402
 from core.kg import entity_catalog  # noqa: E402
 from core.tasks import chunk_edital_task  # noqa: E402
 
 
-def _load_ids(source_filter: str | None) -> list[str]:
+def _load_ids(source_filter: str | None, edital_ids: list[str] | None = None) -> list[str]:
+    if edital_ids:
+        ids = list(dict.fromkeys(edital_ids))
+        if source_filter:
+            ids = [eid for eid in ids if eid.startswith(f"{source_filter}:")]
+        return sorted(ids)
     data = entity_catalog.list_editais(limit=500)
     ids = [e["id"] for e in data if e.get("id")]
     if source_filter:
@@ -80,13 +86,15 @@ async def _process_one(db, edital_id: str, queue: bool, force: bool) -> dict:
             return {"edital_id": edital_id, "status": "enqueued"}
         await _run_sync(edital_id, force=force)
         n = _count_chunks(db, edital_id)
+        if n == 0:
+            return {"edital_id": edital_id, "status": "error: nenhum chunk produzido"}
         return {"edital_id": edital_id, "status": f"indexed ({n} chunks)"}
     except Exception as e:
         return {"edital_id": edital_id, "status": f"error: {e}"}
 
 
 async def _main_async(args: argparse.Namespace) -> int:
-    targets = _load_ids(args.source)
+    targets = _load_ids(args.source, args.edital_ids)
     if not targets:
         print("[reindex_all] Nenhum edital encontrado no catálogo gold")
         return 1
@@ -116,6 +124,10 @@ def main() -> int:
         help="Filtra por fonte (ex: finep, fapesp, web). Sem filtro = todas.",
     )
     parser.add_argument(
+        "--edital-id", action="append", dest="edital_ids", metavar="ID",
+        help="Reindexa somente o ID canônico informado (repetível).",
+    )
+    parser.add_argument(
         "--force", action="store_true",
         help="Re-indexa mesmo se já houver chunks (ignora gate de content_hash).",
     )
@@ -124,6 +136,7 @@ def main() -> int:
         help="Enfileira via procrastinate ao invés de rodar inline.",
     )
     args = parser.parse_args()
+    assert_database_target("all editais reindex")
     return asyncio.run(_main_async(args))
 
 

@@ -152,7 +152,7 @@
     {
       "id": "investidor:barn-invest",
       "name": "Barn Invest",
-      "tese": "Venture capital de greentech em estágio de crescimento (growth): agro, energia renovável, mobilidade e indústria limpa/circular.",
+      "tese": "Venture capital de greentech para impulsionar a transição verde na América Latina, com foco em empresas em estágio de crescimento (growth).",
       "tese_themes": [
         "energia e transição sustentável",
         "agro - bioeconomia e alimentos",
@@ -166,10 +166,10 @@
         "economia circular"
       ],
       "setores": [
-        "energia",
-        "agro",
-        "mobilidade",
-        "industria"
+        "agro e uso da terra",
+        "transporte e mobilidade",
+        "indústria limpa e economia circular",
+        "energia renovável e eficiência energética"
       ],
       "estagio_alvo": [
         "growth"

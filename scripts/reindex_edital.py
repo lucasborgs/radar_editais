@@ -29,6 +29,7 @@ if str(ROOT) not in sys.path:
 
 from config import FINEP_PDFS_DIR  # noqa: E402
 from core.db import get_supabase_service  # noqa: E402
+from core.environment import assert_database_target  # noqa: E402
 from core.tasks import chunk_edital_task  # noqa: E402
 
 # Historical cost estimate retained for the CLI's existing output contract.
@@ -175,6 +176,7 @@ def main() -> int:
     args = parser.parse_args()
     if not args.edital_id and not args.all:
         parser.error("forneça <edital_id> ou --all")
+    assert_database_target("edital reindex")
     return asyncio.run(_main_async(args))
 
 

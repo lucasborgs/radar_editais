@@ -15,8 +15,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from dotenv import load_dotenv
-
+from core.environment import load_environment_profile
 from core.eval.harness import run_suite
 from core.eval.registry import SUITES, get_suite
 
@@ -53,7 +52,7 @@ def _normalize_legacy_args(argv: list[str]) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    load_dotenv()  # CLI standalone: credenciais antes dos imports que as leem
+    load_environment_profile()  # CLI standalone: perfil antes dos consumidores
     args = _parser().parse_args(_normalize_legacy_args(list(argv or sys.argv[1:])))
     names = list(SUITES) if args.suite == "all" else [args.suite]
     statuses = []

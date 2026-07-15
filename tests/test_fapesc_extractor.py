@@ -106,6 +106,21 @@ def test_find_edital_pdf_none_when_no_pdf():
     assert scraper._find_edital_pdf(soup) is None
 
 
+def test_normative_pdfs_compose_base_and_retification():
+    html = """
+    <a href="https://fapesc.sc.gov.br/wp-content/uploads/2026/01/Edital-31.pdf">ACESSE O EDITAL COMPLETO</a>
+    <a href="https://fapesc.sc.gov.br/wp-content/uploads/2026/02/Retificacao-1.pdf">1ª Retificação</a>
+    <a href="https://fapesc.sc.gov.br/wp-content/uploads/2026/03/Resultado.pdf">Resultado</a>
+    """
+    scraper = FAPESCScraper()
+    with patch("pipeline.extractors.fapesc._skip_keywords", return_value=["resultado"]):
+        docs = scraper._find_normative_pdfs(BeautifulSoup(html, "html.parser"))
+    assert docs == [
+        ("https://fapesc.sc.gov.br/wp-content/uploads/2026/01/Edital-31.pdf", "edital-base"),
+        ("https://fapesc.sc.gov.br/wp-content/uploads/2026/02/Retificacao-1.pdf", "emenda"),
+    ]
+
+
 # =============================================================================
 # _parse_chamada — orquestração: HTML → PDF → texto_cru + prazo do PDF
 # =============================================================================

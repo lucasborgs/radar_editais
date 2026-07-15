@@ -14,7 +14,9 @@ from __future__ import annotations
 import json
 import logging
 import re
+import unicodedata
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 from config import BRONZE_DIR, FINEP_PDFS_DIR
 
@@ -52,6 +54,7 @@ _SKIP_KEYWORDS_FALLBACK = [
     "apresentacao", "resultado", "oficio", "telas", "guia",
     "orientacoes_para_apresentacao",
     "orientacoes_para_despesas", "relatorio_parcial", "ebook", "agravo",
+    "aviso",
 ]
 
 
@@ -60,9 +63,15 @@ def _skip_keywords() -> list[str]:
     from core.kg import schema  # import tardio: evita ciclo no import do pipeline
     return schema.skip_keywords("finep") or _SKIP_KEYWORDS_FALLBACK
 
+
+def _fold(value: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", value or "")
+    return "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
+
 _FAQ_VERSION_RE = re.compile(r"vers[aã]o[_\s\-]*(\d+)")
 _FAQ_DATE_RE = re.compile(r"(\d{2})[_\s\-]?(\d{2})[_\s\-]?(\d{4})")
-_EDITAL_RERR_NUM_RE = re.compile(r"(\d+)[ªº°][_\s\-]*rerratifica")
+_RERR_NUM_RE = re.compile(r"(?:^|[_\s\-])(\d+)(?:[ªº°])?[_\s\-]*rerratifica")
+_ANY_DATE_RE = re.compile(r"(?<!\d)(\d{2})[_.\s\-](\d{2})[_.\s\-](\d{4})(?!\d)")
 _FILENAME_TOKEN_RE = re.compile(r"[_\s\-.]+")
 
 
@@ -91,15 +100,32 @@ def _version_info(stem: str) -> tuple[str | None, int]:
         return ("__faq__", recency)
 
     has_edital_tok = "edital" in tokens
+    has_regulamento_tok = "regulamento" in tokens
+    has_anexo_tok = "anexo" in tokens
     has_rerr_tok = any("rerratificad" in t for t in tokens)
-    if has_edital_tok and (has_rerr_tok or s == "edital"):
+    if has_edital_tok or has_regulamento_tok or has_anexo_tok:
+        if has_regulamento_tok:
+            family = "__regulamento__"
+        elif has_anexo_tok:
+            try:
+                anexo_idx = tokens.index("anexo")
+                anexo_num = tokens[anexo_idx + 1] if tokens[anexo_idx + 1].isdigit() else "geral"
+            except (ValueError, IndexError):
+                anexo_num = "geral"
+            family = f"__anexo_{anexo_num}__"
+        else:
+            family = "__edital__"
         recency = 0
-        m = _EDITAL_RERR_NUM_RE.search(s)
+        date_match = _ANY_DATE_RE.search(s)
+        if date_match:
+            d, mo, y = date_match.groups()
+            recency = int(y) * 10000 + int(mo) * 100 + int(d)
+        m = _RERR_NUM_RE.search(s)
         if m:
-            recency = int(m.group(1)) * 1000
+            recency += int(m.group(1)) * 100_000_000
         elif has_rerr_tok:
-            recency = 500
-        return ("__edital__", recency)
+            recency += 50_000_000
+        return (family, recency)
 
     return (None, 0)
 
@@ -127,6 +153,42 @@ def _filter_to_latest_versions(pdfs: list[Path]) -> list[Path]:
             )
     keep.sort(key=lambda p: p.name)
     return keep
+
+
+def _versioned_documents(pdfs: list[Path]) -> list[tuple[Path, dict]]:
+    """Classifica todas as versões, preservando históricas para auditoria."""
+    classified = [(pdf, *_version_info(pdf.stem)) for pdf in pdfs]
+    winners: dict[str, Path] = {}
+    for pdf, group, recency in classified:
+        if group is None:
+            continue
+        current = winners.get(group)
+        if current is None or recency > _version_info(current.stem)[1]:
+            winners[group] = pdf
+
+    from core.kg import schema
+
+    overrides = schema.document_authority_overrides("finep")
+    result: list[tuple[Path, dict]] = []
+    for pdf, group, recency in classified:
+        date_match = _ANY_DATE_RE.search(pdf.stem.lower())
+        published_at = None
+        if date_match:
+            d, mo, y = date_match.groups()
+            published_at = f"{y}-{mo}-{d}"
+        revision_match = _RERR_NUM_RE.search(pdf.stem.lower())
+        metadata = {
+            "family": (group or pdf.stem).strip("_"),
+            "revision": int(revision_match.group(1)) if revision_match else 0,
+            "published_at": published_at,
+            "authority_state": (
+                "superseded" if group and winners.get(group) != pdf else "vigente"
+            ),
+            "version_score": recency,
+        }
+        metadata.update(overrides.get(pdf.name) or {})
+        result.append((pdf, metadata))
+    return result
 
 
 # =============================================================================
@@ -160,16 +222,25 @@ class Adapter(SourceAdapter):
         skip = _skip_keywords()
         candidates = [
             p for p in sorted(pdf_dir.glob("*.pdf"))
-            if not any(kw in p.stem.lower() for kw in skip)
+            if not any(_fold(kw) in _fold(p.stem) for kw in skip)
         ]
-        candidates = _filter_to_latest_versions(candidates)
-
+        provenance = self.provenance(edital_id)
+        url_by_name = {
+            _fold(Path(unquote(urlsplit(url).path)).name): url
+            for url in provenance.get("urls_documentos", [])
+        }
         documents: CanonicalDoc = []
-        for pdf in candidates:
+        for pdf, metadata in _versioned_documents(candidates):
             pages = _extract_pages(pdf)
             if not any(p.strip() for p in pages):
                 continue
-            documents.append({"doc_name": pdf.name, "units": pages})
+            metadata = dict(metadata)
+            source_url = url_by_name.get(_fold(pdf.name))
+            if source_url:
+                metadata["source_url"] = source_url
+            documents.append({
+                "doc_name": pdf.name, "units": pages, "metadata": metadata,
+            })
         return documents
 
     def provenance(self, edital_id: str) -> dict:

@@ -49,8 +49,6 @@ skip_keywords:
   - passo-a-passo          # tutoriais de submissão
   - cadastr                # cadastramento no SIGFAPESC
   - sigfapesc
-  - retificacao            # emenda ao edital — não é o normativo-base do MVP
-  - errata                 # idem
 ```
 
 ---
@@ -88,11 +86,13 @@ retorna 1 entrada de Documento Canônico (§12.3), fatiada em units a partir do
 
 ```yaml
 canonical_doc:
-  shape: '[{"doc_name": "pagina-chamada", "units": split_into_units(texto_cru)}]'
+  shape: '[{"doc_name": nome, "units": split_into_units(texto), "metadata": autoridade}]'
 ```
 
-Campos extras no bronze para rastreio (não consumidos pelo adapter):
-`edital_pdf_url` (URL do PDF escolhido) e `content_source` (`pdf` | `html`).
+Campos extras no bronze para rastreio: `edital_pdf_url` (PDF-base escolhido),
+`documentos_normativos` (edital-base + retificações/erratas, com URL e texto) e
+`content_source` (`pdf` | `html`). Retificações e erratas compõem o edital-base
+em ordem cronológica; não são descartadas nem tratadas isoladamente.
 
 ---
 
@@ -148,9 +148,10 @@ graph_overrides:
   contexto de submissão/encerramento ("até …", "prazo …", "submissão …") e pega
   a MAIS DISTANTE (rerratificações empurram pra frente). Sem data → `None`; a
   normalização (§7.1 WIKI.md) trata sem-prazo + ABERTA como vigente.
-- **Retificações/erratas ficam de fora no MVP.** A skip-list (§skip_keywords)
-  descarta `retificacao`/`errata`: o alvo é o edital-base ("completo"). Quando
-  uma retificação muda o prazo, o bronze fica desatualizado — débito conhecido.
+- **Retificações/erratas são normativas.** O scraper preserva o edital-base e
+  todas as emendas anexadas à página. O Documento Canônico marca a família e a
+  data de cada peça; o conteúdo vigente é a composição cronológica. Resultado,
+  manual e demais peças de andamento continuam fora pela skip-list.
 - **Só chamadas ABERTAS.** A fonte varre `/chamadas-abertas/`; encerradas vivem
   em `/category/chamadas-encerradas/` e NÃO são coletadas (status sempre ABERTA,
   salvo "fluxo contínuo" detectado no texto).

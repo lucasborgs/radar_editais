@@ -18,12 +18,12 @@ event loop.
 """
 from __future__ import annotations
 
-# Carrega .env ANTES de importar procrastinate — o connector lê DATABASE_URL
+# Carrega o perfil ANTES de importar procrastinate — o connector lê DATABASE_URL
 # no import time. Quando o worker roda via `python -m procrastinate ...`,
 # nada antes do nosso código carrega o env. Deve ser o primeiro import.
-from dotenv import load_dotenv
+from core.environment import assert_runtime_environment, load_environment_profile
 
-load_dotenv()
+load_environment_profile()
 
 import asyncio  # noqa: E402
 import hashlib  # noqa: E402
@@ -45,6 +45,7 @@ from pipeline.adapters.base import get_adapter  # noqa: E402
 
 setup_logging()
 logger = logging.getLogger(__name__)
+assert_runtime_environment("background worker")
 
 # Same list used by WritingSession to skip non-edital boilerplate PDFs.
 # Descoberta de PDFs e dedup de versão são L1 (FINEP-específico) — vivem em
@@ -470,16 +471,14 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
     source = source_of(edital_id)
     native = native_id_of(edital_id)
 
-    # Documento Canônico DURÁVEL-primeiro (robustez contra o disco efêmero do
-    # worker — spec docs/specs/durable-source-docs.md). O disco vira só
-    # cache/fallback. Se o durável faltar mas o disco tiver o bronze (ex.: logo
-    # após scrape, ou edital pré-feature), backfilla o durável (self-healing).
-    documents = source_docs.load(edital_id)
-    if not documents:
-        adapter = get_adapter(source)
-        documents = adapter.to_documents(native)
-        if documents:
-            source_docs.save(edital_id, source, documents)
+    # Conteúdo recém-coletado prevalece quando está no disco; o durável é o
+    # fallback de redeploy/lazy indexing. Isso evita usar por mais uma run uma
+    # versão normativa antiga que ainda esteja persistida.
+    documents = get_adapter(source).to_documents(native)
+    if documents:
+        source_docs.save(edital_id, source, documents)
+    else:
+        documents = source_docs.load(edital_id)
     if not documents:
         logger.warning(
             "chunk_edital_task: sem conteúdo-fonte p/ edital=%s "
@@ -488,7 +487,8 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
         )
         return []
 
-    blocks = build_or_load_structured_doc(source, native, documents)
+    active = source_docs.active_documents(documents)
+    blocks = build_or_load_structured_doc(source, native, active)
     if not blocks:
         logger.warning(
             "chunk_edital_task: silver vazio p/ edital=%s (structurer falhou)",
@@ -726,7 +726,7 @@ def _insert_chunks_psycopg(rows: list[dict]) -> None:
 
 
 def _build_all_silver() -> int:
-    """Materializa o silver (structurer) de todos os editais scraped, durable-first.
+    """Persiste o canônico fresco e materializa Silver dos editais scraped.
 
     Passo EXPLÍCITO do pipeline v3 (spec docs/specs/v3-unified.md §10): bronze →
     adapter → silver (structurer). Enumera direto do BRONZE (fonte autoritativa dos
@@ -740,8 +740,12 @@ def _build_all_silver() -> int:
     for source, native in gold.iter_bronze_editais():
         eid = f"{source}:{native}"
         try:
-            docs = source_docs.load(eid) or get_adapter(source).to_documents(native)
-            if docs and build_or_load_structured_doc(source, native, docs):
+            fresh = get_adapter(source).to_documents(native)
+            if fresh:
+                source_docs.save(eid, source, fresh)
+            docs = fresh or source_docs.load(eid)
+            active = source_docs.active_documents(docs or [])
+            if active and build_or_load_structured_doc(source, native, active):
                 n += 1
         except Exception:
             logger.warning("_build_all_silver: falha em %s", eid, exc_info=True)
@@ -851,14 +855,14 @@ async def _run_daily_etl(timestamp: int) -> None:
 
     # -------------------------------------------------------------------
     # Pós-scraping (pipeline v3 — spec docs/specs/v3-unified.md §10):
-    #   bronze → adapter → silver (structurer) → ingest_all() (gold +
-    #   embeddings) → Documento Canônico durável → vault Obsidian.
+    #   bronze → adapter/autoridade → Documento Canônico durável → silver
+    #   (structurer) → ingest_all() (gold + embeddings) → vault Obsidian.
     # O produtor legado (hipergrado / hyper-extract) foi removido: o catálogo e
     # o match vêm das tabelas gold (entities/match_chunks, migration 036).
     # -------------------------------------------------------------------
 
-    # 1) Silver EXPLÍCITO: materializa data/silver/structured_docs/*.jsonl a
-    #    partir do bronze recém-scraped (structurer, durable-first). É a ENTRADA
+    # 1) CANÔNICO + SILVER: persiste primeiro o documento recém-scraped e então
+    #    materializa data/silver/structured_docs/*.jsonl. É a ENTRADA
     #    do ingest_all (gold) e do RAG de escrita. Sem LLM.
     try:
         n_silver = await asyncio.to_thread(_build_all_silver)
@@ -885,12 +889,9 @@ async def _run_daily_etl(timestamp: int) -> None:
             "run_daily_etl_task: sem OPENAI_API_KEY/DATABASE_URL — ingestão gold pulada",
         )
 
-    # 3) Persiste o Documento Canônico durável (§12.3) enquanto o bronze
-    #    recém-scraped está no disco. O FS do worker não é fonte de verdade
-    #    durável: sem isto, um rebuild de imagem apaga o bronze e o chunk_edital
-    #    produz 0 chunks. Enumera pelos editais gold de (2) — roda DEPOIS
-    #    do ingest p/ capturar os editais novos. Barato, sem LLM. Spec:
-    #    docs/specs/durable-source-docs.md.
+    # 3) Rede de segurança: persiste documentos de editais que já existiam no
+    #    catálogo mas não foram enumerados pelo bronze da run. O caminho normal
+    #    já persistiu conteúdo fresco em (1).
     try:
         from core.kg.source_docs import persist_all_current  # noqa: PLC0415
         n_docs = await asyncio.to_thread(persist_all_current)
@@ -942,7 +943,10 @@ async def ingest_promoted_edital_task(edital_id: str) -> None:
 
     source = source_of(edital_id)
     native = native_id_of(edital_id)
-    docs = source_docs.load(edital_id) or get_adapter(source).to_documents(native)
+    fresh = get_adapter(source).to_documents(native)
+    if fresh:
+        source_docs.save(edital_id, source, fresh)
+    docs = source_docs.active_documents(fresh or source_docs.load(edital_id) or [])
     if not docs or not build_or_load_structured_doc(source, native, docs):
         logger.warning("ingest_promoted_edital: silver vazio p/ %s — abortado", edital_id)
         from core.services.discovery_promotion import mark_by_edital  # noqa: PLC0415

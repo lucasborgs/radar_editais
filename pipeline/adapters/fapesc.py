@@ -67,12 +67,41 @@ class Adapter(SourceAdapter):
             logger.info("fapesc adapter: chamada %s não encontrada no bronze", edital_id)
             return []
 
+        normative = match.get("documentos_normativos") or []
+        if normative:
+            documents: CanonicalDoc = []
+            for index, item in enumerate(normative):
+                text = (item.get("text") or "").strip()
+                if not text:
+                    continue
+                documents.append({
+                    "doc_name": item.get("doc_name") or f"documento-{index + 1}",
+                    "units": split_into_units(text),
+                    "metadata": {
+                        "family": item.get("family") or "edital-base",
+                        "revision": index,
+                        "source_url": item.get("url") or "",
+                        "authority_state": "vigente",
+                        "composition_order": index,
+                    },
+                })
+            if documents:
+                return documents
+
         texto = (match.get("texto_cru") or "").strip()
         if not texto:
             logger.info("fapesc adapter: chamada %s sem texto_cru — sem documento", edital_id)
             return []
 
-        return [{"doc_name": "pagina-chamada", "units": split_into_units(texto)}]
+        return [{
+            "doc_name": "pagina-chamada",
+            "units": split_into_units(texto),
+            "metadata": {
+                "family": "edital-base", "revision": 0,
+                "source_url": match.get("edital_pdf_url") or match.get("url") or "",
+                "authority_state": "vigente", "composition_order": 0,
+            },
+        }]
 
     def provenance(self, edital_id: str) -> dict:
         """URL oficial (`url`) + PDF anexo (`edital_pdf_url`) + data de coleta do
@@ -84,8 +113,14 @@ class Adapter(SourceAdapter):
             prov: dict = {"fonte": "fapesc"}
             if url:
                 prov["url"] = url
-            if ch.get("edital_pdf_url"):
-                prov["urls_documentos"] = [ch["edital_pdf_url"]]
+            urls = [
+                d.get("url") for d in (ch.get("documentos_normativos") or [])
+                if d.get("url")
+            ]
+            if not urls and ch.get("edital_pdf_url"):
+                urls = [ch["edital_pdf_url"]]
+            if urls:
+                prov["urls_documentos"] = urls
             if coletado_em(ch):
                 prov["coletado_em"] = coletado_em(ch)
             return prov

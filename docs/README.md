@@ -56,6 +56,9 @@ cada assunto; não substitui os documentos indicados.
 | [`discovery-operations.md`](specs/discovery-operations.md) | vigente | promoção, retry e observabilidade da Descoberta |
 | [`crawl4ai-discovery-integration.md`](specs/crawl4ai-discovery-integration.md) | vigente | coletor opcional e seus limites |
 | [`durable-source-docs.md`](specs/durable-source-docs.md) | vigente | persistência dos documentos canônicos |
+| [`explore-factual-rag.md`](specs/explore-factual-rag.md) | implementada em pré-produção local; promoção pendente | autoridade de versões, RAG factual e síntese enumerativa no Explorar |
+| [`environment-parity-isolation.md`](specs/environment-parity-isolation.md) | pré-produção local implementada; staging Cloud adiado | paridade, credenciais e isolamento de local/test/staging/produção |
+| [`environment-promotion.md`](runbooks/environment-promotion.md) | vigente | bootstrap, staging e promoção segura entre ambientes |
 
 ## Regras de autoridade
 

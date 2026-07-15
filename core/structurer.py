@@ -138,6 +138,7 @@ def _structure_single_doc(
     out: list[dict] = []
     carry: list[str] = []
     doc_name = doc["doc_name"]
+    doc_metadata = dict(doc.get("metadata") or {})
     n_pages = len(doc["units"])
     n_failed = 0
     for page_num, page_text in enumerate(doc["units"], start=1):
@@ -164,6 +165,7 @@ def _structure_single_doc(
                 "section_path": b["section_path"],
                 "kind": b["kind"],
                 "text": b["text"],
+                "document_metadata": doc_metadata,
             })
         for b in reversed(page_blocks):
             if b["section_path"]:
@@ -221,6 +223,9 @@ def _source_hash(documents: CanonicalDoc) -> str:
     h = hashlib.md5()
     for doc in sorted(documents, key=lambda d: d["doc_name"]):
         h.update(doc["doc_name"].encode())
+        h.update(json.dumps(
+            doc.get("metadata") or {}, sort_keys=True, ensure_ascii=False,
+        ).encode("utf-8", "ignore"))
         for unit in doc["units"]:
             h.update(unit.encode("utf-8", "ignore"))
     return h.hexdigest()

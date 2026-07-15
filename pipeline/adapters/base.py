@@ -23,11 +23,17 @@ from core.kg import schema
 logger = logging.getLogger(__name__)
 
 
-class CanonicalDocEntry(TypedDict):
+class _CanonicalDocEntryRequired(TypedDict):
     """Uma unidade do Documento Canônico (§12.3): um 'documento lógico'."""
 
     doc_name: str          # rótulo (ex: 'Edital.pdf', 'pagina_chamada')
     units: list[str]       # texto por unidade (1 unit/página de PDF, 1+ pra HTML)
+
+
+class CanonicalDocEntry(_CanonicalDocEntryRequired, total=False):
+    """Documento lógico com autoridade opcional e retrocompatível."""
+
+    metadata: dict
 
 
 CanonicalDoc = list[CanonicalDocEntry]

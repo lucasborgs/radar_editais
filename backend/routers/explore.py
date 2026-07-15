@@ -158,7 +158,12 @@ def explore(
     )
 
     # PR1 (four-phase-workflow): detecta se pergunta pede planejamento.
-    result: dict = {"answer": answer, "truncated": explore_meta["truncated"]}
+    result: dict = {
+        "answer": answer,
+        "truncated": explore_meta["truncated"],
+        "route_decision": explore_meta.get("route_decision"),
+        "called_tools": explore_meta.get("called_tools", []),
+    }
     if is_complex_proposal(message, answer, len(req.history)):
         result["next_action"] = {
             "offer": "Estruturar proposta?",

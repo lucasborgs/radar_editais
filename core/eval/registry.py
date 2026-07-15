@@ -6,6 +6,7 @@ suítes especializadas registradas abaixo. Todas exercitam o pipeline real.
 from __future__ import annotations
 
 from core.eval import (
+    explore,
     extraction,
     matching,
     opportunity_type,
@@ -23,6 +24,7 @@ SUITES: dict[str, Suite] = {
     rag.SUITE.name: rag.SUITE,
     writing.SUITE.name: writing.SUITE,
     extraction.SUITE.name: extraction.SUITE,
+    explore.SUITE.name: explore.SUITE,
     opportunity_type.SUITE.name: opportunity_type.SUITE,
     triage.SUITE.name: triage.SUITE,
     profile_extractor.SUITE.name: profile_extractor.SUITE,

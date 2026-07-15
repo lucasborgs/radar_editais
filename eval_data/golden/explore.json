@@ -1,0 +1,66 @@
+{
+  "version": "2026-07-15",
+  "source_of_truth": "NotebookLM, com autoridade temporal dos documentos oficiais",
+  "cases": [
+    {
+      "id": "finep-745-itens-financiaveis",
+      "incident": "finep",
+      "query": "Quais os itens financiáveis pelo edital?",
+      "target": {"type": "edital", "id": "finep:745"},
+      "expected_route": "EDITAL_FACT_ENUMERATIVE",
+      "reference_answer": "A resposta deve enumerar os itens financiáveis com recursos Finep e de contrapartida.",
+      "adaptation_notes": ["Aplicar a 3ª rerratificação de 09/02/2026, que prevalece sobre a resposta histórica do NotebookLM."],
+      "assertions": {
+        "required": ["identificar a versão vigente", "citar os itens 4.3 e 4.5", "pagamento de pessoal"],
+        "forbidden": ["obras como rubrica vigente", "equipamentos como rubrica vigente", "diárias como rubrica vigente", "serviços PJ como rubrica vigente"],
+        "conditional": ["rubricas antigas somente quando identificadas como históricas e superadas"]
+      },
+      "evidence": ["3ª rerratificação de 09/02/2026", "seção 4.3", "seção 4.5"]
+    },
+    {
+      "id": "fapesc-31-2026-admissibilidade",
+      "incident": "fapesc",
+      "query": "Quais os critérios de admissibilidade do edital?",
+      "target": {"type": "edital", "id": "fapesc:31-2026"},
+      "expected_route": "EDITAL_FACT_ENUMERATIVE",
+      "reference_answer": "A resposta deve cobrir empresa, proponente/coordenador, equipe técnica e proposta, conforme a Seção 4.",
+      "adaptation_notes": [],
+      "assertions": {
+        "required": ["empresa proponente", "coordenador geral", "equipe técnica", "proposta", "CNPJ há pelo menos um ano", "faturamento de até R$ 1.200.000", "contrapartida mínima de 5%", "TRL igual ou superior a 2", "valor máximo de R$ 80.000", "execução de até 12 meses", "vedação a EI e MEI"],
+        "forbidden": ["apresentar apenas quatro requisitos", "transformar critério preferencial em obrigatório"],
+        "conditional": ["requisitos da equipe técnica aplicam-se quando houver equipe"]
+      },
+      "evidence": ["Seção 4", "itens 4.2 a 4.5"]
+    },
+    {
+      "id": "barn-verticais",
+      "incident": "barn",
+      "query": "Em quais verticais a Barn Invest realiza investimentos?",
+      "target": {"type": "investidor", "id": "investidor:barn-invest"},
+      "expected_route": "ENTITY_FACT",
+      "reference_answer": "Agri & Land Use; Transport & Mobility; Clean Industry & Circular Economy; Renewable Energy & Energy Efficiency.",
+      "adaptation_notes": [],
+      "assertions": {
+        "required": ["agro e uso da terra", "transporte e mobilidade", "indústria limpa e economia circular", "energia renovável e eficiência energética"],
+        "forbidden": ["redirect para escrita", "vertical inventada"],
+        "conditional": ["subtemas somente com fonte ou catálogo que os preserve"]
+      },
+      "evidence": ["https://barninvest.com.br/en", "investidor:barn-invest"]
+    },
+    {
+      "id": "barn-tese",
+      "incident": "barn",
+      "query": "Qual a tese de investimentos da Barn?",
+      "target": {"type": "investidor", "id": "investidor:barn-invest"},
+      "expected_route": "ENTITY_FACT",
+      "reference_answer": "A Barn investe em greentechs para impulsionar a transição verde na América Latina, nas quatro verticais estratégicas.",
+      "adaptation_notes": [],
+      "assertions": {
+        "required": ["greentech", "transição verde", "América Latina", "quatro verticais"],
+        "forbidden": ["redirect para escrita", "regulação pela CVM como vertical"],
+        "conditional": ["parceria de longo prazo e regulação podem aparecer apenas como contexto"]
+      },
+      "evidence": ["https://barninvest.com.br/en", "investidor:barn-invest"]
+    }
+  ]
+}

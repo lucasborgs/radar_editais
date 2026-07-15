@@ -47,7 +47,10 @@ def _skip_reason() -> str | None:
     return None
 
 
-pytestmark = pytest.mark.skipif(_skip_reason() is not None, reason=_skip_reason() or "")
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(_skip_reason() is not None, reason=_skip_reason() or ""),
+]
 
 import jwt as pyjwt  # noqa: E402  (só importa quando o gate passa)
 import psycopg  # noqa: E402

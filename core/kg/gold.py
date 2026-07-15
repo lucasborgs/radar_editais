@@ -49,6 +49,7 @@ from functools import lru_cache
 import psycopg
 
 from config import BRONZE_DIR, SILVER_DIR
+from core.environment import assert_database_target
 from core.kg import schema
 from core.kg.canonicalize import anti_class_verdict
 
@@ -639,6 +640,10 @@ def _ingest_investidores(conn, stats: dict) -> None:
                     curated=True, verificado_em=_parse_date(r.get("verificado_em")),
                     metadata={
                         "estagio_alvo": r.get("estagio_alvo") or [],
+                        # `setores` da coluna é vocabulário normalizado (1–3
+                        # itens) para matching. A ficha factual precisa manter
+                        # todas as verticais declaradas pelo investidor.
+                        "verticais": list(r.get("setores") or []),
                         "lead_follow": r.get("lead_follow"), "generalista": r.get("generalista"),
                         "fund_status": r.get("fund_status"), "site": r.get("site"),
                         # Preservados p/ o card de escrita (pitch p/ fundo) — não
@@ -779,7 +784,15 @@ def _programa_id_map(conn) -> dict[str, str]:
         return {nid: eid for nid, eid in cur.fetchall()}
 
 
-def _ingest_editais(conn, agency_cache: dict, stats: dict, *, limit: int | None, skip_unchanged: bool) -> None:
+def _ingest_editais(
+    conn,
+    agency_cache: dict,
+    stats: dict,
+    *,
+    limit: int | None,
+    skip_unchanged: bool,
+    edital_ids: list[str] | None = None,
+) -> None:
     from core.kg.constraints_producer import produce_from_text
     from core.llm.llm_client import make_client
     from core.retrieval.embedder import embed_query
@@ -794,6 +807,9 @@ def _ingest_editais(conn, agency_cache: dict, stats: dict, *, limit: int | None,
         d = STRUCTURED_DIR / src
         if d.exists():
             todo += [(src, f.stem) for f in sorted(d.glob("*.jsonl"))]
+    if edital_ids:
+        requested = set(edital_ids)
+        todo = [(src, stem) for src, stem in todo if f"{src}:{stem}" in requested]
     if limit:
         todo = todo[:limit]
 
@@ -876,7 +892,11 @@ def _ingest_editais(conn, agency_cache: dict, stats: dict, *, limit: int | None,
 # ===========================================================================
 
 def ingest_all(
-    *, sources: list[str] | None = None, limit: int | None = None, skip_unchanged: bool = True
+    *,
+    sources: list[str] | None = None,
+    limit: int | None = None,
+    skip_unchanged: bool = True,
+    edital_ids: list[str] | None = None,
 ) -> dict:
     """Ingesta as 4 fontes pré-beta nas tabelas gold. `sources` filtra
     ('investidor','programa','ict','edital'); `limit` corta os editais (debug).
@@ -892,7 +912,14 @@ def ingest_all(
         if "ict" in want:
             _ingest_icts(conn, agency_cache, stats)
         if "edital" in want:
-            _ingest_editais(conn, agency_cache, stats, limit=limit, skip_unchanged=skip_unchanged)
+            _ingest_editais(
+                conn,
+                agency_cache,
+                stats,
+                limit=limit,
+                skip_unchanged=skip_unchanged,
+                edital_ids=edital_ids,
+            )
     stats["agencia"] = len(agency_cache)
     logger.info("ingest_all concluído: %s", dict(stats))
     return dict(stats)
@@ -905,9 +932,21 @@ def main() -> None:
                     choices=["investidor", "programa", "ict", "edital"],
                     help="restringe a fonte (repetível); default = todas")
     ap.add_argument("--limit", type=int, default=None, help="corta os editais (debug)")
+    ap.add_argument(
+        "--edital-id",
+        action="append",
+        dest="edital_ids",
+        help="restringe a ingestão de editais ao ID canônico (repetível)",
+    )
     ap.add_argument("--no-skip", action="store_true", help="reprocessa editais mesmo com source_hash igual")
     args = ap.parse_args()
-    out = ingest_all(sources=args.sources, limit=args.limit, skip_unchanged=not args.no_skip)
+    assert_database_target("gold ingest")
+    out = ingest_all(
+        sources=args.sources,
+        limit=args.limit,
+        skip_unchanged=not args.no_skip,
+        edital_ids=args.edital_ids,
+    )
     print(json.dumps(out, ensure_ascii=False, indent=2))
 
 

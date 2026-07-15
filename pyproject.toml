@@ -104,6 +104,13 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 exclude = ["pipeline/", "bronze_data/", "silver_data/", "knowledge_graph/"]
 
+[tool.pytest.ini_options]
+markers = [
+    "unit: teste hermético, sem rede ou banco externo",
+    "integration: integração contra dependência local/efêmera",
+    "remote_integration: integração opt-in exclusivamente contra staging",
+]
+
 [[tool.mypy.overrides]]
 module = "pipeline.*"
 ignore_errors = true

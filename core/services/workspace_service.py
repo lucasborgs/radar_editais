@@ -272,7 +272,26 @@ def _dispatch_explorer(
     library_items: list | None = None,
 ) -> str:
     """Modo /explorer: ExploreAgent contextualizado ao edital e anexos."""
+    from core.services.explore_routing import (
+        RouteContext,
+        classify_ambiguous_route,
+        redirect_for,
+        route_message,
+    )
+
     agent = ExploreAgent()
+
+    decision = route_message(RouteContext(
+        mode=MODE_EXPLORER,
+        target_type="edital" if edital_ids else None,
+        target_id=edital_ids[0] if edital_ids else None,
+        message=message,
+        has_profile=profile is not None,
+        has_documents=bool(library_items),
+    ), ambiguous_classifier=classify_ambiguous_route)
+    redirect = redirect_for(decision, MODE_EXPLORER)
+    if redirect:
+        return redirect
 
     profile_text = None
     if profile:
@@ -285,7 +304,8 @@ def _dispatch_explorer(
         except Exception:
             profile_text = None
 
-    # Constrói o prompt com contexto do edital + anexos + redirect block
+    # Constrói o prompt somente com contexto factual. Redirects são decididos
+    # pela política pura acima e nunca anexados à mensagem do usuário.
     context_parts = [_mode_history_str(history)]
     if edital_ids:
         context_parts.append(f"EDITAL-ID: {edital_ids[0]}")
@@ -295,8 +315,7 @@ def _dispatch_explorer(
 
     msg_with_hint = (
         f"{message}\n\n"
-        f"[CONTEXTO]\n" + "\n".join(context_parts) + "\n"
-        f"{mode_redirect_block(MODE_EXPLORER)}"
+        f"[CONTEXTO]\n" + "\n".join(context_parts)
     )
 
     answer = agent.explore(
@@ -306,6 +325,7 @@ def _dispatch_explorer(
         has_profile=profile is not None,
         profile_text=profile_text,
         profile=profile,
+        route_decision=decision,
     )
     return answer
 

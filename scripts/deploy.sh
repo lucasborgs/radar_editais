@@ -22,7 +22,9 @@ cat <<'EOF'
 1) SUPABASE CLOUD — schema
    a. Aplicar TODAS as migrations versionadas em supabase/migrations/:
         supabase link --project-ref <ref>
-        supabase db push
+        ENVIRONMENT=production ALLOW_ENVIRONMENT_INITIALIZATION=1 \
+        ALLOW_PRODUCTION_MUTATION=1 CONFIRM_PROJECT_REF=<ref> \
+        python scripts/supabase_safe.py push
       (003 = schema do procrastinate → habilita o worker;
        035 = match_verdicts; 036 = catálogo gold relacional;
        037 remove company_hypergraphs; 038 = estado da promoção da Descoberta.)
@@ -79,6 +81,7 @@ ENV — referência (.env na raiz, lido por app+worker via env_file no compose)
      OPENAI_API_KEY  DATABASE_URL(pooler Supabase)  SUPABASE_URL
      SUPABASE_ANON_KEY  SUPABASE_SERVICE_KEY  SUPABASE_JWT_SECRET
   CONFIG          (app + worker):
+     ENVIRONMENT=production
      LLM_BACKEND=openai   OPENAI_MODEL=gpt-4o-mini
      EMBEDDING_MODEL=text-embedding-3-small   RETRIEVAL_EMBEDDING_COLUMN=embedding
   CONFIG          (app only):

@@ -445,13 +445,15 @@ def get_investidor(native_id: str) -> dict | None:
         "name": row.get("name") or "",
         "tese": row.get("description") or "",
         "tese_themes": list(meta.get("tese_themes") or []),
-        "setores": list(row.get("setores") or []),
+        "setores": list(meta.get("verticais") or row.get("setores") or []),
         "estagio_alvo": list(meta.get("estagio_alvo") or []),
         "ticket_range": _ticket_dict(row),
         "lead_follow": meta.get("lead_follow") or "",
         "portfolio": list(meta.get("portfolio") or []),
         "co_investidores": list(meta.get("co_investidores") or []),
         "site": meta.get("site") or "",
+        "source_urls": list(meta.get("source_urls") or []),
+        "verificado_em": meta.get("verificado_em"),
     }
 
 

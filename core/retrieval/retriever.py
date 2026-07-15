@@ -295,6 +295,8 @@ def retrieve_chunks(
     metadata_boost: float = DEFAULT_METADATA_BOOST,
     sparse: str = "bm25",
     hyde: bool = True,
+    expand_sections: bool = False,
+    expansion_limit: int = 24,
 ) -> list[dict]:
     """Hybrid retrieval over edital_chunks para um ou mais editais.
 
@@ -376,22 +378,18 @@ def retrieve_chunks(
     fts_weight = max(0.0, min(1.0, fts_weight))
     dense_weight = 1.0 - fts_weight
 
-    # 1. HyDE: substitui a query por um pseudo-doc gerado por LLM quando
-    #    hyde=True. O pseudo-doc (estilo edital formal) fica mais próximo
-    #    do corpus no espaço de embedding do que a pergunta crua do usuário.
-    #    Fallback silencioso: se generate_hyde_doc retornar "", mantém a
-    #    query original (timeout, erro de API, etc.).
-    if hyde and query_vec is None:
-        hyde_query = generate_hyde_doc(query)
-        if hyde_query:
-            query = hyde_query
+    # HyDE afeta exclusivamente o braço dense. BM25/FTS, metadata, rerank e
+    # observabilidade sempre recebem a pergunta original do usuário.
+    raw_query, dense_query = _prepare_retrieval_queries(
+        query, hyde=hyde, has_query_vec=query_vec is not None,
+    )
 
     # 2. Embed the query (sync, blocking ~100ms — acceptable in a turn).
     #    Reusa o vetor pré-computado quando o caller já embedou (mesmo turno).
     if query_vec is None:
-        query_vec = embed_query(query)
+        query_vec = embed_query(dense_query)
     vec_literal = _vector_literal(query_vec)
-    ts_or_query = _build_or_tsquery(query)
+    ts_or_query = _build_or_tsquery(raw_query)
 
     # 2. Open a short-lived psycopg connection. We don't pool here because the
     #    function is called once per `turn()` — small overhead vs. an extra
@@ -418,6 +416,7 @@ def retrieve_chunks(
                       FROM public.edital_chunks
                      WHERE edital_id = ANY(%s)
                        AND {emb_col} IS NOT NULL
+                       AND COALESCE(metadata->>'authority_state', 'vigente') <> 'superseded'
                      ORDER BY {emb_col} <=> %s::vector
                      LIMIT %s
                     """,
@@ -442,6 +441,7 @@ def retrieve_chunks(
                     SELECT id::text, edital_id, chunk_index, text, section, source_file, page_range, metadata
                       FROM public.edital_chunks
                      WHERE edital_id = ANY(%s)
+                       AND COALESCE(metadata->>'authority_state', 'vigente') <> 'superseded'
                        AND text_search @@ to_tsquery('portuguese', %s)
                      ORDER BY ts_rank(text_search, to_tsquery('portuguese', %s)) DESC
                      LIMIT %s
@@ -455,6 +455,7 @@ def retrieve_chunks(
                     SELECT id::text, edital_id, chunk_index, text, section, source_file, page_range, metadata
                       FROM public.edital_chunks
                      WHERE edital_id = ANY(%s)
+                       AND COALESCE(metadata->>'authority_state', 'vigente') <> 'superseded'
                     """,
                     (edital_ids,),
                 )
@@ -485,7 +486,7 @@ def retrieve_chunks(
     dense_ids = [r[0] for r in dense_rows]
     if sparse == "bm25":
         sparse_ids = _bm25_retrieve(
-            [(r[0], r[3]) for r in bm25_rows], query, _CANDIDATE_LIMIT
+            [(r[0], r[3]) for r in bm25_rows], raw_query, _CANDIDATE_LIMIT
         )
     else:
         sparse_ids = [r[0] for r in sparse_rows]
@@ -498,7 +499,7 @@ def retrieve_chunks(
     #     critérios sobe chunks que comprovadamente contêm esse tipo de conteúdo
     #     (flags do chunker). Ver docstring de `metadata_boost`.
     scores = _apply_metadata_boost(
-        scores, by_id, _detect_query_flags(query), metadata_boost
+        scores, by_id, _detect_query_flags(raw_query), metadata_boost
     )
 
     # 4. Ordenação por RRF score.
@@ -509,10 +510,86 @@ def retrieve_chunks(
     #     rerank_scores devolve None se o backend estiver ausente/falhar e
     #     mantemos o RRF.
     if rerank and len(ranked) > 1:
-        ranked = _apply_rerank(ranked, by_id, query, k_candidates)
+        ranked = _apply_rerank(ranked, by_id, raw_query, k_candidates)
 
     # 5. Corte top-k com dedup por source_file pra diversidade.
-    return _dedup_by_source(ranked, by_id, k, max_per_source)
+    selected = _dedup_by_source(ranked, by_id, k, max_per_source)
+    if expand_sections:
+        return _expand_section_families(selected, by_id, expansion_limit)
+    return selected
+
+
+def _prepare_retrieval_queries(
+    query: str, *, hyde: bool, has_query_vec: bool,
+) -> tuple[str, str]:
+    """Retorna ``(raw_query, dense_query)`` sem contaminar o braço lexical."""
+    raw_query = query
+    dense_query = raw_query
+    if hyde and not has_query_vec:
+        hyde_query = generate_hyde_doc(raw_query)
+        if hyde_query:
+            dense_query = hyde_query
+    return raw_query, dense_query
+
+
+_SECTION_NUMBER_RE = re.compile(r"(?<!\d)(\d+)(?:\.\d+)*")
+
+
+def _section_family(section: str | None) -> str | None:
+    # O caminho completo pode conter números antes da seção normativa, como
+    # "3ª RERRATIFICAÇÃO" ou o número do próprio edital. A seção efetiva é o
+    # último segmento numerado do path (ex.: ... > 4.3.2 → família 4).
+    matches = list(_SECTION_NUMBER_RE.finditer(section or ""))
+    return matches[-1].group(1) if matches else None
+
+
+def _expand_section_families(
+    selected: list[dict], by_id: dict[str, dict], limit: int,
+) -> list[dict]:
+    """Expande a família estrutural do melhor hit antes dos hits secundários.
+
+    Uma query enumerativa costuma trazer hits esparsos de outras seções. Se
+    todas as famílias forem expandidas na ordem global do documento, esses
+    falsos positivos consomem o limite antes do fim da seção relevante. O
+    primeiro hit é a âncora; seus irmãos vêm em ordem documental e os demais
+    hits selecionados ficam como cauda de apoio.
+    """
+    if not selected or limit <= len(selected):
+        return selected[:max(0, limit)]
+    anchor = selected[0]
+    anchor_family = _section_family(anchor.get("section"))
+    anchor_key = (anchor.get("source_file"), anchor_family)
+    if not anchor_family:
+        return selected[:limit]
+
+    out: list[dict] = []
+    seen: set[str] = set()
+    siblings = sorted(
+        by_id.values(),
+        key=lambda c: (str(c.get("source_file") or ""), int(c.get("chunk_index") or 0)),
+    )
+    for chunk in siblings:
+        key = (chunk.get("source_file"), _section_family(chunk.get("section")))
+        chunk_id = str(chunk.get("id"))
+        if key != anchor_key or chunk_id in seen:
+            continue
+        item = dict(chunk)
+        item["score"] = anchor.get("score", 0.0) if chunk_id == str(anchor.get("id")) else 0.0
+        if chunk_id != str(anchor.get("id")):
+            item["structural_expansion"] = True
+        out.append(item)
+        seen.add(chunk_id)
+        if len(out) >= limit:
+            return out
+    for chunk in selected:
+        chunk_id = str(chunk.get("id"))
+        if chunk_id in seen:
+            continue
+        out.append(chunk)
+        seen.add(chunk_id)
+        if len(out) >= limit:
+            break
+    return out
 
 
 def _apply_rerank(

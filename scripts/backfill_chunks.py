@@ -19,9 +19,9 @@ import asyncio
 import logging
 import time
 
-from dotenv import load_dotenv
+from core.environment import assert_database_target, load_environment_profile
 
-load_dotenv()
+load_environment_profile()
 
 from core.kg.entity_catalog import list_editais  # noqa: E402
 from core.tasks import chunk_edital_task  # noqa: E402
@@ -56,6 +56,7 @@ def main() -> None:
     parser.add_argument("--status", type=str, default=None, help="filtra por status (ex.: ABERTA)")
     parser.add_argument("--concurrency", type=int, default=3, help="editais em paralelo (default 3)")
     args = parser.parse_args()
+    assert_database_target("RAG chunks backfill")
 
     cards = list_editais(status=args.status, limit=args.limit or 1000)
     ids = [c["id"] for c in cards]

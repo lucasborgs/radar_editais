@@ -14,12 +14,18 @@ build/
 .env
 .env.*
 !.env.example
+!.env.local.example
+!.env.test.example
+!.env.staging.example
+!.env.staging-local.example
+!.env.production.example
 
 # Cloudflare Tunnel — credentials sensíveis
 cloudflared/
 
 # Data (raw sources — não versionar)
 data/bronze/
+.data-staging/
 # silver é derivado (não versionar), EXCETO as fontes curadas à mão do v3
 # (§3 da spec docs/specs/v3-unified.md) — load-bearing, precisam de versão.
 # Nota: "data/silver/*" (não "data/silver/") porque git não re-inclui arquivo

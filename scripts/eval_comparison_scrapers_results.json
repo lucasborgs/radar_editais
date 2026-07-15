@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "test_date": "2026-07-13T21:45:14.465564+00:00",
+    "bronze_dirs": {
+      "finep": "/Users/lucasborges/radar_editais/data/bronze/finep_raw/finep_chamadas_*.json",
+      "fapesp": "/Users/lucasborges/radar_editais/data/bronze/fapesp_raw/fapesp_scan_*.json",
+      "fapesc": "/Users/lucasborges/radar_editais/data/bronze/fapesc_raw/fapesc_scan_*.json"
+    }
+  },
+  "comparison": [
+    {
+      "source": "finep",
+      "scraper": {
+        "titulo": "Finep Mais Inovação Brasil – Rodada 2 – Mobilidade Sustentável",
+        "prazo_envio": "31/08/2026",
+        "status": "ABERTA",
+        "texto_chars": 1372,
+        "pdf_count": 9
+      },
+      "crawl4ai": {
+        "titulo": "Finep Mais Inovação Brasil – Rodada 2 – Mobilidade Sustentável",
+        "prazo_envio": "31/08/2026",
+        "status": "ABERTA",
+        "texto_chars": 2239,
+        "pdf_count": 17,
+        "filled_secoes": 7
+      }
+    },
+    {
+      "source": "fapesp",
+      "scraper": {
+        "titulo": "Chamada de Propostas - Auxílio à Inovação Regular",
+        "prazo_envio": "2026-06-15",
+        "status": "ABERTA",
+        "texto_chars": 35797,
+        "pdf_count": 0
+      },
+      "crawl4ai": {
+        "titulo": "Chamada de Propostas - Auxílio à Inovação Regular",
+        "prazo_envio": "15/06/2026",
+        "status": "ABERTA",
+        "texto_chars": 13196,
+        "pdf_count": 0,
+        "filled_secoes": 6
+      }
+    },
+    {
+      "source": "fapesc",
+      "scraper": {
+        "titulo": "EDITAL DE CHAMADA PÚBLICA FAPESC N.º 37/2026 PROGRAMA DE CIÊNCIA, TECNOLOGIA E INOVAÇÃO PARA APOIO AOS GRUPOS DE PESQUISA DA UDESC",
+        "prazo_envio": null,
+        "status": "ABERTA",
+        "texto_chars": 142627,
+        "pdf_count": 1
+      },
+      "crawl4ai": {
+        "titulo": "EDITAL DE CHAMADA PÚBLICA FAPESC N.º 37/2026 PROGRAMA DE CIÊNCIA, TECNOLOGIA E INOVAÇÃO PARA APOIO AOS GRUPOS DE PESQUISA DA UDESC",
+        "prazo_envio": "19/06/2026 a 17/09/2026",
+        "status": "ABERTA",
+        "texto_chars": 1277,
+        "pdf_count": 1,
+        "filled_secoes": 2
+      }
+    }
+  ]
+}

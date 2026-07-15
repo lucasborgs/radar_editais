@@ -19,8 +19,66 @@ from core.retrieval.retriever import (  # noqa: E402
     _build_or_tsquery,
     _dedup_by_source,
     _detect_query_flags,
+    _expand_section_families,
+    _prepare_retrieval_queries,
     format_chunks_for_prompt,
 )
+
+
+def test_hyde_so_altera_query_dense(monkeypatch):
+    monkeypatch.setattr(
+        "core.retrieval.retriever.generate_hyde_doc",
+        lambda _q: "pseudo documento com rubricas hipotéticas",
+    )
+    raw, dense = _prepare_retrieval_queries(
+        "Quais os itens financiáveis?", hyde=True, has_query_vec=False,
+    )
+    assert raw == "Quais os itens financiáveis?"
+    assert dense == "pseudo documento com rubricas hipotéticas"
+
+
+def test_query_vec_precomputada_nao_chama_hyde(monkeypatch):
+    monkeypatch.setattr(
+        "core.retrieval.retriever.generate_hyde_doc",
+        lambda _q: (_ for _ in ()).throw(AssertionError("HyDE indevido")),
+    )
+    assert _prepare_retrieval_queries("prazo", hyde=True, has_query_vec=True) == (
+        "prazo", "prazo",
+    )
+
+
+def test_expansao_estrutural_traz_subsecoes_irmas():
+    by_id = {
+        "a": {"id": "a", "source_file": "Edital.pdf", "section": "4.2 Empresa", "chunk_index": 2},
+        "b": {"id": "b", "source_file": "Edital.pdf", "section": "4.3 Coordenador", "chunk_index": 3},
+        "c": {"id": "c", "source_file": "Edital.pdf", "section": "5. Avaliação", "chunk_index": 4},
+    }
+    out = _expand_section_families([{**by_id["a"], "score": 1.0}], by_id, 10)
+    assert [c["id"] for c in out] == ["a", "b"]
+    assert out[1]["structural_expansion"] is True
+
+
+def test_expansao_ignora_numero_de_rerratificacao_antes_da_secao():
+    prefix = "REGULAMENTO – 3ª RERRATIFICAÇÃO > 4. Características"
+    by_id = {
+        "a": {"id": "a", "source_file": "Regulamento.pdf", "section": f"{prefix} > 4.3.1", "chunk_index": 1},
+        "b": {"id": "b", "source_file": "Regulamento.pdf", "section": f"{prefix} > 4.5", "chunk_index": 2},
+        "c": {"id": "c", "source_file": "Regulamento.pdf", "section": "REGULAMENTO – 3ª RERRATIFICAÇÃO > 7. Avaliação", "chunk_index": 3},
+    }
+    out = _expand_section_families([{**by_id["a"], "score": 1.0}], by_id, 10)
+    assert [chunk["id"] for chunk in out] == ["a", "b"]
+
+
+def test_expansao_prioriza_familia_do_melhor_hit():
+    by_id = {
+        "a": {"id": "a", "source_file": "Edital.pdf", "section": "4.2 Empresa", "chunk_index": 2},
+        "b": {"id": "b", "source_file": "Edital.pdf", "section": "4.5 Proposta", "chunk_index": 5},
+        "c": {"id": "c", "source_file": "Edital.pdf", "section": "10. Julgamento", "chunk_index": 10},
+        "d": {"id": "d", "source_file": "Edital.pdf", "section": "10.3 Mérito", "chunk_index": 11},
+    }
+    selected = [{**by_id["a"], "score": 1.0}, {**by_id["c"], "score": 0.8}]
+    out = _expand_section_families(selected, by_id, 10)
+    assert [chunk["id"] for chunk in out] == ["a", "b", "c"]
 
 # =============================================================================
 # OR-tsquery rewrite

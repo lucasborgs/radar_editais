@@ -197,6 +197,7 @@ def test_suites_registered():
         "matching", "rag", "writing", "extraction",
         "opportunity_type", "triage", "writing_v2",
         "profile_extractor", "reranker", "structurer",
+        "explore",
     }
 
 

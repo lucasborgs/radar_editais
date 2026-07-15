@@ -8,6 +8,7 @@ spec v3-unified:
   • get_edital          — ficha completa de UM edital
   • list_icts           — ICTs por tema (capacidade de P&D)
   • list_investidores   — fundos com tese num tema
+  • get_investidor      — ficha estruturada completa de um fundo nomeado
   • explore_opportunity — panorama de um tema (editais + ICTs + investidores + programas)
   • search_entities     — §8.1 busca SEMÂNTICA sobre entities.embedding (por kind)
   • related_by_tags     — §8.2 entidades que compartilham tecnologias_tags (join GIN)
@@ -158,6 +159,50 @@ def build_explore_tools() -> list[BaseTool]:
         return "\n".join(lines)
 
     @tool
+    def get_investidor(investidor_id: str) -> str:
+        """Retorna a ficha estruturada completa de um investidor específico.
+
+        Use quando o usuário nomeia um fundo ou pergunta por sua tese,
+        verticais, setores, estágio, ticket ou portfólio. Prefira o ID retornado
+        por list_investidores/search_entities (ex.: investidor:barn-invest).
+
+        Args:
+            investidor_id: identificador canônico do investidor.
+        """
+        try:
+            card = entity_catalog.get_investidor(investidor_id)
+        except Exception as e:
+            return f"Erro ao buscar investidor {investidor_id}: {e}."
+        if not card:
+            return (
+                f"Investidor {investidor_id} não encontrado. Use list_investidores "
+                "ou search_entities para resolver o ID."
+            )
+        parts = [
+            f"Investidor {card.get('id', investidor_id)} — {card.get('name', '(sem nome)')}",
+            f"Tese: {card.get('tese') or 'não informada'}",
+        ]
+        for label, key in (
+            ("Verticais/setores", "setores"),
+            ("Temas", "tese_themes"),
+            ("Estágio-alvo", "estagio_alvo"),
+            ("Portfólio", "portfolio"),
+        ):
+            values = card.get(key) or []
+            if values:
+                parts.append(f"{label}: {', '.join(str(v) for v in values)}")
+        ticket = card.get("ticket_range") or {}
+        if ticket.get("min_brl") is not None or ticket.get("max_brl") is not None:
+            parts.append(
+                f"Ticket (BRL): {ticket.get('min_brl', '?')} a {ticket.get('max_brl', '?')}"
+            )
+        if card.get("site"):
+            parts.append(f"Fonte oficial: {card['site']}")
+        if card.get("verificado_em"):
+            parts.append(f"Verificado em: {card['verificado_em']}")
+        return "\n".join(parts)
+
+    @tool
     def explore_opportunity(tema: str, top_k: int = 15) -> str:
         """Panorama de oportunidades num tema: editais + ICTs + investidores +
         programas — o que o ecossistema tem para o tema.
@@ -277,7 +322,8 @@ def build_explore_tools() -> list[BaseTool]:
             return f"Erro ao ler a vizinhança: {e}."
 
     return [explore_opportunity, list_editais, get_edital, search_entities,
-            related_by_tags, get_node_neighborhood, list_icts, list_investidores]
+            related_by_tags, get_node_neighborhood, list_icts, list_investidores,
+            get_investidor]
 
 
 # =============================================================================

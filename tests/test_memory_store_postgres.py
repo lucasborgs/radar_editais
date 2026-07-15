@@ -16,10 +16,13 @@ import uuid
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    not os.getenv("DATABASE_URL"),
-    reason="Store Postgres real — requer DATABASE_URL (integração gated)",
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not os.getenv("DATABASE_URL"),
+        reason="Store Postgres real — requer DATABASE_URL (integração gated)",
+    ),
+]
 
 import core.llm.agent_graph as ag  # noqa: E402
 

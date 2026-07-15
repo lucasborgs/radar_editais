@@ -200,7 +200,7 @@ def chunk_from_blocks(blocks: list[dict]) -> list[dict]:
 
     # 1. Agrupa blocos contíguos enquanto doc e section_path não mudam e o
     #    budget não estoura. Bloco oversize é quebrado preservando metadados.
-    groups: list[dict] = []  # {texts[], section, doc, pages[]}
+    groups: list[dict] = []  # {texts[], section, doc, pages[], doc_metadata}
     cur: dict | None = None
 
     def _flush():
@@ -213,6 +213,7 @@ def chunk_from_blocks(blocks: list[dict]) -> list[dict]:
         sp = b.get("section_path") or []
         section = " > ".join(sp)[:200] if sp else None
         doc = b.get("doc")
+        doc_metadata = dict(b.get("document_metadata") or {})
         page = b.get("page")
         pieces = _split_oversize(b["text"].strip(), MAX_TOKENS)
         for piece in pieces:
@@ -221,12 +222,14 @@ def chunk_from_blocks(blocks: list[dict]) -> list[dict]:
                 cur is None
                 or cur["section"] != section
                 or cur["doc"] != doc
+                or cur["doc_metadata"] != doc_metadata
                 or cur["tokens"] + pt > TARGET_TOKENS
             )
             if new_boundary:
                 _flush()
                 cur = {"texts": [], "section": section, "doc": doc,
-                       "pages": set(), "tokens": 0}
+                       "pages": set(), "tokens": 0,
+                       "doc_metadata": doc_metadata}
             cur["texts"].append(piece)
             cur["tokens"] += pt
             if page is not None:
@@ -258,12 +261,13 @@ def chunk_from_blocks(blocks: list[dict]) -> list[dict]:
             ov = _tail_overlap("\n\n".join(merged[idx - 1]["texts"]), OVERLAP_TOKENS)
             if ov:
                 full = f"[…] {ov}\n\n{body}"
+        metadata = {**_detect_metadata(full), **g.get("doc_metadata", {})}
         result.append({
             "chunk_index": idx,
             "text": full,
             "section": g["section"],
             "page_range": _page_range(sorted(g["pages"])),
             "source_file": g["doc"],
-            "metadata": _detect_metadata(full),
+            "metadata": metadata,
         })
     return result

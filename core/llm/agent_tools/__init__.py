@@ -18,6 +18,7 @@ from core.llm.agent_tools.explore_tools import (
     build_explore_tools,
     load_recent_exploration_decisions,
 )
+from core.llm.agent_tools.factual_tools import build_factual_tools
 from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
 from core.llm.agent_tools.profile_tools import ExtractionState, build_profile_tools
 from core.llm.agent_tools.research_tools import build_research_tools
@@ -31,6 +32,7 @@ __all__ = [
     "Scratchpad",
     "build_exploration_log_tools",
     "build_explore_tools",
+    "build_factual_tools",
     "build_planning_tools",
     "load_recent_exploration_decisions",
     "build_profile_tools",

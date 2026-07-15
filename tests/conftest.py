@@ -18,6 +18,28 @@ import os
 
 import pytest
 
+# A suíte comum é hermética: mesmo que o desenvolvedor tenha um `.env` apontando
+# para staging/produção, os testes não herdam essas credenciais. Suítes de
+# integração precisam optar explicitamente por INTEGRATION_TARGET=local|staging.
+_integration_target = os.environ.get("INTEGRATION_TARGET", "").strip().lower()
+if _integration_target == "production":
+    raise RuntimeError("INTEGRATION_TARGET=production é proibido; use staging.")
+if _integration_target == "staging" and os.environ.get("ENVIRONMENT") != "staging":
+    raise RuntimeError("INTEGRATION_TARGET=staging exige ENVIRONMENT=staging.")
+if _integration_target not in {"", "local", "staging"}:
+    raise RuntimeError(f"INTEGRATION_TARGET inválido: {_integration_target}")
+
+os.environ.setdefault("ENVIRONMENT", "test")
+if not _integration_target:
+    for _var in (
+        "DATABASE_URL",
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_KEY",
+        "SUPABASE_JWT_SECRET",
+    ):
+        os.environ[_var] = ""
+
 # Telemetria Langfuse OFF na suíte (nível de módulo: roda quando o pytest importa
 # este conftest, ANTES dos test modules e seus `load_dotenv()`). Forçamos as keys
 # a "" — `load_dotenv(override=False)` não sobrescreve var já presente, e

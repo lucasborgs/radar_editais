@@ -205,6 +205,57 @@ def test_explore_agent_includes_read_tools(monkeypatch):
     assert captured["max_steps"] >= 10  # EXPLORE_AGENT_MAX_STEPS
 
 
+def test_factual_enumerativo_usa_sintese_fechada(monkeypatch):
+    monkeypatch.setattr(
+        "core.services.factual_synthesis.synthesize_enumerative_answer",
+        lambda edital_id, query: f"síntese {edital_id}: {query}",
+    )
+    monkeypatch.setattr(
+        "core.llm.agent_runtime.run_agent",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("ReAct indevido")),
+    )
+    _, meta = ExploreAgent().explore_with_meta(
+        "quais os itens financiáveis?", edital_ids=["finep:745"],
+    )
+    assert meta["called_tools"] == ["search_edital_factual"]
+    assert meta["route_decision"]["intent"] == "EDITAL_FACT_ENUMERATIVE"
+
+
+def test_factual_rag_kill_switch_remove_tool(monkeypatch):
+    captured = {}
+    fake_result = AgentResult(
+        final_text="ok", steps=[], stop_reason="end_turn",
+        usage={"input_tokens": 0, "output_tokens": 0},
+    )
+    monkeypatch.setenv("EXPLORE_FACTUAL_RAG_ENABLED", "false")
+    monkeypatch.setattr(
+        "core.llm.agent_runtime.run_agent",
+        lambda **kwargs: captured.update(kwargs) or fake_result,
+    )
+    ExploreAgent().explore_with_meta(
+        "quais os itens financiáveis?", edital_ids=["finep:745"],
+    )
+    assert "search_edital_factual" not in {tool.name for tool in captured["tools"]}
+
+
+def test_entity_fact_investidor_restringe_tool_ao_contrato(monkeypatch):
+    captured = {}
+    fake_result = AgentResult(
+        final_text="ok", steps=[], stop_reason="end_turn",
+        usage={"input_tokens": 0, "output_tokens": 0},
+    )
+    monkeypatch.setattr(
+        "core.llm.agent_runtime.run_agent",
+        lambda **kwargs: captured.update(kwargs) or fake_result,
+    )
+    ExploreAgent().explore_with_meta(
+        "Em quais verticais a Barn investe?",
+        node_id="investidor:barn-invest",
+        node_type="investidor",
+    )
+    assert [tool.name for tool in captured["tools"]] == ["get_investidor"]
+
+
 def test_explore_agent_error_returns_friendly_message(monkeypatch):
     svc = ExploreAgent()
     fake_result = AgentResult(
@@ -239,8 +290,26 @@ def test_explore_tools_count_and_names():
     assert set(names) == {
         "list_editais", "get_edital", "explore_opportunity",
         "search_entities", "related_by_tags", "get_node_neighborhood",
-        "list_icts", "list_investidores",
+        "list_icts", "list_investidores", "get_investidor",
     }
+
+
+def test_get_investidor_expoe_ficha_completa(monkeypatch):
+    from core.kg import entity_catalog
+
+    monkeypatch.setattr(entity_catalog, "get_investidor", lambda _id: {
+        "id": "investidor:barn-invest", "name": "Barn Invest",
+        "tese": "Greentech para a transição verde na América Latina.",
+        "setores": ["agro", "mobilidade", "indústria limpa", "energia renovável"],
+        "tese_themes": [], "estagio_alvo": ["growth"], "portfolio": [],
+        "ticket_range": {}, "site": "https://barninvest.com.br/en",
+        "verificado_em": "2026-06-09",
+    })
+    tools = {t.name: t for t in build_explore_tools()}
+    out = tools["get_investidor"].invoke({"investidor_id": "investidor:barn-invest"})
+    assert "Greentech" in out
+    assert "agro, mobilidade, indústria limpa, energia renovável" in out
+    assert "Fonte oficial" in out
 
 
 def test_explore_tools_deep_research_gated(monkeypatch):

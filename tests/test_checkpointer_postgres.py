@@ -16,10 +16,13 @@ import uuid
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    not os.getenv("DATABASE_URL"),
-    reason="checkpointer Postgres real — requer DATABASE_URL (integração gated)",
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not os.getenv("DATABASE_URL"),
+        reason="checkpointer Postgres real — requer DATABASE_URL (integração gated)",
+    ),
+]
 
 from langchain_core.language_models.chat_models import BaseChatModel  # noqa: E402
 from langchain_core.messages import AIMessage  # noqa: E402

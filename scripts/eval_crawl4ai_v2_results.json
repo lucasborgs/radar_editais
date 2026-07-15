@@ -1,0 +1,330 @@
+{
+  "metadata": {
+    "test_date": "2026-07-13T21:45:14.465564+00:00",
+    "crawl4ai_version": "0.9.1",
+    "llm_model": "gpt-4o-mini",
+    "bm25_threshold": 0.8,
+    "total_urls": 6
+  },
+  "results": [
+    {
+      "name": "FAPEMIG - Sede Compete Minas",
+      "url": "https://fapemig.br/oportunidades/chamadas-e-editais/fapemig-sede-compete-minas",
+      "source": "fapemig",
+      "success": true,
+      "crawl_duration_ms": 24163,
+      "markdown_raw_len": 10162,
+      "markdown_fit_len": 771,
+      "markdown_sections": 6,
+      "bm25_reduction_pct": 92.4,
+      "llm_extraction": {
+        "titulo": "Chamada FAPEMIG/SEDE - 011/2026 - Compete Minas",
+        "prazo_envio": "30/07/2026",
+        "publico_alvo": "Empresas e cooperativas, com data de criação anterior a 13 de junho de 2026, que tenham sede ou filial em Minas Gerais.",
+        "descricao": "Financiar projetos de inovação e desenvolvimento tecnológico propostos por empresas e cooperativas sediadas em Minas Gerais, com ou sem parceria com Instituições Científicas, Tecnológicas e de Inovação (ICTs-MG). O foco é fortalecer a competitividade do setor produtivo mineiro.",
+        "status": "ABERTA",
+        "opportunity_type": "edital",
+        "tema": [],
+        "tema_livre": [],
+        "secoes": {
+          "resumo": "Chamada aberta Linha de fomento: Auxílio à Inovação, Parcerias Público-alvo: Empresas, ICT Valor da chamada: R$ 50 milhões Lançamento da chamada: 15 de jun. de 2026 Limite para submissão: 30 de jul. de 2026 Divulgação do Resultado: 20 de out. de 2026 (prev.)",
+          "descricao_completa": "Financiar projetos de inovação e desenvolvimento tecnológico propostos por empresas e cooperativas sediadas em Minas Gerais, com ou sem parceria com Instituições Científicas, Tecnológicas e de Inovação (ICTs-MG). O foco é fortalecer a competitividade do setor produtivo mineiro",
+          "quem_pode_participar": "Empresas e cooperativas, com data de criação anterior a 13 de junho de 2026, que tenham sede ou filial em Minas Gerais.",
+          "cronograma": "Data Início de Submissão de Propostas: 15/06/2026 Data Final de Submissão de Propostas: 30/07/2026 Data Prevista de Divulgação do Resultado: 20/10/2026 Resultado Preliminar: 20/10/2026 - 20/10/2026",
+          "requisitos": "Estar claramente caracterizada como projeto de desenvolvimento tecnológico, com foco na criação ou aperfeiçoamento de produtos, bens, serviços e/ou processos inovadores; Demonstrar diferenciação tecnológica ou mercadológica relevante, evidenciando inovações que transcendam melhorias triviais e contribuam para a geração de vantagem competitiva no mercado; Evidenciar potencial para contribuir com o crescimento econômico sustentável de Minas Gerais, por meio do desenvolvimento de inovações que agreguem valor à matriz econômica e industrial do estado, ampliando a produtividade, a competitividade e a geração de riqueza em setores estratégicos; Ser original, entendendo-se como tal o projeto concebido pelo(a) coordenador(a) da proposta ou desenvolvido pela própria empresa ou cooperativa, inédito e não ter sido integralmente financiado anteriormente para execução do mesmo escopo, metas e entregas; Apresentar prazo de execução de 18 até 36 (trinta e seis) meses, contados a partir da data de publicação do extrato do instrumento jurídico no Diário Oficial do Estado de Minas Gerais; Atender aos requisitos específicos da Linha e Categoria selecionada.",
+          "categorias_financiamento": "| Categoria | Descrição | Valor Máximo | Contrapartida | | --- | --- | --- | --- | | Categoria I - Faturamento até 4,8 milhões | Linha I - Tríplice Hélice | R$ 50.000.000,00 | 1.500% | | Categoria II - Faturamento de 4,8 a 16 milhões | Linha I - Tríplice Hélice | R$ 100.000.000,00 | 5.000% | | Categoria III - Faturamento de 16 a 90 milhões | Linha I - Tríplice Hélice | R$ 200.000.000,00 | 10.000% | | Categoria IV - Faturamento de 90 a 300 milhões | Linha I - Tríplice Hélice | R$ 400.000.000,00 | 10.000% | | Categoria V - Faturamento acima de 300 milhões | Linha I - Tríplice Hélice | R$ 400.000.000,00 | 10.000% | | Categoria I - Faturamento até 4,8 milhões | Linha II - Empresarial | R$ 20.000.000,00 | 2.000% | | Categoria II - Faturamento de 4,8 a 16 milhões | Linha II - Empresarial | R$ 50.000.000,00 | 5.000% | | Categoria III - Faturamento de 16 a 90 milhões | Linha II - Empresarial | R$ 100.000.000,00 | 10.000% | | Categoria IV - Faturamento de 90 a 300 milhões | Linha II - Empresarial | R$ 350.000.000,00 | 10.000% | | Categoria V - Faturamento acima de 300 milhões | Linha II - Empresarial | R$ 350.000.000,00 | 10.000% |",
+          "faq": ""
+        },
+        "pdf_urls": [
+          "https://fapemig.br/files/Chamada-FAPEMIG%252FSEDE---011%252F2026---Compete-Minas?title=Chamada+FAPEMIG/SEDE+-+011/2026+-+Compete+Minas&url=https://api.site.fapemig.br/wp-content/uploads/Chamada-FAPEMIG_SEDE-011_2026-Compete-Minas-1.pdf"
+        ],
+        "pdf_legendas": [
+          "Chamada FAPEMIG/SEDE - 011/2026 - Compete Minas"
+        ],
+        "error": false
+      },
+      "pdf_total": 1,
+      "pdf_baixados": 0,
+      "pdf_skipped": 0,
+      "pdf_texts_chars": [],
+      "filled_secoes": 6,
+      "extraction_quality": "medium"
+    },
+    {
+      "name": "FINEP - Mais Inovação (Mobilidade Sustentável)",
+      "url": "https://www.finep.gov.br/e/chamada-publica/222684/755376",
+      "source": "finep",
+      "success": true,
+      "crawl_duration_ms": 55321,
+      "markdown_raw_len": 24467,
+      "markdown_fit_len": 2239,
+      "markdown_sections": 3,
+      "bm25_reduction_pct": 90.8,
+      "llm_extraction": {
+        "titulo": "Finep Mais Inovação Brasil – Rodada 2 – Mobilidade Sustentável",
+        "prazo_envio": "31/08/2026",
+        "publico_alvo": "Empresas, obrigatoriamente com a parceria de Instituições Científicas, Tecnológicas e de Inovação (ICTs)",
+        "descricao": "Esta Seleção Pública tem por objetivo conceder recursos de subvenção econômica para atividades de pesquisa, desenvolvimento tecnológico e inovação (PD&I) em projetos inovadores, com risco tecnológico associado, executados por empresas.",
+        "status": "ABERTA",
+        "opportunity_type": "edital",
+        "tema": [
+          "Mobilidade Aérea",
+          "Metroferroviária",
+          "Aquaviária",
+          "Micromobilidade"
+        ],
+        "tema_livre": [],
+        "secoes": {
+          "resumo": "Esta Seleção Pública tem por objetivo conceder recursos de subvenção econômica para atividades de pesquisa, desenvolvimento tecnológico e inovação (PD&I) em projetos inovadores, com risco tecnológico associado, executados por empresas, obrigatoriamente com a parceria de Instituições Científicas, Tecnológicas e de Inovação (ICTs).",
+          "descricao_completa": "A iniciativa busca fomentar o desenvolvimento de tecnologias inovadoras em mobilidade, com impactos na sustentabilidade e no adensamento das cadeias produtivas brasileiras, nas seguintes temáticas: mobilidade aérea, metroferroviária, aquaviária e micromobilidade, conforme linhas temáticas definidas no item 2 do Anexo 1 do Regulamento.",
+          "quem_pode_participar": "Empresas, obrigatoriamente com a parceria de Instituições Científicas, Tecnológicas e de Inovação (ICTs).",
+          "cronograma": "Previsão de disponibilização do sistema de submissão de propostas: Até 23/03/2026. Prazo para envio de propostas até: 31/08/2026 até as 17:00.",
+          "requisitos": "Projetos inovadores, com risco tecnológico associado.",
+          "categorias_financiamento": "Recursos de subvenção econômica para atividades de pesquisa, desenvolvimento tecnológico e inovação (PD&I).",
+          "faq": "Em caso de dúvidas e orientações sobre a seleção pública: cp_mobilidadesustentavel@finep.gov.br."
+        },
+        "pdf_urls": [
+          "http://download.finep.gov.br/ManuaisSubvencaoDireta/Manual_Cliente_Cadastro.pdf",
+          "http://download.finep.gov.br/ManuaisSubvencaoDireta/ManuaisSubvencaoDireta/Manual_Cliente_Formulario_Apresentacao_Proposta_FAP.pdf",
+          "https://download.finep.gov.br/ManuaisSubvencaoDireta/Manual_Cliente_Recursos.pdf",
+          "http://download.finep.gov.br/ManuaisSubvencaoDireta/ManuaisSubvencaoDireta/TutorialGeral-SubvencaoDireta.mp4",
+          "http://download.finep.gov.br/ManuaisSubvencaoDireta/Comosevincularaumaempresajacadastrada.mp4",
+          "https://download.finep.gov.br/ManuaisSubvencaoDireta/ManuaisSubvencaoDireta/ProblemasacessoPlataformadaFinep.mp4",
+          "https://www.finep.gov.br/documents/20120/758476/Relat%C3%B3rio+-+Mobilidade+-+10_06_2026.xlsx/7b54c026-5a3b-37bd-bbc9-d30f9c720314?version=1.0&t=1781557275660&download=true&objectDefinitionExternalReferenceCode=5c06f88d-cc8a-003f-94e4-d9ed8cb642f3&objectEntryExternalReferenceCode=44a5fec5-0a8f-68ea-9f87-6b64194fc606",
+          "https://www.finep.gov.br/documents/20120/758476/Regulamento+Mobilidade+Sustent%C3%A1vel+-+rerrat.pdf/ca277671-1fa0-e287-7133-56f1c5345703?version=1.0&t=1781626277959&download=true&objectDefinitionExternalReferenceCode=5c06f88d-cc8a-003f-94e4-d9ed8cb642f3&objectEntryExternalReferenceCode=549af3b4-9184-8408-4383-60045232a9b2",
+          "https://www.finep.gov.br/documents/20120/758476/Aviso+Rerratifica%C3%A7%C3%A3o_Mobilidade+Sustent%C3%A1ve.pdf/58499112-be87-89dd-121f-74712578e39b?version=1.0&t=1781557604757&download=true&objectDefinitionExternalReferenceCode=5c06f88d-cc8a-003f-94e4-d9ed8cb642f3&objectEntryExternalReferenceCode=0e2a1329-a636-5374-c66b-161709c4c2af",
+          "https://www.finep.gov.br/documents/20120/758476/Anexo+1+-+rerrat.pdf/2e86de5c-3970-1e03-35f3-158f5f38f787?version=1.0&t=1781557692487&download=true&objectDefinitionExternalReferenceCode=5c06f88d-cc8a-003f-94e4-d9ed8cb642f3&objectEntryExternalReferenceCode=78346433-fb15-9b51-de36-1d5349e39ff6",
+          "https://www.finep.gov.br/documents/20117/206285/17_04_2026_FAQ_Mobilidade_Sustentavel.pdf/3320e47c-ae20-7349-b41d-355e615c0a7a?version=1.0&t=1778033630761&download=true&objectDefinitionExternalReferenceCode=5c06f88d-cc8a-003f-94e4-d9ed8cb642f3&objectEntryExternalReferenceCode=79b4e885-1232-f026-f05b-15334a9baead",
+          "https://www.finep.gov.br/documents/20117/206285/06_03-2026_MU_Regulamento.pdf/bc214373-c1a5-7881-2925-cc355c1ef752?version=1.0&t=1778033622329&download=true&objectDefinitionExternalReferenceCode=5c06f88d-cc8a-003f-94e4-d9ed8cb642f3&objectEntryExternalReferenceCode=bd0dc725-2500-8f49-8acd-427082660602",
+          "https://www.finep.gov.br/documents/20117/206285/06_03-2026_MU_A1.pdf/46585c3b-756b-2f9b-b4d1-7ac0676d5832?version=1.0&t=1778033623707&download=true&objectDefinitionExternalReferenceCode=5c06f88d-cc8a-003f-94e4-d9ed8cb642f3&objectEntryExternalReferenceCode=0223db3b-01ff-5a19-d392-a592ea734fa6",
+          "https://www.finep.gov.br/documents/20117/206285/06_03-2026_MU_A2.pdf/972544f6-8999-d1b9-b738-b7a0b6047061?version=1.0&t=1778033625144&download=true&objectDefinitionExternalReferenceCode=5c06f88d-cc8a-003f-94e4-d9ed8cb642f3&objectEntryExternalReferenceCode=2e48e334-de08-d1e9-77f5-ea7d4cce8a2f",
+          "https://www.finep.gov.br/documents/20117/206285/06_03-2026_MU_A3.pdf/7386f75a-415b-818f-a063-067f6238e08b?version=1.0&t=1778033626586&download=true&objectDefinitionExternalReferenceCode=5c06f88d-cc8a-003f-94e4-d9ed8cb642f3&objectEntryExternalReferenceCode=66f8ba14-cca5-4fb6-88a2-56740761cdaf",
+          "https://www.finep.gov.br/documents/20117/206285/06_03-2026_MU_A4.pdf/7a1d952f-c26c-f3f5-8be0-02c0f798714c?version=1.0&t=1778033627903&download=true&objectDefinitionExternalReferenceCode=5c06f88d-cc8a-003f-94e4-d9ed8cb642f3&objectEntryExternalReferenceCode=d269cf4c-a3e0-ba92-7cec-c02adcca7853",
+          "https://www.finep.gov.br/documents/20117/206285/06_03-2026_MU_A5.pdf/27df79f3-cd8e-2957-0f7e-6b1b763df7f6?version=1.0&t=1778033629241&download=true&objectDefinitionExternalReferenceCode=5c06f88d-cc8a-003f-94e4-d9ed8cb642f3&objectEntryExternalReferenceCode=979e7f57-cc4a-85bf-101a-53537fc596a3"
+        ],
+        "pdf_legendas": [
+          "Manual do Cliente - Cadastro",
+          "Manual do Cliente - Formulário de Apresentação de Proposta - FAP",
+          "Manual do Cliente - Recursos",
+          "Tutorial geral",
+          "Como se vincular a uma empresa já cadastrada",
+          "Problemas de acesso à Plataforma da Finep",
+          "Resultado parcial até 10/06/2026",
+          "1ª Rerratificação do Regulamento",
+          "Aviso de rerratificação",
+          "Anexo 1 rerratificado",
+          "FAQ - Perguntas Frequentes",
+          "Regulamento",
+          "Anexo 1: Características Específicas da Seleção Pública",
+          "Anexo 2: Minuta de Termo de Outorga de Subvenção Econômica",
+          "Anexo 3: Declaração de ações coletivas",
+          "Anexo 4: Declaração ambiental e outros aspectos regulatórios",
+          "Anexo 5: Definição do Nível de Maturidade Tecnológica"
+        ],
+        "error": false
+      },
+      "pdf_total": 17,
+      "pdf_baixados": 11,
+      "pdf_skipped": 3,
+      "pdf_texts_chars": [
+        10161,
+        2815,
+        35122,
+        2236,
+        10428,
+        24989,
+        34616,
+        10360,
+        1367,
+        3025,
+        1433
+      ],
+      "filled_secoes": 7,
+      "extraction_quality": "medium"
+    },
+    {
+      "name": "FAPESP - Auxílio Inovação Regular",
+      "url": "https://fapesp.br/18067",
+      "source": "fapesp",
+      "success": true,
+      "crawl_duration_ms": 32722,
+      "markdown_raw_len": 45343,
+      "markdown_fit_len": 13196,
+      "markdown_sections": 6,
+      "bm25_reduction_pct": 70.9,
+      "llm_extraction": {
+        "titulo": "Chamada de Propostas - Auxílio à Inovação Regular",
+        "prazo_envio": "15/06/2026",
+        "publico_alvo": "Pesquisadores com vínculo com a Instituição Sede do estado de São Paulo, pública ou privada.",
+        "descricao": "O Auxílio à Inovação Regular visa a apoiar projetos de desenvolvimento técnico-científicos, com foco na geração de soluções inovadoras e suas aplicações.",
+        "status": "ABERTA",
+        "opportunity_type": "edital",
+        "tema": [],
+        "tema_livre": [],
+        "secoes": {
+          "resumo": "O Auxílio à Inovação Regular visa a apoiar projetos de desenvolvimento técnico-científicos, com foco na geração de soluções inovadoras e suas aplicações.",
+          "descricao_completa": "O Auxílio à Inovação Regular visa a apoiar projetos de desenvolvimento técnico-científicos, com foco na geração de soluções inovadoras e suas aplicações. No contexto desta modalidade, Inovação é a implementação de soluções novas ou significativamente aprimoradas – sejam produtos, processos, modelos de negócio ou serviços – que gerem valor econômico, social ou ambiental. A presente Chamada tem por objetivo selecionar propostas na modalidade Auxílio à Inovação Regular (AIR) a serem desenvolvidas sob a responsabilidade de um Pesquisador Responsável que possua vínculo com a Instituição Sede do estado de São Paulo, pública ou privada, que sediará o projeto. Os resultados esperados incluem avanços concretos em áreas específicas do conhecimento ou setores econômicos, promovendo a valorização do conhecimento aplicado, o protagonismo do pesquisador e a indução de trajetórias tecnológicas e empreendedoras promissoras. O estímulo à cultura empreendedora, a articulação com o setor produtivo e o aprimoramento de cadeias de suprimentos, gerando benefícios ampliados para a sociedade, também podem ser objetivos de um projeto apoiado pelo Auxílio à Inovação Regular. O Pesquisador Responsável deve ter experiência demonstrada na liderança de projetos de inovação competitivos ou demonstrar evidências de grande potencial de realização de projetos de inovação. Sua súmula curricular deverá demonstrar experiência em atividades de inovação de alto nível.",
+          "quem_pode_participar": "O Pesquisador Responsável deve ter experiência demonstrada na liderança de projetos de inovação competitivos ou demonstrar evidências de grande potencial de realização de projetos de inovação. Sua súmula curricular deverá demonstrar experiência em atividades de inovação de alto nível. Para a concessão do Auxílio será analisada a importância da contribuição pretendida para a área de conhecimento e potencial de aplicação do resultado do projeto, a adequação do montante de recursos solicitados, equipe proponente, impacto esperado, entre outros componentes da proposta.",
+          "cronograma": "Lançamento da Chamada: 17/03/2026\nData limite para submissão das propostas no SAGe: 15/06/2026\nAnúncio dos projetos selecionados: A partir de outubro de 2026",
+          "requisitos": "O Pesquisador Responsável deve estar em dia com a FAPESP, ter título de doutor ou qualificação equivalente, e possuir vínculo empregatício com a Instituição Sede do estado de São Paulo proposta para sediar o projeto.",
+          "categorias_financiamento": "Valor máximo da Chamada: R$ 12.000.000,00\nValor máximo por projeto: R$ 600.000,00 (Custo Total da Proposta)",
+          "faq": ""
+        },
+        "pdf_urls": [],
+        "pdf_legendas": [],
+        "error": false
+      },
+      "pdf_total": 0,
+      "pdf_baixados": 0,
+      "pdf_skipped": 0,
+      "pdf_texts_chars": [],
+      "filled_secoes": 6,
+      "extraction_quality": "medium"
+    },
+    {
+      "name": "FAPESC - Chamada 37/2026",
+      "url": "https://fapesc.sc.gov.br/edital-de-chamada-publica-fapesc-n-o-37-2026-programa-de-ciencia-tecnologia-e-inovacao-para-apoio-aos-grupos-de-pesquisa-da-udesc",
+      "source": "fapesc",
+      "success": true,
+      "crawl_duration_ms": 11487,
+      "markdown_raw_len": 10024,
+      "markdown_fit_len": 1277,
+      "markdown_sections": 3,
+      "bm25_reduction_pct": 87.3,
+      "llm_extraction": {
+        "titulo": "EDITAL DE CHAMADA PÚBLICA FAPESC N.º 37/2026 PROGRAMA DE CIÊNCIA, TECNOLOGIA E INOVAÇÃO PARA APOIO AOS GRUPOS DE PESQUISA DA UDESC",
+        "prazo_envio": "19/06/2026 a 17/09/2026",
+        "publico_alvo": "Líderes dos grupos de pesquisa da UDESC",
+        "descricao": "A FAPESC, em colaboração com a UDESC, lança este Edital de Chamada Pública para propostas de pesquisa em Ciência, Tecnologia e/ou Inovação que contribuam para o desenvolvimento do setor no estado de Santa Catarina.",
+        "status": "ABERTA",
+        "opportunity_type": "edital",
+        "tema": [],
+        "tema_livre": [],
+        "secoes": {
+          "resumo": "A FUNDAÇÃO DE AMPARO À PESQUISA E INOVAÇÃO DO ESTADO DE SANTA CATARINA (FAPESC), em colaboração com a UNIVERSIDADE DO ESTADO DE SANTA CATARINA (UDESC), no âmbito do Termo de Mútua Colaboração em Ciência, Tecnologia e Inovação n.º 13/2023, torna público o lançamento do presente Edital de Chamada Pública.",
+          "descricao_completa": "O presente Edital convida os(as) líderes dos grupos de pesquisa da UDESC a submeterem propostas de pesquisa em Ciência, Tecnologia e/ou Inovação (CTI), que contribuam para o desenvolvimento do setor no estado de Santa Catarina.",
+          "quem_pode_participar": "Líderes dos grupos de pesquisa da UDESC.",
+          "cronograma": "Prazo para submissão: 19/06/2026 a 17/09/2026",
+          "requisitos": "",
+          "categorias_financiamento": "",
+          "faq": ""
+        },
+        "pdf_urls": [
+          "https://fapesc.sc.gov.br/wp-content/uploads/2026/06/Documento-FAPESC-00001149_2026.pdf"
+        ],
+        "pdf_legendas": [
+          "ACESSE O EDITAL COMPLETO"
+        ],
+        "error": false
+      },
+      "pdf_total": 1,
+      "pdf_baixados": 1,
+      "pdf_skipped": 0,
+      "pdf_texts_chars": [
+        142627
+      ],
+      "filled_secoes": 2,
+      "extraction_quality": "medium"
+    },
+    {
+      "name": "Programa Centelha",
+      "url": "https://programacentelha.com.br",
+      "source": "centelha",
+      "success": true,
+      "crawl_duration_ms": 18203,
+      "markdown_raw_len": 14638,
+      "markdown_fit_len": 1556,
+      "markdown_sections": 0,
+      "bm25_reduction_pct": 89.4,
+      "llm_extraction": {
+        "titulo": "O Programa Centelha",
+        "prazo_envio": "",
+        "publico_alvo": "Pessoa física (coordenador do projeto) que, se aprovada, deverá constituir uma Microempresa ou Empresa de Pequeno Porte (MEEPP) com sede no estado participante, ou Pessoa física (coordenador do projeto) que possua vínculo como proprietário ou sócio proprietário de MEEPP, sediada no Estado participante, com data de constituição de até 12 meses antes da publicação do edital.",
+        "descricao": "O Programa Centelha é uma iniciativa de empreendedorismo inovador que oferece recursos financeiros, capacitação e suporte para transformar ideias inovadoras em negócios.",
+        "status": "ABERTA",
+        "opportunity_type": "programa",
+        "tema": [
+          "Empreendedorismo",
+          "Inovação",
+          "Tecnologia"
+        ],
+        "tema_livre": [],
+        "secoes": {
+          "resumo": "O Programa Centelha é uma iniciativa de empreendedorismo inovador que oferece recursos financeiros, capacitação e suporte para transformar ideias inovadoras em negócios.",
+          "descricao_completa": "O Programa Centelha é uma iniciativa de empreendedorismo inovador que oferece recursos financeiros, capacitação e suporte para transformar ideias inovadoras em negócios. Promovido pelo Ministério da Ciência, Tecnologia e Inovação (MCTI), pela Financiadora de Estudos e Projetos (Finep) e o Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq), em parceria com o Conselho Nacional das Fundações Estaduais de Amparo à Pesquisa (CONFAP) e a Fundação CERTI, o programa tem execução descentralizada, realizada na maioria das unidades federativas pelas Fundações de Amparo à Pesquisa estaduais. Na sua terceira edição lançada em 2025, o Centelha chega a todos os 26 estados e ao Distrito Federal com a expectativa de apoiar mais de 1.100 projetos pelo país.",
+          "quem_pode_participar": "As propostas podem ser submetidas por: Pessoa física (coordenador do projeto) que, se aprovada, deverá constituir uma Microempresa ou Empresa de Pequeno Porte (MEEPP) com sede no estado participante, ou Pessoa física (coordenador do projeto) que possua vínculo como proprietário ou sócio proprietário de MEEPP, sediada no Estado participante, com data de constituição de até 12 meses antes da publicação do edital.",
+          "cronograma": "",
+          "requisitos": "Não é necessário ter uma empresa para participar, mas a constituição da empresa será exigida após a terceira fase do programa, caso a ideia seja aprovada.",
+          "categorias_financiamento": "Os empreendedores receberão cerca de R$ 50 mil na forma de subvenção econômica.",
+          "faq": "As perguntas frequentes incluem quem pode submeter ideias, como submeter, quantas ideias podem ser submetidas, e como as ideias serão avaliadas."
+        },
+        "pdf_urls": [
+          "https://drive.google.com/file/d/1HshNigYAJ3HtKifSAQvjP50xje2ayE6z/view?usp=sharing",
+          "https://drive.google.com/file/d/1f4Uk_7zFs7zknFLuMyc92M65B9fX6my9/view?usp=sharing"
+        ],
+        "pdf_legendas": [
+          "Acesse o material completo",
+          "Acesse o guia"
+        ],
+        "error": false
+      },
+      "pdf_total": 2,
+      "pdf_baixados": 0,
+      "pdf_skipped": 0,
+      "pdf_texts_chars": [],
+      "filled_secoes": 6,
+      "extraction_quality": "medium"
+    },
+    {
+      "name": "CONFAP - Horizon Europe (pending discovery)",
+      "url": "https://confap.org.br/pt/editais/49/horizon-europe",
+      "source": "confap",
+      "success": true,
+      "crawl_duration_ms": 15170,
+      "markdown_raw_len": 15171,
+      "markdown_fit_len": 3717,
+      "markdown_sections": 3,
+      "bm25_reduction_pct": 75.5,
+      "llm_extraction": {
+        "titulo": "Horizon Europe",
+        "prazo_envio": "31/12/2027",
+        "publico_alvo": "Pesquisadores, instituições acadêmicas e não acadêmicas (incluindo empresas) de países fora da União Europeia (UE).",
+        "descricao": "O Horizon Europe é o nono programa-quadro europeu de Pesquisa & Inovação (2021-2027) com um orçamento de 95 bilhões de euros, destinado a financiar projetos de pesquisa e inovação que abordem grandes desafios globais.",
+        "status": "EM ANDAMENTO",
+        "opportunity_type": "programa",
+        "tema": [],
+        "tema_livre": [],
+        "secoes": {
+          "resumo": "O Horizon Europe é o nono programa-quadro europeu de Pesquisa & Inovação (2021-2027). O programa, aberto à cooperação internacional, tem o objetivo de ajudar a fortalecer a base de conhecimento europeia por meio de pesquisas de fronteira, estimular inovações e apoiar o desenvolvimento e a demonstração de soluções inovadoras, além de ajudar a restaurar a indústria e a economia.",
+          "descricao_completa": "Com um orçamento de 95 bilhões de euros, o programa vai financiar projetos de pesquisa e inovação comprometidos em resolver grandes desafios do mundo. As propostas do Horizon Europe podem incluir pesquisadores, instituições acadêmicas e não acadêmicas (incluindo empresas) de países fora da União Europeia (UE). Participantes de países que não fazem parte da UE ou que não sejam elegíveis a receber automaticamente recursos do programa devem obter financiamento de outras fontes.",
+          "quem_pode_participar": "Pesquisadores, instituições acadêmicas e não acadêmicas (incluindo empresas) de países fora da União Europeia (UE).",
+          "cronograma": "Data de Encerramento: 31/12/2027",
+          "requisitos": "",
+          "categorias_financiamento": "",
+          "faq": ""
+        },
+        "pdf_urls": [
+          "https://confap.org.br/pt/editais/download/196",
+          "https://confap.org.br/pt/editais/download/195",
+          "https://confap.org.br/pt/editais/download/266",
+          "https://confap.org.br/pt/editais/download/267"
+        ],
+        "pdf_legendas": [
+          "Ficha Informativa Horizon Europe (Em inglês)",
+          "Apresentação do Horizonte Europa (2021-2027)",
+          "Arranjo Administrativo_Cooperação UE_Brasil (Português)",
+          "Arranjo Administrativo_Cooperação UE_Brasil (Inglês)"
+        ],
+        "error": false
+      },
+      "pdf_total": 4,
+      "pdf_baixados": 1,
+      "pdf_skipped": 0,
+      "pdf_texts_chars": [
+        28565
+      ],
+      "filled_secoes": 3,
+      "extraction_quality": "medium"
+    }
+  ]
+}

@@ -9,7 +9,8 @@ OU mudança de env var) apaga `data/bronze/` e os PDFs FINEP (`FINEP_PDFS_DIR`).
 
 O `chunk_edital` (aquecido diariamente e também garantido sob demanda; ver
 [data-plane-convergence.md](data-plane-convergence.md)) lê o conteúdo-fonte via
-adapters, com preferência pelo seam durável:
+adapters quando o bronze fresco está disponível e usa o seam durável como
+fallback de redeploy:
 
 - `finep` → PDFs de `FINEP_PDFS_DIR/<id>/` (pdfplumber per-página)
 - `web` → HTML cru de `bronze/web_raw/*.json`
@@ -29,7 +30,7 @@ ou sob demanda. O problema **não é re-buscar a fonte** —
 é que o texto extraído é gravado **só no disco efêmero**.
 
 Logo: persistir o **Documento Canônico** (§12.3 — o contrato agnóstico de fonte:
-`[{doc_name, units}]`) num seam durável, **gravado no scrape (disco fresco)**,
+`[{doc_name, units, metadata?}]`) num seam durável, **gravado no scrape (disco fresco)**,
 elimina a dependência de disco no chunk. Não adiciona custo de extração.
 
 Descartado: **re-fetch on-demand** (re-baixar PDF/URL no chunk) — exigiria
@@ -54,28 +55,27 @@ RLS habilitada sem policies (service-role only) — espelha `kg_artifacts` (016)
 Postgres-only: sem Supabase é no-op (dev local usa o fallback de disco, que não
 é efêmero).
 
-### Escrita (proativa, no scrape)
+### Escrita (proativa, antes do Silver)
 
-`run_daily_etl_task` (cron 03:00), após scrape + build KG, chama
-`source_docs.persist_all_current()`: itera os editais do index e faz upsert do
-Documento Canônico de cada um (via `adapter.to_documents`, com o disco fresco).
-Custo: pdfplumber/html-clean para o catálogo vigente — barato (já era extraído),
-sem LLM.
+`run_daily_etl_task` (cron 03:00), após o scrape, faz adapter/autoridade e grava
+o Documento Canônico antes de materializar Silver e gold. A ordem impede que
+uma versão durável antiga sobreviva por mais uma run. `persist_all_current()`
+permanece depois do gold apenas como rede de segurança para itens já catalogados
+que não foram enumerados no bronze da run.
 
-### Leitura (durável-primeiro, no chunk)
+### Leitura (fresco-primeiro com fallback durável)
 
-`_build_chunks_for_edital` lê `source_docs.load(edital_id)` primeiro. Só cai no
-`adapter.to_documents` (disco) se o durável faltar — e, nesse caso, **backfilla**
-o durável (self-healing para editais pré-feature ou quando o disco está fresco).
-Disco vira **cache/fallback**, não dependência.
+`_build_chunks_for_edital` consulta primeiro o adapter. Se houver bronze fresco,
+salva esse resultado e o usa na mesma run; se não houver, lê
+`source_docs.load(edital_id)`. Assim o disco não é dependência após redeploy, mas
+uma coleta nova sempre prevalece sobre o snapshot persistido anterior.
 
 ### Invariantes preservadas
 
 - **Chunking híbrido**: o mesmo produtor idempotente atende ao aquecimento diário
   e ao ensure/prefetch sob demanda. Só a extração de origem é persistida aqui.
-- **Silver cache** (`structurer._source_hash`): hash é content-based sobre o
-  Documento Canônico — o durável guarda exatamente o que o adapter produz, então
-  o hash bate e o cache silver continua válido.
+- **Silver cache** (`structurer._source_hash`): hash inclui conteúdo e metadata
+  de autoridade; mudança de revisão invalida o cache mesmo com texto idêntico.
 - **Gate de `content_hash`** (`chunk_edital_task`): inalterado.
 - **Freshness**: o cron diário re-scrapeia → re-persiste → o gate re-chunka só o
   que mudou.

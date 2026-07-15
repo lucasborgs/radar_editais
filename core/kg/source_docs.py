@@ -38,9 +38,23 @@ def canonical_hash(doc: CanonicalDoc) -> str:
     h = hashlib.md5()
     for entry in sorted(doc, key=lambda d: d.get("doc_name", "")):
         h.update((entry.get("doc_name") or "").encode("utf-8", "ignore"))
+        h.update(json.dumps(
+            entry.get("metadata") or {}, sort_keys=True, ensure_ascii=False,
+        ).encode("utf-8", "ignore"))
         for unit in entry.get("units") or []:
             h.update((unit or "").encode("utf-8", "ignore"))
     return h.hexdigest()
+
+
+def active_documents(doc: CanonicalDoc) -> CanonicalDoc:
+    """Remove versões explicitamente superadas do data plane factual.
+
+    Ausência de metadata mantém compatibilidade com documentos legados.
+    """
+    return [
+        entry for entry in doc
+        if (entry.get("metadata") or {}).get("authority_state") != "superseded"
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -146,9 +160,10 @@ def persist_all_current() -> int:
 if __name__ == "__main__":
     # Backfill manual: popula o durável a partir do disco atual. Útil logo após
     # um scrape para publicar o Documento Canônico para prod sem esperar o cron.
-    from dotenv import load_dotenv
+    from core.environment import assert_database_target, load_environment_profile
 
-    load_dotenv()
+    load_environment_profile()
     logging.basicConfig(level=logging.INFO)
+    assert_database_target("source docs backfill")
     count = persist_all_current()
     print(json.dumps({"persisted": count}))

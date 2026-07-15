@@ -21,9 +21,9 @@ cai para InMemorySaver/InMemoryStore e este script não é necessário.
 """
 from __future__ import annotations
 
-from dotenv import load_dotenv
+from core.environment import assert_database_target, load_environment_profile
 
-load_dotenv()
+load_environment_profile()
 
 import logging  # noqa: E402
 import os  # noqa: E402
@@ -40,6 +40,7 @@ def main() -> int:
             "DATABASE_URL ausente — nada a fazer (runtime usa InMemorySaver/InMemoryStore).",
         )
         return 1
+    assert_database_target("agent memory schema setup")
 
     # Reusa a init real do runtime (cria pools no schema agent_memory + roda setup()
     # no loop dedicado). O search_path no schema dedicado já tranca contra o PostgREST.

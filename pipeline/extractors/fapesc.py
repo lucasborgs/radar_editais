@@ -58,8 +58,9 @@ _UPLOADS_DATE_RE = re.compile(r"/wp-content/uploads/(\d{4})/(\d{2})/", re.IGNORE
 # Boilerplate institucional + peças de andamento que NÃO são o edital normativo.
 _SKIP_KEYWORDS_FALLBACK = [
     "plano-de-integridade", "codigo_conduta", "resultado", "manual",
-    "passo-a-passo", "retificacao", "errata", "cadastr", "sigfapesc",
+    "passo-a-passo", "cadastr", "sigfapesc",
 ]
+_AMENDMENT_RE = re.compile(r"retifica|rerratifica|errata", re.IGNORECASE)
 
 
 def _skip_keywords() -> list[str]:
@@ -180,8 +181,12 @@ class FAPESCScraper(BaseScraper):
             if _EDITAL_ANCHOR_RE.search(anchor) and not self._is_boilerplate(url, skip)
         ]
         if edital_anchors:
-            completos = [ua for ua in edital_anchors if "completo" in ua[1].lower()]
-            pool = completos or edital_anchors
+            base_anchors = [
+                ua for ua in edital_anchors
+                if not _AMENDMENT_RE.search(f"{ua[1]} {ua[0].rsplit('/', 1)[-1]}")
+            ]
+            completos = [ua for ua in base_anchors if "completo" in ua[1].lower()]
+            pool = completos or base_anchors or edital_anchors
             pool.sort(key=lambda ua: self._uploads_recency(ua[0]), reverse=True)
             return pool[0][0]
 
@@ -192,6 +197,31 @@ class FAPESCScraper(BaseScraper):
         cand.sort(key=self._uploads_recency, reverse=True)
         return cand[0]
 
+    def _find_normative_pdfs(self, soup: BeautifulSoup) -> list[tuple[str, str]]:
+        """Edital-base + retificações/erratas em ordem de composição.
+
+        Mantém `_find_edital_pdf` como seletor retrocompatível do documento-base
+        e acrescenta emendas normativas que antes eram descartadas.
+        """
+        base = self._find_edital_pdf(soup)
+        if not base:
+            return []
+        skip = _skip_keywords()
+        amendments: list[tuple[str, str]] = []
+        seen = {base}
+        for a in soup.find_all("a", href=True):
+            href = a["href"].strip()
+            if ".pdf" not in href.lower():
+                continue
+            url = href.split("#")[0].split("?")[0].replace("http://", "https://")
+            label = f"{a.get_text(' ', strip=True)} {url.rsplit('/', 1)[-1]}"
+            if url in seen or self._is_boilerplate(url, skip) or not _AMENDMENT_RE.search(label):
+                continue
+            seen.add(url)
+            amendments.append((url, "emenda"))
+        amendments.sort(key=lambda item: (self._uploads_recency(item[0]), item[0]))
+        return [(base, "edital-base"), *amendments]
+
     def _parse_chamada(self, url: str, titulo: str) -> dict | None:
         try:
             html = self._fetch(url)
@@ -200,14 +230,28 @@ class FAPESCScraper(BaseScraper):
             return None
 
         soup = BeautifulSoup(html, "html.parser")
-        edital_pdf_url = self._find_edital_pdf(soup)
+        normative_pdfs = self._find_normative_pdfs(soup)
+        edital_pdf_url = normative_pdfs[0][0] if normative_pdfs else None
 
         # texto_cru = texto do PDF do edital; fallback ao resumo HTML se o PDF
         # não existir ou não extrair (não perde a chamada — só degrada).
         texto_cru = ""
         content_source = "html"
-        if edital_pdf_url:
-            texto_cru = self._extract_pdf_text(edital_pdf_url)
+        documentos_normativos: list[dict] = []
+        for pdf_url, family in normative_pdfs:
+            pdf_text = self._extract_pdf_text(pdf_url)
+            if not pdf_text:
+                continue
+            documentos_normativos.append({
+                "doc_name": pdf_url.rsplit("/", 1)[-1],
+                "url": pdf_url,
+                "family": family,
+                "text": pdf_text,
+            })
+        if documentos_normativos:
+            texto_cru = "\n\n".join(
+                f"[{d['doc_name']}]\n{d['text']}" for d in documentos_normativos
+            )
             if texto_cru:
                 content_source = "pdf"
         if not texto_cru:
@@ -251,6 +295,7 @@ class FAPESCScraper(BaseScraper):
             "areas": None,         # idem áreas
             "texto_cru": texto_cru,
             "edital_pdf_url": edital_pdf_url,
+            "documentos_normativos": documentos_normativos,
             "content_source": content_source,
             "fluxo_continuo": fluxo_continuo,
             "fonte": "FAPESC",

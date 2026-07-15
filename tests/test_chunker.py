@@ -114,3 +114,18 @@ def test_tail_overlap_prosa_comportamento_estavel():
 def test_tail_overlap_vazio_e_zero():
     assert _tail_overlap("", 150) == ""
     assert _tail_overlap("texto", 0) == ""
+
+
+def test_chunk_preserva_metadados_de_autoridade():
+    blocks = [{
+        "doc": "Regulamento.pdf", "page": 4,
+        "section_path": ["4.3 Itens Financiáveis"], "kind": "paragraph",
+        "text": "Pagamento de pessoal para pesquisadores.",
+        "document_metadata": {
+            "authority_state": "vigente", "revision": 3,
+            "published_at": "2026-02-09",
+        },
+    }]
+    chunks = chunker.chunk_from_blocks(blocks)
+    assert chunks[0]["metadata"]["authority_state"] == "vigente"
+    assert chunks[0]["metadata"]["revision"] == 3
