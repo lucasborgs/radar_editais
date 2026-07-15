@@ -95,9 +95,9 @@ Laboratório técnico
 
 | Capacidade | Pergunta do usuário | Superfícies atuais | Resultado |
 |---|---|---|---|
-| Mapeamento | “O que existe e como este ecossistema se organiza?” | Explorer `/`, catálogo `/oportunidades`, fichas | entendimento de oportunidades e atores |
+| Mapeamento | “O que existe e como este ecossistema se organiza?” | Explorar `/`, Ecossistema `/oportunidades`, fichas | entendimento de oportunidades e atores |
 | Match/Radar | “O que faz sentido para esta empresa e por quê?” | `/radar`, cards e perfil | conjunto priorizado com evidência e elegibilidade |
-| Escrita | “Como transformar esta escolha em uma proposta defensável?” | `/workspace/{sessionId}`, library e checklist | rascunho iterável, fundamentado e revisável |
+| Escrita | “Como transformar esta escolha em uma proposta defensável?” | Projetos `/projects`, `/workspace/{sessionId}`, library e checklist | rascunho iterável, fundamentado e revisável |
 
 ### 4.2 Capacidades transversais
 
@@ -232,7 +232,7 @@ O trabalho de coerência estará concluído quando:
 | Eixo | Spec | Estado |
 |---|---|---|
 | Autoridade documental | [`document-authority.md`](document-authority.md) | vigente |
-| Modelo mental e superfície do usuário | [`user-mental-model.md`](user-mental-model.md) | aprovada |
+| Modelo mental e superfície do usuário | [`user-mental-model.md`](user-mental-model.md) | vigente |
 
 Os demais eixos só recebem uma spec quando o eixo anterior tiver sido executado
 e reconciliado, salvo bloqueio comprovado ou independência explícita.

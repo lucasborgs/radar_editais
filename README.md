@@ -1,8 +1,8 @@
 # Radar de Editais
 
-Plataforma de IA que cruza o perfil de startups deep-tech brasileiras com
-oportunidades de fomento público — editais, programas e investidores — em ranking
-único, com escrita assistida de propostas via RAG.
+Plataforma de IA para mapear o ecossistema brasileiro de inovação, cruzar o
+perfil de startups deep-tech com editais, programas e investidores e desenvolver
+propostas ou pitches com escrita assistida por RAG.
 
 > IA rascunha, o humano decide.
 
@@ -58,7 +58,7 @@ flowchart LR
     RANK -->|ranking| ESCRITA
 
     %% Spoke 3: Explore
-    subgraph EXPLORE["③ Explore — Mapa"]
+    subgraph EXPLORE["③ Explorar — Mapa"]
         HG[Grafo relacional<br/>entidades · relações · tags] --> EA[ExploreAgent ReAct]
         EA --> RESP[Respostas → profile_diff]
     end
@@ -70,8 +70,8 @@ flowchart LR
 
 - **Descoberta**: busca web e adapters dedicados → evidências canônicas → staging com gate humano. A versão promovida é congelada em bronze web e segue para silver → gold como qualquer edital de agência; Crawl4AI é um enriquecimento opcional do worker, não substitui adapters nem o pipeline nativo.
 - **Radar (Match)**: funil determinístico de 4 estágios — vigência (SQL) → elegibilidade → MaxSim (zero LLM) → veredito gpt-4o-mini no top-K. Trilha investidor paralela por cosseno de tese.
-- **Explore**: agente ReAct com busca semântica, vizinhança nas relações gold, entidades por tags e o motor de match como ferramenta.
-- **Escrita**: sessões LangGraph com checkpointer Postgres durável, RAG híbrida (HyDE + pgvector + BM25 + RRF + rerank), ficha da oportunidade via catálogo, checklist paralelo 3-passos.
+- **Explorar**: catálogo do Ecossistema + agente ReAct com busca semântica, vizinhança nas relações gold, entidades por tags e o motor de match como ferramenta.
+- **Projetos**: propostas e pitches em sessões LangGraph com checkpointer Postgres durável, RAG híbrida (HyDE + pgvector + BM25 + RRF + rerank), ficha da oportunidade via catálogo e checklist paralelo 3-passos.
 - **Runtime**: 5 tiers de LLM independentes por env var (embedding, contextual, extração, explore, escrita).
 
 ## Stack

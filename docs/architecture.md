@@ -5,10 +5,10 @@
 > [índice da documentação](README.md).
 
 O produto conecta empresas early-stage/PME a oportunidades de fomento público
-brasileiro através de **quatro funcionalidades**: **Radar** (match
-empresa↔oportunidade), **Escrita assistida** (propostas com RAG sobre o edital),
-**Mapeamento do ecossistema** (catálogo + exploração conversacional de atores e
-programas) e **Descoberta** (torneira de novas oportunidades com gate humano).
+brasileiro através de três capacidades: **Explorar** (mapeamento do ecossistema
+por catálogo e conversa), **Radar** (match empresa↔oportunidade) e **Projetos**
+(propostas e pitches com RAG). **Descoberta** é a torneira operacional de novas
+oportunidades com gate humano, não uma quarta jornada do usuário de produto.
 
 Arquitetura v3 (concluída 2026-07-11): representações especializadas por
 funcionalidade derivadas da mesma fonte — filtros estruturados + embeddings de

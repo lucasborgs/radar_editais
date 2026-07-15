@@ -113,7 +113,7 @@ versão do pacote.
 - Não altera match v3, ontologia, elegibilidade, chunker ou modelo de embedding.
 - Não torna Crawl4AI dependência obrigatória do backend; fica em extra/runtime
   do worker de descoberta até decisão de rollout.
-- Não expõe pacote bruto, erros internos ou staging no Explorer/Radar público.
+- Não expõe pacote bruto, erros internos ou staging em Explorar/Radar público.
 
 ## 7. Critérios de aceite
 

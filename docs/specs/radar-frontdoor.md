@@ -1,8 +1,8 @@
-# Spec — Radar como porta de entrada
+# Spec — Radar como superfície explícita
 
 **Status:** vigente · **Data:** 2026-07-14
 **Escopo da primeira entrega:** Radar explícito, explicável e acionável.
-**Fora do escopo desta entrega:** alterar ranking/embeddings/elegibilidade, comparação, timeline de prazo, estados operacionais da descoberta e canvas de projeto do Explorer.
+**Fora do escopo desta entrega:** alterar ranking/embeddings/elegibilidade, comparação, timeline de prazo, estados operacionais da descoberta e canvas avançado de projeto.
 
 **Documento-pai:** [system-coherence.md](system-coherence.md).
 
@@ -22,7 +22,7 @@ faz recomendação absoluta.
 Jornada alvo:
 
 ```text
-Explorer ou preenchimento de perfil
+Explorar ou preenchimento de perfil
   → perfil mínimo (nome + atividades)
   → Radar explícito
   → entender evidência e elegibilidade
@@ -53,7 +53,7 @@ O frontend já possui os componentes e tipos fundamentais:
 
 - `MatchedEditalCard`, `MatchedEntityCard` e `VerdictBlock`;
 - `matched_excerpts[]`, setores, prazo, valor e elegibilidade;
-- `mergeRadar()` para ordenação estável por afinidade;
+- contratos de cards e snapshots de match compatíveis com o payload do backend;
 - perfil em `localStorage` e gate `isRadarReady()`.
 
 Portanto, a primeira entrega cria composição, rota e contrato explícito; não
@@ -105,7 +105,7 @@ Novo endpoint: `POST /radar/matches`.
 
 ### Estados
 
-1. **Sem perfil mínimo:** explica o que é preciso e leva ao Explorer/Perfil;
+1. **Sem perfil mínimo:** explica o que é preciso e leva a Explorar/Perfil;
    não dispara embedding nem match.
 2. **Carregando:** skeleton por trilha, com mensagem curta sobre análise de
    afinidade e elegibilidade.
@@ -169,7 +169,7 @@ F0: contrato/API determinística
 - **Discovery operations:** estados `silver_ready`, `catalog_ready`,
   `radar_ready`, `rag_ready`, retry e histórico. Depende de migration e tasks;
   deve ter spec própria.
-- **Explorer de projetos:** canvas persistente de problema, solução, TRL,
+- **Canvas avançado de projetos:** problema, solução, TRL,
   parceiros e mecanismo; transição explícita para o Radar. Depende da decisão
   de produto sobre armazenamento e memória, portanto não entra nesta branch.
 

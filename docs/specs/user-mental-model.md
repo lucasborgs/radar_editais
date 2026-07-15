@@ -1,6 +1,6 @@
 # Spec — Modelo mental e superfície do usuário
 
-**Status:** aprovada · **Data:** 2026-07-14
+**Status:** vigente · **Data:** 2026-07-14
 **Documento-pai:** [`system-coherence.md`](system-coherence.md)
 **Perfis afetados:** usuário de produto; secundariamente operador
 **Impacto:** médio; navegação, nomenclatura e composição de superfícies, sem
@@ -86,7 +86,7 @@ A navegação global deve apresentar, no mesmo nível:
 |---|---|---|
 | Explorar | `/` | perguntar, compreender o ecossistema e completar contexto |
 | Radar | `/radar` | ver e comparar aderências explicadas |
-| Projetos | destino de listagem a definir na implementação | retomar propostas e pitches |
+| Projetos | `/projects` | retomar propostas e pitches |
 
 A implementação pode preservar aliases e rotas internas existentes. A criação
 do destino de listagem de Projetos é apenas composição sobre sessões já
@@ -280,3 +280,27 @@ O eixo estará concluído quando:
 8. a pessoa conseguir atravessar Explorar → Radar → Projetos sem precisar
    compreender termos de implementação; e
 9. contratos, persistência e comportamento de IA permanecerem inalterados.
+
+## 13. Resultado da execução
+
+Implementado em 2026-07-14:
+
+- Explorar, Radar e Projetos passaram a formar a navegação primária;
+- o catálogo amplo passou a se chamar Ecossistema, preservando a rota
+  `/oportunidades` e suas categorias;
+- entradas de match na conversa passaram a renderizar uma prévia com CTA, sem
+  duplicar a lista completa, filtros e comparação de `/radar`;
+- `/projects` passou a listar e retomar as sessões de proposta e pitch já
+  persistidas por `GET /writing/sessions`;
+- Radar e Projetos passaram a compartilhar um shell focado e responsivo;
+- o painel visível do projeto passou de Explorer para Estrutura, e seus modos
+  são apresentados como Contexto, Plano e Escrita sem alterar os slash commands;
+- retornos e CTAs passaram a apontar para a capacidade expressa pelo rótulo; e
+- APIs, schemas, migrations, ranking, agentes, retrieval e persistência não
+  foram alterados.
+
+Validação da execução: `git diff --check`, `npx tsc --noEmit`, `npm run lint`,
+build de produção e inspeção local das rotas `/`, `/radar`, `/projects` e
+`/oportunidades`, incluindo viewport de 390 px. A inspeção autenticada depende
+de uma sessão real, mas a listagem reutiliza sem alteração o endpoint e o
+contrato de sessões de escrita existentes.

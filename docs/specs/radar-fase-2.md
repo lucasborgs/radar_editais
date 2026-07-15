@@ -100,8 +100,8 @@ seleção recomendada ou geração por LLM.
   filtro não cria embeddings, jobs, vereditos ou chamadas LLM.
 - Vereditos permanecem secundários e não participam de filtro, urgência ou
   ordenação nesta fase.
-- A experiência no Explorer não muda: os cards nele continuam compactos e sem
-  painel de comparação; a comparação pertence ao `/radar` explícito.
+- Explorar mantém apenas contexto ou prévia com CTA; lista completa, filtros e
+  comparação pertencem ao `/radar` explícito.
 
 ## 7. Fora de escopo
 

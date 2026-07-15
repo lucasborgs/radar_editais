@@ -76,7 +76,7 @@ dependem do coletor. Crawl4AI não é dependência obrigatória do backend.
 | D5 | PDF direto segue os mesmos componentes nativos de conteúdo `web`: bronze → structurer/silver → `gold.ingest_all` para o Radar; e `chunk_edital` → contextual retrieval → embeddings para RAG. Não haverá pipeline paralelo de parsing ou embedding. |
 | D6 | Falha em uma superfície não desfaz a outra. Por exemplo, gold concluído e chunking falho é `radar_ready` + `rag_failed`; o operador pode repetir somente RAG. |
 | D7 | Retry é ação explícita de operador, idempotente e limitado a uma etapa falha ou pendente. Ele reaproveita os artefatos válidos e não recria `web_sources`, bronze, registros gold ou chunks sem necessidade. |
-| D8 | A interface e APIs desta entrega são administrativas. Staging, erros internos, links de job e histórico não são expostos no Radar, Explorer nem a usuários finais. |
+| D8 | A interface e APIs desta entrega são administrativas. Staging, erros internos, links de job e histórico não são expostos no Radar, em Explorar nem a usuários finais. |
 
 ## 4. Modelo de estados
 

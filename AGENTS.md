@@ -203,6 +203,10 @@ GET/POST/PUT/DELETE /library, POST /library/{id}/archive
 ### Frontend
 Next.js 14 + TypeScript + TailwindCSS + Radix UI. API client at `frontend/src/lib/api.ts`. Backend URL via `NEXT_PUBLIC_API_URL` in `frontend/.env.local`. Design tokens em `frontend/DESIGN_SYSTEM.md`. Toast canônico = **sonner**. Perfil da empresa acumulado no `localStorage` (não no backend) até `isRadarReady()`.
 
+Jornadas primárias: Explorar `/`, Radar `/radar` e Projetos `/projects`.
+Ecossistema permanece em `/oportunidades`; o ambiente interno de um projeto usa
+`/workspace/{sessionId}`.
+
 ## Key Gotchas
 
 ### Imports
