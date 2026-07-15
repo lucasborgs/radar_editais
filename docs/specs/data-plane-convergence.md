@@ -1,6 +1,6 @@
 # Spec — Convergência do data plane de editais
 
-**Status:** proposta · **Data:** 2026-07-15
+**Status:** vigente · **Data:** 2026-07-15
 **Documento-pai:** [`system-coherence.md`](system-coherence.md)
 **Perfis afetados:** usuário técnico e operador
 **Impacto:** médio; documentação autoritativa, helpers e tooling do data plane,
