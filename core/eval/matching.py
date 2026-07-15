@@ -9,8 +9,8 @@ célula de comparação com o motor v2 (deletado nesta fase; rollback = git reve
 Métricas (piso do gate da Fase 2):
   mrr        — posição do 1º positivo no ranking (piso: média ≥ 0.6)
   recall@10  — positivos do golden no top-10 (piso: média ≥ 0.55)
-  noise@8    — matches no top-8 acima do PISO DE PRODUÇÃO (MIN_AFFINITY) que
-               não são positivos NEM neutros (guarda-chuva) = falso-positivo
+  false_positives@8 — resultados do top-8 explicitamente julgados irrelevantes
+  unjudged@8 — resultados do top-8 ainda sem julgamento humano; impedem gate
   hardneg    — hard negative de elegibilidade eliminado no Stage 1 (piso: 3/3)
 
 `as_of` é PINADO em 2026-07-05 (data de curadoria do golden): o Stage 0 "vivo"
@@ -30,7 +30,7 @@ from functools import lru_cache
 from typing import Any
 
 from config import ROOT
-from core.eval.harness import Evaluation, Suite, get_input
+from core.eval.harness import Criterion, Evaluation, Suite, get_input
 
 GOLDEN = ROOT / "eval_data" / "golden" / "matching.json"
 HARDNEG = ROOT / "eval_data" / "golden" / "matching_hard_negatives.json"
@@ -38,7 +38,7 @@ HARDNEG = ROOT / "eval_data" / "golden" / "matching_hard_negatives.json"
 # Data de curadoria do golden — pina o Stage 0 (ver docstring).
 AS_OF = datetime.date(2026, 7, 5)
 TOP_K = 10          # ranking medido no top-10 (r@10 é métrica do gate)
-SUITE_K = 8         # o produto exibe ~8 — janela do noise
+SUITE_K = 8         # o produto exibe ~8 — janela de julgamento
 
 
 @lru_cache(maxsize=1)
@@ -70,7 +70,11 @@ def load_data() -> list[dict]:
             continue
         items.append({
             "input": {"case_kind": "ranking", "profile": raw, "top_k": TOP_K},
-            "expected_output": {"relevant": case["relevant"], "neutral": g["neutral"]},
+            "expected_output": {
+                "relevant": case["relevant"],
+                "neutral": g["neutral"],
+                "confirmed_irrelevant": case.get("confirmed_irrelevant", []),
+            },
             "metadata": {"case_id": company},
         })
     for case in _hardneg()["cases"]:
@@ -96,7 +100,7 @@ def task(*, item: Any, **_) -> dict:
         return {"stage1": v}
 
     # Ranking: piso DESLIGADO (min_affinity=0) p/ medir mrr/recall no ranking
-    # completo; o noise@8 reaplica o piso de produção via `affinity` retornada.
+    # completo; as métricas do top-8 reaplicam o piso via `affinity` retornada.
     matches = match_v3.find_matching_opportunities(
         inp["profile"], kinds=frozenset({"edital"}), as_of=AS_OF,
         top_k=inp.get("top_k", TOP_K), min_affinity=0.0, use_hyde=False,
@@ -146,19 +150,47 @@ def eval_recall10(*, output, expected_output, **_) -> Evaluation | None:
             "comment": f"miss={miss}" if miss else "todos no top-10"}
 
 
-def eval_noise(*, output, expected_output, **_) -> Evaluation | None:
-    """Falso-positivo no top-8 ACIMA do piso de produção: fora de positivos E
-    de neutros (guarda-chuva). Reaplica MIN_AFFINITY sobre o ranking sem piso."""
+def _shown_at_production_floor(output: Any) -> list[str]:
     from core.services.match_v3 import MIN_AFFINITY
 
+    matches = output.get("matches", []) if isinstance(output, dict) else []
+    return [
+        match["file_key"]
+        for match in matches
+        if match["affinity"] >= MIN_AFFINITY
+    ][:SUITE_K]
+
+
+def eval_false_positives(*, output, expected_output, **_) -> Evaluation | None:
+    """Conta apenas irrelevâncias confirmadas por julgamento humano."""
     exp = expected_output or {}
     if "relevant" not in exp:
         return None
-    relevant, neutral = set(exp.get("relevant", [])), set(exp.get("neutral", []))
-    ms = output.get("matches", []) if isinstance(output, dict) else []
-    shown = [m["file_key"] for m in ms if m["affinity"] >= MIN_AFFINITY][:SUITE_K]
-    noise = [fk for fk in shown if fk not in relevant and fk not in neutral]
-    return {"name": "noise", "value": len(noise), "comment": f"fp={noise}" if noise else ""}
+    irrelevant = set(exp.get("confirmed_irrelevant", []))
+    false_positives = [fk for fk in _shown_at_production_floor(output) if fk in irrelevant]
+    return {
+        "name": "false_positives_at_8",
+        "value": len(false_positives),
+        "comment": f"confirmed={false_positives}" if false_positives else "",
+    }
+
+
+def eval_unjudged(*, output, expected_output, **_) -> Evaluation | None:
+    """Resultado sem rótulo não é falso positivo, mas impede aprovação."""
+    exp = expected_output or {}
+    if "relevant" not in exp:
+        return None
+    judged = (
+        set(exp.get("relevant", []))
+        | set(exp.get("neutral", []))
+        | set(exp.get("confirmed_irrelevant", []))
+    )
+    unjudged = [fk for fk in _shown_at_production_floor(output) if fk not in judged]
+    return {
+        "name": "unjudged_at_8",
+        "value": len(unjudged),
+        "comment": f"unjudged={unjudged}" if unjudged else "",
+    }
 
 
 def eval_hardneg(*, output, expected_output, **_) -> Evaluation | None:
@@ -194,11 +226,50 @@ def _prereqs() -> str | None:
     return None
 
 
+def _expected_cases() -> int:
+    return len(_golden()["cases"]) + len(_hardneg()["cases"])
+
+
+def _expected_case_ids() -> list[str]:
+    return [case["company"] for case in _golden()["cases"]] + [
+        case["id"] for case in _hardneg()["cases"]
+    ]
+
+
 SUITE = Suite(
     name="matching",
-    description="Funil v3 (Stage 0-2) vs golden: mrr/recall@10/noise + hard negatives de elegibilidade.",
+    description="Funil v3 vs golden: ranking, falsos positivos confirmados e hard negatives.",
     load_data=load_data,
     task=task,
-    evaluators=[eval_mrr, eval_recall10, eval_noise, eval_hardneg],
+    evaluators=[eval_mrr, eval_recall10, eval_false_positives, eval_unjudged, eval_hardneg],
     prereqs=_prereqs,
+    classification="candidate",
+    version="2",
+    criteria=[
+        Criterion("mean_mrr", "gte", 0.60, "Piso aceito de posição do primeiro positivo."),
+        Criterion("mean_recall_at_10", "gte", 0.55, "Piso aceito de recall no top-10."),
+        Criterion("mean_hardneg_pass", "eq", 1.0, "Todos os hard negatives devem ser eliminados."),
+        Criterion(
+            "mean_false_positives_at_8", "eq", 0,
+            "Nenhum falso positivo confirmado é aceitável no top-8.",
+        ),
+        Criterion(
+            "mean_unjudged_at_8", "eq", 0,
+            "Todo resultado exibido no top-8 deve possuir julgamento humano.",
+        ),
+    ],
+    metric_directions={
+        "mean_false_positives_at_8": "lower_is_better",
+        "mean_unjudged_at_8": "lower_is_better",
+    },
+    dataset_paths=[GOLDEN, HARDNEG],
+    expected_cases=_expected_cases,
+    expected_case_ids=_expected_case_ids,
+    manifest_env=["EMBEDDING_MODEL", "EMBEDDING_DIMENSIONS", "MATCH_V3_MIN_AFFINITY"],
+    manifest_config={
+        "as_of": AS_OF.isoformat(),
+        "ranking_top_k": TOP_K,
+        "judgment_window": SUITE_K,
+        "use_hyde": False,
+    },
 )

@@ -7,16 +7,15 @@ pipeline é uma `Suite` que declara:
   • `evaluators`  — pontuam o output (reaproveitam core/*_eval.py)
   • `run_evaluators` — métricas agregadas da rodada inteira
 
-`run_suite` executa a suíte de dois modos com a MESMA definição:
-  • Langfuse configurado → `langfuse.run_experiment` (Datasets+Experiments,
-    scores comparáveis entre commits, link na UI).
-  • Sem Langfuse        → fallback local idêntico, grava `eval_results/*.json`.
+`run_suite` executa a MESMA definição com duas intenções:
+  • `run`  → diagnóstico, local por padrão;
+  • `gate` → decisão por critérios aceitos, sempre completa.
 
-Assim os 3 harnesses antigos (eval_rag/matching/writing) convergem para uma
-única superfície sem reescrever a lógica de julgamento. Entrypoint: `python -m
-core.eval <suite>`.
+Todo resultado grava um manifesto local em `eval_results/*.json`; publicação no
+Langfuse é explícita. Entrypoint: `python -m core.eval run <suite>` ou
+`python -m core.eval gate <suite>`.
 """
-from core.eval.harness import Evaluation, Suite, run_suite
+from core.eval.harness import Criterion, Evaluation, Suite, run_suite
 from core.eval.registry import SUITES, get_suite
 
-__all__ = ["Evaluation", "Suite", "run_suite", "SUITES", "get_suite"]
+__all__ = ["Criterion", "Evaluation", "Suite", "run_suite", "SUITES", "get_suite"]
