@@ -126,8 +126,33 @@ def gather_source(source: str, n: int | None = None) -> list[dict]:
 
 
 def raw_by_native_id(source: str) -> dict[str, dict]:
-    """Índice `{native_id: {title, raw}}` para a suíte casar golden ↔ input."""
-    return {it["native_id"]: it for it in gather_source(source)}
+    """Índice `{native_id: {title, raw}}` para a suíte casar golden ↔ input.
+
+    O scan FAPESP mais recente deixa de listar chamadas encerradas. Para que um
+    golden continue reproduzível, o índice compõe todos os snapshots bronze e
+    deixa o registro mais novo prevalecer. A ingestão normal continua lendo o
+    snapshot mais recente por `gather_source`.
+    """
+    if source != "fapesp":
+        return {it["native_id"]: it for it in gather_source(source)}
+
+    index: dict[str, dict] = {}
+    for path in sorted((BRONZE_DIR / "fapesp_raw").glob("*.json")):
+        for record in json.loads(path.read_text(encoding="utf-8")):
+            raw = "\n".join(filter(None, [
+                record.get("titulo", ""), record.get("texto_cru", ""),
+            ]))
+            native_id = (
+                record.get("url", "").rstrip("/").split("/")[-1]
+                or record.get("titulo", "")[:40]
+            )
+            index[native_id] = {
+                "source": "fapesp",
+                "native_id": native_id,
+                "title": record.get("titulo", ""),
+                "raw": raw[:RAW_CAP],
+            }
+    return index
 
 
 # ---------------------------------------------------------------------------

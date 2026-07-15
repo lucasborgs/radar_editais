@@ -9,9 +9,8 @@ Mede a extração-LLM contra o golden CORRIGIDO por humano. Três métricas:
   • evidence_faithfulness — para campos `stated`, a `evidence` é SUBSTRING real
     da fonte? Pega evidência fabricada.
 
-Golden: `eval_data/golden/extraction.json` (corrigido). Se ausente, cai para o
-rascunho `extraction_draft.json` com AVISO — aí os números medem consistência
-(extrator vs rascunho da própria LLM), não correção.
+Golden: `eval_data/golden/extraction.json` (corrigido por revisão humana). O
+gate nunca usa rascunhos gerados pela própria LLM como referência.
 """
 from __future__ import annotations
 
@@ -20,17 +19,10 @@ import os
 from typing import Any
 
 from config import ROOT
-from core.eval.harness import Evaluation, Suite, get_input
+from core.eval.harness import Criterion, Evaluation, Suite, get_input
 from domain.edital_extraction import DECISION_FIELDS
 
 GOLDEN = ROOT / "eval_data" / "golden" / "extraction.json"
-DRAFT = ROOT / "eval_data" / "golden" / "extraction_draft.json"
-
-
-def _golden_path():
-    return GOLDEN if GOLDEN.exists() else DRAFT
-
-
 def _norm(s: str) -> str:
     return " ".join((s or "").lower().split())
 
@@ -40,11 +32,10 @@ def _present(field: dict | None) -> bool:
 
 
 def load_data() -> list[dict]:
-    path = _golden_path()
-    if not path.exists():
+    if not GOLDEN.exists():
         return []
     from core.edital_extractor import raw_by_native_id
-    golden = json.loads(path.read_text(encoding="utf-8"))
+    golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
 
     raw_idx: dict[str, dict] = {}
     items = []
@@ -153,13 +144,31 @@ def run_presence_regression(item_results: list[dict]) -> Evaluation:
 
 
 def _prereqs() -> str | None:
-    if not os.getenv("OPENAI_API_KEY"):
-        return "requer OPENAI_API_KEY (extrator)"
-    if not _golden_path().exists():
+    backend = os.getenv("LLM_BACKEND", "openai").lower()
+    if backend == "openai" and not os.getenv("OPENAI_API_KEY"):
+        return "requer OPENAI_API_KEY (extrator OpenAI)"
+    if backend == "gemini" and not (
+        os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    ):
+        return "requer GEMINI_API_KEY ou GOOGLE_API_KEY (extrator Gemini)"
+    if not GOLDEN.exists():
         return "golden ausente — rode scripts/bootstrap_extraction_golden.py"
-    if _golden_path() == DRAFT:
-        return None  # roda, mas o harness avisa no nome
     return None
+
+
+def _expected_cases() -> int:
+    if not GOLDEN.exists():
+        return 0
+    return len(json.loads(GOLDEN.read_text(encoding="utf-8")))
+
+
+def _expected_case_ids() -> list[str]:
+    if not GOLDEN.exists():
+        return []
+    return [
+        f"{item['source']}:{item['native_id']}"
+        for item in json.loads(GOLDEN.read_text(encoding="utf-8"))
+    ]
 
 
 SUITE = Suite(
@@ -170,4 +179,25 @@ SUITE = Suite(
     evaluators=[eval_presence, eval_value, eval_faithfulness],
     run_evaluators=[run_presence_regression],
     prereqs=_prereqs,
+    classification="gate",
+    version="1",
+    criteria=[
+        Criterion(
+            "mean_presence_accuracy", "gte", _PRESENCE_BASELINE,
+            "Média de presença/abstenção não pode regredir do baseline aceito.",
+        ),
+    ],
+    metric_directions={
+        "mean_value_correctness": "higher_is_better",
+        "mean_evidence_faithfulness": "higher_is_better",
+        "presence_regression": "lower_is_better",
+    },
+    dataset_paths=[GOLDEN],
+    expected_cases=_expected_cases,
+    expected_case_ids=_expected_case_ids,
+    manifest_env=["LLM_BACKEND", "OPENAI_MODEL_PRO", "GEMINI_MODEL", "OLLAMA_MODEL"],
+    manifest_config={
+        "decision_fields": list(DECISION_FIELDS),
+        "raw_source": "core.edital_extractor.raw_by_native_id",
+    },
 )

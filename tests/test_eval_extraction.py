@@ -66,3 +66,13 @@ def test_counterpart_compara_required_ignora_percentual():
                                        state=FieldState.STATED))
     r = ex.eval_value(output=pred, expected_output=gold)
     assert r["value"] == 1.0  # required bate, % ignorado no match
+
+
+def test_prereqs_respeita_backend_gemini(monkeypatch):
+    monkeypatch.setenv("LLM_BACKEND", "gemini")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    assert "GEMINI_API_KEY" in ex._prereqs()
+
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy")
+    assert ex._prereqs() is None
