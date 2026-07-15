@@ -53,7 +53,8 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
 - **Ponto de entrada:** `core/reflection_service.py`, `core/tasks.py`,
   `core/skills.py` e `supabase/migrations/024_playbook_overlays.sql`.
 - **Restrição:** não religar a flag nem criar o job apenas para completar o
-  scaffold.
+  scaffold. Classificação e gates consolidados em
+  [`reference/capability-lifecycle.md`](reference/capability-lifecycle.md).
 
 ### Reduzir o seam legado de `kg_store` somente após migrar os consumidores vivos
 

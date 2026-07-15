@@ -3,8 +3,8 @@
 DeepResearch Fase A. Padrão subagente-como-tool:
 `run_deep_research` roda um `run_agent` interno com duas tools (web_search via
 core.web_search; fetch_url para leitura profunda). Devolve `DeepResearchResult`
-estruturado (answer + sources) — a função pura que tanto a tool do Redator
-(core.llm.agent_tools.research_tools) quanto, no futuro, a UI/gate (Fase B) consomem.
+estruturado (answer + sources) — consumido pela tool dos agentes e pela staging
+`research_findings`, revisada na Content Library.
 
 Princípio inegociável (anti-fabricação, [[project_robustez_spec]]): o subagente
 sintetiza SÓ o que as fontes trazem, cita URL, e diz "não encontrei" quando for o

@@ -157,13 +157,17 @@ Todos os agentes (escrita, explore, critic) rodam num único runtime LangGraph:
 - **Grafo ReAct** (agent → tools → memória → reflect) com checkpointer
   Postgres durável — sessões sobrevivem a restart.
 - **Human-in-the-loop** nativo via interrupt.
-- **Memória cross-session** por workspace (Store semântico): reflexões e
-  padrões sintetizados em background.
+- **Memória cross-session** por workspace (Store semântico): leitura de insights
+  existentes permanece ativa; escrita automática e síntese estão congeladas por
+  default com `AUTO_MEMORY_WRITE=0`.
 - **Isolamento multi-tenant** por workspace em todas as superfícies de dado do
   usuário (RLS + namespaces), coberto por leak-tests com Postgres real.
 
 Cinco tiers de LLM trocáveis por env var (embeddings, contextual, extração
 determinística, explore, escrita) — trocar um não afeta os outros.
+
+Capacidades opcionais, experimentais e dormentes, com seus gates e fallbacks,
+estão no [`ciclo de vida das capacidades`](reference/capability-lifecycle.md).
 
 ---
 

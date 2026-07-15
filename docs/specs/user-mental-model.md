@@ -101,8 +101,7 @@ Permanecem como suporte às três jornadas:
 
 - **Perfil**;
 - **Pipeline**;
-- **Arquivos**; e
-- **Configurações**.
+- **Arquivos**.
 
 Esses itens não competem visualmente com as três capacidades. **Descobertas**
 permanece visível apenas para operador autorizado.

@@ -39,11 +39,6 @@ class ProfilePayload(BaseModel):
     tipos_financiamento_interesse: list[str] = []
 
 
-class PreferencesPayload(BaseModel):
-    """Toggle de consent para agregação global de pesos (ADR C3)."""
-    contribute_to_global_weights: bool
-
-
 class FeedbackPayload(BaseModel):
     """Feedback livre do tester (build-in-public). `context` carrega metadados
     leves do cliente (ex.: {"page": "/pipeline"}) — sem PII."""
@@ -85,14 +80,10 @@ def get_me(
     payload: Annotated[dict, Depends(get_current_user)],
 ):
     workspace = _ensure_workspace(user_id, db)
-    # contribute_to_global_weights pode não existir se migration 004 ainda
-    # não tiver sido aplicada — default False para compatibilidade.
-    consent = bool(workspace.get("contribute_to_global_weights", False))
     return {
         "user_id": user_id,
         "workspace_id": workspace["id"],
         "profile": workspace.get("profile", {}),
-        "contribute_to_global_weights": consent,
         "updated_at": workspace.get("updated_at"),
         # Operador do sistema (ADMIN_EMAILS) — o front usa para exibir/ocultar
         # ferramentas de gestão (ex.: fila da Descoberta).
@@ -135,35 +126,6 @@ def update_profile(payload: ProfilePayload, user_id: CurrentUserId, db: DbClient
         raise HTTPException(status_code=500, detail="Falha ao salvar perfil")
 
     return {"success": True, "profile": result.data[0]["profile"]}
-
-
-@router.put(
-    "/me/preferences",
-    summary="Atualiza consent para agregação global de pesos (ADR C3)",
-)
-def update_preferences(
-    payload: PreferencesPayload, user_id: CurrentUserId, db: DbClient
-):
-    """Toggle do opt-in `contribute_to_global_weights` no workspace do usuário."""
-    workspace = _ensure_workspace(user_id, db)
-
-    result = (
-        db.table("workspaces")
-        .update({"contribute_to_global_weights": payload.contribute_to_global_weights})
-        .eq("id", workspace["id"])
-        .execute()
-    )
-    if not result.data:
-        raise HTTPException(status_code=500, detail="Falha ao atualizar preferências")
-
-    return {
-        "success": True,
-        "contribute_to_global_weights": bool(
-            result.data[0].get(
-                "contribute_to_global_weights", payload.contribute_to_global_weights
-            )
-        ),
-    }
 
 
 @router.post("/me/reflect", summary="Dispara ReflectionService on-demand (Fase 2 #17)")

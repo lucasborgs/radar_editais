@@ -22,9 +22,10 @@ síntese fica desligada por padrão com `AUTO_MEMORY_WRITE=0` e possui
 short-circuits em `core/reflection_service.py` e `core/tasks.py`. Isso é uma
 decisão de segurança entre workspaces, não ausência acidental de wiring.
 
-O scaffold `playbook_overlays`/`meta_reflection_runs` não possui job de escrita
-ativo. Seu gatilho de retomada e a proibição de religamento oportunista estão em
-[`BACKLOG.md`](../BACKLOG.md).
+O seam `playbook_overlays`/`meta_reflection_runs` não possui job de escrita
+ativo. As tabelas e o reader vazio são preservados como capacidade dormente de
+laboratório; seu gate está no
+[`ciclo de vida das capacidades`](capability-lifecycle.md).
 
 ## Isolamento e falha
 

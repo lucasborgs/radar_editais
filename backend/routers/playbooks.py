@@ -4,10 +4,10 @@ Auditoria de playbooks — playbook resolvido CAMADA POR CAMADA (Item 3).
 A competência de escrita é composta em camadas (core/skills.py):
     git base (mechanism/<mech>.md)
       + git source (source/<src>/global.md + source/<src>/<mech>.md)
-      + learned overlays do banco (playbook_overlays)  ← o sistema aprende aqui
+      + learned overlays do banco (playbook_overlays)  ← reader dormente, sem writer
 
-Este router expõe essas camadas SEM mergear, para a UI "o que veio de onde":
-mitigação do risco de overlays aprendidos contradizerem o seed humano.
+Este router expõe essas camadas sem mergear para auditoria. No runtime atual não
+há produtor de overlays; sem linhas, somente as camadas git são retornadas.
 """
 from fastapi import APIRouter
 
