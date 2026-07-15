@@ -64,18 +64,22 @@ Discovery web não escreve diretamente no KG — vai para staging com gate human
 
 ### Avaliação (harness unificado)
 ```bash
-python -m core.eval matching        # roda uma suíte (Langfuse Experiment se configurado; senão eval_results/*.json)
-python -m core.eval all              # todas as suítes registradas
-python -m core.eval matching --no-push --limit 1   # fallback local, subconjunto (debug)
+python -m core.eval run matching              # diagnóstico local completo
+python -m core.eval run matching --limit 1    # subconjunto local (debug)
+python -m core.eval run rag --publish         # diagnóstico completo publicado
+python -m core.eval gate extraction --publish # decisão bloqueante oficial
 ```
 Suítes: `matching`, `rag`, `writing`, `writing_v2`, `extraction`,
 `opportunity_type`, `triage`, `profile_extractor`, `reranker` e `structurer` —
 todas em `core/eval/`,
 registro em `core/eval/registry.py`. Cada uma é uma `Suite`: `task` roda o pipeline real,
-`evaluators` reaproveitam `core/*_eval.py`. Com `LANGFUSE_*` no ambiente vira
-Experiment (scores comparáveis entre commits); senão grava `eval_results/*.json`.
+`evaluators` reaproveitam `core/*_eval.py`. `run` nunca bloqueia por qualidade;
+`gate` aplica somente critérios aceitos e não permite `--limit`. Runs são locais
+por padrão e sempre gravam `eval_results/*.json`; `--publish` envia a rodada
+completa ao Langfuse. O manifesto do resultado define se runs são comparáveis.
 NÃO criar harnesses novos paralelos — registrar uma suíte aqui. Prereqs: `rag`
 exige SUPABASE+OPENAI+golden; `writing` exige SUPABASE+LLM+`EVAL_WORKSPACE_ID`.
+Triggers e contratos completos: `docs/specs/evaluation-operations.md`.
 
 ### Frontend
 ```bash

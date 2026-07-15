@@ -1,6 +1,7 @@
 # Spec — Avaliação e operação
 
-**Status:** aprovada · **Data:** 2026-07-14
+**Status:** aprovada; implementação operacional concluída, matching ainda
+candidato · **Data:** 2026-07-14
 **Documento-pai:** [`system-coherence.md`](system-coherence.md)
 **Perfis afetados:** usuário técnico e operador
 **Impacto:** médio; harness, metadados de avaliação e gates operacionais, sem
@@ -84,7 +85,7 @@ Uma pessoa técnica deve conseguir responder, a partir de um resultado oficial:
 | Suíte | Estado | Pode bloquear após esta execução? | Razão |
 |---|---|---:|---|
 | `matching` | candidata a gate | sim, depois de completar o contrato | já possui pisos aceitos para MRR, recall e hard negatives; falta critério de noise e completude |
-| `extraction` | candidata a gate | sim, depois de completar o contrato | já possui baseline aceito de presença/abstenção; falta transformar resultado em decisão e garantir corpus completo |
+| `extraction` | gate | sim | baseline aceito aplicado; golden curado e completude obrigatórios |
 | `rag` | diagnóstica | não | métricas existentes, sem threshold atual aceito |
 | `writing` | diagnóstica | não | juízes e métricas úteis, sem contrato bloqueante |
 | `writing_v2` | experimental | não | contém limitações F0 e métricas sentinela indisponíveis |
@@ -211,12 +212,11 @@ um dump integral de resultados.
 
 ### 7.3 Artefatos sem consumidor atual
 
-`eval_data/golden/compliance_monitor.json` e
-`tests/fixtures/eval_investor_match.json` possuem resultados históricos locais,
-mas nenhuma suíte registrada ou consumidor atual fora do histórico. Durante a
-execução devem ser classificados por prova: reativados como diagnóstico apenas
-se houver pipeline vivo e intenção explícita, ou movidos para histórico. Não
-serão removidos apenas por ausência no registry.
+Os antigos `eval_data/golden/compliance_monitor.json` e
+`tests/fixtures/eval_investor_match.json` possuíam resultados históricos locais,
+mas nenhuma suíte registrada ou consumidor atual fora do histórico. Foram
+preservados em `eval_data/historical/`, com sua condição documentada em
+`eval_data/README.md`; não governam os pipelines atuais.
 
 Os goldens `finep_relaxed`, `finep_independent` e `fapesp` possuem consumidores
 em benchmarks atuais e permanecem como datasets diagnósticos.
@@ -265,7 +265,7 @@ tenham thresholds aceitos; não entram implicitamente na decisão.
 
 | Mudança | Evidência mínima |
 |---|---|
-| `match_v3`, elegibilidade, company chunks, embeddings de match ou regra WIKI consumida pelo funil | gate `matching` publicado |
+| `match_v3`, elegibilidade, company chunks, embeddings de match ou regra WIKI consumida pelo funil | run `matching` completa; gate somente após promoção do contrato |
 | schema/extrator de edital ou `DECISION_FIELDS` | gate `extraction` publicado |
 | retriever, chunker, contextual retrieval ou RAG | run `rag` completa e publicada |
 | agente/tools/prompts de escrita | run `writing` ou `writing_v2` aplicável |
@@ -375,3 +375,36 @@ O eixo estará concluído quando:
 9. triggers e prereqs estiverem documentados em uma única fonte operacional;
 10. CI hermético continuar sem depender de secrets/LLMs; e
 11. nenhum pipeline avaliado tiver comportamento alterado por este trabalho.
+
+## 16. Resultado da execução
+
+Implementado:
+
+- CLI explícita `run`/`gate`, publicação opt-in e alias temporário da sintaxe
+  anterior;
+- manifesto v1 sanitizado com identidade Git, hashes e casos dos datasets,
+  modelos/configuração, critérios, erros, status e publicação;
+- estados `diagnostic`, `passed`, `failed`, `error` e `skipped`, com exit codes
+  distintos;
+- gate de extraction com piso `presence_accuracy >= 0,95`, golden estrito e
+  raws históricos FAPESP reproduzíveis;
+- matching classificado como candidato, com três critérios já aceitos, sem
+  decisão enquanto `noise@8` não tiver limite aprovado;
+- goldens de escrita movidos para `eval_data/golden/` e corpora sem consumidor
+  movidos, sem exclusão, para `eval_data/historical/`; e
+- relatório limitado a runs de manifesto compatível e à direção declarada de
+  cada métrica.
+
+Evidência local de 2026-07-15, não publicada:
+
+- matching: 11/11 casos, sem erro; MRR `0,673`, recall@10 `0,5237`, noise@8
+  médio `4,5` e hard negatives `3/3`. Permanece candidato porque recall ficou
+  abaixo de `0,55` e não existe limite aceito de noise;
+- extraction, primeira rodada: `error` por três raws FAPESP omitidos pelo índice
+  do snapshot mais recente;
+- extraction após compor snapshots bronze históricos: 10/10 casos, sem erro,
+  status `failed`; presence accuracy `0,8665` contra piso `0,95`, value
+  correctness `0,6584` e evidence faithfulness `0,95`.
+
+Os JSONs dessas rodadas permanecem ignorados em `eval_results/`. Os resultados
+reprovados demonstram o gate; não autorizam mudanças no pipeline de produto.

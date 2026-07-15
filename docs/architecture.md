@@ -167,8 +167,13 @@ determinística, explore, escrita) — trocar um não afeta os outros.
 ## 7. Avaliação
 
 Harness unificado com suítes por funcionalidade (matching, RAG, escrita, entre
-outras) — cada suíte roda o pipeline real e vira Experiment no Langfuse quando
-configurado. Regra do projeto: gates medem **correção absoluta** (recall de
-positivos, hard negatives, pisos de ranking), nunca paridade com arquiteturas
-anteriores. Mudanças de motor passam por bake-off offline antes de migrar
-consumidores (eval-first).
+outras). `run` produz diagnóstico local por padrão; `--publish` envia uma
+rodada completa ao Langfuse. `gate` aplica critérios versionados, rejeita
+subconjuntos e distingue reprovação de qualidade, erro operacional e skip. Cada
+JSON inclui manifesto de commit, datasets, modelos, configuração e
+comparabilidade. Regra do projeto: gates medem **correção absoluta**, nunca
+paridade com arquiteturas anteriores.
+
+`extraction` é gate ativo. `matching` permanece candidato: os pisos de MRR,
+recall e hard negatives estão declarados, mas não bloqueiam até que o limite de
+`noise@8` seja aprovado e o contrato seja promovido explicitamente.
