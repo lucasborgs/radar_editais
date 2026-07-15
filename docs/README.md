@@ -48,6 +48,7 @@ cada assunto; não substitui os documentos indicados.
 | [`document-authority.md`](specs/document-authority.md) | vigente | autoridade e ciclo de vida documental |
 | [`user-mental-model.md`](specs/user-mental-model.md) | vigente | Explorar, Radar e Projetos como modelo mental do produto |
 | [`evaluation-operations.md`](specs/evaluation-operations.md) | aprovada; matching candidato | runs reproduzíveis e gates operacionais explícitos |
+| [`data-plane-convergence.md`](specs/data-plane-convergence.md) | proposta | caminho canônico de dados e remoção de resíduos sem runtime |
 | [`v3-unified.md`](specs/v3-unified.md) | vigente | contrato da arquitetura gold v3 |
 | [`radar-frontdoor.md`](specs/radar-frontdoor.md) | vigente | entrada e contrato da superfície Radar |
 | [`radar-fase-2.md`](specs/radar-fase-2.md) | vigente | filtros, urgência e comparação |
