@@ -30,9 +30,10 @@ export default function DiscoveredPage() {
   }, [getToken]);
 
   const reload = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
     try {
-      const res = await getDiscoveredOpportunities(token as string, filter === "all");
+      const res = await getDiscoveredOpportunities(token, filter === "all");
       setOpportunities(res.opportunities);
     } catch (e: unknown) {
       // Fila da Descoberta é do operador (ADMIN_EMAILS): 403 vira estado
@@ -91,10 +92,11 @@ export default function DiscoveredPage() {
   }
 
   async function handlePromote(opp: DiscoveredOpportunity) {
+    if (!token) return;
     setActingOn(opp.id);
     try {
       const editalLink = editalInputs[opp.id]?.trim() || undefined;
-      const res = await promoteDiscoveredOpportunity(opp.id, editalLink, token as string);
+      const res = await promoteDiscoveredOpportunity(opp.id, editalLink, token);
       const detail = res.edital_processed
         ? `PDF processado (${res.edital_processed.n_chars} chars, chunk enfileirado)`
         : "URL adicionada ao web_sources";
@@ -113,9 +115,10 @@ export default function DiscoveredPage() {
   }
 
   async function handleReject(opp: DiscoveredOpportunity) {
+    if (!token) return;
     setActingOn(opp.id);
     try {
-      await rejectDiscoveredOpportunity(opp.id, undefined, token as string);
+      await rejectDiscoveredOpportunity(opp.id, undefined, token);
       toast.success("Rejeitada");
       await reload();
     } catch (e: unknown) {
@@ -127,11 +130,12 @@ export default function DiscoveredPage() {
   }
 
   async function handleSaveEditalLink(opp: DiscoveredOpportunity) {
+    if (!token) return;
     const link = editalInputs[opp.id]?.trim();
     if (!link) return;
     setActingOn(opp.id);
     try {
-      await updateDiscoveredEditalLink(opp.id, link, token as string);
+      await updateDiscoveredEditalLink(opp.id, link, token);
       toast.success("Link do edital salvo");
       await reload();
     } catch (e: unknown) {
@@ -142,9 +146,10 @@ export default function DiscoveredPage() {
   }
 
   async function handleRetry(opp: DiscoveredOpportunity, stage: "fetch" | "silver" | "radar" | "rag") {
+    if (!token) return;
     setActingOn(opp.id);
     try {
-      await retryDiscoveredPromotion(opp.id, stage, token as string);
+      await retryDiscoveredPromotion(opp.id, stage, token);
       toast.success(`Retry de ${stage} enfileirado`);
       await reload();
     } catch (e: unknown) {

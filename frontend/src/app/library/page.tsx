@@ -408,16 +408,17 @@ export default function FilesPage() {
   useEffect(() => {
     getToken().then((t) => {
       setToken(t);
-      loadItems(t ?? undefined);
+      if (t) loadItems(t);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadItems(t?: string) {
     const tk = t ?? token;
+    if (!tk) return;
     setLoading(true);
     try {
-      const data = await getLibraryItems(tk as string, undefined, undefined, includeArchived);
+      const data = await getLibraryItems(tk, undefined, undefined, includeArchived);
       setItems(data);
     } finally {
       setLoading(false);
@@ -425,7 +426,7 @@ export default function FilesPage() {
   }
 
   useEffect(() => {
-    loadItems();
+    if (token) loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [includeArchived]);
 
@@ -434,16 +435,17 @@ export default function FilesPage() {
     (i) => i.enrichment_status === "pending" || i.enrichment_status === "processing"
   );
   useEffect(() => {
-    if (!hasPending) return;
+    if (!hasPending || !token) return;
     const id = setInterval(() => loadItems(), 4000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPending]);
+  }, [hasPending, token]);
 
   async function handleDelete(id: string) {
+    if (!token) return;
     setItems((prev) => prev.filter((i) => i.id !== id));
     try {
-      await deleteLibraryItem(id, token as string);
+      await deleteLibraryItem(id, token);
       toast.success("Arquivo excluído");
     } catch {
       toast.error("Erro ao excluir — recarregando…");
@@ -452,9 +454,10 @@ export default function FilesPage() {
   }
 
   async function handleArchive(id: string) {
+    if (!token) return;
     if (!includeArchived) setItems((prev) => prev.filter((i) => i.id !== id));
     try {
-      await archiveLibraryItem(id, token as string);
+      await archiveLibraryItem(id, token);
       toast.success("Arquivo arquivado");
       if (includeArchived) loadItems();
     } catch {
@@ -464,8 +467,9 @@ export default function FilesPage() {
   }
 
   async function handleUnarchive(id: string) {
+    if (!token) return;
     try {
-      await unarchiveLibraryItem(id, token as string);
+      await unarchiveLibraryItem(id, token);
       toast.success("Arquivo restaurado");
       loadItems();
     } catch {

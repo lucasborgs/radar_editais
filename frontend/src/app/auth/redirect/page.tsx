@@ -6,15 +6,13 @@ import { useAuth } from "@/lib/auth";
 
 export default function AuthRedirectPage() {
   const router = useRouter();
-  const DEMO_MODE = typeof process !== "undefined" && process.env.NEXT_PUBLIC_DEMO_MODE === "1";
   const { loading, user } = useAuth();
 
   useEffect(() => {
-    if (DEMO_MODE) {
-      router.replace("/");
-      return;
-    }
     if (loading) return;
+    // Pós-login sempre cai na porta única "/" (D7): lá o front-door hidrata o
+    // perfil da conta e faz o merge com a conversa anônima (F5/F6). Sem usuário,
+    // volta ao login.
     router.replace(user ? "/" : "/login");
   }, [loading, user, router]);
 

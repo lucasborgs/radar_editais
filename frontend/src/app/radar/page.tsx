@@ -48,7 +48,7 @@ function ComparisonPanel({ editais, onRemove, onStartWriting }: { editais: Radar
 
 export default function RadarPage() {
   const router = useRouter();
-  const { loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<CompanyProfile>(EMPTY_PROFILE);
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -82,9 +82,10 @@ export default function RadarPage() {
   }, []);
   const startWriting = useCallback(async (id: string, mode?: "proposal" | "pitch") => {
     if (!isCompleteForWriting(profile).ok) { toast.message("Complete o perfil para iniciar uma proposta."); router.push("/perfil"); return; }
+    if (!user) { toast.message("Entre para iniciar uma proposta ou pitch."); router.push("/login"); return; }
     try { const session = await startWritingSession(id, profile, mode); if (session.session_id) router.push(`/workspace/${session.session_id}`); }
     catch (cause) { toast.error(cause instanceof Error ? cause.message : "Não consegui iniciar agora."); }
-  }, [profile, router]);
+  }, [profile, router, user]);
 
   if (!hydrated || authLoading) return <main className="mx-auto min-h-screen max-w-4xl px-4 py-10"><JourneyNavigation active="radar" /><LoadingCards /></main>;
   if (!ready) return <main className="mx-auto min-h-screen max-w-2xl px-4 py-10"><JourneyNavigation active="radar" /><div className="mt-24 rounded-xl border border-border bg-surface p-6"><p className="text-sm font-semibold text-primary">Seu Radar</p><h1 className="mt-2 text-2xl font-semibold text-content-primary">Conte o que sua empresa faz.</h1><p className="mt-2 text-content-secondary">Com o nome e uma descrição das atividades, encontramos oportunidades por afinidade de escopo — não por promessa de aprovação.</p><Link href="/" className="mt-5 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90">Explorar e completar perfil →</Link></div></main>;

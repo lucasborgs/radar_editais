@@ -30,7 +30,12 @@ export default function PipelinePage() {
     (async () => {
       try {
         const token = await getToken();
-        const res = await listApplications(token as string);
+        if (!token) {
+          setError("Faça login para ver seu pipeline.");
+          setLoading(false);
+          return;
+        }
+        const res = await listApplications(token);
         if (cancelled) return;
         setApps(res ?? []);
       } catch (e: unknown) {
@@ -59,7 +64,8 @@ export default function PipelinePage() {
     setMoving(id);
     try {
       const token = await getToken();
-      await updateApplicationStatus(id, status, token as string);
+      if (!token) throw new Error("Sessão expirada.");
+      await updateApplicationStatus(id, status, token);
     } catch {
       // Reverte em caso de falha.
       setApps(prev);

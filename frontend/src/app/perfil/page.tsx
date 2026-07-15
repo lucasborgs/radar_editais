@@ -168,7 +168,8 @@ function FieldInput({
 
 // ── Página ────────────────────────────────────────────────────────────────────
 export default function PerfilPage() {
-  const { getToken } = useAuth();
+  const { session, getToken } = useAuth();
+  const isAuthed = !!session;
 
   const [profile, setProfile] = useState<CompanyProfile>(EMPTY_PROFILE);
   const [dirty, setDirty] = useState(false);
@@ -189,8 +190,12 @@ export default function PerfilPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Carrega perfil + arquivos ao montar.
+  // Carrega perfil + arquivos ao montar (logado).
   useEffect(() => {
+    if (!isAuthed) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -211,7 +216,7 @@ export default function PerfilPage() {
     return () => {
       cancelled = true;
     };
-  }, [getToken]);
+  }, [isAuthed, getToken]);
 
   const setField = useCallback((field: keyof CompanyProfile, raw: unknown) => {
     setProfile((prev) => {
@@ -355,6 +360,18 @@ export default function PerfilPage() {
     },
     [getToken],
   );
+
+  if (!isAuthed) {
+    return (
+      <DashboardLayout title="Perfil">
+        <div className="max-w-md mx-auto py-16 text-center">
+          <p className="text-sm text-content-secondary font-sans">
+            Entre para criar e gerenciar o perfil da sua empresa.
+          </p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Perfil">

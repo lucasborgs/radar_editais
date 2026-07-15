@@ -38,7 +38,11 @@ export default function ProjectsPage() {
     (async () => {
       try {
         const token = await getToken();
-        const response = await listWritingSessions(token as string);
+        if (!token) {
+          if (!cancelled) setError("Entre para acessar seus projetos.");
+          return;
+        }
+        const response = await listWritingSessions(token);
         if (!cancelled) {
           setSessions(response.sessions.filter((session) => session.kind !== "frontdoor"));
         }
