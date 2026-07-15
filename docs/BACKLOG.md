@@ -21,6 +21,24 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
 
 ## Pendências verificadas
 
+### Ativar o gate bloqueante de matching somente com casos reais revisados
+
+- **Evidência atual:** `core/eval/matching.py` mantém a suíte como `candidate`.
+  O contrato v2 mede MRR, recall@10, hard negatives, falsos positivos
+  confirmados e resultados não julgados no top-8. A última rodada diagnóstica
+  completa registrou recall `0,5237` e média de `4,5` resultados não julgados;
+  os perfis atuais do golden são sintéticos.
+- **Motivo do adiamento:** ainda não há casos reais representativos nem
+  julgamentos humanos suficientes para transformar essas métricas em decisão
+  obrigatória de merge/release.
+- **Gatilho:** amostra representativa de uso real, com o top-8 classificado por
+  perfil como relevante, neutro defensável ou irrelevante confirmado.
+- **Ponto de entrada:** `core/eval/matching.py`,
+  `eval_data/golden/matching.json` e
+  `docs/specs/evaluation-operations.md`.
+- **Restrição:** a suíte permanece diagnóstica; esta pendência não bloqueia,
+  desativa ou altera a feature de match no produto.
+
 ### Manter a escrita automática de memória congelada até haver evidência real
 
 - **Evidência atual:** `AUTO_MEMORY_WRITE=0` é o default em
