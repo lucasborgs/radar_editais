@@ -181,8 +181,7 @@ export default function WorkspacePage() {
 
   // Anexos: itens da biblioteca do workspace.
   useEffect(() => {
-    if (!token) return;
-    getLibraryItems(token).then(setAttachments).catch(() => setAttachments([]));
+    getLibraryItems(token as string).then(setAttachments).catch(() => setAttachments([]));
   }, [token]);
 
   // ── Estrutura: navegação e anexos ─────────────────────────────────────────
@@ -493,16 +492,6 @@ export default function WorkspacePage() {
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
-  if (authChecked && !token) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-app-bg">
-        <p className="text-sm text-content-secondary font-sans">
-          Faça login para abrir o projeto.
-        </p>
-      </div>
-    );
-  }
-
   if (loadError) {
     return (
       <div className="h-screen flex items-center justify-center bg-app-bg px-6">

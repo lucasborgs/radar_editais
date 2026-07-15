@@ -4,6 +4,9 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 
+const DEMO_MODE =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
 const INPUT_CLS = cn(
   "w-full rounded-lg border border-border px-3 py-2 text-sm font-sans",
   "text-content-primary placeholder:text-content-secondary",
@@ -17,6 +20,30 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (DEMO_MODE) {
+    return (
+      <div className="min-h-screen bg-app-bg flex items-center justify-center p-4">
+        <div className="w-full max-w-sm text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary font-sans mb-2">
+            Radar de Editais
+          </p>
+          <h1 className="font-heading text-2xl font-bold text-content-primary mb-4">
+            Login desativado
+          </h1>
+          <p className="text-sm text-content-secondary font-sans mb-6">
+            O sistema está em modo demo — não é necessário login.
+          </p>
+          <a
+            href="/"
+            className="inline-block px-4 py-2 rounded-xl text-sm font-semibold font-sans text-white bg-primary hover:bg-primary-hover transition-colors"
+          >
+            Voltar ao início
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

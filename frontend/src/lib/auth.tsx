@@ -11,6 +11,9 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { createSupabaseClient } from "./supabase";
 
+const DEMO_MODE =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
 interface AuthState {
   session: Session | null;
   user: User | null;
@@ -29,6 +32,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (DEMO_MODE) {
+      setLoading(false);
+      return;
+    }
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setUser(data.session?.user ?? null);
@@ -45,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithEmail = useCallback(
     async (email: string): Promise<{ error: string | null }> => {
+      if (DEMO_MODE) return { error: "Login desativado no modo demo." };
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
@@ -57,10 +65,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
+    if (DEMO_MODE) return;
     await supabase.auth.signOut();
   }, []);
 
   const getToken = useCallback(async (): Promise<string | null> => {
+    if (DEMO_MODE) return null;
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token ?? null;
   }, []);

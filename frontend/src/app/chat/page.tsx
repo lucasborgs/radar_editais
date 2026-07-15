@@ -38,16 +38,12 @@ function ChatResolverInner() {
       }
 
       const token = await getToken();
-      if (!token) {
-        router.replace("/login");
-        return;
-      }
 
       try {
         const sessionId = await resolveWorkspaceSession(
           editalId,
           profile ?? EMPTY_PROFILE,
-          token,
+          token as string,
         );
         router.replace(`/workspace/${sessionId}`);
       } catch (e) {
