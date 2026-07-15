@@ -15,7 +15,7 @@ import re
 import time
 from datetime import datetime, timezone
 
-from crawl4ai import AsyncWebCrawler, LLMConfig, LLMExtractionStrategy, CrawlerRunConfig, CacheMode
+from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig, LLMConfig, LLMExtractionStrategy
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_PATH = os.path.join(SCRIPT_DIR, "eval_crawl4ai_results.json")

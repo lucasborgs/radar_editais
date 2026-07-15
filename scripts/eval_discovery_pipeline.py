@@ -20,8 +20,7 @@ from pathlib import Path
 import pdfplumber
 import requests
 import yaml
-
-from crawl4ai import AsyncWebCrawler, LLMConfig, LLMExtractionStrategy, CrawlerRunConfig, CacheMode
+from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig, LLMConfig, LLMExtractionStrategy
 from crawl4ai.content_filter_strategy import BM25ContentFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
@@ -188,7 +187,7 @@ def _download_and_extract_pdf(url: str, timeout: int = 30) -> str | None:
                 if t:
                     texts.append(t)
         return "\n\n".join(texts) if texts else None
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -203,8 +202,8 @@ def _web_url_hash(url: str) -> str:
 
 def _simulate_current_extraction(page_text: str, title: str, url: str, agency: str) -> dict:
     """LLM em 6k chars, igual ao _extract atual. Sem PDFs, sem seções."""
-    from core.llm.llm_client import make_client
     from core.kg import schema as ws
+    from core.llm.llm_client import make_client
 
     api_key = os.environ.get("OPENAI_API_KEY")
     client = make_client(api_key=api_key)
@@ -404,9 +403,9 @@ async def main():
             # Print summary
             c = rows[-1]["current"]
             n = rows[-1]["new"]
-            print(f"\n  ┌── Comparação ──────────────────────────────")
-            print(f"  │ Métrica               | Atual          | Novo")
-            print(f"  │───────────────────────|────────────────|──────────────")
+            print("\n  ┌── Comparação ──────────────────────────────")
+            print("  │ Métrica               | Atual          | Novo")
+            print("  │───────────────────────|────────────────|──────────────")
             print(f"  │ chars input LLM       | {c['llm_input_chars']:>6,}        | {n.get('fit_markdown_len', 0):>6,}")
             print(f"  │ chars texto_cru       | {len(str(c.get('texto_cru',''))):>6,}        | {len(str(n.get('texto_cru',''))):>6,}")
             print(f"  │ seções preenchidas    | N/A (plano)   | {sum(1 for v in (n.get('secoes',{}) or {}).values() if v and len(str(v))>50)}/7")

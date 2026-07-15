@@ -90,6 +90,7 @@ jobs:
             echo "DATABASE_URL=$LOCAL_DB_URL"
             echo "ENVIRONMENT=test"
             echo "INTEGRATION_TARGET=local"
+            echo "EMBEDDING_DIMENSIONS=1536"
           } >> "$GITHUB_ENV"
 
       - name: Marca a sentinela do banco efêmero como test

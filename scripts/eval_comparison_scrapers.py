@@ -50,7 +50,6 @@ FIELD_MAP = {
 
 def _load_latest_bronze(bronze_glob: str) -> list[dict]:
     """Carrega o JSON bronze mais recente que casa o glob."""
-    base = BRONZE_DIR / bronze_glob
     candidates = sorted(BRONZE_DIR.glob(bronze_glob))
     if not candidates:
         return []
@@ -162,7 +161,7 @@ def main():
             print(f"  {label:30s} | {sv[:48]:50s} | {cv[:48]:50s} | {match}")
 
         # Campos específicos por fonte
-        print(f"\n  ── Campos específicos ──")
+        print("\n  ── Campos específicos ──")
 
         if key == "finep":
             pdfs_scraper = chamada.get("pdf_urls", [])
@@ -178,21 +177,20 @@ def main():
             print(f"  {'data_limite (formatted)':30s} | {chamada.get('data_limite',''):50s} | {ext.get('prazo_envio',''):50s}")
 
         if key == "fapesc":
-            pdf_url = chamada.get("edital_pdf_url", "")
             print(f"  {'PDF edital':30s} | {'Sim (baixado)':50s} | {str(ext.get('pdf_urls',[])[:1]):50s}")
             print(f"  {'content_source':30s} | {chamada.get('content_source',''):50s} | {'crawl4ai (html)':50s}")
 
         # Qualidade do texto
         scraper_text_chars = len(_get_scraper_value(bronze_text, "texto_cru" if "texto_cru" in bronze_text else "descricao"))
         crawl_text_chars = crawl.get("markdown_fit_len") or crawl.get("markdown_raw_len", 0) or 0
-        print(f"\n  ── Qualidade do conteúdo ──")
+        print("\n  ── Qualidade do conteúdo ──")
         print(f"  {'texto útil (chars)':30s} | {scraper_text_chars:>6,}                     | {crawl_text_chars:>6,}")
         print(f"  {'seções preenchidas':30s} | {'N/A (texto plano)':50s} | {filled_secoes}/7")
         print(f"  {'PDFs baixados':30s} | {chamada.get('pdf_texts',{}) if isinstance(chamada.get('pdf_texts'), dict) else 'N/A'}")
 
         # Token estimation
         input_tokens_llm_crawl = (crawl.get("markdown_fit_len") or crawl.get("markdown_raw_len", 0) or 0) // 4
-        print(f"\n  ── Custo estimado (por URL) ──")
+        print("\n  ── Custo estimado (por URL) ──")
         print(f"  {'tokens input LLM':30s} | {'0 (sem LLM)':50s} | ~{input_tokens_llm_crawl:,}")
 
         comparison.append({
