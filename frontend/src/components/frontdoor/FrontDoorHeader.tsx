@@ -9,16 +9,15 @@ import { cn } from "@/lib/utils";
  * Header fino do front-door: nome do produto + ação de conta + menu "⋮".
  *
  * - Anônimo: "Entrar" (→ /login) e o menu só tem "Começar de novo".
- * - Logado: "Minha conta" some; o menu "⋮" vira o hub de navegação secundária
- *   (Biblioteca/Sessões/Pipeline/Editais/Configurações) + Sair, já que a sidebar
- *   antiga sai do fluxo do front-door (D7/§6). "Começar de novo" limpa o
- *   transcript local em ambos os casos.
+ * - Logado: o menu "⋮" reúne navegação de suporte e operação. As jornadas de
+ *   produto permanecem visíveis fora dele. "Começar de novo" limpa o transcript
+ *   local em ambos os casos.
  */
 const AUTHED_LINKS: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/library", label: "Biblioteca" },
   { href: "/sessions", label: "Sessões" },
   { href: "/pipeline", label: "Pipeline" },
-  { href: "/oportunidades", label: "Oportunidades" },
+  { href: "/oportunidades", label: "Ecossistema" },
   // Fila da Descoberta é ferramenta do operador (ADMIN_EMAILS), não do cliente.
   { href: "/discovered", label: "Descobertas", adminOnly: true },
   { href: "/settings", label: "Configurações" },
@@ -61,6 +60,9 @@ export function FrontDoorHeader({
         </Link>
 
         <div className="flex items-center gap-1">
+          <Link href="/" className="rounded-lg px-3 py-1.5 text-sm font-sans text-content-primary hover:bg-app-bg transition-colors">
+            Explorar
+          </Link>
           <Link href="/radar" className="rounded-lg px-3 py-1.5 text-sm font-sans text-content-primary hover:bg-app-bg transition-colors">
             Radar
           </Link>

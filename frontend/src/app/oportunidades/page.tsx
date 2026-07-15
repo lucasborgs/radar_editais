@@ -154,12 +154,12 @@ export default function OportunidadesPage() {
   };
 
   return (
-    <DashboardLayout title="Oportunidades">
+    <DashboardLayout title="Ecossistema">
       <div className="space-y-5">
         {/* KPI row */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
           <MetricCard
-            label="Total de Oportunidades"
+            label="Itens no ecossistema"
             value={stats ? stats.total_oportunidades : "—"}
             subtext="editais + programas + investidores + ICTs"
           />
@@ -217,7 +217,7 @@ export default function OportunidadesPage() {
               <span className="font-data font-medium text-content-primary">
                 {filtered.length}
               </span>{" "}
-              oportunidades encontradas
+              itens encontrados
               {opportunities && filtered.length !== opportunities.length &&
                 ` de ${opportunities.length} carregadas`}
             </p>

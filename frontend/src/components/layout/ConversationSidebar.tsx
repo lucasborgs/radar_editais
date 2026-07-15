@@ -1,10 +1,8 @@
 "use client";
 
-// Sidebar chat-first. Substitui o
-// AppSidebar (navegação de SaaS dashboard) por uma sidebar de app de chat
-// (estilo ChatGPT/Claude): "Nova conversa" no topo, busca client-side,
-// histórico de conversas agrupado por data, e um rodapé discreto com as páginas
-// utilitárias (Pipeline/Editais/Arquivos/Configurações) + identidade do usuário.
+// Sidebar do produto: destinos primários, histórico de conversas e páginas de
+// suporte. A conversa continua sendo a entrada de Explorar, mas não precisa
+// carregar sozinha o modelo mental das demais capacidades.
 //
 // Fase 2: o histórico vem de `listConversations` (/conversations) — lista
 // unificada de conversas de escrita (kind=writing, retomada via /chat?edital=)
@@ -73,12 +71,19 @@ const ICON_PATHS = {
   dots: "M5 12h.01M12 12h.01M19 12h.01",
   discovered:
     "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm4-12l-6 2-2 6 6-2 2-6z",
+  radar:
+    "M12 3a9 9 0 109 9M12 7a5 5 0 105 5M12 11a1 1 0 100 2M12 12l6.5-6.5",
 } as const;
+
+const PRIMARY_ITEMS = [
+  { href: "/", label: "Explorar", d: ICON_PATHS.discovered },
+  { href: "/radar", label: "Radar", d: ICON_PATHS.radar },
+] as const;
 
 const UTILITY_ITEMS: { href: string; label: string; d: string; adminOnly?: boolean }[] = [
   { href: "/perfil", label: "Perfil", d: ICON_PATHS.profile },
   { href: "/pipeline", label: "Pipeline", d: ICON_PATHS.pipeline },
-  { href: "/oportunidades", label: "Oportunidades", d: ICON_PATHS.editais },
+  { href: "/oportunidades", label: "Ecossistema", d: ICON_PATHS.editais },
   { href: "/library", label: "Arquivos", d: ICON_PATHS.files },
   // Fila da Descoberta é ferramenta do operador (ADMIN_EMAILS), não do cliente.
   { href: "/discovered", label: "Descobertas", d: ICON_PATHS.discovered, adminOnly: true },
@@ -282,6 +287,27 @@ export function ConversationSidebar() {
           <Icon d={ICON_PATHS.plus} />
           Nova conversa
         </button>
+
+        <nav aria-label="Jornadas principais" className="space-y-0.5">
+          {PRIMARY_ITEMS.map(({ href, label, d }) => {
+            const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium font-sans transition-colors",
+                  active
+                    ? "bg-primary/10 text-primary"
+                    : "text-content-secondary hover:bg-content-secondary/10 hover:text-content-primary",
+                )}
+              >
+                <Icon d={d} />
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
 
         {/* Busca client-side por título */}
         <div className="relative">
