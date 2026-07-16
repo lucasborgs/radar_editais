@@ -62,11 +62,11 @@ export function Explorer({
 
   if (collapsed) {
     return (
-      <div className="w-11 shrink-0 border-r border-border bg-white flex flex-col items-center py-3 gap-1">
+      <div className="w-11 shrink-0 border-r border-border bg-surface flex flex-col items-center py-3 gap-1">
         <button
           onClick={toggle}
           title="Expandir estrutura"
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-content-secondary hover:bg-gray-50 transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-content-secondary hover:bg-app-bg transition-colors"
         >
           ☰
         </button>
@@ -81,7 +81,7 @@ export function Explorer({
             onClick={onReview}
             disabled={reviewing}
             title="Revisar"
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40"
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-app-bg transition-colors disabled:opacity-40"
           >
             {reviewing ? (
               <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -92,7 +92,7 @@ export function Explorer({
           <button
             onClick={onExport}
             title="Exportar"
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-50 transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-app-bg transition-colors"
           >
             ⬇
           </button>
@@ -102,7 +102,7 @@ export function Explorer({
   }
 
   return (
-    <div className="w-60 shrink-0 border-r border-border bg-white flex flex-col">
+    <div className="w-60 shrink-0 border-r border-border bg-surface flex flex-col">
       {/* topo: título + colapsar */}
       <div className="h-9 shrink-0 px-3 flex items-center justify-between border-b border-border">
         <span className="text-[10px] font-semibold text-content-secondary font-sans uppercase tracking-wide">
@@ -130,12 +130,12 @@ export function Explorer({
               key={s.title}
               type="button"
               onClick={() => onSelectSection(s.title)}
-              className="w-full text-left pl-5 pr-3 py-1.5 flex items-center gap-2 text-sm font-sans text-content-primary hover:bg-gray-50 transition-colors"
+              className="w-full text-left pl-5 pr-3 py-1.5 flex items-center gap-2 text-sm font-sans text-content-primary hover:bg-app-bg transition-colors"
             >
               <span
                 className={cn(
                   "w-3 shrink-0 text-xs font-data text-center",
-                  hasContent ? "text-green-600" : "text-content-secondary/40",
+                  hasContent ? "text-green-600 dark:text-green-400" : "text-content-secondary/40",
                 )}
               >
                 {hasContent ? "✓" : "·"}
@@ -144,7 +144,7 @@ export function Explorer({
               {findings > 0 && (
                 <span
                   title={`${findings} ${findings === 1 ? "observação" : "observações"} da revisão`}
-                  className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-100 text-amber-800 px-1.5 text-[10px] font-medium"
+                  className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 px-1.5 text-[10px] font-medium"
                 >
                   ⚠︎{findings}
                 </span>
@@ -168,7 +168,7 @@ export function Explorer({
               type="button"
               onClick={() => onSelectAttachment(item)}
               title={`Inserir @${item.title} no chat`}
-              className="w-full text-left pl-5 pr-3 py-1.5 flex items-center gap-2 text-sm font-sans text-content-primary hover:bg-gray-50 transition-colors"
+              className="w-full text-left pl-5 pr-3 py-1.5 flex items-center gap-2 text-sm font-sans text-content-primary hover:bg-app-bg transition-colors"
             >
               <span className="shrink-0 text-xs" aria-hidden>
                 📎
@@ -184,7 +184,7 @@ export function Explorer({
         <button
           onClick={onReview}
           disabled={reviewing}
-          className="w-full text-xs font-sans text-content-primary border border-border rounded-lg py-1.5 hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+          className="w-full text-xs font-sans text-content-primary border border-border rounded-lg py-1.5 hover:bg-app-bg transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
         >
           {reviewing ? (
             <>
@@ -195,7 +195,7 @@ export function Explorer({
             <>
               ▶ Revisar
               {totalFindings > 0 && (
-                <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-1.5 text-[10px] font-medium">
+                <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 px-1.5 text-[10px] font-medium">
                   {totalFindings}
                 </span>
               )}
@@ -204,7 +204,7 @@ export function Explorer({
         </button>
         <button
           onClick={onExport}
-          className="w-full text-xs font-sans text-content-primary border border-border rounded-lg py-1.5 hover:bg-gray-50 transition-colors"
+          className="w-full text-xs font-sans text-content-primary border border-border rounded-lg py-1.5 hover:bg-app-bg transition-colors"
         >
           ⬇ Exportar
         </button>

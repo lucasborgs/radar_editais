@@ -11,9 +11,9 @@ const MODE_LABELS: Record<Mode, string> = {
 };
 
 const MODE_STYLES: Record<Mode, string> = {
-  explorer: "bg-blue-100 text-blue-800 border-blue-200",
-  plan: "bg-amber-100 text-amber-800 border-amber-200",
-  escrita: "bg-green-100 text-green-800 border-green-200",
+  explorer: "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900",
+  plan: "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900",
+  escrita: "bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900",
 };
 
 export function ModeBadge({

@@ -58,7 +58,7 @@ export function DocumentEditor({
   }, [registerScrollTo]);
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto bg-white">
+    <div ref={containerRef} className="flex-1 overflow-y-auto bg-surface">
       <div className="max-w-3xl mx-auto px-8 py-8 space-y-8">
         {generalFindings.length > 0 && (
           <GeneralFindingsBlock findings={generalFindings} onFixWithAI={onFixWithAI} />
@@ -119,7 +119,7 @@ function FindingRow({ finding, onFix }: { finding: Finding; onFix: () => void })
   return (
     <li className="text-xs font-sans text-content-primary">
       <div className="flex items-start gap-2">
-        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-white border border-amber-200 px-1.5 py-0.5 text-[10px] text-amber-800">
+        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-surface border border-amber-200 dark:border-amber-900 px-1.5 py-0.5 text-[10px] text-amber-800 dark:text-amber-300">
           {KIND_LABEL[finding.kind]}
           {finding.badge && <span className="opacity-70">· {finding.badge}</span>}
         </span>
@@ -227,8 +227,8 @@ function SectionBlock({
               className={cn(
                 "shrink-0 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium transition-colors",
                 showFindings
-                  ? "bg-amber-200 text-amber-900"
-                  : "bg-amber-100 text-amber-800 hover:bg-amber-200",
+                  ? "bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200"
+                  : "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60",
               )}
             >
               ⚠︎{findings.length}
@@ -314,7 +314,7 @@ function SectionBlock({
           onKeyDown={onKeyDown}
           placeholder="— rascunhe aqui ou peça ao agente"
           className={cn(
-            "w-full resize-none rounded-md border border-primary/40 bg-white px-3 py-2",
+            "w-full resize-none rounded-md border border-primary/40 bg-surface px-3 py-2",
             "text-sm font-mono text-content-primary leading-relaxed",
             "focus:outline-none focus:ring-2 focus:ring-primary/40",
           )}
@@ -323,7 +323,7 @@ function SectionBlock({
         <button
           type="button"
           onClick={enterEdit}
-          className="w-full text-left rounded-md hover:bg-gray-50 transition-colors -mx-2 px-2 py-1"
+          className="w-full text-left rounded-md hover:bg-app-bg transition-colors -mx-2 px-2 py-1"
           title="Clique para editar"
         >
           {hasContent ? (

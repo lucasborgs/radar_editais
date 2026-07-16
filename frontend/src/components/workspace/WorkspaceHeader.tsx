@@ -26,7 +26,7 @@ export function WorkspaceHeader({
   sessionId?: string;
 }) {
   return (
-    <header className="h-12 shrink-0 border-b border-border bg-white flex items-center gap-3 px-4">
+    <header className="h-12 shrink-0 border-b border-border bg-surface flex items-center gap-3 px-4">
       <Link
         href="/projects"
         className="text-xs font-sans text-content-secondary hover:text-content-primary transition-colors shrink-0"

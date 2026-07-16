@@ -231,7 +231,7 @@ function PlanningInner() {
           <h2 className="text-sm font-semibold text-content-primary font-sans mb-3 uppercase tracking-wide">
             Alinhamento
           </h2>
-          <div className="bg-white rounded-lg border border-border p-4 space-y-2">
+          <div className="bg-surface rounded-lg border border-border p-4 space-y-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-content-secondary font-sans">
                 Score:
@@ -289,7 +289,7 @@ function PlanningInner() {
             {plan.sections.map((sec) => (
               <div
                 key={sec.id}
-                className="bg-white rounded-lg border border-border p-4"
+                className="bg-surface rounded-lg border border-border p-4"
               >
                 <h3 className="text-sm font-semibold text-content-primary font-sans mb-1">
                   {sec.title}
@@ -346,7 +346,7 @@ function PlanningInner() {
         <div className="flex gap-3 pt-4 border-t border-border">
           <button
             onClick={handleBackToWorkspace}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-content-secondary font-sans hover:bg-white/60 transition-colors"
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-content-secondary font-sans hover:bg-app-bg transition-colors"
           >
             {isExisting ? "← Voltar ao workspace" : "← Voltar"}
           </button>
@@ -370,7 +370,7 @@ function PlanningInner() {
             <>
               <button
                 onClick={handleAdjustOld}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-content-secondary font-sans hover:bg-white/60 transition-colors"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-content-secondary font-sans hover:bg-app-bg transition-colors"
               >
                 Ajustar plano
               </button>

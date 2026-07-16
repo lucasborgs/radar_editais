@@ -539,7 +539,7 @@ export default function WorkspacePage() {
 
       {/* Mobile: abas Documento | Chat + drawer da estrutura */}
       {wsMode === "escrita" && sections.length > 0 && (
-        <div className="md:hidden flex items-center border-b border-border bg-white">
+        <div className="md:hidden flex items-center border-b border-border bg-surface">
           <button
             onClick={() => setMobileDrawer(true)}
             title="Abrir estrutura"
@@ -671,7 +671,7 @@ export default function WorkspacePage() {
       {/* F4: plano pendente de confirmação */}
       {planPending && !generating && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="max-w-2xl w-full mx-4 bg-white rounded-lg shadow-xl border border-border max-h-[80vh] flex flex-col">
+          <div className="max-w-2xl w-full mx-4 bg-surface rounded-lg shadow-xl border border-border max-h-[80vh] flex flex-col">
             <div className="p-5 border-b border-border">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-content-primary font-sans">
@@ -749,7 +749,7 @@ export default function WorkspacePage() {
             <div className="p-4 border-t border-border flex gap-3 justify-end">
               <button
                 onClick={() => setPlanPending(null)}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-content-secondary font-sans hover:bg-white/60 transition-colors"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-content-secondary font-sans hover:bg-app-bg transition-colors"
               >
                 Dispensar
               </button>
@@ -778,7 +778,7 @@ export default function WorkspacePage() {
       {/* Critic feedback after refinement (FASE 3) */}
       {refineFeedback && refineFeedback.feedback.critic_feedback && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="max-w-lg w-full mx-4 bg-white rounded-lg shadow-xl border border-border">
+          <div className="max-w-lg w-full mx-4 bg-surface rounded-lg shadow-xl border border-border">
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-content-primary font-sans">
@@ -823,7 +823,7 @@ export default function WorkspacePage() {
                 {refineFeedback.feedback.options?.includes("voltar") && (
                   <button
                     onClick={() => setRefineFeedback(null)}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-content-secondary font-sans hover:bg-gray-50 transition-colors"
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-content-secondary font-sans hover:bg-app-bg transition-colors"
                   >
                     Voltar
                   </button>

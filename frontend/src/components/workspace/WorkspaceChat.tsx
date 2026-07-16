@@ -56,7 +56,7 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
 
   return (
     <div className={cn(fullWidth ? "w-full" : "w-[26rem] shrink-0", "border-l border-border bg-app-bg flex flex-col min-w-0")}>
-      <div className="h-9 shrink-0 px-3 flex items-center border-b border-border bg-white">
+      <div className="h-9 shrink-0 px-3 flex items-center border-b border-border bg-surface">
         <span className="text-[10px] font-semibold text-content-secondary font-sans uppercase tracking-wide">
           Agente
         </span>
@@ -78,7 +78,7 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
 
             {/* avisos de compliance (âmbar) */}
             {msg.role === "assistant" && (msg.complianceFlags?.length ?? 0) > 0 && (
-              <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 font-sans">
+              <div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 font-sans">
                 {msg.complianceFlags!.map((flag, fi) => (
                   <p key={fi}>
                     ⚠︎ {String(flag.message ?? flag.reason ?? "Atenção a um requisito do edital.")}
@@ -93,13 +93,13 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
                 {msg.editedSections!.map((title) => (
                   <span
                     key={title}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 border border-amber-200 px-2 py-0.5 text-[11px] font-sans text-amber-800"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 px-2 py-0.5 text-[11px] font-sans text-amber-800 dark:text-amber-300"
                   >
                     <span className="truncate max-w-[12rem]">§ {title} atualizada</span>
                     <button
                       type="button"
                       onClick={() => onUndoSection(title)}
-                      className="font-medium text-amber-900 hover:underline shrink-0"
+                      className="font-medium text-amber-900 dark:text-amber-200 hover:underline shrink-0"
                       title="Desfazer esta edição do agente"
                     >
                       ↶ desfazer
@@ -120,7 +120,7 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
         <div ref={bottomRef} />
       </div>
 
-      <div className="shrink-0 border-t border-border bg-white p-3 space-y-2">
+      <div className="shrink-0 border-t border-border bg-surface p-3 space-y-2">
         {pending && (
           <PendingUserInputPrompt
             pending={pending}

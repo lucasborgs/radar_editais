@@ -124,7 +124,7 @@ export function ExportModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl border border-border w-full max-w-md shadow-xl">
+      <div className="bg-surface rounded-2xl border border-border w-full max-w-md shadow-xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="font-heading text-base font-bold text-content-primary">Exportar</h2>
           <button
@@ -166,14 +166,14 @@ export function ExportModal({
               <button
                 onClick={() => void handleMd()}
                 disabled={busy === "md"}
-                className="flex-1 text-xs font-sans text-content-primary border border-border rounded-lg py-1.5 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="flex-1 text-xs font-sans text-content-primary border border-border rounded-lg py-1.5 hover:bg-app-bg transition-colors disabled:opacity-50"
               >
                 {busy === "md" ? "Baixando…" : "Baixar .md"}
               </button>
               <button
                 onClick={() => void handleCopyMd()}
                 disabled={busy === "copy"}
-                className="flex-1 text-xs font-sans text-content-primary border border-border rounded-lg py-1.5 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="flex-1 text-xs font-sans text-content-primary border border-border rounded-lg py-1.5 hover:bg-app-bg transition-colors disabled:opacity-50"
               >
                 {busy === "copy" ? "Copiando…" : "Copiar tudo"}
               </button>
@@ -209,7 +209,7 @@ function ExportOption({
     <button
       onClick={onClick}
       disabled={loading}
-      className="w-full flex items-center gap-3 rounded-xl border border-border p-3 text-left hover:bg-gray-50 transition-colors disabled:opacity-60"
+      className="w-full flex items-center gap-3 rounded-xl border border-border p-3 text-left hover:bg-app-bg transition-colors disabled:opacity-60"
     >
       <span className="text-lg" aria-hidden>
         {icon}
