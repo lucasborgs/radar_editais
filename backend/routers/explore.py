@@ -14,10 +14,9 @@ import logging
 import jwt
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from slowapi.util import get_remote_address
 
 from backend.common import CompanyProfileSchema, explore_agent
-from backend.rate_limit import limiter
+from backend.rate_limit import get_client_ip, limiter
 from core.auth import CurrentUserId, DbClient, OptionalDbClient, OptionalUserId
 from core.kg.planning_node import is_complex_proposal
 from core.profile_extractor import ProfileExtractor
@@ -79,7 +78,7 @@ def _explore_key(request: Request) -> str:
                 return f"auth:{sub}"
         except Exception:
             pass
-    return f"anon:{get_remote_address(request)}"
+    return f"anon:{get_client_ip(request)}"
 
 
 def _explore_limit(key: str) -> str:

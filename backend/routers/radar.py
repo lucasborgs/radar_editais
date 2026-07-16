@@ -5,10 +5,9 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from slowapi.util import get_remote_address
 
 from backend.common import CompanyProfileSchema
-from backend.rate_limit import limiter
+from backend.rate_limit import get_client_ip, limiter
 from core.auth import OptionalDbClient, OptionalUserId
 from core.services import match_v3, match_verdict
 from core.services.content_library import get_workspace_id
@@ -34,7 +33,7 @@ def _radar_key(request: Request) -> str:
                 return f"auth:{payload['sub']}"
         except Exception:  # noqa: BLE001 - chave de rate limit é best-effort
             pass
-    return f"anon:{get_remote_address(request)}"
+    return f"anon:{get_client_ip(request)}"
 
 
 def _radar_limit(key: str) -> str:
