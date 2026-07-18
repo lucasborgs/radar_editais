@@ -12,8 +12,32 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
+from typing import Literal
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ExploreStreamEvent:
+    """Evento do canal streaming de `ExploreAgent.explore_stream` (item 1,
+    TASK 3). Contrato público do serviço — o router SSE não sabe nada sobre
+    `AgentResult`/`StreamDelta` internos de `core.llm.agent_graph`, mesma
+    fronteira de encapsulamento que `explore_with_meta` já mantém hoje.
+
+    kind == "token":    delta de texto do assistente (`text`).
+    kind == "tool_end": uma tool terminou (`name`) — sinal leve p/ "pensando".
+    kind == "final":    fim do turno — `answer` e `meta` têm o MESMO shape
+                        que `explore_with_meta` retorna (`stop_reason`,
+                        `truncated`, `called_match`, `route_decision`,
+                        `called_tools`).
+    """
+    kind: Literal["token", "tool_end", "final"]
+    text: str = ""
+    name: str = ""
+    answer: str = ""
+    meta: dict = field(default_factory=dict)
 
 
 EXPLORE_LOG_INSTRUCTION = """
@@ -190,6 +214,200 @@ class ExploreAgent:
             profile_text=profile_text, workspace_id=workspace_id, db=db, profile=profile,
             route_decision=route_decision,
         )
+
+    async def explore_stream(
+        self,
+        message: str,
+        history: list[dict] | None = None,
+        edital_ids: list[str] | None = None,
+        node_id: str | None = None,
+        node_type: str | None = None,
+        has_profile: bool = False,
+        profile_text: str | None = None,
+        workspace_id: str | None = None,
+        db=None,
+        profile: dict | None = None,
+    ) -> AsyncIterator[ExploreStreamEvent]:
+        """Variação streaming de `explore_with_meta` (item 1, TASK 3).
+
+        Mesma resolução de rota e mesmo shape de `(answer, meta)` no final —
+        só o transporte muda: tokens chegam ao vivo via `ExploreStreamEvent`
+        em vez de um retorno único. Deliberadamente DUPLICA o corpo de
+        `_explore_agent` (system/tools/route) em vez de extrair um helper
+        compartilhado — menor toque da TASK 3: `_explore_agent`/`explore_with_meta`
+        ficam byte-idênticos, zero risco de regressão no caminho síncrono de
+        produção. Custo aceito: as duas cópias podem divergir com o tempo — se
+        isso incomodar, é candidato a refatoração numa task futura, não aqui.
+        """
+        from core.services.explore_routing import (
+            RouteContext,
+            classify_ambiguous_route,
+            route_message,
+        )
+        target_type = node_type or ("edital" if edital_ids else None)
+        target_id = node_id or (edital_ids[0] if edital_ids else None)
+        route_decision = route_message(RouteContext(
+            message=message, target_type=target_type, target_id=target_id,
+            has_profile=has_profile, workspace_id=workspace_id,
+        ), ambiguous_classifier=classify_ambiguous_route)
+
+        if (
+            route_decision.intent.value == "EDITAL_FACT_ENUMERATIVE"
+            and route_decision.target_id
+            and os.getenv("EXPLORE_FACTUAL_RAG_ENABLED", "true").lower() == "true"
+        ):
+            try:
+                from core.services.factual_synthesis import synthesize_enumerative_answer
+
+                answer = synthesize_enumerative_answer(route_decision.target_id, message)
+                meta = {
+                    "stop_reason": "end_turn",
+                    "truncated": False,
+                    "called_match": False,
+                    "route_decision": route_decision.to_dict(),
+                    "called_tools": ["search_edital_factual"],
+                }
+                # Síntese factual não é um loop de tokens do LLM streamado (é
+                # uma chamada única que já devolve o texto pronto) — emite o
+                # texto inteiro como um único delta pra manter o contrato SSE
+                # uniforme (o front sempre recebe ≥1 "token" antes do "final").
+                if answer:
+                    yield ExploreStreamEvent(kind="token", text=answer)
+                yield ExploreStreamEvent(kind="final", answer=answer, meta=meta)
+                return
+            except Exception as exc:  # degrada para o agente/tool já existente
+                logger.warning(
+                    "síntese factual enumerativa falhou (%s): %s; usando ReAct",
+                    route_decision.target_id, exc,
+                )
+
+        from core.llm.agent_runtime import resolve_agent_provider, run_agent_streaming_async
+
+        messages: list[dict] = []
+        for turn in (history or [])[-8:]:
+            role = turn.get("role")
+            content = turn.get("content")
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+
+        hint = self._build_explore_hint(edital_ids, node_id, node_type)
+        if hint:
+            messages.append({"role": "user", "content": hint})
+
+        messages.append({"role": "user", "content": message, "cache_hint": True})
+
+        tools = self._explore_tools()
+        system = EXPLORE_AGENT_SYSTEM
+        route_payload = route_decision.to_dict()
+        system += (
+            "\n\nROTA DETERMINADA PELA POLÍTICA (não reclassifique e não "
+            f"emita redirect): {route_payload}. Use somente ferramentas "
+            "compatíveis com essa rota."
+        )
+        if (
+            route_decision.intent.value in {"EDITAL_FACT", "EDITAL_FACT_ENUMERATIVE"}
+            and route_decision.target_id
+            and os.getenv("EXPLORE_FACTUAL_RAG_ENABLED", "true").lower() == "true"
+        ):
+            from core.llm.agent_tools.factual_tools import build_factual_tools
+            tools += build_factual_tools(
+                route_decision.target_id, route_decision.retrieval_profile,
+            )
+            system += (
+                " Para esta rota, chame search_edital_factual antes de responder. "
+                "Não use get_edital como substituto e não use editais análogos. "
+                "Em listas, cubra todas as subseções recuperadas. Cite documento, "
+                "versão/data, seção e página; declare ausência de autoridade."
+            )
+        elif (
+            route_decision.intent.value == "ENTITY_FACT"
+            and route_decision.target_type == "investidor"
+            and route_decision.target_id
+        ):
+            tools = [tool for tool in tools if tool.name == "get_investidor"]
+            system += (
+                " Para esta rota, chame obrigatoriamente get_investidor com "
+                f"investidor_id={route_decision.target_id!r} antes de responder."
+            )
+
+        if profile_text and profile:
+            from core.llm.agent_tools.match_tools import build_match_tools
+            tools = tools + build_match_tools(
+                profile_text, profile=profile, workspace_id=workspace_id,
+                db=db, brief=True,
+            )
+            system = system + EXPLORE_MATCH_INSTRUCTION
+
+        if db is not None and workspace_id:
+            from core.llm.agent_tools.explore_tools import (
+                build_exploration_log_tools,
+                load_recent_exploration_decisions,
+            )
+            tools = tools + build_exploration_log_tools(db, workspace_id)
+            system = system + EXPLORE_LOG_INSTRUCTION
+            prior = load_recent_exploration_decisions(db, workspace_id)
+            if prior:
+                system = f"{system}\n\n{prior}"
+
+        provider, model = resolve_agent_provider(
+            "anthropic", ANTHROPIC_MODEL_AGENT_EXPLORE,
+        )
+
+        result = None
+        async for delta in run_agent_streaming_async(
+            system=system,
+            initial_messages=messages,
+            tools=tools,
+            model=model,
+            provider=provider,
+            max_steps=EXPLORE_AGENT_MAX_STEPS,
+        ):
+            if delta.kind == "token":
+                if delta.text:
+                    yield ExploreStreamEvent(kind="token", text=delta.text)
+            elif delta.kind == "tool_end":
+                yield ExploreStreamEvent(kind="tool_end", name=delta.name)
+            elif delta.kind == "done":
+                result = delta.result
+            # kind == "error": o "done" seguinte já carrega o AgentResult
+            # degradado (mesmo contrato de run_agent_graph_streaming) — nada
+            # extra a fazer aqui.
+
+        if result is None:
+            # Não deveria disparar: run_agent_graph_streaming SEMPRE emite um
+            # "done" antes de terminar (inclusive nos caminhos de erro) — mas
+            # não propaga exceção crua nem confia em invariante silenciosa
+            # (mesma lição do fix de `agent_graph.py`: nunca um `assert` nu
+            # no meio do generator).
+            logger.error("explore agent (stream): terminou sem evento 'done'")
+            yield ExploreStreamEvent(
+                kind="final",
+                answer="Desculpe, não consegui processar agora. Tente novamente em instantes.",
+                meta={"stop_reason": "error", "truncated": False, "called_match": False},
+            )
+            return
+
+        called_match = any(
+            s.kind == "tool"
+            and s.name in ("find_matching_editais", "find_matching_entities")
+            for s in result.steps
+        )
+        called_tools = [s.name for s in result.steps if s.kind == "tool" and s.name]
+        meta = {
+            "stop_reason": result.stop_reason,
+            "truncated": result.stop_reason == "max_steps",
+            "called_match": called_match,
+            "route_decision": route_decision.to_dict(),
+            "called_tools": called_tools,
+        }
+
+        if result.stop_reason == "error":
+            logger.error("explore agent (stream): stop_reason=error após %d steps", len(result.steps))
+            answer = "Desculpe, não consegui processar agora. Tente novamente em instantes."
+        else:
+            answer = result.final_text or "Não consegui formular uma resposta agora."
+
+        yield ExploreStreamEvent(kind="final", answer=answer, meta=meta)
 
     def _explore_tools(self) -> list:
         """Tools do agente de explore: leitura do catálogo gold e

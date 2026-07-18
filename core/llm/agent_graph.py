@@ -570,7 +570,18 @@ async def run_agent_graph_streaming(
             yield StreamDelta(kind="done", result=degraded)
             return
 
-        assert final_state is not None, "astream multimode não emitiu estado final (values)"
+        if final_state is None:
+            # Não deveria disparar (astream com stream_mode=["values"] garante ao
+            # menos um estado terminal) — backstop no mesmo padrão dos outros
+            # caminhos de falha: nunca propaga exceção crua pelo generator (um
+            # `assert` puro some silenciosamente com `python -O` e quebraria o
+            # contrato de StreamDelta ao vazar `AssertionError`).
+            logger.error("agent_graph: astream multimode não emitiu estado final (values)")
+            degraded = AgentResult(final_text="", steps=[], stop_reason="error", usage={})
+            yield StreamDelta(kind="error", text="sem estado final do stream")
+            yield StreamDelta(kind="done", result=degraded)
+            return
+
         stop = _derive_stop_reason(final_state, max_steps)
         result = _messages_to_agent_result(final_state["messages"], stop)
 

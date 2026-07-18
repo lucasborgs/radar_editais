@@ -9,10 +9,13 @@ Per spec match-evolution.md Fase 2.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 
 import jwt
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.common import CompanyProfileSchema, explore_agent
@@ -156,6 +159,25 @@ def explore(
         profile=current or None,
     )
 
+    return _post_process(message, req, ctx, current, answer, explore_meta, user_id, db)
+
+
+def _post_process(
+    message: str,
+    req: ExploreRequest,
+    ctx: str,
+    current: dict,
+    answer: str,
+    explore_meta: dict,
+    user_id: str | None,
+    db,
+) -> dict:
+    """Pós-processamento do turno de explore — match v3, diff de perfil,
+    persistência, vereditos. Compartilhado por `/explore` (sync) e
+    `/explore/stream` (SSE, TASK 3 do item 1 — a mesma pipeline roda depois
+    do `done` do streaming, via `asyncio.to_thread`, pra manter os dois
+    caminhos byte-a-byte idênticos aqui e nunca divergir cards/persistência
+    entre eles). Extração pura de `/explore` — nenhuma lógica mudou."""
     # PR1 (four-phase-workflow): detecta se pergunta pede planejamento.
     result: dict = {
         "answer": answer,
@@ -237,6 +259,88 @@ def explore(
                 logger.warning("explore: falha no veredito do match: %s", e)
 
     return result
+
+
+def _sse(event: str, data: dict) -> bytes:
+    """Formata um frame SSE. `json.dumps` escapa quebras de linha do próprio
+    JSON — o `\\n\\n` literal abaixo é só o delimitador de frame do protocolo."""
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
+
+
+@router.post(
+    "/explore/stream",
+    summary="Chat exploratório em streaming (SSE) — item 1, TASK 3",
+)
+@limiter.limit(_explore_limit, key_func=_explore_key)
+async def explore_stream_endpoint(
+    request: Request,
+    req: ExploreRequest,
+    user_id: OptionalUserId,
+    db: OptionalDbClient,
+):
+    """Variação SSE de `/explore` — tokens ao vivo durante a geração,
+    seguidos de um frame `done` com o MESMO shape do `/explore` síncrono
+    (pós-processamento idêntico: match v3, diff de perfil, persistência,
+    vereditos — `_post_process`, rodado em thread por ser bloqueante).
+
+    Formato:
+        event: token  data: {"text": "<delta>"}
+        event: tool   data: {"name": "<tool>", "phase": "end"}
+        event: done   data: {...payload idêntico ao /explore...}
+        event: error  data: {"message": "<msg>"}
+
+    Wrinkle (não é bug): quando o agente chama tool de match, o `answer`
+    final é SOBRESCRITO por `_match_cards_intro` no pós-processamento — os
+    tokens streamados são um preview progressivo; `done.answer` é
+    AUTORITATIVO e pode divergir do texto que chegou token a token. O
+    frontend trata `done.answer` como a verdade final (critério de aceite
+    da TASK 4).
+
+    `/explore` (sync) fica intacto — este é um endpoint novo, aditivo.
+    """
+    message = req.message.strip()
+    if not message:
+        raise HTTPException(status_code=422, detail="Mensagem vazia.")
+
+    ctx = _profile_context_block(req.profile)
+    explore_message = f"{ctx}\n\n{message}" if ctx else message
+    current = req.profile.model_dump() if req.profile is not None else {}
+
+    async def gen():
+        try:
+            answer = ""
+            explore_meta: dict = {}
+            async for event in explore_agent.explore_stream(
+                explore_message, req.history, req.edital_ids, req.node_id,
+                req.node_type, has_profile=req.profile is not None,
+                profile_text=ctx or None,
+                profile=current or None,
+            ):
+                if event.kind == "token":
+                    yield _sse("token", {"text": event.text})
+                elif event.kind == "tool_end":
+                    yield _sse("tool", {"name": event.name, "phase": "end"})
+                elif event.kind == "final":
+                    answer = event.answer
+                    explore_meta = event.meta
+
+            result = await asyncio.to_thread(
+                _post_process, message, req, ctx, current, answer, explore_meta, user_id, db,
+            )
+            yield _sse("done", result)
+        except Exception as e:
+            logger.error("explore/stream: falha: %s", e)
+            yield _sse("error", {"message": "Erro ao processar. Tente novamente."})
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 def _enqueue_verdicts(workspace_id: str, items: list[dict], profile: dict) -> None:
