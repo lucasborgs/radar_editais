@@ -20,12 +20,14 @@ import { UrlHero } from "@/components/frontdoor/UrlHero";
 import { UnlockCard } from "@/components/frontdoor/UnlockCard";
 import {
   frontdoorTurn,
+  exploreStream,
   getMe,
   saveProfile,
   extractProfileFromDocument,
   getConversation,
   updateConversationEntry,
   type ProfileDiffItem,
+  type ExploreTurnResult,
 } from "@/lib/api";
 const PLANNING_CTX_KEY = "planning_context";
 import { useAuth } from "@/lib/auth";
@@ -152,6 +154,10 @@ export default function FrontDoorPage() {
   const [entries, setEntries] = useState<TranscriptEntry[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  // Preview ao vivo do turno em streaming (item 1, TASK 4). null = sem turno
+  // em voo OU ainda sem primeiro token (mostra TypingIndicator); string
+  // (mesmo vazia) = já recebeu o primeiro token, mostra a bolha parcial.
+  const [streamingText, setStreamingText] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   // Conversa persistida no servidor (logado, spec chat-first fase 2). null =
   // ainda sem binding (anônimo, ou logado antes do 1º turno).
@@ -342,13 +348,12 @@ export default function FrontDoorPage() {
       setInput("");
       setSending(true);
 
-      try {
-        const { answer, truncated, profile_diff, matched_editais, matched_entities, session_id, entry_ids, next_action } = await frontdoorTurn(
-          trimmed,
-          toApiHistory(withUser),
-          profile.nome ? profile : null,
-          sessionId,
-        );
+      // Aplica o payload de fim de turno (mesmo shape em /explore e no frame
+      // "done" de /explore/stream — ExploreTurnResult) — usado pelos dois
+      // caminhos (streaming e fallback) pra nunca divergir em como o
+      // transcript é montado.
+      const applyTurnResult = (payload: ExploreTurnResult) => {
+        const { answer, truncated, profile_diff, matched_editais, matched_entities, session_id, entry_ids, next_action } = payload;
         // PR1 (four-phase-workflow): guarda contexto para a fase de planejamento.
         if (next_action && next_action.options.some((o) => o.action === "goto_planning")) {
           const editalId = matched_editais?.[0]?.edital_id || undefined;
@@ -385,6 +390,57 @@ export default function FrontDoorPage() {
           }
           return next;
         });
+      };
+
+      try {
+        // `gotAnyFrame` distingue as duas falhas possíveis de `exploreStream`:
+        // (a) nunca chegou nenhum frame do servidor (rede caiu, navegador sem
+        //     suporte a stream reader, HTTP não-ok antes do SSE começar) →
+        //     recuperável, cai pro caminho antigo (`frontdoorTurn`) sem
+        //     incomodar o usuário;
+        // (b) já tínhamos frames (tokens, ou um "error" explícito do SSE) →
+        //     turno genuinamente falhou depois de começar; refazer via
+        //     `frontdoorTurn` duplicaria a chamada ao LLM/efeitos colaterais
+        //     — trata como falha normal (mesmo catch de sempre), sem retry.
+        let gotAnyFrame = false;
+        try {
+          setStreamingText("");
+          await exploreStream(
+            trimmed,
+            toApiHistory(withUser),
+            profile.nome ? profile : null,
+            sessionId,
+            {
+              onToken: (delta) => {
+                gotAnyFrame = true;
+                setStreamingText((prev) => (prev ?? "") + delta);
+              },
+              onTool: () => {
+                gotAnyFrame = true;
+              },
+              onDone: (payload) => {
+                applyTurnResult(payload);
+              },
+              onError: (message) => {
+                // TERMINAL (contrato do endpoint): não há "done" depois disto.
+                // Lança pra cair no catch de fora — mesmo tratamento de
+                // falha que o /explore síncrono sempre teve.
+                gotAnyFrame = true;
+                throw new Error(message);
+              },
+            },
+          );
+        } catch (streamErr) {
+          if (gotAnyFrame) throw streamErr;
+          // Fallback: stream não chegou a começar — caminho antigo intacto.
+          const payload = await frontdoorTurn(
+            trimmed,
+            toApiHistory(withUser),
+            profile.nome ? profile : null,
+            sessionId,
+          );
+          applyTurnResult(payload);
+        }
       } catch (e) {
         setEntries((prev) => prev.filter((m) => m !== userEntry));
         setInput(trimmed);
@@ -392,6 +448,7 @@ export default function FrontDoorPage() {
           e instanceof Error ? e.message : "Não consegui falar com o servidor. Tente novamente.",
         );
       } finally {
+        setStreamingText(null);
         setSending(false);
       }
     },
@@ -696,11 +753,17 @@ export default function FrontDoorPage() {
           }
         })}
 
-        {sending && (
+        {sending && streamingText ? (
+          // Preview ao vivo (item 1, TASK 4) — substituído sem glitch pelo
+          // "done" autoritativo assim que o turno termina (applyTurnResult
+          // empurra a entrada final em `entries` e limpa este state no mesmo
+          // tick; nunca aparecem os dois ao mesmo tempo).
+          <Bubble role="assistant" content={streamingText} />
+        ) : sending ? (
           <div className="flex items-start">
             <TypingIndicator />
           </div>
-        )}
+        ) : null}
       </ChatMessageList>
 
         {showUnlock && (

@@ -267,25 +267,31 @@ export const getRadarMatches = (profile: CompanyProfile) =>
     body: JSON.stringify({ profile }),
   });
 
+// Payload de fim de turno — mesmo shape em `POST /explore` (JSON único) e no
+// frame `done` de `POST /explore/stream` (SSE, item 1/TASK 4): o backend
+// gera os dois a partir do mesmo `_post_process`, então um único tipo cobre
+// ambos os transportes.
+export interface ExploreTurnResult {
+  answer: string;
+  truncated?: boolean; // PR6.2: resposta cortada no teto de passos do agente
+  profile_diff: ProfileDiffItem[] | null;
+  matched_editais?: MatchedEdital[];
+  matched_entities?: MatchedEntity[];
+  session_id?: string;
+  entry_ids?: FrontdoorEntryIds;
+  next_action?: {
+    offer: string;
+    options: Array<{ label: string; action: string }>;
+  }; // PR1 (4-phase): oferta de planejamento
+}
+
 export const frontdoorTurn = (
   message: string,
   history: KGChatMessage[],
   profile: Partial<CompanyProfile> | null,
   sessionId?: string | null,
 ) =>
-  apiFetch<{
-    answer: string;
-    truncated?: boolean; // PR6.2: resposta cortada no teto de passos do agente
-    profile_diff: ProfileDiffItem[] | null;
-    matched_editais?: MatchedEdital[];
-    matched_entities?: MatchedEntity[];
-    session_id?: string;
-    entry_ids?: FrontdoorEntryIds;
-    next_action?: {
-      offer: string;
-      options: Array<{ label: string; action: string }>;
-    }; // PR1 (4-phase): oferta de planejamento
-  }>("/explore", {
+  apiFetch<ExploreTurnResult>("/explore", {
     method: "POST",
     body: JSON.stringify({
       message,
@@ -294,6 +300,91 @@ export const frontdoorTurn = (
       session_id: sessionId ?? null,
     }),
   });
+
+// ── Explore streaming (SSE) — item 1, TASK 4 ────────────────
+// Variação de `frontdoorTurn` que consome `POST /explore/stream`. Callbacks
+// em vez de um retorno único: `onToken` chega ao vivo, `onDone`/`onError` são
+// TERMINAIS (mutuamente exclusivos — nunca os dois no mesmo turno; um `error`
+// NUNCA é seguido de `done`, contrato do endpoint). Não passa por `apiFetch`
+// (que faz `res.json()` de corpo único) — lê o stream via `getReader()`.
+export interface ExploreStreamCallbacks {
+  onToken: (text: string) => void;
+  onTool?: (name: string) => void;
+  onDone: (payload: ExploreTurnResult) => void;
+  onError: (message: string) => void;
+}
+
+export async function exploreStream(
+  message: string,
+  history: KGChatMessage[],
+  profile: Partial<CompanyProfile> | null,
+  sessionId: string | null | undefined,
+  callbacks: ExploreStreamCallbacks,
+): Promise<void> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "text/event-stream",
+  };
+  const token = await getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE_URL}/explore/stream`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ message, history, profile, session_id: sessionId ?? null }),
+  });
+  if (!res.ok) throw await buildApiError(res);
+  if (!res.body) throw new Error("Streaming não suportado neste navegador.");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // Frames SSE terminam em uma linha em branco (\n\n). Um frame pode
+    // chegar fatiado entre dois reads — só processa o que já está completo,
+    // mantém o resto no buffer pro próximo chunk.
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      const frame = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+
+      let eventName = "message";
+      let dataLine = "";
+      for (const line of frame.split("\n")) {
+        if (line.startsWith("event:")) eventName = line.slice(6).trim();
+        else if (line.startsWith("data:")) dataLine += line.slice(5).trim();
+      }
+      if (!dataLine) continue;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(dataLine);
+      } catch {
+        continue;
+      }
+
+      if (eventName === "token") {
+        callbacks.onToken((parsed as { text: string }).text);
+      } else if (eventName === "tool") {
+        callbacks.onTool?.((parsed as { name: string }).name);
+      } else if (eventName === "done") {
+        callbacks.onDone(parsed as ExploreTurnResult);
+        return;
+      } else if (eventName === "error") {
+        // TERMINAL (contrato do endpoint, backend/routers/explore.py): nunca
+        // há um "done" depois. Lança pra quem chamou tratar como falha de
+        // turno — igual ao catch de `frontdoorTurn` hoje, sem esperar mais nada.
+        callbacks.onError((parsed as { message: string }).message);
+        return;
+      }
+    }
+  }
+}
 
 // Poll cache-only dos vereditos (Estágio 2): a chave é o file_key do hipergrado
 // (`${source}__${edital_id}`). Auth obrigatória — anônimo não tem workspace.
