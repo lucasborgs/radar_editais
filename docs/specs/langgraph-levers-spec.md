@@ -25,7 +25,9 @@
 
 ---
 
-## Item 1 — Streaming (`astream_events`)
+## Item 1 — Streaming (`astream_events`) — ✅ PROMOVIDO (fatia explore) 2026-07-18
+
+**Status:** mergeado na main (merge `897ca9631`) e deployado em prod. Gate: smoke SSE Docker-staging (TTFT 2.63s vs done 3.96s) + smoke via Cloudflare Tunnel em prod (535 tokens, span 5.83s, sem buffering). Smoke Anthropic **diferido** (sem key em nenhum ambiente — ver adendo do plano). Pendência viva: streaming da escrita (Task 6), pareada ao Item 3. Achado operacional do gate: a WAF da Cloudflare barrou cliente não-navegador no endpoint novo (403 sem User-Agent de browser) — irrelevante para o frontend real, relevante para smokes futuros.
 
 - **Régua (revista):** sem spike separado — **a task 1 do plano É o demo** (script em `spikes/`, throwaway), com **checkpoint go/no-go** antes das demais tasks.
 - **Objetivo da task 1.** Provar que dá para emitir tokens/passos ao vivo do grafo existente e que o `AgentResult` pode ser reconstruído do stream no fim (sem quebrar o contrato dos call sites).
