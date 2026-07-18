@@ -24,12 +24,13 @@ import logging
 import os
 import re
 import threading
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from langchain_core.messages import (
     AIMessage,
+    AIMessageChunk,
     AnyMessage,
     HumanMessage,
     SystemMessage,
@@ -104,7 +105,14 @@ def _build_chat_model(
         or os.environ.get("AGENT_OPENAI_API_KEY")
         or os.environ.get("OPENAI_API_KEY")
     )
-    kw = {"model": model, "timeout": _TIMEOUT, "max_retries": _MAX_RETRIES}
+    kw = {
+        "model": model, "timeout": _TIMEOUT, "max_retries": _MAX_RETRIES,
+        # Defensivo (Item 1, TASK 2): protege o usage em streaming caso a lib
+        # regrida — langchain-openai 1.3.3 já popula usage_metadata em stream
+        # por padrão (achado do spike, spikes/lever1_streaming/FINDINGS.md),
+        # então isto é inócuo no path não-streaming e no streaming de hoje.
+        "stream_usage": True,
+    }
     if temperature is not None:
         kw["temperature"] = temperature
     if base:
@@ -429,6 +437,157 @@ async def run_agent_graph_async(
         for s in result.steps:
             on_step(s)
     return result
+
+
+# =============================================================================
+# Item 1 (streaming) — entry point streaming aditivo, ao lado de ainvoke
+# =============================================================================
+
+@dataclass
+class StreamDelta:
+    """Evento do canal lateral de streaming (`run_agent_graph_streaming`).
+
+    kind == "token":     delta de texto do assistente (`text`).
+    kind == "tool_end":  uma tool terminou de rodar (`name`) — sinal leve para
+                         indicador de "pensando"; sem `tool_start` neste
+                         transporte (astream multimode não expõe início de
+                         tool de forma barata — ver FINDINGS da TASK 1).
+    kind == "done":      fim do turno — `result` é o AgentResult AUTORITATIVO,
+                         reconstruído do estado final pelo MESMO tradutor do
+                         `ainvoke` (nunca dos chunks acumulados).
+    kind == "error":     erro antes do turno terminar (sempre seguido de um
+                         "done" com AgentResult degradado — nunca propaga
+                         exceção crua pelo generator).
+    """
+    kind: Literal["token", "tool_end", "done", "error"]
+    text: str = ""
+    name: str = ""
+    result: AgentResult | None = None
+
+
+async def run_agent_graph_streaming(
+    *,
+    system: str,
+    initial_messages: list[dict[str, Any]],
+    tools: list[BaseTool],
+    model: str,
+    provider: Provider = "anthropic",
+    max_steps: int = 8,
+    on_step: Callable[[TraceStep], None] | None = None,
+    span_name: str | None = None,
+    temperature: float | None = None,
+    openai_base_url: str | None = None,
+    openai_api_key: str | None = None,
+    trace_context: dict | None = None,
+) -> AsyncIterator[StreamDelta]:
+    """Variação streaming de `run_agent_graph_async` — MESMA assinatura, canal
+    lateral de tokens ao vivo. Aditivo: não toca `run_agent_graph_async` nem
+    nenhum call site existente.
+
+    Transporte decidido na TASK 1 do item 1 (checkpoint GO, ver
+    `spikes/lever1_streaming/FINDINGS.md`): `graph.astream(stream_mode=
+    ["messages", "values"])`. `astream_events(version="v3")` não está
+    disponível como async iterator direto na versão pinada do langgraph
+    (retorna um `AsyncGraphRunStream` experimental); `values` garante o
+    estado terminal pela própria API, sem heurística de "isto é a raiz".
+
+    Wrinkle crítico (achado da TASK 1, critério de aceite formal): o modo
+    `"messages"` emite tanto `AIMessageChunk` (delta real de token) quanto
+    `ToolMessage` completo (resultado da tool). Sem filtrar por
+    `isinstance(msg, AIMessageChunk)`, o texto bruto da tool vaza como se
+    fosse resposta do assistente.
+
+    O `AgentResult` do evento `done` vem do estado final (última mensagem do
+    modo `"values"`) passado pelos MESMOS tradutores de `run_agent_graph_async`
+    (`_derive_stop_reason` + `_messages_to_agent_result`) — o streaming é só
+    um canal lateral, nunca a fonte do contrato (decisão de arquitetura #1 do
+    plano do item 1).
+    """
+    chat = _build_chat_model(
+        provider, model,
+        temperature=temperature,
+        openai_base_url=openai_base_url,
+        openai_api_key=openai_api_key,
+    )
+    # checkpointer=False: mesmo motivo do path stateless em run_agent_graph_async
+    # (corta herança de checkpointer de subagente rodando noutro loop).
+    graph = _build_graph(chat, tools, max_steps=max_steps, checkpointer=False)
+
+    init: AgentState = {
+        "messages": [
+            _build_system_message(system, provider),
+            *_to_lc_messages(initial_messages, provider=provider),
+        ],
+        "llm_calls": 0,
+        "tool_rounds": 0,
+        "documents": {},
+    }
+
+    from core import telemetry
+
+    with telemetry.agent_run(
+        name=span_name or f"agent.{provider}.{model}",
+        input={"system": system, "initial_messages": initial_messages},
+        metadata={
+            "provider": provider, "model": model,
+            "max_steps": max_steps, "runtime": "langgraph-streaming",
+            "tools": [t.name for t in tools],
+        },
+        trace_context=trace_context,
+    ) as agent_span:
+        config: dict[str, Any] = {"recursion_limit": 3 * max_steps + 5}
+        handler = telemetry.make_callback_handler()
+        if handler is not None:
+            config["callbacks"] = [handler]
+
+        final_state: dict[str, Any] | None = None
+        try:
+            async for stream_mode, chunk in graph.astream(
+                init, config=config, stream_mode=["messages", "values"],
+            ):
+                if stream_mode == "messages":
+                    msg_chunk, _meta = chunk
+                    if isinstance(msg_chunk, AIMessageChunk):
+                        delta = _msg_text(msg_chunk)
+                        if delta:
+                            yield StreamDelta(kind="token", text=delta)
+                    elif isinstance(msg_chunk, ToolMessage):
+                        yield StreamDelta(kind="tool_end", name=msg_chunk.name or "")
+                elif stream_mode == "values":
+                    final_state = chunk
+        except GraphRecursionError:
+            logger.warning("agent_graph: recursion_limit atingido (backstop, streaming) — max_steps")
+            degraded = AgentResult(final_text="", steps=[], stop_reason="max_steps", usage={})
+            yield StreamDelta(kind="error", text="max_steps")
+            yield StreamDelta(kind="done", result=degraded)
+            return
+        except Exception as e:
+            logger.error("agent_graph: grafo falhou (streaming): %s", e)
+            if agent_span is not None:
+                agent_span.update(level="ERROR", status_message=str(e))
+            degraded = AgentResult(final_text="", steps=[], stop_reason="error", usage={})
+            yield StreamDelta(kind="error", text=str(e))
+            yield StreamDelta(kind="done", result=degraded)
+            return
+
+        assert final_state is not None, "astream multimode não emitiu estado final (values)"
+        stop = _derive_stop_reason(final_state, max_steps)
+        result = _messages_to_agent_result(final_state["messages"], stop)
+
+        if agent_span is not None:
+            agent_span.update(
+                output={"final_text": result.final_text, "stop_reason": result.stop_reason},
+                metadata={
+                    "stop_reason": result.stop_reason,
+                    "n_steps": len(result.steps),
+                    "usage": result.usage,
+                },
+            )
+
+    if on_step:
+        for s in result.steps:
+            on_step(s)
+    yield StreamDelta(kind="done", result=result)
 
 
 # =============================================================================

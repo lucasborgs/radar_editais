@@ -268,6 +268,48 @@ async def run_agent_async(
     )
 
 
+async def run_agent_streaming_async(
+    *,
+    system: str,
+    initial_messages: list[dict[str, Any]],
+    tools: list[BaseTool],
+    model: str,
+    provider: Provider = "anthropic",
+    max_steps: int = 8,
+    on_step: Callable[[TraceStep], None] | None = None,
+    span_name: str | None = None,
+    temperature: float | None = None,
+    openai_base_url: str | None = None,
+    openai_api_key: str | None = None,
+    trace_context: dict | None = None,
+):
+    """Espelha `run_agent_async`, mas delega ao canal streaming do grafo
+    (`run_agent_graph_streaming`) — `AsyncIterator[StreamDelta]` em vez de um
+    único `AgentResult`. O evento final (`kind="done"`) carrega o mesmo
+    `AgentResult` autoritativo que `run_agent_async` retornaria.
+
+    Aditivo: não altera `run_agent_async`/`run_agent`, nenhum call site existente
+    muda de comportamento.
+    """
+    from core.llm.agent_graph import run_agent_graph_streaming
+
+    async for delta in run_agent_graph_streaming(
+        system=system,
+        initial_messages=initial_messages,
+        tools=tools,
+        model=model,
+        provider=provider,
+        max_steps=max_steps,
+        on_step=on_step,
+        span_name=span_name,
+        temperature=temperature,
+        openai_base_url=openai_base_url,
+        openai_api_key=openai_api_key,
+        trace_context=trace_context,
+    ):
+        yield delta
+
+
 def run_agent(
     *,
     system: str,
