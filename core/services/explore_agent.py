@@ -366,6 +366,7 @@ class ExploreAgent:
             model=model,
             provider=provider,
             max_steps=EXPLORE_AGENT_MAX_STEPS,
+            mode="explore",
         ):
             if delta.kind == "token":
                 if delta.text:
@@ -569,6 +570,7 @@ class ExploreAgent:
             model=model,
             provider=provider,
             max_steps=EXPLORE_AGENT_MAX_STEPS,
+            mode="explore",
         )
 
         called_match = any(

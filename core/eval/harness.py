@@ -308,41 +308,69 @@ def _base_manifest(
 # Fallback local (sem Langfuse) — replica a semântica do run_experiment.
 # ---------------------------------------------------------------------------
 
+def _eval_max_workers() -> int:
+    """Concorrência do loop de casos (env EVAL_MAX_WORKERS, default 4 — modesto
+    para não estourar rate limit do gpt-4o-mini)."""
+    raw = os.getenv("EVAL_MAX_WORKERS", "4")
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        logger.warning("EVAL_MAX_WORKERS inválida (%r) — usando 4", raw)
+        return 4
+
+
+def _run_one_item(
+    suite: Suite, item: Item,
+) -> tuple[dict, list[dict[str, Any]]]:
+    """Roda task + evaluators para UM item. Isolamento de falha: qualquer exceção
+    (task ou evaluator) vira erro registrado, nunca propaga (espelha o Langfuse)."""
+    errors: list[dict[str, Any]] = []
+    inp = get_input(item)
+    expected = item.get("expected_output") if isinstance(item, dict) else None
+    meta = (item.get("metadata") if isinstance(item, dict) else None) or {}
+    try:
+        output = suite.task(item=item)
+    except Exception as e:
+        logger.error("task falhou (%s): %s", meta.get("case_id", "?"), e)
+        output = {"error": str(e)}
+        errors.append({"stage": "task", "case_id": meta.get("case_id"), "error": str(e)})
+
+    evals: list[Evaluation] = []
+    for ev in suite.evaluators:
+        try:
+            r = ev(input=inp, output=output, expected_output=expected, metadata=meta)
+        except Exception as e:
+            r = {"name": getattr(ev, "__name__", "evaluator"),
+                 "value": None, "comment": f"erro: {e}"}
+            errors.append({
+                "stage": "evaluator",
+                "case_id": meta.get("case_id"),
+                "evaluator": getattr(ev, "__name__", "evaluator"),
+                "error": str(e),
+            })
+        evals.extend(_coerce_evals(r))
+
+    return {
+        "input": inp, "output": output, "expected_output": expected,
+        "metadata": meta, "evaluations": evals,
+    }, errors
+
+
 def _run_local(
     suite: Suite, items: list[Item],
 ) -> tuple[list[dict], list[Evaluation], list[dict[str, Any]]]:
-    item_results: list[dict] = []
+    import concurrent.futures
+
+    item_results: list[dict | None] = [None] * len(items)
     errors: list[dict[str, Any]] = []
-    for item in items:
-        inp = get_input(item)
-        expected = item.get("expected_output") if isinstance(item, dict) else None
-        meta = (item.get("metadata") if isinstance(item, dict) else None) or {}
-        try:
-            output = suite.task(item=item)
-        except Exception as e:  # isola falha de um caso (espelha o Langfuse)
-            logger.error("task falhou (%s): %s", meta.get("case_id", "?"), e)
-            output = {"error": str(e)}
-            errors.append({"stage": "task", "case_id": meta.get("case_id"), "error": str(e)})
+    max_workers = min(_eval_max_workers(), len(items)) or 1
 
-        evals: list[Evaluation] = []
-        for ev in suite.evaluators:
-            try:
-                r = ev(input=inp, output=output, expected_output=expected, metadata=meta)
-            except Exception as e:
-                r = {"name": getattr(ev, "__name__", "evaluator"),
-                     "value": None, "comment": f"erro: {e}"}
-                errors.append({
-                    "stage": "evaluator",
-                    "case_id": meta.get("case_id"),
-                    "evaluator": getattr(ev, "__name__", "evaluator"),
-                    "error": str(e),
-                })
-            evals.extend(_coerce_evals(r))
-
-        item_results.append({
-            "input": inp, "output": output, "expected_output": expected,
-            "metadata": meta, "evaluations": evals,
-        })
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(_run_one_item, suite, item): i for i, item in enumerate(items)}
+        for fut in concurrent.futures.as_completed(futures):
+            idx = futures[fut]
+            item_results[idx], item_errors = fut.result()
+            errors.extend(item_errors)
 
     run_evals: list[Evaluation] = []
     for rev in suite.run_evaluators:

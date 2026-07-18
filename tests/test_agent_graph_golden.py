@@ -127,6 +127,82 @@ def test_tool_error_recovers(monkeypatch):
     assert graph.final_text == "Não consegui, mas sigo."
 
 
+def test_last_step_notice_injected(monkeypatch):
+    """Item 6/T2 — no penúltimo passo (llm_calls == max_steps-1), o grafo injeta o
+    aviso de última chance de chamar tools antes do backstop cego (`finalize`)."""
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return "mais"
+
+    turns = [
+        {"text": "t1", "tool_calls": [{"id": "a", "name": "search", "args": {"q": "1"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "t2", "tool_calls": [{"id": "b", "name": "search", "args": {"q": "2"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "t3", "tool_calls": [{"id": "c", "name": "search", "args": {"q": "3"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "melhor resposta possível", "tool_calls": [],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+    ]
+    graph, scripted = _run_graph(monkeypatch, turns, [search], max_steps=3)
+    assert graph.stop_reason == "max_steps"
+    third_call_msgs = scripted._received[2]
+    assert any(
+        isinstance(m, HumanMessage) and "esta é a última rodada" in str(m.content)
+        for m in third_call_msgs
+    ), "budget_notice não injetou o aviso de penúltimo passo"
+
+
+def test_last_step_notice_never_leaks(monkeypatch):
+    """ANTI-LEAK (obrigatório) — mesmo com o aviso injetado, ele nunca vaza para
+    `final_text` (mesma classe do bug de vazamento da reflexão)."""
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return "mais"
+
+    turns = [
+        {"text": "t1", "tool_calls": [{"id": "a", "name": "search", "args": {"q": "1"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "t2", "tool_calls": [{"id": "b", "name": "search", "args": {"q": "2"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "t3", "tool_calls": [{"id": "c", "name": "search", "args": {"q": "3"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "melhor resposta possível", "tool_calls": [],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+    ]
+    graph, _ = _run_graph(monkeypatch, turns, [search], max_steps=3)
+    assert "não é mensagem do usuário" not in graph.final_text
+    assert "esta é a última rodada" not in graph.final_text
+    assert graph.final_text == "melhor resposta possível"
+
+
+def test_no_notice_when_max_steps_2(monkeypatch):
+    """ADENDO DE GOVERNANÇA — com max_steps=2 (batch de geração), o aviso NUNCA é
+    injetado (viraria fixture constante em toda seção que chame tool)."""
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return "mais"
+
+    turns = [
+        {"text": "t1", "tool_calls": [{"id": "a", "name": "search", "args": {"q": "1"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "t2", "tool_calls": [{"id": "b", "name": "search", "args": {"q": "2"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "melhor resposta possível", "tool_calls": [],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+    ]
+    graph, scripted = _run_graph(monkeypatch, turns, [search], max_steps=2)
+    assert graph.stop_reason == "max_steps"
+    for received in scripted._received:
+        assert not any(
+            "esta é a última rodada" in str(m.content)
+            for m in received
+        ), "budget_notice não deveria disparar com max_steps=2"
+
+
 def test_max_steps_stop_reason(monkeypatch):
     """Modelo insiste em tool além do teto → stop_reason=max_steps; tools da última
     rodada SÃO executadas (trace llm,tool,llm,tool), e uma rodada final SEM tools
@@ -193,7 +269,8 @@ def test_no_internal_human_message_injected_in_turn(monkeypatch):
 
 def test_graph_topology_has_no_reflect_or_prune_nodes(monkeypatch):
     """F2 — a topologia final do grafo é START→agent→{END,tools}; tools→{finalize,
-    agent}; finalize→agent_final→END. Sem reflect/reflect_followup/manage_memory."""
+    agent,budget_notice}; finalize→agent_final→END; budget_notice→agent (Item 6/T2).
+    Sem reflect/reflect_followup/manage_memory."""
     @tool
     def noop(x: str = "") -> str:
         """noop."""
@@ -202,7 +279,7 @@ def test_graph_topology_has_no_reflect_or_prune_nodes(monkeypatch):
     scripted = ScriptedChatModel(responses=[])
     compiled = ag._build_graph(scripted, [noop], max_steps=8)
     node_names = set(compiled.get_graph().nodes.keys())
-    assert {"agent", "agent_final", "tools", "finalize"} <= node_names
+    assert {"agent", "agent_final", "tools", "finalize", "budget_notice"} <= node_names
     assert not (
         {"reflect", "reflect_followup", "manage_memory"} & node_names
     ), f"nós deletados no F2 ainda presentes: {node_names}"

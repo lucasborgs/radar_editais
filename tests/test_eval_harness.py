@@ -7,6 +7,7 @@ isolamento de falha de caso, run_evaluators, skip por prereqs e persistência.
 from __future__ import annotations
 
 import json
+import time
 
 import pytest
 
@@ -61,6 +62,69 @@ def test_task_failure_is_isolated(tmp_path):
     assert all("error" in ir["output"] for ir in res["item_results"])
     assert res["status"] == "error"
     assert len(res["manifest"]["execution"]["errors"]) == 2
+
+
+def test_local_run_preserves_order_despite_concurrent_completion(tmp_path, monkeypatch):
+    """Item 6/T4 — casos rodam em paralelo (ThreadPoolExecutor), mas item_results
+    preserva a ordem de ENTRADA, não a ordem de término. O 1º caso dorme mais que
+    o 2º; se a coleta fosse por ordem de término, o 2º apareceria primeiro."""
+    monkeypatch.setenv("EVAL_MAX_WORKERS", "4")
+
+    def slow_first(*, item, **_):
+        n = get_input(item)
+        if n == 2:
+            time.sleep(0.15)
+        return n ** 2
+
+    suite = _square_suite()
+    suite.task = slow_first
+    res = run_suite(suite, out_dir=tmp_path)
+    assert [ir["input"] for ir in res["item_results"]] == [2, 3]
+    assert res["aggregate"]["mean_correct"] == 1.0
+
+
+def test_local_run_isolates_exception_per_case_under_concurrency(tmp_path, monkeypatch):
+    """Item 6/T4 — um caso que levanta não derruba os outros mesmo rodando em
+    paralelo; permanece isolado em `errors`, mesma semântica do loop sequencial."""
+    monkeypatch.setenv("EVAL_MAX_WORKERS", "4")
+
+    def boom_on_two(*, item, **_):
+        n = get_input(item)
+        if n == 2:
+            raise ValueError("explodiu")
+        return n ** 2
+
+    suite = _square_suite()
+    suite.task = boom_on_two
+    res = run_suite(suite, out_dir=tmp_path)
+    assert res["n_cases"] == 2
+    outputs = [ir["output"] for ir in res["item_results"]]
+    assert "error" in outputs[0]
+    assert outputs[1] == 9
+    assert len(res["manifest"]["execution"]["errors"]) == 1
+
+
+def test_local_run_is_faster_in_parallel(tmp_path, monkeypatch):
+    """Item 6/T4 — redução de tempo-de-parede observável: N casos que dormem cada
+    um `t` levam ~t (paralelo), não ~N*t (sequencial), com workers suficientes."""
+    def sleepy(*, item, **_):
+        time.sleep(0.1)
+        return get_input(item) ** 2
+
+    suite = _square_suite()
+    suite.task = sleepy
+
+    monkeypatch.setenv("EVAL_MAX_WORKERS", "1")
+    t0 = time.monotonic()
+    run_suite(suite, out_dir=tmp_path)
+    sequential_s = time.monotonic() - t0
+
+    monkeypatch.setenv("EVAL_MAX_WORKERS", "4")
+    t0 = time.monotonic()
+    run_suite(suite, out_dir=tmp_path)
+    parallel_s = time.monotonic() - t0
+
+    assert parallel_s < sequential_s * 0.75
 
 
 def test_run_evaluator_feeds_aggregate(tmp_path):

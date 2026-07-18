@@ -135,6 +135,22 @@ _FINALIZE_PROMPT = (
     "nunca deixe de responder."
 )
 
+# Aviso de penúltimo passo (Item 6, Task 2) — guarda por estado: injetado UM passo
+# antes do `_FINALIZE_PROMPT`, quando o modelo ainda tem uma rodada com tools. Ataca
+# o padrão do spike (gastar todos os passos em busca sem nunca escrever a resposta).
+# Mesmo prefixo anti-leak do `_FINALIZE_PROMPT` — nunca deve aparecer no final_text.
+# REWORD (2026-07-18, decisão de governança pós-T3): a versão original mencionava
+# a possibilidade de "uma última chamada" — achado do smoke (spike lever6_budget,
+# caso biotecstartup) foi que isso INDUZ o modelo a exercer a chamada extra, às
+# vezes empurrando um turno que terminaria dentro do teto para fora dele (mesma
+# lição de project_radar_cards_persist: mencionar uma opção induz o modelo a
+# tomá-la). O reword é uma proibição direta, sem abrir a porta para "mais uma".
+_LAST_STEP_PROMPT = (
+    "[Aviso interno — não é mensagem do usuário] Seu orçamento de passos "
+    "acabou: esta é a última rodada. NÃO chame mais tools — escreva agora a "
+    "resposta final ao usuário com o que você já tem."
+)
+
 
 # =============================================================================
 # Resolução de provider por API key disponível
@@ -225,6 +241,7 @@ async def run_agent_async(
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
     trace_context: dict | None = None,
+    mode: str | None = None,
 ) -> AgentResult:
     """Loop ReAct do agente sobre LangGraph. Delega para o grafo compilado em
     `core.llm.agent_graph.run_agent_graph_async`.
@@ -265,6 +282,7 @@ async def run_agent_async(
         openai_base_url=openai_base_url,
         openai_api_key=openai_api_key,
         trace_context=trace_context,
+        mode=mode,
     )
 
 
@@ -282,6 +300,7 @@ async def run_agent_streaming_async(
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
     trace_context: dict | None = None,
+    mode: str | None = None,
 ):
     """Espelha `run_agent_async`, mas delega ao canal streaming do grafo
     (`run_agent_graph_streaming`) — `AsyncIterator[StreamDelta]` em vez de um
@@ -306,6 +325,7 @@ async def run_agent_streaming_async(
         openai_base_url=openai_base_url,
         openai_api_key=openai_api_key,
         trace_context=trace_context,
+        mode=mode,
     ):
         yield delta
 
@@ -324,6 +344,7 @@ def run_agent(
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
     trace_context: dict | None = None,
+    mode: str | None = None,
 ) -> AgentResult:
     """Shim síncrono sobre `run_agent_async`.
 
@@ -348,6 +369,7 @@ def run_agent(
             openai_base_url=openai_base_url,
             openai_api_key=openai_api_key,
             trace_context=trace_context,
+            mode=mode,
         )
 
     try:
