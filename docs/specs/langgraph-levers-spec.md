@@ -92,7 +92,9 @@
 
 ---
 
-## Item 6 — Guarda por estado (budget consciente / anti-truncamento) — 🔜 PRÓXIMO DA FILA (herdou a frente do #2)
+## Item 6 — Guarda por estado (budget consciente / anti-truncamento) — ✅ PROMOVIDO 2026-07-18
+
+**Status:** mergeado na main (merge `625cca853`) e deployado (app+worker). T3 pós-reword: taxa de truncamento writing **1.00→0.50**, avg_llm_calls **11.00→10.50** — regra pré-registrada satisfeita nos 2 critérios (N=4, direcional). Telemetria `turn_end` viva em prod. **Lição que fica:** a 1ª versão do aviso ("faça UMA última chamada") INDUZIU chamada extra e piorou a métrica — reword para proibição direta resolveu; é a 2ª confirmação da lição `project_radar_cards_persist` (mencionar opção induz o modelo a exercê-la), agora em prompt de sistema de grafo. Explore nunca aciona o aviso (avg 4 de teto 15) — letra morta inofensiva lá. Subir `max_steps` segue decisão separada, agora COM telemetria para embasá-la.
 
 **Origem:** discussão de 2026-07-18 — `max_steps` é backstop correto, mas **burro**: corta sem o modelo saber que o orçamento estava acabando, produzindo respostas truncadas via `finalize` forçado.
 
