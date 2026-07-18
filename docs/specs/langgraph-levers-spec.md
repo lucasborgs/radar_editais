@@ -21,7 +21,7 @@
 
 ## Sequência e dependências
 
-`#1 streaming → #2 contexto → #3 threads`, nessa ordem (risco crescente; #3 toca produtores, fazer só com #1/#2 firmes). `#4 Send` é independente ("spike de sábado"). `#5 interrupt` é **semi-dependente**: exige checkpointer no caminho-alvo, que hoje só a escrita tem (ver pegadinha do item). `#6 guarda por estado` é barata, serve todos os modos e pode entrar a qualquer momento (casa bem com o #2). A adjacente (`playbook_overlays`) é ortogonal ao LangGraph e pode entrar a qualquer momento.
+**Sequência REVISADA pós-spike do #2 (2026-07-18):** `#1 (✅ prod) → #6 guarda por estado → #3 threads`. O **#2 está ARQUIVADO com gatilhos** (ver item — o spike refutou trim puro e mostrou que o gargalo real de hoje é passos, não contexto; o #6 herdou a frente). `#4 Send` é independente ("spike de sábado"). `#5 interrupt` é **semi-dependente**: exige checkpointer no caminho-alvo, que hoje só a escrita tem (ver pegadinha do item). A adjacente (`playbook_overlays`) é ortogonal ao LangGraph e pode entrar a qualquer momento.
 
 ---
 
@@ -38,7 +38,18 @@
 - **Pegadinha.** O contrato `AgentResult` (trace/usage) tem que ser montado a partir do stream final; garantir paridade de `usage` com o caminho `ainvoke`.
 - **Decisão de fechamento (2026-07-18, planejamento).** O item **promove pela fatia explore** (entry point compartilhado + SSE + frontend do explore). O streaming da **escrita** fica como pendência nomeada — pareada ao **Item 3** (que já toca `writing_session`) ou antes se a UX gritar; o contrato dela exige um frame de `interrupt` que o explore não tem. Plano de tasks: `docs/specs/langgraph-lever1-streaming-plan.md`.
 
-## Item 2 — Gestão de contexto (`trim_messages` + nó de resumo)
+## Item 2 — Gestão de contexto (`trim_messages` + nó de resumo) — ⏸️ ARQUIVADO COM GATILHOS (governança, 2026-07-18)
+
+**Decisão pós-spike** (`spikes/lever2_context/FINDINGS.md`): **NO-GO para promoção agora.**
+- `trim_messages` puro **REFUTADO**: corta por idade, não importância — derruba citação real (`get_edital`) em orçamento apertado e mantém navegação redundante; perda silenciosa. Falha o sinal de sucesso do próprio item. Achado adicional: `start_on="human"` colapsa no shape intra-turno (transferido ao Item 3, onde é a ferramenta certa).
+- Resumo seletivo por densidade: mecânica provada (~380 tok/chamada), mas detector confiável é **o cerne do trabalho** — construí-lo = "motor de compaction" = o harness-smell que esta spec manda parar e reavaliar (candidato a gatilho de SDK, não a construção à mão).
+- Premissa empírica caiu: o único truncamento real observado foi por **contagem de passos** (`max_steps`, 7.520 tokens — longe de janela), não contexto. O teto de hoje é o do Item 6.
+
+**Gatilhos de reabertura:** (i) telemetria do #6 mostrar truncamento real por overflow de tokens; (ii) subida de `max_steps` (pós-#6) criar pressão de contexto real. Na reabertura, caminho = density-aware, começando pela pergunta "é o momento-SDK?".
+
+**Legado do spike (não perder):** writing golden **RODA** (`--limit 1` produz métricas — corrige a memória "nunca rodou"); suíte N=12 ~25-35min por ser sequencial (`core/eval/harness.py`, loop `for` confirmado no código) — paralelizar é chore pequeno/isolado, carona no próximo plano. Comportamentos de desperdício observados (`read_exact_chunk`×5 por busca; `list_icts`/`list_investidores`×6 sem dedup) anotados como motivação do #6.
+
+*(Contrato original abaixo, mantido para a eventual reabertura.)*
 
 - **Objetivo do spike.** Provar que poda seletiva/resumo destrava turnos mais longos sem perder evidência load-bearing (citações de edital, constraints), substituindo o corte cego (`TOOL_RESULT_CHAR_CAP` + os tetos de `max_steps` por modo: 10 chat / 12 profile / 15 explore / 20 refine / 2 batch).
 - **Abordagem.** Pegar um histórico real hoje truncado; aplicar `trim_messages` (estratégia `last`, `token_counter`, `start_on`/`end_on`) num script throwaway e comparar o que o modelo "vê" antes/depois. Opcional: um nó de resumo simples que dispara acima de um limiar de tokens.
@@ -51,6 +62,7 @@
 ## Item 3 — Thread por sessão (checkpointer como memória)
 
 - **Régua (revista):** spike dobrado como **task 1 exploratória do plano** com checkpoint go/no-go — os guardrails de risco já existem como testes (leak-test RLS + interrupt/resume da escrita), então o vehicle certo é um plano que os roda cedo, não um spike solto.
+- **Herança do spike do #2 (2026-07-18):** `trim_messages(start_on="human"/end_on)` é a ferramenta certa **aqui** (fronteira de turno, memória multi-troca) — no shape intra-turno ela colapsa para quase-vazio (comprovado empiricamente). Quando a thread por sessão acumular turnos, o corte de histórico entre turnos usa `start_on`; nunca aplicar na cadeia intra-turno.
 - **Objetivo da task 1.** Provar que uma thread por sessão (em vez de por turno) elimina a reconstrução de histórico pelos produtores e habilita fork/time-travel.
 - **Abordagem.** Rodar uma conversa de explore de 3 turnos com `thread_id` de escopo de sessão sobre um único checkpointer durável; conferir que o 2º/3º turno não re-semeiam o histórico. Testar um fork via `update_state` a partir de um checkpoint intermediário.
 - **Contrato.** Muda a convenção de `thread_id` (hoje `"{ws}:{session}:{turn_index}"` → `"{ws}:{session}"`) e **toca os produtores** (`writing_session`, explore) — não só o grafo. **Nuance verificada (2026-07-18):** só a escrita usa checkpointer hoje; o explore roda `checkpointer=False` (stateless total, sem `thread_id` algum). Para o explore, este item significa **ligar** o checkpointer, não só re-escopar a chave — é trabalho maior e distinto por produtor.
@@ -80,9 +92,11 @@
 
 ---
 
-## Item 6 — Guarda por estado (budget consciente / anti-truncamento)
+## Item 6 — Guarda por estado (budget consciente / anti-truncamento) — 🔜 PRÓXIMO DA FILA (herdou a frente do #2)
 
 **Origem:** discussão de 2026-07-18 — `max_steps` é backstop correto, mas **burro**: corta sem o modelo saber que o orçamento estava acabando, produzindo respostas truncadas via `finalize` forçado.
+
+**Munição do spike do #2 (2026-07-18):** o truncamento real observado foi exatamente desta classe — `search_edital → read_exact_chunk ×5 → search_edital → read_exact_chunk ×3` esgotou os 10 passos SEM escrever a seção. Padrões de desperdício documentados: leitura de trechos 1-a-1 e `list_icts`/`list_investidores` repetidos até 6× sem dedup. Budget-awareness ataca os dois. **Correção do passo (a):** o campo `truncated` NUNCA é persistido (achado do spike — só existe no response em memória; `session_turns` não o tem) — medir exige primeiro **persistir/telemetrar** o `stop_reason` por turno. **Herança:** a Task 5 do plano do item 1 (carona 6b) não foi implementada — este item a absorve. **Fora de escopo daqui:** subir `max_steps` — é decisão separada de governança, gated pelos dados deste item (e reabriria o #2 via gatilho ii).
 
 - **Objetivo.** Reduzir truncamentos abruptos (`stop_reason == "max_steps"`) tornando o agente **consciente do budget restante**; abrir caminho para tetos por custo/tokens no estado.
 - **Abordagem (em 3 passos, parar no primeiro que resolver).**
