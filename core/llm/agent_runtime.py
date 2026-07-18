@@ -135,6 +135,16 @@ _FINALIZE_PROMPT = (
     "nunca deixe de responder."
 )
 
+# Aviso de penúltimo passo (Item 6, Task 2) — guarda por estado: injetado UM passo
+# antes do `_FINALIZE_PROMPT`, quando o modelo ainda tem uma rodada com tools. Ataca
+# o padrão do spike (gastar todos os passos em busca sem nunca escrever a resposta).
+# Mesmo prefixo anti-leak do `_FINALIZE_PROMPT` — nunca deve aparecer no final_text.
+_LAST_STEP_PROMPT = (
+    "[Aviso interno — não é mensagem do usuário] Este é o último passo em que você "
+    "pode chamar tools. Conclua agora a resposta ao usuário com o que já tem; se "
+    "ainda precisar de um dado, faça no máximo UMA última chamada e então responda."
+)
+
 
 # =============================================================================
 # Resolução de provider por API key disponível

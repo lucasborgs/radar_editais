@@ -45,6 +45,7 @@ from typing_extensions import TypedDict
 
 from core.llm.agent_runtime import (
     _FINALIZE_PROMPT,
+    _LAST_STEP_PROMPT,
     _MAX_RETRIES,
     _TIMEOUT,
     TOOL_RESULT_CHAR_CAP,
@@ -193,6 +194,14 @@ def _build_graph(
         # texto vazio pro usuário (bug real, achado ao validar a rodada final).
         if state["llm_calls"] >= max_steps:
             return "finalize"
+        # Item 6 (Task 2): aviso de penúltimo passo — o modelo ainda tem uma
+        # rodada com tools, mas sabe que é a última antes do backstop cego.
+        # ADENDO DE GOVERNANÇA: só dispara com max_steps >= 3 — com max_steps=2
+        # (batch de geração) o passo 1 já é o penúltimo, e o aviso viraria um
+        # fixture constante no caminho calibrado do batch (redundante, o design
+        # já é "busca uma vez e escreve").
+        if max_steps >= 3 and state["llm_calls"] == max_steps - 1:
+            return "budget_notice"
         return "agent"
 
     def finalize(state: AgentState) -> dict:
@@ -201,11 +210,18 @@ def _build_graph(
             "documents": state.get("documents", {}),
         }
 
+    def budget_notice(state: AgentState) -> dict:
+        return {
+            "messages": [HumanMessage(content=_LAST_STEP_PROMPT)],
+            "documents": state.get("documents", {}),
+        }
+
     g = StateGraph(AgentState)
     g.add_node("agent", agent)
     g.add_node("agent_final", agent_final)
     g.add_node("tools", tools)
     g.add_node("finalize", finalize)
+    g.add_node("budget_notice", budget_notice)
     g.add_edge(START, "agent")
     g.add_conditional_edges(
         "agent", should_continue,
@@ -213,8 +229,9 @@ def _build_graph(
     )
     g.add_conditional_edges(
         "tools", after_tools,
-        {"finalize": "finalize", "agent": "agent"},
+        {"finalize": "finalize", "agent": "agent", "budget_notice": "budget_notice"},
     )
+    g.add_edge("budget_notice", "agent")
     g.add_edge("finalize", "agent_final")
     g.add_edge("agent_final", END)
     return g.compile(checkpointer=checkpointer)
