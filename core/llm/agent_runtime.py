@@ -225,6 +225,7 @@ async def run_agent_async(
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
     trace_context: dict | None = None,
+    mode: str | None = None,
 ) -> AgentResult:
     """Loop ReAct do agente sobre LangGraph. Delega para o grafo compilado em
     `core.llm.agent_graph.run_agent_graph_async`.
@@ -265,6 +266,7 @@ async def run_agent_async(
         openai_base_url=openai_base_url,
         openai_api_key=openai_api_key,
         trace_context=trace_context,
+        mode=mode,
     )
 
 
@@ -282,6 +284,7 @@ async def run_agent_streaming_async(
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
     trace_context: dict | None = None,
+    mode: str | None = None,
 ):
     """Espelha `run_agent_async`, mas delega ao canal streaming do grafo
     (`run_agent_graph_streaming`) — `AsyncIterator[StreamDelta]` em vez de um
@@ -306,6 +309,7 @@ async def run_agent_streaming_async(
         openai_base_url=openai_base_url,
         openai_api_key=openai_api_key,
         trace_context=trace_context,
+        mode=mode,
     ):
         yield delta
 
@@ -324,6 +328,7 @@ def run_agent(
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
     trace_context: dict | None = None,
+    mode: str | None = None,
 ) -> AgentResult:
     """Shim síncrono sobre `run_agent_async`.
 
@@ -348,6 +353,7 @@ def run_agent(
             openai_base_url=openai_base_url,
             openai_api_key=openai_api_key,
             trace_context=trace_context,
+            mode=mode,
         )
 
     try:

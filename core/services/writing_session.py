@@ -1303,6 +1303,7 @@ class WritingSession:
                 thread_id=thread_id,
                 resume=user_message,
                 prior_n_msgs=resume_ctx.get("n_msgs", 0),
+                mode="writing",
             )
         else:
             mentions_context = self._resolve_mentions(user_message)
@@ -1318,6 +1319,7 @@ class WritingSession:
                 thread_id=thread_id,
                 resume=None,
                 prior_n_msgs=0,
+                mode="writing",
             )
 
         result = outcome.result

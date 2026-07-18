@@ -314,6 +314,7 @@ class ProfileExtractor:
                 model=model,
                 provider=provider,
                 max_steps=EXTRACTOR_AGENT_MAX_STEPS,
+                mode="profile",
             )
         except Exception as e:
             logger.error("extract_agent: run_agent levantou: %s", e)

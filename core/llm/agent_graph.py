@@ -352,6 +352,7 @@ async def run_agent_graph_async(
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
     trace_context: dict | None = None,
+    mode: str | None = None,
 ) -> AgentResult:
     """Equivalente LangGraph de `run_agent_async` (mesma assinatura/contrato).
 
@@ -359,7 +360,11 @@ async def run_agent_graph_async(
     ToolNode, sem bridge.
 
     `trace_context` (Etapa 6): parent remoto p/ aninhar quando este run é um subagente
-    rodando noutra thread (ver run_subagent → agent_run(trace_context=...))."""
+    rodando noutra thread (ver run_subagent → agent_run(trace_context=...)).
+
+    `mode` (Item 6, Task 1): rótulo do produtor ("explore"/"writing"/"profile"/...)
+    — dimensão só para observabilidade (metadata do span + log `turn_end`); não
+    afeta o comportamento do grafo."""
     chat = _build_chat_model(
         provider, model,
         temperature=temperature,
@@ -397,7 +402,7 @@ async def run_agent_graph_async(
         metadata={
             "provider": provider, "model": model,
             "max_steps": max_steps, "runtime": "langgraph",
-            "tools": [t.name for t in tools],
+            "tools": [t.name for t in tools], "mode": mode,
         },
         trace_context=trace_context,
     ) as agent_span:
@@ -412,6 +417,10 @@ async def run_agent_graph_async(
         except GraphRecursionError:
             # Backstop — não deveria disparar (teto real é llm_calls). Trata como max_steps.
             logger.warning("agent_graph: recursion_limit atingido (backstop) — max_steps")
+            logger.info(
+                "turn_end mode=%s stop_reason=%s llm_calls=%d max_steps=%d",
+                mode, "max_steps", 0, max_steps,
+            )
             return AgentResult(final_text="", steps=[], stop_reason="max_steps", usage={})
         except Exception as e:
             logger.error("agent_graph: grafo falhou: %s", e)
@@ -422,6 +431,10 @@ async def run_agent_graph_async(
         msgs = final["messages"]
         stop = _derive_stop_reason(final, max_steps)
         result = _messages_to_agent_result(msgs, stop)
+        logger.info(
+            "turn_end mode=%s stop_reason=%s llm_calls=%d max_steps=%d",
+            mode, stop, final.get("llm_calls", 0), max_steps,
+        )
 
         if agent_span is not None:
             agent_span.update(
@@ -479,6 +492,7 @@ async def run_agent_graph_streaming(
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
     trace_context: dict | None = None,
+    mode: str | None = None,
 ) -> AsyncIterator[StreamDelta]:
     """Variação streaming de `run_agent_graph_async` — MESMA assinatura, canal
     lateral de tokens ao vivo. Aditivo: não toca `run_agent_graph_async` nem
@@ -531,7 +545,7 @@ async def run_agent_graph_streaming(
         metadata={
             "provider": provider, "model": model,
             "max_steps": max_steps, "runtime": "langgraph-streaming",
-            "tools": [t.name for t in tools],
+            "tools": [t.name for t in tools], "mode": mode,
         },
         trace_context=trace_context,
     ) as agent_span:
@@ -557,6 +571,10 @@ async def run_agent_graph_streaming(
                     final_state = chunk
         except GraphRecursionError:
             logger.warning("agent_graph: recursion_limit atingido (backstop, streaming) — max_steps")
+            logger.info(
+                "turn_end mode=%s stop_reason=%s llm_calls=%d max_steps=%d",
+                mode, "max_steps", 0, max_steps,
+            )
             degraded = AgentResult(final_text="", steps=[], stop_reason="max_steps", usage={})
             yield StreamDelta(kind="error", text="max_steps")
             yield StreamDelta(kind="done", result=degraded)
@@ -584,6 +602,10 @@ async def run_agent_graph_streaming(
 
         stop = _derive_stop_reason(final_state, max_steps)
         result = _messages_to_agent_result(final_state["messages"], stop)
+        logger.info(
+            "turn_end mode=%s stop_reason=%s llm_calls=%d max_steps=%d",
+            mode, stop, final_state.get("llm_calls", 0), max_steps,
+        )
 
         if agent_span is not None:
             agent_span.update(
@@ -972,6 +994,7 @@ async def _writing_turn_async(
     temperature: float | None,
     openai_base_url: str | None,
     openai_api_key: str | None,
+    mode: str | None = None,
 ) -> WritingTurnOutcome:
     from langgraph.types import Command
 
@@ -1009,7 +1032,7 @@ async def _writing_turn_async(
         metadata={
             "provider": provider, "model": model, "max_steps": max_steps,
             "runtime": "langgraph", "thread_id": thread_id,
-            "tools": [t.name for t in tools],
+            "tools": [t.name for t in tools], "mode": mode,
         },
     ) as agent_span:
         # Spans nativos do grafo aninhados sob o turno (Etapa 6). O critic (subagente
@@ -1021,6 +1044,10 @@ async def _writing_turn_async(
             final = await graph.ainvoke(payload, config=config)
         except GraphRecursionError:
             logger.warning("writing_turn: recursion_limit (backstop) — max_steps")
+            logger.info(
+                "turn_end mode=%s stop_reason=%s llm_calls=%d max_steps=%d",
+                mode, "max_steps", 0, max_steps,
+            )
             return WritingTurnOutcome(
                 AgentResult(final_text="", steps=[], stop_reason="max_steps", usage={}),
                 None, prior_n_msgs,
@@ -1050,6 +1077,10 @@ async def _writing_turn_async(
             stop = _derive_stop_reason(final, max_steps)
 
         result = _messages_to_agent_result(delta, stop)
+        logger.info(
+            "turn_end mode=%s stop_reason=%s llm_calls=%d max_steps=%d",
+            mode, stop, final.get("llm_calls", 0), max_steps,
+        )
 
         if agent_span is not None:
             agent_span.update(
@@ -1076,6 +1107,7 @@ def run_writing_turn(
     temperature: float | None = None,
     openai_base_url: str | None = None,
     openai_api_key: str | None = None,
+    mode: str | None = None,
 ) -> WritingTurnOutcome:
     """Roda UM turno-run da escrita pelo grafo com checkpointer durável (sync).
 
@@ -1102,6 +1134,7 @@ def run_writing_turn(
         temperature=temperature,
         openai_base_url=openai_base_url,
         openai_api_key=openai_api_key,
+        mode=mode,
     ))
 
 
