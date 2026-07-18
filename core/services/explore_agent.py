@@ -238,6 +238,11 @@ class ExploreAgent:
         ficam byte-idênticos, zero risco de regressão no caminho síncrono de
         produção. Custo aceito: as duas cópias podem divergir com o tempo — se
         isso incomodar, é candidato a refatoração numa task futura, não aqui.
+
+        ATENÇÃO — cópia espelhada de `_explore_agent` (linha ~428): qualquer
+        mudança de system/tools/rota lá (ou aqui) tem que ser replicada
+        manualmente no outro lado, ou o streaming e o sync divergem em
+        comportamento (não só em transporte). Unificação prevista pra TASK 6.
         """
         from core.services.explore_routing import (
             RouteContext,
@@ -435,7 +440,12 @@ class ExploreAgent:
     ) -> tuple[str, dict]:
         """Pipeline agente: run_agent + tools de leitura do catálogo gold,
         planejamento e (gated) deep_research — montadas em `_explore_tools`.
-        Retorna `(answer, meta)`; meta carrega stop_reason/truncated."""
+        Retorna `(answer, meta)`; meta carrega stop_reason/truncated.
+
+        ATENÇÃO — `explore_stream` (linha ~218) duplica este setup (system/
+        tools/rota) pro caminho streaming. Mudança aqui tem que ser replicada
+        lá também, ou os dois caminhos divergem em comportamento (não só
+        transporte). Unificação prevista pra TASK 6."""
         if (
             route_decision is not None
             and route_decision.intent.value == "EDITAL_FACT_ENUMERATIVE"

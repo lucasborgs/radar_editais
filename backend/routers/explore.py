@@ -287,7 +287,9 @@ async def explore_stream_endpoint(
         event: token  data: {"text": "<delta>"}
         event: tool   data: {"name": "<tool>", "phase": "end"}
         event: done   data: {...payload idêntico ao /explore...}
-        event: error  data: {"message": "<msg>"}
+        event: error  data: {"message": "<msg>"}  — TERMINAL: nunca é seguido
+            de um "done" no mesmo turno (ver `except` em `gen()`); a UI deve
+            encerrar o turno no "error", não esperar um "done" que não vem.
 
     Wrinkle (não é bug): quando o agente chama tool de match, o `answer`
     final é SOBRESCRITO por `_match_cards_intro` no pós-processamento — os
@@ -324,6 +326,11 @@ async def explore_stream_endpoint(
                     answer = event.answer
                     explore_meta = event.meta
 
+            # Disconnect do cliente antes daqui (fecha a aba, perde a rede) faz o
+            # Starlette encerrar este generator sem rodar _post_process — o turno
+            # NUNCA é persistido. Divergência aceita vs /explore sync (que só
+            # responde depois de persistir): streaming troca "sempre persiste"
+            # por "persiste se o cliente ficar até o fim".
             result = await asyncio.to_thread(
                 _post_process, message, req, ctx, current, answer, explore_meta, user_id, db,
             )
