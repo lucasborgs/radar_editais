@@ -1,76 +1,100 @@
 # FINDINGS — Item 6, Task 3: smoke de taxa de truncamento (budget_notice)
 
-**Status:** dados coletados · **Data:** 2026-07-18 · **Decisão de promover/arquivar: NÃO tomada aqui — é da governança.**
+**Status:** VEREDITO APLICADO (regra pré-registrada, iteração única) · **Data:** 2026-07-18
 
-Throwaway: `spikes/lever6_budget/demo.py` (mantém-se só se a governança pedir; os
-números abaixo são o produto real desta task). Rodado contra os produtores reais
+Throwaway: `spikes/lever6_budget/demo.py`. Rodado contra os produtores reais
 (`ExploreAgent`/`WritingSession`), provider resolvido para `openai`/`gpt-4o-mini`
-(único disponível no ambiente).
+(único disponível no ambiente). Duas iterações: a 1ª motivou um reword do
+prompt (achado: menção a "uma última chamada" induzia o modelo a exercê-la);
+a 2ª (esta) reroda com o texto novo e amostra maior de writing, e aplica a
+regra de promoção pré-registrada pela governança. **Não há 3ª iteração.**
 
-## Amostra
+---
 
-Conjunto fixo, NÃO um eval (sem gate, sem golden) — 3 turnos de explore
-multi-hop (força `list_editais`/`get_edital`/`list_icts`/`list_investidores`
-repetidos) + 2 turnos de writing pedindo seção detalhada com instrução para
-`search_edital`/`read_exact_chunk` (mesmo padrão do achado do spike do #2).
-Cada bateria (baseline/treatment) roda os 5 turnos uma vez — **N pequeno,
-resultado direcional, não estatístico**.
+## Iteração 1 (histórico — motivou o reword)
 
-## Tabela ANTES/DEPOIS
+Amostra original: 3 explore + 2 writing (`tratorbr`, `biotecstartup`), texto
+antigo de `_LAST_STEP_PROMPT` (mencionava "faça no máximo UMA última
+chamada").
+
+| modo    | condição  | #turnos | #truncados | taxa  | avg llm_calls/turno |
+|---------|-----------|---------|------------|-------|----------------------|
+| explore | baseline/treatment | 3 | 0    | 0.00  | 4.00                 |
+| writing | baseline  | 2       | 1          | 0.50  | 10.50                |
+| writing | treatment | 2       | 2          | 1.00  | 11.00                |
+
+Achado: o caso `biotecstartup` (não-truncado no baseline, 10 chamadas) passou
+a truncar no treatment (11 chamadas) — a menção a "uma última chamada"
+parecia induzir o modelo a exercê-la. Isso motivou o reword de
+`_LAST_STEP_PROMPT` (commit `6cb536d1d`): proibição direta ("NÃO chame mais
+tools"), sem abrir a porta para "mais uma".
+
+---
+
+## Iteração 2 (final) — prompt reescrito + amostra maior
+
+Amostra: explore mantido em N=3 (mesmas perguntas). Writing expandido para
+**N=4** por condição: os 2 originais (`tratorbr`, `biotecstartup`, mantidos
+para comparabilidade) + 2 novos (`espectra`/Contrapartida financeira,
+`agrosoftsys`/Critérios de elegibilidade), mesmo padrão
+search_edital+read_exact_chunk.
+
+### Tabela ANTES/DEPOIS
 
 | modo    | condição  | #turnos | #truncados | taxa  | avg llm_calls/turno |
 |---------|-----------|---------|------------|-------|----------------------|
 | explore | baseline  | 3       | 0          | 0.00  | 4.00                 |
-| explore | treatment | 3       | 0          | 0.00  | 4.00                 |
-| writing | baseline  | 2       | 1          | 0.50  | 10.50                |
-| writing | treatment | 2       | 2          | 1.00  | 11.00                |
+| explore | treatment | 3       | 0          | 0.00  | 4.67                 |
+| writing | baseline  | 4       | 4          | 1.00  | 11.00                |
+| writing | treatment | 4       | 2          | 0.50  | 10.50                |
 
-(baseline = `budget_notice` desligado via monkeypatch de `_build_graph` para a
-topologia de 2 vias pré-Task 2; treatment = código real da Task 2, ligado.)
+### Detalhe por variante de writing (ORIGINAL = também rodou na iteração 1)
 
-Eventos crus (`turn_end` parseado):
+| variante      | origem   | baseline stop_reason (llm_calls) | treatment stop_reason (llm_calls) |
+|---------------|----------|-----------------------------------|-------------------------------------|
+| tratorbr      | ORIGINAL | max_steps (11)                    | max_steps (11)                      |
+| biotecstartup | ORIGINAL | max_steps (11)                    | end_turn (10)                       |
+| espectra      | novo     | max_steps (11)                    | end_turn (10)                       |
+| agrosoftsys   | novo     | max_steps (11)                    | max_steps (11)                      |
 
-```
-baseline: explore×3 (end_turn, llm_calls=4, max_steps=15)
-          writing:  max_steps llm_calls=11 max_steps=10   (tratorbr/Equipe técnica)
-          writing:  end_turn  llm_calls=10 max_steps=10   (biotecstartup/Cronograma)
+**Nota de reprodutibilidade:** `biotecstartup` truncou no baseline desta
+iteração (11 chamadas) mas NÃO truncava no baseline da iteração 1 (10
+chamadas) para a mesma instrução/perfil — cada rodada usa uma `WritingSession`
+nova (sessão/thread independente) e o modelo não roda a `temperature=0`, então
+o próprio baseline varia entre execuções independentes. Isso é esperado (LLM
+real, não determinístico) mas limita a confiança do resultado a "direcional",
+não estatístico — ver Amostra/N abaixo.
 
-treatment: explore×3 (end_turn, llm_calls=4, max_steps=15)
-           writing:  max_steps llm_calls=11 max_steps=10  (tratorbr/Equipe técnica)
-           writing:  max_steps llm_calls=11 max_steps=10  (biotecstartup/Cronograma)
-```
+---
 
-## Leitura dos números (sem conclusão de promoção)
+## Regra pré-registrada (anunciada antes de olhar o resultado desta iteração)
 
-- **Explore:** 0% de truncamento nas duas condições, `avg_llm_calls=4` bem
-  abaixo do teto (`max_steps=15`) — o aviso nunca dispara nesta amostra
-  (dispararia só em `llm_calls==14`), então baseline e treatment são
-  **idênticos** para este modo. Não há sinal de nenhum tipo aqui.
-- **Writing:** o caso que estourou o teto no baseline (`tratorbr`, "Equipe
-  técnica") **continua estourando** no treatment — mesmo `llm_calls=11`,
-  mesma taxa. Mas o caso que **não** estourava no baseline (`biotecstartup`,
-  "Cronograma", `llm_calls=10`, `stop_reason=end_turn`) **passou a estourar**
-  no treatment (`llm_calls=11`, `stop_reason=max_steps`): a instrução do aviso
-  ("faça no máximo UMA última chamada e então responda") parece ter levado o
-  modelo a gastar exatamente mais UMA chamada de tool que não gastaria por
-  conta própria — empurrando um turno que terminaria naturalmente dentro do
-  teto para fora dele. Isto é o oposto do "sinal de sucesso" da spec (queda ou
-  não-aumento da taxa **sem** inflar `avg_llm_calls`): aqui a taxa **subiu**
-  (0.50→1.00) e a média de `llm_calls` também (10.50→11.00).
-- **Amostra pequena** (N=2 em writing, N=3 em explore): um caso migrando de
-  categoria já move a taxa em 50 pontos percentuais. Não dá para separar
-  "o aviso piora sistematicamente" de "ruído de 1 caso" com este N — só um
-  eval maior (fora do escopo desta task, que é smoke) resolveria isso.
+> **PROMOVE** se `taxa(treatment) <= taxa(baseline)` **E**
+> `avg_llm_calls(treatment) <= avg_llm_calls(baseline) + 0.25`.
+> Caso contrário, **ARQUIVA** (revert da Task 2). Sem segunda iteração.
 
-## Nota de gate
+Aplicação mecânica aos números do modo **writing** (o único onde o aviso
+dispara nesta amostra — explore nunca chega perto do teto):
 
-Conforme a spec e o plano: nenhum eval rodou aqui (o aviso não muda a
-evidência normativa vista pelo modelo). Este smoke não substitui o eval — só
-mede a métrica de budget diretamente pedida pela Task 3.
+- `taxa(treatment)=0.50 <= taxa(baseline)=1.00` → **verdadeiro**
+- `avg_llm_calls(treatment)=10.50 <= avg_llm_calls(baseline)=11.00 + 0.25 (=11.25)` → **verdadeiro**
 
-## Próximo passo (não decidido aqui)
+**→ PROMOVE.** Ambas as condições da regra pré-registrada são satisfeitas.
+`budget_notice` (Task 2, com o texto reescrito da iteração 2) permanece no
+grafo — nenhum revert foi executado.
 
-Os números acima vão para a governança. Cenários possíveis que ELES podem
-escolher (não este script): arquivar o nó por não mostrar melhora na amostra
-(e ter um caso pior), rodar uma amostra maior antes de decidir, ou investigar
-por que o aviso empurrou o caso `biotecstartup` para +1 chamada.
+## Amostra e limitações (honestas, não escondidas pelo veredito)
+
+- N=4 por condição em writing, N=3 em explore — ainda pequeno; a regra foi
+  aplicada mecanicamente como pré-registrado, mas 1-2 casos migrando de
+  categoria moveriam o resultado (ver nota de reprodutibilidade acima: o
+  próprio baseline já variou entre iterações para o mesmo caso).
+- Explore permanece sem sinal (0% truncamento nas duas condições nas duas
+  iterações) — o aviso nunca dispara aí (bem abaixo do teto de 15 passos).
+- Nenhum eval rodou (nota de gate da spec): o aviso não muda a evidência
+  normativa vista pelo modelo, só sinaliza budget.
+
+## Encerramento
+
+Regra pré-registrada aplicada, veredito = PROMOVE, sem revert. Esta é a
+iteração final — nenhuma nova rodada de smoke está planejada para este item.

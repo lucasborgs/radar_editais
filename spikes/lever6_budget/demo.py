@@ -54,6 +54,7 @@ class TurnEndEvent:
     stop_reason: str
     llm_calls: int
     max_steps: int
+    tag: str = ""  # preenchido pelo caller (ex.: profile_key da variante de writing)
 
 
 class _TurnEndCapture(logging.Handler):
@@ -215,7 +216,36 @@ WRITING_VARIANTS = [
             "fechar."
         ),
     },
+    {
+        "profile_key": "espectra",
+        "edital_id": "finep:769",
+        "section_hint": "5. Contrapartida financeira",
+        "instruction": (
+            "Escreva a seção 'Contrapartida financeira'. Antes de escrever, "
+            "busque no edital (search_edital) os percentuais mínimos de "
+            "contrapartida exigidos e as modalidades aceitas (financeira, "
+            "econômica); use read_exact_chunk sempre que precisar do texto exato "
+            "de uma cláusula. Cite os percentuais e condições literalmente. "
+            "Salve quando fechar."
+        ),
+    },
+    {
+        "profile_key": "agrosoftsys",
+        "edital_id": "finep:769",
+        "section_hint": "7. Critérios de elegibilidade",
+        "instruction": (
+            "Escreva a seção 'Critérios de elegibilidade' detalhando quem pode "
+            "submeter e as exclusões. Antes de escrever, busque no edital "
+            "(search_edital) os critérios formais de elegibilidade e as vedações; "
+            "use read_exact_chunk sempre que precisar do texto exato de uma "
+            "cláusula. Cite os critérios literalmente. Salve quando fechar."
+        ),
+    },
 ]
+
+# Os 2 primeiros são os ORIGINAIS da 1ª rodada da T3 (comparabilidade); os 2
+# últimos foram adicionados na iteração única pós-smoke (amostra maior).
+WRITING_VARIANTS_ORIGINAL_KEYS = {"tratorbr", "biotecstartup"}
 
 
 def _load_golden_profile(profile_key: str):
@@ -272,10 +302,15 @@ def run_battery(label: str) -> list[TurnEndEvent]:
                 print(f"    [explore] FALHOU: {e}")
         for i, v in enumerate(WRITING_VARIANTS, 1):
             print(f"  writing[{i}] ({v['profile_key']}, {v['section_hint']})")
+            n_before = len(capture.events)
             try:
                 run_writing_variant(v)
             except Exception as e:  # noqa: BLE001
                 print(f"    [writing] FALHOU: {e}")
+            # Tag qualquer evento novo desta variante (normalmente 1) com o
+            # profile_key — permite marcar "original" vs "novo" no FINDINGS.
+            for e in capture.events[n_before:]:
+                e.tag = v["profile_key"]
     finally:
         graph_logger.removeHandler(capture)
     return capture.events
@@ -306,6 +341,16 @@ def print_table(title: str, summary: dict[str, dict]) -> None:
               f"{s['taxa']:<6.2f} {s['avg_llm_calls']:<13.2f}")
 
 
+def print_writing_detail(title: str, events: list[TurnEndEvent]) -> None:
+    print(f"\n--- {title} (por variante) ---")
+    for e in events:
+        if e.mode != "writing":
+            continue
+        origin = "ORIGINAL" if e.tag in WRITING_VARIANTS_ORIGINAL_KEYS else "novo"
+        print(f"  {e.tag:16s} [{origin:8s}] stop_reason={e.stop_reason:10s} "
+              f"llm_calls={e.llm_calls}")
+
+
 def main() -> None:
     logging.basicConfig(level=logging.WARNING)  # só o handler dedicado captura turn_end
 
@@ -322,6 +367,8 @@ def main() -> None:
 
     print_table("ANTES (baseline)", baseline_summary)
     print_table("DEPOIS (treatment)", treatment_summary)
+    print_writing_detail("ANTES (baseline)", baseline_events)
+    print_writing_detail("DEPOIS (treatment)", treatment_events)
 
     print("\n(números crus para FINDINGS.md)")
     print("baseline_events:", baseline_events)
