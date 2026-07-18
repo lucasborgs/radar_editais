@@ -150,9 +150,33 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 2. Confirmar que `test_cross_workspace_isolation_durable` (`:132`) e os 7 unit de interrupt/resume passam **antes** de qualquer mudança.
 
 **Critérios de aceite:**
-- [ ] Leak-test durável (`:132`) e interrupt/resume durável (`:102`) **verdes** localmente contra Postgres real.
-- [ ] Os 7 unit de `test_agent_graph_checkpointer.py` verdes (incl. `test_subagent_inside_checkpointed_writing_turn:215` e `test_thread_id_isolates_state:191`).
-- [ ] Baseline registrado (comando + saída) — é o "antes" comparável dos gates das Tasks 3/4.
+- [x] Leak-test durável (`:132`) e interrupt/resume durável (`:102`) **verdes** localmente contra Postgres real.
+- [x] Os 7 unit de `test_agent_graph_checkpointer.py` verdes (incl. `test_subagent_inside_checkpointed_writing_turn:215` e `test_thread_id_isolates_state:191`).
+- [x] Baseline registrado (comando + saída) — é o "antes" comparável dos gates das Tasks 3/4.
+
+### ✅ LINHA DE BASE — guardrails (registrada 2026-07-18)
+
+**Alvo:** Postgres **LOCAL** (Supabase `127.0.0.1:54322`, `ENVIRONMENT=test`) — nunca prod. Tabelas `agent_memory.{checkpoints,checkpoint_blobs,checkpoint_writes}` criadas via `scripts/setup_checkpointer.py`. **Comando:**
+```
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+SUPABASE_URL=http://127.0.0.1:54321 ENVIRONMENT=test INTEGRATION_TARGET=local \
+.venv/bin/python -m pytest tests/test_checkpointer_postgres.py tests/test_agent_graph_checkpointer.py -v
+```
+**Resultado: 9 passed / 0 failed / 0 skipped (3.15s).** Qualquer regressão nas Tasks 3-5 é atribuída contra estes números:
+
+| # | Teste | Tipo | Baseline |
+|---|---|---|---|
+| B1 | `test_checkpointer_postgres::test_interrupt_resume_durable` | durável (PG real) | PASS |
+| B2 | `test_checkpointer_postgres::test_cross_workspace_isolation_durable` (**leak-test / gate segurança**) | durável (PG real) | PASS |
+| B3 | `test_agent_graph_checkpointer::test_interrupt_pauses_with_payload` | unit (InMemory) | PASS |
+| B4 | `test_agent_graph_checkpointer::test_resume_continues_from_interrupt` | unit | PASS |
+| B5 | `test_agent_graph_checkpointer::test_resume_token_usage_is_delta_only` (**delta não dobra** — o wrinkle da T4) | unit | PASS |
+| B6 | `test_agent_graph_checkpointer::test_batched_tool_reexecutes_on_resume` | unit | PASS |
+| B7 | `test_agent_graph_checkpointer::test_thread_id_isolates_state` | unit | PASS |
+| B8 | `test_agent_graph_checkpointer::test_subagent_inside_checkpointed_writing_turn` (**subagente stateless**) | unit | PASS |
+| B9 | `test_agent_graph_checkpointer::test_subagent_graph_compiles_with_checkpointer_false` | unit | PASS |
+
+**Nota:** B2 é o leak-test **atual** (convenção `{ws}:{session}:{turn}`). A versão **estendida** (`{ws}:{session}` p/ explore e escrita) é gate NOVO dentro das Tasks 3/4 — deve entrar como B2′/B2″ ao lado deste, não substituí-lo. B5 e B8 são os guardrails mais sensíveis às Tasks 4 e 3 respectivamente.
 
 ---
 
@@ -160,7 +184,11 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 
 **Objetivo.** O explore streaming (caminho vivo) passa a usar **uma thread de sessão** sobre o checkpointer durável, **parando de re-seedar** o histórico do DB; o corte de janela (paridade com `[-8:]` de hoje) migra pra fronteira de turno via `trim_messages`.
 
-**Sub-decisão de infra (resolvida pelo probe da Task 1):** se o probe confirmou o loop-binding, o explore recebe um **`AsyncPostgresSaver` loop-local** (pool aberto no loop da request/uvicorn, pool SEPARADO do saver do bg-loop da escrita) — ou, se o probe mostrar que o cruzamento pro bg-loop é viável sem matar o streaming, reusa o saver existente. **Não** compartilhar um pool entre loops. Documentar a escolha no topo da função nova.
+**Sub-decisão de infra (resolvida pelo probe da Task 1; emenda de governança 2026-07-18):** se o probe confirmou o loop-binding, o explore recebe um **`AsyncPostgresSaver` loop-local** — e este saver é **singleton POR LOOP**, obrigatoriamente:
+- **Registry keyed pelo loop**, espelhando o padrão do bg-loop da escrita (`_get_writing_checkpointer:816` — dupla-checagem sob lock, `_checkpointer`/`_checkpointer_ready`/`_checkpointer_lock`). A versão da request usa uma estrutura análoga keyed pelo `asyncio.get_running_loop()` (ex.: `WeakKeyDictionary`/dict por `id(loop)` sob lock), de modo que **cada loop tem no máximo um saver**. Uvicorn tipicamente tem um loop por worker → na prática um saver por processo, mas a chave-por-loop é o guardrail defensivo.
+- **NUNCA instanciar por request.** Um `AsyncPostgresSaver`/pool novo por request vaza conexões e recria pool a cada turno — proibido. A request pega o singleton do seu loop via o registry (init preguiçoso na 1ª vez, sob lock).
+- **Pool SEPARADO do saver do bg-loop da escrita**, com **tamanho limitado** (`max_size` explícito, como `_make_agent_memory_pool:706`), e **pools JAMAIS compartilhados entre loops** (é a origem do "Lock bound to a different event loop").
+- Alternativa só se o probe da Task 1 mostrar que cruzar pro bg-loop é viável sem matar o streaming: reusar o saver existente (aí não há saver novo). Documentar a escolha no topo da função nova.
 
 **Arquivos:**
 - `core/llm/agent_graph.py` — **aditivo**: dar a `run_agent_graph_streaming` (`:498`) (e por simetria `run_agent_graph_async:358`, se o fallback sync for migrado) parâmetros **opcionais** `thread_id: str | None = None` e um provedor de checkpointer para o path stateful. Quando `thread_id is None` → comportamento **byte-idêntico** de hoje (`checkpointer=False`, sem re-seed mudado). Quando setado → compila com o saver loop-local e passa `config={"configurable":{"thread_id": thread_id}}`. O tradutor de `AgentResult` (`_messages_to_agent_result`) continua saindo do estado final — sem mudança de contrato. **Não** tocar o ramo `checkpointer=False` dos subagentes (`:391-397` continua valendo — subagente do `deep_research` do explore roda via `run_agent_graph_async` com `False`).
@@ -172,6 +200,7 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 **Critérios de aceite:**
 - [ ] Conversa de explore autenticada de ≥3 turnos: turnos 2/3 **não re-seedam** (log/asserção de que o payload leva só a msg nova) e o agente demonstra memória do turno 1.
 - [ ] **Leak-test ESTENDIDO** (novo caso em `test_checkpointer_postgres.py`, espelhando `:132`): dois workspaces com `thread_id="{wsA}:sess"` vs `"{wsB}:sess"` — B **não** lê o estado de A. Verde contra Postgres real.
+- [ ] **Saver singleton por loop (emenda de governança):** N requests de explore no mesmo loop reusam o **MESMO** `AsyncPostgresSaver` (asserção: nenhum pool novo por request; registry keyed pelo loop). Nenhum saver/pool instanciado por request.
 - [ ] **Subagente stateless preservado:** um `deep_research` disparado dentro de um turno de explore com thread NÃO persiste no checkpointer (espelho de `test_agent_graph_checkpointer.py:215`, adaptado ao explore) — sem "Lock bound to a different event loop".
 - [ ] Explore **anônimo/sem workspace** continua stateless (`thread_id=None`, caminho de hoje intacto).
 - [ ] Janela cortada: sessão longa (>8 turnos) não cresce o payload indefinidamente (trim na fronteira observável).
@@ -188,7 +217,8 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 
 **Arquivos:**
 - `core/services/writing_session.py`:
-  - `_turn_agent` (`:1263`): `thread_id = f"{self.workspace_id}:{self.session_id}"` **sempre** (fresco e resume convergem no mesmo thread); `prior_n_msgs = self._last_n_messages` (0 no 1º turno); parar de reinjetar `self._history` no `_build_agent_initial_messages` (o prefixo estável — perfil/card/outline/playbook — **permanece**, porque é contexto de sistema, não histórico de conversa; só o `messages.extend(self._history)` em `:2144` sai quando há thread). Após o turno, gravar `self._last_n_messages = outcome.n_messages` e persistir.
+  - `_turn_agent` (`:1263`): `thread_id = f"{self.workspace_id}:{self.session_id}"` **sempre** (fresco e resume convergem no mesmo thread); `prior_n_msgs = self._last_n_messages` (0 no 1º turno); parar de reinjetar `self._history` no `_build_agent_initial_messages` (só o `messages.extend(self._history)` em `:2144` sai quando há thread — é o histórico episódico que o checkpointer agora replaya). Após o turno, gravar `self._last_n_messages = outcome.n_messages` e persistir.
+  - **Prefixo estável idempotente (obrigatório — Adendo de governança abaixo).** O prefixo (perfil/card/**outline**/playbook) **continua entrando a cada turno** (o outline é MUTÁVEL — cada `save_draft` o altera; congelá-lo na thread = bug "outline invisível" de 2026-07-02 por outro caminho). MAS re-injetá-lo como mensagens normais numa thread durável faz o `add_messages` reducer **APPENDAR** → N cópias, com versões conflitantes do outline no mesmo estado. Mecanismo exigido: o bloco de prefixo entra como **uma mensagem de id determinístico estável** (ex.: `id="ws-stable-prefix"`), reconstruída fresca a cada invoke — o `add_messages` **substitui em posição** (mesmo id → replace, não append), mantendo **uma** cópia sempre-fresca no índice fixo. Alternativa equivalente: um nó pre-model que reconstrói/substitui o prefixo a partir do estado atual da sessão (via `RemoveMessage` + re-append). Confirmar o comportamento replace-por-id do `add_messages` na versão pinada antes de escolher. **Nuance de delta:** o prefixo fica no índice 0 (< `prior_n_msgs` nos turnos ≥2) → não entra no slice de trace/usage (`msgs[prior_n_msgs:]`), então não dobra contagem; o token real que o modelo viu vem do `usage_metadata` do AIMessage, não do slice.
   - `interrupt/resume` (`:1293-1306`): deixa de precisar do `resume_ctx["thread_id"]` separado — o thread já é o da sessão; o resume continua sendo `Command(resume=user_message)` com `prior_n_msgs = last_n_messages`. `_pending_user_input` guarda só `field/prompt` (o `thread_id` vira redundante; manter por compat ou remover — decidir e comentar).
   - Persistência do `last_n_messages`: campo na linha da sessão (schema `writing_sessions`), carregado no rehidrato (junto de `_history_summary` em `:756`).
   - Aplicar `trim_messages(start_on="human", ...)` na fronteira de turno pra paridade com `_compress_history` (a sumarização atual pode ser aposentada OU mantida como camada de exibição — **manter** para não mexer no dashboard; o trim é só do contexto do agente).
@@ -201,7 +231,8 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 - [ ] Conversa de escrita de ≥3 turnos: turnos 2/3 **não re-seedam** `_history`; `prior_n_msgs` fatia o delta corretamente (trace/usage do turno N ≈ só o turno N, sem dobrar — asserção sobre `result.usage`).
 - [ ] **`interrupt/resume` NÃO regride:** um turno que pausa em `request_user_info` emite `pending_user_input` e o resume continua e fecha (rodar o cenário de `test_checkpointer_postgres.py:102` adaptado ao thread-por-sessão; e os unit `:84,116` verdes).
 - [ ] `last_n_messages` persiste e sobrevive ao rehidrato da sessão (reabrir a sessão num processo novo continua o delta certo).
-- [ ] Prefixo estável (perfil/card/outline/playbook) **continua** entrando (não é histórico — não pode sumir com a parada de re-seed).
+- [ ] Prefixo estável (perfil/card/outline/playbook) **continua** entrando fresco a cada turno (não é histórico — não pode sumir com a parada de re-seed).
+- [ ] **Idempotência do prefixo (Adendo de governança):** após 3 turnos na mesma thread, o estado **persistido** contém **zero ou uma** cópia do bloco de prefixo — teste que **inspeciona a thread** (`aget_state`), não só o comportamento. E: um `save_draft` no turno 2 que muda o outline → o turno 3 vê o outline **novo** (não o do turno 1).
 - [ ] **Gate de eval de writing (N=12, `EVAL_MAX_WORKERS`)** verde — é o eixo com checkpointer durável (spec). Baseline v3 próprio, não paridade com legado.
 - [ ] **Leak-test** (`:132`) verde com a convenção `{ws}:{session}` da escrita.
 - [ ] **Smoke via `verify`** dirigindo chat de escrita real multi-turno com ≥1 tool (`save_draft`) e um ciclo interrupt→resume.
