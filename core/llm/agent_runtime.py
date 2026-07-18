@@ -139,10 +139,16 @@ _FINALIZE_PROMPT = (
 # antes do `_FINALIZE_PROMPT`, quando o modelo ainda tem uma rodada com tools. Ataca
 # o padrão do spike (gastar todos os passos em busca sem nunca escrever a resposta).
 # Mesmo prefixo anti-leak do `_FINALIZE_PROMPT` — nunca deve aparecer no final_text.
+# REWORD (2026-07-18, decisão de governança pós-T3): a versão original mencionava
+# a possibilidade de "uma última chamada" — achado do smoke (spike lever6_budget,
+# caso biotecstartup) foi que isso INDUZ o modelo a exercer a chamada extra, às
+# vezes empurrando um turno que terminaria dentro do teto para fora dele (mesma
+# lição de project_radar_cards_persist: mencionar uma opção induz o modelo a
+# tomá-la). O reword é uma proibição direta, sem abrir a porta para "mais uma".
 _LAST_STEP_PROMPT = (
-    "[Aviso interno — não é mensagem do usuário] Este é o último passo em que você "
-    "pode chamar tools. Conclua agora a resposta ao usuário com o que já tem; se "
-    "ainda precisar de um dado, faça no máximo UMA última chamada e então responda."
+    "[Aviso interno — não é mensagem do usuário] Seu orçamento de passos "
+    "acabou: esta é a última rodada. NÃO chame mais tools — escreva agora a "
+    "resposta final ao usuário com o que você já tem."
 )
 
 

@@ -149,7 +149,7 @@ def test_last_step_notice_injected(monkeypatch):
     assert graph.stop_reason == "max_steps"
     third_call_msgs = scripted._received[2]
     assert any(
-        isinstance(m, HumanMessage) and "último passo em que você pode chamar tools" in str(m.content)
+        isinstance(m, HumanMessage) and "esta é a última rodada" in str(m.content)
         for m in third_call_msgs
     ), "budget_notice não injetou o aviso de penúltimo passo"
 
@@ -174,7 +174,7 @@ def test_last_step_notice_never_leaks(monkeypatch):
     ]
     graph, _ = _run_graph(monkeypatch, turns, [search], max_steps=3)
     assert "não é mensagem do usuário" not in graph.final_text
-    assert "último passo em que você pode chamar tools" not in graph.final_text
+    assert "esta é a última rodada" not in graph.final_text
     assert graph.final_text == "melhor resposta possível"
 
 
@@ -198,7 +198,7 @@ def test_no_notice_when_max_steps_2(monkeypatch):
     assert graph.stop_reason == "max_steps"
     for received in scripted._received:
         assert not any(
-            "último passo em que você pode chamar tools" in str(m.content)
+            "esta é a última rodada" in str(m.content)
             for m in received
         ), "budget_notice não deveria disparar com max_steps=2"
 
