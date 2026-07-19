@@ -491,6 +491,39 @@ def test_turn_agent_resume_routes_command_and_clears_pending(monkeypatch):
     assert result["assistant_message"] == "CNPJ registrado. Seção concluída."
 
 
+def test_turn_agent_gates_trim_to_fresh_turns_only(monkeypatch):
+    """Item 3 (regressão da revisão T4): `_trim_thread_history` roda em turno
+    FRESCO mas NUNCA no resume — podar uma thread pausada num interrupt via
+    update_state descarta o estado pendente e quebra o Command(resume)."""
+    s = _make_session()
+    trim_calls: list = []
+    monkeypatch.setattr(s, "_trim_thread_history", lambda tid: trim_calls.append(tid))
+    monkeypatch.setattr("core.llm.agent_graph.get_thread_message_count", lambda *a, **k: 0)
+
+    final = AgentResult(
+        final_text="ok", steps=[], stop_reason="end_turn",
+        usage={"input_tokens": 10, "output_tokens": 5},
+    )
+    monkeypatch.setattr(
+        "core.llm.agent_graph.run_writing_turn",
+        lambda **kw: _outcome(final, interrupt=None, n_messages=4),
+    )
+
+    # Turno FRESCO → poda roda.
+    s._turn_count = 1
+    s._turn_agent("primeiro turno", section_hint=None, user_turn_index=1, resume_ctx=None)
+    assert trim_calls == ["ws_1:sess_1"], "turno fresco deve podar"
+
+    # RESUME → poda NÃO roda (thread pausada).
+    trim_calls.clear()
+    s._turn_count = 2
+    s._turn_agent(
+        "resposta ao interrupt", section_hint=None, user_turn_index=2,
+        resume_ctx={"thread_id": "ws_1:sess_1", "n_msgs": 3},
+    )
+    assert trim_calls == [], "resume NÃO pode podar a thread pausada"
+
+
 # ============================================================================
 # Modo PITCH (investidor, kind_class=entidade) — Fatia 2 multi-quadrante
 # ============================================================================

@@ -1356,7 +1356,14 @@ class WritingSession:
         # Paridade de janela (Decisão 2): poda o histórico episódico da thread
         # ANTES do turno se ele passou da janela — o checkpointer acumularia sem
         # limite (hoje o re-seed cortava em HISTORY_WINDOW). No-op se sob a janela.
-        self._trim_thread_history(thread_id)
+        #
+        # SÓ em turno FRESCO (resume_ctx is None): num resume a thread está PAUSADA
+        # num interrupt() e podá-la via update_state pode perturbar o estado
+        # pendente e quebrar o Command(resume) (revisão de governança da T4). A poda
+        # espera o próximo turno fresco — a janela é higiene de custo, não correção,
+        # então adiar uma iteração é inócuo.
+        if resume_ctx is None:
+            self._trim_thread_history(thread_id)
         # Fronteira do delta: nº de mensagens já na thread (0 no 1º turno).
         prior_n_msgs = get_thread_message_count(thread_id)
 

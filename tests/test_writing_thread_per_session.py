@@ -246,6 +246,58 @@ def test_interrupt_resume_same_session_thread(monkeypatch, real_checkpointer):
         _delete_threads(prefix_key)
 
 
+def test_resume_skips_trim_window_exceeded_still_closes(monkeypatch, real_checkpointer):
+    """Cruzamento trim×interrupt (regressão da revisão T4): janela excedida +
+    interrupt + resume → FECHA. O produtor NÃO poda no resume — podar uma thread
+    PAUSADA num interrupt via update_state descarta o estado pendente e quebra o
+    Command(resume) (provado: o resume volta com final_text vazio). A poda espera
+    o próximo turno fresco. Este teste espelha a regra do `_turn_agent`."""
+    shared = ScriptedChatModel(responses=[
+        _ai("r0"), _ai("r1"), _ai("r2"),
+        _ai("vou pedir", [{"id": "t1", "name": "ask_cnpj", "args": {}}]),
+        _ai("CNPJ ok. Pronto."),
+    ])
+    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: shared)
+    keep_ids = ("wr:system", WR_PREFIX_ID)
+    win = 2
+
+    def producer_turn(tid, user, tools, resume=None):
+        # Regra do _turn_agent: trim SÓ em turno fresco (resume=None).
+        if resume is None:
+            ag.trim_thread_history(tid, keep_human_turns=win, keep_ids=keep_ids)
+        prior = ag.get_thread_message_count(tid)
+        im = [] if resume is not None else [
+            {"role": "user", "content": "p", "id": WR_PREFIX_ID},
+            {"role": "user", "content": user},
+        ]
+        return ag.run_writing_turn(
+            system="s", initial_messages=im, tools=tools, model="m",
+            provider="anthropic", max_steps=5, thread_id=tid,
+            resume=resume, prior_n_msgs=prior, mode="writing",
+        )
+
+    prefix_key = f"wsTPS_{uuid.uuid4().hex[:8]}"
+    tid = f"{prefix_key}:sess"
+    try:
+        for i in range(3):
+            producer_turn(tid, f"m{i}", tools=[])
+        first = producer_turn(tid, "escreva", tools=[ask_cnpj])
+        assert first.interrupt == {"field": "cnpj", "prompt": "Qual o CNPJ?"}
+        # Thread pausada EXCEDE a janela (>2 humanos) — se o resume podasse (bug),
+        # o Command(resume) quebraria; o fix garante que não poda.
+        humans = [
+            m for m in _read_thread_messages(tid)
+            if isinstance(m, HumanMessage) and m.id != WR_PREFIX_ID
+        ]
+        assert len(humans) > win, f"esperava thread > janela, veio {len(humans)}"
+        # Resume NÃO poda → fecha limpo.
+        second = producer_turn(tid, "resp", tools=[ask_cnpj], resume="12.345.678/0001-90")
+        assert second.interrupt is None
+        assert second.result.final_text == "CNPJ ok. Pronto."
+    finally:
+        _delete_threads(prefix_key)
+
+
 def test_cross_workspace_isolation_session_thread(monkeypatch, real_checkpointer):
     """Leak-test ESTENDIDO (B2′) — a convenção NOVA `{ws}:{session}` (sem :turn)
     preserva o namespacing por workspace: o estado de A é invisível pelo thread_id
