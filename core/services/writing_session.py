@@ -2219,9 +2219,29 @@ class WritingSession:
         # Volátil por último: o outline muda a cada save_draft.
         if self._proposal_outline:
             outline_str = "\n".join(f"- {t}" for t in self._proposal_outline)
+            # PRECEDÊNCIA (T4.1): o "EXATO" fica ESCOPADO ao argumento das tools
+            # (save_draft/read_section fazem lookup por título; save_draft rejeita
+            # título fora do outline). A versão anterior — "use o título EXATO ...
+            # não invente outra estrutura" — colapsada e re-injetada fresca a cada
+            # turno lia como regra de sistema saliente e SOBREPUNHA a edição de
+            # título pedida pelo usuário na conversa (gate T4: case-título 0/3,
+            # baseline 3/3). Formulado como REGRA DE PRECEDÊNCIA, não permissão
+            # (lição item 6 / project_radar_cards_persist: enumerar a possibilidade
+            # — "você pode renomear" — induz o modelo; precedência só dispara no
+            # conflito). Esta lista é o estado ATUAL da estrutura, não uma restrição.
+            #
+            # RESULTADO PARCIAL (re-gate fam3 x3): título 0/3 → 1/3, frase 3/3 (sem
+            # regressão). Paridade NÃO restaurada. Diagnóstico refinado: a âncora
+            # suavizada ELIMINOU o override do título antigo, mas o agente passou a
+            # escrever só CORPO (sem heading) → o título novo não aterrissa. O gap
+            # residual é de EMISSÃO do título, não de override — fora do alcance de
+            # precedência pura no prefixo. Handoff no plan doc para a governança.
             parts.append(
-                "OUTLINE COMPLETO DA PROPOSTA (para save_draft/read_section — "
-                "use o título EXATO como está aqui, não invente outra estrutura):"
+                "OUTLINE COMPLETO DA PROPOSTA — títulos vigentes das seções. Ao "
+                "chamar save_draft/read_section, use o título de uma seção existente "
+                "como aparece nesta lista (é o argumento que o lookup casa). Esta "
+                "lista reflete o estado ATUAL da estrutura; instruções do usuário na "
+                "conversa têm precedência sobre ela quando conflitarem."
                 f"\n{outline_str}"
             )
         return "\n\n".join(parts)
