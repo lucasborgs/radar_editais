@@ -337,22 +337,34 @@ def _to_lc_messages(
         cache_hint = bool(m.pop("cache_hint", False))
         if provider == "anthropic" and cache_hint:
             content = _as_cached_content(content)
+        # `id` opcional (Item 3): quando o produtor marca uma mensagem com id
+        # determinístico (ex.: prefixo estável da escrita numa thread-por-sessão),
+        # o reducer `add_messages` a SUBSTITUI em posição em vez de acumular cópias
+        # a cada turno. Sem id (default), comportamento byte-idêntico ao anterior
+        # (o LangGraph gera um uuid por mensagem).
+        msg_id = m.get("id")
         if role == "assistant":
-            out.append(AIMessage(content=content))
+            out.append(AIMessage(content=content, id=msg_id))
         elif role == "system":
-            out.append(SystemMessage(content=content))
+            out.append(SystemMessage(content=content, id=msg_id))
         else:
-            out.append(HumanMessage(content=content))
+            out.append(HumanMessage(content=content, id=msg_id))
     return out
 
 
-def _build_system_message(system: str, provider: Provider | None) -> SystemMessage:
+def _build_system_message(
+    system: str, provider: Provider | None, *, msg_id: str | None = None,
+) -> SystemMessage:
     """SystemMessage top-level. No caminho Anthropic recebe um breakpoint de cache
     (o system é estável por sessão — 1º dos 3 breakpoints do turno). Nos demais
-    providers vai como string simples (idêntico ao anterior)."""
+    providers vai como string simples (idêntico ao anterior).
+
+    `msg_id` (Item 3): id determinístico para que `add_messages` substitua o system
+    em posição numa thread-por-sessão (writing). Sem ele (default), comportamento
+    byte-idêntico ao anterior."""
     if provider == "anthropic":
-        return SystemMessage(content=_as_cached_content(system))
-    return SystemMessage(content=system)
+        return SystemMessage(content=_as_cached_content(system), id=msg_id)
+    return SystemMessage(content=system, id=msg_id)
 
 
 async def run_agent_graph_async(
@@ -833,6 +845,108 @@ def _get_writing_checkpointer():
     return _checkpointer
 
 
+def get_thread_message_count(thread_id: str) -> int:
+    """Nº de mensagens acumuladas na thread durável (Item 3 — thread-por-sessão).
+
+    Fonte de verdade do `prior_n_msgs` do PRÓXIMO turno: cada request rehidrata uma
+    WritingSession nova, então o count em-memória não sobrevive — lê-se direto do
+    checkpointer. Thread inexistente (1º turno) ou sem checkpointer → 0. Roda no
+    bg-loop (o pool do AsyncPostgresSaver fica bound a ele)."""
+    ckpt = _get_writing_checkpointer()
+    if ckpt is None:
+        return 0
+    try:
+        tup = _run_on_bg_loop(
+            ckpt.aget_tuple({"configurable": {"thread_id": thread_id}})
+        )
+    except Exception as e:
+        logger.warning("get_thread_message_count(%s) falhou: %s — assume 0", thread_id, e)
+        return 0
+    if tup is None:
+        return 0
+    msgs = tup.checkpoint.get("channel_values", {}).get("messages", [])
+    return len(msgs)
+
+
+_state_maint_graph = None
+_state_maint_lock = threading.Lock()
+
+
+def _get_state_maint_graph():
+    """Grafo mínimo (nó no-op) só para aplicar updates de canal via `aupdate_state`
+    — o reducer `add_messages` processa `RemoveMessage` na poda de histórico
+    (Item 3). Compilado com o checkpointer durável, roda no bg-loop."""
+    global _state_maint_graph
+    if _state_maint_graph is not None:
+        return _state_maint_graph
+    with _state_maint_lock:
+        if _state_maint_graph is not None:
+            return _state_maint_graph
+        ckpt = _get_writing_checkpointer()
+        g = StateGraph(AgentState)
+
+        async def _noop(state: AgentState) -> dict:
+            return {}
+
+        g.add_node("noop", _noop)
+        g.add_edge(START, "noop")
+        g.add_edge("noop", END)
+        _state_maint_graph = g.compile(checkpointer=ckpt)
+    return _state_maint_graph
+
+
+def trim_thread_history(
+    thread_id: str, *, keep_human_turns: int, keep_ids: tuple[str, ...],
+) -> int:
+    """Item 3 (Decisão 2) — poda o histórico episódico da thread durável para a
+    janela de paridade, na FRONTEIRA de turno (nunca intra-turno — o spike do #2
+    mostrou que `start_on="human"` colapsa na cadeia intra-turno).
+
+    Preserva: as mensagens de id estável (`keep_ids` = system + prefixo) e um
+    SUFIXO VÁLIDO do episódico que começa numa `HumanMessage` (senão a API recebe
+    um `ToolMessage` órfão de seu `AIMessage`). No-op se sob a janela, sem
+    checkpointer, ou sem nada a remover. Retorna quantas mensagens removeu.
+
+    Roda no bg-loop (checkpointer bound a ele). É best-effort: falha vira warning,
+    o turno segue (poda é higiene de custo, não correção)."""
+    from langchain_core.messages import HumanMessage, RemoveMessage
+
+    ckpt = _get_writing_checkpointer()
+    if ckpt is None:
+        return 0
+    config = {"configurable": {"thread_id": thread_id}}
+    try:
+        tup = _run_on_bg_loop(ckpt.aget_tuple(config))
+    except Exception as e:
+        logger.warning("trim_thread_history(%s): aget_tuple falhou: %s", thread_id, e)
+        return 0
+    if tup is None:
+        return 0
+    msgs = tup.checkpoint.get("channel_values", {}).get("messages", [])
+    # Episódico = tudo exceto os blocos de id estável (system/prefixo).
+    episodic = [m for m in msgs if getattr(m, "id", None) not in keep_ids]
+    human_idxs = [i for i, m in enumerate(episodic) if isinstance(m, HumanMessage)]
+    if len(human_idxs) <= keep_human_turns:
+        return 0
+    # Mantém a partir da k-ésima HumanMessage contada do fim (janela válida).
+    cut = human_idxs[-keep_human_turns]
+    to_remove = [m for m in episodic[:cut] if getattr(m, "id", None)]
+    if not to_remove:
+        return 0
+    removals = [RemoveMessage(id=m.id) for m in to_remove]
+    try:
+        graph = _get_state_maint_graph()
+        _run_on_bg_loop(graph.aupdate_state(config, {"messages": removals}))
+    except Exception as e:
+        logger.warning("trim_thread_history(%s): aupdate_state falhou: %s", thread_id, e)
+        return 0
+    logger.info(
+        "trim_thread_history: thread=%s removeu=%d (janela=%d turnos)",
+        thread_id, len(removals), keep_human_turns,
+    )
+    return len(removals)
+
+
 # ---------------------------------------------------------------------------
 # Memory Store singleton (Etapa 5) — projeção read-optimized dos reflection_insights
 # ---------------------------------------------------------------------------
@@ -981,6 +1095,12 @@ def memory_search(workspace_id: str, query: str, *, limit: int = 6) -> list[dict
 # Entry point da escrita: interrupt/resume sobre o checkpointer
 # ---------------------------------------------------------------------------
 
+# Id determinístico do system numa thread-por-sessão (Item 3): `add_messages`
+# substitui a mensagem de mesmo id em posição em vez de acumular cópias por turno.
+# Só precisa ser único DENTRO da thread — uma constante serve todas as sessões.
+WR_SYSTEM_MSG_ID = "wr:system"
+
+
 @dataclass
 class WritingTurnOutcome:
     """Resultado de um turno-run da escrita pelo grafo com checkpointer.
@@ -1033,7 +1153,11 @@ async def _writing_turn_async(
     else:
         payload = {
             "messages": [
-                _build_system_message(system, provider),
+                # id determinístico (Item 3): numa thread-por-sessão o system é
+                # reconstruído a cada turno; `add_messages` o substitui em posição
+                # em vez de acumular. `WR_SYSTEM_MSG_ID` só bate dentro da própria
+                # thread, então uma constante serve todas as sessões.
+                _build_system_message(system, provider, msg_id=WR_SYSTEM_MSG_ID),
                 *_to_lc_messages(initial_messages, provider=provider),
             ],
             "llm_calls": 0,

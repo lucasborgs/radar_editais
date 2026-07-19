@@ -324,6 +324,16 @@ conflitantes do outline dentro da mesma memória). Entra por-invoke fora do esta
 **Critério de aceite:** após 3 turnos na mesma thread, o estado persistido contém **zero ou uma** cópia do bloco de prefixo — teste
 que inspecione a thread, não só o comportamento.
 
+## Adendo de EXECUÇÃO da T4 (governança, 2026-07-18) — design ratificado antes da cirurgia
+
+Design da promoção da escrita aprovado ponto-a-ponto pela governança (substitui os detalhes correspondentes do corpo da T4 acima):
+
+1. **Prefixo idempotente = 1 mensagem colapsada de id determinístico** (ex.: `id="wr:stable-prefix"`), `add_messages` substitui em posição → sempre **uma** cópia, sempre fresca. **Ordem interna: estável → volátil** — perfil, card, programa, library, playbook primeiro; **outline por ÚLTIMO**. Racional da ordem: o provider real é **OpenAI** (não há `ANTHROPIC_API_KEY` em ambiente nenhum), cujo cache é **automático por prefixo de tokens** — a granularidade de mensagem é irrelevante e a ordenação interna recupera o cache incremental que a "N mensagens" prometia; os breakpoints Anthropic (`cache_hint`/`_as_cached_content`) são **código dormante**, não o ponto frágil. O system (writer) também recebe id determinístico (`id="wr:system"`). **Rejeitada** a opção "nó pre-model no grafo" por princípio: grafo é mecânica, domínio (perfil/outline) fica no **produtor**; quando o explore precisar do mesmo refresh, generaliza-se o helper no produtor.
+2. **`prior_n_msgs` via `aget_state`/`aget_tuple` do checkpointer, no início do turno — SEM migration** (desvio aprovado sobre o plano, que previa coluna `last_n_messages`). Cada request rehidrata uma `WritingSession` nova (`:793-794`), então o checkpointer é a única fonte durável do count. Turno 1 (thread inexistente) → `None` → 0. Unifica fresh e resume (ambos leem o mesmo count; o resume deixa de depender de `resume_ctx["n_msgs"]`).
+3. **Tail dinâmico** (temporal/reflection/mentions/section) **dobrado na mensagem do usuário atual** — é contexto episódico do turno; evita acumular blocos stale na thread. Histórico episódico **não** é re-injetado (o checkpointer replaya).
+4. **Canais de estado sob checkpointer persistente:** turno fresco manda `llm_calls:0/tool_rounds:0/documents:{}` → **resetam** (budget é por-turno, correto); resume (`Command`) não os manda → continua. `_history_summary` **sai** do prefixo em modo-thread (redundante com o histórico durável; `_compress_history` segue só para exibição).
+5. **interrupt/resume converge no thread `{ws}:{session}`** (determinístico). **Mantém `thread_id` no `_pending_user_input`** como discriminador resume-vs-plan-confirmation (`:1168`); só **`n_msgs` deixa de ser usado** (vem do checkpointer). Não regride o fluxo de pausa.
+
 ## Notas de execução para o implementador (Opus 4.8)
 
 - Comece pela **TASK 1** e **pare no checkpoint**. O probe de loop-binding alimenta o desenho de infra da Task 3 — não pule.

@@ -429,6 +429,9 @@ def test_turn_agent_interrupt_surfaces_pending_and_persists_question(monkeypatch
             partial, interrupt={"field": "cnpj", "prompt": "Qual o CNPJ?"}, n_messages=3,
         ),
     )
+    # Item 3: thread-por-sessão — helpers de checkpointer mockados (unit hermético).
+    monkeypatch.setattr("core.llm.agent_graph.get_thread_message_count", lambda *a, **k: 0)
+    monkeypatch.setattr("core.llm.agent_graph.trim_thread_history", lambda *a, **k: 0)
 
     s._turn_count = 1
     result = s._turn_agent("escreva a identificação", section_hint=None, user_turn_index=1)
@@ -437,8 +440,8 @@ def test_turn_agent_interrupt_surfaces_pending_and_persists_question(monkeypatch
     assert result["pending_user_input"] == {"field": "cnpj", "prompt": "Qual o CNPJ?"}
     # A pergunta é a msg do assistente persistida (espelha o chat).
     assert result["assistant_message"] == "Qual o CNPJ?"
-    # Estado interno guarda thread_id + n_msgs para retomar.
-    assert s._pending_user_input["thread_id"] == "ws_1:sess_1:1"
+    # Item 3: thread da SESSÃO (sem :turn); discriminador de resume preservado.
+    assert s._pending_user_input["thread_id"] == "ws_1:sess_1"
     assert s._pending_user_input["n_msgs"] == 3
 
 
@@ -446,10 +449,10 @@ def test_turn_agent_resume_routes_command_and_clears_pending(monkeypatch):
     """Quando há interrupt pendente (com thread_id), turn() retoma o thread via
     resume= e fecha a pergunta: pending limpo, resposta final no chat."""
     s = _make_session()
-    # Estado de uma sessão recarregada com interrupt em aberto.
+    # Estado de uma sessão recarregada com interrupt em aberto (thread da sessão).
     s._pending_user_input = {
         "field": "cnpj", "prompt": "Qual o CNPJ?",
-        "thread_id": "ws_1:sess_1:1", "n_msgs": 3,
+        "thread_id": "ws_1:sess_1", "n_msgs": 3,
     }
 
     captured: dict = {}
@@ -471,12 +474,16 @@ def test_turn_agent_resume_routes_command_and_clears_pending(monkeypatch):
         return _outcome(final, interrupt=None, n_messages=5)
 
     monkeypatch.setattr("core.llm.agent_graph.run_writing_turn", fake)
+    # Item 3: prior_n_msgs vem do checkpointer (não de resume_ctx["n_msgs"]).
+    monkeypatch.setattr("core.llm.agent_graph.get_thread_message_count", lambda *a, **k: 3)
+    monkeypatch.setattr("core.llm.agent_graph.trim_thread_history", lambda *a, **k: 0)
 
     result = s.turn("12.345.678/0001-90")
 
-    # Retomou o MESMO thread com resume = a resposta do usuário.
+    # Retomou o MESMO thread da sessão com resume = a resposta do usuário.
     assert captured["resume"] == "12.345.678/0001-90"
-    assert captured["thread_id"] == "ws_1:sess_1:1"
+    assert captured["thread_id"] == "ws_1:sess_1"
+    # prior_n_msgs sourced do checkpointer (mock=3), não mais de resume_ctx.
     assert captured["prior_n_msgs"] == 3
     # Pergunta fechada: pending limpo e resposta final no chat.
     assert s._pending_user_input is None
