@@ -8,6 +8,49 @@
 
 ---
 
+## ⚑ STATUS DE HANDOFF (2026-07-19) — leia isto primeiro
+
+A próxima sessão parte DAQUI, não do executor anterior. Estado real:
+
+### Status por task
+| Task | Estado |
+|---|---|
+| T1 spike (explore 3-turnos + fork) | ✅ **GO ratificado** (`spikes/lever3_threads/FINDINGS.md`; probe loop-binding EXPLODE) |
+| T2 guardrails baseline | ✅ **B1–B9 verdes** (leak-test + interrupt/resume, Postgres local) |
+| **T4 ESCRITA (1ª fatia)** | ✅ **implementada** (`dd382056e`,`574c3e532`) + **fix da ponte** (este commit). **NO-GO para MERGE** — paridade de `user_edit_preserved` NÃO restaurada (ver abaixo). Reside na branch `feat/lever3-threads` |
+| T3 EXPLORE (2ª fatia) | ⏳ **PENDENTE** — não começada. Carrega saver singleton-por-loop + descobertas A/B (delta-slicing + system idempotente). Ver §TASK 3 |
+| T5 robustez (concorrência + purge) | ⏳ PENDENTE |
+| T6-design (frame interrupt SSE) | ✅ desenho feito (§TASK 6-design); implementação = follow-on do item 1 |
+
+### Números finais do gate T4 (A/B local, main=baseline vs branch=treatment)
+- **Métricas-núcleo NÃO degradam:** `saved` 0.75→0.83, `pct_grounded` 0.58→0.74, `coherent` 1.0=1.0. A T4 não piora o eixo central.
+- **`section_hallucination`:** falso-positivo — **artefato de avaliador** (conta subheadings `###` como alucinação). Anotado em `core/eval/writing.py::eval_section_hallucination`. NÃO é regressão.
+- **`user_edit_preserved` (fam3, pass/fail):** baseline **1.0** → treatment pré-fix **0.0** (x3, consistente 0/6) → **pós-fix 0.5** (PARCIAL). Detalhe por-caso pós-fix:
+  - case "substitua a **primeira frase**": **3/3 ✅** (a ponte resolveu).
+  - case "**altere o título**": **0/3 ❌** (RESIDUAL — ver mecanismo #2).
+
+### Root cause + fix (a cadeia causal completa)
+- **Mecanismo #1 (resolvido pela ponte):** a T4 fez `_turn_agent` parar de re-seedar `self._history`, confiando no checkpointer. MAS o **plan-first do 1º turno** (`_first_turn_with_generation`) NÃO passa por `_turn_agent` → nunca escreve na thread `{ws}:{session}`. No turno de edição (`_turn_agent`, `prior_n_msgs`=0) o histórico — incluindo a instrução de edição do usuário — SUMIA. **Fix:** ponte de semeadura (`_turn_agent`: thread vazia + `_history` não-vazio → inclui `_history` no payload; invariante documentado no código). Cobre o caso crítico (descrição capturada no plan-first).
+- **Mecanismo #2 (RESIDUAL, não resolvido):** para edição de **TÍTULO**, o prefixo colapsado da T4 carrega o outline com "use o título EXATO, não invente outra estrutura" de forma saliente/fresca → **sobrepõe a edição de título do usuário**. A ponte torna a edição visível mas o outline-anchoring vence. É o suspeito (c) da governança, isolado a title-edits. **Precisa de fix separado** antes da paridade (ex.: rebaixar a força do "título EXATO" quando há edição de usuário conflitante, ou dar precedência à edição na composição do prefixo).
+
+### Lições que o próximo executor PRECISA
+1. **Eval/golden roda LOCAL (`:54322`), nunca cloud** (memória `feedback_eval_runs_local`). Rodar contra o pooler de cloud pela WAN trava (quedas de conexão). Setup local: `scripts/seed_eval_corpus.py` (corpus finep:769/774 + **nós KG `entities`** — sem eles o card do agente floora e `saved`≈0) + identidade de eval em `supabase/seed.sql` (user `auth.users` + workspace, MESMOS UUIDs do cloud, dummy). Env: `.env.staging-local` + `EVAL_WORKSPACE_ID`.
+2. **`section_hallucination` é métrica furada** (conta subheadings). Não tratar como sinal de regressão sem inspeção qualitativa. Dívida anotada no avaliador.
+3. **Risco de prod pós-deploy (round-trips do checkpointer):** prod é Docker-local + Supabase Cloud pela WAN (NÃO co-locado). A T4 adiciona round-trips por turno (`get_thread_message_count` + `trim`). **Observar logs de conexão do checkpointer pós-deploy.**
+4. **Gotcha de repro entre worktrees:** `python <path>/script.py` NÃO adiciona cwd ao `sys.path` → importa o `core` do editable-install (MAIN), não do worktree. Use `python -c` (adiciona cwd) OU `sys.path.insert(0, os.getcwd())`. (Custou um diagnóstico falso nesta sessão.)
+
+### Desvios aprovados (registrados)
+- `prior_n_msgs` vem do checkpointer via `aget_tuple` (helper `get_thread_message_count`), **sem migration/coluna** (cada request rehidrata sessão nova). Aprovado.
+- Prefixo colapsado numa msg de id determinístico, ordem estável→volátil (provider real = OpenAI, cache por prefixo de tokens). Aprovado.
+- Ponte de semeadura: `prior_n_msgs = 2 + len(_history)` no turno semeador (exclui o histórico do delta).
+
+### Estado do git (reconciliação PENDENTE — governança segura até o veredito de merge)
+- Branch `feat/lever3-threads`: T4 + fix + testes + este handoff. É a fonte de verdade da T4.
+- Checkout principal está em `main` (a governança trocou); tem **stray edits uncommitted** (plan doc, `supabase/seed.sql`, `scripts/seed_eval_corpus.py` novo). O A/B rodou de um **worktree** da branch.
+- A infra de eval (seed) precisa ser decidida: fica na branch ou vai pra main (é fixture geral)?
+
+---
+
 ## Estado real verificado (âncoras de código, lidas em 2026-07-18)
 
 O plano é contra o código, não contra memória.

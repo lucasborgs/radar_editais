@@ -229,7 +229,16 @@ def _trigram_overlap(a: str, b: str) -> float:
 def eval_section_hallucination(*, output, metadata=None, **_) -> Evaluation | None:
     """Flag se o conteúdo do rascunho contém seções que NÃO estão no outline
     do edital — medido por overlap de trigramas com os títulos de seção
-    conhecidos. 0 = sem alucinação, 1+ = seções suspeitas."""
+    conhecidos. 0 = sem alucinação, 1+ = seções suspeitas.
+
+    DÍVIDA DE AVALIADOR (anotada no gate da T4, 2026-07-19): esta métrica conta
+    QUALQUER linha `#...` com overlap <0.3 vs o título da seção — então
+    SUBHEADINGS legítimos (`### Contexto`, `### Objetivo`) dentro da seção correta
+    são contados como "alucinação". Um draft bem-estruturado pontua MAIS que prosa
+    chata sem que haja alucinação real de seção do outline. No A/B da T4 isso deu
+    falso-positivo (o treatment escrevia com subheadings). Fix futuro: distinguir
+    `#`/`##` (candidatos a seção do outline) de `###`+ (subestrutura interna), ou
+    comparar contra a LISTA de títulos do outline, não só a seção ativa."""
     if not isinstance(output, dict):
         return None
     section = output.get("section", "")

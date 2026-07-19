@@ -1353,24 +1353,41 @@ class WritingSession:
         provider, model = resolve_agent_provider("anthropic", ANTHROPIC_MODEL_AGENT)
 
         thread_id = f"{self.workspace_id}:{self.session_id}"
-        # Paridade de janela (Decisão 2): poda o histórico episódico da thread
-        # ANTES do turno se ele passou da janela — o checkpointer acumularia sem
-        # limite (hoje o re-seed cortava em HISTORY_WINDOW). No-op se sob a janela.
+
+        # INVARIANTE (governança T4): a thread `{ws}:{session}` deve refletir TODA
+        # troca conversacional user↔agente, independente do caminho interno que a
+        # processou. Caminhos NÃO-conversacionais (geração em lote por seção)
+        # legitimamente NÃO escrevem nela. O problema: caminhos conversacionais que
+        # NÃO passam por `_turn_agent` — hoje o plan-first do 1º turno
+        # (`_first_turn_with_generation`) — deixam a thread vazia enquanto
+        # `self._history` já tem a troca. Sem ponte, o 1º turno `_turn_agent` lê
+        # prior_n_msgs=0 e perde TUDO antes dele (bug real do gate: a instrução de
+        # edição do usuário sumia → user_edit_preserved 1.0→0.0).
         #
-        # SÓ em turno FRESCO (resume_ctx is None): num resume a thread está PAUSADA
-        # num interrupt() e podá-la via update_state pode perturbar o estado
-        # pendente e quebrar o Command(resume) (revisão de governança da T4). A poda
-        # espera o próximo turno fresco — a janela é higiene de custo, não correção,
-        # então adiar uma iteração é inócuo.
-        if resume_ctx is None:
+        # PONTE (thread vazia + histórico não-vazio → semeia): incluímos
+        # `self._history` no payload deste turno, que assim GRAVA a conversa
+        # anterior na thread e o agente a enxerga. Forma "thread vazia" (não
+        # "thread atrás do _history"): comparar contagens é frágil (a thread tem
+        # system+prefixo+tool-messages; `_history` é só pares user/assistant).
+        # BURACOS RESIDUAIS aceitos e documentados: um caminho não-`_turn_agent` no
+        # MEIO da sessão (thread já não-vazia) — geração em lote / refine — não é
+        # re-semeado; é aceitável porque sua saída vai pro DOCUMENTO (lida via
+        # read_section), não é informação conversacional do usuário que se perca.
+        # O caso crítico (descrição do projeto capturada no plan-first do 1º turno)
+        # ESTÁ coberto: é a 1ª passagem por `_turn_agent`, thread vazia → semeia.
+        n_in_thread = get_thread_message_count(thread_id)
+        seed_history = resume_ctx is None and n_in_thread == 0 and bool(self._history)
+
+        # Poda de janela (Decisão 2): só em turno fresco NÃO-semeador. Num resume a
+        # thread está pausada num interrupt (podar via update_state quebraria o
+        # Command(resume) — revisão de governança). Num turno semeador a thread
+        # está vazia, não há o que podar.
+        if resume_ctx is None and not seed_history:
             self._trim_thread_history(thread_id)
-        # Fronteira do delta: nº de mensagens já na thread (0 no 1º turno).
-        prior_n_msgs = get_thread_message_count(thread_id)
 
         if resume_ctx:
             # Retomada: a mensagem do usuário é a RESPOSTA ao interrupt pendente.
-            # Mesmo thread da sessão; prior_n_msgs (do checkpointer) fatia o delta
-            # deste turno-run (o thread acumula pré+pós-interrupt no mesmo state).
+            # Mesmo thread da sessão; prior_n_msgs (do checkpointer) fatia o delta.
             outcome = run_writing_turn(
                 system=self._writer_system(),
                 initial_messages=[],
@@ -1378,13 +1395,23 @@ class WritingSession:
                 max_steps=max_steps or AGENT_MAX_STEPS,
                 thread_id=thread_id,
                 resume=user_message,
-                prior_n_msgs=prior_n_msgs,
+                prior_n_msgs=get_thread_message_count(thread_id),
                 mode="writing",
             )
         else:
             mentions_context = self._resolve_mentions(user_message)
             messages = self._build_thread_initial_messages(
                 user_message, section_hint, mentions_context,
+                include_history=seed_history,
+            )
+            # Fronteira do delta. Turno semeador: payload = [system, prefixo,
+            # *history, current] → o delta começa DEPOIS do histórico semeado
+            # (system + prefixo + len(history)); sem isso o trace/usage contaria o
+            # histórico plan-first como passos deste turno. Turno normal: nº de
+            # mensagens já na thread (0 no 1º turno sem histórico).
+            prior_n_msgs = (
+                2 + len(self._history) if seed_history
+                else get_thread_message_count(thread_id)
             )
             outcome = run_writing_turn(
                 system=self._writer_system(),
@@ -2204,11 +2231,18 @@ class WritingSession:
         user_message: str,
         section_hint: str | None,
         mentions_context: str,
+        include_history: bool = False,
     ) -> list[dict]:
         """Item 3 (thread-por-sessão): mensagens de um turno FRESCO numa thread
         durável. Diferente de `_build_agent_initial_messages` (legacy/por-turno):
 
-          • NÃO re-injeta `self._history` — o checkpointer replaya o episódico;
+          • Normalmente NÃO re-injeta `self._history` — o checkpointer replaya o
+            episódico. EXCEÇÃO (`include_history=True`): PONTE de semeadura na 1ª
+            passagem por `_turn_agent` quando a thread está vazia mas já houve
+            troca (ex.: plan-first do 1º turno não passa por `_turn_agent`, então
+            não escreveu na thread). Aí incluímos `self._history` ENTRE o prefixo
+            e a mensagem atual, para o turno gravar a conversa anterior na thread
+            e o agente enxergá-la (ver invariante em `_turn_agent`).
           • o prefixo estável vira UMA mensagem de id determinístico
             (`WR_PREFIX_MSG_ID`) → `add_messages` a substitui em posição a cada
             turno (sempre fresca: outline atualizado), sem acumular cópias;
@@ -2224,6 +2258,13 @@ class WritingSession:
             "id": WR_PREFIX_MSG_ID,
             "cache_hint": True,
         }
+        # PONTE: histórico anterior entre prefixo e mensagem atual (só quando
+        # semeando uma thread vazia — ver `_turn_agent`). Sem id/cache_hint: são
+        # mensagens episódicas normais que o checkpointer passa a acumular.
+        history_msgs = (
+            [{"role": t["role"], "content": t["content"]} for t in self._history]
+            if include_history else []
+        )
 
         tail_parts: list[str] = []
         if self._temporal_block:
@@ -2241,7 +2282,7 @@ class WritingSession:
             "content": "\n\n".join(tail_parts),
             "cache_hint": True,
         }
-        return [prefix, current]
+        return [prefix, *history_msgs, current]
 
     def _build_agent_initial_messages(
         self,

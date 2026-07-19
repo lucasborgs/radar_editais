@@ -524,6 +524,55 @@ def test_turn_agent_gates_trim_to_fresh_turns_only(monkeypatch):
     assert trim_calls == [], "resume NÃO pode podar a thread pausada"
 
 
+def _bridge_session(monkeypatch, *, thread_count):
+    """Sessão com _history não-vazio (pós plan-first) + captura do run_writing_turn."""
+    s = _make_session()
+    s._history = [
+        {"role": "user", "content": "Redija a descrição. Depois substitua a primeira frase por 'NOSSO PROJETO X'."},
+        {"role": "assistant", "content": "## Plano da Proposta — 11 seções."},
+    ]
+    monkeypatch.setattr("core.llm.agent_graph.get_thread_message_count", lambda *a, **k: thread_count)
+    monkeypatch.setattr(s, "_trim_thread_history", lambda tid: None)
+    captured: dict = {}
+    final = AgentResult(final_text="ok", steps=[], stop_reason="end_turn",
+                        usage={"input_tokens": 10, "output_tokens": 5})
+    monkeypatch.setattr(
+        "core.llm.agent_graph.run_writing_turn",
+        lambda **kw: (captured.update(kw), _outcome(final))[1],
+    )
+    return s, captured
+
+
+def test_turn_agent_bridges_history_into_empty_thread(monkeypatch):
+    """PONTE (fix do NO-GO): 1º turno `_turn_agent` com thread VAZIA + _history
+    não-vazio (o plan-first não escreveu na thread) → semeia o histórico no
+    payload, para o agente ver a instrução de edição do usuário. Sem isso a
+    edição se perdia (user_edit_preserved 1.0→0.0)."""
+    s, captured = _bridge_session(monkeypatch, thread_count=0)  # thread vazia
+    n_hist = len(s._history)  # ANTES do turno (_turn_agent appenda ao _history)
+    s._turn_count = 1
+    s._turn_agent("Finalize e salve.", section_hint="2. Descrição do projeto",
+                  user_turn_index=1, resume_ctx=None)
+    texts = [m["content"] for m in captured["initial_messages"]]
+    assert any("substitua a primeira frase" in t for t in texts), \
+        "histórico (com a edição) deve ser semeado no payload"
+    # delta pula o histórico semeado: system(1) + prefixo(1) + len(history original)
+    assert captured["prior_n_msgs"] == 2 + n_hist
+
+
+def test_turn_agent_bridge_idempotent_when_thread_populated(monkeypatch):
+    """Idempotência da ponte: thread JÁ com conteúdo → NÃO re-semeia o histórico
+    (o checkpointer já o tem); prior_n_msgs vem do checkpointer, não do 2+len."""
+    s, captured = _bridge_session(monkeypatch, thread_count=7)  # thread não-vazia
+    s._turn_count = 3
+    s._turn_agent("Continue.", section_hint="2. Descrição do projeto",
+                  user_turn_index=3, resume_ctx=None)
+    texts = [m["content"] for m in captured["initial_messages"]]
+    assert not any("substitua a primeira frase" in t for t in texts), \
+        "thread não-vazia: NÃO re-semeia (evita duplicar histórico)"
+    assert captured["prior_n_msgs"] == 7
+
+
 # ============================================================================
 # Modo PITCH (investidor, kind_class=entidade) — Fatia 2 multi-quadrante
 # ============================================================================
