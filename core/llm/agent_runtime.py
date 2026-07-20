@@ -301,6 +301,10 @@ async def run_agent_streaming_async(
     openai_api_key: str | None = None,
     trace_context: dict | None = None,
     mode: str | None = None,
+    thread_id: str | None = None,
+    checkpointer: Any = None,
+    prior_n_msgs: int = 0,
+    system_msg_id: str | None = None,
 ):
     """Espelha `run_agent_async`, mas delega ao canal streaming do grafo
     (`run_agent_graph_streaming`) — `AsyncIterator[StreamDelta]` em vez de um
@@ -308,7 +312,9 @@ async def run_agent_streaming_async(
     `AgentResult` autoritativo que `run_agent_async` retornaria.
 
     Aditivo: não altera `run_agent_async`/`run_agent`, nenhum call site existente
-    muda de comportamento.
+    muda de comportamento. Item 3 (TASK 3): repassa `thread_id`/`checkpointer`/
+    `prior_n_msgs`/`system_msg_id` para o modo thread-por-sessão do explore
+    (default None/0 = path stateless byte-idêntico).
     """
     from core.llm.agent_graph import run_agent_graph_streaming
 
@@ -326,6 +332,10 @@ async def run_agent_streaming_async(
         openai_api_key=openai_api_key,
         trace_context=trace_context,
         mode=mode,
+        thread_id=thread_id,
+        checkpointer=checkpointer,
+        prior_n_msgs=prior_n_msgs,
+        system_msg_id=system_msg_id,
     ):
         yield delta
 

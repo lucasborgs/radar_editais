@@ -8,6 +8,130 @@
 
 ---
 
+## ⚑ PACOTE PARA O GATE DE MERGE (2026-07-20) — governança
+
+Item 3 (thread por sessão) **implementado end-to-end** na branch `feat/lever3-threads`. Pilha de commits:
+`c9c2116aa` (T4.1 parcial) → `586364cfd` (T4.1-D fam3 3/3) → `1fe202215` (T3 explore) → `29b2925e2` (T5+T6) → smoke HTTP (este commit).
+
+**Escopo entregue:** T4 escrita (thread-por-sessão, fam3 fechada por definição-D) + T3 explore (thread-por-sessão, streaming) + T5 (concorrência + purge) + T6 (apêndice de design).
+
+**Gates verdes:**
+- **Escrita (T4/T4.1-D):** fam3 3/3 (frase-conteúdo 3/3 + título-redirect 3/3); métricas-núcleo não degradam (saved 0.75→0.83, pct_grounded 0.58→0.74, coherent 1.0). *Pendente do escopo-maior da T4 (fora da fatia econômica): eval N=12 + leak-test `{ws}:{session}` da escrita + smoke `verify` da escrita.*
+- **Explore (T3):** 6 gates de integração (Postgres real) verdes — singleton-por-loop, system idempotente, delta+called_match, leak-test estendido `{wsA}:sess`≠`{wsB}:sess`, subagente stateless, concorrência sem corrupção. Smoke produtor real + **smoke HTTP `/explore/stream` multi-turno PASS** (JWT do usuário seed; turno 2 lembra via thread-por-sessão).
+- **T5:** concorrência mesma-thread sem corrupção; purge real (dormência purgada, ativa intacta).
+- **Suíte inteira:** 839+ passed / 4 skipped. ruff limpo.
+
+**Débitos ACEITOS (documentados, não bloqueiam):** (1) gap fallback-sync (amnésia de 1 turno se um turno cair no espelho sync — raro, gracioso, `session_turns` preserva; fecha na T6); (2) purge é decisão de produto (retention 90d de memória de sessão dormente); (3) warning cosmético "Event loop is closed" no teardown de teste (prod = 1 loop, não ocorre).
+
+## ⚑ GATE FINAL — eval writing_v2 N=12 completo (2026-07-20) — ✅ PROMOVIDO
+
+Rodado sequencial (`EVAL_MAX_WORKERS=1`, ~2h20min, 36 execuções, zero erro de processo) — confirma que o travamento anterior era mesmo concorrência (ThreadPoolExecutor × checkpointer durável compartilhado), não bug de lógica. Risco já registrado acima como "round-trips extra pela WAN"; agora com uma segunda confirmação (concorrência de eval, não só WAN de prod).
+
+**Núcleo (relativo ao baseline registrado — branch não pode degradar):**
+| Métrica | Baseline original | Treatment (N=36, agora) | Veredito |
+|---|---|---|---|
+| saved | 0.75 | 0.778 | ✅ não degrada |
+| pct_grounded | 0.58 | 0.642 | ✅ acima do baseline |
+| coherent | 1.0 | 1.000 | ✅ mantém |
+
+**Famílias pass/fail:**
+- F3 (user-edit + title-redirect): 6/6 ✅ — confirma a fix da T4.1-D em amostra maior.
+- F2 (misfit): `misfit_honesty` automático 0/6 ❌ — **investigado, não é regressão.** Inspeção manual dos 6 outputs brutos: o agente identifica corretamente o misfit e alerta explicitamente em `assistant_text` nos 6/6 casos (ex.: "A BioTec Startup é um MEI, o que a torna inelegível..."). O avaliador `eval_misfit_honesty` (`core/eval/writing.py`) só busca a recusa no campo `draft` (conteúdo salvo da seção) — nunca no `assistant_text` (onde o alerta de fato vive), porque um draft de seção normal nunca teria linguagem de recusa por natureza. **Precedente direto nesta mesma investigação:** no gate x1 anterior à T4.1, o registro já dizia "misfit_honesty=0.0 nos dois — pré-T4" — confirma que é falha pré-existente do avaliador, não introduzida por este branch. Mesma classe de "avaliador furado" já documentada para `section_hallucination` (item 6). **Comportamento esperado do produto (agente honesto sobre misfit) está satisfeito** — a régua é que aponta para o campo errado.
+
+**Decisão de governança:** GO para merge. Núcleo não degrada (grounding até sobe), F3 fecha limpo, F2 é debt de avaliador pré-existente (não bloqueia, registrado ao lado do débito gêmeo de `section_hallucination`).
+
+**Débito adicional registrado:** `eval_misfit_honesty` deve futuramente checar `assistant_text` além de `draft` — não urgente, não bloqueia este merge.
+
+**Riscos p/ prod (do handoff):** round-trips extra do checkpointer por turno (Docker-local + Supabase Cloud pela WAN não co-locado) — observar logs de conexão pós-deploy. Setup de deploy: migration/schema `agent_memory` já existe; `CHECKPOINT_RETENTION_DAYS` default 90.
+
+---
+
+## ⚑ STATUS DE HANDOFF (2026-07-19) — leia isto primeiro
+
+A próxima sessão parte DAQUI, não do executor anterior. Estado real:
+
+### Status por task
+| Task | Estado |
+|---|---|
+| T1 spike (explore 3-turnos + fork) | ✅ **GO ratificado** (`spikes/lever3_threads/FINDINGS.md`; probe loop-binding EXPLODE) |
+| T2 guardrails baseline | ✅ **B1–B9 verdes** (leak-test + interrupt/resume, Postgres local) |
+| **T4 ESCRITA (1ª fatia)** | ✅ **implementada** (`dd382056e`,`574c3e532`,`e9135c173`,`c9c2116aa`) + **T4.1 opção D** (título estrutural → redirect). **fam3 fecha 3/3** (frase-conteúdo 3/3 + título-redirect 3/3). Reside na branch `feat/lever3-threads` |
+| T3 EXPLORE (2ª fatia) | ✅ **implementada + gate completo**: saver loop-local singleton-por-loop + delta-slicing + system idempotente + trim. 6 gates verdes (Postgres real, incl. concorrência) + smoke produtor + **smoke HTTP `/explore/stream` PASS**. Ver §T3 e §MERGE abaixo |
+| T5 robustez (concorrência + purge) | ✅ **implementada** (este commit): concorrência mesma-thread sem corrupção + purge reconciliado (dormência≠lixo, retention 30→90). Ver §T5 abaixo |
+| T6-design (frame interrupt SSE) | ✅ **apêndice de design** (§APÊNDICE T6-design + nota no plano do item 1); implementação = follow-on do item 1 |
+
+### Números finais do gate T4 (A/B local, main=baseline vs branch=treatment)
+- **Métricas-núcleo NÃO degradam:** `saved` 0.75→0.83, `pct_grounded` 0.58→0.74, `coherent` 1.0=1.0. A T4 não piora o eixo central.
+- **`section_hallucination`:** falso-positivo — **artefato de avaliador** (conta subheadings `###` como alucinação). Anotado em `core/eval/writing.py::eval_section_hallucination`. NÃO é regressão.
+- **`user_edit_preserved` (fam3, pass/fail):** baseline **1.0** → treatment pré-fix **0.0** (x3, consistente 0/6) → **pós-fix 0.5** (PARCIAL). Detalhe por-caso pós-fix:
+  - case "substitua a **primeira frase**": **3/3 ✅** (a ponte resolveu).
+  - case "**altere o título**": **0/3 ❌** (RESIDUAL — ver mecanismo #2).
+
+### Root cause + fix (a cadeia causal completa)
+- **Mecanismo #1 (resolvido pela ponte):** a T4 fez `_turn_agent` parar de re-seedar `self._history`, confiando no checkpointer. MAS o **plan-first do 1º turno** (`_first_turn_with_generation`) NÃO passa por `_turn_agent` → nunca escreve na thread `{ws}:{session}`. No turno de edição (`_turn_agent`, `prior_n_msgs`=0) o histórico — incluindo a instrução de edição do usuário — SUMIA. **Fix:** ponte de semeadura (`_turn_agent`: thread vazia + `_history` não-vazio → inclui `_history` no payload; invariante documentado no código). Cobre o caso crítico (descrição capturada no plan-first).
+- **Mecanismo #2 (RESIDUAL, não resolvido):** para edição de **TÍTULO**, o prefixo colapsado da T4 carrega o outline com "use o título EXATO, não invente outra estrutura" de forma saliente/fresca → **sobrepõe a edição de título do usuário**. A ponte torna a edição visível mas o outline-anchoring vence. É o suspeito (c) da governança, isolado a title-edits. **Precisa de fix separado** antes da paridade (ex.: rebaixar a força do "título EXATO" quando há edição de usuário conflitante, ou dar precedência à edição na composição do prefixo).
+
+### T4.1 (2026-07-19) — fix de PRECEDÊNCIA aplicado ao mecanismo #2 · **PARCIAL, teto 1/3**
+- **O que mudou** (`_build_stable_prefix_block`, `writing_session.py`): a âncora do outline no prefixo colapsado deixou de dizer "use o título EXATO ... não invente outra estrutura" (proibição global saliente) e passou a **escopar o "exato" ao argumento das tools** (save_draft/read_section fazem lookup por título; save_draft rejeita título fora do outline) + **regra de precedência** — "instruções do usuário na conversa têm precedência sobre esta lista quando conflitarem". Formulado como **precedência, não permissão** (lição item 6 / `project_radar_cards_persist`: enumerar "você pode renomear" induz o modelo).
+- **Re-gate econômico** (fam3 x3 treatment-only, Postgres local `:54322`, gpt-4o-mini; script throwaway `spikes/lever3_threads/regate_t41.py`):
+  - case **frase** (substitui 1ª frase): **3/3 ✅** — **sem regressão** (baseline 3/3).
+  - case **título** (altera título): **0/3 → 1/3 ⚠️** — melhora, mas **paridade (3/3) NÃO restaurada**.
+  - 2ª iteração (framing "rótulo-de-lookup vs texto-do-conteúdo", explicitando que a lista é só lookup): também **1/3** — não moveu. Revertida para a formulação mais limpa (números idênticos, menos risco de o agente passar o título novo como argumento de save_draft).
+- **⚠️ DIAGNÓSTICO REFINADO (muda o entendimento do mecanismo #2):** a hipótese original era "a âncora SOBREPÕE o título → o agente escreve o título ANTIGO". Os dados refutam isso parcialmente: **suavizar a âncora ELIMINOU o override** (nenhum run pós-fix reproduziu o título antigo/heading do outline de forma dominante), mas os falhos passaram a escrever **só o corpo em prosa, SEM heading** ("O objetivo deste projeto é desenvolver um trator compacto...") → o título novo **não tem onde aterrissar**. O gap residual é de **EMISSÃO do título pedido**, não de override. `save_draft` só aceita títulos do outline (rejeita novos), então a única forma do título novo aparecer no draft é como **heading dentro do conteúdo** — e o agente não o emite de forma confiável nesse modo.
+- **Por que baseline faz 3/3 e o treatment não:** hipótese (não confirmada com nova medição, para não regerar baseline — mem. `feedback_no_redundant_baselines`): no baseline (`_build_agent_initial_messages`, thread-por-turno) o `self._history` é **re-injetado como mensagens prominentes** logo antes da msg do usuário; a instrução de título fica saliente e o agente a emite como heading. No treatment (thread-mode) o histórico é semeado na thread pela ponte, mas o **prefixo colapsado (com o outline) é re-injetado FRESCO na posição 1** e compete; além disso a estrutura do eval põe a edição de título no **t=1** (plan-first) e o t=2 é um genérico "finalize e salve" — a edição nunca é a mensagem corrente.
+- **DECISÃO PENDENTE (governança):** o fix de precedência puro no prefixo tem teto ~1/3 para title-edits. Direções candidatas para restaurar paridade, para a governança escolher: **(a)** fix de EMISSÃO — quando a conversa pede um título de seção, garantir que o conteúdo salvo leve esse título como heading (prompt do writer/critic ou pós-processamento no `save_draft`); **(b)** aceitar o residual e re-visitar o realismo do eval (edit no t=1 + t=2 genérico é artificial; um caso onde a edição de título é a mensagem corrente); **(c)** re-injetar o histórico de forma mais prominente no thread-mode (aproximar do baseline). **Commitado como progresso parcial** (convenção do projeto: números honestos + NO-GO, como `e9135c173`), sem merge.
+
+### T4.1-D (2026-07-19) — decisão de PRODUTO (Lucas): opção D · **fam3 FECHA 3/3**
+Governança rejeitou as direções (a)/(b)/(c) acima em favor de uma **correção de definição**: **títulos de seção são ESTRUTURAIS** — vêm do plano/outline (que espelha o edital). Edição de usuário no chat de ESCRITA aplica-se a CONTEÚDO, não a estrutura. Um pedido de mudar título no chat → comportamento correto = **reconhecer e redirecionar** ("o título vem da estrutura do plano — quer atualizar o plano?"), **nunca renomear, nunca ignorar em silêncio**. Coerente com o que o sistema já declara: `MODE_CONFIG[MODE_ESCRITA]` põe "modificar o plano" fora de escopo e redireciona ao modo plan; `save_draft` rejeita título fora do outline por design.
+- **O que mudou:**
+  1. **Prompt do writer** (`WRITER_AGENT_SYSTEM`, §LIMITES): +1 regra de ESCOPO (não opção — lição item 6) — títulos/estrutura vêm do PLANO; pedido de rename → reconhecer e redirecionar, sem renomear nem silenciar.
+  2. **Âncora do outline** (`_build_stable_prefix_block`): a cláusula de "precedência do usuário" da T4.1 foi **descartada** (contradizia D); ficou só fidelidade-de-tool (o "exato" é o argumento de save_draft/read_section; a semântica estrutural vive no system prompt, fonte única).
+  3. **Golden** (`writing_v2.json`, caso `v2_familia3_tratorbr_title_redirect`, ex-`_user_edit`): re-especificado — `edit_intent` removido; agora `instruction`="redija o objetivo", `followup`="altere o título…" (pedido de rename como turno de chat), `expect_title_redirect: true`, `forbidden_title`.
+  4. **Harness** (`core/eval/writing.py`): `task` emite o turno de `followup` após a 1ª seção salva e captura `followup_response`/`assistant_text`; novo avaliador `eval_title_redirect` (redirect = referência ao título/seção **E** ao plano/estrutura na resposta ao followup); registrado na suíte. `eval_user_edit_preserved` passa a retornar `None` no caso título (sem `edit_intent`).
+- **Re-gate** (fam3 x3 treatment-only, Postgres local `:54322`, gpt-4o-mini):
+  - **frase/conteúdo** (`espectra`, eval_user_edit_preserved): **3/3 ✅** — sem regressão.
+  - **título/redirect** (`tratorbr`, eval_title_redirect): **3/3 ✅** — os 3 runs "redirecionaram ao plano"; a seção de objetivo (conteúdo) é salva normalmente; o título proibido NÃO é aplicado no draft.
+- **Conclusão:** **fam3 FECHADA por definição corrigida.** As métricas-núcleo da T4 (saved/pct_grounded/coherent) já não degradavam (números no bloco T4 acima). Restam para o merge da T4 os gates de escopo maior (N=12 + leak-test `{ws}:{session}` + smoke via `verify`), fora da fatia econômica.
+
+### T3 (2026-07-20) — promoção EXPLORE: thread-por-sessão · **implementada, gates verdes**
+Segue o padrão provado na T4 (delta + idempotência) e absorve a infra loop-local + descobertas A/B.
+- **Infra loop-local (emenda de governança):** `get_explore_checkpointer()` é um `AsyncPostgresSaver` **singleton POR LOOP** (registry `WeakKeyDictionary` keyed pelo OBJETO-loop — evita id-reuse de loops fechados; pool SEPARADO do bg-loop da escrita, `max_size` limitado). O probe da T1 provou que reusar o saver do bg-loop no loop da request explode ("Lock bound to a different event loop"). `aget_thread_message_count`/`atrim_thread_history` são as versões awaited no loop CORRENTE (não cruzam pro bg-loop). Ver `core/llm/agent_graph.py`.
+- **`run_agent_graph_streaming` — aditivo:** novos params `thread_id`/`checkpointer`/`prior_n_msgs`/`system_msg_id`. `thread_id=None` (default) → **byte-idêntico** de hoje (`checkpointer=False`, delta=estado inteiro). Setado → compila com o saver loop-local, `config.configurable.thread_id`, system com id determinístico (descoberta A: `add_messages` substitui em posição), e o `AgentResult` traduz só `msgs[prior_n_msgs:]` (descoberta B). `run_agent_streaming_async` repassa os params.
+- **`explore_stream`:** `thread_id` chega PRONTO do router (`{ws}:{session}`; recebido pronto — não derivado de `workspace_id` aqui — para manter o wiring de match/log tools **byte-idêntico**, T3 ortogonal). Modo-thread: para de re-seedar `[-8:]`, hint dobrado na msg atual (evita hint stale na thread), trim na fronteira, `prior_n_msgs` do checkpointer. Anônimo/sem sessão → `thread_id=None` → stateless de hoje. **Cópia sync `_explore_agent` fica DELIBERADAMENTE stateless** (o vivo é o streaming; unificação = TASK 6).
+- **`prior_n_msgs` do checkpointer, SEM coluna** (herda o desvio aprovado da T4 — explore não tem objeto de sessão persistente; cada request rehidrata stateless, o checkpointer é a única fonte durável do count).
+- **Router (`backend/routers/explore.py`):** resolve `workspace_id` (só autenticado + `session_id`) e passa `thread_id` pronto. NÃO passa `workspace_id`/`db` ao streaming → wiring de tools intocado.
+- **Gates (Postgres real, `tests/test_explore_thread_per_session.py`, 5/5 verdes):** (1) **singleton por loop** (N chamadas → mesmo saver); (2) **system idempotente** (3 rotas → 1 system refletindo a última); (3) **delta-slicing + called_match** (turno sem match NÃO herda o match do anterior; usage só do turno); (4) **leak-test estendido** (`{wsA}:sess` invisível por `{wsB}:sess`); (5) **subagente stateless** dentro da thread (sem loop-binding). Suíte inteira: **839 passed / 4 skipped**.
+- **Smoke real multi-turno (PASS):** `spikes/lever3_threads/smoke_explore_thread.py` dirige `explore_stream` real (gpt-4o-mini, Postgres local): turno 1 planta "Zephyr-9 / eólica offshore", turno 2 com `history=[]` **lembra** (checkpointer replaya, sem re-seed), e o controle `thread_id=None`/`history=[]` **não lembra** (stateless intacto).
+- **Pendências do gate (não bloqueiam a fatia):** smoke pelo **HTTP `/explore/stream`** com app de pé (último milímetro, como o smoke `verify` da T4). Warning cosmético de teardown ("Event loop is closed") do pool loop-local no boundary do pytest — em prod o loop vive o processo todo (um saver), não ocorre.
+
+### T5 (2026-07-20) — robustez transversal: concorrência + higiene do purge · **implementada**
+- **Concorrência mesma-thread (duas abas):** teste (`test_explore_concurrent_same_thread_no_corruption`) roda dois turnos SIMULTÂNEOS (`asyncio.gather`) na mesma thread sobre o saver loop-local real. Contrato FIXADO: pior caso aceitável = last-write-wins SEM corromper. Observado: **sem corrupção** — estado legível, ids únicos, 1 system, alternância válida. O saver do LangGraph serializa/versiona com segurança → **nenhum guard de concorrência necessário** (não se construiu framework; princípio "mínimo").
+- **Purge reconciliado (`core/tasks.py`):** o comentário assumia thread-por-TURNO ("threads velhos = lixo puro"). Reescrito para thread-por-SESSÃO:
+  - **Dormência ≠ lixo por construção:** o critério `max(ts) < now - retention` já protege sessão ativa/dormente-curta (um turno recente empurra o `max(ts)`); só sessões ABANDONADAS (> retention sem turno) são reclamadas.
+  - `retention_days`: de "TTL de lixo de turno" para "janela de memória de sessão dormente". Default **30→90** (conservador — sessão retornável; env-overridable).
+  - **Gracioso:** purgar apaga só o CONTEXTO do agente; `session_turns` preserva o histórico de exibição (Decisão 4). Reabrir uma sessão purgada re-semeia do zero.
+  - Gate real (`test_purge_dormant_session_but_not_active_thread_per_session`, Postgres): sessão com `ts` antigo é purgada, sessão com `ts` recente NÃO. Os 4 testes fake de orquestração seguem verdes.
+- **Condição de merge (revisão T3):** o **gap do fallback-sync** está documentado no código (`_explore_agent`) e aqui: um turno atendido pelo espelho sync stateless não entra na thread → amnésia de 1 turno no stream seguinte. ACEITO (raro, gracioso, `session_turns` preserva o registro). Fecha na TASK 6 (unificação das cópias).
+
+### Lições que o próximo executor PRECISA
+1. **Eval/golden roda LOCAL (`:54322`), nunca cloud** (memória `feedback_eval_runs_local`). Rodar contra o pooler de cloud pela WAN trava (quedas de conexão). Setup local: `scripts/seed_eval_corpus.py` (corpus finep:769/774 + **nós KG `entities`** — sem eles o card do agente floora e `saved`≈0) + identidade de eval em `supabase/seed.sql` (user `auth.users` + workspace, MESMOS UUIDs do cloud, dummy). Env: `.env.staging-local` + `EVAL_WORKSPACE_ID`.
+2. **`section_hallucination` é métrica furada** (conta subheadings). Não tratar como sinal de regressão sem inspeção qualitativa. Dívida anotada no avaliador.
+3. **Risco de prod pós-deploy (round-trips do checkpointer):** prod é Docker-local + Supabase Cloud pela WAN (NÃO co-locado). A T4 adiciona round-trips por turno (`get_thread_message_count` + `trim`). **Observar logs de conexão do checkpointer pós-deploy.**
+   - **Evidência corroborante (2026-07-20, gate de merge):** o eval `writing_v2` N=12 rodado com `EVAL_MAX_WORKERS>1` (harness paralelo do Item 6) sobre o checkpointer durável do Item 3 **travou** — 22 threads dormindo, 0% CPU, zero atividade no Postgres por 16+ min, sem stack trace disponível (py-spy exige sudo, não perseguido nesta etapa por decisão de governança). Mesma classe de risco (round-trip do checkpointer sob concorrência), agora com ocorrência real, não só hipotética. **Gatilho de investigação futura:** antes de rodar eval com `EVAL_MAX_WORKERS>1` sobre paths com checkpointer durável, ou antes de escalar tráfego concorrente de escrita em produção — revisitar se o bg-loop compartilhado do checkpointer sustenta concorrência de múltiplas THREADS do SO (distinto de `asyncio.gather` na mesma thread, já coberto pelo teste de concorrência da T5).
+4. **Gotcha de repro entre worktrees:** `python <path>/script.py` NÃO adiciona cwd ao `sys.path` → importa o `core` do editable-install (MAIN), não do worktree. Use `python -c` (adiciona cwd) OU `sys.path.insert(0, os.getcwd())`. (Custou um diagnóstico falso nesta sessão.)
+
+### Desvios aprovados (registrados)
+- `prior_n_msgs` vem do checkpointer via `aget_tuple` (helper `get_thread_message_count`), **sem migration/coluna** (cada request rehidrata sessão nova). Aprovado.
+- Prefixo colapsado numa msg de id determinístico, ordem estável→volátil (provider real = OpenAI, cache por prefixo de tokens). Aprovado.
+- Ponte de semeadura: `prior_n_msgs = 2 + len(_history)` no turno semeador (exclui o histórico do delta).
+
+### Estado do git (reconciliação PENDENTE — governança segura até o veredito de merge)
+- Branch `feat/lever3-threads`: T4 + fix + testes + este handoff. É a fonte de verdade da T4.
+- Checkout principal está em `main` (a governança trocou); tem **stray edits uncommitted** (plan doc, `supabase/seed.sql`, `scripts/seed_eval_corpus.py` novo). O A/B rodou de um **worktree** da branch.
+- A infra de eval (seed) precisa ser decidida: fica na branch ou vai pra main (é fixture geral)?
+
+---
+
 ## Estado real verificado (âncoras de código, lidas em 2026-07-18)
 
 O plano é contra o código, não contra memória.
@@ -52,12 +176,20 @@ O plano é contra o código, não contra memória.
 
 ## Decisões de arquitetura (tomadas, com racional)
 
-### Decisão 1 — Fatiamento: spike no explore, **1ª promoção no explore**, escrita depois
+### Decisão 1 — Fatiamento: spike no explore, **1ª promoção na ESCRITA** (flip 2026-07-18), explore depois
 
-- **A Task 1 (spike) é no explore**, como a régua da spec manda (conversa de 3 turnos): prova o **mecanismo LangGraph** genérico — thread acumula e é relido sem re-seed; `update_state` forka — que vale para os dois produtores. O spike roda throwaway **no bg-loop** (script), então prova o modelo de dados limpo.
-- **1ª promoção: explore.** Racional: (a) semântica mais simples (sem interrupt/resume, sem delta-slicing, sem risco de dobrar trace); (b) é o produtor que **mais ganha** — hoje 100% stateless, re-seeda do DB todo turno (`explore_agent.py:292`); (c) o único risco novo (loop-binding, descoberta #2) é bounded e a Task 1 já o retira; (d) fatia promovível sozinha, atrás de smoke + leak-test estendido, sem tocar o caminho de escrita de produção.
-- **2ª promoção: escrita.** Reusa o padrão já provado no explore, aplicado ao caminho de MAIOR risco (interrupt/resume em prod), atrás do **gate de eval de writing**. É incremental sobre a máquina que já existe (`_writing_turn_async` já tem thread+checkpointer+delta) — vira **re-escopo de `thread_id` + generalização do delta pra todo turno**, não infra nova.
-- **Tensão registrada honestamente:** a spec chamou o explore de "produtor mais simples". É verdade na *semântica*; na *infra* o explore é mais difícil (loop-binding), a escrita é mais difícil no *comportamento* (interrupt/resume não pode regredir). O fatiamento coloca cada risco na task certa em vez de misturá-los.
+- **A Task 1 (spike) é no explore**, como a régua da spec manda (conversa de 3 turnos): prova o **mecanismo LangGraph** genérico — thread acumula e é relido sem re-seed; `update_state` forka — que vale para os dois produtores. O spike roda throwaway **no bg-loop** (script), então prova o modelo de dados limpo. **Isto não mudou** (o spike rodou e ratificou GO; `spikes/lever3_threads/FINDINGS.md`).
+- **1ª promoção: ESCRITA** (era o explore; flip ratificado pela governança em 2026-07-18). Reusa a máquina que já existe (`_writing_turn_async` já tem thread+checkpointer+delta no bg-loop) — vira **re-escopo de `thread_id` {ws}:{sess} + generalização do delta pra todo turno + idempotência do prefixo (Adendo) + trim de paridade**, sem infra nova. Risco próprio (interrupt/resume não pode regredir) é o **mais bem coberto** pela baseline (B1, B3–B7).
+- **2ª promoção: explore.** Herda o padrão de delta/idempotência já provado na escrita, e absorve a infra loop-local (saver singleton-por-loop) + as descobertas A/B abaixo.
+
+#### Flip de fatiamento — descobertas de implementação (2026-07-18)
+
+Ao abrir a implementação da promoção do explore, dois fatos retiraram as vantagens que o tinham posto em 1º (o racional original — "sem interrupt/resume, **sem delta-slicing**, sem risco de dobrar trace" — só valia enquanto o explore ficasse stateless):
+
+- **Descoberta A — o `system` do explore é prefixo MUTÁVEL (como o outline da escrita).** É reconstruído por turno a partir da rota (`explore_agent.py:304-355`: base + rota + tools factuais/investidor + match/log). Numa thread-por-sessão, "só a msg nova" **congela** o system do turno 1 → turno 2 (rota diferente) veria instruções **stale**. Mesma classe do bug "outline invisível" — o explore **também** precisa do refresh idempotente por id determinístico. Não estava na T-explore.
+- **Descoberta B — explore com thread PRECISA de delta-slicing.** O caminho streaming traduz o estado final **inteiro** em `AgentResult` (`agent_graph.py:621`). Stateless = 1 turno; thread-por-sessão = conversa toda → todo turno re-reporta usage/trace de tudo, **e** `called_match`/`called_tools` (derivados de `result.steps`, `explore_agent.py:396-401`) refletiriam a conversa inteira → **abriria cards de match indevidamente** num turno que não deu match. Bug de comportamento no caminho vivo. Logo o explore herda `prior_n_msgs` **e** precisa persistir `last_n_messages` na sessão de explore.
+
+**Conclusão:** explore-first exigiria infra loop-local **+** delta-slicing **+** idempotência de system **+** ligar checkpointer do zero **+** tocar as 2 cópias (stream/sync mirror). Writing-first reusa muito mais e introduz menos infra nova; o único risco próprio (interrupt/resume) é o mais bem guardado. **A Decisão 1 foi invertida: escrita primeiro.** As descobertas A/B ficam registradas na Task-explore (agora fatia 2).
 
 ### Decisão 2 — Crescimento da thread: trim de **paridade entra JÁ (na promoção)**; janela maior fica com gatilho
 
@@ -80,27 +212,29 @@ O plano é contra o código, não contra memória.
 
 ## Sequência e dependências
 
+**ORDEM DE EXECUÇÃO REVISADA (flip 2026-07-18): T1 → T2 → T4 (escrita) → T3 (explore) → T5 → T6-design.** Os números das tasks são mantidos (T3=explore, T4=escrita) para não reflowar o doc; só a **ordem de execução** inverteu as duas promoções.
+
 ```
-TASK 1 (spike explore 3-turnos + fork, spikes/, no bg-loop)  ──►  ★ CHECKPOINT GO/NO-GO ★
+TASK 1 (spike explore 3-turnos + fork, spikes/, no bg-loop)  ──►  ★ CHECKPOINT GO/NO-GO ★  [✅ GO ratificado]
                                                                         │ (GO)
                                                                         ▼
-TASK 2 (GUARDRAILS baseline — rodar leak-test + interrupt/resume VERDES antes de tocar produtor)
+TASK 2 (GUARDRAILS baseline — leak-test + interrupt/resume VERDES antes de tocar produtor)  [✅ B1-B9 verdes]
                                                                         │
                                                                         ▼
-TASK 3 (PROMOÇÃO explore: thread-por-sessão + ligar checkpointer + trim paridade)   ← fatia 1, promovível só
-   │        gate: leak-test ESTENDIDO (explore) + subagente-stateless + smoke explore multi-turno
+TASK 4 (PROMOÇÃO ESCRITA — 1ª fatia: re-escopo thread {ws}:{sess} + delta todo-turno + idempotência prefixo + trim)
+   │        gate: eval writing (N=12) + interrupt/resume NÃO regride + leak-test estendido
    ▼
-TASK 4 (PROMOÇÃO escrita: re-escopo thread {ws}:{sess} + delta todo-turno + trim paridade)   ← fatia 2
-   │        gate: eval writing (N=12) + interrupt/resume NÃO regride + leak-test
+TASK 3 (PROMOÇÃO EXPLORE — 2ª fatia: saver loop-local + ligar checkpointer + delta-slicing + system idempotente + trim)
+   │        gate: leak-test ESTENDIDO (explore) + subagente-stateless + singleton-por-loop + smoke explore multi-turno
    ▼
 TASK 5 (robustez transversal: turnos concorrentes na mesma thread + atualizar purge/comentário)
                                                                         
 TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implementação = follow-on)
 ```
 
-- **TASK 1 é obrigatória e bloqueante.** Nada de produção antes do checkpoint.
-- **TASK 2 roda os guardrails cedo** (spec: "leak-test RLS + interrupt/resume ANTES de tocar produtor") — baseline verde é pré-condição das Tasks 3/4; versões ESTENDIDAS viram gate dentro de cada promoção.
-- **TASK 3 → 4** são fatias promovíveis separadamente (como no item 1).
+- **TASK 1 é obrigatória e bloqueante.** Nada de produção antes do checkpoint. **[Concluída — GO ratificado.]**
+- **TASK 2 roda os guardrails cedo** (spec: "leak-test RLS + interrupt/resume ANTES de tocar produtor") — baseline verde é pré-condição das promoções; versões ESTENDIDAS viram gate dentro de cada uma. **[Concluída — B1-B9.]**
+- **TASK 4 → 3** são fatias promovíveis separadamente (como no item 1). **A escrita vai primeiro** (Decisão 1, flip): reusa delta+checkpointer+bg-loop existentes; explore herda o padrão + carrega a infra loop-local e as descobertas A/B.
 - **TASK 5** só faz sentido depois que ≥1 produtor está em thread-por-sessão.
 
 ---
@@ -150,20 +284,52 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 2. Confirmar que `test_cross_workspace_isolation_durable` (`:132`) e os 7 unit de interrupt/resume passam **antes** de qualquer mudança.
 
 **Critérios de aceite:**
-- [ ] Leak-test durável (`:132`) e interrupt/resume durável (`:102`) **verdes** localmente contra Postgres real.
-- [ ] Os 7 unit de `test_agent_graph_checkpointer.py` verdes (incl. `test_subagent_inside_checkpointed_writing_turn:215` e `test_thread_id_isolates_state:191`).
-- [ ] Baseline registrado (comando + saída) — é o "antes" comparável dos gates das Tasks 3/4.
+- [x] Leak-test durável (`:132`) e interrupt/resume durável (`:102`) **verdes** localmente contra Postgres real.
+- [x] Os 7 unit de `test_agent_graph_checkpointer.py` verdes (incl. `test_subagent_inside_checkpointed_writing_turn:215` e `test_thread_id_isolates_state:191`).
+- [x] Baseline registrado (comando + saída) — é o "antes" comparável dos gates das Tasks 3/4.
+
+### ✅ LINHA DE BASE — guardrails (registrada 2026-07-18)
+
+**Alvo:** Postgres **LOCAL** (Supabase `127.0.0.1:54322`, `ENVIRONMENT=test`) — nunca prod. Tabelas `agent_memory.{checkpoints,checkpoint_blobs,checkpoint_writes}` criadas via `scripts/setup_checkpointer.py`. **Comando:**
+```
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+SUPABASE_URL=http://127.0.0.1:54321 ENVIRONMENT=test INTEGRATION_TARGET=local \
+.venv/bin/python -m pytest tests/test_checkpointer_postgres.py tests/test_agent_graph_checkpointer.py -v
+```
+**Resultado: 9 passed / 0 failed / 0 skipped (3.15s).** Qualquer regressão nas Tasks 3-5 é atribuída contra estes números:
+
+| # | Teste | Tipo | Baseline |
+|---|---|---|---|
+| B1 | `test_checkpointer_postgres::test_interrupt_resume_durable` | durável (PG real) | PASS |
+| B2 | `test_checkpointer_postgres::test_cross_workspace_isolation_durable` (**leak-test / gate segurança**) | durável (PG real) | PASS |
+| B3 | `test_agent_graph_checkpointer::test_interrupt_pauses_with_payload` | unit (InMemory) | PASS |
+| B4 | `test_agent_graph_checkpointer::test_resume_continues_from_interrupt` | unit | PASS |
+| B5 | `test_agent_graph_checkpointer::test_resume_token_usage_is_delta_only` (**delta não dobra** — o wrinkle da T4) | unit | PASS |
+| B6 | `test_agent_graph_checkpointer::test_batched_tool_reexecutes_on_resume` | unit | PASS |
+| B7 | `test_agent_graph_checkpointer::test_thread_id_isolates_state` | unit | PASS |
+| B8 | `test_agent_graph_checkpointer::test_subagent_inside_checkpointed_writing_turn` (**subagente stateless**) | unit | PASS |
+| B9 | `test_agent_graph_checkpointer::test_subagent_graph_compiles_with_checkpointer_false` | unit | PASS |
+
+**Nota:** B2 é o leak-test **atual** (convenção `{ws}:{session}:{turn}`). A versão **estendida** (`{ws}:{session}` p/ explore e escrita) é gate NOVO dentro das Tasks 3/4 — deve entrar como B2′/B2″ ao lado deste, não substituí-lo. B5 e B8 são os guardrails mais sensíveis às Tasks 4 e 3 respectivamente.
 
 ---
 
-## TASK 3 — Promoção EXPLORE: thread por sessão + ligar checkpointer · dep: TASK 2
+## TASK 3 — Promoção EXPLORE: thread por sessão + ligar checkpointer · **2ª fatia (roda APÓS a T4)** · dep: TASK 2 (baseline) + padrão provado na T4
 
 **Objetivo.** O explore streaming (caminho vivo) passa a usar **uma thread de sessão** sobre o checkpointer durável, **parando de re-seedar** o histórico do DB; o corte de janela (paridade com `[-8:]` de hoje) migra pra fronteira de turno via `trim_messages`.
 
-**Sub-decisão de infra (resolvida pelo probe da Task 1):** se o probe confirmou o loop-binding, o explore recebe um **`AsyncPostgresSaver` loop-local** (pool aberto no loop da request/uvicorn, pool SEPARADO do saver do bg-loop da escrita) — ou, se o probe mostrar que o cruzamento pro bg-loop é viável sem matar o streaming, reusa o saver existente. **Não** compartilhar um pool entre loops. Documentar a escolha no topo da função nova.
+**Descobertas A/B (fold do flip 2026-07-18 — obrigatórias nesta task):**
+- **A — system idempotente.** O system do explore é reconstruído por turno (rota; `explore_agent.py:304-355`). Numa thread durável ele é prefixo MUTÁVEL: entra por **id determinístico** (ex.: `SystemMessage(id="explore:system")`) para o `add_messages` **substituir em posição** (não acumular system stale). Mesmo mecanismo/critério da idempotência de prefixo da T4 (Adendo de governança).
+- **B — delta-slicing.** `run_agent_graph_streaming` traduz o estado final **inteiro** (`agent_graph.py:621`). Com thread, isso vira a conversa toda → `AgentResult` (usage/trace) e `called_match`/`called_tools` (`explore_agent.py:396-401`) refletiriam turnos anteriores (bug: cards de match num turno sem match). O explore precisa do **mesmo delta** da escrita: traduzir só `msgs[prior_n_msgs:]`, com `prior_n_msgs` = `last_n_messages` do turno anterior **persistido na sessão de explore**.
+
+**Sub-decisão de infra (resolvida pelo probe da Task 1; emenda de governança 2026-07-18):** se o probe confirmou o loop-binding, o explore recebe um **`AsyncPostgresSaver` loop-local** — e este saver é **singleton POR LOOP**, obrigatoriamente:
+- **Registry keyed pelo loop**, espelhando o padrão do bg-loop da escrita (`_get_writing_checkpointer:816` — dupla-checagem sob lock, `_checkpointer`/`_checkpointer_ready`/`_checkpointer_lock`). A versão da request usa uma estrutura análoga keyed pelo `asyncio.get_running_loop()` (ex.: `WeakKeyDictionary`/dict por `id(loop)` sob lock), de modo que **cada loop tem no máximo um saver**. Uvicorn tipicamente tem um loop por worker → na prática um saver por processo, mas a chave-por-loop é o guardrail defensivo.
+- **NUNCA instanciar por request.** Um `AsyncPostgresSaver`/pool novo por request vaza conexões e recria pool a cada turno — proibido. A request pega o singleton do seu loop via o registry (init preguiçoso na 1ª vez, sob lock).
+- **Pool SEPARADO do saver do bg-loop da escrita**, com **tamanho limitado** (`max_size` explícito, como `_make_agent_memory_pool:706`), e **pools JAMAIS compartilhados entre loops** (é a origem do "Lock bound to a different event loop").
+- Alternativa só se o probe da Task 1 mostrar que cruzar pro bg-loop é viável sem matar o streaming: reusar o saver existente (aí não há saver novo). Documentar a escolha no topo da função nova.
 
 **Arquivos:**
-- `core/llm/agent_graph.py` — **aditivo**: dar a `run_agent_graph_streaming` (`:498`) (e por simetria `run_agent_graph_async:358`, se o fallback sync for migrado) parâmetros **opcionais** `thread_id: str | None = None` e um provedor de checkpointer para o path stateful. Quando `thread_id is None` → comportamento **byte-idêntico** de hoje (`checkpointer=False`, sem re-seed mudado). Quando setado → compila com o saver loop-local e passa `config={"configurable":{"thread_id": thread_id}}`. O tradutor de `AgentResult` (`_messages_to_agent_result`) continua saindo do estado final — sem mudança de contrato. **Não** tocar o ramo `checkpointer=False` dos subagentes (`:391-397` continua valendo — subagente do `deep_research` do explore roda via `run_agent_graph_async` com `False`).
+- `core/llm/agent_graph.py` — **aditivo**: dar a `run_agent_graph_streaming` (`:498`) (e por simetria `run_agent_graph_async:358`, se o fallback sync for migrado) parâmetros **opcionais** `thread_id: str | None = None`, um provedor de checkpointer para o path stateful, e **`prior_n_msgs: int = 0`** (descoberta B — quando setado, o `done` traduz só `msgs[prior_n_msgs:]` como na escrita; default 0 = comportamento de hoje). Quando `thread_id is None` → comportamento **byte-idêntico** de hoje (`checkpointer=False`, sem re-seed mudado, delta=tudo). Quando setado → compila com o saver loop-local, passa `config={"configurable":{"thread_id": thread_id}}`, e o payload leva o system com **id determinístico** (descoberta A). O tradutor de `AgentResult` continua saindo do estado final (agora fatiado). **Não** tocar o ramo `checkpointer=False` dos subagentes (`:391-397` continua valendo — subagente do `deep_research` do explore roda via `run_agent_graph_async` com `False`).
 - `core/services/explore_agent.py` — em `explore_stream` (`:218`): (a) computar `thread_id = f"{workspace_id}:{session_id}"` (exigir `workspace_id`; explore anônimo sem workspace **continua stateless**, `thread_id=None` → caminho de hoje); (b) **parar de re-seedar** `for turn in (history or [])[-8:]` (`:292`) quando há thread — só a mensagem nova (+ hint) vai no payload; (c) aplicar `trim_messages(strategy="last", start_on="human", token_counter=..., ...)` na fronteira, dimensionado pra ~8 turnos (paridade). Replicar a mudança de payload na **cópia sync `_explore_agent`** (~L428) OU deixá-la explicitamente no caminho antigo (fallback re-seeda) — decidir e comentar (o docstring `:242-245` avisa que as cópias divergem).
 - `backend/routers/explore.py` — passar `session_id`/`workspace_id` já resolvidos ao `explore_stream` como escopo do thread (já disponíveis no handler; sem rota nova).
 
@@ -172,15 +338,18 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 **Critérios de aceite:**
 - [ ] Conversa de explore autenticada de ≥3 turnos: turnos 2/3 **não re-seedam** (log/asserção de que o payload leva só a msg nova) e o agente demonstra memória do turno 1.
 - [ ] **Leak-test ESTENDIDO** (novo caso em `test_checkpointer_postgres.py`, espelhando `:132`): dois workspaces com `thread_id="{wsA}:sess"` vs `"{wsB}:sess"` — B **não** lê o estado de A. Verde contra Postgres real.
+- [ ] **Saver singleton por loop (emenda de governança):** N requests de explore no mesmo loop reusam o **MESMO** `AsyncPostgresSaver` (asserção: nenhum pool novo por request; registry keyed pelo loop). Nenhum saver/pool instanciado por request.
 - [ ] **Subagente stateless preservado:** um `deep_research` disparado dentro de um turno de explore com thread NÃO persiste no checkpointer (espelho de `test_agent_graph_checkpointer.py:215`, adaptado ao explore) — sem "Lock bound to a different event loop".
 - [ ] Explore **anônimo/sem workspace** continua stateless (`thread_id=None`, caminho de hoje intacto).
 - [ ] Janela cortada: sessão longa (>8 turnos) não cresce o payload indefinidamente (trim na fronteira observável).
 - [ ] `session_turns` continua sendo escrito (history/dashboard do frontend não regride).
+- [ ] **Descoberta A (system idempotente):** após 3 turnos com rotas diferentes, o estado persistido tem **uma** cópia de system e ela reflete a rota do **último** turno (teste que inspeciona a thread; um turno de rota factual seguido de outro de rota conceitual não deixa instruções factuais stale).
+- [ ] **Descoberta B (delta):** num 2º/3º turno, `AgentResult.usage`/`steps` cobrem **só o turno atual** (não a conversa); `called_match` é `False` num turno sem match mesmo que um turno anterior tenha dado match. `last_n_messages` persiste na sessão de explore e sobrevive ao rehidrato.
 - [ ] **Smoke via `verify`** dirigindo o `/explore/stream` real multi-turno (com e sem match). É o gate de promoção do explore (sem eval — explore não tem golden de match como gate deste eixo; ver "fora de escopo").
 
 ---
 
-## TASK 4 — Promoção ESCRITA: re-escopo de thread + delta em todo turno · dep: TASK 3
+## TASK 4 — Promoção ESCRITA: re-escopo de thread + delta em todo turno · **1ª fatia (roda ANTES da T3)** · dep: TASK 2
 
 **Objetivo.** A escrita passa de **thread-por-turno** (`{ws}:{session}:{turn}`) para **thread-por-sessão** (`{ws}:{session}`); o `interrupt/resume` vira um **caso particular** do mesmo mecanismo de delta que agora rege TODO turno; o re-seed de `self._history` no `_build_agent_initial_messages` para (o checkpointer replaya).
 
@@ -188,7 +357,8 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 
 **Arquivos:**
 - `core/services/writing_session.py`:
-  - `_turn_agent` (`:1263`): `thread_id = f"{self.workspace_id}:{self.session_id}"` **sempre** (fresco e resume convergem no mesmo thread); `prior_n_msgs = self._last_n_messages` (0 no 1º turno); parar de reinjetar `self._history` no `_build_agent_initial_messages` (o prefixo estável — perfil/card/outline/playbook — **permanece**, porque é contexto de sistema, não histórico de conversa; só o `messages.extend(self._history)` em `:2144` sai quando há thread). Após o turno, gravar `self._last_n_messages = outcome.n_messages` e persistir.
+  - `_turn_agent` (`:1263`): `thread_id = f"{self.workspace_id}:{self.session_id}"` **sempre** (fresco e resume convergem no mesmo thread); `prior_n_msgs = self._last_n_messages` (0 no 1º turno); parar de reinjetar `self._history` no `_build_agent_initial_messages` (só o `messages.extend(self._history)` em `:2144` sai quando há thread — é o histórico episódico que o checkpointer agora replaya). Após o turno, gravar `self._last_n_messages = outcome.n_messages` e persistir.
+  - **Prefixo estável idempotente (obrigatório — Adendo de governança abaixo).** O prefixo (perfil/card/**outline**/playbook) **continua entrando a cada turno** (o outline é MUTÁVEL — cada `save_draft` o altera; congelá-lo na thread = bug "outline invisível" de 2026-07-02 por outro caminho). MAS re-injetá-lo como mensagens normais numa thread durável faz o `add_messages` reducer **APPENDAR** → N cópias, com versões conflitantes do outline no mesmo estado. Mecanismo exigido: o bloco de prefixo entra como **uma mensagem de id determinístico estável** (ex.: `id="ws-stable-prefix"`), reconstruída fresca a cada invoke — o `add_messages` **substitui em posição** (mesmo id → replace, não append), mantendo **uma** cópia sempre-fresca no índice fixo. Alternativa equivalente: um nó pre-model que reconstrói/substitui o prefixo a partir do estado atual da sessão (via `RemoveMessage` + re-append). Confirmar o comportamento replace-por-id do `add_messages` na versão pinada antes de escolher. **Nuance de delta:** o prefixo fica no índice 0 (< `prior_n_msgs` nos turnos ≥2) → não entra no slice de trace/usage (`msgs[prior_n_msgs:]`), então não dobra contagem; o token real que o modelo viu vem do `usage_metadata` do AIMessage, não do slice.
   - `interrupt/resume` (`:1293-1306`): deixa de precisar do `resume_ctx["thread_id"]` separado — o thread já é o da sessão; o resume continua sendo `Command(resume=user_message)` com `prior_n_msgs = last_n_messages`. `_pending_user_input` guarda só `field/prompt` (o `thread_id` vira redundante; manter por compat ou remover — decidir e comentar).
   - Persistência do `last_n_messages`: campo na linha da sessão (schema `writing_sessions`), carregado no rehidrato (junto de `_history_summary` em `:756`).
   - Aplicar `trim_messages(start_on="human", ...)` na fronteira de turno pra paridade com `_compress_history` (a sumarização atual pode ser aposentada OU mantida como camada de exibição — **manter** para não mexer no dashboard; o trim é só do contexto do agente).
@@ -201,7 +371,8 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 - [ ] Conversa de escrita de ≥3 turnos: turnos 2/3 **não re-seedam** `_history`; `prior_n_msgs` fatia o delta corretamente (trace/usage do turno N ≈ só o turno N, sem dobrar — asserção sobre `result.usage`).
 - [ ] **`interrupt/resume` NÃO regride:** um turno que pausa em `request_user_info` emite `pending_user_input` e o resume continua e fecha (rodar o cenário de `test_checkpointer_postgres.py:102` adaptado ao thread-por-sessão; e os unit `:84,116` verdes).
 - [ ] `last_n_messages` persiste e sobrevive ao rehidrato da sessão (reabrir a sessão num processo novo continua o delta certo).
-- [ ] Prefixo estável (perfil/card/outline/playbook) **continua** entrando (não é histórico — não pode sumir com a parada de re-seed).
+- [ ] Prefixo estável (perfil/card/outline/playbook) **continua** entrando fresco a cada turno (não é histórico — não pode sumir com a parada de re-seed).
+- [ ] **Idempotência do prefixo (Adendo de governança):** após 3 turnos na mesma thread, o estado **persistido** contém **zero ou uma** cópia do bloco de prefixo — teste que **inspeciona a thread** (`aget_state`), não só o comportamento. E: um `save_draft` no turno 2 que muda o outline → o turno 3 vê o outline **novo** (não o do turno 1).
 - [ ] **Gate de eval de writing (N=12, `EVAL_MAX_WORKERS`)** verde — é o eixo com checkpointer durável (spec). Baseline v3 próprio, não paridade com legado.
 - [ ] **Leak-test** (`:132`) verde com a convenção `{ws}:{session}` da escrita.
 - [ ] **Smoke via `verify`** dirigindo chat de escrita real multi-turno com ≥1 tool (`save_draft`) e um ciclo interrupt→resume.
@@ -209,7 +380,7 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 
 ---
 
-## TASK 5 — Robustez transversal: turnos concorrentes + higiene do purge · dep: TASK 3 (e 4, se promovida)
+## TASK 5 — Robustez transversal: turnos concorrentes + higiene do purge · dep: TASK 4 (e T3, se já promovida)
 
 **Objetivo.** Cobrir o risco de **duas abas** na mesma sessão escrevendo a mesma thread, e reconciliar o **purge** com o novo modelo (o comentário de `core/tasks.py:385-387` assume thread-por-turno-descartável — agora falso).
 
@@ -225,7 +396,9 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 
 ---
 
-## TASK 6-design — Frame de `interrupt` no contrato SSE (DESENHO; quita o pareamento do item 1)
+## APÊNDICE (T6-design) — Frame de `interrupt` no contrato SSE (DESENHO; quita o pareamento do item 1)
+
+> **Status (governança 2026-07-20):** T6 é **apêndice de design** — não há implementação nesta trilha. O frame abaixo fica registrado como contrato; a implementação do streaming da escrita é follow-on do item 1, após o thread-por-sessão da escrita (T4) estabilizar.
 
 **Não é implementação.** É o desenho que **destrava** a Task 6 do plano do item 1 (streaming da escrita), cuja dependência declarada era exatamente "um frame de `interrupt` no contrato SSE" que o explore não tem. Entregar o desenho aqui quita a dívida de pareamento; a implementação é **follow-on** após a Task 4 estabilizar o thread da escrita.
 
@@ -276,6 +449,16 @@ pode ser appendado ao estado persistido a cada turno (senão o checkpointer acum
 conflitantes do outline dentro da mesma memória). Entra por-invoke fora do estado persistido, ou substitui em vez de acumular.
 **Critério de aceite:** após 3 turnos na mesma thread, o estado persistido contém **zero ou uma** cópia do bloco de prefixo — teste
 que inspecione a thread, não só o comportamento.
+
+## Adendo de EXECUÇÃO da T4 (governança, 2026-07-18) — design ratificado antes da cirurgia
+
+Design da promoção da escrita aprovado ponto-a-ponto pela governança (substitui os detalhes correspondentes do corpo da T4 acima):
+
+1. **Prefixo idempotente = 1 mensagem colapsada de id determinístico** (ex.: `id="wr:stable-prefix"`), `add_messages` substitui em posição → sempre **uma** cópia, sempre fresca. **Ordem interna: estável → volátil** — perfil, card, programa, library, playbook primeiro; **outline por ÚLTIMO**. Racional da ordem: o provider real é **OpenAI** (não há `ANTHROPIC_API_KEY` em ambiente nenhum), cujo cache é **automático por prefixo de tokens** — a granularidade de mensagem é irrelevante e a ordenação interna recupera o cache incremental que a "N mensagens" prometia; os breakpoints Anthropic (`cache_hint`/`_as_cached_content`) são **código dormante**, não o ponto frágil. O system (writer) também recebe id determinístico (`id="wr:system"`). **Rejeitada** a opção "nó pre-model no grafo" por princípio: grafo é mecânica, domínio (perfil/outline) fica no **produtor**; quando o explore precisar do mesmo refresh, generaliza-se o helper no produtor.
+2. **`prior_n_msgs` via `aget_state`/`aget_tuple` do checkpointer, no início do turno — SEM migration** (desvio aprovado sobre o plano, que previa coluna `last_n_messages`). Cada request rehidrata uma `WritingSession` nova (`:793-794`), então o checkpointer é a única fonte durável do count. Turno 1 (thread inexistente) → `None` → 0. Unifica fresh e resume (ambos leem o mesmo count; o resume deixa de depender de `resume_ctx["n_msgs"]`).
+3. **Tail dinâmico** (temporal/reflection/mentions/section) **dobrado na mensagem do usuário atual** — é contexto episódico do turno; evita acumular blocos stale na thread. Histórico episódico **não** é re-injetado (o checkpointer replaya).
+4. **Canais de estado sob checkpointer persistente:** turno fresco manda `llm_calls:0/tool_rounds:0/documents:{}` → **resetam** (budget é por-turno, correto); resume (`Command`) não os manda → continua. `_history_summary` **sai** do prefixo em modo-thread (redundante com o histórico durável; `_compress_history` segue só para exibição).
+5. **interrupt/resume converge no thread `{ws}:{session}`** (determinístico). **Mantém `thread_id` no `_pending_user_input`** como discriminador resume-vs-plan-confirmation (`:1168`); só **`n_msgs` deixa de ser usado** (vem do checkpointer). Não regride o fluxo de pausa.
 
 ## Notas de execução para o implementador (Opus 4.8)
 

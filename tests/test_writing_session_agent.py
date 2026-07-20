@@ -429,6 +429,9 @@ def test_turn_agent_interrupt_surfaces_pending_and_persists_question(monkeypatch
             partial, interrupt={"field": "cnpj", "prompt": "Qual o CNPJ?"}, n_messages=3,
         ),
     )
+    # Item 3: thread-por-sessão — helpers de checkpointer mockados (unit hermético).
+    monkeypatch.setattr("core.llm.agent_graph.get_thread_message_count", lambda *a, **k: 0)
+    monkeypatch.setattr("core.llm.agent_graph.trim_thread_history", lambda *a, **k: 0)
 
     s._turn_count = 1
     result = s._turn_agent("escreva a identificação", section_hint=None, user_turn_index=1)
@@ -437,8 +440,8 @@ def test_turn_agent_interrupt_surfaces_pending_and_persists_question(monkeypatch
     assert result["pending_user_input"] == {"field": "cnpj", "prompt": "Qual o CNPJ?"}
     # A pergunta é a msg do assistente persistida (espelha o chat).
     assert result["assistant_message"] == "Qual o CNPJ?"
-    # Estado interno guarda thread_id + n_msgs para retomar.
-    assert s._pending_user_input["thread_id"] == "ws_1:sess_1:1"
+    # Item 3: thread da SESSÃO (sem :turn); discriminador de resume preservado.
+    assert s._pending_user_input["thread_id"] == "ws_1:sess_1"
     assert s._pending_user_input["n_msgs"] == 3
 
 
@@ -446,10 +449,10 @@ def test_turn_agent_resume_routes_command_and_clears_pending(monkeypatch):
     """Quando há interrupt pendente (com thread_id), turn() retoma o thread via
     resume= e fecha a pergunta: pending limpo, resposta final no chat."""
     s = _make_session()
-    # Estado de uma sessão recarregada com interrupt em aberto.
+    # Estado de uma sessão recarregada com interrupt em aberto (thread da sessão).
     s._pending_user_input = {
         "field": "cnpj", "prompt": "Qual o CNPJ?",
-        "thread_id": "ws_1:sess_1:1", "n_msgs": 3,
+        "thread_id": "ws_1:sess_1", "n_msgs": 3,
     }
 
     captured: dict = {}
@@ -471,17 +474,103 @@ def test_turn_agent_resume_routes_command_and_clears_pending(monkeypatch):
         return _outcome(final, interrupt=None, n_messages=5)
 
     monkeypatch.setattr("core.llm.agent_graph.run_writing_turn", fake)
+    # Item 3: prior_n_msgs vem do checkpointer (não de resume_ctx["n_msgs"]).
+    monkeypatch.setattr("core.llm.agent_graph.get_thread_message_count", lambda *a, **k: 3)
+    monkeypatch.setattr("core.llm.agent_graph.trim_thread_history", lambda *a, **k: 0)
 
     result = s.turn("12.345.678/0001-90")
 
-    # Retomou o MESMO thread com resume = a resposta do usuário.
+    # Retomou o MESMO thread da sessão com resume = a resposta do usuário.
     assert captured["resume"] == "12.345.678/0001-90"
-    assert captured["thread_id"] == "ws_1:sess_1:1"
+    assert captured["thread_id"] == "ws_1:sess_1"
+    # prior_n_msgs sourced do checkpointer (mock=3), não mais de resume_ctx.
     assert captured["prior_n_msgs"] == 3
     # Pergunta fechada: pending limpo e resposta final no chat.
     assert s._pending_user_input is None
     assert result["pending_user_input"] is None
     assert result["assistant_message"] == "CNPJ registrado. Seção concluída."
+
+
+def test_turn_agent_gates_trim_to_fresh_turns_only(monkeypatch):
+    """Item 3 (regressão da revisão T4): `_trim_thread_history` roda em turno
+    FRESCO mas NUNCA no resume — podar uma thread pausada num interrupt via
+    update_state descarta o estado pendente e quebra o Command(resume)."""
+    s = _make_session()
+    trim_calls: list = []
+    monkeypatch.setattr(s, "_trim_thread_history", lambda tid: trim_calls.append(tid))
+    monkeypatch.setattr("core.llm.agent_graph.get_thread_message_count", lambda *a, **k: 0)
+
+    final = AgentResult(
+        final_text="ok", steps=[], stop_reason="end_turn",
+        usage={"input_tokens": 10, "output_tokens": 5},
+    )
+    monkeypatch.setattr(
+        "core.llm.agent_graph.run_writing_turn",
+        lambda **kw: _outcome(final, interrupt=None, n_messages=4),
+    )
+
+    # Turno FRESCO → poda roda.
+    s._turn_count = 1
+    s._turn_agent("primeiro turno", section_hint=None, user_turn_index=1, resume_ctx=None)
+    assert trim_calls == ["ws_1:sess_1"], "turno fresco deve podar"
+
+    # RESUME → poda NÃO roda (thread pausada).
+    trim_calls.clear()
+    s._turn_count = 2
+    s._turn_agent(
+        "resposta ao interrupt", section_hint=None, user_turn_index=2,
+        resume_ctx={"thread_id": "ws_1:sess_1", "n_msgs": 3},
+    )
+    assert trim_calls == [], "resume NÃO pode podar a thread pausada"
+
+
+def _bridge_session(monkeypatch, *, thread_count):
+    """Sessão com _history não-vazio (pós plan-first) + captura do run_writing_turn."""
+    s = _make_session()
+    s._history = [
+        {"role": "user", "content": "Redija a descrição. Depois substitua a primeira frase por 'NOSSO PROJETO X'."},
+        {"role": "assistant", "content": "## Plano da Proposta — 11 seções."},
+    ]
+    monkeypatch.setattr("core.llm.agent_graph.get_thread_message_count", lambda *a, **k: thread_count)
+    monkeypatch.setattr(s, "_trim_thread_history", lambda tid: None)
+    captured: dict = {}
+    final = AgentResult(final_text="ok", steps=[], stop_reason="end_turn",
+                        usage={"input_tokens": 10, "output_tokens": 5})
+    monkeypatch.setattr(
+        "core.llm.agent_graph.run_writing_turn",
+        lambda **kw: (captured.update(kw), _outcome(final))[1],
+    )
+    return s, captured
+
+
+def test_turn_agent_bridges_history_into_empty_thread(monkeypatch):
+    """PONTE (fix do NO-GO): 1º turno `_turn_agent` com thread VAZIA + _history
+    não-vazio (o plan-first não escreveu na thread) → semeia o histórico no
+    payload, para o agente ver a instrução de edição do usuário. Sem isso a
+    edição se perdia (user_edit_preserved 1.0→0.0)."""
+    s, captured = _bridge_session(monkeypatch, thread_count=0)  # thread vazia
+    n_hist = len(s._history)  # ANTES do turno (_turn_agent appenda ao _history)
+    s._turn_count = 1
+    s._turn_agent("Finalize e salve.", section_hint="2. Descrição do projeto",
+                  user_turn_index=1, resume_ctx=None)
+    texts = [m["content"] for m in captured["initial_messages"]]
+    assert any("substitua a primeira frase" in t for t in texts), \
+        "histórico (com a edição) deve ser semeado no payload"
+    # delta pula o histórico semeado: system(1) + prefixo(1) + len(history original)
+    assert captured["prior_n_msgs"] == 2 + n_hist
+
+
+def test_turn_agent_bridge_idempotent_when_thread_populated(monkeypatch):
+    """Idempotência da ponte: thread JÁ com conteúdo → NÃO re-semeia o histórico
+    (o checkpointer já o tem); prior_n_msgs vem do checkpointer, não do 2+len."""
+    s, captured = _bridge_session(monkeypatch, thread_count=7)  # thread não-vazia
+    s._turn_count = 3
+    s._turn_agent("Continue.", section_hint="2. Descrição do projeto",
+                  user_turn_index=3, resume_ctx=None)
+    texts = [m["content"] for m in captured["initial_messages"]]
+    assert not any("substitua a primeira frase" in t for t in texts), \
+        "thread não-vazia: NÃO re-semeia (evita duplicar histórico)"
+    assert captured["prior_n_msgs"] == 7
 
 
 # ============================================================================

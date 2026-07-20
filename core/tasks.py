@@ -381,10 +381,22 @@ def _purge_stale_checkpoints(retention_days: int) -> dict[str, int]:
     checkpoint é mais antigo que `retention_days`. Síncrono — rodar via to_thread.
 
     O timestamp vem do próprio checkpoint (JSONB, key `ts`, ISO-8601): o schema
-    do AsyncPostgresSaver não tem coluna de data. O thread_id é
-    {workspace_id}:{session_id}:{turn} — cada turno é um thread permanente que
-    só é relido em resume de interrupt DENTRO do próprio turno, então threads
-    velhos são lixo puro (F9: nada mais deletava esses rows).
+    do AsyncPostgresSaver não tem coluna de data.
+
+    SEMÂNTICA (Item 3, TASK 5 — thread-por-SESSÃO): o modelo antigo era
+    thread-por-TURNO (`{ws}:{session}:{turn}`), onde um thread velho era LIXO PURO
+    (turno morto). Agora o thread é `{ws}:{session}` e é a **memória viva da sessão**
+    — todos os turnos acumulam nele. Consequência:
+      • DORMÊNCIA vs LIXO: o critério `max(ts) < now - retention` distingue os dois
+        por construção — um turno recente em QUALQUER sessão empurra o `max(ts)` pra
+        frente, então uma sessão só-dormente (tocada há < retention) NUNCA é purgada;
+        só sessões ABANDONADAS (sem nenhum turno há > retention) são reclamadas.
+      • `retention_days` deixou de ser "TTL de lixo de turno" e passou a ser "por
+        quanto tempo guardamos a memória-de-agente de uma sessão dormante antes de
+        reclamá-la". Default subido 30→90 (conservador — sessão retornável).
+      • GRACIOSO: purgar a thread apaga só o CONTEXTO do agente; `session_turns`
+        (persist_turn) preserva o histórico de EXIBIÇÃO do usuário (Decisão 4). Uma
+        sessão purgada e reaberta re-semeia do zero, não perde o registro de produto.
     """
     import psycopg
 
@@ -429,7 +441,8 @@ def _purge_stale_checkpoints(retention_days: int) -> dict[str, int]:
 @app.task(name="purge_agent_checkpoints", queue="default")
 async def purge_agent_checkpoints(timestamp: int) -> None:
     """Cron semanal (domingo 06:00 UTC): purga do schema agent_memory os threads
-    de checkpoint mais antigos que CHECKPOINT_RETENTION_DAYS (default 30).
+    de checkpoint mais antigos que CHECKPOINT_RETENTION_DAYS (default 90 — janela de
+    memória de sessão DORMENTE, não lixo de turno; ver _purge_stale_checkpoints).
 
     Sem retry de propósito (padrão dos wrappers de cron): falha re-roda na
     semana seguinte. Sem DATABASE_URL (dev/teste com InMemorySaver) é no-op.
@@ -438,7 +451,7 @@ async def purge_agent_checkpoints(timestamp: int) -> None:
     if not os.environ.get("DATABASE_URL"):
         logger.info("purge_agent_checkpoints: DATABASE_URL ausente — no-op")
         return
-    retention = int(os.getenv("CHECKPOINT_RETENTION_DAYS", "30"))
+    retention = int(os.getenv("CHECKPOINT_RETENTION_DAYS", "90"))
     counts = await asyncio.to_thread(_purge_stale_checkpoints, retention)
     logger.info(
         "purge_agent_checkpoints: %d threads purgados (retention=%dd, timestamp=%s): %s",

@@ -152,6 +152,9 @@ ANTHROPIC_MODEL_AGENT_EXPLORE = os.getenv(
     os.getenv("ANTHROPIC_MODEL_AGENT", "claude-sonnet-4-6"),
 )
 EXPLORE_AGENT_MAX_STEPS = int(os.getenv("EXPLORE_AGENT_MAX_STEPS", "15"))
+# Item 3 (TASK 3): janela de paridade do trim da thread-por-sessão do explore —
+# preserva ~8 turnos (o mesmo `[-8:]` que o path stateless re-seedava).
+EXPLORE_THREAD_HISTORY_WINDOW = int(os.getenv("EXPLORE_THREAD_HISTORY_WINDOW", "8"))
 
 
 class ExploreAgent:
@@ -227,6 +230,7 @@ class ExploreAgent:
         workspace_id: str | None = None,
         db=None,
         profile: dict | None = None,
+        thread_id: str | None = None,
     ) -> AsyncIterator[ExploreStreamEvent]:
         """Variação streaming de `explore_with_meta` (item 1, TASK 3).
 
@@ -288,18 +292,55 @@ class ExploreAgent:
 
         from core.llm.agent_runtime import resolve_agent_provider, run_agent_streaming_async
 
-        messages: list[dict] = []
-        for turn in (history or [])[-8:]:
-            role = turn.get("role")
-            content = turn.get("content")
-            if role in ("user", "assistant") and content:
-                messages.append({"role": role, "content": content})
-
+        # Item 3 (TASK 3) — thread-por-sessão do explore. `thread_id` chega PRONTO do
+        # router (`{ws}:{session}`, exige workspace autenticado + sessão; preserva o
+        # prefixo `{ws}` do leak-test). Recebê-lo pronto — em vez de derivar de
+        # `workspace_id` aqui — mantém a T3 ORTOGONAL ao wiring de tools: `workspace_id`
+        # segue alimentando match/log exatamente como hoje (o streaming não muda de
+        # ferramentas). Explore anônimo/sem sessão → `thread_id=None` → caminho
+        # stateless de HOJE (re-seeda `[-8:]`), byte-idêntico.
+        saver = None
+        prior_n_msgs = 0
+        system_msg_id = None
         hint = self._build_explore_hint(edital_ids, node_id, node_type)
-        if hint:
-            messages.append({"role": "user", "content": hint})
+        messages: list[dict] = []
 
-        messages.append({"role": "user", "content": message, "cache_hint": True})
+        if thread_id is not None:
+            from core.llm.agent_graph import (
+                EXPLORE_SYSTEM_MSG_ID,
+                aget_thread_message_count,
+                atrim_thread_history,
+                get_explore_checkpointer,
+            )
+            saver = await get_explore_checkpointer()
+            if saver is None:
+                thread_id = None  # init degradou → stateless (sem quebrar o turno)
+
+        if thread_id is not None:
+            system_msg_id = EXPLORE_SYSTEM_MSG_ID
+            # Poda na fronteira do turno (paridade com `[-8:]`), best-effort, ANTES
+            # de ler o count (o delta fatia a partir do estado já podado).
+            await atrim_thread_history(
+                saver, thread_id,
+                keep_human_turns=EXPLORE_THREAD_HISTORY_WINDOW,
+                keep_ids=(EXPLORE_SYSTEM_MSG_ID,),
+            )
+            prior_n_msgs = await aget_thread_message_count(saver, thread_id)
+            # NÃO re-seeda o histórico — o checkpointer replaya. O hint é contexto
+            # episódico do alvo (edital/nó): dobrado na msg atual (evita acumular
+            # hints stale de turnos anteriores na thread durável).
+            content = f"{hint}\n\n{message}" if hint else message
+            messages.append({"role": "user", "content": content, "cache_hint": True})
+        else:
+            # Stateless (anônimo/sem sessão): caminho de hoje, byte-idêntico.
+            for turn in (history or [])[-8:]:
+                role = turn.get("role")
+                content = turn.get("content")
+                if role in ("user", "assistant") and content:
+                    messages.append({"role": role, "content": content})
+            if hint:
+                messages.append({"role": "user", "content": hint})
+            messages.append({"role": "user", "content": message, "cache_hint": True})
 
         tools = self._explore_tools()
         system = EXPLORE_AGENT_SYSTEM
@@ -367,6 +408,10 @@ class ExploreAgent:
             provider=provider,
             max_steps=EXPLORE_AGENT_MAX_STEPS,
             mode="explore",
+            thread_id=thread_id,
+            checkpointer=saver,
+            prior_n_msgs=prior_n_msgs,
+            system_msg_id=system_msg_id,
         ):
             if delta.kind == "token":
                 if delta.text:
@@ -474,6 +519,20 @@ class ExploreAgent:
 
         from core.llm.agent_runtime import resolve_agent_provider, run_agent
 
+        # Item 3 (TASK 3): a promoção thread-por-sessão é do caminho VIVO (streaming,
+        # `explore_stream`). Esta cópia sync (`/explore` não-streaming) fica
+        # DELIBERADAMENTE stateless — re-seeda `[-8:]` como sempre. Migrá-la exigiria
+        # cruzar o saver loop-local pro `run_agent` sync (outro loop) sem ganho: o
+        # front usa o streaming. Unificação das duas cópias fica pra TASK 6.
+        #
+        # GAP ACEITO (governança, revisão T3): um turno atendido por ESTE espelho
+        # sync NÃO escreve na thread `{ws}:{session}`. Se um turno cair aqui (ex.:
+        # cliente não-streaming) e o SEGUINTE for pelo stream, o agente não verá o
+        # turno-sync na thread → amnésia de 1 turno. Aceito porque: (a) é raro (o
+        # front usa `/explore/stream`); (b) degradação graciosa (o pior é re-perguntar,
+        # não corromper); (c) `session_turns` (persist_turn) preserva o registro de
+        # produto — só o CONTEXTO do agente perde aquele turno, não o histórico do
+        # usuário. Fechar o gap = unificar as cópias (TASK 6).
         messages: list[dict] = []
         for turn in (history or [])[-8:]:
             role = turn.get("role")

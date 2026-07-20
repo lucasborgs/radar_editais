@@ -308,6 +308,19 @@ async def explore_stream_endpoint(
     explore_message = f"{ctx}\n\n{message}" if ctx else message
     current = req.profile.model_dump() if req.profile is not None else {}
 
+    # Item 3 (TASK 3): escopo da thread-por-sessão do explore. `thread_id` só existe
+    # com usuário autenticado (workspace) + sessão; anônimo/sem sessão → None →
+    # stateless (caminho de hoje). Passa-se o thread_id PRONTO (não workspace_id) p/
+    # manter o wiring de tools do streaming byte-idêntico (ortogonalidade da T3).
+    thread_id = None
+    if user_id and db is not None and req.session_id:
+        try:
+            ws = get_workspace_id(db, user_id)
+            if ws:
+                thread_id = f"{ws}:{req.session_id}"
+        except Exception as e:  # noqa: BLE001 — degrada para stateless
+            logger.warning("explore/stream: thread_id não resolvido (%s) — stateless", e)
+
     async def gen():
         try:
             answer = ""
@@ -317,6 +330,7 @@ async def explore_stream_endpoint(
                 req.node_type, has_profile=req.profile is not None,
                 profile_text=ctx or None,
                 profile=current or None,
+                thread_id=thread_id,
             ):
                 if event.kind == "token":
                     yield _sse("token", {"text": event.text})
