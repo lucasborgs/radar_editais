@@ -71,12 +71,12 @@ export default function WorkspacePage() {
   const [refining, setRefining] = useState<string | null>(null);
   const [wsMode, setWsMode] = useState<"explorer" | "escrita">("explorer");
 
-  function parseCommand(input: string): { command?: "explorer" | "escrita"; message: string } {
-    const match = input.trim().match(/^\/(explorer|escrita|help)\b/);
+  function parseCommand(input: string): { command?: "explorer" | "escrita" | "profile" | "review"; message: string } {
+    const match = input.trim().match(/^\/(explorer|escrita|help|profile|review)\b/);
     if (!match) return { message: input };
     if (match[1] === "help") return { message: "" };
     return {
-      command: match[1] as "explorer" | "escrita",
+      command: match[1] as "explorer" | "escrita" | "profile" | "review",
       message: input.slice(match[0].length).trim(),
     };
   }
@@ -271,11 +271,33 @@ export default function WorkspacePage() {
         const helpText = `**Comandos disponíveis:**
   • \`/explorer\` — explorar o edital, tirar dúvidas
   • \`/escrita\` — escrever/refinar as seções
+  • \`/profile\` — extrair sugestão de perfil de uma URL
+  • \`/review\` — revisar uma seção com o Critic
   • \`/help\` — mostrar esta mensagem
 
   Modo atual: **/${wsMode}**`;
         setMessages((prev) => [...prev, { role: "assistant", content: helpText, timestamp: nowTime() }]);
         setWorking(false);
+        return;
+      }
+
+      // Ações one-shot: /profile, /review — não mudam wsMode
+      if (command === "profile" || command === "review") {
+        setMessages((prev) => [...prev, { role: "user", content, timestamp: nowTime() }]);
+        setInput("");
+        setWorking(true);
+        try {
+          const res = await workspaceMode(sessionId, command, message || content);
+          if (res.error) {
+            toast.error(res.error);
+            return;
+          }
+          setMessages((prev) => [...prev, { role: "assistant", content: res.response, timestamp: nowTime() }]);
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Erro ao executar ação.");
+        } finally {
+          setWorking(false);
+        }
         return;
       }
 

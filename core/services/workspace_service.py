@@ -19,6 +19,7 @@ MODE_EXPLORER = "explorer"
 MODE_ESCRITA = "escrita"
 
 VALID_MODES = frozenset({MODE_EXPLORER, MODE_ESCRITA})
+VALID_ACTIONS = frozenset({"profile", "review"})
 
 # ── Blocos de redirecionamento ──────────────────────────────────────────────
 # Cada modo tem: escopo, ações fora-de-escopo, e mensagem de redirecionamento.
@@ -184,6 +185,19 @@ def dispatch(
           - welcome: str | None (mensagem de boas-vindas se modo mudou)
           - error: str | None
     """
+    if mode in VALID_ACTIONS:
+        if mode == "profile":
+            response = _dispatch_profile(
+                db, session_id, workspace_id, profile, message, library_items,
+            )
+        elif mode == "review":
+            response = _dispatch_review(
+                db, session_id, workspace_id, profile, message, library_items,
+            )
+        else:
+            response = f"Ação desconhecida: /{mode}."
+        return {"mode": mode, "response": response, "welcome": None, "error": None}
+
     if mode not in VALID_MODES:
         return {"mode": mode, "response": "", "welcome": None,
                 "error": f"Modo inválido: {mode}. Use /explorer ou /escrita."}
@@ -394,6 +408,134 @@ def _dispatch_escrita(
 
     result = session.turn(user_message=enriched)
     return result.get("assistant_message", result.get("error", "Erro no modo escrita."))
+
+
+def _dispatch_profile(
+    db,
+    session_id: str,
+    workspace_id: str,
+    profile,
+    message: str,
+    library_items: list | None = None,
+) -> str:
+    """Ação /profile: extrai sugestão de perfil de uma URL via ProfileExtractor.
+
+    Nunca persiste — só retorna a sugestão + confiança.
+    Sem URL na mensagem → pede a URL sem chamar LLM.
+    """
+    import re
+
+    from core.profile_extractor import ProfileExtractor
+
+    url_match = re.search(r'https?://[^\s]+', message)
+    if not url_match:
+        return (
+            "**Extrair Perfil** — Forneça a URL do site da empresa.\n\n"
+            "Exemplo: `/profile https://minhaempresa.com.br`"
+        )
+
+    url = url_match.group(0)
+    extractor = ProfileExtractor()
+    result = extractor.extract(url)
+
+    if result.error:
+        return f"**Erro ao extrair perfil:** {result.error}"
+
+    lines = [f"**Sugestão de perfil** — fonte: {result.source_title}"]
+    pd = result.profile
+    lines.append(f"- **Nome:** {pd.nome or '—'}")
+    lines.append(f"- **Tipo:** {pd.tipo_entidade or '—'}")
+    lines.append(f"- **One-liner:** {pd.one_liner or '—'}")
+    lines.append(f"- **Solução:** {pd.solution_summary or '—'}")
+    lines.append(f"- **Atividades:** {pd.descricao_atividades or '—'}")
+    if pd.uf:
+        lines.append(f"- **UF:** {pd.uf}")
+    if pd.ano_fundacao is not None:
+        lines.append(f"- **Ano fundação:** {pd.ano_fundacao}")
+    if pd.tamanho_empresa:
+        lines.append(f"- **Porte:** {pd.tamanho_empresa}")
+    if pd.trl is not None:
+        lines.append(f"- **TRL:** {pd.trl}")
+
+    conf_label = "Baixa" if result.low_confidence else "Média/Alta"
+    lines.append(f"\n**Confiança:** {conf_label}")
+    lines.append("*Isso é uma sugestão — nada foi salvo.*")
+    return "\n".join(lines)
+
+
+def _dispatch_review(
+    db,
+    session_id: str,
+    workspace_id: str,
+    profile,
+    message: str,
+    library_items: list | None = None,
+) -> str:
+    """Ação /review: dispara o Critic sobre a seção especificada.
+
+    Consulta sem side-effect — nenhum set_section_content, nenhum save.
+    Sem seção resolvível → lista o outline e não chama o critic.
+    """
+    from core.llm.agent_tools.critic_agent import run_critic
+    from core.services import writing_session as _ws_mod
+
+    ws_cls = _ws_mod.WritingSession
+    session = ws_cls(
+        db=db,
+        workspace_id=workspace_id,
+        profile=profile,
+        session_id=session_id,
+        library_items=library_items or [],
+    )
+
+    section_title = message.strip()
+
+    if not section_title:
+        outline = getattr(session, "_proposal_outline", [])
+        if not outline:
+            return "Nenhuma seção disponível para revisão."
+        lines = ["**Revisar Seção** — Seções disponíveis:"]
+        for t in outline:
+            has = bool(getattr(session, "_doc_sections", {}).get(t, "").strip())
+            lines.append(f"- `{t}`{' (com rascunho)' if has else ''}")
+        lines.append("\nUse `/review <título>` para revisar uma seção específica.")
+        return "\n".join(lines)
+
+    doc_sections = getattr(session, "_doc_sections", {})
+    outline = getattr(session, "_proposal_outline", [])
+
+    target = section_title
+    if target not in doc_sections:
+        norm = target.strip().lower()
+        for t in outline:
+            if t.strip().lower() == norm:
+                target = t
+                break
+        else:
+            avail = "\n".join(f"- `{t}`" for t in outline)
+            return f"Seção \"{section_title}\" não encontrada. Seções disponíveis:\n{avail}"
+
+    content = doc_sections.get(target, "")
+    if not content.strip():
+        return f"A seção **{target}** ainda não tem conteúdo."
+
+    try:
+        result = run_critic(content, target, session)
+    except Exception as e:
+        logger.error("_dispatch_review: run_critic falhou: %s", e)
+        return f"**Erro ao revisar:** {e}"
+
+    lines = [f"**Revisão da seção:** {target}"]
+    verdict = "✅ Aprovado" if result.approved else "❌ Bloqueado"
+    lines.append(f"**Veredito:** {verdict}")
+    if result.feedback:
+        lines.append(f"**Feedback:** {result.feedback}")
+    if result.issues:
+        lines.append("**Issues:**")
+        for issue in result.issues:
+            lines.append(f"- {issue}")
+    lines.append("\n*Isso é uma consulta — nada foi alterado.*")
+    return "\n".join(lines)
 
 
 def _mode_history_str(history: list[dict]) -> str:
