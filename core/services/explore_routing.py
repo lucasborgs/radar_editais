@@ -180,11 +180,47 @@ def route_message(
 
 
 def redirect_for(decision: RouteDecision, current_mode: str = "explorer") -> str | None:
-    """Redirect determinístico apenas para ações explícitas fora do modo."""
+    """Redirect determinístico apenas para ações explícitas fora do modo.
+
+    Deprecated: use handoff_target() para transição fluida.
+    Mantido para compatibilidade de chamadas diretas a _dispatch_explorer.
+    """
     if current_mode != "explorer":
         return None
     if decision.intent == Intent.WRITING_ACTION:
         return "⚠ Você está no modo /explorer. Para escrever ou refinar a proposta, digite /escrita no chat."
+    return None
+
+
+def handoff_target(decision: RouteDecision, current_mode: str) -> str | None:
+    """Retorna o modo-alvo de handoff ou None se o modo atual já é o correto.
+
+    Função pura, sem I/O — testável isoladamente. Substitui redirect_for
+    no fluxo do dispatch(): o código decide a troca de produtor, não o
+    modelo.
+
+    Mapeamento pós-Task 4:
+      WRITING_ACTION / PLAN_ACTION → escrita (escrita absorve o plano)
+      intents factuais/de exploração → explorer
+      None se já está no modo correto
+    """
+    _factual_ints = frozenset({
+        Intent.EDITAL_SUMMARY,
+        Intent.EDITAL_FACT,
+        Intent.EDITAL_FACT_ENUMERATIVE,
+        Intent.ENTITY_FACT,
+        Intent.DISCOVERY,
+        Intent.MATCH_PROFILE,
+        Intent.CONCEPTUAL,
+    })
+    if decision.intent in (Intent.WRITING_ACTION, Intent.PLAN_ACTION):
+        if current_mode != "escrita":
+            return "escrita"
+        return None
+    if decision.intent in _factual_ints:
+        if current_mode != "explorer":
+            return "explorer"
+        return None
     return None
 
 

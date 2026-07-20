@@ -27,13 +27,9 @@ VALID_MODES = frozenset({MODE_EXPLORER, MODE_ESCRITA})
 _REDIRECT_BLOCK = """
 MODO ATUAL: /{mode}
 ESCOPO: {scope}
-NÃO FAZ: {out_of_scope}
 
-Se o usuário pedir algo FORA DO ESCOPO, responda APENAS:
-"⚠ Você está no modo /{mode}. Para {redirect_action}, digite /{redirect_mode}
-no chat. Quer que eu te ajude com {redirect_offer}?"
-
-NÃO tente executar ações fora do escopo — recuse educadamente e redirecione.
+Se o usuário pedir algo fora do escopo, o sistema troca de contexto
+automaticamente. Mantenha o foco no escopo atual.
 """
 
 MODE_CONFIG: dict[str, dict] = {
@@ -59,6 +55,14 @@ MODE_CONFIG: dict[str, dict] = {
         "welcome": "✍️ Modo Escrita — escreva sua proposta. "
                    "Para dúvidas sobre o edital, digite /explorer.",
     },
+}
+
+
+# ── Prefixos de transição fluida ──────────────────────────────────────────
+# Injetados antes da resposta do produtor alvo quando o dispatch faz handoff.
+TRANSITION_PREFIXES: dict[tuple[str, str], str] = {
+    ("escrita", "explorer"): "↪ Entendi que você quer escrever — troquei para /escrita.\n\n",
+    ("explorer", "escrita"): "↪ Entendi sua pergunta sobre o edital — troquei para /explorer.\n\n",
 }
 
 
@@ -189,12 +193,62 @@ def dispatch(
     # Carrega edital_id da sessão (útil para explorer)
     edital_id = _load_session_edital_id(db, session_id)
 
+    # Classifica a intenção uma vez no dispatch (antes de chamar o produtor)
+    from core.services.explore_routing import (
+        RouteContext,
+        classify_ambiguous_route,
+        handoff_target,
+        route_message,
+    )
+
+    decision = route_message(RouteContext(
+        mode=mode,
+        target_type="edital" if edital_id else None,
+        target_id=edital_id if edital_id else None,
+        message=message,
+        has_profile=profile is not None,
+        has_documents=bool(library_items),
+    ), ambiguous_classifier=classify_ambiguous_route)
+
+    target = handoff_target(decision, mode)
+
+    if target is not None and target != mode:
+        # Handoff fluido: o código decide a troca de produtor
+        try:
+            if target == MODE_ESCRITA:
+                producer_response = _dispatch_escrita(
+                    db, session_id, workspace_id, profile, message, library_items,
+                )
+            elif target == MODE_EXPLORER:
+                producer_response = _dispatch_explorer(
+                    message, history, profile,
+                    edital_ids=[edital_id] if edital_id else None,
+                    library_items=library_items,
+                    decision=decision,
+                )
+            else:
+                producer_response = "Modo não reconhecido."
+        except Exception as e:
+            logger.error("dispatch handoff erro %s→%s: %s", mode, target, e)
+            return {"mode": mode, "response": "", "welcome": None,
+                    "error": f"Erro no modo /{target}: {e}"}
+
+        prefix = TRANSITION_PREFIXES.get((target, mode),
+                                         f"↪ Entendi, troquei para /{target}.\n\n")
+        response = prefix + producer_response
+
+        # Persiste turno no modo-alvo (a conversa continua lá)
+        _save_turn(db, session_id, target, "user", message)
+        _save_turn(db, session_id, target, "assistant", response)
+        return {"mode": target, "response": response, "welcome": None, "error": None}
+
     try:
         if mode == MODE_EXPLORER:
             response = _dispatch_explorer(
                 message, history, profile,
                 edital_ids=[edital_id] if edital_id else None,
                 library_items=library_items,
+                decision=decision,
             )
         elif mode == MODE_ESCRITA:
             response = _dispatch_escrita(
@@ -249,8 +303,13 @@ def _dispatch_explorer(
     profile,
     edital_ids: list[str] | None = None,
     library_items: list | None = None,
+    decision=None,
 ) -> str:
-    """Modo /explorer: ExploreAgent contextualizado ao edital e anexos."""
+    """Modo /explorer: ExploreAgent contextualizado ao edital e anexos.
+
+    Quando ``decision`` (RouteDecision) é fornecido pelo dispatch(),
+    a classificação de rota já foi feita uma vez — não repete.
+    """
     from core.services.explore_routing import (
         RouteContext,
         classify_ambiguous_route,
@@ -260,17 +319,18 @@ def _dispatch_explorer(
 
     agent = ExploreAgent()
 
-    decision = route_message(RouteContext(
-        mode=MODE_EXPLORER,
-        target_type="edital" if edital_ids else None,
-        target_id=edital_ids[0] if edital_ids else None,
-        message=message,
-        has_profile=profile is not None,
-        has_documents=bool(library_items),
-    ), ambiguous_classifier=classify_ambiguous_route)
-    redirect = redirect_for(decision, MODE_EXPLORER)
-    if redirect:
-        return redirect
+    if decision is None:
+        decision = route_message(RouteContext(
+            mode=MODE_EXPLORER,
+            target_type="edital" if edital_ids else None,
+            target_id=edital_ids[0] if edital_ids else None,
+            message=message,
+            has_profile=profile is not None,
+            has_documents=bool(library_items),
+        ), ambiguous_classifier=classify_ambiguous_route)
+        redirect = redirect_for(decision, MODE_EXPLORER)
+        if redirect:
+            return redirect
 
     profile_text = None
     if profile:

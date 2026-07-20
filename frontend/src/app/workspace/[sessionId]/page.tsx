@@ -305,6 +305,10 @@ export default function WorkspacePage() {
             toast.error(res.error);
             return;
           }
+          // Handoff fluido: se o backend trocou de modo, sincroniza o front
+          if (res.mode && res.mode !== wsMode) {
+            setWsMode(res.mode);
+          }
           setMessages((prev) => [
             ...prev,
             { role: "assistant", content: res.response, timestamp: nowTime() },
