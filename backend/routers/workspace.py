@@ -1,4 +1,4 @@
-"""Workspace multi-modo — dispatcher /explorer /plan /escrita.
+"""Workspace multi-modo — dispatcher /explorer /escrita + ações one-shot.
 
 Endpoints:
   POST /workspace/{session_id}/mode → troca modo e envia mensagem
@@ -16,6 +16,7 @@ from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient
 from core.services.content_library import get_workspace_id, list_items
 from core.services.workspace_service import (
+    VALID_ACTIONS,
     VALID_MODES,
     dispatch,
     mode_welcome,
@@ -55,10 +56,10 @@ def workspace_mode(
     Se o modo for diferente do atual, o histórico é filtrado para o novo
     modo e o response inclui uma mensagem de boas-vindas.
     """
-    if req.mode not in VALID_MODES:
+    if req.mode not in VALID_MODES and req.mode not in VALID_ACTIONS:
         raise HTTPException(
             status_code=422,
-            detail=f"Modo inválido: '{req.mode}'. Use: {', '.join(sorted(VALID_MODES))}",
+            detail=f"Modo inválido: '{req.mode}'. Use: {', '.join(sorted(VALID_MODES))} ou {', '.join(sorted(VALID_ACTIONS))}",
         )
 
     workspace_id = get_workspace_id(db, user_id)
@@ -81,8 +82,9 @@ def workspace_mode(
         raise HTTPException(status_code=502, detail=result["error"])
 
     # Se a mensagem estiver vazia (apenas troca de modo), inclui welcome
+    # Ações one-shot nunca disparam welcome.
     welcome = None
-    if not req.message.strip():
+    if not req.message.strip() and req.mode not in VALID_ACTIONS:
         welcome = mode_welcome(req.mode)
 
     return ModeSwitchResponse(
