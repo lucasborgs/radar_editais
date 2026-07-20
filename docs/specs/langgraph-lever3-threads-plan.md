@@ -8,6 +8,25 @@
 
 ---
 
+## ⚑ PACOTE PARA O GATE DE MERGE (2026-07-20) — governança
+
+Item 3 (thread por sessão) **implementado end-to-end** na branch `feat/lever3-threads`. Pilha de commits:
+`c9c2116aa` (T4.1 parcial) → `586364cfd` (T4.1-D fam3 3/3) → `1fe202215` (T3 explore) → `29b2925e2` (T5+T6) → smoke HTTP (este commit).
+
+**Escopo entregue:** T4 escrita (thread-por-sessão, fam3 fechada por definição-D) + T3 explore (thread-por-sessão, streaming) + T5 (concorrência + purge) + T6 (apêndice de design).
+
+**Gates verdes:**
+- **Escrita (T4/T4.1-D):** fam3 3/3 (frase-conteúdo 3/3 + título-redirect 3/3); métricas-núcleo não degradam (saved 0.75→0.83, pct_grounded 0.58→0.74, coherent 1.0). *Pendente do escopo-maior da T4 (fora da fatia econômica): eval N=12 + leak-test `{ws}:{session}` da escrita + smoke `verify` da escrita.*
+- **Explore (T3):** 6 gates de integração (Postgres real) verdes — singleton-por-loop, system idempotente, delta+called_match, leak-test estendido `{wsA}:sess`≠`{wsB}:sess`, subagente stateless, concorrência sem corrupção. Smoke produtor real + **smoke HTTP `/explore/stream` multi-turno PASS** (JWT do usuário seed; turno 2 lembra via thread-por-sessão).
+- **T5:** concorrência mesma-thread sem corrupção; purge real (dormência purgada, ativa intacta).
+- **Suíte inteira:** 839+ passed / 4 skipped. ruff limpo.
+
+**Débitos ACEITOS (documentados, não bloqueiam):** (1) gap fallback-sync (amnésia de 1 turno se um turno cair no espelho sync — raro, gracioso, `session_turns` preserva; fecha na T6); (2) purge é decisão de produto (retention 90d de memória de sessão dormente); (3) warning cosmético "Event loop is closed" no teardown de teste (prod = 1 loop, não ocorre).
+
+**Riscos p/ prod (do handoff):** round-trips extra do checkpointer por turno (Docker-local + Supabase Cloud pela WAN não co-locado) — observar logs de conexão pós-deploy. Setup de deploy: migration/schema `agent_memory` já existe; `CHECKPOINT_RETENTION_DAYS` default 90.
+
+---
+
 ## ⚑ STATUS DE HANDOFF (2026-07-19) — leia isto primeiro
 
 A próxima sessão parte DAQUI, não do executor anterior. Estado real:
@@ -18,7 +37,7 @@ A próxima sessão parte DAQUI, não do executor anterior. Estado real:
 | T1 spike (explore 3-turnos + fork) | ✅ **GO ratificado** (`spikes/lever3_threads/FINDINGS.md`; probe loop-binding EXPLODE) |
 | T2 guardrails baseline | ✅ **B1–B9 verdes** (leak-test + interrupt/resume, Postgres local) |
 | **T4 ESCRITA (1ª fatia)** | ✅ **implementada** (`dd382056e`,`574c3e532`,`e9135c173`,`c9c2116aa`) + **T4.1 opção D** (título estrutural → redirect). **fam3 fecha 3/3** (frase-conteúdo 3/3 + título-redirect 3/3). Reside na branch `feat/lever3-threads` |
-| T3 EXPLORE (2ª fatia) | ✅ **implementada** (este commit): saver loop-local singleton-por-loop + delta-slicing + system idempotente + trim. **5 gates verdes** (Postgres real) + **smoke real multi-turno PASS**. Falta só o smoke pelo HTTP `/explore/stream` com app de pé (último milímetro). Ver §T3-D abaixo |
+| T3 EXPLORE (2ª fatia) | ✅ **implementada + gate completo**: saver loop-local singleton-por-loop + delta-slicing + system idempotente + trim. 6 gates verdes (Postgres real, incl. concorrência) + smoke produtor + **smoke HTTP `/explore/stream` PASS**. Ver §T3 e §MERGE abaixo |
 | T5 robustez (concorrência + purge) | ✅ **implementada** (este commit): concorrência mesma-thread sem corrupção + purge reconciliado (dormência≠lixo, retention 30→90). Ver §T5 abaixo |
 | T6-design (frame interrupt SSE) | ✅ **apêndice de design** (§APÊNDICE T6-design + nota no plano do item 1); implementação = follow-on do item 1 |
 
