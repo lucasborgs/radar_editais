@@ -59,7 +59,9 @@
 - **Promoção.** Mudança no nó `tools` + eventual nó de resumo. **Gate:** eval de **grounding + writing golden** (muda o que o modelo vê — risco de resumir fora citação; ver memória `project_writing_agent_evolution`). **Pré-requisito do gate:** tornar o writing golden **rodável** e a métrica de grounding confiável — dívida conhecida (o golden N=3 nunca rodou; a métrica já deu falso alarme uma vez). Sem isso o gate não informa; pagar essa dívida é parte do item, antes da promoção.
 - **Pegadinha.** Resumo destrutivo não pode comer constraint/citação; preferir preservar tool-results de fonte normativa e resumir só os de baixa densidade.
 
-## Item 3 — Thread por sessão (checkpointer como memória)
+## Item 3 — Thread por sessão (checkpointer como memória) — ✅ PROMOVIDO 2026-07-20
+
+**Status:** mergeado na main (`eb6add629`), deployado (app+worker), smoke SSE via Cloudflare Tunnel PASS, zero erro de conexão do checkpointer nos logs pós-deploy. Gate final: eval `writing_v2` N=12 sequencial (isolando de um travamento por concorrência, confirmado como causa) — núcleo não degrada (saved 0.778, pct_grounded 0.642↑ vs baseline 0.75/0.58, coherent 1.0); F3 (user-edit) 6/6; F2 (misfit) 0/6 automático é **debt pré-existente do avaliador** (precedente direto desta mesma investigação + inspeção manual: agente honesto em 6/6 casos reais, o avaliador mede o campo errado — `draft`, não `assistant_text`). Detalhe completo em `docs/specs/langgraph-lever3-threads-plan.md`.
 
 - **Régua (revista):** spike dobrado como **task 1 exploratória do plano** com checkpoint go/no-go — os guardrails de risco já existem como testes (leak-test RLS + interrupt/resume da escrita), então o vehicle certo é um plano que os roda cedo, não um spike solto.
 - **Herança do spike do #2 (2026-07-18):** `trim_messages(start_on="human"/end_on)` é a ferramenta certa **aqui** (fronteira de turno, memória multi-troca) — no shape intra-turno ela colapsa para quase-vazio (comprovado empiricamente). Quando a thread por sessão acumular turnos, o corte de histórico entre turnos usa `start_on`; nunca aplicar na cadeia intra-turno.
