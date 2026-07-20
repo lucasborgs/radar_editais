@@ -10,6 +10,7 @@ import {
   startWritingSession,
   workspaceMode,
   getEditalById,
+  planningAdjust,
 } from "@/lib/api";
 import type { CompanyProfile } from "@/types/profile";
 import type { Plan } from "@/types/api";
@@ -153,14 +154,7 @@ function PlanningInner() {
     if (!adjustInput.trim() || !sessionId) return;
     setSaving(true);
     try {
-      // Envia ajuste via workspace /plan mode
-      const res = await workspaceMode(sessionId, "plan", adjustInput);
-      if (res.error) {
-        toast.error(res.error);
-        return;
-      }
-      // Recarrega o plano atualizado
-      const updated = await getExistingPlan(sessionId);
+      const updated = await planningAdjust(sessionId, adjustInput);
       setPlan(updated);
       setAdjustInput("");
       setAdjusting(false);

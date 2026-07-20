@@ -183,8 +183,6 @@ def redirect_for(decision: RouteDecision, current_mode: str = "explorer") -> str
     """Redirect determinístico apenas para ações explícitas fora do modo."""
     if current_mode != "explorer":
         return None
-    if decision.intent == Intent.PLAN_ACTION:
-        return "⚠ Você está no modo /explorer. Para planejar a proposta, digite /plan no chat."
     if decision.intent == Intent.WRITING_ACTION:
         return "⚠ Você está no modo /explorer. Para escrever ou refinar a proposta, digite /escrita no chat."
     return None

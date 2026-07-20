@@ -22,7 +22,7 @@ export function WorkspaceHeader({
   mode: WritingMode;
   filled: number;
   total: number;
-  wsMode?: "explorer" | "plan" | "escrita";
+  wsMode?: "explorer" | "escrita";
   sessionId?: string;
 }) {
   return (
