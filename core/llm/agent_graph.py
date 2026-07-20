@@ -24,6 +24,7 @@ import logging
 import os
 import re
 import threading
+import weakref
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
@@ -522,10 +523,24 @@ async def run_agent_graph_streaming(
     openai_api_key: str | None = None,
     trace_context: dict | None = None,
     mode: str | None = None,
+    thread_id: str | None = None,
+    checkpointer: Any = None,
+    prior_n_msgs: int = 0,
+    system_msg_id: str | None = None,
 ) -> AsyncIterator[StreamDelta]:
     """Variação streaming de `run_agent_graph_async` — MESMA assinatura, canal
     lateral de tokens ao vivo. Aditivo: não toca `run_agent_graph_async` nem
     nenhum call site existente.
+
+    Item 3 (TASK 3) — thread-por-sessão do explore (aditivo, opt-in por `thread_id`):
+      • `thread_id is None` (default) → comportamento BYTE-IDÊNTICO de hoje:
+        `checkpointer=False` (corta herança de subagente), delta = estado inteiro.
+      • `thread_id` setado → compila com o `checkpointer` LOOP-LOCAL passado, roda
+        `astream` com `config.configurable.thread_id`, o `system` entra com
+        `system_msg_id` determinístico (descoberta A: `add_messages` substitui em
+        posição, sem system stale), e o `AgentResult` do `done` traduz só
+        `msgs[prior_n_msgs:]` (descoberta B: usage/trace/called_* do TURNO, não da
+        conversa toda). O produtor lê `prior_n_msgs` do checkpointer antes do turno.
 
     Transporte decidido na TASK 1 do item 1 (checkpoint GO, ver
     `spikes/lever1_streaming/FINDINGS.md`): `graph.astream(stream_mode=
@@ -552,13 +567,17 @@ async def run_agent_graph_streaming(
         openai_base_url=openai_base_url,
         openai_api_key=openai_api_key,
     )
-    # checkpointer=False: mesmo motivo do path stateless em run_agent_graph_async
-    # (corta herança de checkpointer de subagente rodando noutro loop).
-    graph = _build_graph(chat, tools, max_steps=max_steps, checkpointer=False)
+    # thread_id None → checkpointer=False (path stateless de hoje; corta herança de
+    # subagente rodando noutro loop). thread_id setado → o saver loop-local passado
+    # (nunca None aqui: o produtor só seta thread_id quando tem saver).
+    graph = _build_graph(
+        chat, tools, max_steps=max_steps,
+        checkpointer=(checkpointer if thread_id is not None else False),
+    )
 
     init: AgentState = {
         "messages": [
-            _build_system_message(system, provider),
+            _build_system_message(system, provider, msg_id=system_msg_id),
             *_to_lc_messages(initial_messages, provider=provider),
         ],
         "llm_calls": 0,
@@ -579,6 +598,8 @@ async def run_agent_graph_streaming(
         trace_context=trace_context,
     ) as agent_span:
         config: dict[str, Any] = {"recursion_limit": 3 * max_steps + 5}
+        if thread_id is not None:
+            config["configurable"] = {"thread_id": thread_id}
         handler = telemetry.make_callback_handler()
         if handler is not None:
             config["callbacks"] = [handler]
@@ -630,7 +651,12 @@ async def run_agent_graph_streaming(
             return
 
         stop = _derive_stop_reason(final_state, max_steps)
-        result = _messages_to_agent_result(final_state["messages"], stop)
+        # Descoberta B (thread-por-sessão): traduz só o delta deste turno-run
+        # (msgs[prior_n_msgs:]) — usage/trace e os called_* derivados de steps
+        # refletem o TURNO, não a conversa toda. prior_n_msgs=0 (stateless ou 1º
+        # turno) → estado inteiro, byte-idêntico ao de hoje. _derive_stop_reason
+        # segue lendo o estado inteiro (last AI + llm_calls são do turno corrente).
+        result = _messages_to_agent_result(final_state["messages"][prior_n_msgs:], stop)
         logger.info(
             "turn_end mode=%s stop_reason=%s llm_calls=%d max_steps=%d",
             mode, stop, final_state.get("llm_calls", 0), max_steps,
@@ -843,6 +869,161 @@ def _get_writing_checkpointer():
             _checkpointer = None
         _checkpointer_ready = True
     return _checkpointer
+
+
+# ---------------------------------------------------------------------------
+# Checkpointer LOOP-LOCAL para o explore streaming (Item 3, TASK 3)
+# ---------------------------------------------------------------------------
+# O probe da TASK 1 (spikes/lever3_threads/FINDINGS.md) confirmou: reusar o saver
+# do bg-loop (acima) a partir do loop da request/uvicorn explode com "Lock is bound
+# to a different event loop" — o pool/lock do AsyncPostgresSaver fica bound ao loop
+# onde foi criado. A escrita cruza inteiro pro bg-loop (run_writing_turn é sync); o
+# explore STREAMING não pode (precisa yield-ar tokens de volta ao loop da request).
+#
+# Solução (emenda de governança 2026-07-18): um AsyncPostgresSaver cujo pool é
+# aberto NO loop da request, **singleton POR LOOP** (registry keyed por id(loop)).
+# Pool SEPARADO do saver do bg-loop; JAMAIS compartilhado entre loops. Uvicorn tem
+# tipicamente um loop por worker → na prática um saver por processo, mas a chave-
+# por-loop é o guardrail defensivo (proíbe vazar pool entre loops).
+# Keyed pelo OBJETO-loop (WeakKeyDictionary): quando o loop é coletado, a entrada
+# some — evita o id-reuse de loops fechados (id(loop) pode ser reciclado entre
+# loops curtos, ex.: em testes, devolvendo um saver bound a um loop já morto). Em
+# prod (um loop longo por worker uvicorn) é uma entrada só.
+_explore_checkpointers: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
+_explore_ckpt_locks: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
+_explore_maint_graphs: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
+
+
+async def _init_explore_checkpointer():
+    """Cria o AsyncPostgresSaver loop-local (pool aberto no loop CORRENTE). Sem
+    DATABASE_URL → InMemorySaver de processo (dev/teste). Nunca reusa o pool do
+    bg-loop da escrita."""
+    dsn = os.environ.get("DATABASE_URL")
+    if not dsn:
+        from langgraph.checkpoint.memory import InMemorySaver
+        logger.warning(
+            "explore checkpointer: DATABASE_URL ausente — InMemorySaver (sem "
+            "durabilidade cross-instância). OK em dev/teste.",
+        )
+        return InMemorySaver()
+
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
+    pool = await _make_agent_memory_pool(
+        dsn, max_size=int(os.getenv("EXPLORE_CHECKPOINTER_POOL_MAX", "4")),
+    )
+    saver = AsyncPostgresSaver(pool)
+    await saver.setup()  # idempotente
+    logger.info(
+        "explore checkpointer: AsyncPostgresSaver loop-local pronto (schema %s)",
+        AGENT_MEMORY_SCHEMA,
+    )
+    return saver
+
+
+async def get_explore_checkpointer():
+    """Singleton POR LOOP do checkpointer do explore. Init preguiçoso sob lock (o
+    lock também é por-loop). N requests no MESMO loop reusam o MESMO saver — nunca
+    instancia pool novo por request. Degrada para None em falha de init (explore
+    segue stateless)."""
+    loop = asyncio.get_running_loop()
+    if loop in _explore_checkpointers:
+        return _explore_checkpointers[loop]
+    # get/set do lock são síncronos (sem await entre eles) → sem corrida.
+    lock = _explore_ckpt_locks.get(loop)
+    if lock is None:
+        lock = asyncio.Lock()
+        _explore_ckpt_locks[loop] = lock
+    async with lock:
+        if loop in _explore_checkpointers:
+            return _explore_checkpointers[loop]
+        try:
+            saver = await _init_explore_checkpointer()
+        except Exception as e:
+            logger.error(
+                "explore checkpointer: init falhou (%s) — explore segue stateless", e,
+            )
+            saver = None
+        _explore_checkpointers[loop] = saver
+        return saver
+
+
+async def aget_thread_message_count(saver, thread_id: str) -> int:
+    """Como `get_thread_message_count`, mas awaited no loop CORRENTE sobre o saver
+    loop-local do explore (não cruza pro bg-loop). Fonte do `prior_n_msgs` do
+    próximo turno (mesmo padrão da T4 — desvio aprovado: lê do checkpointer, sem
+    coluna/migration; cada request rehidrata stateless)."""
+    if saver is None:
+        return 0
+    try:
+        tup = await saver.aget_tuple({"configurable": {"thread_id": thread_id}})
+    except Exception as e:
+        logger.warning("aget_thread_message_count(%s) falhou: %s — assume 0", thread_id, e)
+        return 0
+    if tup is None:
+        return 0
+    msgs = tup.checkpoint.get("channel_values", {}).get("messages", [])
+    return len(msgs)
+
+
+def _get_explore_maint_graph(saver):
+    """Grafo no-op (aplica RemoveMessage via add_messages) compilado com o saver
+    loop-local, cacheado por loop. Espelha `_get_state_maint_graph` (bg-loop)."""
+    loop = asyncio.get_running_loop()
+    g = _explore_maint_graphs.get(loop)
+    if g is not None:
+        return g
+    graph = StateGraph(AgentState)
+
+    async def _noop(state: AgentState) -> dict:
+        return {}
+
+    graph.add_node("noop", _noop)
+    graph.add_edge(START, "noop")
+    graph.add_edge("noop", END)
+    compiled = graph.compile(checkpointer=saver)
+    _explore_maint_graphs[loop] = compiled
+    return compiled
+
+
+async def atrim_thread_history(
+    saver, thread_id: str, *, keep_human_turns: int, keep_ids: tuple[str, ...],
+) -> int:
+    """Como `trim_thread_history`, mas awaited no loop CORRENTE sobre o saver
+    loop-local. Poda na fronteira de turno (nunca intra-turno). Best-effort."""
+    from langchain_core.messages import HumanMessage, RemoveMessage
+
+    if saver is None:
+        return 0
+    config = {"configurable": {"thread_id": thread_id}}
+    try:
+        tup = await saver.aget_tuple(config)
+    except Exception as e:
+        logger.warning("atrim_thread_history(%s): aget_tuple falhou: %s", thread_id, e)
+        return 0
+    if tup is None:
+        return 0
+    msgs = tup.checkpoint.get("channel_values", {}).get("messages", [])
+    episodic = [m for m in msgs if getattr(m, "id", None) not in keep_ids]
+    human_idxs = [i for i, m in enumerate(episodic) if isinstance(m, HumanMessage)]
+    if len(human_idxs) <= keep_human_turns:
+        return 0
+    cut = human_idxs[-keep_human_turns]
+    to_remove = [m for m in episodic[:cut] if getattr(m, "id", None)]
+    if not to_remove:
+        return 0
+    removals = [RemoveMessage(id=m.id) for m in to_remove]
+    try:
+        graph = _get_explore_maint_graph(saver)
+        await graph.aupdate_state(config, {"messages": removals})
+    except Exception as e:
+        logger.warning("atrim_thread_history(%s): aupdate_state falhou: %s", thread_id, e)
+        return 0
+    logger.info(
+        "atrim_thread_history: thread=%s removeu=%d (janela=%d turnos)",
+        thread_id, len(removals), keep_human_turns,
+    )
+    return len(removals)
 
 
 def get_thread_message_count(thread_id: str) -> int:
@@ -1099,6 +1280,11 @@ def memory_search(workspace_id: str, query: str, *, limit: int = 6) -> list[dict
 # substitui a mensagem de mesmo id em posição em vez de acumular cópias por turno.
 # Só precisa ser único DENTRO da thread — uma constante serve todas as sessões.
 WR_SYSTEM_MSG_ID = "wr:system"
+
+# Item 3 (TASK 3): id determinístico do system do EXPLORE numa thread-por-sessão.
+# O system do explore é MUTÁVEL por turno (muda com a rota) — com id fixo, o
+# add_messages o substitui em posição (descoberta A: sem system stale acumulado).
+EXPLORE_SYSTEM_MSG_ID = "explore:system"
 
 
 @dataclass
