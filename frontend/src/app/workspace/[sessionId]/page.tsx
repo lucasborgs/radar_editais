@@ -44,9 +44,8 @@ function nowTime(): string {
   return new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
-const WELCOME_BY_MODE: Record<"explorer" | "plan" | "escrita", string> = {
-  explorer: "🧭 Contexto ativado (`/explorer`). Tire dúvidas sobre o edital. Quando quiser planejar, digite `/plan`.",
-  plan: "📋 Plano ativado (`/plan`). Estruture a proposta. Para escrever, digite `/escrita`.",
+const WELCOME_BY_MODE: Record<"explorer" | "escrita", string> = {
+  explorer: "🧭 Contexto ativado (`/explorer`). Tire dúvidas sobre o edital. Para escrever, digite `/escrita`.",
   escrita: "✍️ Escrita ativada (`/escrita`). Desenvolva sua proposta. Para dúvidas sobre o edital, digite `/explorer`.",
 };
 
@@ -70,14 +69,14 @@ export default function WorkspacePage() {
   const [pending, setPending] = useState<PendingUserInput | null>(null);
   const [savingSection, setSavingSection] = useState<string | null>(null);
   const [refining, setRefining] = useState<string | null>(null);
-  const [wsMode, setWsMode] = useState<"explorer" | "plan" | "escrita">("explorer");
+  const [wsMode, setWsMode] = useState<"explorer" | "escrita">("explorer");
 
-  function parseCommand(input: string): { command?: "explorer" | "plan" | "escrita"; message: string } {
-    const match = input.trim().match(/^\/(explorer|plan|escrita|help)\b/);
+  function parseCommand(input: string): { command?: "explorer" | "escrita"; message: string } {
+    const match = input.trim().match(/^\/(explorer|escrita|help)\b/);
     if (!match) return { message: input };
     if (match[1] === "help") return { message: "" };
     return {
-      command: match[1] as "explorer" | "plan" | "escrita",
+      command: match[1] as "explorer" | "escrita",
       message: input.slice(match[0].length).trim(),
     };
   }
@@ -261,7 +260,7 @@ export default function WorkspacePage() {
       const content = text.trim();
       if (!content || !sessionId || working) return;
 
-      // Detecta comandos de modo (/explorer, /plan, /escrita, /help)
+      // Detecta comandos de modo (/explorer, /escrita, /help)
       const { command, message } = parseCommand(content);
 
       // /help: mostra comandos disponíveis
@@ -271,7 +270,6 @@ export default function WorkspacePage() {
         setInput("");
         const helpText = `**Comandos disponíveis:**
   • \`/explorer\` — explorar o edital, tirar dúvidas
-  • \`/plan\` — planejar a estrutura da proposta
   • \`/escrita\` — escrever/refinar as seções
   • \`/help\` — mostrar esta mensagem
 
@@ -281,7 +279,7 @@ export default function WorkspacePage() {
         return;
       }
 
-      // Troca de modo: /explorer, /plan, /escrita
+      // Troca de modo: /explorer, /escrita
       if (command && command !== wsMode) {
         setWsMode(command);
         setMessages((prev) => [...prev, { role: "user", content: content, timestamp: nowTime() }]);
@@ -306,6 +304,10 @@ export default function WorkspacePage() {
           if (res.error) {
             toast.error(res.error);
             return;
+          }
+          // Handoff fluido: se o backend trocou de modo, sincroniza o front
+          if (res.mode && res.mode !== wsMode) {
+            setWsMode(res.mode);
           }
           setMessages((prev) => [
             ...prev,

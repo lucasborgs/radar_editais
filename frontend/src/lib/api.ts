@@ -413,6 +413,12 @@ export const planningGenerate = (
 export const getExistingPlan = (sessionId: string) =>
   apiFetch<Plan>(`/planning/${sessionId}`);
 
+export const planningAdjust = (sessionId: string, instruction: string) =>
+  apiFetch<Plan>(`/planning/${sessionId}/adjust`, {
+    method: "POST",
+    body: JSON.stringify({ instruction }),
+  });
+
 // ── Writing Session ────────────────────────────────────────
 
 export const startWritingSession = (
@@ -926,7 +932,7 @@ export const retryDiscoveredPromotion = (id: string, stage: "fetch" | "silver" |
 // ── Workspace multi-modo ──────────────────────────────────
 
 export interface ModeSwitchResponse {
-  mode: "explorer" | "plan" | "escrita";
+  mode: "explorer" | "escrita";
   response: string;
   welcome?: string | null;
   error?: string | null;

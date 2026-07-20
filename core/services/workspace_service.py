@@ -1,8 +1,7 @@
-"""Workspace multi-modo (Fase 1 da spec workspace-multi-mode).
+"""Workspace multi-modo — dispatcher de skills.
 
 Dispatcher que roteia mensagens ao agente correto com base no modo atual:
   /explorer → ExploreAgent (RAG + KG, dúvidas sobre o edital)
-  /plan     → PlanningNode (gerar/ajustar plano da proposta)
   /escrita  → WritingSession (escrever/refinar seções)
 
 RAG e KG são transversais — todos os modos acessam ambos.
@@ -17,10 +16,9 @@ from core.services.explore_agent import ExploreAgent
 logger = logging.getLogger(__name__)
 
 MODE_EXPLORER = "explorer"
-MODE_PLAN = "plan"
 MODE_ESCRITA = "escrita"
 
-VALID_MODES = frozenset({MODE_EXPLORER, MODE_PLAN, MODE_ESCRITA})
+VALID_MODES = frozenset({MODE_EXPLORER, MODE_ESCRITA})
 
 # ── Blocos de redirecionamento ──────────────────────────────────────────────
 # Cada modo tem: escopo, ações fora-de-escopo, e mensagem de redirecionamento.
@@ -29,13 +27,9 @@ VALID_MODES = frozenset({MODE_EXPLORER, MODE_PLAN, MODE_ESCRITA})
 _REDIRECT_BLOCK = """
 MODO ATUAL: /{mode}
 ESCOPO: {scope}
-NÃO FAZ: {out_of_scope}
 
-Se o usuário pedir algo FORA DO ESCOPO, responda APENAS:
-"⚠ Você está no modo /{mode}. Para {redirect_action}, digite /{redirect_mode}
-no chat. Quer que eu te ajude com {redirect_offer}?"
-
-NÃO tente executar ações fora do escopo — recuse educadamente e redirecione.
+Se o usuário pedir algo fora do escopo, o sistema troca de contexto
+automaticamente. Mantenha o foco no escopo atual.
 """
 
 MODE_CONFIG: dict[str, dict] = {
@@ -49,31 +43,26 @@ MODE_CONFIG: dict[str, dict] = {
         "redirect_mode": "escrita",
         "redirect_offer": "explorar o edital",
         "welcome": "🧭 Modo Explorer — tire dúvidas sobre o edital. "
-                   "Quando quiser planejar, digite /plan.",
-    },
-    MODE_PLAN: {
-        "scope": "Gerar, visualizar e ajustar o plano estruturado da "
-                 "proposta (seções, alinhamento empresa↔edital, "
-                 "compliance hints).",
-        "out_of_scope": "Explorar o edital em profundidade, escrever "
-                        "conteúdo das seções, refinar rascunhos.",
-        "redirect_action": "explorar o edital em detalhes",
-        "redirect_mode": "explorer",
-        "redirect_offer": "planejar a proposta",
-        "welcome": "📋 Modo Plan — planeje a estrutura da proposta. "
                    "Para escrever, digite /escrita.",
     },
     MODE_ESCRITA: {
         "scope": "Escrever, refinar e salvar seções da proposta com "
                  "validação do Critic automático.",
-        "out_of_scope": "Explorar o edital em profundidade, gerar ou "
-                        "modificar o plano da proposta.",
-        "redirect_action": "modificar o plano da proposta",
-        "redirect_mode": "plan",
+        "out_of_scope": "Explorar o edital em profundidade.",
+        "redirect_action": "explorar o edital em detalhes",
+        "redirect_mode": "explorer",
         "redirect_offer": "escrever a proposta",
         "welcome": "✍️ Modo Escrita — escreva sua proposta. "
                    "Para dúvidas sobre o edital, digite /explorer.",
     },
+}
+
+
+# ── Prefixos de transição fluida ──────────────────────────────────────────
+# Injetados antes da resposta do produtor alvo quando o dispatch faz handoff.
+TRANSITION_PREFIXES: dict[tuple[str, str], str] = {
+    ("escrita", "explorer"): "↪ Entendi que você quer escrever — troquei para /escrita.\n\n",
+    ("explorer", "escrita"): "↪ Entendi sua pergunta sobre o edital — troquei para /explorer.\n\n",
 }
 
 
@@ -184,7 +173,7 @@ def dispatch(
         session_id: ID da sessão de escrita.
         workspace_id: ID do workspace.
         profile: CompanyProfile do usuário.
-        mode: Modo atual (explorer | plan | escrita).
+        mode: Modo atual (explorer | escrita).
         message: Mensagem do usuário.
         library_items: Itens da biblioteca (anexos).
 
@@ -197,12 +186,61 @@ def dispatch(
     """
     if mode not in VALID_MODES:
         return {"mode": mode, "response": "", "welcome": None,
-                "error": f"Modo inválido: {mode}. Use /explorer, /plan ou /escrita."}
+                "error": f"Modo inválido: {mode}. Use /explorer ou /escrita."}
 
     history = _mode_history(db, session_id, mode, window=8)
 
-    # Carrega edital_id da sessão (útil para explorer e plan)
+    # Carrega edital_id da sessão (útil para explorer)
     edital_id = _load_session_edital_id(db, session_id)
+
+    # Classifica a intenção uma vez no dispatch (antes de chamar o produtor)
+    from core.services.explore_routing import (
+        RouteContext,
+        classify_ambiguous_route,
+        handoff_target,
+        route_message,
+    )
+
+    decision = route_message(RouteContext(
+        mode=mode,
+        target_type="edital" if edital_id else None,
+        target_id=edital_id if edital_id else None,
+        message=message,
+        has_profile=profile is not None,
+        has_documents=bool(library_items),
+    ), ambiguous_classifier=classify_ambiguous_route)
+
+    target = handoff_target(decision, mode)
+
+    if target is not None and target != mode:
+        # Handoff fluido: o código decide a troca de produtor
+        try:
+            if target == MODE_ESCRITA:
+                producer_response = _dispatch_escrita(
+                    db, session_id, workspace_id, profile, message, library_items,
+                )
+            elif target == MODE_EXPLORER:
+                producer_response = _dispatch_explorer(
+                    message, history, profile,
+                    edital_ids=[edital_id] if edital_id else None,
+                    library_items=library_items,
+                    decision=decision,
+                )
+            else:
+                producer_response = "Modo não reconhecido."
+        except Exception as e:
+            logger.error("dispatch handoff erro %s→%s: %s", mode, target, e)
+            return {"mode": mode, "response": "", "welcome": None,
+                    "error": f"Erro no modo /{target}: {e}"}
+
+        prefix = TRANSITION_PREFIXES.get((target, mode),
+                                         f"↪ Entendi, troquei para /{target}.\n\n")
+        response = prefix + producer_response
+
+        # Persiste turno no modo-alvo (a conversa continua lá)
+        _save_turn(db, session_id, target, "user", message)
+        _save_turn(db, session_id, target, "assistant", response)
+        return {"mode": target, "response": response, "welcome": None, "error": None}
 
     try:
         if mode == MODE_EXPLORER:
@@ -210,12 +248,7 @@ def dispatch(
                 message, history, profile,
                 edital_ids=[edital_id] if edital_id else None,
                 library_items=library_items,
-            )
-        elif mode == MODE_PLAN:
-            response = _dispatch_plan(
-                db, session_id, message, profile,
-                edital_id=edital_id,
-                library_items=library_items,
+                decision=decision,
             )
         elif mode == MODE_ESCRITA:
             response = _dispatch_escrita(
@@ -270,8 +303,13 @@ def _dispatch_explorer(
     profile,
     edital_ids: list[str] | None = None,
     library_items: list | None = None,
+    decision=None,
 ) -> str:
-    """Modo /explorer: ExploreAgent contextualizado ao edital e anexos."""
+    """Modo /explorer: ExploreAgent contextualizado ao edital e anexos.
+
+    Quando ``decision`` (RouteDecision) é fornecido pelo dispatch(),
+    a classificação de rota já foi feita uma vez — não repete.
+    """
     from core.services.explore_routing import (
         RouteContext,
         classify_ambiguous_route,
@@ -281,17 +319,18 @@ def _dispatch_explorer(
 
     agent = ExploreAgent()
 
-    decision = route_message(RouteContext(
-        mode=MODE_EXPLORER,
-        target_type="edital" if edital_ids else None,
-        target_id=edital_ids[0] if edital_ids else None,
-        message=message,
-        has_profile=profile is not None,
-        has_documents=bool(library_items),
-    ), ambiguous_classifier=classify_ambiguous_route)
-    redirect = redirect_for(decision, MODE_EXPLORER)
-    if redirect:
-        return redirect
+    if decision is None:
+        decision = route_message(RouteContext(
+            mode=MODE_EXPLORER,
+            target_type="edital" if edital_ids else None,
+            target_id=edital_ids[0] if edital_ids else None,
+            message=message,
+            has_profile=profile is not None,
+            has_documents=bool(library_items),
+        ), ambiguous_classifier=classify_ambiguous_route)
+        redirect = redirect_for(decision, MODE_EXPLORER)
+        if redirect:
+            return redirect
 
     profile_text = None
     if profile:
@@ -328,141 +367,6 @@ def _dispatch_explorer(
         route_decision=decision,
     )
     return answer
-
-
-def _dispatch_plan(
-    db,
-    session_id: str,
-    message: str,
-    profile,
-    edital_id: str | None = None,
-    library_items: list | None = None,
-) -> str:
-    """Modo /plan: gera ou ajusta o plano da proposta."""
-    from core.kg.planning_node import generate_plan
-
-    # Carrega o plano existente (se houver)
-    existing_plan = None
-    try:
-        row = (
-            db.table("writing_sessions")
-            .select("section_drafts")
-            .eq("id", session_id)
-            .maybe_single()
-            .execute()
-        )
-        if row and row.data:
-            drafts = row.data.get("section_drafts") or {}
-            existing_plan = drafts.get("__plan__")
-    except Exception as e:
-        logger.debug("dispatch_plan: erro ao ler __plan__: %s", e)
-
-    if existing_plan:
-        # Ajuste do plano existente
-        return _adjust_plan(existing_plan, message)
-    else:
-        # Geração de novo plano
-        plan = generate_plan(
-            question=message,
-            analysis="",
-            edital_id=edital_id,
-            company_nodes=None,
-        )
-        if "error" in plan:
-            return f"Não foi possível gerar o plano: {plan['error']}"
-
-        # Salva o plano no JSONB
-        try:
-            row = (
-                db.table("writing_sessions")
-                .select("section_drafts")
-                .eq("id", session_id)
-                .maybe_single()
-                .execute()
-            )
-            drafts = dict(row.data.get("section_drafts") or {}) if row and row.data else {}
-            drafts["__plan__"] = plan
-            db.table("writing_sessions").update({
-                "section_drafts": drafts,
-            }).eq("id", session_id).execute()
-        except Exception as e:
-            logger.debug("dispatch_plan: erro ao salvar __plan__: %s", e)
-
-        return _format_plan_response(plan)
-
-
-def _adjust_plan(existing_plan: dict, instruction: str) -> str:
-    """Ajusta o plano existente baseado na instrução do usuário."""
-    from core.llm.llm_client import make_client
-
-    client = make_client()
-    try:
-        resp = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": (
-                    "Você ajusta um plano de proposta de fomento. "
-                    "Recebe o plano atual em JSON e uma instrução de ajuste. "
-                    "Retorne APENAS o JSON do plano ajustado, com a mesma estrutura."
-                )},
-                {"role": "user", "content": (
-                    f"PLANO ATUAL:\n{json.dumps(existing_plan, ensure_ascii=False, indent=2)}\n\n"
-                    f"INSTRUÇÃO: {instruction}\n\n"
-                    f"{mode_redirect_block(MODE_PLAN)}"
-                )},
-            ],
-            temperature=0.3,
-            response_format={"type": "json_object"},
-        )
-        raw = resp.choices[0].message.content
-        if raw:
-            adjusted = json.loads(raw)
-            return _format_plan_response(adjusted)
-        return "Não consegui ajustar o plano."
-    except Exception as e:
-        logger.debug("adjust_plan erro: %s", e)
-        return f"Erro ao ajustar plano: {e}"
-
-
-def _format_plan_response(plan: dict) -> str:
-    """Formata o plano como texto legível para o chat."""
-    title = plan.get("title", "Proposta")
-    sections = plan.get("sections", [])
-    alignment = plan.get("alignment", {})
-    hints = plan.get("compliance_hints", [])
-
-    lines = [f"## {title}", ""]
-    lines.append(f"**{len(sections)} seções**")
-    for sec in sections:
-        lines.append("")
-        lines.append(f"### {sec.get('title', '')}")
-        if sec.get("estimated_length"):
-            lines.append(f"*~{sec['estimated_length']}*")
-        if sec.get("description"):
-            lines.append(f"{sec['description']}")
-        if sec.get("key_points"):
-            for kp in sec["key_points"]:
-                lines.append(f"- {kp}")
-
-    if alignment:
-        lines.extend(["", "**Alinhamento:**"])
-        score = alignment.get("match_score")
-        if score is not None:
-            lines.append(f"Match: {score * 100:.0f}%")
-        if alignment.get("critical_gaps"):
-            lines.append("Gaps:")
-            for g in alignment["critical_gaps"]:
-                lines.append(f"- ⚠ {g}")
-
-    if hints:
-        lines.extend(["", "**Compliance:**"])
-        for h in hints:
-            lines.append(f"- ⚠ {h}")
-
-    lines.append("")
-    lines.append("---")
-    lines.append("Quer ajustar algo ou posso salvar e começar a escrever?")
-    return "\n".join(lines)
 
 
 def _dispatch_escrita(
