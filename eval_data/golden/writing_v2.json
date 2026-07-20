@@ -146,14 +146,17 @@
       "edit_intent": "NOSSO PROJETO VISA APLICAR SENSORIAMENTO HIPERESPECTRAL PARA CLASSIFICAÇÃO DE GRÃOS."
     },
     {
-      "id": "v2_familia3_tratorbr_user_edit",
+      "id": "v2_familia3_tratorbr_title_redirect",
       "familia": 3,
       "profile": "tratorbr",
       "edital_id": "finep:769",
       "section": "2. Objetivo do projeto",
-      "instruction": "Redija o objetivo do projeto. Depois altere o título para 'OBJETIVO: TRATOR COMPACTO PARA AGRICULTURA FAMILIAR NO NORDESTE' e instrua o agente a preservar essa mudança.",
+      "instruction": "Redija o objetivo do projeto.",
+      "followup": "Altere o título desta seção para 'OBJETIVO: TRATOR COMPACTO PARA AGRICULTURA FAMILIAR NO NORDESTE'.",
       "max_turns": 4,
-      "edit_intent": "OBJETIVO: TRATOR COMPACTO PARA AGRICULTURA FAMILIAR NO NORDESTE"
+      "expect_title_redirect": true,
+      "forbidden_title": "OBJETIVO: TRATOR COMPACTO PARA AGRICULTURA FAMILIAR NO NORDESTE",
+      "_note": "Opção D (governança 2026-07-19): títulos de seção são ESTRUTURAIS (vêm do plano/outline). Pedido de mudança de título no chat de escrita → expected = reconhecer e redirecionar ao plano, NUNCA renomear nem ignorar. edit_intent removido; ver eval_title_redirect."
     },
     {
       "id": "v2_familia4_espectra_batch",

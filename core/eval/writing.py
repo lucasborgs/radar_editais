@@ -81,6 +81,7 @@ def task(*, item: Any, **_) -> dict:
     instruction = inp["instruction"]
     section_hint = inp.get("section")
     max_turns = inp.get("max_turns", 4)
+    followup = inp.get("followup")
 
     session = WritingSession(
         db=db, workspace_id=workspace_id, profile=profile, edital_id=edital_id,
@@ -88,6 +89,7 @@ def task(*, item: Any, **_) -> dict:
     saved_title: str | None = None
     turns_to_save: int | None = None
     n_tool_calls = 0
+    assistant_msgs: list[str] = []
     t0 = time.monotonic()
     for t in range(1, max_turns + 1):
         before = dict(session._doc_sections)
@@ -95,12 +97,23 @@ def task(*, item: Any, **_) -> dict:
             "Finalize e salve o rascunho desta seção com save_draft."
         )
         result = session.turn(msg, section_hint=section_hint)
+        assistant_msgs.append(result.get("assistant_message") or "")
         n_tool_calls += len(result.get("tool_trace") or [])
         changed = [k for k, v in session._doc_sections.items() if before.get(k) != v]
         if changed:
             saved_title = changed[-1]
             turns_to_save = t
             break
+
+    # Opção D (fam3 título): após a seção salva, o pedido de mudança de título
+    # entra como turno conversacional. A resposta a ESTE turno é onde medimos o
+    # redirect (eval_title_redirect) — modela o usuário pedindo o rename no chat.
+    followup_response = ""
+    if followup and saved_title is not None:
+        fu = session.turn(followup, section_hint=section_hint)
+        followup_response = fu.get("assistant_message") or ""
+        assistant_msgs.append(followup_response)
+        n_tool_calls += len(fu.get("tool_trace") or [])
     latency_ms = (time.monotonic() - t0) * 1000.0
 
     saved = saved_title is not None
@@ -144,6 +157,8 @@ def task(*, item: Any, **_) -> dict:
         "coherent": coh.coherent if coh else None,
         "contradictions": coh.contradictions if coh else [],
         "draft_chars": len(draft),
+        "assistant_text": "\n\n".join(m for m in assistant_msgs if m),
+        "followup_response": followup_response,
     }
 
 
@@ -270,6 +285,30 @@ def eval_user_edit_preserved(*, output, metadata=None, **_) -> Evaluation | None
             "comment": "preservou" if preserved else "perdeu edição do usuário"}
 
 
+def eval_title_redirect(*, output, metadata=None, **_) -> Evaluation | None:
+    """Família 3 (opção D, governança 2026-07-19): o título de seção é ESTRUTURAL
+    — vem do plano/outline (que espelha o edital). Um pedido para mudar o título
+    no chat de ESCRITA é mudança de PLANO: o correto é reconhecer e REDIRECIONAR
+    ao plano, NUNCA renomear a seção nem ignorar em silêncio. Mede o redirect na
+    resposta ao turno de followup (o pedido de rename como mensagem de chat).
+    None se não for esse caso."""
+    if not isinstance(output, dict) or not metadata:
+        return None
+    if not metadata.get("expect_title_redirect"):
+        return None
+    resp = (output.get("followup_response") or output.get("assistant_text") or "").lower()
+    # Redirect = conecta o pedido (título/seção) à origem estrutural (plano/outline).
+    references_ask = bool(re.search(r"t[íi]tulo|nome da seç|seç", resp))
+    points_to_plan = bool(re.search(r"plano|estrutura|outline|reestrutur", resp))
+    redirected = references_ask and points_to_plan
+    # Sinal de "renomeou em silêncio": título proibido no draft salvo sem redirect.
+    forbidden = (metadata.get("forbidden_title") or "").lower()
+    applied = bool(forbidden) and forbidden in (output.get("draft") or "").lower()
+    comment = ("redirecionou ao plano" if redirected
+               else ("renomeou em silêncio" if applied else "não redirecionou nem renomeou"))
+    return {"name": "title_redirect", "value": redirected, "comment": comment}
+
+
 def eval_misfit_honesty(*, output, metadata=None, **_) -> Evaluation | None:
     """Família 2: o agente RECUSOU educadamente (true) ou tentou fabricar
     alinhamento (false). None se não for caso misfit."""
@@ -327,6 +366,9 @@ def load_data_v2() -> list[dict]:
                 "instruction": case["instruction"],
                 "section": case.get("section"),
                 "max_turns": case.get("max_turns", 4),
+                # Opção D (fam3 título): turno conversacional adicional após a 1ª
+                # seção salva — o pedido de mudança de título vira mensagem de chat.
+                "followup": case.get("followup"),
             },
             "expected_output": None,
             "metadata": {
@@ -335,6 +377,9 @@ def load_data_v2() -> list[dict]:
                 "familia": familia,
                 "edit_intent": case.get("edit_intent", ""),
                 "edital_ids_extra": case.get("edital_ids_extra", []),
+                # Opção D: título estrutural → expected = redirect ao plano.
+                "expect_title_redirect": case.get("expect_title_redirect", False),
+                "forbidden_title": case.get("forbidden_title", ""),
             },
         }
         # N-runs: replica cada caso N vezes para estabilidade métrica
@@ -372,7 +417,7 @@ SUITE_WRITING_V2 = Suite(
         eval_save, eval_grounding, eval_n_claims, eval_factual_errors,
         eval_coherence, eval_tool_calls,
         eval_section_hallucination, eval_user_edit_preserved,
-        eval_misfit_honesty, eval_tools0_sections,
+        eval_title_redirect, eval_misfit_honesty, eval_tools0_sections,
     ],
     prereqs=_prereqs_v2,
     classification="experimental",
