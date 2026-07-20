@@ -203,7 +203,16 @@ def handoff_target(decision: RouteDecision, current_mode: str) -> str | None:
       WRITING_ACTION / PLAN_ACTION → escrita (escrita absorve o plano)
       intents factuais/de exploração → explorer
       None se já está no modo correto
+
+    Segurança: nunca faz handoff quando a classificação veio do fallback
+    de baixa confiança (reason_code == safe_conceptual_fallback).
+    Mensagens ambíguas não expulsam o usuário do modo atual.
     """
+    # Nunca força handoff em classificação de baixa confiança — a mensagem
+    # pode ser ambígua e o usuário não pediu para trocar de skill.
+    if decision.reason_code == "safe_conceptual_fallback":
+        return None
+
     _factual_ints = frozenset({
         Intent.EDITAL_SUMMARY,
         Intent.EDITAL_FACT,

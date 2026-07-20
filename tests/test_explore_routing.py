@@ -98,3 +98,16 @@ def test_handoff_target_table():
             f"handoff_target({intent.value}, current_mode='{current_mode}') "
             f"retornou {result!r}, esperava {expected!r}"
         )
+
+
+def test_handoff_target_nao_forca_por_fallback_ambiguo():
+    """handoff_target respeita reason_code=safe_conceptual_fallback: não expulsa."""
+    fallback = RouteDecision(
+        intent=Intent.CONCEPTUAL,
+        target_type=None, target_id=None,
+        confidence=0.5, reason_code="safe_conceptual_fallback",
+    )
+    # Em escrita: não expulsa para explorer
+    assert handoff_target(fallback, "escrita") is None
+    # Em explorer: fica onde está
+    assert handoff_target(fallback, "explorer") is None
