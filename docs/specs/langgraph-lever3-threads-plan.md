@@ -23,6 +23,25 @@ Item 3 (thread por sessão) **implementado end-to-end** na branch `feat/lever3-t
 
 **Débitos ACEITOS (documentados, não bloqueiam):** (1) gap fallback-sync (amnésia de 1 turno se um turno cair no espelho sync — raro, gracioso, `session_turns` preserva; fecha na T6); (2) purge é decisão de produto (retention 90d de memória de sessão dormente); (3) warning cosmético "Event loop is closed" no teardown de teste (prod = 1 loop, não ocorre).
 
+## ⚑ GATE FINAL — eval writing_v2 N=12 completo (2026-07-20) — ✅ PROMOVIDO
+
+Rodado sequencial (`EVAL_MAX_WORKERS=1`, ~2h20min, 36 execuções, zero erro de processo) — confirma que o travamento anterior era mesmo concorrência (ThreadPoolExecutor × checkpointer durável compartilhado), não bug de lógica. Risco já registrado acima como "round-trips extra pela WAN"; agora com uma segunda confirmação (concorrência de eval, não só WAN de prod).
+
+**Núcleo (relativo ao baseline registrado — branch não pode degradar):**
+| Métrica | Baseline original | Treatment (N=36, agora) | Veredito |
+|---|---|---|---|
+| saved | 0.75 | 0.778 | ✅ não degrada |
+| pct_grounded | 0.58 | 0.642 | ✅ acima do baseline |
+| coherent | 1.0 | 1.000 | ✅ mantém |
+
+**Famílias pass/fail:**
+- F3 (user-edit + title-redirect): 6/6 ✅ — confirma a fix da T4.1-D em amostra maior.
+- F2 (misfit): `misfit_honesty` automático 0/6 ❌ — **investigado, não é regressão.** Inspeção manual dos 6 outputs brutos: o agente identifica corretamente o misfit e alerta explicitamente em `assistant_text` nos 6/6 casos (ex.: "A BioTec Startup é um MEI, o que a torna inelegível..."). O avaliador `eval_misfit_honesty` (`core/eval/writing.py`) só busca a recusa no campo `draft` (conteúdo salvo da seção) — nunca no `assistant_text` (onde o alerta de fato vive), porque um draft de seção normal nunca teria linguagem de recusa por natureza. **Precedente direto nesta mesma investigação:** no gate x1 anterior à T4.1, o registro já dizia "misfit_honesty=0.0 nos dois — pré-T4" — confirma que é falha pré-existente do avaliador, não introduzida por este branch. Mesma classe de "avaliador furado" já documentada para `section_hallucination` (item 6). **Comportamento esperado do produto (agente honesto sobre misfit) está satisfeito** — a régua é que aponta para o campo errado.
+
+**Decisão de governança:** GO para merge. Núcleo não degrada (grounding até sobe), F3 fecha limpo, F2 é debt de avaliador pré-existente (não bloqueia, registrado ao lado do débito gêmeo de `section_hallucination`).
+
+**Débito adicional registrado:** `eval_misfit_honesty` deve futuramente checar `assistant_text` além de `draft` — não urgente, não bloqueia este merge.
+
 **Riscos p/ prod (do handoff):** round-trips extra do checkpointer por turno (Docker-local + Supabase Cloud pela WAN não co-locado) — observar logs de conexão pós-deploy. Setup de deploy: migration/schema `agent_memory` já existe; `CHECKPOINT_RETENTION_DAYS` default 90.
 
 ---
@@ -98,6 +117,7 @@ Segue o padrão provado na T4 (delta + idempotência) e absorve a infra loop-loc
 1. **Eval/golden roda LOCAL (`:54322`), nunca cloud** (memória `feedback_eval_runs_local`). Rodar contra o pooler de cloud pela WAN trava (quedas de conexão). Setup local: `scripts/seed_eval_corpus.py` (corpus finep:769/774 + **nós KG `entities`** — sem eles o card do agente floora e `saved`≈0) + identidade de eval em `supabase/seed.sql` (user `auth.users` + workspace, MESMOS UUIDs do cloud, dummy). Env: `.env.staging-local` + `EVAL_WORKSPACE_ID`.
 2. **`section_hallucination` é métrica furada** (conta subheadings). Não tratar como sinal de regressão sem inspeção qualitativa. Dívida anotada no avaliador.
 3. **Risco de prod pós-deploy (round-trips do checkpointer):** prod é Docker-local + Supabase Cloud pela WAN (NÃO co-locado). A T4 adiciona round-trips por turno (`get_thread_message_count` + `trim`). **Observar logs de conexão do checkpointer pós-deploy.**
+   - **Evidência corroborante (2026-07-20, gate de merge):** o eval `writing_v2` N=12 rodado com `EVAL_MAX_WORKERS>1` (harness paralelo do Item 6) sobre o checkpointer durável do Item 3 **travou** — 22 threads dormindo, 0% CPU, zero atividade no Postgres por 16+ min, sem stack trace disponível (py-spy exige sudo, não perseguido nesta etapa por decisão de governança). Mesma classe de risco (round-trip do checkpointer sob concorrência), agora com ocorrência real, não só hipotética. **Gatilho de investigação futura:** antes de rodar eval com `EVAL_MAX_WORKERS>1` sobre paths com checkpointer durável, ou antes de escalar tráfego concorrente de escrita em produção — revisitar se o bg-loop compartilhado do checkpointer sustenta concorrência de múltiplas THREADS do SO (distinto de `asyncio.gather` na mesma thread, já coberto pelo teste de concorrência da T5).
 4. **Gotcha de repro entre worktrees:** `python <path>/script.py` NÃO adiciona cwd ao `sys.path` → importa o `core` do editable-install (MAIN), não do worktree. Use `python -c` (adiciona cwd) OU `sys.path.insert(0, os.getcwd())`. (Custou um diagnóstico falso nesta sessão.)
 
 ### Desvios aprovados (registrados)
