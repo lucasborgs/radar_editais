@@ -491,6 +491,13 @@ class WritingSession:
         # sob chave _critic_annotations.
         self._generation_critic_annotations: dict[str, dict] = {}
 
+        # Task 4 (plano playbook-overlays-plan.md) — captura best-effort do par
+        # rascunho-IA → edição do usuário em set_section_content. Combustível
+        # para um futuro extrator de estilo; NÃO é lido por nada nesta fase.
+        # Persistido em section_drafts sob chave _style_edit_log (mesmo padrão
+        # de _critic_annotations acima — evita migration).
+        self._style_edit_log: list[dict] = []
+
         if session_id:
             # Retomar sessão existente — carrega tudo do Postgres.
             self.session_id = session_id
@@ -603,6 +610,17 @@ class WritingSession:
         self._playbook_writer_block: str = ""
         self._playbook_monitor_block: str = ""
         self._resolve_playbook()
+
+        # Estilo de escrita da empresa (craft, preenchido à mão pelo dono no
+        # Perfil). Resolvido uma vez aqui — mesma lógica de "não reler o
+        # perfil a cada turno" do playbook acima. Só o Redator vê; NUNCA vai
+        # para for_monitor()/ComplianceMonitor/Critic (plano
+        # docs/specs/playbook-overlays-plan.md Task 2).
+        self._estilo_empresa_block: str = (
+            f"ESTILO DA EMPRESA (como esta empresa gosta de contar sua história):\n"
+            f"{self.profile.estilo_escrita}"
+            if getattr(self.profile, "estilo_escrita", "") else ""
+        )
 
         logger.info(
             "WritingSession %s | edital=%s | %d seções | turnos=%d | %s/%s",
@@ -767,6 +785,10 @@ class WritingSession:
         critic_data = self._doc_sections.pop("_critic_annotations", None)
         self._generation_critic_annotations = (
             critic_data if isinstance(critic_data, dict) else {}
+        )
+        style_log_data = self._doc_sections.pop("_style_edit_log", None)
+        self._style_edit_log = (
+            style_log_data if isinstance(style_log_data, list) else []
         )
         pending = row.get("pending_user_input")
         self._pending_user_input = pending if isinstance(pending, dict) else None
@@ -1604,6 +1626,8 @@ class WritingSession:
         try:
             drafts = dict(self._doc_sections)
             drafts["_critic_annotations"] = self._generation_critic_annotations
+            if self._style_edit_log:
+                drafts["_style_edit_log"] = self._style_edit_log
             self._db.table("writing_sessions").update({
                 "section_drafts": drafts,
             }).eq("id", self.session_id).execute()
@@ -1668,6 +1692,15 @@ class WritingSession:
             messages.append({
                 "role": "user",
                 "content": f"PLAYBOOK DE ESCRITA:\n{self._playbook_writer_block}",
+            })
+
+        # Estilo de escrita da empresa (craft, não elegibilidade) — bloco
+        # irmão do playbook acima, só para o Redator. Vazio quando o dono não
+        # preencheu (regressão-zero). NUNCA entra em for_monitor()/Critic.
+        if self._estilo_empresa_block:
+            messages.append({
+                "role": "user",
+                "content": self._estilo_empresa_block,
             })
 
         # Tail dinâmico: temporal depois do prefixo estável (PR2 §2.1).
@@ -2135,6 +2168,15 @@ class WritingSession:
                 "content": f"PLAYBOOK DE ESCRITA:\n{self._playbook_writer_block}",
             })
 
+        # Estilo de escrita da empresa (craft, não elegibilidade) — bloco
+        # irmão do playbook acima, só para o Redator. Vazio quando o dono não
+        # preencheu (regressão-zero). NUNCA entra em for_monitor()/Critic.
+        if self._estilo_empresa_block:
+            messages.append({
+                "role": "user",
+                "content": self._estilo_empresa_block,
+            })
+
         # Breakpoint 2 (PR2 §2.2): fim do prefixo estável entre turnos — a última
         # mensagem entre perfil/card/programa/library/summary/playbook. O history
         # vem depois (append-mostly): o cache incremental da Anthropic reaproveita
@@ -2285,6 +2327,29 @@ class WritingSession:
         }
 
     def set_section_content(self, section_title: str, content: str) -> None:
+        # Task 4 (plano playbook-overlays-plan.md, severável) — antes de
+        # sobrescrever, se já existe rascunho para a seção e o conteúdo novo
+        # difere, guarda o par para alimentar um futuro extrator de estilo.
+        # Heurística grosseira: trata o conteúdo anterior como "rascunho IA"
+        # (é o que save_draft grava; edições manuais sucessivas via PUT
+        # /section reusam o mesmo caminho, então o par pode registrar
+        # edição-sobre-edição, não só IA→humano — aceitável, ninguém lê isto
+        # ainda). Best-effort: nunca quebra o save da seção.
+        try:
+            previous = self._doc_sections.get(section_title, "")
+            if previous and previous != content:
+                self._style_edit_log.append({
+                    "section": section_title,
+                    "ai_draft": previous,
+                    "user_edited": content,
+                    "ts": datetime.utcnow().isoformat(),
+                })
+        except Exception as e:
+            logger.warning(
+                "[%s] Falha ao capturar style_edit_log (%s): %s",
+                self.session_id, section_title, e,
+            )
+
         self._doc_sections[section_title] = content
         try:
             # Preserva anotações do critic (F1) que vivem em _doc_sections só durante
@@ -2293,6 +2358,8 @@ class WritingSession:
             drafts = dict(self._doc_sections)
             if self._generation_critic_annotations:
                 drafts["_critic_annotations"] = self._generation_critic_annotations
+            if self._style_edit_log:
+                drafts["_style_edit_log"] = self._style_edit_log
             self._db.table("writing_sessions").update({
                 "section_drafts": drafts,
             }).eq("id", self.session_id).execute()
@@ -2823,6 +2890,7 @@ def get_session_document(
     drafts = row.get("section_drafts") or {}
     critic_annotations = drafts.pop("_critic_annotations", {})
     plan_data = drafts.pop("__plan__", None)
+    drafts.pop("_style_edit_log", None)  # combustível interno; não exposto no doc
     return {
         "session_id": row["id"],
         "edital_id": row["edital_id"],

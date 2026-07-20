@@ -42,6 +42,7 @@ export const FIELD_SPECS: Partial<Record<keyof CompanyProfile, FieldSpec>> = {
   solution_summary: { kind: "textarea" },
   descricao_atividades: { kind: "textarea" },
   portfolio_projetos: { kind: "textarea" },
+  estilo_escrita: { kind: "textarea" },
   equipe_resumo: { kind: "textarea" },
   cap_table_resumo: { kind: "textarea" },
   tracao_resumo: { kind: "textarea" },

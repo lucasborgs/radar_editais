@@ -57,6 +57,9 @@ const FIELD_GROUPS: { title: string; fields: (keyof CompanyProfile)[] }[] = [
   { title: "Maturidade", fields: ["tamanho_empresa", "trl", "estagio", "faturamento_anual", "capital_social"] },
   { title: "Investimento", fields: ["tipos_financiamento_interesse", "mrr_arr", "round_alvo_brl"] },
   { title: "Narrativas", fields: ["portfolio_projetos", "equipe_resumo", "tracao_resumo", "cap_table_resumo"] },
+  // Craft de escrita (preenchido à mão pelo dono) — só o Redator vê; não entra
+  // em matching nem em extração automática (plano playbook-overlays-plan.md).
+  { title: "Estilo de escrita", fields: ["estilo_escrita"] },
 ];
 
 const FIELD_LABELS: Partial<Record<keyof CompanyProfile, string>> = {
@@ -81,6 +84,15 @@ const FIELD_LABELS: Partial<Record<keyof CompanyProfile, string>> = {
   equipe_resumo: "Equipe",
   tracao_resumo: "Tração",
   cap_table_resumo: "Cap table",
+  estilo_escrita: "Estilo de escrita",
+};
+
+// Texto instrutivo exibido sob o rótulo de campos que precisam de mais
+// contexto do que o rótulo curto dá conta (hoje só estilo_escrita).
+const FIELD_HINTS: Partial<Record<keyof CompanyProfile, string>> = {
+  estilo_escrita:
+    "Como sua empresa gosta de contar sua história (tom, analogias, foco no " +
+    "cliente, o que evitar…). O redator seguirá estas instruções.",
 };
 
 // ── Input por campo (deriva o tipo de fieldSpec) ──────────────────────────────
@@ -457,6 +469,11 @@ export default function PerfilPage() {
                       <label className="block text-xs font-semibold text-content-secondary font-sans mb-1">
                         {FIELD_LABELS[field] ?? field}
                       </label>
+                      {FIELD_HINTS[field] && (
+                        <p className="text-xs text-content-secondary font-sans mb-1.5">
+                          {FIELD_HINTS[field]}
+                        </p>
+                      )}
                       <FieldInput
                         field={field}
                         value={profile[field]}

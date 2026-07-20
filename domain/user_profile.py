@@ -26,6 +26,8 @@ class CompanyProfile:
     solution_summary: str = ""      # Como resolve (tecnologia/abordagem)
     descricao_atividades: str = ""  # Descrição completa das atividades
     portfolio_projetos: str = ""
+    estilo_escrita: str = ""        # Craft de escrita (preenchido à mão pelo dono);
+                                     # só o Redator vê — NÃO entra em to_context() (matching)
 
     # ── Classificação ─────────────────────────────────────────────────────
     tamanho_empresa: str = ""        # MEI, ME, EPP, MEDIO, GRANDE

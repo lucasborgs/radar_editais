@@ -16,6 +16,8 @@ export interface CompanyProfile {
   solution_summary: string;
   descricao_atividades: string;
   portfolio_projetos: string;
+  // Estilo de escrita — craft, só o Redator vê (não entra em matching)
+  estilo_escrita: string;
   // Classificação
   tamanho_empresa: CompanySize | "";
   capital_social: number | null;
@@ -47,6 +49,7 @@ export const EMPTY_PROFILE: CompanyProfile = {
   solution_summary: "",
   descricao_atividades: "",
   portfolio_projetos: "",
+  estilo_escrita: "",
   tamanho_empresa: "",
   capital_social: null,
   uf: "",

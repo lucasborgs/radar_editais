@@ -34,6 +34,7 @@ class CompanyProfileSchema(BaseModel):
     solution_summary: str = ""
     descricao_atividades: str = ""
     portfolio_projetos: str = ""
+    estilo_escrita: str = ""  # craft de escrita p/ Redator; NÃO entra em matching
     tamanho_empresa: str = ""
     capital_social: float | None = None
     # elegibilidade organizacional (espelha domain.CompanyProfile; o diff do
@@ -62,6 +63,7 @@ def to_py_profile(schema: CompanyProfileSchema) -> PyCompanyProfile:
         solution_summary=schema.solution_summary,
         descricao_atividades=schema.descricao_atividades,
         portfolio_projetos=schema.portfolio_projetos,
+        estilo_escrita=schema.estilo_escrita,
         tamanho_empresa=schema.tamanho_empresa,
         capital_social=schema.capital_social,
         uf=schema.uf,
@@ -104,6 +106,7 @@ def profile_from_workspace(db, workspace_id: str) -> PyCompanyProfile:
     allowed = {
         "nome", "cnpj", "url_site", "tipo_entidade", "one_liner",
         "solution_summary", "descricao_atividades", "portfolio_projetos",
+        "estilo_escrita",
         "tamanho_empresa", "capital_social", "equipe_resumo", "trl",
         "tipos_financiamento_interesse",
         "estagio", "mrr_arr", "round_alvo_brl", "cap_table_resumo", "tracao_resumo",

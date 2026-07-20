@@ -65,6 +65,7 @@ def _make_session() -> WritingSession:
     s._critic_fail_open_count = 0
     s._playbook_writer_block = ""  # F5: vazio — nenhum mecanismo resolvido
     s._playbook_monitor_block = ""  # F5: vazio
+    s._estilo_empresa_block = ""  # estilo de escrita — vazio por padrão (plano playbook-overlays)
     s.backend = "anthropic"
     s.model = "claude-sonnet-4-6"
     return s
