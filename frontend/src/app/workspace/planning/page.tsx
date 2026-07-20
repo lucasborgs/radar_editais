@@ -8,7 +8,6 @@ import {
   planningGenerate,
   getExistingPlan,
   startWritingSession,
-  workspaceMode,
   getEditalById,
   planningAdjust,
 } from "@/lib/api";
