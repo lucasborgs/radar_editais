@@ -19,8 +19,8 @@ A próxima sessão parte DAQUI, não do executor anterior. Estado real:
 | T2 guardrails baseline | ✅ **B1–B9 verdes** (leak-test + interrupt/resume, Postgres local) |
 | **T4 ESCRITA (1ª fatia)** | ✅ **implementada** (`dd382056e`,`574c3e532`,`e9135c173`,`c9c2116aa`) + **T4.1 opção D** (título estrutural → redirect). **fam3 fecha 3/3** (frase-conteúdo 3/3 + título-redirect 3/3). Reside na branch `feat/lever3-threads` |
 | T3 EXPLORE (2ª fatia) | ✅ **implementada** (este commit): saver loop-local singleton-por-loop + delta-slicing + system idempotente + trim. **5 gates verdes** (Postgres real) + **smoke real multi-turno PASS**. Falta só o smoke pelo HTTP `/explore/stream` com app de pé (último milímetro). Ver §T3-D abaixo |
-| T5 robustez (concorrência + purge) | ⏳ **PRÓXIMA** (enxuta; **purge assume thread-por-turno — revisão OBRIGATÓRIA antes de prod**) |
-| T6-design (frame interrupt SSE) | ✅ desenho feito → **rebaixado a apêndice** (§TASK 6-design); implementação = follow-on do item 1 |
+| T5 robustez (concorrência + purge) | ✅ **implementada** (este commit): concorrência mesma-thread sem corrupção + purge reconciliado (dormência≠lixo, retention 30→90). Ver §T5 abaixo |
+| T6-design (frame interrupt SSE) | ✅ **apêndice de design** (§APÊNDICE T6-design + nota no plano do item 1); implementação = follow-on do item 1 |
 
 ### Números finais do gate T4 (A/B local, main=baseline vs branch=treatment)
 - **Métricas-núcleo NÃO degradam:** `saved` 0.75→0.83, `pct_grounded` 0.58→0.74, `coherent` 1.0=1.0. A T4 não piora o eixo central.
@@ -65,6 +65,15 @@ Segue o padrão provado na T4 (delta + idempotência) e absorve a infra loop-loc
 - **Gates (Postgres real, `tests/test_explore_thread_per_session.py`, 5/5 verdes):** (1) **singleton por loop** (N chamadas → mesmo saver); (2) **system idempotente** (3 rotas → 1 system refletindo a última); (3) **delta-slicing + called_match** (turno sem match NÃO herda o match do anterior; usage só do turno); (4) **leak-test estendido** (`{wsA}:sess` invisível por `{wsB}:sess`); (5) **subagente stateless** dentro da thread (sem loop-binding). Suíte inteira: **839 passed / 4 skipped**.
 - **Smoke real multi-turno (PASS):** `spikes/lever3_threads/smoke_explore_thread.py` dirige `explore_stream` real (gpt-4o-mini, Postgres local): turno 1 planta "Zephyr-9 / eólica offshore", turno 2 com `history=[]` **lembra** (checkpointer replaya, sem re-seed), e o controle `thread_id=None`/`history=[]` **não lembra** (stateless intacto).
 - **Pendências do gate (não bloqueiam a fatia):** smoke pelo **HTTP `/explore/stream`** com app de pé (último milímetro, como o smoke `verify` da T4). Warning cosmético de teardown ("Event loop is closed") do pool loop-local no boundary do pytest — em prod o loop vive o processo todo (um saver), não ocorre.
+
+### T5 (2026-07-20) — robustez transversal: concorrência + higiene do purge · **implementada**
+- **Concorrência mesma-thread (duas abas):** teste (`test_explore_concurrent_same_thread_no_corruption`) roda dois turnos SIMULTÂNEOS (`asyncio.gather`) na mesma thread sobre o saver loop-local real. Contrato FIXADO: pior caso aceitável = last-write-wins SEM corromper. Observado: **sem corrupção** — estado legível, ids únicos, 1 system, alternância válida. O saver do LangGraph serializa/versiona com segurança → **nenhum guard de concorrência necessário** (não se construiu framework; princípio "mínimo").
+- **Purge reconciliado (`core/tasks.py`):** o comentário assumia thread-por-TURNO ("threads velhos = lixo puro"). Reescrito para thread-por-SESSÃO:
+  - **Dormência ≠ lixo por construção:** o critério `max(ts) < now - retention` já protege sessão ativa/dormente-curta (um turno recente empurra o `max(ts)`); só sessões ABANDONADAS (> retention sem turno) são reclamadas.
+  - `retention_days`: de "TTL de lixo de turno" para "janela de memória de sessão dormente". Default **30→90** (conservador — sessão retornável; env-overridable).
+  - **Gracioso:** purgar apaga só o CONTEXTO do agente; `session_turns` preserva o histórico de exibição (Decisão 4). Reabrir uma sessão purgada re-semeia do zero.
+  - Gate real (`test_purge_dormant_session_but_not_active_thread_per_session`, Postgres): sessão com `ts` antigo é purgada, sessão com `ts` recente NÃO. Os 4 testes fake de orquestração seguem verdes.
+- **Condição de merge (revisão T3):** o **gap do fallback-sync** está documentado no código (`_explore_agent`) e aqui: um turno atendido pelo espelho sync stateless não entra na thread → amnésia de 1 turno no stream seguinte. ACEITO (raro, gracioso, `session_turns` preserva o registro). Fecha na TASK 6 (unificação das cópias).
 
 ### Lições que o próximo executor PRECISA
 1. **Eval/golden roda LOCAL (`:54322`), nunca cloud** (memória `feedback_eval_runs_local`). Rodar contra o pooler de cloud pela WAN trava (quedas de conexão). Setup local: `scripts/seed_eval_corpus.py` (corpus finep:769/774 + **nós KG `entities`** — sem eles o card do agente floora e `saved`≈0) + identidade de eval em `supabase/seed.sql` (user `auth.users` + workspace, MESMOS UUIDs do cloud, dummy). Env: `.env.staging-local` + `EVAL_WORKSPACE_ID`.
@@ -348,7 +357,9 @@ SUPABASE_URL=http://127.0.0.1:54321 ENVIRONMENT=test INTEGRATION_TARGET=local \
 
 ---
 
-## TASK 6-design — Frame de `interrupt` no contrato SSE (DESENHO; quita o pareamento do item 1)
+## APÊNDICE (T6-design) — Frame de `interrupt` no contrato SSE (DESENHO; quita o pareamento do item 1)
+
+> **Status (governança 2026-07-20):** T6 é **apêndice de design** — não há implementação nesta trilha. O frame abaixo fica registrado como contrato; a implementação do streaming da escrita é follow-on do item 1, após o thread-por-sessão da escrita (T4) estabilizar.
 
 **Não é implementação.** É o desenho que **destrava** a Task 6 do plano do item 1 (streaming da escrita), cuja dependência declarada era exatamente "um frame de `interrupt` no contrato SSE" que o explore não tem. Entregar o desenho aqui quita a dívida de pareamento; a implementação é **follow-on** após a Task 4 estabilizar o thread da escrita.
 

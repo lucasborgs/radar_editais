@@ -236,6 +236,57 @@ async def test_explore_cross_workspace_isolation(explore_saver):
         _delete_threads(prefix)
 
 
+class _StaticChat(BaseChatModel):
+    """Sempre devolve a MESMA resposta (concurrency-safe: sem _idx compartilhado)."""
+
+    @property
+    def _llm_type(self) -> str:
+        return "static"
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+        return ChatResult(generations=[ChatGeneration(message=_ai("ok"))])
+
+    def bind_tools(self, tools, **kwargs):  # noqa: ANN001
+        return self
+
+
+@pytest.mark.asyncio
+async def test_explore_concurrent_same_thread_no_corruption(explore_saver, monkeypatch):
+    """TASK 5 — dois turnos SIMULTÂNEOS na mesma thread (duas abas). Contrato:
+    o pior caso aceitável é last-write-wins SEM corromper; corrupção (ids
+    duplicados / estado ilegível) é falha. Observa o comportamento do saver."""
+    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: _StaticChat())
+    prefix = f"wsEXP_{uuid.uuid4().hex[:8]}"
+    tid = f"{prefix}:sess"
+
+    async def _one(user):
+        result = None
+        async for d in ag.run_agent_graph_streaming(
+            system="s", initial_messages=[{"role": "user", "content": user}],
+            tools=[], model="m", provider="anthropic", max_steps=5,
+            thread_id=tid, checkpointer=explore_saver, prior_n_msgs=0,
+            system_msg_id=EXPLORE_SYS_ID, mode="explore",
+        ):
+            if d.kind == "done":
+                result = d.result
+        return result
+
+    try:
+        # Concorrência real na mesma thread: gather de dois turnos.
+        r_a, r_b = await asyncio.gather(_one("aba A"), _one("aba B"))
+        assert r_a is not None and r_b is not None, "ambos os turnos devem completar"
+
+        msgs = await _read_thread(explore_saver, tid)
+        # Não corrompeu: estado legível, sem ids duplicados, alternância válida.
+        ids = [getattr(m, "id", None) for m in msgs if getattr(m, "id", None)]
+        assert len(ids) == len(set(ids)), f"ids duplicados = corrupção: {ids}"
+        assert sum(1 for m in msgs if isinstance(m, SystemMessage)) == 1
+        humans = [m for m in msgs if isinstance(m, HumanMessage)]
+        assert humans, "estado deve conter ao menos um turno humano"
+    finally:
+        _delete_threads(prefix)
+
+
 @pytest.mark.asyncio
 async def test_explore_subagent_stateless_in_thread(explore_saver, monkeypatch):
     """Um subagente (run_subagent → grafo efêmero checkpointer=False) disparado por

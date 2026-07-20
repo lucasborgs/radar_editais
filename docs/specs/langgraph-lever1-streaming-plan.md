@@ -201,6 +201,8 @@ O deploy real é **Docker + Cloudflare Tunnel** (memória `project_v3_progress`)
 
 ## TASK 6 — Streaming da escrita (2º produtor) · dep: TASK 2 · **adiável**
 
+> **Dependência DESTRAVADA (Item 3, 2026-07-20):** o bloqueio declarado desta task era "um frame de `interrupt` no contrato SSE" que o explore não tinha. Esse frame está **desenhado** no apêndice do plano do Item 3 (`docs/specs/langgraph-lever3-threads-plan.md` §APÊNDICE (T6-design)). Além disso, o thread-por-sessão da escrita (Item 3 / T4) já converge interrupt/resume no thread `{ws}:{session}` — a Task 6 agora depende só desse thread estabilizado + do cruzamento bg-loop→fila (wrinkle abaixo), não mais de um contrato faltante.
+
 **Objetivo.** Estender o streaming ao turno de escrita, reusando a máquina da TASK 2. **Follow-on**: não bloqueia o valor do explore (tasks 3-4). Marcada adiável porque tem wrinkles próprios.
 
 **Wrinkles verificados (por que é mais pesado que o explore):**

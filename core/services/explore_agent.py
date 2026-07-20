@@ -524,6 +524,15 @@ class ExploreAgent:
         # DELIBERADAMENTE stateless — re-seeda `[-8:]` como sempre. Migrá-la exigiria
         # cruzar o saver loop-local pro `run_agent` sync (outro loop) sem ganho: o
         # front usa o streaming. Unificação das duas cópias fica pra TASK 6.
+        #
+        # GAP ACEITO (governança, revisão T3): um turno atendido por ESTE espelho
+        # sync NÃO escreve na thread `{ws}:{session}`. Se um turno cair aqui (ex.:
+        # cliente não-streaming) e o SEGUINTE for pelo stream, o agente não verá o
+        # turno-sync na thread → amnésia de 1 turno. Aceito porque: (a) é raro (o
+        # front usa `/explore/stream`); (b) degradação graciosa (o pior é re-perguntar,
+        # não corromper); (c) `session_turns` (persist_turn) preserva o registro de
+        # produto — só o CONTEXTO do agente perde aquele turno, não o histórico do
+        # usuário. Fechar o gap = unificar as cópias (TASK 6).
         messages: list[dict] = []
         for turn in (history or [])[-8:]:
             role = turn.get("role")

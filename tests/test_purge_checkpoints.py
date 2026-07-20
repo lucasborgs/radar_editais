@@ -94,6 +94,55 @@ def test_purge_without_database_url_raises(monkeypatch):
         tasks._purge_stale_checkpoints(30)
 
 
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not __import__("os").getenv("DATABASE_URL"),
+    reason="purge SQL real — requer DATABASE_URL (integração gated)",
+)
+def test_purge_dormant_session_but_not_active_thread_per_session():
+    """TASK 5 (thread-por-sessão) — a semântica DORMÊNCIA vs LIXO no Postgres real:
+    uma sessão com turno RECENTE (ativa/dormente-curta) NÃO é purgada; só a sessão
+    ABANDONADA (max(ts) > retention) é reclamada. Insere linhas mínimas com `ts`
+    controlado direto em agent_memory.checkpoints (o purge só lê thread_id + ts)."""
+    import os
+    import uuid
+
+    import psycopg
+
+    prefix = f"wsPURGE_{uuid.uuid4().hex[:8]}"
+    tid_active = f"{prefix}_active:sess"
+    tid_dormant = f"{prefix}_dormant:sess"
+    dsn = os.environ["DATABASE_URL"]
+
+    def _insert(tid, ts_iso):
+        with psycopg.connect(dsn, autocommit=True) as c, c.cursor() as cur:
+            cur.execute(
+                "INSERT INTO agent_memory.checkpoints "
+                "(thread_id, checkpoint_id, checkpoint) VALUES (%s, %s, %s::jsonb)",
+                (tid, uuid.uuid4().hex, f'{{"ts": "{ts_iso}"}}'),
+            )
+
+    def _exists(tid) -> bool:
+        with psycopg.connect(dsn, autocommit=True) as c, c.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM agent_memory.checkpoints WHERE thread_id = %s LIMIT 1", (tid,)
+            )
+            return cur.fetchone() is not None
+
+    try:
+        _insert(tid_active, "2099-01-01T00:00:00+00:00")   # futuro → sempre "recente"
+        _insert(tid_dormant, "2000-01-01T00:00:00+00:00")  # abandonada há décadas
+        counts = tasks._purge_stale_checkpoints(90)
+        assert counts["threads"] >= 1
+        assert not _exists(tid_dormant), "sessão ABANDONADA deveria ser purgada"
+        assert _exists(tid_active), "sessão ATIVA/dormente NÃO pode ser purgada"
+    finally:
+        with psycopg.connect(dsn, autocommit=True) as c, c.cursor() as cur:
+            cur.execute(
+                "DELETE FROM agent_memory.checkpoints WHERE thread_id LIKE %s", (prefix + "%",)
+            )
+
+
 @pytest.mark.asyncio
 async def test_cron_task_is_noop_without_database_url(monkeypatch, caplog):
     monkeypatch.delenv("DATABASE_URL", raising=False)
