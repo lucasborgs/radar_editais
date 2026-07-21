@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 
 WORKDIR /app
 
-COPY pyproject.toml requirements.lock.txt ./
+COPY pyproject.toml requirements.lock.txt requirements.worker.lock.txt ./
 COPY config.py ./
 COPY backend/ ./backend/
 COPY core/ ./core/
@@ -41,7 +41,7 @@ FROM base AS worker
 # Compartilhado entre a instalação (root) e o processo do worker (app).
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-RUN pip install --no-cache-dir crawl4ai \
+RUN pip install --no-cache-dir --require-hashes -r requirements.worker.lock.txt \
     && python -m playwright install --with-deps chromium \
     && useradd -m -u 1000 app \
     && chown -R app:app /app /ms-playwright
