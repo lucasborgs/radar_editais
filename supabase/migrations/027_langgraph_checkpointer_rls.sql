@@ -1,6 +1,6 @@
 -- 027: trava as tabelas do checkpointer LangGraph contra o PostgREST (2026-06-19)
 --
--- A Etapa 3 da migração LangGraph (docs/specs/langgraph-migration.md) adiciona um
+-- A Etapa 3 da migração LangGraph (docs/historical/langgraph-migration.md) adiciona um
 -- checkpointer Postgres à WritingSession. As tabelas (checkpoints, checkpoint_blobs,
 -- checkpoint_writes, checkpoint_migrations) são criadas em runtime pelo
 -- AsyncPostgresSaver.setup() (ver scripts/setup_checkpointer.py) — NÃO por migration,

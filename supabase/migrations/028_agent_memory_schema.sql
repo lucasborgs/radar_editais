@@ -1,6 +1,6 @@
 -- 028: schema dedicado `agent_memory` para a maquinaria que bypassa RLS (2026-06-19)
 --
--- Etapa 5 da migração LangGraph (docs/specs/langgraph-migration.md). O LangGraph
+-- Etapa 5 da migração LangGraph (docs/historical/langgraph-migration.md). O LangGraph
 -- PostgresStore (memória cross-session, projeção dos reflection_insights) e o
 -- AsyncPostgresSaver da Etapa 3 (checkpointer) escrevem via conexão DIRETA
 -- (DATABASE_URL, role postgres → bypassa RLS). O isolamento multi-tenant vem do

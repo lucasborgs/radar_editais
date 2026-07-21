@@ -43,7 +43,7 @@ jobs:
   tenant-isolation:
     name: Tenant isolation leak-test (Supabase)
     runs-on: ubuntu-latest
-    # Gate de segurança P0 (docs/security/tenant-isolation.md). Sobe o Supabase
+    # Gate de segurança P0 (docs/reference/tenant-isolation.md). Sobe o Supabase
     # local e roda a suíte adversarial das 4 superfícies. Job SEPARADO do backend:
     # um hiccup do Docker/Supabase não bloqueia a suíte principal — mas um LEAK
     # real (ou a regressão do procrastinate, migration 034) reprova aqui.
@@ -73,7 +73,7 @@ jobs:
           # (2.99+) regrediram o fresh-start: service_role fica SEM grant nas
           # tabelas de migration → `permission denied for table workspaces` (a
           # suíte nem semeia). 2.98.2 é a versão validada localmente (33 passed).
-          # Reproduzível > último. Ver docs/security/tenant-isolation.md.
+          # Reproduzível > último. Ver docs/reference/tenant-isolation.md.
           version: 2.98.2
 
       - name: Start Supabase (aplica migrations, inclui 034)

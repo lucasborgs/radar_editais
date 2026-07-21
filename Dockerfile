@@ -3,7 +3,7 @@
 #   app    → usa o CMD abaixo (uvicorn).
 #   worker → sobrescreve o CMD no docker-compose.yml
 #            (python -m procrastinate --app=core.tasks.app worker).
-# See ADR-001-decisoes-iniciais.md (D1, D3, D4).
+# See docs/historical/ADR-001-decisoes-iniciais.md (D1, D3, D4).
 
 FROM python:3.11-slim AS base
 

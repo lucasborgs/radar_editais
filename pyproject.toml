@@ -79,7 +79,6 @@ ignore = ["E501"]  # line too long handled by formatter
 "scripts/*" = ["E402"]
 # load_dotenv() must run before module imports that read os.environ at import time
 "backend/api.py" = ["E402"]
-"core/hybrid_match_service.py" = ["E402"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency injection helpers are evaluated once per request, not at definition time
@@ -102,7 +101,7 @@ ignore_missing_imports = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-exclude = ["pipeline/", "bronze_data/", "silver_data/", "knowledge_graph/"]
+exclude = ["pipeline/", "data/bronze/", "data/silver/", "data/knowledge_graph/"]
 
 [tool.pytest.ini_options]
 markers = [
