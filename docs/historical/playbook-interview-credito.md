@@ -108,9 +108,9 @@
 
 ### Destilação (depois das respostas)
 
-Distilar em `skills/mechanism/credito.md` no padrão do gabarito
-[skills/mechanism/subvencao.md](../../skills/mechanism/subvencao.md):
+Distilar em `docs/playbooks/mechanism/credito.md` no padrão do gabarito
+[docs/playbooks/mechanism/subvencao.md](../playbooks/mechanism/subvencao.md):
 3 seções roteadas (`## Padrões de escrita e tom` → Redator · `## Heurísticas de
 aprovação` e `## Anti-padrões / red flags` → ComplianceMonitor) + rodapé fato↔craft.
-Praxe de fonte (F12/F13) vai pro overlay `skills/source/<fonte>/credito.md`, não na
+Praxe de fonte (F12/F13) vai pro overlay `docs/playbooks/source/<fonte>/credito.md`, não na
 base. **Cortar sem dó** — craft afiado, fato nenhum.

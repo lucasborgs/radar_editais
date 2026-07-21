@@ -1,6 +1,6 @@
 # FAPESP — Schema específico
 
-Estende [WIKI.md](../WIKI.md). Só documenta o que diverge do schema global.
+Estende [docs/domain/schema.md](../schema.md). Só documenta o que diverge do schema global.
 
 ---
 
@@ -38,7 +38,7 @@ são formulários/declarações e podem ser ignorados na síntese.
 
 ## 3. Mapeamento bronze → schema comum
 
-Campos do JSON bronze FAPESP e correspondência ao schema do índice (§4 WIKI.md).
+Campos do JSON bronze FAPESP e correspondência ao schema do índice (§4 docs/domain/schema.md).
 
 ```yaml
 bronze_mapping:
@@ -83,7 +83,7 @@ incluir como `doc_name` adicional.
 
 ## 5. Metadados enviados ao prompt
 
-Mesma lista do FINEP (§5 wikis/finep.md), aplicada aos campos canônicos:
+Mesma lista do FINEP (§5 docs/domain/sources/finep.md), aplicada aos campos canônicos:
 
 ```yaml
 metadata_to_llm:
@@ -100,7 +100,7 @@ metadata_to_llm:
 
 ## 6. Prompt de extração
 
-Usa o prompt global (§8.1 WIKI.md) sem overrides.
+Usa o prompt global (§8.1 docs/domain/schema.md) sem overrides.
 
 ---
 
@@ -139,9 +139,9 @@ graph_overrides:
   o slug a partir do título e fazer fetch direto na URL completa.
 - **`publico_alvo` ausente.** FAPESP não declara público-alvo como campo
   estruturado nem na listagem nem na página individual. O vocabulário legado
-  em `wikis/_pme_filter.md` registra aliases FAPESP-específicos.
+  em `docs/domain/sources/_pme_filter.md` registra aliases FAPESP-específicos.
 - **`data_limite` em ISO.** Bronze emite `yyyy-mm-dd`; o schema canônico
-  (§4.1 WIKI.md) exige `dd/mm/yyyy`. `wiki_schema.iso_to_br_date` converte.
+  (§4.1 docs/domain/schema.md) exige `dd/mm/yyyy`. `wiki_schema.iso_to_br_date` converte.
 - **`fluxo_continuo == True` significa "sem prazo fixo" (programa contínuo).**
-  Não confundir com "encerrado". §7.1 WIKI.md trata sem prazo + status ABERTA
+  Não confundir com "encerrado". §7.1 docs/domain/schema.md trata sem prazo + status ABERTA
   como vigente.

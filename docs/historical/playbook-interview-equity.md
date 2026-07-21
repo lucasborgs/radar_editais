@@ -105,9 +105,9 @@
 
 ### Destilação (depois das respostas)
 
-Distilar em `skills/mechanism/equity.md` — **roteado ao agente de pitch** (D4), NÃO ao
+Distilar em `docs/playbooks/mechanism/equity.md` — **roteado ao agente de pitch** (D4), NÃO ao
 ComplianceMonitor/Critic. Padrão do gabarito
-[skills/mechanism/subvencao.md](../../skills/mechanism/subvencao.md) adaptado: seções
+[docs/playbooks/mechanism/subvencao.md](../playbooks/mechanism/subvencao.md) adaptado: seções
 como tipos (`## Padrões de escrita e tom` → gerador de pitch · `## Heurísticas` e
 `## Anti-padrões` → avaliador de pitch). Sem rodapé fato↔RAG-de-edital; em vez disso, a
 nota "fato = dado do deal, não vem de RAG de fomento". Overlay por **tipo de investidor/

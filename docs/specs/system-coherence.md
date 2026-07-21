@@ -191,7 +191,7 @@ ou pela conveniência de agrupar muitas mudanças num único PR.
 | `README.md` | proposta do sistema, arquitetura resumida e início rápido |
 | `AGENTS.md` | execução, validação e cuidados operacionais para agentes/mantenedores |
 | `docs/architecture.md` | runtime e fluxos atuais |
-| `WIKI.md` + `wikis/` | domínio, vocabulários e regras lidas pelo código |
+| `docs/domain/schema.md` + `docs/domain/sources/` | domínio, vocabulários e regras lidas pelo código |
 | `docs/specs/` | contratos ativos ou ainda vigentes |
 | `docs/historical/` | decisões e implementações substituídas, sem autoridade atual |
 

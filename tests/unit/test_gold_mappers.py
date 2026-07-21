@@ -1,6 +1,6 @@
 """Testes dos mapeadores DETERMINÍSTICOS do ingest gold v3 (core/kg/gold.py).
 
-Rodam sem LLM nem DB — só as funções puras que leem os vocabulários do WIKI.md
+Rodam sem LLM nem DB — só as funções puras que leem os vocabulários do docs/domain/schema.md
 (§13). Cobrem o passe de normalização de tags/setores, a classificação de seções
 (temática/elegibilidade/boilerplate), extração de UF, split de operador, mapeamento
 de mecanismo/formato e a detecção conservadora de programa-pai (subordinado_a).

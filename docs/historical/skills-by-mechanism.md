@@ -28,14 +28,14 @@ a competência de transformar o fato do grafo na narrativa que aprova.
 
 **Substrato (destino):** o conhecimento mora no **nó do KG** (mecanismo/fonte como
 nós com wiki_page — "o grafo é a fonte de conhecimento", à la LLM-wiki). Arquivos
-`skills/*.md` em git são o **bootstrap** (tier-0) para autorar a competência agora.
+`docs/playbooks/*.md` em git são o **bootstrap** (tier-0) para autorar a competência agora.
 **Evolução por uso (learning loop)** → congelada no
 [backlog técnico](../BACKLOG.md#manter-a-escrita-automática-de-memória-congelada-até-haver-evidência-real)
 até haver outcomes reais e curadoria compartilhada.
 
 ## Problema (o que estava errado)
 
-1. **Eixo de keying errado.** Skills eram `skills/<source>_compliance.md` (por
+1. **Eixo de keying errado.** Skills eram `docs/playbooks/<source>_compliance.md` (por
    fonte). Mas a aderência gruda no **mecanismo** (instrumento), não na agência.
    Quebra em: (a) web é balde de agências, não mecanismo; (b) uma fonte tem vários
    mecanismos (FINEP faz subvenção E crédito); (c) pitch não é compliance.
@@ -50,7 +50,7 @@ até haver outcomes reais e curadoria compartilhada.
   `---`), normaliza o vocabulário (D1/D2) e cai em `confidence="low"` no fallback (D3);
   guard de PLACEHOLDER preservado. Consumidores **já flipados**: ComplianceMonitor puxa
   `for_monitor()`; a tool `load_skill` do Redator puxa `for_writer()` (pitch→equity). Os
-  `skills/<source>_compliance.md` antigos foram removidos (craft tácito migrou p/
+  `docs/playbooks/<source>_compliance.md` antigos foram removidos (craft tácito migrou p/
   `source/finep/global.md`; regra dura é RAG). Critic intocado.
 - `mechanism` **já é campo estruturado** de todo edital — `MATCH_FIELDS`
   (wiki_schema.py:46), extraído no Stage 1.
@@ -101,7 +101,7 @@ Merge **por seção** (concatena listas dentro de cada `##`), não prosa solta �
 neutraliza o risco de instrução conflitante. Layout:
 
 ```
-skills/
+docs/playbooks/
   mechanism/{subvencao,credito,bolsa,matching,equity,premio}.md
   source/finep/{global,subvencao,credito}.md
   source/fapesp/{global,subvencao,bolsa}.md

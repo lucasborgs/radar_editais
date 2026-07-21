@@ -8,7 +8,7 @@
 
 | # | Tópico | Decisão |
 |---|--------|---------|
-| 1 | Detecção de `requires_ict_partner` | **Heurística por regex** sobre o texto do edital (MVP). Patterns no schema (WIKI.md), não no código |
+| 1 | Detecção de `requires_ict_partner` | **Heurística por regex** sobre o texto do edital (MVP). Patterns no schema (docs/domain/schema.md), não no código |
 | 2 | Granularidade do match | **Macro-tema** (`edital.themes ∩ ict.themes`, §5.9). `areas_raw` fino fica para refino futuro |
 | 3 | Exposição ao agente | Tool `find_ict_partners(edital_id)` **só no Explorador** (KGMatch). **Nunca no Redator** |
 | 4 | ICT na escrita | **Só via decisão humana → ContentLibrary**, nunca via ponte temática automática (peça 4, fase posterior) |
@@ -32,10 +32,10 @@ parceiros é ruído (sugere ICT para edital que não pede).
 
 ### Design
 Campo booleano derivado no build do edital, via regex sobre o texto disponível.
-Schema-first: os patterns vivem em WIKI.md (regra), o código só aplica.
+Schema-first: os patterns vivem em docs/domain/schema.md (regra), o código só aplica.
 
 ```yaml
-# WIKI.md §5.10 (novo)
+# docs/domain/schema.md §5.10 (novo)
 ict_requirement_patterns:
   - "institui[çc][ãa]o de ci[êe]ncia e tecnologia"
   - "\\bICTs?\\b"
@@ -53,7 +53,7 @@ ict_requirement_patterns:
   do `index.json`. É **propriedade/tag**, não nó (§6.1.1).
 
 ### Arquivos
-`WIKI.md` (§5.10 patterns + campo em §4), `core/wiki_schema.py` (helper
+`docs/domain/schema.md` (§5.10 patterns + campo em §4), `core/wiki_schema.py` (helper
 `ict_requirement_patterns()`), `pipeline/build_knowledge_graph.py`,
 `tests/test_wiki_schema_consistency.py` (campo presente nas entries).
 

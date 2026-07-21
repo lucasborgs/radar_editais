@@ -1,5 +1,5 @@
 """
-Chunker agnóstico à fonte (WIKI.md §11, L2 / §12 L3b).
+Chunker agnóstico à fonte (docs/domain/schema.md §11, L2 / §12 L3b).
 
 Consome blocos silver do structurer (com `section_path` e `kind`) e agrupa
 em chunks respeitando fronteira de seção e documento. Target ~800 tokens
@@ -169,7 +169,7 @@ def _tail_overlap(text: str, n_tokens: int = OVERLAP_TOKENS) -> str:
 
 
 # =============================================================================
-# SILVER ENTRY POINT (WIKI.md §11 — consome blocos do structurer)
+# SILVER ENTRY POINT (docs/domain/schema.md §11 — consome blocos do structurer)
 # =============================================================================
 
 _DROP_KINDS = {"boilerplate", "signature"}

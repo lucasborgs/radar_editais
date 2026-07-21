@@ -1,5 +1,5 @@
 """
-Web Source Adapter — L1 (WIKI.md §12, strategy=html_clean).
+Web Source Adapter — L1 (docs/domain/schema.md §12, strategy=html_clean).
 
 Fonte web genérica: o bronze (web_raw, escrito por pipeline/extractors/web.py)
 guarda HTML CRU por URL. O adapter lê o bronze, acha o item pelo `native_id`

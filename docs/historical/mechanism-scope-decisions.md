@@ -8,7 +8,7 @@ enum de financiamento é livre; parsing defensivo de valor legado é opcional).
 
 O sistema modela "mecanismos de fomento" em **dois vocabulários que se cruzam no
 match**: o lado do edital (`card.mechanism ∈ {subvencao, reembolsavel, investimento,
-misto}`, vocab WIKI.md §5.1) e o lado do perfil (`tipos_financiamento_interesse`,
+misto}`, vocab docs/domain/schema.md §5.1) e o lado do perfil (`tipos_financiamento_interesse`,
 escolhido no onboarding). A ponte é o `_MECHANISM_MAP`
 (hybrid_match_service.py:57), que
 alimenta a dimensão **mecanismo** (15 de 100 pts no Stage 1 —
@@ -59,7 +59,7 @@ vira trilha paralela; EMBRAPII/ICT vira camada de parceria sobre o match.
 
 | Invariante | Onde vive | Regra |
 |---|---|---|
-| **Schema do KG é autoritativo nos docs** | WIKI.md / `wikis/` | Campo/regra novo (flag EMBRAPII) vai no **doc**, não no código; `tests/test_wiki_schema_consistency.py` continua verde |
+| **Schema do KG é autoritativo nos docs** | docs/domain/schema.md / `docs/domain/sources/` | Campo/regra novo (flag EMBRAPII) vai no **doc**, não no código; `tests/test_wiki_schema_consistency.py` continua verde |
 | **`_MECHANISM_MAP`/ranking → gate de eval** | CLAUDE.md / `radar.core.eval` | Qualquer edit que mude o scoring roda `python -m radar.core.eval matching` antes do merge |
 | **ICT é sugestão no match, nunca na escrita** | guard-rail `project_ict_mapping` | O Redator não recebe `find_ict_partners` nem lê `icts.json`; complemento é display + decisão humana |
 | **Aditivo e isolado onde der** | de-risk multi-quadrante | Trilha de investidor e complemento ICT não tocam o caminho de scoring do edital |
@@ -198,11 +198,11 @@ não regride além do esperado (eles devem cair levemente, não sumir).
   na UI e na union** (`profileFields.ts:24`, `profile.ts:6`, comentário em
   `user_profile.py:49`, doc do extrator).
 - Arquitetura ICT já meio-construída (`project_ict_mapping`):
-  - Nó `ict` no KG; `ict_schema()` em WIKI.md §6.1.2
+  - Nó `ict` no KG; `ict_schema()` em docs/domain/schema.md §6.1.2
     (wiki_schema.py:259).
   - `core/ict_match.py::find_partners(edital_id)`
     (:93) — ranking determinístico por overlap de tema.
-  - `requires_ict_partner` (campo derivado da entry, WIKI.md §5.10) +
+  - `requires_ict_partner` (campo derivado da entry, docs/domain/schema.md §5.10) +
     `ict_requirement_patterns()` (wiki_schema.py:280).
   - Tool `find_ict_partners` no Explorador
     ([explore_tools.py:260](../../core/llm/agent_tools/explore_tools.py#L260)).
@@ -230,8 +230,8 @@ não regride além do esperado (eles devem cair levemente, não sumir).
 | `user_profile.py:49` | atualiza comentário |
 | `profile_extractor.py` (doc do prompt) | remove menção |
 
-### (b) Flag de co-financiamento no schema ICT (WIKI.md — autoritativo)
-- **WIKI.md §6.1.2 / `ict_schema`:** adicionar `brings_cofinancing` a `node_fields`
+### (b) Flag de co-financiamento no schema ICT (docs/domain/schema.md — autoritativo)
+- **docs/domain/schema.md §6.1.2 / `ict_schema`:** adicionar `brings_cofinancing` a `node_fields`
   (campo **opcional**, NÃO em `required_fields` — senão o validador exige em todas as 90
   ICTs antes de regenerar). Documentar a semântica: "ICT cujo arranjo aporta recurso
   não-reembolsável ao projeto (Unidade EMBRAPII: ~1/3 do custo). Default `false`; derivado
@@ -306,7 +306,7 @@ queimar OpenAI em CI); com `EMBEDDING_BACKEND` OS quando aplicável.
 | Tema | Decisões | Síntese |
 |---|---|---|
 | **Acoplamento do `_MECHANISM_MAP`** | D1+D2+D3 | as 3 remoções tocam o mesmo dict; `investimento_direto`+`matching_embrapii` são os únicos `investimento` → o tratamento neutro precisa entrar junto. Batidas no PR 1, um gate só |
-| **Schema autoritativo nos docs** | D3 | `brings_cofinancing` vai em WIKI.md §6.1.2, não no `.py`; validador é o portão |
+| **Schema autoritativo nos docs** | D3 | `brings_cofinancing` vai em docs/domain/schema.md §6.1.2, não no `.py`; validador é o portão |
 | **ICT sugestão, não compromisso** | D3 | complemento no match nunca entra na escrita sem decisão humana |
 | **Sem migração** | D1, D3 | pré-lançamento; valor de financiamento legado em perfil seed só deixa de casar (inócuo) |
 | **Não reconstruir caminhos existentes** | D2, D3 | investor match e `find_partners` já existem — só conectar a entrada/saída |

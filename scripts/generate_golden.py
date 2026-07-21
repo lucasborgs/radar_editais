@@ -5,7 +5,7 @@ Gera um golden dataset pra eval do RAG via LLM.
 Para cada edital indicado, lê chunks da tabela `edital_chunks`, faz amostragem
 diversa (por source_file + section quando possível), e pede pro GPT-4o-mini
 gerar uma pergunta natural que aquele chunk responde. Resultado fica em
-`eval_data/golden/<source>.json` no formato consumido pela suíte rag
+`data/evaluation/golden/<source>.json` no formato consumido pela suíte rag
 (`python -m radar.core.eval rag`).
 
 Uso:
@@ -42,7 +42,7 @@ import psycopg  # noqa: E402
 
 from radar.core.llm.llm_client import make_client  # noqa: E402
 
-GOLDEN_DIR = ROOT / "eval_data" / "golden"
+GOLDEN_DIR = ROOT / "data" / "evaluation" / "golden"
 DEFAULT_PER_EDITAL = 8
 DEFAULT_MODEL = "gpt-4o-mini"
 

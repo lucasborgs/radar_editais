@@ -6,7 +6,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Schema autoritativo
 
-Regras de vocabulários, workflows de ingestão e manutenção vivem em [WIKI.md](WIKI.md) (global) e [wikis/](wikis/)`<fonte>.md` (por fonte). O código lê os blocos YAML via [src/radar/core/kg/schema.py](src/radar/core/kg/schema.py). **Mudanças em regras → edite os docs, não o código.**
+Regras de vocabulários, workflows de ingestão e manutenção vivem em [docs/domain/schema.md](docs/domain/schema.md) (global) e [docs/domain/sources/](docs/domain/sources/)`<fonte>.md` (por fonte). O código lê os blocos YAML via [src/radar/core/kg/schema.py](src/radar/core/kg/schema.py). **Mudanças em regras → edite os docs, não o código.**
 
 **Nota:** o produtor legado da linhagem hyper-extract (hipergrafos N-ários,
 `hyper_extractor.py`, wiki pages, `build_knowledge_graph`) foi removido (v3 PR-C).
@@ -169,7 +169,7 @@ src/radar/core/ services/ (writing_session, match_v3, company_chunks,
 src/radar/domain/ CompanyProfile dataclass (user_profile.py)
 src/radar/pipeline/ ETL multi-fonte (extractors/, adapters/)
 scripts/       CLI: reindex_edital, reindex_all, export_to_obsidian, dev.sh, deploy.sh
-skills/        playbooks de mecanismo (subvencao, credito, equity) — lidos pelo WritingAgent
+docs/playbooks/ playbooks de mecanismo (subvencao, credito, equity) — lidos pelo WritingAgent
 supabase/      migrations/*.sql + config.toml (local CLI)
 data/          bronze/ (raw imutável), silver/ (derivado + catálogos versionados)
 ```

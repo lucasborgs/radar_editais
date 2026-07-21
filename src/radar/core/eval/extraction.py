@@ -9,7 +9,7 @@ Mede a extração-LLM contra o golden CORRIGIDO por humano. Três métricas:
   • evidence_faithfulness — para campos `stated`, a `evidence` é SUBSTRING real
     da fonte? Pega evidência fabricada.
 
-Golden: `eval_data/golden/extraction.json` (corrigido por revisão humana). O
+Golden: `data/evaluation/golden/extraction.json` (corrigido por revisão humana). O
 gate nunca usa rascunhos gerados pela própria LLM como referência.
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ from radar.core.config import ROOT
 from radar.core.eval.harness import Criterion, Evaluation, Suite, get_input
 from radar.domain.edital_extraction import DECISION_FIELDS
 
-GOLDEN = ROOT / "eval_data" / "golden" / "extraction.json"
+GOLDEN = ROOT / "data" / "evaluation" / "golden" / "extraction.json"
 def _norm(s: str) -> str:
     return " ".join((s or "").lower().split())
 

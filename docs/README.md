@@ -10,7 +10,7 @@ cada assunto; não substitui os documentos indicados.
 | o produto e como iniciá-lo | [`README.md`](../README.md) | proposta e início rápido |
 | setup, comandos, validação e cuidados de manutenção | [`AGENTS.md`](../AGENTS.md) | runbook técnico |
 | runtime, dados, agentes, deploy e avaliação | [`architecture.md`](architecture.md) | arquitetura implementada |
-| vocabulários, ingestão e regras por fonte | [`WIKI.md`](../WIKI.md) e [`wikis/`](../wikis/) | domínio lido pelo código |
+| vocabulários, ingestão e regras por fonte | [`domain/schema.md`](domain/schema.md) e [`domain/sources/`](domain/sources/) | domínio lido pelo código |
 | trabalho técnico adiado com evidência | [`BACKLOG.md`](BACKLOG.md) | backlog técnico atual |
 | mudanças propostas ou contratos vigentes | [`specs/`](specs/) | specs correntes |
 | operação e subsistemas atuais | [`reference/`](reference/) | referência derivada |
@@ -29,7 +29,7 @@ cada assunto; não substitui os documentos indicados.
 
 1. [`AGENTS.md`](../AGENTS.md)
 2. [`architecture.md`](architecture.md)
-3. [`WIKI.md`](../WIKI.md)
+3. [`domain/schema.md`](domain/schema.md)
 4. referências e specs do subsistema afetado
 
 ### Operador
@@ -62,7 +62,7 @@ cada assunto; não substitui os documentos indicados.
 
 ## Regras de autoridade
 
-- regras de negócio começam em `WIKI.md`/`wikis/`;
+- regras de negócio começam em `docs/domain/schema.md`/`docs/domain/sources/`;
 - código, migrations e manifests provam o runtime existente, que deve estar
   fielmente descrito em `architecture.md`;
 - uma spec expressa intenção até ser implementada e reconciliada;

@@ -3,7 +3,7 @@
 # em SCRAPER_REGISTRY — `python scripts/run_all.py` percorre o registry.
 #
 # Chave do registry = `source` canônico (lowercase), igual à chave em
-# WIKI.md §12.4 `source_adapters` e ao prefixo usado em `core/edital_id.py`.
+# docs/domain/schema.md §12.4 `source_adapters` e ao prefixo usado em `core/edital_id.py`.
 # `display_name` é só pra logging/UX.
 
 from .base import BaseScraper
@@ -29,7 +29,7 @@ SCRAPER_REGISTRY = {
         cls=FAPESCScraper, kwargs={},
         # WordPress server-side; varre /chamadas-abertas/ (só ABERTAS). Sem
         # histórico via API — snapshot mais recente. Edital vem do PDF anexo
-        # (estratégia pdf): o scraper baixa+extrai → texto_cru. Ver wikis/fapesc.md §8.
+        # (estratégia pdf): o scraper baixa+extrai → texto_cru. Ver docs/domain/sources/fapesc.md §8.
     ),
     "web": dict(
         source="web", display_name="Web", bronze_dir="web_raw",

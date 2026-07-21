@@ -1,6 +1,6 @@
 -- 024: playbook_overlays + meta_reflection_runs — learned overlays de playbook (Item 3, Sprint 4)
 --
--- Os arquivos .md em skills/ (mechanism/*.md + source/<fonte>/*.md) são o SEED
+-- Os arquivos .md em docs/playbooks/ (mechanism/*.md + source/<fonte>/*.md) são o SEED
 -- canônico humano do playbook de escrita. Aqui mora o que o SISTEMA aprende: a
 -- 4ª camada do loader (core/skills.py), mergeada POR SEÇÃO depois das camadas git
 -- (adiciona/sobrepõe aquela seção, nunca reescreve o playbook todo).
@@ -45,7 +45,7 @@ create policy "playbook_overlays_read" on public.playbook_overlays
   for select to authenticated using (true);
 
 comment on table public.playbook_overlays is
-  'Learned overlays de playbook — 4ª camada do loader (core/skills.py), mergeada por seção depois das camadas git. GLOBAL/cross-workspace (destilado de todos os tenants via run_meta_reflection); NÃO é workspace-scoped. RLS read-only para authenticated; escrita só service-role. Os .md em skills/ continuam o seed canônico.';
+  'Learned overlays de playbook — 4ª camada do loader (core/skills.py), mergeada por seção depois das camadas git. GLOBAL/cross-workspace (destilado de todos os tenants via run_meta_reflection); NÃO é workspace-scoped. RLS read-only para authenticated; escrita só service-role. Os .md em docs/playbooks/ continuam o seed canônico.';
 comment on column public.playbook_overlays.source is
   'NULL = overlay vale para o mecanismo em qualquer fonte; preenchido = praxe agência × mecanismo.';
 comment on column public.playbook_overlays.section is

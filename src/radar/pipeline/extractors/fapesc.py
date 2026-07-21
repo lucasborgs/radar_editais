@@ -12,7 +12,7 @@ FINEP), não `html_body`: o scraper baixa o PDF do edital e extrai o texto
 inline (pdfplumber), gravando-o em `texto_cru`. O adapter (que fatia `texto_cru`
 em units) não muda — só a origem do texto muda.
 
-Output bronze (shape do bronze_mapping em wikis/fapesc.md):
+Output bronze (shape do bronze_mapping em docs/domain/sources/fapesc.md):
   native_id, titulo, url, data_limite (dd/mm/yyyy|None), status (ABERTA|FLUXO_CONTINUO),
   modalidades, areas, texto_cru, edital_pdf_url, content_source (pdf|html),
   fluxo_continuo (bool), fonte, data_extracao.
@@ -54,7 +54,7 @@ _EDITAL_ANCHOR_RE = re.compile(r"\bedital\b", re.IGNORECASE)
 # Recência de um anexo pelo path /wp-content/uploads/AAAA/MM/.
 _UPLOADS_DATE_RE = re.compile(r"/wp-content/uploads/(\d{4})/(\d{2})/", re.IGNORECASE)
 
-# Fallback defensivo se o doc (wikis/fapesc.md §skip_keywords) estiver ausente.
+# Fallback defensivo se o doc (docs/domain/sources/fapesc.md §skip_keywords) estiver ausente.
 # Boilerplate institucional + peças de andamento que NÃO são o edital normativo.
 _SKIP_KEYWORDS_FALLBACK = [
     "plano-de-integridade", "codigo_conduta", "resultado", "manual",
@@ -64,7 +64,7 @@ _AMENDMENT_RE = re.compile(r"retifica|rerratifica|errata", re.IGNORECASE)
 
 
 def _skip_keywords() -> list[str]:
-    """Skip-list autoritativa do doc (wikis/fapesc.md); fallback à constante."""
+    """Skip-list autoritativa do doc (docs/domain/sources/fapesc.md); fallback à constante."""
     from radar.core.kg import schema  # import tardio: evita ciclo no import do pipeline
     return schema.skip_keywords("fapesc") or _SKIP_KEYWORDS_FALLBACK
 

@@ -19,10 +19,10 @@ Rodar a extração **tipada** (`EditalExtractor` / [domain/edital_extraction.py]
 
 **D1 — Produtor / seam.** A extração roda no passo de silver que já produz o card rico (`source=etl_process`, em pipeline/etl_process.py — confirmar a função exata na impl) **ou** como passo de enriquecimento sobre a wiki page. Recomendado: no silver, reusando o **texto já em mãos** (que gera `objective`/`key_requirements`) e o **cache por hash** (espelhar `.enrichment_cache.json`; não re-chamar LLM em edital inalterado). Gravar **só** `eligibility_constraints` — preserva o resto do card. Pular os `metadata_only` (sem texto → nada a extrair).
 
-**D2 — Schema (doc-first, autoritativo).** Declarar `eligibility_constraints` como campo **synthesized** da wiki page no **WIKI.md** §4/§8.1 (estrutura: `[{type, description, evidence}]`, `type ∈ {region, company_age, revenue, cnae, consortium}`). Atualizar core/kg/wiki_schema.py e manter tests/test_wiki_schema_consistency.py verde. Mudança de regra vai no doc, não no código.
+**D2 — Schema (doc-first, autoritativo).** Declarar `eligibility_constraints` como campo **synthesized** da wiki page no **docs/domain/schema.md** §4/§8.1 (estrutura: `[{type, description, evidence}]`, `type ∈ {region, company_age, revenue, cnae, consortium}`). Atualizar core/kg/wiki_schema.py e manter tests/test_wiki_schema_consistency.py verde. Mudança de regra vai no doc, não no código.
 
 **D3 — Plano de eval (load-bearing).**
-- **Extração**: já gate-able — `eval_data/golden/extraction.json` (10 casos) **já cobre** `eligibility_constraints`. Confirmar cobertura dos 3 tipos suportados (region/company_age/revenue); completar o golden se faltar tipo.
+- **Extração**: já gate-able — `data/evaluation/golden/extraction.json` (10 casos) **já cobre** `eligibility_constraints`. Confirmar cobertura dos 3 tipos suportados (region/company_age/revenue); completar o golden se faltar tipo.
 - **Match (o crux)**: a suíte `matching` (`tests/fixtures/eval_matching.json`) **não tem** caso onde a elegibilidade é o discriminador → ligar a dimensão seria **invisível** ao eval. **Adicionar ≥1 golden case**: perfil hard-inelegível (ex.: empresa SP × edital com `region` só-NE; ou empresa 10 anos × `company_age` "até 4 anos") onde o esperado é o edital **cair** no ranking vs. um par elegível. Sem esse caso, o ganho fim-a-fim não é mensurável nem gate-ável.
 
 **D4 — Soft + HITL.** Re-rank apenas; nunca eliminar (já garantido pelo scorer: `None`→omitido, `0.5` neutro quando perfil sem o par). Aflorar a `evidence` verbatim ao usuário ("este edital exige sede no NE — *trecho*") = **Fase 2 / frontend**, fora desta spec.
@@ -31,7 +31,7 @@ Rodar a extração **tipada** (`EditalExtractor` / [domain/edital_extraction.py]
 
 ## Plano de implementação (PRs)
 
-1. **PR1 — schema**: WIKI.md + `wiki_schema.py` declaram `eligibility_constraints`; validator verde. (sem comportamento, destrava o resto)
+1. **PR1 — schema**: docs/domain/schema.md + `wiki_schema.py` declaram `eligibility_constraints`; validator verde. (sem comportamento, destrava o resto)
 2. **PR2 — golden de match**: caso(s) de elegibilidade em `eval_matching.json` + rodar `radar.core.eval matching` para registrar o baseline COM a dimensão ainda dormente (deve permanecer estável). Estabelece a régua.
 3. **PR3 — produtor**: wiring do extrator no silver (D1) + cache; popula `eligibility_constraints`. **GATE**: `radar.core.eval extraction` (qualidade da extração) **e** `radar.core.eval matching` (o golden de D3 melhora; nada mais regride).
 

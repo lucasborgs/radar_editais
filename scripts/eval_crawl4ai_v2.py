@@ -25,7 +25,7 @@ from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_PATH = os.path.join(SCRIPT_DIR, "eval_crawl4ai_v2_results.json")
-WIKIS_DIR = Path(__file__).resolve().parent.parent / "wikis"
+WIKIS_DIR = Path(__file__).resolve().parent.parent / "docs" / "domain" / "sources"
 
 TEST_URLS = [
     {
@@ -99,7 +99,7 @@ Responda APENAS JSON válido, sem markdown, sem comentários.
 """
 
 # =============================================================================
-# Skip-lists: mesma lógica de core/kg/schema.py (lê YAML de wikis/*.md)
+# Skip-lists: mesma lógica de core/kg/schema.py (lê YAML de docs/domain/sources/*.md)
 # =============================================================================
 
 _YAML_BLOCK_RE = re.compile(r"```yaml\n(.*?)```", re.DOTALL)

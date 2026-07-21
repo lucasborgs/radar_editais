@@ -12,7 +12,7 @@ O runtime de catálogo e match já convergiu para o gold relacional, mas o
 repositório ainda apresenta caminhos antigos e camadas atuais como se fossem
 alternativas equivalentes:
 
-1. `WIKI.md` declara corretamente que o gold v3 é relacional, mas ainda mantém
+1. `docs/domain/schema.md` declara corretamente que o gold v3 é relacional, mas ainda mantém
    schema, prompt e workflow de geração de wiki pages JSON; em §12 continua
    chamando wiki page de “Knowledge gold”, embora o produtor hyper-extract e
    `build_knowledge_graph` tenham sido removidos;
@@ -115,7 +115,7 @@ convergir para `llm_client`.
 
 ### Etapa 1 — Reconciliar autoridade e história
 
-1. tornar a arquitetura de camadas atual inequívoca em `WIKI.md`, preservando
+1. tornar a arquitetura de camadas atual inequívoca em `docs/domain/schema.md`, preservando
    somente os blocos YAML ainda lidos por consumidores comprovados;
 2. mover instruções de geração de wiki pages e workflow hyper-extract para
    histórico quando tiverem valor explicativo;
@@ -124,7 +124,7 @@ convergir para `llm_client`.
 4. reconciliar `README.md`, `AGENTS.md`, `docs/architecture.md` e specs que
    descrevem wiki JSON como data plane vivo.
 
-Mudanças de regras de domínio continuam sendo feitas em `WIKI.md`; esta etapa
+Mudanças de regras de domínio continuam sendo feitas em `docs/domain/schema.md`; esta etapa
 remove apenas descrições e schemas de um produtor comprovadamente ausente.
 
 ### Etapa 2 — Remover superfície sem consumidor

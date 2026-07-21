@@ -28,12 +28,13 @@ ENV PYTHONPATH=/app/src
 COPY pyproject.toml requirements.lock.txt requirements.worker.lock.txt ./
 COPY src/ ./src/
 COPY scripts/ ./scripts/
-COPY wikis/ ./wikis/
-COPY WIKI.md ./
+COPY docs/domain/ ./docs/domain/
+COPY docs/playbooks/ ./docs/playbooks/
 
 RUN pip install --no-cache-dir --require-hashes -r requirements.lock.txt \
     && pip install --no-cache-dir --no-deps /wheels/*.whl \
-    && rm -rf /wheels
+    && rm -rf /wheels \
+    && python -c "from radar.core.skills import load_playbook; assert load_playbook('subvencao', 'finep', include_overlays=False).sections"
 
 FROM base AS app
 

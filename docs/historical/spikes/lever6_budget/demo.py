@@ -254,7 +254,7 @@ def _load_golden_profile(profile_key: str):
     from radar.core.config import ROOT
     from radar.domain.user_profile import CompanyProfile
 
-    data = json.loads((ROOT / "eval_data" / "golden" / "writing_v2.json").read_text(encoding="utf-8"))
+    data = json.loads((ROOT / "data" / "evaluation" / "golden" / "writing_v2.json").read_text(encoding="utf-8"))
     raw = data["profiles"][profile_key]
     allowed = set(CompanyProfile.__dataclass_fields__.keys())
     return CompanyProfile(**{k: v for k, v in raw.items() if k in allowed})

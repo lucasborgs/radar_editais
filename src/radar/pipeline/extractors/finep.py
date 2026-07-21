@@ -155,7 +155,7 @@ class FINEPScraper(BaseScraper):
             "titulo": raw.get("titulo") or "",
             "link": chamada_url_publica(liferay_id) if liferay_id else "",
             "status": situacao,
-            # Liferay entrega ISO; schema exige dd/mm/yyyy (WIKI.md §4.1).
+            # Liferay entrega ISO; schema exige dd/mm/yyyy (docs/domain/schema.md §4.1).
             "data_publicacao": iso_to_br_date(raw.get("dataDePublicacao")) or None,
             # prazoProposto é o prazo real de submissão; vigenciaFim é sempre null na API.
             "prazo_envio": iso_to_br_date(raw.get("prazoProposto")) or None,

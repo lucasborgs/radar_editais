@@ -15,7 +15,7 @@ from typing import Any
 from radar.core.config import ROOT
 from radar.core.eval.harness import Evaluation, Suite, get_input
 
-GOLDEN = ROOT / "eval_data" / "golden" / "profile_extractor.json"
+GOLDEN = ROOT / "data" / "evaluation" / "golden" / "profile_extractor.json"
 
 
 def load_data() -> list[dict]:

@@ -1,5 +1,5 @@
 """
-Avaliação INTRÍNSECA de parsing/chunking (estágio 1 do bake-off, WIKI.md §11/§12).
+Avaliação INTRÍNSECA de parsing/chunking (estágio 1 do bake-off, docs/domain/schema.md §11/§12).
 
 Métricas baratas, sem golden e sem juiz LLM, para filtrar estratégias de
 parsing/chunking ANTES do end-to-end (estágio 2, suíte `rag`). Medem a

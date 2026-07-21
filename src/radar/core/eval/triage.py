@@ -10,7 +10,7 @@ Mudou prompt/input/modelo da triagem → rode `python -m radar.core.eval triage`
 ANTES de mergear (foi assim que o A/B de 2026-06-10 mostrou que content[:1500]
 não domina o snippet: corrige truncamento mas se engana com página-lista).
 
-Golden: `eval_data/golden/triage.json` (casos com `review: true` ainda
+Golden: `data/evaluation/golden/triage.json` (casos com `review: true` ainda
 aguardam palavra final do fundador — rotulagem inicial por auditoria).
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import Any
 from radar.core.config import ROOT
 from radar.core.eval.harness import Evaluation, Suite, get_input
 
-GOLDEN = ROOT / "eval_data" / "golden" / "triage.json"
+GOLDEN = ROOT / "data" / "evaluation" / "golden" / "triage.json"
 
 
 def load_data() -> list[dict]:

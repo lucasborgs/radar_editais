@@ -20,7 +20,7 @@ from radar.pipeline.extractors.fapesp import FAPESPScraper  # noqa: E402
 pytestmark = pytest.mark.unit
 
 # =============================================================================
-# _clean_text — duplo-unescape + strip tags (gotcha §8 wikis/fapesp.md)
+# _clean_text — duplo-unescape + strip tags (gotcha §8 docs/domain/sources/fapesp.md)
 # =============================================================================
 
 def test_clean_text_double_unescape():

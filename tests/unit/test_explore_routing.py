@@ -19,7 +19,7 @@ pytestmark = pytest.mark.unit
 
 def test_cases_motivadores_seguem_rota_do_golden():
     golden = json.loads(
-        (ROOT / "eval_data" / "golden" / "explore.json").read_text(encoding="utf-8")
+        (ROOT / "data" / "evaluation" / "golden" / "explore.json").read_text(encoding="utf-8")
     )
     assert len(golden["cases"]) == 4
     for case in golden["cases"]:

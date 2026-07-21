@@ -2,7 +2,7 @@
 
 > **Objetivo:** capturar editais/chamadas/desafios de fomento que surgem espalhados pelo Brasil (FAPs estaduais, ministérios, SEBRAE, fundações, programas pontuais) — fontes desconhecidas e de formato arbitrário — via descoberta web diária, e integrá-los ao KG para que entrem nos fluxos de match e escrita.
 > **Base:** branch a criar a partir de `ict-mapping`/`main`. **Data:** 2026-06-03. Reusa `core/web_search.py` (DeepResearch Fase A).
-> **Pré-leitura:** [spec_deepresearch.md](deep-research-design.md) (infra de busca), WIKI.md §10 (adicionar fonte), §12.3/§12.4 (Documento Canônico / Source Adapter), §5.9 (tema vocab), §5.10.
+> **Pré-leitura:** [spec_deepresearch.md](deep-research-design.md) (infra de busca), docs/domain/schema.md §10 (adicionar fonte), §12.3/§12.4 (Documento Canônico / Source Adapter), §5.9 (tema vocab), §5.10.
 
 ## Princípio: integrar o KG, com dimensão de confiança (não com gate bloqueante)
 
@@ -63,7 +63,7 @@ Task diária (procrastinate, ao lado de `run_daily_etl` em [core/tasks.py](../..
    **pme_filter**, canonicalização de tema (§5.9), `requires_ict_partner` (§5.10),
    `edital_id` prefixado. **Resultado: edital provisório vivo no KG.**
 
-### Schema (WIKI.md)
+### Schema (docs/domain/schema.md)
 - Novo campo do edital `verificacao` ∈ {`provisorio`, `verificado`} (§5.11 novo).
   Default `verificado` para FINEP/FAPESP (fontes confiáveis); `provisorio` para
   descobertas. Propriedade/tag, não nó (§6.1.1). Index-derived (não nos campos
@@ -74,8 +74,8 @@ Task diária (procrastinate, ao lado de `run_daily_etl` em [core/tasks.py](../..
 `supabase/migrations/016_discovery_ledger.sql` (ledger de dedup: url, dedup_key,
 first_seen_at, ingested_edital_id), `core/ingestion/opportunity_discovery.py` (descoberta +
 triagem + extração), `core/tasks.py` (task `discover_opportunities`), doc do
-vocabulário + WIKI.md §5.11, `pipeline/build_knowledge_graph.py` (carregar
-`verificacao` do bronze), `wikis/web.md` (bronze_mapping da fonte genérica).
+vocabulário + docs/domain/schema.md §5.11, `pipeline/build_knowledge_graph.py` (carregar
+`verificacao` do bronze), `docs/domain/sources/web.md` (bronze_mapping da fonte genérica).
 
 ### Critérios de aceitação
 - Task descobre → tria → extrai → ingere editais `provisorio` no `index.json`.

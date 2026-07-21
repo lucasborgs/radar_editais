@@ -195,7 +195,7 @@ SELECT DISTINCT * FROM neighborhood ORDER BY depth, name;
 - Remover `kg_store.save_hypergraphs()`
 - Remover `load_all_hypergraphs()` de `kg_store.py` (se只剩 scripts)
 - Remover `scripts/canonicalize_concepts.py`
-- Atualizar `WIKI.md`: bloco `hypergraph_schema` substituído por `setores_taxonomia`
+- Atualizar `docs/domain/schema.md`: bloco `hypergraph_schema` substituído por `setores_taxonomia`
 
 ## 7. Riscos e Mitigações
 

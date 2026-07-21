@@ -34,7 +34,7 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
 - **Gatilho:** amostra representativa de uso real, com o top-8 classificado por
   perfil como relevante, neutro defensável ou irrelevante confirmado.
 - **Ponto de entrada:** `core/eval/matching.py`,
-  `eval_data/golden/matching.json` e
+  `data/evaluation/golden/matching.json` e
   `docs/specs/evaluation-operations.md`.
 - **Restrição:** a suíte permanece diagnóstica; esta pendência não bloqueia,
   desativa ou altera a feature de match no produto.
@@ -93,7 +93,7 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
   operacional documentada, não uma pendência automática.
 - `radar.domain.vocabulary.canonicalize_themes` é um normalizador parcial usado pelo
   vocab lint; novos sinônimos só entram com evidência do corpus e atualização do
-  vocabulário autoritativo em `WIKI.md`.
+  vocabulário autoritativo em `docs/domain/schema.md`.
 - `requires_ict_partner` permanece no contrato avaliado de extração e não é gate
   de elegibilidade nem sinal consumido pelo match atual.
 

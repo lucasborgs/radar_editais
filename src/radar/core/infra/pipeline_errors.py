@@ -69,7 +69,7 @@ class ParseError(PipelineError):
 
 
 class SchemaViolationError(PipelineError):
-    """Edital com campos fora do vocabulário autorizado (WIKI.md). Entra em
+    """Edital com campos fora do vocabulário autorizado (docs/domain/schema.md). Entra em
     quarentena para revisão; não retenta."""
     category = "schema_violation"
     retryable = False

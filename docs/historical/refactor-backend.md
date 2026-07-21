@@ -9,7 +9,7 @@
 ## Diagnóstico (2026-06-10)
 
 O que está **bom** e deve ser preservado como referência de padrão:
-- **Schema autoritativo em doc** (`WIKI.md` + `core/wiki_schema.py`, validado por teste) — regra vive no doc, código lê. Manter e expandir esse padrão.
+- **Schema autoritativo em doc** (`docs/domain/schema.md` + `core/wiki_schema.py`, validado por teste) — regra vive no doc, código lê. Manter e expandir esse padrão.
 - **Seam de dados único** (`core/kg_store.py`) — file vs Postgres atrás de uma fronteira só.
 - **Harness de eval unificado** (`core/eval/`, registry) — uma suíte = uma linha.
 - **Routers já começaram a sair** (`backend/auth_routes.py`, `library_routes.py`).

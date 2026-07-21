@@ -275,7 +275,7 @@ Converter para grafo ReAct usando `_build_graph` (mesmo runtime do WritingAgent,
 | `extract(url, text)` | existe como LLM call | `core/ingestion/opportunity_discovery.py` |
 | `stage(opportunity)` | existe | `core/ingestion/opportunity_discovery.py` |
 
-O agente recebe as queries de `wikis/_discovery.md` no system prompt (estável → prefixo, D6) e decide a sequência de execução. O gate humano (`POST /promote`) permanece intacto.
+O agente recebe as queries de `docs/domain/sources/_discovery.md` no system prompt (estável → prefixo, D6) e decide a sequência de execução. O gate humano (`POST /promote`) permanece intacto.
 
 **Shadow-run obrigatório antes de desligar o pipeline atual:**
 Flag `DISCOVERY_SHADOW_RUN=1` roda os dois em paralelo e registra: coverage (URLs encontradas por cada um), precision (% que passa pela triage humana), duração e custo por run. Mínimo de 1 semana de shadow-run antes de desligar o pipeline fixo.

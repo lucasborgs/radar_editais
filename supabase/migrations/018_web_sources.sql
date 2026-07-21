@@ -1,6 +1,6 @@
 -- 018 — fonte web genérica: seed list de URLs (web_sources)
 --
--- A fonte `web` (WIKI.md §12.4, strategy=html_clean) não tem listagem
+-- A fonte `web` (docs/domain/schema.md §12.4, strategy=html_clean) não tem listagem
 -- estruturada como FINEP/FAPESP. As URLs a indexar são curadas: vivem nesta
 -- tabela operacional (dado mutável por deploy/UI, não schema). O WebScraper
 -- (pipeline/extractors/web.py) lê as linhas `active` via service-role, busca

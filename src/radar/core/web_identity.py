@@ -1,7 +1,7 @@
 """
 Identidade de página web — normalização de URL + hash estável.
 
-A fonte `web` (WIKI.md §12.4, strategy=html_clean) identifica cada página por um
+A fonte `web` (docs/domain/schema.md §12.4, strategy=html_clean) identifica cada página por um
 hash do URL normalizado: `web:<url_hash>`. Vive em `core/` (não em
 `pipeline/extractors/web.py`) porque DOIS produtores precisam do mesmo hash —
 o WebScraper (seed list manual, em `pipeline/`) e a Descoberta

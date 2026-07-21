@@ -91,7 +91,7 @@
   «tabaco»↔«tabaco» com cosseno alto e o match a *aprova*, quando a aresta `exclui` deveria
   reprovar. Nó-cosseno não tem sinal negativo nem condição numérica.
 - **Decisão de design já tomada:** o golden de matching cravou *"critério = afinidade;
-  elegibilidade é camada SEPARADA"* (eval_data/golden/matching.json) — **essa camada
+  elegibilidade é camada SEPARADA"* (data/evaluation/golden/matching.json) — **essa camada
   separada são literalmente as arestas**. Logo NÃO é otimização do ranking de afinidade
   (esse está coberto sem elas); é **capacidade nova** (filtro duro + exclusões + explicação
   encadeada do `get_node_neighborhood`).
@@ -276,7 +276,7 @@
 
 ### Golden RAG expandido — 24 → ~80 queries (item 3 da auditoria 2026-06-12)
 
-- **O quê:** o golden de retrieval (`eval_data/golden/finep.json`, 24 queries
+- **O quê:** o golden de retrieval (`data/evaluation/golden/finep.json`, 24 queries
   sintéticas, 3 editais FINEP) tem piso de ruído de ~1 query — flips por
   não-determinismo de embedding (caso q14, 2026-06-12) e ±4pp de erro em
   hit@5. Expandir para ~80, estratificado por intent (prazo/valor/
@@ -526,7 +526,7 @@
   2. **Validador puro** (sem LLM, pegada do `core/ingestion/profile_drift.py`): soma items, lê
      `funding_amount`+`counterpart.percentage` da wiki page, devolve flags
      (estouro de teto · contrapartida insuficiente · rubrica vedada).
-  3. **Rubricas permitidas:** v0 hard-coded num skill `skills/finep_budget.md` (padrão
+  3. **Rubricas permitidas:** v0 hard-coded num skill `docs/playbooks/finep_budget.md` (padrão
      dos compliance skills); v1 extrai `allowed_rubricas` da seção de orçamento via
      `edital_chunks` → novo campo na wiki page (`core/wiki_schema.py` + golden).
 - **Por que adiado:** priorizado pipeline UI + perfil-de-proposta antes. Dificuldade
@@ -610,7 +610,7 @@
 - **Status:** shadow-run pendente de rodar (~1 semana de runs).
 
 ### Triagem da Descoberta — 13 labels do golden aguardam decisão de persona
-- **O quê:** o golden da suíte `triage` (`eval_data/golden/triage.json`, 122
+- **O quê:** o golden da suíte `triage` (`data/evaluation/golden/triage.json`, 122
   candidatos reais de 2026-06-10) tem **13 casos `review: true`** — rotulagem
   inicial por auditoria, mas a palavra final é decisão de PRODUTO, não de código.
 - **As 2 decisões principais:** (a) **hub de desafio corporativo perene**
@@ -747,9 +747,9 @@
 
 ### Descoberta de Oportunidades (item 2.2) — Fase B + graduação (A e C feitas)
 - **Feito (Fase A):** engine `core/ingestion/opportunity_discovery.py` (web_search → triagem
-  → extração → bronze + ledger de dedup). Vocab em `wikis/_discovery.md`.
+  → extração → bronze + ledger de dedup). Vocab em `docs/domain/sources/_discovery.md`.
 - **Feito (Unificação Opção A + Fase C/recorrência):** a Descoberta deixou de ter
-  bronze/índice próprios — virou a **torneira automática da fonte `web`** (WIKI.md
+  bronze/índice próprios — virou a **torneira automática da fonte `web`** (docs/domain/schema.md
   §12.4). Grava `web_raw/web_discovery_*.json` no schema web (`url_hash`/`texto_cru`/
   `verificacao=provisorio`), entra pelo `_build_editais("web")` e **é chunkada pro
   RAG** pelo adapter web — fechando o gap "provisório de snippet = escrita rasa".
@@ -786,7 +786,7 @@
 
 ### RAG — golden `finep` com sections obsoletas (brittle a re-chunk)
 - **O quê:** a suíte `rag` casa `expected` por `source_file` + `section` EXATA
-  (`core/eval/metrics_rag.py::_matches`). O golden `eval_data/golden/finep.json` (03/06) tem
+  (`core/eval/metrics_rag.py::_matches`). O golden `data/evaluation/golden/finep.json` (03/06) tem
   13/24 queries com `section` específica que **não existe mais** nos chunks atuais —
   os editais foram re-chunkados e as labels de section deslocaram. Resultado: hit@5
   aparenta 0.50 mesmo o retriever acertando o PDF no rank 1.
@@ -798,7 +798,7 @@
   (passo crítico, ver docstring do script); (b) decidir o design durável do match: a
   igualdade EXATA de section é frágil a qualquer re-chunk — considerar matching em
   nível de PDF (robusto, coarser) ou section fuzzy/normalizada. Golden relaxado em
-  `eval_data/golden/finep_relaxed.json` (sections nulladas) serve de baseline interino.
+  `data/evaluation/golden/finep_relaxed.json` (sections nulladas) serve de baseline interino.
 - **Status:** retriever OK; golden a regenerar. Não bloqueia hospedar.
 
 ### Escrita — eval validado; resíduos de fixture/juiz/TPM
@@ -878,7 +878,7 @@
   estruturado); DOU-sourced pode nascer com `verificacao` > `provisorio`.
   Ver `docs/spec_dou_feeder.md` §6.1.
 - **Mitigação imediata (barata): FEITA (2026-06-10)** — queries do Tavily
-  reescopadas em `wikis/_discovery.md` pras zonas que o DOU NÃO cobre
+  reescopadas em `docs/domain/sources/_discovery.md` pras zonas que o DOU NÃO cobre
   (FAPs/estaduais, desafios open-innovation, Q4 aceleradoras; Q3 VC ficou fora —
   investidor é diretório curado). O Tavily deixou de re-varrer o federal.
 - **Solução durável:** dedup semântico (título+órgão+nº do edital, ou
@@ -886,7 +886,7 @@
   abaixo e com `verificacao`.
 - **Por que adiado:** só morde quando DOU + Tavily rodam juntos no federal; a
   mitigação imediata (encolher Tavily) já segura o MVP. **Ponto de entrada:**
-  `core/ingestion/opportunity_discovery.py` (`_known_urls`/`_norm_url`/ledger), `wikis/_discovery.md`
+  `core/ingestion/opportunity_discovery.py` (`_known_urls`/`_norm_url`/ledger), `docs/domain/sources/_discovery.md`
   (queries do Tavily). **Status:** aberto (destrava quando a flag `DISCOVERY_DOU_ENABLED` ligar).
 
 ### DOU — sync de ciclo de vida (retificação/prorrogação/encerramento → temporal)
@@ -1017,7 +1017,7 @@ de fora — nenhum bloqueia o que foi entregue.
 ## Débitos conhecidos (menores)
 
 - **`domain/vocabulary.canonicalize_themes` é stub** (só lowercase/dedupe). O vocab
-  canônico de temas vive em WIKI.md §5.9; quando uma fonte emitir variação de tema,
+  canônico de temas vive em docs/domain/schema.md §5.9; quando uma fonte emitir variação de tema,
   implementar o mapa de sinônimos para convergir ao §5.9.
 - ~~**Export Obsidian ainda FINEP-only** — nós `ict` não são exportados ao vault.~~
   RESOLVIDO 2026-07-06: `scripts/export_to_obsidian.py` reescrito p/ o schema
@@ -1037,7 +1037,7 @@ de fora — nenhum bloqueia o que foi entregue.
      KG. Cresce o corpus, cresce a fragmentação — relacionado a
      [[project_hyperedges_underused]]. Pode ficar moot se a exploração de schema
      em andamento consolidar os tipos-eixo.
-  2. Dois dicionários de canonicalização de Fonte divergentes: `WIKI.md §5.4
+  2. Dois dicionários de canonicalização de Fonte divergentes: `docs/domain/schema.md §5.4
      fontes_canonicas` (via `radar.core.kg.schema`) vs `hypergraph_catalog._FONTE_CANONICAL`
      (hardcoded, usado de fato pelo normalizador vivo). Viola o princípio do
      projeto ("regra vive no doc") — risco de drift silencioso.
@@ -1151,7 +1151,7 @@ de fora — nenhum bloqueia o que foi entregue.
   skill (competência).
 - **Substrato (decisão):** o destino do conhecimento é o **nó do KG** (mecanismo/
   fonte como nós com wiki_page, à la LLM-wiki de Karpathy — "o grafo é a fonte de
-  conhecimento"). Arquivos `skills/*.md` em git são o **bootstrap** (tier-0); o
+  conhecimento"). Arquivos `docs/playbooks/*.md` em git são o **bootstrap** (tier-0); o
   loop é idêntico nos dois (escreve delta em markdown). Reconciliação Karpathy:
   o LLM **propõe** sempre; o gate **promove** nas páginas compartilhadas.
 - **Por que parado:** sem usuários reais não há outcomes → nada a aprender. É
@@ -1165,7 +1165,7 @@ de fora — nenhum bloqueia o que foi entregue.
 ### Playbooks: conhecimento tácito por mecanismo — spec travada 2026-06-14
 
 - **O quê:** redesenho do subsistema de "skills" do Redator/Monitor. Hoje são
-  keyed por fonte (`skills/<source>_compliance.md`) e misturam regra dura (que é do
+  keyed por fonte (`docs/playbooks/<source>_compliance.md`) e misturam regra dura (que é do
   edital/RAG) com tácito. Spec completa em [docs/specs/skills-by-mechanism.md](skills-by-mechanism.md):
   separar **normativo (RAG)** de **tácito (playbook)**; keying por **mecanismo**
   (campo já estruturado) + overlays de fonte; **seções-nomeadas = tipos =
@@ -1200,7 +1200,7 @@ de fora — nenhum bloqueia o que foi entregue.
   autorar o playbook de redação agora. Template de entrevista preenchido já existe em
   `docs/specs/playbook-interview-matching.md` (semente). `bolsa` ficou **fora de
   escopo** de vez (sistema não atende bolsas). **Gatilho:** decidir que a escrita
-  cooperativa entra no produto → rodar a entrevista e destilar `skills/mechanism/matching.md`.
+  cooperativa entra no produto → rodar a entrevista e destilar `docs/playbooks/mechanism/matching.md`.
 
 ## Fechado-adiado (revisitar só no gatilho)
 
@@ -1215,7 +1215,7 @@ de fora — nenhum bloqueia o que foi entregue.
 - **Como revisitar então:** rotular amostra (exige ICT? s/n) → medir precisão/
   recall → ajustar patterns §5.10 (incl. contexto negativo); se empacar, graduar
   para classificador LLM no build.
-- **Onde:** WIKI.md §5.10.
+- **Onde:** docs/domain/schema.md §5.10.
 
 ## Concluídos (referência)
 

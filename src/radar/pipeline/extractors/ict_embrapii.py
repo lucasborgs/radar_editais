@@ -2,7 +2,7 @@
 Extractor EMBRAPII — unidades credenciadas (ICTs parceiras).
 
 EMBRAPII não lança edital: suas unidades são ICTs que viabilizam candidaturas
-exigindo parceria. Logo este extractor produz **nós ict** (WIKI.md §6.1.2), não
+exigindo parceria. Logo este extractor produz **nós ict** (docs/domain/schema.md §6.1.2), não
 editais — e NÃO entra no SCRAPER_REGISTRY (que percorre o ETL de edital).
 
 Fonte: embrapii.org.br é WordPress. As unidades são um custom post type exposto

@@ -39,7 +39,7 @@ Estado da arte (2024-2026) endossa a direção: funil hard-filter → denso → 
 5. **Postgres é a source of truth única.** Nada de runtime lê JSON de disco.
 6. **Duas superfícies de embedding com ciclos de vida distintos:** match (cru, eager, barato) e writing (contextual, lazy, caro). Não se misturam.
 7. **Fronteira redefinida:** match consome `match_chunks` e `entities`; **nunca** `edital_chunks` (writing). Writing não muda.
-8. **Vocabulários vivem nos docs** (WIKI.md via `src/radar/core/kg/schema.py`): taxonomia de setores, regras de normalização de tags, vocabulário de constraints.
+8. **Vocabulários vivem nos docs** (docs/domain/schema.md via `src/radar/core/kg/schema.py`): taxonomia de setores, regras de normalização de tags, vocabulário de constraints.
 
 ## 3. Escopo pré-beta (fontes fixas)
 
@@ -90,7 +90,7 @@ Tags não são nós (fan-in≈1 no dado real). Com índice GIN, tags compartilha
 
 Editais brasileiros não segmentam por rodada de investimento — segmentam por porte legal (MEI/ME/EPP), faturamento-teto contínuo (Centelha R$4,8mi / Tecnova R$16mi / Mais Inovação R$90mi) e idade de CNPJ (Centelha: máx. 12 meses). `estagio_alvo` existe **só em investidor**.
 
-Constraints (vocabulário no WIKI.md, avaliadas por `eligibility.py`): `porte`, `faturamento` (lte/gte), `idade_empresa_meses` (lte/gte — direção varia), `sede_uf`, `forma_juridica`, `trl`, `cnae`, `parceria` (exige ICT), `vinculo_incubacao` (exige), `investidor_privado` (exige — PIPE Invest).
+Constraints (vocabulário no docs/domain/schema.md, avaliadas por `eligibility.py`): `porte`, `faturamento` (lte/gte), `idade_empresa_meses` (lte/gte — direção varia), `sede_uf`, `forma_juridica`, `trl`, `cnae`, `parceria` (exige ICT), `vinculo_incubacao` (exige), `investidor_privado` (exige — PIPE Invest).
 
 ## 5. Schema (Migration 036)
 
@@ -164,7 +164,7 @@ CREATE TABLE match_chunks (
 ```
 
 - ~~Embed cru do texto do silver, sem contextual retrieval.~~ **REVOGADO pelo gate da Fase 1.5 (2026-07-10):** a célula `contextual` venceu o cru em TODAS as métricas (MRR 0.505→0.666) — o embedding dos `match_chunks` é **contextualizado** (`src/radar/core/contextual_retrieval.py`, doc de contexto = blocos temáticos do próprio silver; texto armazenado segue cru, só o vetor muda — mesma convenção de `edital_chunks`). Os motivos originais do cru ((a) contexto institucional como anti-sinal, (c) simetria com o lado empresa) eram hipóteses e foram refutados empiricamente; o custo (d) foi aceito (~US$0,7/corpus, pago só no re-ingest por `source_hash`).
-- **Só seções temáticas entram** (objetivos, temas, linhas, escopo). Boilerplate (cronograma, documentação exigida, disposições gerais) é excluído por `section_path`/`kind` — regra no WIKI.md.
+- **Só seções temáticas entram** (objetivos, temas, linhas, escopo). Boilerplate (cronograma, documentação exigida, disposições gerais) é excluído por `section_path`/`kind` — regra no docs/domain/schema.md.
 - Editais e programas geram chunks (programas: description curada = 1-2 chunks). Investidores/ICTs usam só `entities.embedding` (descrições curtas — single-vector basta).
 
 ### 5.4 `company_chunks` — lado empresa (dado de tenant)
@@ -211,7 +211,7 @@ ingest_all():
 
 **Por que o tagger NÃO se funde no structurer:** o structurer é 1 chamada LLM **por página** (transcrição verbatim, "neutro e burro"); o tagger precisa da visão do edital inteiro. Fundir não economiza chamada (vira N opiniões por página + agregação), acopla ciclos de cache incompatíveis (silver re-roda por `source_hash`; tags re-rodam quando a taxonomia muda) e mistura tarefas cognitivas no prompt da camada-fundação.
 
-Dependências: `embedder.py`, `llm_client.py` (factory), `schema.py`/WIKI.md, adapters por fonte, Supabase. **Não depende de:** lib `hyperextract`, passes LLM de canonicalização, `kg_store` blob.
+Dependências: `embedder.py`, `llm_client.py` (factory), `schema.py`/docs/domain/schema.md, adapters por fonte, Supabase. **Não depende de:** lib `hyperextract`, passes LLM de canonicalização, `kg_store` blob.
 
 ## 7. Match: funil
 
@@ -264,7 +264,7 @@ Substituição concreta das arestas semânticas — 4 tools sobre SQL (via `enti
 
 **Fica:** structurer (silver — inalterado) · `eligibility.py` (avaliador único, mesma semântica) · `constraints_producer` (adaptado: input = seções de elegibilidade do silver; output = colunas de entities) · `match_verdict.py` (adaptado: lê entities + matched_excerpts) · `embedder`/`chunker` · **WritingSession inalterada** (RAG contextual lazy sobre `edital_chunks` — intacto, incl. PR #44) · memória do agente (PostgresStore/checkpointer) · `anti_class_verdict` como filtro pós-LLM de tags · a *curadoria* do canon (vira mapa de normalização).
 
-**Novo:** `entities` + `entity_relationships` + `match_chunks` + `company_chunks` (migration 036) · `src/radar/core/kg/gold.py` · `src/radar/core/kg/entity_catalog.py` · Stage 0-3 do match · tools §8 · blocos novos no WIKI.md (`setores_taxonomia`, `tag_normalization`, `match_sections`) · flags `MATCH_ENGINE=v2|v3` e `CATALOG_BACKEND=hypergraph|sql`.
+**Novo:** `entities` + `entity_relationships` + `match_chunks` + `company_chunks` (migration 036) · `src/radar/core/kg/gold.py` · `src/radar/core/kg/entity_catalog.py` · Stage 0-3 do match · tools §8 · blocos novos no docs/domain/schema.md (`setores_taxonomia`, `tag_normalization`, `match_sections`) · flags `MATCH_ENGINE=v2|v3` e `CATALOG_BACKEND=hypergraph|sql`.
 
 ## 10. Plano de migração (eval-first)
 
@@ -287,15 +287,15 @@ Substituição concreta das arestas semânticas — 4 tools sobre SQL (via `enti
 
 **Fase 4 — Pipeline diário + discovery** (1 PR): `run_daily_etl` = scrapers → bronze → adapter → silver (structurer) → `ingest_all()` incremental (diff por `source_hash`) → embeddings. Substitui `build_all_hypergraphs`. Promote do discovery (admin-only) entra no mesmo caminho silver→gold. O `chunk_edital` da escrita é produzido separadamente; no runtime atual, há aquecimento diário e garantia sob demanda.
 
-**Fase 5 — Limpeza** (1 PR): deletar tudo da lista "Morre" (§9), remover flags, atualizar WIKI.md/AGENTS.md/architecture.md, eval matching aponta só para v3.
+**Fase 5 — Limpeza** (1 PR): deletar tudo da lista "Morre" (§9), remover flags, atualizar docs/domain/schema.md/AGENTS.md/architecture.md, eval matching aponta só para v3.
 
 ## 11. Riscos e mitigações
 
 | Risco | Mitigação |
 |---|---|
 | Constraints extraídas por LLM erradas → filtro mata elegível | Semântica PR5: `unknown` nunca elimina; hard negatives no golden; `requisitos_texto` residual sempre exibido no card |
-| Tags fragmentam (iot/IoT/internet das coisas) | Passe determinístico obrigatório no ingest; mapa de sinônimos versionado no WIKI.md; seed = concept_canon |
-| Boilerplate domina o Stage 2 mesmo com filtro de seção | sum-of-max limita o dano (1 chunk ruim ≠ score global); regra de seções ajustável no WIKI.md; medido no bake-off |
+| Tags fragmentam (iot/IoT/internet das coisas) | Passe determinístico obrigatório no ingest; mapa de sinônimos versionado no docs/domain/schema.md; seed = concept_canon |
+| Boilerplate domina o Stage 2 mesmo com filtro de seção | sum-of-max limita o dano (1 chunk ruim ≠ score global); regra de seções ajustável no docs/domain/schema.md; medido no bake-off |
 | Perfil curto → sinal fraco no cold start | HyDE (`origin='hyde'`); a UI já empurra onboarding progressivo de perfil |
 | Regressão vs v2 durante transição | Fase 1.5 é gate; `MATCH_ENGINE` flag permite A/B e rollback |
 | Vazamento cross-tenant em `company_chunks` | RLS por workspace + leak-test durável como critério de aceite da Fase 0 |

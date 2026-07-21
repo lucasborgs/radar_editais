@@ -16,7 +16,7 @@ de TOOL_RESULT_CHAR_CAP=8000/tool nem de max_steps (ver FINDINGS.md, seção
 o formato (que seria suficiente). Por isso os 2 históricos abaixo são gerados
 AO VIVO contra os produtores reais — explore multi-hop força vários get_edital/
 list_* na mesma resposta; writing reusa um caso real do golden v2
-(eval_data/golden/writing_v2.json) para puxar citações verdadeiras de
+(data/evaluation/golden/writing_v2.json) para puxar citações verdadeiras de
 search_edital.
 
 Uso:
@@ -95,7 +95,7 @@ _EXISTING_SESSION_ID = "3457abbd-c2a5-4135-97e8-a3a2dc6aac7d"  # finep:769, ws=E
 
 
 def _load_golden_profile(profile_key: str) -> dict:
-    data = json.loads((ROOT / "eval_data" / "golden" / "writing_v2.json").read_text(encoding="utf-8"))
+    data = json.loads((ROOT / "data" / "evaluation" / "golden" / "writing_v2.json").read_text(encoding="utf-8"))
     return data["profiles"][profile_key]
 
 

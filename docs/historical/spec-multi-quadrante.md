@@ -1,7 +1,7 @@
 # spec_multi_quadrante.md — Radar multi-quadrante (evento + entidade)
 
 > **Status:** proposta de arquitetura (2026-06-08). Não-normativo até aprovação.
-> Quando aprovado, as partes de schema migram para `WIKI.md` (autoritativo) e
+> Quando aprovado, as partes de schema migram para `docs/domain/schema.md` (autoritativo) e
 > esta spec vira o "porquê". **Persona-alvo travada:** startup deep-tech
 > early-stage. Tudo aqui é otimizado para ela — não é um radar genérico.
 
@@ -41,7 +41,7 @@ escrita. O resto do sistema permanece compartilhado.
 ## 1. O precedente que já existe: o nó `ict`
 
 Antes de propor `investidor`, registre que **o codebase já provou esse padrão**.
-O nó `ict` (WIKI.md §6.1.2) é uma **entidade fora do ciclo de edital**:
+O nó `ict` (docs/domain/schema.md §6.1.2) é uma **entidade fora do ciclo de edital**:
 
 | Propriedade de `ict` (hoje) | Vale igual para `investidor` |
 |---|---|
@@ -59,9 +59,9 @@ como já é a casa da ICT.
 
 ---
 
-## 2. Taxonomia de `node_type` (proposta para WIKI.md §6.1)
+## 2. Taxonomia de `node_type` (proposta para docs/domain/schema.md §6.1)
 
-Critério vigente (WIKI.md §355-359): *é nó só se for hub de navegação **e** tiver
+Critério vigente (docs/domain/schema.md §355-359): *é nó só se for hub de navegação **e** tiver
 identidade própria*. Os quatro passam. Bloco proposto (estende o yaml atual):
 
 ```yaml
@@ -241,7 +241,7 @@ para edital" pode estar incompleto para investidor. Isso vira sinal de UX
 
 `investidor` e `desafio` se ligam ao grafo de eventos pela **mesma estratégia da
 ICT**: interseção de `tema`/`setor` (sem aresta direta startup↔fundo, computada
-por slug compartilhado). Novos `link_types` (WIKI.md §6.2):
+por slug compartilhado). Novos `link_types` (docs/domain/schema.md §6.2):
 
 ```yaml
 investidor_has_thesis_theme: {from: investidor, to: tema}
@@ -439,7 +439,7 @@ a estrutura existente:
 triagem per-type, extração (+campos opcionais + `InvestorEntity`), build_kg
 (emite pastas novas + `investidores.json`), `kg_match_service` (prompt type-aware
 + merge na leitura), `writing_session` (branch de `mode`), `user_profile`
-(+5 campos), `WIKI.md`, 3 de frontend, +diretório novo, +feeder DOU.
+(+5 campos), `docs/domain/schema.md`, 3 de frontend, +diretório novo, +feeder DOU.
 
 **Tensão com o objetivo "robustez antes de afinar match/RAG/escrita":**
 investidor é o tipo cujo match (tese) e escrita (pitch) mais divergem — as

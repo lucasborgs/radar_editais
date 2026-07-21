@@ -37,7 +37,7 @@ from radar.domain.edital_extraction import DECISION_FIELDS  # noqa: E402
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("bootstrap_golden")
 
-OUT = ROOT / "eval_data" / "golden" / "extraction_draft.json"
+OUT = ROOT / "data" / "evaluation" / "golden" / "extraction_draft.json"
 
 
 def _abstention_summary(extractions: list[dict]) -> dict:
@@ -90,7 +90,7 @@ def main() -> int:
     print("\nAbstenção por campo DECISÃO (stated/inferred/absent):")
     for f, c in _abstention_summary([g["extraction"] for g in golden]).items():
         print(f"  {f:20s} {c}")
-    print("\n>>> REVISE e corrija eval_data/golden/extraction_draft.json antes de usar como verdade.")
+    print("\n>>> REVISE e corrija data/evaluation/golden/extraction_draft.json antes de usar como verdade.")
     return 0
 
 

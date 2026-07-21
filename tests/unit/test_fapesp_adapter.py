@@ -108,7 +108,7 @@ def test_to_documents_empty_texto_cru_returns_empty(tmp_path: Path, monkeypatch,
 
 
 # =============================================================================
-# Dedup intra-arquivo (URL duplicada — gotcha §8 wikis/fapesp.md)
+# Dedup intra-arquivo (URL duplicada — gotcha §8 docs/domain/sources/fapesp.md)
 # =============================================================================
 
 def test_to_documents_dedup_picks_first_occurrence(tmp_path: Path, monkeypatch, adapter):

@@ -16,7 +16,7 @@ federal publicado — as queries Tavily NÃO devem re-varrer essa zona (desperd�
 só-no-site) e **programas de aceleração/incubação** (Q4). Q3 (VC) fica FORA da
 Descoberta: investidor é diretório curado, não cabe no schema de oportunidade.
 
-**Unificação (Opção A, WIKI.md §12.4):** a Descoberta é a *torneira automática*
+**Unificação (Opção A, docs/domain/schema.md §12.4):** a Descoberta é a *torneira automática*
 da fonte `web` — não tem bronze/índice próprios. Grava em `data/bronze/web_raw/`
 (prefixo `web_discovery_`) no schema web (`url`/`url_hash`/`texto_cru`/
 `verificacao=provisorio`), e daí entra como qualquer página web: chunkada pro RAG
