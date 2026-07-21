@@ -19,12 +19,12 @@ import asyncio
 import logging
 import time
 
-from core.environment import assert_database_target, load_environment_profile
+from radar.core.environment import assert_database_target, load_environment_profile
 
 load_environment_profile()
 
-from core.kg.entity_catalog import list_editais  # noqa: E402
-from core.tasks import chunk_edital_task  # noqa: E402
+from radar.core.kg.entity_catalog import list_editais  # noqa: E402
+from radar.core.tasks import chunk_edital_task  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("backfill_chunks")

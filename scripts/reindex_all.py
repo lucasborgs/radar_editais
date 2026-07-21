@@ -25,10 +25,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core.environment import assert_database_target  # noqa: E402
-from core.infra.db import get_supabase_service  # noqa: E402
-from core.kg import entity_catalog  # noqa: E402
-from core.tasks import chunk_edital_task  # noqa: E402
+from radar.core.environment import assert_database_target  # noqa: E402
+from radar.core.infra.db import get_supabase_service  # noqa: E402
+from radar.core.kg import entity_catalog  # noqa: E402
+from radar.core.tasks import chunk_edital_task  # noqa: E402
 
 
 def _load_ids(source_filter: str | None, edital_ids: list[str] | None = None) -> list[str]:
@@ -70,7 +70,7 @@ async def _run_sync(edital_id: str, force: bool) -> None:
 
 
 async def _enqueue(edital_id: str, force: bool) -> None:
-    from core.tasks import app as tasks_app
+    from radar.core.tasks import app as tasks_app
     async with tasks_app.open_async():
         await tasks_app.configure_task("chunk_edital").defer_async(
             edital_id=edital_id, force=force,

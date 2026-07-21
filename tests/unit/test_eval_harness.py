@@ -11,7 +11,7 @@ import time
 
 import pytest
 
-from core.eval.harness import Criterion, Suite, get_input, run_suite
+from radar.core.eval.harness import Criterion, Suite, get_input, run_suite
 
 pytestmark = pytest.mark.unit
 
@@ -258,7 +258,7 @@ def test_manifest_hashes_dataset_and_ignores_secret_values(tmp_path, monkeypatch
 # --- suítes reais registradas (sem rodar task/LLM) -------------------------
 
 def test_suites_registered():
-    from core.eval.registry import SUITES
+    from radar.core.eval.registry import SUITES
     assert set(SUITES) == {
         "matching", "rag", "writing", "extraction",
         "opportunity_type", "triage", "writing_v2",
@@ -271,7 +271,7 @@ def test_rag_skips_without_supabase(tmp_path, monkeypatch):
     """rag deve pular limpo (não estourar) quando faltam creds de retrieval."""
     monkeypatch.delenv("SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
-    from core.eval.registry import get_suite
+    from radar.core.eval.registry import get_suite
     res = run_suite(get_suite("rag"), out_dir=tmp_path)
     assert res.get("skipped")
 
@@ -279,6 +279,6 @@ def test_rag_skips_without_supabase(tmp_path, monkeypatch):
 def test_writing_skips_without_workspace(tmp_path, monkeypatch):
     monkeypatch.delenv("SUPABASE_URL", raising=False)
     monkeypatch.delenv("EVAL_WORKSPACE_ID", raising=False)
-    from core.eval.registry import get_suite
+    from radar.core.eval.registry import get_suite
     res = run_suite(get_suite("writing"), out_dir=tmp_path)
     assert res.get("skipped")

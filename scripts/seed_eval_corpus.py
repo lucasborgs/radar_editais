@@ -64,7 +64,7 @@ def _copy_table(cloud, local, table: str) -> None:
 
 def _copy_edital_entities(cloud, local) -> None:
     """Copia os NÓS DE EDITAL do KG (tabela `entities`, keyed por native_id) —
-    fonte do 'source card' do agente (core.kg.entity_catalog.get_edital). Sem
+    fonte do 'source card' do agente (radar.core.kg.entity_catalog.get_edital). Sem
     isso o card fica vazio e o agente floora (saved≈0) — foi o artefato de
     ambiente do 1º A/B local. Só os nós de edital: os alvos das relations
     (agências/programas) degradam gracioso e colidem com curadoria já local

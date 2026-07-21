@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from core.ingestion import edital_extractor
+from radar.core.ingestion import edital_extractor
 
 pytestmark = pytest.mark.unit
 

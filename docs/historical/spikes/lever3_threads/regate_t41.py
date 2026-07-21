@@ -16,11 +16,11 @@ import sys
 
 sys.path.insert(0, os.getcwd())  # worktree > editable-install (lição #4)
 
-from core.environment import load_environment_profile  # noqa: E402
+from radar.core.environment import load_environment_profile  # noqa: E402
 
 load_environment_profile()
 
-from core.eval.writing import (  # noqa: E402
+from radar.core.eval.writing import (  # noqa: E402
     eval_title_redirect,
     eval_user_edit_preserved,
     load_data_v2,

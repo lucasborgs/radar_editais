@@ -21,7 +21,7 @@ cai para InMemorySaver/InMemoryStore e este script não é necessário.
 """
 from __future__ import annotations
 
-from core.environment import assert_database_target, load_environment_profile
+from radar.core.environment import assert_database_target, load_environment_profile
 
 load_environment_profile()
 
@@ -44,7 +44,7 @@ def main() -> int:
 
     # Reusa a init real do runtime (cria pools no schema agent_memory + roda setup()
     # no loop dedicado). O search_path no schema dedicado já tranca contra o PostgREST.
-    from core.llm.agent_graph import (
+    from radar.core.llm.agent_graph import (
         _get_memory_store,
         _get_writing_checkpointer,
         shutdown_writing_runtime,

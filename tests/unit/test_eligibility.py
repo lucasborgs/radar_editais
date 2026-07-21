@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.services import eligibility as el
+from radar.core.services import eligibility as el
 
 pytestmark = pytest.mark.unit
 

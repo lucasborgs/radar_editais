@@ -12,7 +12,7 @@ from contextlib import nullcontext
 
 import pytest
 
-from core.services import company_chunks as cc
+from radar.core.services import company_chunks as cc
 
 pytestmark = pytest.mark.unit
 
@@ -113,8 +113,8 @@ def no_network(monkeypatch):
         embeds.append(list(texts))
         return [[0.1] * 4 for _ in texts]
 
-    import core.retrieval.embedder as embedder
-    import core.retrieval.hyde as hyde
+    import radar.core.retrieval.embedder as embedder
+    import radar.core.retrieval.hyde as hyde
     monkeypatch.setattr(embedder, "embed_texts", fake_embed)
     monkeypatch.setattr(hyde, "generate_hyde_doc", lambda q: f"pseudo-doc sobre {q[:30]}")
     return embeds
@@ -151,7 +151,7 @@ def test_ensure_cold_start_adiciona_hyde(no_network):
 
 
 def test_ensure_hyde_falhou_nao_reembeda_para_sempre(monkeypatch, no_network):
-    import core.retrieval.hyde as hyde
+    import radar.core.retrieval.hyde as hyde
     monkeypatch.setattr(hyde, "generate_hyde_doc", lambda q: "")  # HyDE indisponível
     conn = _FakeConn([])
     cc.ensure_company_chunks("ws-1", THIN_PROFILE, conn=conn)

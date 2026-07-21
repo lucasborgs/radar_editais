@@ -31,10 +31,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import core.llm.agent_graph as agent_graph_mod  # noqa: E402
-from core.config import ROOT  # noqa: E402
-from core.llm.agent_graph import _build_chat_model, shutdown_writing_runtime  # noqa: E402
-from core.llm.agent_runtime import resolve_agent_provider  # noqa: E402
+import radar.core.llm.agent_graph as agent_graph_mod  # noqa: E402
+from radar.core.config import ROOT  # noqa: E402
+from radar.core.llm.agent_graph import _build_chat_model, shutdown_writing_runtime  # noqa: E402
+from radar.core.llm.agent_runtime import resolve_agent_provider  # noqa: E402
 
 # =============================================================================
 # Captura: monkeypatch de `_messages_to_agent_result` (chamado por
@@ -70,7 +70,7 @@ EXPLORE_QUESTION = (
 
 
 def build_explore_history() -> list:
-    from core.services.explore_agent import ExploreAgent
+    from radar.core.services.explore_agent import ExploreAgent
 
     _captured.clear()
     agent = ExploreAgent()
@@ -102,9 +102,9 @@ def _load_golden_profile(profile_key: str) -> dict:
 def build_writing_history() -> list:
     import os
 
-    from core.infra.db import get_supabase_service
-    from core.services.writing_session import WritingSession
-    from domain.user_profile import CompanyProfile
+    from radar.core.infra.db import get_supabase_service
+    from radar.core.services.writing_session import WritingSession
+    from radar.domain.user_profile import CompanyProfile
 
     profile_raw = _load_golden_profile("tratorbr")
     allowed = set(CompanyProfile.__dataclass_fields__.keys())

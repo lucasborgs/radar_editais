@@ -43,7 +43,7 @@ if not _integration_target:
 # Telemetria Langfuse OFF na suíte (nível de módulo: roda quando o pytest importa
 # este conftest, ANTES dos test modules e seus `load_dotenv()`). Forçamos as keys
 # a "" — `load_dotenv(override=False)` não sobrescreve var já presente, e
-# `core.infra.telemetry._is_configured()` lê `bool("")` = False → cliente não inicializa.
+# `radar.core.infra.telemetry._is_configured()` lê `bool("")` = False → cliente não inicializa.
 # Sem isso, as keys reais do .env vazariam pro processo de teste, o exporter OTel
 # do Langfuse tentaria flush no shutdown e cuspia um 401 (ruído na suíte).
 os.environ["LANGFUSE_PUBLIC_KEY"] = ""
@@ -64,7 +64,7 @@ def _clear_web_cache():
     memória. Sem isolamento, uma URL buscada num teste vaza pro próximo (cache
     hit com dado obsoleto — ex.: links de uma página fetchada por outro teste).
     Limpa antes e depois de cada teste."""
-    from core.web import fetch as _web_fetch
+    from radar.core.web import fetch as _web_fetch
     _web_fetch.clear_cache()
     yield
     _web_fetch.clear_cache()

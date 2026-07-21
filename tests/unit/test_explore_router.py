@@ -9,7 +9,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from backend.routers.explore import _match_cards_intro
+from radar.api.routers.explore import _match_cards_intro
 
 pytestmark = pytest.mark.unit
 

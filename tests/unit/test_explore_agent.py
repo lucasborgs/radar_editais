@@ -19,9 +19,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
-from core.llm.agent_tools import build_explore_tools  # noqa: E402
-from core.services.explore_agent import ExploreAgent  # noqa: E402
+from radar.core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
+from radar.core.llm.agent_tools import build_explore_tools  # noqa: E402
+from radar.core.services.explore_agent import ExploreAgent  # noqa: E402
 
 pytestmark = pytest.mark.unit
 
@@ -103,7 +103,7 @@ def test_explore_agent_happy_path(monkeypatch):
         stop_reason="end_turn",
         usage={"input_tokens": 50, "output_tokens": 10},
     )
-    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
     out, meta = svc._explore_agent("oi", None, None, None, None)
     assert out == "Resposta do agente."
@@ -118,7 +118,7 @@ def test_explore_agent_max_steps_marks_truncated(monkeypatch):
         final_text="resposta parcial", steps=[], stop_reason="max_steps",
         usage={"input_tokens": 0, "output_tokens": 0},
     )
-    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
     out, meta = svc._explore_agent("oi", None, None, None, None)
     assert out == "resposta parcial"
@@ -139,7 +139,7 @@ def test_explore_agent_with_hint_passes_to_messages(monkeypatch):
         captured["initial_messages"] = kw["initial_messages"]
         return fake_result
 
-    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", fake_run_agent)
     svc._explore_agent(
         "qual o prazo?", history=None,
         edital_ids=None,
@@ -168,7 +168,7 @@ def test_explore_agent_passes_history_window(monkeypatch):
         captured["msgs"] = kw["initial_messages"]
         return fake_result
 
-    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", fake_run_agent)
 
     # 12 turnos no histórico
     history = [
@@ -201,7 +201,7 @@ def test_explore_agent_includes_read_tools(monkeypatch):
         captured["max_steps"] = kw["max_steps"]
         return fake_result
 
-    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", fake_run_agent)
     svc._explore_agent("oi", None, None, None, None)
 
     names = {t.name for t in captured["tools"]}
@@ -211,11 +211,11 @@ def test_explore_agent_includes_read_tools(monkeypatch):
 
 def test_factual_enumerativo_usa_sintese_fechada(monkeypatch):
     monkeypatch.setattr(
-        "core.services.factual_synthesis.synthesize_enumerative_answer",
+        "radar.core.services.factual_synthesis.synthesize_enumerative_answer",
         lambda edital_id, query: f"síntese {edital_id}: {query}",
     )
     monkeypatch.setattr(
-        "core.llm.agent_runtime.run_agent",
+        "radar.core.llm.agent_runtime.run_agent",
         lambda **kwargs: (_ for _ in ()).throw(AssertionError("ReAct indevido")),
     )
     _, meta = ExploreAgent().explore_with_meta(
@@ -233,7 +233,7 @@ def test_factual_rag_kill_switch_remove_tool(monkeypatch):
     )
     monkeypatch.setenv("EXPLORE_FACTUAL_RAG_ENABLED", "false")
     monkeypatch.setattr(
-        "core.llm.agent_runtime.run_agent",
+        "radar.core.llm.agent_runtime.run_agent",
         lambda **kwargs: captured.update(kwargs) or fake_result,
     )
     ExploreAgent().explore_with_meta(
@@ -249,7 +249,7 @@ def test_entity_fact_investidor_restringe_tool_ao_contrato(monkeypatch):
         usage={"input_tokens": 0, "output_tokens": 0},
     )
     monkeypatch.setattr(
-        "core.llm.agent_runtime.run_agent",
+        "radar.core.llm.agent_runtime.run_agent",
         lambda **kwargs: captured.update(kwargs) or fake_result,
     )
     ExploreAgent().explore_with_meta(
@@ -266,7 +266,7 @@ def test_explore_agent_error_returns_friendly_message(monkeypatch):
         final_text="", steps=[], stop_reason="error",
         usage={"input_tokens": 0, "output_tokens": 0},
     )
-    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
     out, _meta = svc._explore_agent("oi", None, None, None, None)
     assert "não consegui processar" in out.lower()
@@ -278,7 +278,7 @@ def test_explore_agent_empty_final_text_falls_back(monkeypatch):
         final_text="", steps=[], stop_reason="end_turn",
         usage={"input_tokens": 0, "output_tokens": 0},
     )
-    monkeypatch.setattr("core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
+    monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", lambda **kw: fake_result)
 
     out, _meta = svc._explore_agent("oi", None, None, None, None)
     assert "não consegui" in out.lower() or out  # algo útil, não vazio
@@ -299,7 +299,7 @@ def test_explore_tools_count_and_names():
 
 
 def test_get_investidor_expoe_ficha_completa(monkeypatch):
-    from core.kg import entity_catalog
+    from radar.core.kg import entity_catalog
 
     monkeypatch.setattr(entity_catalog, "get_investidor", lambda _id: {
         "id": "investidor:barn-invest", "name": "Barn Invest",
@@ -333,7 +333,7 @@ def test_explore_tools_deep_research_gated(monkeypatch):
 def test_explore_opportunity_is_cross_dimensional(monkeypatch):
     """O panorama cobre as três frentes (eventos + ICTs + investidores) num só
     retorno — robusto mesmo se alguma dimensão estiver vazia."""
-    from core.kg import entity_catalog
+    from radar.core.kg import entity_catalog
     monkeypatch.setattr(entity_catalog, "list_editais",
                         lambda **kw: [{"id": "finep:1", "title": "E", "status": "ABERTA", "deadline": ""}])
     monkeypatch.setattr(entity_catalog, "list_entity_catalog",
@@ -351,27 +351,27 @@ def test_explore_opportunity_is_cross_dimensional(monkeypatch):
 def test_theme_match_natural_language_phrase():
     """Frase natural casa o tema canônico por TOKEN: 'IA em saúde' → 'saúde e
     ciências da vida'."""
-    from core.kg.entity_catalog import _theme_match
+    from radar.core.kg.entity_catalog import _theme_match
     assert _theme_match("IA em saúde", ["saúde e ciências da vida"]) is True
     # agro ⊂ agronegócio (token bidirecional)
     assert _theme_match("IA no agronegócio", ["agro, bioeconomia e alimentos"]) is True
 
 
 def test_theme_match_empty_matches_all():
-    from core.kg.entity_catalog import _theme_match
+    from radar.core.kg.entity_catalog import _theme_match
     assert _theme_match("", ["qualquer tema"]) is True
 
 
 def test_theme_match_rejects_unrelated():
     """Não casa tema sem token em comum — recall-first, mas não casa tudo."""
-    from core.kg.entity_catalog import _theme_match
+    from radar.core.kg.entity_catalog import _theme_match
     assert _theme_match("turismo", ["saúde e ciências da vida"]) is False
     # stopword/conectivo sozinho não casa (cai no corte de tamanho/stopword)
     assert _theme_match("em de para", ["saúde e ciências da vida"]) is False
 
 
 def test_list_editais_tool_returns_string_with_results(monkeypatch):
-    from core.kg import entity_catalog
+    from radar.core.kg import entity_catalog
     monkeypatch.setattr(entity_catalog, "list_editais",
                         lambda **kw: [{"id": "finep:1", "title": "Edital X", "status": "ABERTA", "deadline": "", "themes": []}])
     t = next(x for x in build_explore_tools() if x.name == "list_editais")
@@ -382,7 +382,7 @@ def test_list_editais_tool_returns_string_with_results(monkeypatch):
 
 def test_list_editais_caps_limit(monkeypatch):
     """Limit > 50 é cortado para 50 (proteção contra prompt blowup)."""
-    from core.kg import entity_catalog
+    from radar.core.kg import entity_catalog
     captured: dict = {}
 
     def _fake(**kw):
@@ -397,7 +397,7 @@ def test_list_editais_caps_limit(monkeypatch):
 
 
 def test_get_edital_tool_returns_error_string_for_invalid_id(monkeypatch):
-    from core.kg import entity_catalog
+    from radar.core.kg import entity_catalog
     monkeypatch.setattr(entity_catalog, "get_edital", lambda eid: None)
     t = next(x for x in build_explore_tools() if x.name == "get_edital")
     out = t.invoke({"edital_id": "id_que_nao_existe_xyz"})

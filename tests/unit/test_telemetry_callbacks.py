@@ -12,9 +12,9 @@ import asyncio
 import pytest
 from langchain_core.messages import AIMessage
 
-import core.infra.telemetry as telemetry
-import core.llm.agent_graph as ag
-import core.llm.agent_runtime as art
+import radar.core.infra.telemetry as telemetry
+import radar.core.llm.agent_graph as ag
+import radar.core.llm.agent_runtime as art
 
 pytestmark = pytest.mark.unit
 

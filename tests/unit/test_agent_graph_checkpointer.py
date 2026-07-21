@@ -16,7 +16,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import interrupt
 from pydantic import PrivateAttr
 
-import core.llm.agent_graph as ag
+import radar.core.llm.agent_graph as ag
 
 pytestmark = pytest.mark.unit
 
@@ -221,7 +221,7 @@ def test_subagent_inside_checkpointed_writing_turn(monkeypatch):
     worker thread, sem checkpointer). Prova que não há conflito de event loop
     entre o bg-loop do checkpointer e o loop do subagente — o caminho real do
     critic dentro do save_draft. Ambos os modelos são scriptados (zero token)."""
-    from core.llm.agent_runtime import run_subagent
+    from radar.core.llm.agent_runtime import run_subagent
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-x")
 

@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from core.config import ROOT
-from core.services.explore_routing import (
+from radar.core.config import ROOT
+from radar.core.services.explore_routing import (
     Intent,
     RouteContext,
     RouteDecision,

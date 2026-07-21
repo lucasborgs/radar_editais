@@ -35,7 +35,7 @@ from langchain_core.tools import tool  # noqa: E402
 from langgraph.types import interrupt  # noqa: E402
 from pydantic import PrivateAttr  # noqa: E402
 
-import core.llm.agent_graph as ag  # noqa: E402
+import radar.core.llm.agent_graph as ag  # noqa: E402
 
 # O produtor usa WR_PREFIX_MSG_ID de writing_session; aqui replicamos a constante
 # (o teste é do MECANISMO do grafo, não do produtor).

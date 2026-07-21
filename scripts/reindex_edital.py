@@ -2,7 +2,7 @@
 """
 Reindex one or all FINEP editais into the `edital_chunks` table (RAG).
 
-This wraps `core.tasks.chunk_edital_task` so operators can run it either
+This wraps `radar.core.tasks.chunk_edital_task` so operators can run it either
 synchronously (the default — useful for one-offs and debugging) or via the
 procrastinate queue (`--queue` — useful for backfilling many editais without
 holding the CLI open).
@@ -27,10 +27,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core.config import FINEP_PDFS_DIR  # noqa: E402
-from core.environment import assert_database_target  # noqa: E402
-from core.infra.db import get_supabase_service  # noqa: E402
-from core.tasks import chunk_edital_task  # noqa: E402
+from radar.core.config import FINEP_PDFS_DIR  # noqa: E402
+from radar.core.environment import assert_database_target  # noqa: E402
+from radar.core.infra.db import get_supabase_service  # noqa: E402
+from radar.core.tasks import chunk_edital_task  # noqa: E402
 
 # Historical cost estimate retained for the CLI's existing output contract.
 # The active model is configured through EMBEDDING_MODEL; treat this figure as
@@ -63,7 +63,7 @@ def _discover_editais() -> list[str]:
     adapter resolve o PDF de volta via native_id. Prefixamos aqui (são todos
     FINEP por definição de FINEP_PDFS_DIR).
     """
-    from core.kg.edital_id import make_id  # noqa: PLC0415
+    from radar.core.kg.edital_id import make_id  # noqa: PLC0415
     if not FINEP_PDFS_DIR.exists():
         return []
     return sorted(make_id("finep", d.name) for d in FINEP_PDFS_DIR.iterdir() if d.is_dir())
@@ -82,7 +82,7 @@ async def _run_sync(edital_id: str, force: bool = False) -> None:
 
 async def _enqueue(edital_id: str, force: bool = False) -> None:
     """Defer the job via procrastinate so a worker can pick it up."""
-    from core.tasks import app as tasks_app
+    from radar.core.tasks import app as tasks_app
     async with tasks_app.open_async():
         await tasks_app.configure_task("chunk_edital").defer_async(
             edital_id=edital_id, force=force,
@@ -106,7 +106,7 @@ async def _process_one(edital_id: str, queue: bool, force: bool) -> dict:
         return {"edital_id": edital_id, "status": "skipped (already indexed)"}
 
     # O dir é nomeado pelo native_id cru; o edital_id chega prefixado.
-    from core.kg.edital_id import native_id_of  # noqa: PLC0415
+    from radar.core.kg.edital_id import native_id_of  # noqa: PLC0415
     pdf_dir = FINEP_PDFS_DIR / native_id_of(edital_id)
     if not pdf_dir.exists():
         return {"edital_id": edital_id, "status": f"error: directory not found ({pdf_dir})"}

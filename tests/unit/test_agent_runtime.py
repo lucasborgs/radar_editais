@@ -1,4 +1,4 @@
-"""Testes da facade core.llm.agent_runtime.
+"""Testes da facade radar.core.llm.agent_runtime.
 
 Pós-migração LangGraph (Etapas 1-2), o módulo é uma facade fina: o loop ReAct, o
 @tool e os adapters viraram código do LangGraph/grafo. O que resta de lógica
@@ -15,7 +15,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.llm.agent_runtime import resolve_agent_provider  # noqa: E402
+from radar.core.llm.agent_runtime import resolve_agent_provider  # noqa: E402
 
 pytestmark = pytest.mark.unit
 

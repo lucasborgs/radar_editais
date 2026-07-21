@@ -12,8 +12,8 @@ from starlette.requests import Request
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from backend.common import CompanyProfileSchema
-from backend.routers import radar
+from radar.api.common import CompanyProfileSchema
+from radar.api.routers import radar
 
 pytestmark = pytest.mark.unit
 

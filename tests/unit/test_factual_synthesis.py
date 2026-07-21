@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.services import factual_synthesis
+from radar.core.services import factual_synthesis
 
 pytestmark = pytest.mark.unit
 

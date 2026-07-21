@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.eval.metrics_matching import (
+from radar.core.eval.metrics_matching import (
     RubricVerdict,
     _parse_rubric,
     aggregate_matching_runs,

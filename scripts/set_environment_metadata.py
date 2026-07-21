@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 
-from core.environment import (
+from radar.core.environment import (
     Environment,
     initialize_environment_metadata,
     load_environment_profile,

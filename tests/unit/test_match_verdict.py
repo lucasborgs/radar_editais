@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from core.services import match_verdict as mv
+from radar.core.services import match_verdict as mv
 
 pytestmark = pytest.mark.unit
 

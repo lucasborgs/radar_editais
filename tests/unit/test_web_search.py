@@ -9,7 +9,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core import web_search as ws
+from radar.core import web_search as ws
 
 pytestmark = pytest.mark.unit
 

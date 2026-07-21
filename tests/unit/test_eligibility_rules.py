@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.services.eligibility import (
+from radar.core.services.eligibility import (
     _REGIOES,
     contrapartida_minima,
     evaluate_constraint,
@@ -149,7 +149,7 @@ def test_format_curated_rules_block_with_profile_includes_contrapartida():
 
 def test_format_curated_rules_block_empty_without_rules():
     """Fallback seguro quando arquivo de regras não existe."""
-    import core.services.eligibility as el
+    import radar.core.services.eligibility as el
 
     # Força cache vazio
     old_load = el.load_curated_rules

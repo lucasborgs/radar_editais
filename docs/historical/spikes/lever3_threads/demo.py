@@ -36,7 +36,7 @@ load_dotenv()
 
 from langchain_core.messages import HumanMessage  # noqa: E402
 
-from core.llm.agent_graph import (  # noqa: E402
+from radar.core.llm.agent_graph import (  # noqa: E402
     _build_chat_model,
     _build_graph,
     _build_system_message,
@@ -44,8 +44,8 @@ from core.llm.agent_graph import (  # noqa: E402
     _run_on_bg_loop,
     shutdown_writing_runtime,
 )
-from core.llm.agent_runtime import resolve_agent_provider  # noqa: E402
-from core.services.explore_agent import (  # noqa: E402
+from radar.core.llm.agent_runtime import resolve_agent_provider  # noqa: E402
+from radar.core.services.explore_agent import (  # noqa: E402
     EXPLORE_AGENT_SYSTEM,
     ExploreAgent,
 )

@@ -76,7 +76,7 @@ import jwt as pyjwt  # noqa: E402  (só importa quando o gate passa)
 import psycopg  # noqa: E402
 from postgrest.exceptions import APIError  # noqa: E402
 
-from core.infra.db import get_supabase_service, get_supabase_user  # noqa: E402
+from radar.core.infra.db import get_supabase_service, get_supabase_user  # noqa: E402
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -306,8 +306,8 @@ class TestS2HandlerScoping:
     def test_writing_session_load_rejeita_via_rls(self, two_tenants):
         """WritingSession com o cliente RLS de B + session_id de A → não encontra
         (RLS filtra a linha antes do handler)."""
-        from core.services.writing_session import WritingSession
-        from domain.user_profile import CompanyProfile
+        from radar.core.services.writing_session import WritingSession
+        from radar.domain.user_profile import CompanyProfile
 
         db_b = get_supabase_user(two_tenants["jwt_b"])
         with pytest.raises(ValueError):
@@ -322,8 +322,8 @@ class TestS2HandlerScoping:
         """Defesa em profundidade: mesmo com um cliente que bypassa RLS
         (service-role), a checagem explícita de workspace em _load_from_db barra
         session de A quando o workspace ativo é o de B."""
-        from core.services.writing_session import WritingSession
-        from domain.user_profile import CompanyProfile
+        from radar.core.services.writing_session import WritingSession
+        from radar.domain.user_profile import CompanyProfile
 
         svc = get_supabase_service()  # bypassa RLS de propósito
         with pytest.raises(ValueError):
@@ -345,7 +345,7 @@ class TestS3AgenticNamespacing:
         multi-tenant depois do RLS-bypass do Store.
 
         Embed FAKE determinístico (dims do Store) → zero token/rede."""
-        import core.llm.agent_graph as ag
+        import radar.core.llm.agent_graph as ag
 
         # O Store liga a função de embed no init — patch ANTES de _get_memory_store,
         # resetando o singleton (mesmo protocolo de test_memory_store_postgres).
@@ -396,7 +396,7 @@ class TestS3AgenticNamespacing:
         """
         from langgraph.checkpoint.base import empty_checkpoint
 
-        import core.llm.agent_graph as ag
+        import radar.core.llm.agent_graph as ag
 
         saver = ag._get_writing_checkpointer()
         if type(saver).__name__ != "AsyncPostgresSaver":
@@ -432,7 +432,7 @@ class TestS3AgenticNamespacing:
         Se alguém trocar a construção, o teste durável acima perde a premissa."""
         import inspect
 
-        from core.services import writing_session as ws
+        from radar.core.services import writing_session as ws
 
         src = inspect.getsource(ws.WritingSession)
         assert 'f"{self.workspace_id}:{self.session_id}:' in src, (
@@ -444,7 +444,7 @@ class TestS3AgenticNamespacing:
         com checkpointer=False, não None — None faria o LangGraph HERDAR o
         checkpointer do pai (cross-loop crash + persistência indevida). Trava a
         regressão que o comentário em agent_graph.py:421 descreve."""
-        import core.llm.agent_graph as ag
+        import radar.core.llm.agent_graph as ag
 
         captured = {}
         real_build_graph = ag._build_graph
@@ -510,7 +510,7 @@ class TestS4DemoModeGuard:
         (service-role). O guard recusa o boot salvo override deliberado. Espelha
         test_hardening_pr1 — replicado aqui para a suíte de isolamento ser
         auto-contida nas 4 superfícies."""
-        from backend.api import _guard_demo_mode
+        from radar.api.app import _guard_demo_mode
 
         for var in ("DEMO_MODE", "RAILWAY_ENVIRONMENT", "ENVIRONMENT",
                     "DEMO_MODE_ALLOW_PROD"):
@@ -521,7 +521,7 @@ class TestS4DemoModeGuard:
             _guard_demo_mode()
 
     def test_guard_permite_override_deliberado(self, monkeypatch):
-        from backend.api import _guard_demo_mode
+        from radar.api.app import _guard_demo_mode
 
         for var in ("DEMO_MODE", "RAILWAY_ENVIRONMENT", "ENVIRONMENT",
                     "DEMO_MODE_ALLOW_PROD"):

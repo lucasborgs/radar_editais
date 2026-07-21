@@ -20,8 +20,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-import core.ingestion.opportunity_discovery as od
-from core.web_search import SearchHit
+import radar.core.ingestion.opportunity_discovery as od
+from radar.core.web_search import SearchHit
 
 pytestmark = pytest.mark.unit
 

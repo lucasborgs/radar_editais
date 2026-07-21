@@ -11,7 +11,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from core.kg import entity_catalog, temporal
+from radar.core.kg import entity_catalog, temporal
 
 pytestmark = pytest.mark.unit
 

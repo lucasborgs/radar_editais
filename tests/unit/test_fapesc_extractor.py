@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 import pytest  # noqa: E402
 
-from pipeline.extractors.fapesc import FAPESCScraper  # noqa: E402
+from radar.pipeline.extractors.fapesc import FAPESCScraper  # noqa: E402
 
 pytestmark = pytest.mark.unit
 
@@ -78,7 +78,7 @@ _PAGE_HTML = """
 def test_find_edital_pdf_prefers_edital_anchor():
     scraper = FAPESCScraper()
     soup = BeautifulSoup(_PAGE_HTML, "html.parser")
-    with patch("pipeline.extractors.fapesc._skip_keywords",
+    with patch("radar.pipeline.extractors.fapesc._skip_keywords",
                return_value=["plano-de-integridade", "codigo_conduta", "resultado",
                              "manual", "cadastr", "sigfapesc"]):
         url = scraper._find_edital_pdf(soup)
@@ -96,7 +96,7 @@ def test_find_edital_pdf_falls_back_to_recent_non_boilerplate():
     </body></html>
     """
     scraper = FAPESCScraper()
-    with patch("pipeline.extractors.fapesc._skip_keywords",
+    with patch("radar.pipeline.extractors.fapesc._skip_keywords",
                return_value=["codigo_conduta"]):
         url = scraper._find_edital_pdf(BeautifulSoup(html, "html.parser"))
     assert url.endswith("/Anexo-B.pdf")  # mais recente, não-boilerplate
@@ -115,7 +115,7 @@ def test_normative_pdfs_compose_base_and_retification():
     <a href="https://fapesc.sc.gov.br/wp-content/uploads/2026/03/Resultado.pdf">Resultado</a>
     """
     scraper = FAPESCScraper()
-    with patch("pipeline.extractors.fapesc._skip_keywords", return_value=["resultado"]):
+    with patch("radar.pipeline.extractors.fapesc._skip_keywords", return_value=["resultado"]):
         docs = scraper._find_normative_pdfs(BeautifulSoup(html, "html.parser"))
     assert docs == [
         ("https://fapesc.sc.gov.br/wp-content/uploads/2026/01/Edital-31.pdf", "edital-base"),

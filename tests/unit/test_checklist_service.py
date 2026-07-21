@@ -38,7 +38,7 @@ import asyncio
 
 import pytest
 
-from core.services import checklist_service as cs
+from radar.core.services import checklist_service as cs
 
 pytestmark = pytest.mark.unit
 

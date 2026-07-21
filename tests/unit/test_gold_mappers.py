@@ -12,7 +12,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from core.kg import gold
+from radar.core.kg import gold
 
 pytestmark = pytest.mark.unit
 

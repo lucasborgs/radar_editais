@@ -15,7 +15,7 @@ import types
 
 import pytest
 
-import core.llm.agent_graph as ag
+import radar.core.llm.agent_graph as ag
 
 pytestmark = pytest.mark.unit
 
@@ -107,7 +107,7 @@ def test_project_to_store_mirrors_put_and_delete(monkeypatch):
     monkeypatch.setattr(ag, "memory_put", lambda ws, k, t, **kw: puts.append((ws, k, t, kw.get("level"))))
     monkeypatch.setattr(ag, "memory_delete", lambda ws, k: dels.append((ws, k)))
 
-    from core.reflection_service import _project_to_store
+    from radar.core.reflection_service import _project_to_store
     _project_to_store(
         "ws",
         deleted=[{"id": "d1"}, {"id": "d2"}],
@@ -123,13 +123,13 @@ def test_project_to_store_mirrors_put_and_delete(monkeypatch):
 
 def test_tool_uses_semantic_with_query(monkeypatch):
     monkeypatch.setattr(ag, "memory_search", lambda ws, q, limit=6: [{"insight": "hit semântico", "level": 2}])
-    from core.reflection_service import search_insights_for_tool
+    from radar.core.reflection_service import search_insights_for_tool
     out = search_insights_for_tool(db=None, workspace_id="ws", query="trl")
     assert "hit semântico" in out
 
 
 def test_tool_falls_back_to_static_without_query(monkeypatch):
-    import core.reflection_service as rs
+    import radar.core.reflection_service as rs
     monkeypatch.setattr(rs, "load_active_insights", lambda db, ws, max_total=6: [{"level": 1, "insight": "estático"}])
     out = rs.search_insights_for_tool(db=object(), workspace_id="ws", query="")
     assert "estático" in out
@@ -140,7 +140,7 @@ def test_tool_falls_back_to_static_without_query(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def _ws_stub() -> types.SimpleNamespace:
-    from core.services.writing_session import WritingSession
+    from radar.core.services.writing_session import WritingSession
     return types.SimpleNamespace(
         workspace_id="ws",
         _reflection_insights_context="BLOCO ESTÁTICO",
@@ -149,7 +149,7 @@ def _ws_stub() -> types.SimpleNamespace:
 
 
 def _build_for_turn(stub, msg, hint):
-    from core.services.writing_session import WritingSession
+    from radar.core.services.writing_session import WritingSession
     return WritingSession._build_reflection_context_for_turn(stub, msg, hint)
 
 

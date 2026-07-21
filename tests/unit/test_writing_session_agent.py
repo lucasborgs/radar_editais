@@ -17,9 +17,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.llm.agent_graph import WritingTurnOutcome  # noqa: E402
-from core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
-from core.services.writing_session import WritingSession  # noqa: E402
+from radar.core.llm.agent_graph import WritingTurnOutcome  # noqa: E402
+from radar.core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
+from radar.core.services.writing_session import WritingSession  # noqa: E402
 
 pytestmark = pytest.mark.unit
 
@@ -329,7 +329,7 @@ def test_turn_agent_happy_path_no_tools(monkeypatch):
     def fake_run_writing_turn(**kwargs):
         return _outcome(fake_result)
 
-    monkeypatch.setattr("core.llm.agent_graph.run_writing_turn", fake_run_writing_turn)
+    monkeypatch.setattr("radar.core.llm.agent_graph.run_writing_turn", fake_run_writing_turn)
 
     s._turn_count = 1
     result = s._turn_agent("oi", section_hint=None, user_turn_index=1)
@@ -366,7 +366,7 @@ def test_turn_agent_with_tools_persists_trace(monkeypatch):
         usage={"input_tokens": 250, "output_tokens": 18},
     )
     monkeypatch.setattr(
-        "core.llm.agent_graph.run_writing_turn", lambda **kw: _outcome(fake_result),
+        "radar.core.llm.agent_graph.run_writing_turn", lambda **kw: _outcome(fake_result),
     )
 
     s._turn_count = 1
@@ -396,7 +396,7 @@ def test_turn_agent_error_returns_error_dict(monkeypatch):
         usage={"input_tokens": 0, "output_tokens": 0},
     )
     monkeypatch.setattr(
-        "core.llm.agent_graph.run_writing_turn", lambda **kw: _outcome(fake_result),
+        "radar.core.llm.agent_graph.run_writing_turn", lambda **kw: _outcome(fake_result),
     )
 
     s._turn_count = 1
@@ -426,14 +426,14 @@ def test_turn_agent_interrupt_surfaces_pending_and_persists_question(monkeypatch
         usage={"input_tokens": 100, "output_tokens": 10},
     )
     monkeypatch.setattr(
-        "core.llm.agent_graph.run_writing_turn",
+        "radar.core.llm.agent_graph.run_writing_turn",
         lambda **kw: _outcome(
             partial, interrupt={"field": "cnpj", "prompt": "Qual o CNPJ?"}, n_messages=3,
         ),
     )
     # Item 3: thread-por-sessão — helpers de checkpointer mockados (unit hermético).
-    monkeypatch.setattr("core.llm.agent_graph.get_thread_message_count", lambda *a, **k: 0)
-    monkeypatch.setattr("core.llm.agent_graph.trim_thread_history", lambda *a, **k: 0)
+    monkeypatch.setattr("radar.core.llm.agent_graph.get_thread_message_count", lambda *a, **k: 0)
+    monkeypatch.setattr("radar.core.llm.agent_graph.trim_thread_history", lambda *a, **k: 0)
 
     s._turn_count = 1
     result = s._turn_agent("escreva a identificação", section_hint=None, user_turn_index=1)
@@ -475,10 +475,10 @@ def test_turn_agent_resume_routes_command_and_clears_pending(monkeypatch):
         captured.update(kw)
         return _outcome(final, interrupt=None, n_messages=5)
 
-    monkeypatch.setattr("core.llm.agent_graph.run_writing_turn", fake)
+    monkeypatch.setattr("radar.core.llm.agent_graph.run_writing_turn", fake)
     # Item 3: prior_n_msgs vem do checkpointer (não de resume_ctx["n_msgs"]).
-    monkeypatch.setattr("core.llm.agent_graph.get_thread_message_count", lambda *a, **k: 3)
-    monkeypatch.setattr("core.llm.agent_graph.trim_thread_history", lambda *a, **k: 0)
+    monkeypatch.setattr("radar.core.llm.agent_graph.get_thread_message_count", lambda *a, **k: 3)
+    monkeypatch.setattr("radar.core.llm.agent_graph.trim_thread_history", lambda *a, **k: 0)
 
     result = s.turn("12.345.678/0001-90")
 
@@ -500,14 +500,14 @@ def test_turn_agent_gates_trim_to_fresh_turns_only(monkeypatch):
     s = _make_session()
     trim_calls: list = []
     monkeypatch.setattr(s, "_trim_thread_history", lambda tid: trim_calls.append(tid))
-    monkeypatch.setattr("core.llm.agent_graph.get_thread_message_count", lambda *a, **k: 0)
+    monkeypatch.setattr("radar.core.llm.agent_graph.get_thread_message_count", lambda *a, **k: 0)
 
     final = AgentResult(
         final_text="ok", steps=[], stop_reason="end_turn",
         usage={"input_tokens": 10, "output_tokens": 5},
     )
     monkeypatch.setattr(
-        "core.llm.agent_graph.run_writing_turn",
+        "radar.core.llm.agent_graph.run_writing_turn",
         lambda **kw: _outcome(final, interrupt=None, n_messages=4),
     )
 
@@ -533,13 +533,13 @@ def _bridge_session(monkeypatch, *, thread_count):
         {"role": "user", "content": "Redija a descrição. Depois substitua a primeira frase por 'NOSSO PROJETO X'."},
         {"role": "assistant", "content": "## Plano da Proposta — 11 seções."},
     ]
-    monkeypatch.setattr("core.llm.agent_graph.get_thread_message_count", lambda *a, **k: thread_count)
+    monkeypatch.setattr("radar.core.llm.agent_graph.get_thread_message_count", lambda *a, **k: thread_count)
     monkeypatch.setattr(s, "_trim_thread_history", lambda tid: None)
     captured: dict = {}
     final = AgentResult(final_text="ok", steps=[], stop_reason="end_turn",
                         usage={"input_tokens": 10, "output_tokens": 5})
     monkeypatch.setattr(
-        "core.llm.agent_graph.run_writing_turn",
+        "radar.core.llm.agent_graph.run_writing_turn",
         lambda **kw: (captured.update(kw), _outcome(final))[1],
     )
     return s, captured
@@ -615,7 +615,7 @@ def test_pitch_outline_is_capture_genre():
 
 def test_search_edital_returns_fund_node_in_pitch():
     """No pitch, search_edital devolve o nó do fundo, não chunks de edital_chunks."""
-    from core.llm.agent_tools import build_writing_tools
+    from radar.core.llm.agent_tools import build_writing_tools
 
     s = _make_pitch_session()
     tools = {t.name: t for t in build_writing_tools(s)}

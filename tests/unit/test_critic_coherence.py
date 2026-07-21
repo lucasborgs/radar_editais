@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from core.llm.agent_tools.critic_agent import _build_proposal_context, run_critic
+from radar.core.llm.agent_tools.critic_agent import _build_proposal_context, run_critic
 
 pytestmark = pytest.mark.unit
 
@@ -61,7 +61,7 @@ def test_build_context_defensive_without_attrs():
 # outras seções) chega por TOOLS, não mais context-stuffed num único prompt.
 # Mockamos run_subagent para (a) capturar as tools e os params de invocação e
 # (b) exercitar as tools, verificando o roteamento de substrato por gênero.
-from core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
+from radar.core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
 
 
 def _canned_result(content: str, n_steps: int = 1) -> AgentResult:
@@ -73,11 +73,11 @@ def test_run_critic_subagent_proposal_siblings_via_tool(monkeypatch):
     """Gênero proposta: o critic usa run_subagent (provider=openai, gpt-4o,
     temperature=0.05); a seção irmã chega via a tool read_proposal_sections, e o
     edital via read_target_context (que faz o retrieve)."""
-    import core.llm.agent_tools.critic_agent as ca
+    import radar.core.llm.agent_tools.critic_agent as ca
     captured = {}
 
     monkeypatch.setattr(
-        "core.retrieval.retriever.retrieve_chunks", lambda *a, **k: []
+        "radar.core.retrieval.retriever.retrieve_chunks", lambda *a, **k: []
     )
 
     def fake_run_subagent(**kw):
@@ -119,12 +119,12 @@ def test_run_critic_subagent_proposal_siblings_via_tool(monkeypatch):
 def test_run_critic_subagent_pitch_target_is_fund_node(monkeypatch):
     """mode=pitch: read_target_context retorna o nó do fundo (context-stuffing) e
     NÃO chama retrieve_chunks (edital_chunks)."""
-    import core.llm.agent_tools.critic_agent as ca
+    import radar.core.llm.agent_tools.critic_agent as ca
     captured = {}
 
     def _boom(*a, **k):
         raise AssertionError("retrieve_chunks não deve ser chamado no mode=pitch")
-    monkeypatch.setattr("core.retrieval.retriever.retrieve_chunks", _boom)
+    monkeypatch.setattr("radar.core.retrieval.retriever.retrieve_chunks", _boom)
 
     def fake_run_subagent(**kw):
         captured.update(kw)
@@ -158,7 +158,7 @@ def test_run_critic_subagent_pitch_target_is_fund_node(monkeypatch):
 
 def test_run_critic_degrades_on_subagent_error(monkeypatch):
     """stop_reason=='error' do sub-agente → approved=True (save nunca bloqueia)."""
-    import core.llm.agent_tools.critic_agent as ca
+    import radar.core.llm.agent_tools.critic_agent as ca
 
     monkeypatch.setattr(
         ca, "run_subagent",
@@ -172,7 +172,7 @@ def test_run_critic_degrades_on_subagent_error(monkeypatch):
 
 def test_run_critic_degrades_on_unparseable_verdict(monkeypatch):
     """final_text não-JSON → approved=True por fallback."""
-    import core.llm.agent_tools.critic_agent as ca
+    import radar.core.llm.agent_tools.critic_agent as ca
 
     monkeypatch.setattr(
         ca, "run_subagent",

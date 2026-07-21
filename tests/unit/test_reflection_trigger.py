@@ -22,7 +22,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import core.reflection_service as rs
+import radar.core.reflection_service as rs
 
 pytestmark = pytest.mark.unit
 

@@ -6,7 +6,7 @@ import unicodedata
 
 import pytest
 
-from core.config import ROOT
+from radar.core.config import ROOT
 
 pytestmark = pytest.mark.unit
 

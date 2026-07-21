@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from domain.edital_extraction import (
+from radar.domain.edital_extraction import (
     DECISION_FIELDS,
     GATE_FIELDS,
     Counterpart,

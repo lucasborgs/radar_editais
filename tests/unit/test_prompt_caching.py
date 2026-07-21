@@ -19,11 +19,11 @@ from unittest.mock import MagicMock
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-from core.llm.agent_graph import (
+from radar.core.llm.agent_graph import (
     _build_system_message,
     _to_lc_messages,
 )
-from core.services.writing_session import WritingSession
+from radar.core.services.writing_session import WritingSession
 
 pytestmark = pytest.mark.unit
 
@@ -186,8 +186,8 @@ def test_temporal_in_tail_of_generation_builder():
 # ============================================================================
 
 def test_explore_marks_current_user_message(monkeypatch):
-    from core.llm.agent_runtime import AgentResult
-    from core.services.explore_agent import ExploreAgent
+    from radar.core.llm.agent_runtime import AgentResult
+    from radar.core.services.explore_agent import ExploreAgent
 
     captured: dict = {}
 
@@ -196,7 +196,7 @@ def test_explore_marks_current_user_message(monkeypatch):
         return AgentResult(final_text="ok", steps=[], stop_reason="end_turn",
                            usage={"input_tokens": 0, "output_tokens": 0})
 
-    monkeypatch.setattr("core.llm.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", fake_run_agent)
 
     svc = ExploreAgent()
     svc._explore_agent("qual o prazo?", history=[{"role": "user", "content": "antes"}],

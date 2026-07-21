@@ -202,8 +202,8 @@ def _web_url_hash(url: str) -> str:
 
 def _simulate_current_extraction(page_text: str, title: str, url: str, agency: str) -> dict:
     """LLM em 6k chars, igual ao _extract atual. Sem PDFs, sem seções."""
-    from core.kg import schema as ws
-    from core.llm.llm_client import make_client
+    from radar.core.kg import schema as ws
+    from radar.core.llm.llm_client import make_client
 
     api_key = os.environ.get("OPENAI_API_KEY")
     client = make_client(api_key=api_key)
@@ -376,7 +376,7 @@ async def main():
             print(f"{'='*60}")
 
             # 1. Fetch bruto (simula o _page_text atual — trafilatura)
-            from core.llm.agent_tools.profile_tools import _fetch_and_parse
+            from radar.core.llm.agent_tools.profile_tools import _fetch_and_parse
             page_data = _fetch_and_parse(url) or {}
             page_text_bruto = page_data.get("text", "")
 

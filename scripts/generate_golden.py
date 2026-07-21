@@ -6,7 +6,7 @@ Para cada edital indicado, lê chunks da tabela `edital_chunks`, faz amostragem
 diversa (por source_file + section quando possível), e pede pro GPT-4o-mini
 gerar uma pergunta natural que aquele chunk responde. Resultado fica em
 `eval_data/golden/<source>.json` no formato consumido pela suíte rag
-(`python -m core.eval rag`).
+(`python -m radar.core.eval rag`).
 
 Uso:
     python scripts/generate_golden.py --source finep --editais 768 762 743
@@ -40,7 +40,7 @@ load_dotenv()
 
 import psycopg  # noqa: E402
 
-from core.llm.llm_client import make_client  # noqa: E402
+from radar.core.llm.llm_client import make_client  # noqa: E402
 
 GOLDEN_DIR = ROOT / "eval_data" / "golden"
 DEFAULT_PER_EDITAL = 8
@@ -259,7 +259,7 @@ def main() -> int:
     print()
     print(f"[gen] gravado em {out_path}")
     print(f"[gen] total no golden: {len(out['queries'])} ({len(new_queries)} novas)")
-    print("[gen] REVISE o JSON antes de rodar `python -m core.eval rag` — algumas queries podem estar")
+    print("[gen] REVISE o JSON antes de rodar `python -m radar.core.eval rag` — algumas queries podem estar")
     print("[gen] triviais ou específicas demais. Editar/deletar a mão é parte do processo.")
     return 0
 

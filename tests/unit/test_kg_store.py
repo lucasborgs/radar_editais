@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.kg import kg_store
+from radar.core.kg import kg_store
 
 pytestmark = pytest.mark.unit
 

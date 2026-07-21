@@ -16,7 +16,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.tools import tool
 from pydantic import PrivateAttr
 
-import core.llm.agent_graph as ag
+import radar.core.llm.agent_graph as ag
 
 pytestmark = pytest.mark.unit
 

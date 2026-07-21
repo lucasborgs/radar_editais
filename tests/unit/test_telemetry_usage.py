@@ -1,4 +1,4 @@
-"""Testes do helper core.infra.telemetry.record_usage.
+"""Testes do helper radar.core.infra.telemetry.record_usage.
 
 Garante que usage_details é extraído de forma consistente das respostas LLM
 (OpenAI e Anthropic) e registrado no span no formato que o Langfuse usa pra
@@ -19,7 +19,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.infra import telemetry  # noqa: E402
+from radar.core.infra import telemetry  # noqa: E402
 
 pytestmark = pytest.mark.unit
 

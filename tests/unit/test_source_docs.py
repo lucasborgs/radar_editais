@@ -1,4 +1,4 @@
-"""Unit tests para core.kg.source_docs — Documento Canônico durável.
+"""Unit tests para radar.core.kg.source_docs — Documento Canônico durável.
 
 Cobre o contrato sem tocar DB: stub do client supabase (chains
 table().select()/upsert().eq().limit().execute()) e monkeypatch de
@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 import pytest  # noqa: E402
 
-from core.kg import source_docs  # noqa: E402
+from radar.core.kg import source_docs  # noqa: E402
 
 pytestmark = pytest.mark.unit
 
@@ -119,13 +119,13 @@ def test_load_sem_supabase_retorna_none(monkeypatch):
 
 def test_load_hit(monkeypatch, pg_on):
     db = _FakeDB(rows=[{"canonical_doc": DOC}])
-    monkeypatch.setattr("core.infra.db.get_supabase_service", lambda: db)
+    monkeypatch.setattr("radar.core.infra.db.get_supabase_service", lambda: db)
     assert source_docs.load("finep:1") == DOC
 
 
 def test_load_miss_retorna_none(monkeypatch, pg_on):
     db = _FakeDB(rows=[])
-    monkeypatch.setattr("core.infra.db.get_supabase_service", lambda: db)
+    monkeypatch.setattr("radar.core.infra.db.get_supabase_service", lambda: db)
     assert source_docs.load("finep:1") is None
 
 
@@ -133,7 +133,7 @@ def test_load_erro_degrada_para_none(monkeypatch, pg_on):
     def _boom():
         raise RuntimeError("conexão caiu")
 
-    monkeypatch.setattr("core.infra.db.get_supabase_service", _boom)
+    monkeypatch.setattr("radar.core.infra.db.get_supabase_service", _boom)
     assert source_docs.load("finep:1") is None
 
 
@@ -150,7 +150,7 @@ def test_save_sem_supabase_noop(monkeypatch):
 def test_save_doc_vazio_noop(monkeypatch, pg_on):
     called = {"n": 0}
     monkeypatch.setattr(
-        "core.infra.db.get_supabase_service",
+        "radar.core.infra.db.get_supabase_service",
         lambda: called.__setitem__("n", called["n"] + 1),
     )
     assert source_docs.save("finep:1", "finep", []) is False
@@ -160,7 +160,7 @@ def test_save_doc_vazio_noop(monkeypatch, pg_on):
 def test_save_upsert_payload(monkeypatch, pg_on):
     sink: dict = {}
     db = _FakeDB(sink=sink)
-    monkeypatch.setattr("core.infra.db.get_supabase_service", lambda: db)
+    monkeypatch.setattr("radar.core.infra.db.get_supabase_service", lambda: db)
     assert source_docs.save("finep:782", "finep", DOC) is True
     assert sink["payload"]["edital_id"] == "finep:782"
     assert sink["payload"]["source"] == "finep"
@@ -173,6 +173,6 @@ def test_save_erro_nao_levanta(monkeypatch, pg_on):
     def _boom():
         raise RuntimeError("DB fora")
 
-    monkeypatch.setattr("core.infra.db.get_supabase_service", _boom)
+    monkeypatch.setattr("radar.core.infra.db.get_supabase_service", _boom)
     # não deve propagar (persistir não pode quebrar o chunk path); retorna False
     assert source_docs.save("finep:1", "finep", DOC) is False

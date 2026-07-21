@@ -737,19 +737,19 @@ fonte = escrever o adapter + registrar aqui; nada em L2/L3 muda.
 ```yaml
 source_adapters:
   finep:
-    module: "pipeline.adapters.finep"
+    module: "radar.pipeline.adapters.finep"
     raw_dir: "finep_raw"
     strategy: "pdf"          # lê FINEP_PDFS_DIR/{id}/*.pdf, 1 unit/página
   fapesp:
-    module: "pipeline.adapters.fapesp"
+    module: "radar.pipeline.adapters.fapesp"
     raw_dir: "fapesp_raw"
     strategy: "html_body"    # texto_cru do bronze como 1 doc
   fapesc:
-    module: "pipeline.adapters.fapesc"
+    module: "radar.pipeline.adapters.fapesc"
     raw_dir: "fapesc_raw"
     strategy: "pdf"          # texto vem do PDF anexo (extraído no scraper) → texto_cru
   web:
-    module: "pipeline.adapters.web"
+    module: "radar.pipeline.adapters.web"
     raw_dir: "web_raw"
     strategy: "html_clean"   # HTML cru do bronze → html_to_text → split em units
 ```

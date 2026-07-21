@@ -2,7 +2,7 @@
 de pé. Cunha um JWT do usuário seed (HS256/SUPABASE_JWT_SECRET), POSTa 2 turnos
 na MESMA session_id autenticada e verifica memória via thread-por-sessão.
 
-Requer uvicorn em 127.0.0.1:8001 (backend.api:app) + Postgres local seedado.
+Requer uvicorn em 127.0.0.1:8001 (radar.api.app:app) + Postgres local seedado.
 """
 from __future__ import annotations
 

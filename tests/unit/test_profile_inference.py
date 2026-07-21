@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import pytest
 
-from core.ingestion.profile_inference import (
+from radar.core.ingestion.profile_inference import (
     CAPITAL_RISCO,
     PESQUISA_COLABORATIVA,
     SUBVENCAO,
     infer_financiamento,
 )
-from domain.user_profile import CompanyProfile
+from radar.domain.user_profile import CompanyProfile
 
 pytestmark = pytest.mark.unit
 
@@ -94,7 +94,7 @@ def test_tipo_entidade_vazio_sem_sinal():
 
 
 def _make_extract_result(profile: CompanyProfile):
-    from core.ingestion.profile_extractor import ExtractResult
+    from radar.core.ingestion.profile_extractor import ExtractResult
 
     return ExtractResult(
         profile=profile,
@@ -106,7 +106,7 @@ def _make_extract_result(profile: CompanyProfile):
 
 
 def test_serializer_infere_quando_vazio():
-    from backend.routers.profile import _serialize_extract_result
+    from radar.api.routers.profile import _serialize_extract_result
 
     profile = CompanyProfile(tipo_entidade="empresa", trl=6, one_liner="tecnologia")
     out = _serialize_extract_result(_make_extract_result(profile))
@@ -114,7 +114,7 @@ def test_serializer_infere_quando_vazio():
 
 
 def test_serializer_nao_sobrescreve_valor_existente():
-    from backend.routers.profile import _serialize_extract_result
+    from radar.api.routers.profile import _serialize_extract_result
 
     # Perfil já tem mecanismo (ex.: edição manual) → inferência NÃO roda.
     profile = CompanyProfile(

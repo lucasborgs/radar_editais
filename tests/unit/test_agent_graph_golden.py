@@ -1,4 +1,4 @@
-"""Testes de runtime do grafo LangGraph (core.llm.agent_graph).
+"""Testes de runtime do grafo LangGraph (radar.core.llm.agent_graph).
 
 Pós-Etapa 2 o grafo é o único runtime; estes testes exercitam o loop + tradutor
 de contrato com um chat model scriptado (zero rede): no-tool, 1-tool, tool-error,
@@ -17,9 +17,9 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.tools import tool
 from pydantic import PrivateAttr
 
-import core.llm.agent_graph as ag
-from core.llm.agent_graph import run_agent_graph_async
-from core.llm.agent_runtime import TOOL_RESULT_CHAR_CAP
+import radar.core.llm.agent_graph as ag
+from radar.core.llm.agent_graph import run_agent_graph_async
+from radar.core.llm.agent_runtime import TOOL_RESULT_CHAR_CAP
 
 pytestmark = pytest.mark.unit
 
@@ -340,7 +340,7 @@ def test_graph_honors_span_name(monkeypatch):
     """span_name chega na telemetria (igual ao legado → nesting de subagente)."""
     import contextlib
 
-    import core.infra.telemetry as telemetry
+    import radar.core.infra.telemetry as telemetry
 
     captured: list[str] = []
 

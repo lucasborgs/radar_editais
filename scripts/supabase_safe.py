@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 
-from core.environment import (
+from radar.core.environment import (
     Environment,
     assert_database_target,
     database_identity,
