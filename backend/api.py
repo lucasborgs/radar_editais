@@ -17,9 +17,11 @@ from core.environment import assert_runtime_environment, load_environment_profil
 load_environment_profile()
 
 
+import asyncio
 import logging
 import os
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -50,6 +52,24 @@ logger = logging.getLogger(__name__)
 assert_runtime_environment("backend API")
 
 
+def _check_database_health() -> None:
+    """Abre uma conexão curta e confirma que o Postgres aceita queries."""
+    import psycopg
+
+    dsn = os.environ["DATABASE_URL"]
+    with psycopg.connect(dsn, connect_timeout=3) as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1")
+        cur.fetchone()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    yield
+    from core.llm.agent_graph import shutdown_writing_runtime
+
+    await asyncio.to_thread(shutdown_writing_runtime)
+
+
 def _guard_demo_mode() -> None:
     """PR1.3 (hardening-pre-beta): DEMO_MODE bypassa auth+RLS via service-role.
 
@@ -77,7 +97,18 @@ app = FastAPI(
     title="Radar Editais API",
     description="Plataforma de matching e escrita de propostas para editais de fomento (FINEP, FAPESP, FAPESC, web)",
     version="2.0.0",
+    lifespan=lifespan,
 )
+
+
+@app.get("/health", include_in_schema=False)
+async def health():
+    try:
+        await asyncio.to_thread(_check_database_health)
+    except Exception as exc:  # noqa: BLE001 — health deve degradar para 503
+        logger.warning("Healthcheck do Postgres falhou: %s", exc)
+        return JSONResponse(status_code=503, content={"status": "unhealthy"})
+    return {"status": "ok"}
 
 
 class RequestIdMiddleware:

@@ -53,7 +53,7 @@ cat <<'EOF'
    c. Verificar:
         docker compose ps                 # os 3 "Up"
         docker compose logs -f app        # sem erro no boot
-        curl https://api.seudominio.com.br/        # healthcheck leve
+        curl --fail https://api.seudominio.com.br/health  # API + Postgres
    d. O worker é quem roda chunk_edital / enrich_content / os crons de
       scrape+discovery (03:00/04:00 UTC) — sem ele nada disso roda.
 
@@ -82,6 +82,7 @@ ENV — referência (.env na raiz, lido por app+worker via env_file no compose)
      SUPABASE_ANON_KEY  SUPABASE_SERVICE_KEY  SUPABASE_JWT_SECRET
   CONFIG          (app + worker):
      ENVIRONMENT=production
+     KG_STORE_BACKEND=postgres
      LLM_BACKEND=openai   OPENAI_MODEL=gpt-4o-mini
      EMBEDDING_MODEL=text-embedding-3-small   RETRIEVAL_EMBEDDING_COLUMN=embedding
   CONFIG          (app only):
