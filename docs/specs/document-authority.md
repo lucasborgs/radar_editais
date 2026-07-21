@@ -284,3 +284,18 @@ Concluído em 2026-07-14:
 Não permaneceram documentos em `docs/specs/`, `docs/features/` ou
 `docs/components/` por incerteza. O material local de avaliação protegido
 permaneceu não rastreado.
+
+## 13. Gatilho de reconciliação ao promover uma spec
+
+Ao concluir ou promover qualquer spec, o mesmo commit deve revisar seu ciclo de
+vida antes do merge:
+
+- confirmar no código, testes e operação se o contrato foi implementado;
+- corrigir o campo `Status:` para refletir o estado verificável;
+- manter em `docs/specs/` somente contratos ainda úteis e vigentes;
+- mover planos e diários concluídos para `docs/historical/` com `git mv`;
+- atualizar links internos e o índice documental quando aplicável;
+- buscar o path antigo no repositório, incluindo migrations e comentários; e
+- registrar explicitamente pendências ou escopo não promovido.
+
+A reconciliação não reescreve o histórico nem promove uma proposta sem evidência.

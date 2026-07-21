@@ -728,11 +728,11 @@ def _insert_chunks_psycopg(rows: list[dict]) -> None:
 
 
 # =============================================================================
-# Daily ETL — Pipeline #28
+# ETL diário
 # =============================================================================
 # Procrastinate periodic: cron diário 03:00 UTC roda scrapers ativos, materializa
 # silver/gold, persiste documentos canônicos e atualiza o vault. Falhas são tipadas e
-# persistidas em pipeline_errors (taxonomia ADR §3.7).
+# persistidas em pipeline_errors para retry e diagnóstico por categoria.
 #
 # Para mudar o horário: ajuste o cron expression (formato padrão crontab).
 # Para ativar mais fontes: implemente um BaseScraper concreto e registre em SCRAPER_REGISTRY.

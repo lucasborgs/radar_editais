@@ -8,7 +8,7 @@ ver docs/historical/langgraph-migration.md).
 Decisões fechadas:
   • Cap de iterações = contador `llm_calls` em state (paridade exata com
     `for ... range(max_steps)`), NÃO `recursion_limit`. Este vira só backstop.
-  • Sem poda intra-turno nem nó de reflexão (F2): o contexto por turno é limitado
+  • Sem poda intra-turno nem nó de reflexão: o contexto por turno é limitado
     por `max_steps × caps por tool` (TOOL_RESULT_CHAR_CAP), então cabe sem poda.
     A classe do bug de vazamento da reflexão morre por construção — não há mais
     HumanMessage interna injetada no meio do turno (só o `finalize` em max_steps).
@@ -176,7 +176,7 @@ def _build_graph(
         # Cap central (movido do bridge na Etapa 2): trunca cada tool-result acima
         # do orçamento antes de ir ao histórico. Caps por-tool (writing_tools) já
         # podem ter agido antes; este é o teto de segurança final. Sem poda
-        # intra-turno (F2): o histórico cresce no máximo max_steps × este cap.
+        # intra-turno: o histórico cresce no máximo max_steps × este cap.
         for m in tmsgs:
             m.content = _cap(
                 str(m.content), TOOL_RESULT_CHAR_CAP, tool_name=getattr(m, "name", None),
@@ -1538,7 +1538,7 @@ async def _generate_section(
     persistida?), não a fala do agente — o save_draft é a fonte de verdade. Sem
     callback, cai em "stop_reason != error".
 
-    `auto_save(section, text)`: F1 — parseia a última resposta do agente como
+    `auto_save(section, text)` parseia a última resposta do agente como
     JSON `{content, citations}`, extrai `content` e persiste via callback. Se o
     parse falhar ou o content for vazio, a seção é marcada como failed e cai no
     fallback universal da WritingSession.
@@ -1576,7 +1576,7 @@ async def _generate_section(
         if ok and verify_saved:
             logger.info("tripwire: generation_path path=structured section=%s", section)
         elif not ok and auto_save is not None:
-            # F1: contrato quote-first — parseia JSON {content, citations}
+            # Contrato quote-first: parseia JSON {content, citations}.
             last_text = result.final_text or ""
             parsed = _try_parse_generation_json(last_text)
             if parsed and parsed.get("content", "").strip():

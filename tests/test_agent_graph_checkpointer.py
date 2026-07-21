@@ -140,7 +140,7 @@ def test_resume_token_usage_is_delta_only(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Risco #1 — re-execução do batch no resume
+# Caveat: re-execução do batch no resume
 # ---------------------------------------------------------------------------
 
 def test_batched_tool_reexecutes_on_resume(monkeypatch):

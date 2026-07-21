@@ -36,7 +36,7 @@ class CompanyProfile:
     # ── Elegibilidade organizacional ───────────────────────────────────────
     # Pares dos critérios DUROS que os editais filtram (EditalExtraction v2:
     # eligibility_constraints). Capturados agora para alinhar os dois lados; o
-    # gate determinístico sobre eles entra na Fase 3 (hoje são sinal/contexto).
+    # hoje são sinal/contexto; o gate determinístico fica no avaliador de elegibilidade.
     uf: str = ""                       # UF/estado (elegibilidade geográfica)
     faturamento_anual: float | None = None   # receita (≠ capital_social)
     ano_fundacao: int | None = None    # ano de constituição (idade da empresa)

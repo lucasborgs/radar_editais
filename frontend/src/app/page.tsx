@@ -65,11 +65,11 @@ const SUGGESTIONS = [
   "Que apoio há para hardware/deep tech?",
 ];
 
-// Flag p/ não re-disparar o merge de perfil (F5) em toda visita logada.
+// Evita re-disparar o merge de perfil em toda visita logada.
 const MERGED_FLAG = "frontdoor_merged";
 
 // Transcript vive em sessionStorage (decisão 2026-06-11): nova visita/aba =
-// conversa limpa; F5 na mesma aba preserva. O PERFIL continua em localStorage
+// conversa limpa; a mesma aba preserva. O PERFIL continua em localStorage
 // (é o ativo durável). Limpa resíduo da era localStorage do transcript.
 function loadHistory(): TranscriptEntry[] {
   if (typeof window === "undefined") return [];
@@ -170,7 +170,7 @@ export default function FrontDoorPage() {
   // Card "destravar mais matches" (Etapa 2): dispensável por sessão.
   const [unlockDismissed, setUnlockDismissed] = useState(false);
 
-  // Liga o estado local à conversa do servidor (e sobrevive a F5 na mesma aba).
+  // Liga o estado local à conversa do servidor e sobrevive na mesma aba.
   // Binding novo (1º turno) avisa o sidebar para recarregar a lista.
   const bindSession = useCallback(
     (id: string) => {
@@ -256,7 +256,7 @@ export default function FrontDoorPage() {
     [isAuthed, getToken],
   );
 
-  // ── F5/F6: hidratação do perfil logado + merge da conversa ──────────────────
+  // ── Hidratação do perfil logado + merge da conversa ────────────────────────
   useEffect(() => {
     if (!hydrated || !isAuthed) return;
     let alive = true;
@@ -277,7 +277,7 @@ export default function FrontDoorPage() {
           return;
         }
 
-        // Merge F5: campos vazios na conta ← valores locais; conflitos → diff.
+        // Merge: campos vazios na conta ← valores locais; conflitos → diff.
         const filled: CompanyProfile = { ...account };
         const conflicts: ProfileDiffItem[] = [];
         let importedSilently = false;

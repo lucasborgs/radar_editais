@@ -1,5 +1,5 @@
 """
-Pipeline error taxonomy (Pipeline #28).
+Taxonomia de erros do pipeline ETL.
 
 Falhas do pipeline ETL agora são tipadas — permite retry diferenciado por
 causa e alerta de degradação por categoria. Antes, scrapers/etl falhavam

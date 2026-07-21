@@ -66,7 +66,7 @@ OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 # agente com tools (search_edital, save_draft com critic, etc.). Modelo e
 # orçamento de passos configuráveis via env.
 ANTHROPIC_MODEL_AGENT = os.getenv("ANTHROPIC_MODEL_AGENT", "claude-sonnet-4-6")
-# GENERATION_MODEL (D1 — F1): modelo do batch de geração. Default gpt-4o-mini
+# Modelo do batch de geração. Default gpt-4o-mini
 # (barato; o retrieval determinístico + contrato quote-first compensam). Preparando
 # BYOK: env separada do AGENT_*/CRITIC_* tiers para swap independente.
 # Trocar aqui NÃO afeta o modelo do chat (turn()), nem o critic, nem embeddings.
@@ -316,7 +316,7 @@ Responda apenas com o resumo."""
 # o resumo captura "o que foi dito" (alimenta o próximo turno), este captura
 # "o que deu atrito" (alimenta o aprendizado de longo prazo via reflection_insights).
 #
-# F6 (2026-07, D3 — congelamento da memória auto-escrita): este prompt é
+# Com a memória auto-escrita congelada, este prompt é
 # PRESERVADO (não deletado) mas a extração+sinal só roda quando
 # AUTO_MEMORY_WRITE=1 (default 0). Ver `_compress_history`. A LEITURA de
 # insights curados (load_active_insights/memory_search) não é afetada.
@@ -345,11 +345,11 @@ Lista vazia [] se não houver sinal relevante."""
 
 
 # =============================================================================
-# PROMPT — PLAN-FIRST (F4)
+# PROMPT — plano estruturado no primeiro turno
 # =============================================================================
 # Gera um plano estruturado para o 1º turno: outline + por-seção (cobertura,
 # ancora no edital, info faltante) + perguntas críticas. Substitui o roteamento
-# por keyword do F0. Usa as matrizes de dependência como dado estático.
+# anterior por keyword. Usa as matrizes de dependência como dado estático.
 # 1-shot LLM direto (sem grafo), reusa _save_plan/_plan do four-phase-workflow.
 
 PLAN_SYSTEM = """Você é um estrategista de propostas de fomento à inovação.
@@ -397,8 +397,8 @@ Regras:
 # =============================================================================
 # Dado estático: quais seções são impactadas quando uma seção é alterada. A
 # ordem segue o outline padrão. O consumidor original (scope_classifier) foi
-# removido no F2; mantidas como referência estrutural para o plan-first do F4
-# (docs/specs/writing-agent-evolution.md).
+# removido com o scope classifier; mantidas como referência estrutural para o
+# plano do primeiro turno.
 
 PROPOSAL_DEPENDENCY_MATRIX: dict[str, list[str]] = {
     "1. Identificação da empresa":         [],
@@ -495,7 +495,7 @@ class WritingSession:
         # no primeiro turno. Injetada no prompt de geração.
         self._project_description: str | None = None
 
-        # F3 — contratos tipados no save: resultados estruturados das tools
+        # Contratos tipados no save: resultados estruturados das tools
         # save_draft (critic verdict + section title), consumidos por
         # _extract_tool_trace. Resetado a cada turno.
         self._tool_results: list[dict] = []
@@ -503,7 +503,7 @@ class WritingSession:
         # Contador de falhas abertas do critic por sessão (resetado no recarregamento).
         self._critic_fail_open_count: int = 0
 
-        # F1 — anotações do critic pós-save no batch de geração. {section: dict}
+        # Anotações do critic pós-save no batch de geração. {section: dict}
         # Preenchido em generate_full_proposal; persistido em section_drafts
         # sob chave _critic_annotations.
         self._generation_critic_annotations: dict[str, dict] = {}
@@ -574,7 +574,7 @@ class WritingSession:
             self._plan = self._merge_adjustments(plan, user_adjustments)
         else:
             self._plan = None
-        # F4: flag que indica plano pendente de confirmação (1º turno gerou
+        # Indica plano pendente de confirmação (1º turno gerou
         # plano, aguardando usuário confirmar para disparar geração).
         self._plan_pending_confirmation = False
 
@@ -1157,7 +1157,7 @@ class WritingSession:
             "created_at":         self.created_at,
             # PR1: plano de proposta gerado pelo Planning node.
             "plan": self._plan,
-            # F4: plano pendente de confirmação (1º turno gerou plano,
+            # Plano pendente de confirmação (1º turno gerou plano,
             # aguardando usuário confirmar para disparar geração).
             "plan_pending": self._plan_pending_confirmation,
             # Sprint 2 do Cenário B: se há pergunta pendente do agente, frontend
@@ -1181,7 +1181,7 @@ class WritingSession:
         agente falhar (stop_reason=error), retorna erro amigável — sem cair
         em legacy.
 
-        F4 (plan-first): se turn_count==0 e seções vazias, gera um plano
+        No primeiro turno, se turn_count==0 e seções vazias, gera um plano
         estruturado (outline + cobertura por seção + perguntas críticas).
         Geração completa só após confirmação explícita (via botão ou
         /writing/{id}/generate). Roteamento por keyword eliminado.
@@ -1277,7 +1277,7 @@ class WritingSession:
         updated = (self._doc_sections or {}).get(section_title, "")
         was_updated = updated != current
 
-        # Extrai feedback estruturado do Critic do tool_trace (F3: via critic_result,
+        # Extrai feedback estruturado do Critic do tool_trace via critic_result,
         # sem grepar strings de tool output).
         critic_feedback = None
         trace = result.get("tool_trace") or []
@@ -1350,7 +1350,7 @@ class WritingSession:
         from core.llm.agent_runtime import resolve_agent_provider
         from core.llm.agent_tools import build_writing_tools
 
-        # F3: limpa resultados estruturados de tools do turno anterior
+        # Limpa resultados estruturados de tools do turno anterior.
         self._tool_results = []
         tools = build_writing_tools(self)
         provider, model = resolve_agent_provider("anthropic", ANTHROPIC_MODEL_AGENT)
@@ -1440,7 +1440,7 @@ class WritingSession:
         # pareando tool_use blocks com seus tool_result subsequentes no `steps`.
         tool_trace = self._extract_tool_trace(result.steps)
 
-        # F3: tripwire de critic counters por turno
+        # Tripwire de contadores do critic por turno.
         n_blocks = sum(
             1 for e in tool_trace
             if e.get("critic_result") and e["critic_result"].get("approved") is False
@@ -1593,7 +1593,7 @@ class WritingSession:
                     self.session_id,
                     len(outcome.sections_done), len(outcome.failed_sections))
 
-        # Fallback único (F1): LLM cru com o MESMO contrato JSON.
+        # Fallback único: LLM cru com o MESMO contrato JSON.
         if outcome.failed_sections:
             logger.info("[%s] generate_full_proposal: fallback para %d seções",
                         self.session_id, len(outcome.failed_sections))
@@ -1668,7 +1668,7 @@ class WritingSession:
             logger.info("[%s] generate_full_proposal: agente salvou todas as seções",
                         self.session_id)
 
-        # F1: critic pós-save como anotação (D2) — roda DEPOIS de persistir, nunca bloqueia.
+        # Critic pós-save como anotação — roda DEPOIS de persistir, nunca bloqueia.
         self._generation_critic_annotations = {}
         for section in outcome.sections_done:
             try:
@@ -1731,7 +1731,7 @@ class WritingSession:
     def _build_generation_section_messages(self, section: str) -> list[dict]:
         """Mensagens iniciais do agente interno para UMA seção no modo geração.
 
-        F1: retrieval determinístico por seção — injeta top-k chunks do edital
+        Retrieval determinístico por seção injeta top-k chunks do edital
         rotulados com chunk_id ANTES do comando de escrita. search_edital continua
         disponível para complemento. O comando final instrui o JSON structured
         output {content, citations} com referências aos chunk_ids injetados.
@@ -1786,7 +1786,7 @@ class WritingSession:
         if self._temporal_block:
             messages.append({"role": "user", "content": self._temporal_block})
 
-        # F1: retrieval determinístico por seção — chunks rotulados com chunk_id.
+        # Retrieval determinístico por seção — chunks rotulados com chunk_id.
         try:
             query = section
             if self._project_description:
@@ -1812,7 +1812,7 @@ class WritingSession:
             logger.warning("[%s] _build_generation_section_messages: retrieve_chunks falhou para '%s': %s",
                            self.session_id, section, e)
 
-        # F4: injeta contexto do plano por seção (coverage, missing_info, edital_anchor)
+        # Injeta contexto do plano por seção (coverage, missing_info, edital_anchor).
         if self._plan:
             plan_sections = self._plan.get("sections", [])
             for ps in plan_sections:
@@ -1901,7 +1901,7 @@ class WritingSession:
         )
 
     def _generate_plan_first_turn(self) -> dict:
-        """Gera um plano estruturado via LLM 1-shot (F4).
+        """Gera um plano estruturado via LLM 1-shot.
 
         Compõe contexto com perfil + card + outline + matrizes de dependência,
         chama LLM com PLAN_SYSTEM, persiste via _save_plan e retorna o plano
@@ -1963,7 +1963,7 @@ class WritingSession:
         return plan
 
     def _first_turn_with_generation(self, user_message: str) -> dict:
-        """Processa o primeiro turno: gera plano estruturado (F4).
+        """Processa o primeiro turno: gera plano estruturado.
 
         Sempre gera um plano (não há mais roteamento por keyword).
         O plano é persistido e retornado como pending de confirmação.
@@ -2084,7 +2084,7 @@ class WritingSession:
         por ordem — o grafo garante que a sequência é llm → tool* → llm → ...
         e que cada tool_use é seguido por um step tool com o mesmo nome.
 
-        Consome resultados estruturados de save_draft (F3) de `self._tool_results`.
+        Consome resultados estruturados de save_draft de `self._tool_results`.
         """
         # Mapa tool_use_id → input (vem dos steps kind="llm" em tool_uses)
         use_inputs: dict[str, dict] = {}
@@ -2112,7 +2112,7 @@ class WritingSession:
                     "input": s.input,
                     "output": s.output,
                 }
-                # F3: dados estruturados de save_draft (saved_section + critic_result
+                # Dados estruturados de save_draft (saved_section + critic_result
                 # vindos de session._tool_results, sem regex sobre a string).
                 if s.name == "save_draft":
                     self._consume_save_draft_result(entry)
@@ -2478,7 +2478,7 @@ class WritingSession:
 
         self._doc_sections[section_title] = content
         try:
-            # Preserva anotações do critic (F1) que vivem em _doc_sections só durante
+            # Preserva anotações do critic que vivem em _doc_sections só durante
             # geração — a persistência delas é feita explicitamente em
             # generate_full_proposal via chave _critic_annotations no JSONB.
             drafts = dict(self._doc_sections)
@@ -2576,7 +2576,7 @@ class WritingSession:
         # ThreadPoolExecutor (2 workers), não asyncio. O future do sinal é
         # isolado: qualquer falha nele NÃO pode afetar a compressão narrativa.
         #
-        # F6 (2026-07, D3 — congelamento da memória auto-escrita): o signal
+        # Com a memória auto-escrita congelada, o signal
         # (Prompt B) SÓ é submetido quando AUTO_MEMORY_WRITE=1 (default 0). Sob
         # a flag off, apenas o narrative_future roda — 1 chamada LLM por
         # compressão em vez de 2, sem tocar em reflection_insights. A extração
@@ -2592,7 +2592,7 @@ class WritingSession:
         )
 
         if not auto_memory_on:
-            # Caminho congelado (F6): só narrativa, sem sinal/projeção.
+            # Caminho congelado: só narrativa, sem sinal/projeção.
             with ThreadPoolExecutor(max_workers=1) as pool:
                 pool.submit(self._compress_narrative, to_compress).result()
             return
@@ -2643,7 +2643,7 @@ class WritingSession:
         falha de LLM ou de parse vira `[]` — a compressão não pode quebrar o turno.
         O insert em reflection_insights é responsabilidade de `_persist_session_signals`.
 
-        F6 (D3): self-gate defensivo — sob AUTO_MEMORY_WRITE=0 (default) retorna
+        Self-gate defensivo: sob AUTO_MEMORY_WRITE=0 (default) retorna
         `[]` sem chamar LLM. O gate autoritativo está em `_compress_history`
         (não submete o signal_future), mas este método permanece seguro mesmo se
         chamado diretamente. Religamento pós-beta: ver docstring de
@@ -2707,7 +2707,7 @@ class WritingSession:
         level=1 (observação), confidence='low' (extração heurística — conservador).
         Retorna o número de rows inseridas. Best-effort: loga e retorna 0 em falha.
 
-        F6 (D3): self-gate defensivo — sob AUTO_MEMORY_WRITE=0 (default) retorna 0
+        Self-gate defensivo: sob AUTO_MEMORY_WRITE=0 (default) retorna 0
         sem tocar no DB. O gate autoritativo está em `_compress_history`/`
         extract_session_signal`; este método não é o gate único, mas garante
         que nenhuma escrita vaze mesmo se chamado diretamente. A leitura de
@@ -2790,7 +2790,7 @@ class WritingSession:
         de leitura (tabela vazia, RLS, DB offline) viram fallback silencioso —
         a WritingSession opera sem insights e loga em debug.
 
-        F6 (D3): caminho de LEITURA — NÃO gateado. Tripwire abaixo.
+        Caminho de LEITURA — NÃO gateado. Tripwire abaixo.
         """
         try:
             insights = load_active_insights(self._db, workspace_id, max_total=6)
@@ -2822,7 +2822,7 @@ class WritingSession:
             block = self._format_reflection_block(hits)
             if block:
                 return block
-        # Tripwire F6: fallback para o bloco estático (insights curados).
+        # Tripwire: fallback para o bloco estático de insights curados.
         logger.info(
             "tripwire: reflection_block_fallback=static ws=%s section=%s",
             self.workspace_id, section_hint,

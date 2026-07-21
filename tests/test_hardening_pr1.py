@@ -1,6 +1,6 @@
-"""PR1 (hardening-pre-beta): net_guard anti-SSRF, caps de input, DEMO_MODE guard.
+"""Hardening pré-beta: net_guard anti-SSRF, caps de input, DEMO_MODE guard.
 
-Spec histórica: docs/historical/hardening-pre-beta.md (F5, F6, F8).
+Spec histórica: docs/historical/hardening-pre-beta.md.
 """
 from __future__ import annotations
 
@@ -121,7 +121,7 @@ class TestSafeRequestRedirects:
         assert resp.status_code == 200
 
 
-# ── Caps de input (F5) ───────────────────────────────────────────────────
+# ── Caps de input ─────────────────────────────────────────────────────────
 
 
 class TestInputCaps:
@@ -154,7 +154,7 @@ class TestInputCaps:
             ExploreRequest(message="oi", history=[{"role": "user"}] * 51)
 
 
-# ── DEMO_MODE guard (F6) ─────────────────────────────────────────────────
+# ── DEMO_MODE guard ───────────────────────────────────────────────────────
 
 
 class TestDemoModeGuard:

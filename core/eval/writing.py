@@ -10,7 +10,7 @@ latência) viram scores também — instrumentação do harness de agente no mes
 Pré-requisitos (toca DB + LLM): SUPABASE_*, OPENAI/ANTHROPIC e EVAL_WORKSPACE_ID
 (workspace onde as sessões de eval são criadas).
 
-F0 (2026-07-12): writing_v2.json = golden §4 com 4 famílias.
+`writing_v2.json` é o golden de quatro famílias descrito na §4.
 """
 from __future__ import annotations
 
@@ -226,7 +226,7 @@ def _prereqs() -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Evaluadores do Golden §4 (F0)
+# Avaliadores do Golden §4
 # ---------------------------------------------------------------------------
 
 
@@ -333,9 +333,9 @@ def eval_tools0_sections(*, output, **_) -> Evaluation | None:
     if not isinstance(output, dict):
         return None
     # O output atual não expõe tools-por-seção no task().
-    # F0: valor sentinela — em fases posteriores será populado.
+    # Valor sentinela: a task atual ainda não expõe tools por seção.
     return {"name": "tools0_sections", "value": None,
-            "comment": "não disponível na task atual (F0)"}
+            "comment": "não disponível na task atual"}
 
 
 # ---------------------------------------------------------------------------
@@ -355,9 +355,9 @@ def load_data_v2() -> list[dict]:
         raw = profiles.get(case["profile"])
         if raw is None:
             continue
-        # Decisão B2 (F0): edital_ids_extra no metadata é planejamento —
+        # `edital_ids_extra` no metadata ainda é planejamento:
         # a task() atual cria WritingSession só com edital_id primário.
-        # F1 vai wirear o batch multi-edital; até lá, baseline mede só singleton.
+        # Até o batch multi-edital ser ligado, o baseline mede só singleton.
         familia = case.get("familia")
         item = {
             "input": {
