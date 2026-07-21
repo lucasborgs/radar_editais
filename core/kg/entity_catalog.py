@@ -481,40 +481,6 @@ def get_programa(native_id: str) -> dict | None:
     }
 
 
-def investment_offers_by_fund() -> dict[str, dict]:
-    """{nome_do_fundo(lower): facetas da oferta} — para o card do radar. Em v3 o
-    próprio investidor É a oferta (não há nó Oportunidade(investimento) separado)."""
-    client = _client()
-    rows = client.table("entities").select(
-        "name,ticket_min,ticket_max,metadata"
-    ).eq("kind", "investidor").execute().data or []
-    out: dict[str, dict] = {}
-    for r in rows:
-        nm = (r.get("name") or "").strip()
-        if not nm:
-            continue
-        meta = r.get("metadata") or {}
-        out[nm.lower()] = {
-            "offer_name": nm,
-            "official_url": meta.get("site") or "",
-            "estagio_alvo": list(meta.get("estagio_alvo") or []),
-            "ticket_range": _value_display(r),
-        }
-    return out
-
-
-def investment_offer(native_id: str) -> dict | None:
-    """Linha do investidor (kind=investidor) por id, ou None. Substitui o tuplo
-    (node, graph) do legado — em SQL não há subgrafo a serializar; PR-C decide o
-    que o veredito consome. Sem consumidor hoje."""
-    return _fetch_one(_client(), "investidor", native_id)
-
-
-def programa_node(native_id: str) -> dict | None:
-    """Espelha `investment_offer` para o outro kind de oportunidade curada."""
-    return _fetch_one(_client(), "programa", native_id)
-
-
 # ===========================================================================
 # Consciência temporal (temporal.py) — deadline/status crus por edital
 # ===========================================================================
@@ -705,11 +671,6 @@ def _get_search_snapshot() -> dict:
                     return _SEARCH_SNAPSHOT
         _SEARCH_SNAPSHOT = _load_search_snapshot(conn)
     return _SEARCH_SNAPSHOT
-
-
-def invalidate_search_snapshot() -> None:
-    global _SEARCH_SNAPSHOT
-    _SEARCH_SNAPSHOT = None
 
 
 def _rank_by_similarity(query_vec, snapshot: dict, kind: str | None, k: int) -> list[dict]:

@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
-  /** Optional content for a right-side panel (e.g. SidebarFilter) */
+  /** Optional content for a right-side panel. */
   sidebar?: React.ReactNode;
   /** Page title shown in the top bar */
   title?: string;

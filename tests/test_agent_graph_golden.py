@@ -2,7 +2,7 @@
 
 Pós-Etapa 2 o grafo é o único runtime; estes testes exercitam o loop + tradutor
 de contrato com um chat model scriptado (zero rede): no-tool, 1-tool, tool-error,
-max_steps (com trace completo), anti-leak estrutural (F2), cap central, degradação
+max_steps (com trace completo), anti-leak estrutural, cap central, degradação
 por erro de modelo, span_name. Equivalência ao runtime legado foi provada na Etapa
 1 (antes de o legado ser aposentado) e está congelada nas asserções diretas abaixo.
 """
@@ -233,11 +233,11 @@ def test_max_steps_stop_reason(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Anti-leak estrutural (F2) / cap / degradação / span_name
+# Anti-leak estrutural / cap / degradação / span_name
 # ---------------------------------------------------------------------------
 
 def test_no_internal_human_message_injected_in_turn(monkeypatch):
-    """F2 — a classe do bug de vazamento morre por CONSTRUÇÃO, não por prompt.
+    """A classe do bug de vazamento morre por CONSTRUÇÃO, não por prompt.
 
     Num turno normal (agent→tools→agent), o grafo NÃO injeta nenhuma HumanMessage
     interna no meio do raciocínio (os nós reflect/reflect_followup foram deletados).
@@ -268,7 +268,7 @@ def test_no_internal_human_message_injected_in_turn(monkeypatch):
 
 
 def test_graph_topology_has_no_reflect_or_prune_nodes(monkeypatch):
-    """F2 — a topologia final do grafo é START→agent→{END,tools}; tools→{finalize,
+    """A topologia final do grafo é START→agent→{END,tools}; tools→{finalize,
     agent,budget_notice}; finalize→agent_final→END; budget_notice→agent (Item 6/T2).
     Sem reflect/reflect_followup/manage_memory."""
     @tool
@@ -282,7 +282,7 @@ def test_graph_topology_has_no_reflect_or_prune_nodes(monkeypatch):
     assert {"agent", "agent_final", "tools", "finalize", "budget_notice"} <= node_names
     assert not (
         {"reflect", "reflect_followup", "manage_memory"} & node_names
-    ), f"nós deletados no F2 ainda presentes: {node_names}"
+    ), f"nós removidos do runtime ainda presentes: {node_names}"
 
 
 def test_graph_caps_tool_result(monkeypatch):

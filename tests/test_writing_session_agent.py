@@ -60,8 +60,6 @@ def _make_session() -> WritingSession:
     s._plan = None
     s._plan_pending_confirmation = False
     s._tool_results = []
-    s._critic_block_count = 0
-    s._critic_pass_count = 0
     s._critic_fail_open_count = 0
     s._playbook_writer_block = ""  # F5: vazio — nenhum mecanismo resolvido
     s._playbook_monitor_block = ""  # F5: vazio
@@ -376,7 +374,7 @@ def test_turn_agent_with_tools_persists_trace(monkeypatch):
     assert result["tool_trace"][0]["name"] == "search_edital"
     assert result["tool_trace"][0]["output"] == "trecho: 30/06"
 
-    # Custo/turno (#12): a row assistant grava tokens = input+output de todo o
+    # A row assistant grava tokens = input+output de todo o
     # loop do agente (250+18); a row user fica sem tokens (não há custo nela).
     inserts = [c.args[0] for c in s._db.table.return_value.insert.call_args_list]
     turns = {p["role"]: p for p in inserts if isinstance(p, dict) and "role" in p}
@@ -624,5 +622,5 @@ def test_search_edital_returns_fund_node_in_pitch():
 
 def test_pitch_context_injected_in_initial_messages():
     s = _make_pitch_session()
-    msgs = s._build_agent_initial_messages("escreva o problema", None, "")
+    msgs = s._build_thread_initial_messages("escreva o problema", None, "")
     assert any("FUNDO-ALVO" in m["content"] for m in msgs)

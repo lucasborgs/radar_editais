@@ -379,7 +379,6 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
             if critic.fail_open:
                 session._critic_fail_open_count += 1
             if not critic.approved:
-                session._critic_block_count += 1
                 issues_str = "\n".join(f"• {issue}" for issue in critic.issues)
                 return _r(
                     target_title, critic_verdict,
@@ -389,8 +388,6 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
                     "Revise o rascunho e tente save_draft novamente, ou chame "
                     "save_draft com force=True para salvar mesmo assim."
                 )
-            session._critic_pass_count += 1
-
         try:
             session.set_section_content(target_title, content)
         except Exception as e:

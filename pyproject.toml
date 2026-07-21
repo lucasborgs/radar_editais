@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "radar-editais"
 version = "0.1.0"
 description = "Plataforma de matching empresa-edital com pipeline ETL e agentes LLM"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.111",
     "uvicorn[standard]>=0.29",
@@ -57,6 +57,9 @@ dev = [
 rerank = [
     "sentence-transformers>=3.0",
 ]
+discovery = [
+    "crawl4ai>=0.9,<0.10",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -67,19 +70,26 @@ py-modules = ["config"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 extend-exclude = ["data", "__pycache__"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B"]
-ignore = ["E501"]  # line too long handled by formatter
+ignore = [
+    "E501",   # line too long handled by formatter
+    # Alinhar o parser a 3.12 não deve impor uma modernização mecânica ampla
+    # no mesmo lote; estes upgrades ficam para um cleanup dedicado.
+    "UP017",  # datetime.UTC
+    "UP041",  # TimeoutError builtin
+    "UP042",  # StrEnum
+    "UP046",  # type parameters (PEP 695)
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E402"]
 "scripts/*" = ["E402"]
 # load_dotenv() must run before module imports that read os.environ at import time
 "backend/api.py" = ["E402"]
-"core/hybrid_match_service.py" = ["E402"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency injection helpers are evaluated once per request, not at definition time
@@ -95,14 +105,14 @@ extend-immutable-calls = [
 ]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 check_untyped_defs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-exclude = ["pipeline/", "bronze_data/", "silver_data/", "knowledge_graph/"]
+exclude = ["pipeline/", "data/bronze/", "data/silver/", "data/knowledge_graph/"]
 
 [tool.pytest.ini_options]
 markers = [

@@ -124,56 +124,6 @@ def split_into_units(text: str, max_chars: int = _UNIT_MAX_CHARS) -> list[str]:
 _NUMBERED_HEADER_RE = re.compile(r"(?m)^(?=[ \t]*\d+(?:\.\d+)*\)[ \t]+\S)")
 
 
-def split_by_numbering(text: str, max_chars: int = _UNIT_MAX_CHARS) -> list[str]:
-    """Quebra texto plano com hierarquia numerada legal (`6.2.2)`, `7)`) em
-    units alinhadas a fronteira de seção — nunca corta no meio de uma seção.
-
-    Recupera a estrutura que o achatamento HTML→texto deixou só como numeração
-    (caso FAPESP). Segmenta no início de cada cabeçalho numerado, empacota
-    segmentos contíguos até `max_chars`, e sub-divide por parágrafo
-    (`split_into_units`) o segmento que sozinho estourar o teto. Sem numeração
-    suficiente (< 2 cabeçalhos) → cai em `split_into_units` (mesmo contrato).
-
-    Determinístico, sem I/O, sem LLM. É um helper de L1 (fonte-agnóstico no
-    formato: serve qualquer texto com numeração legal — FAPESP, editais
-    convertidos de PDF, etc.).
-    """
-    if not text or not text.strip():
-        return []
-    positions = [m.start() for m in _NUMBERED_HEADER_RE.finditer(text)]
-    if len(positions) < 2:
-        return split_into_units(text, max_chars)
-
-    # Segmentos = [preâmbulo?] + [cabeçalho_i .. cabeçalho_{i+1})
-    bounds = positions + [len(text)]
-    segments: list[str] = []
-    if positions[0] > 0 and text[: positions[0]].strip():
-        segments.append(text[: positions[0]])
-    for i in range(len(positions)):
-        seg = text[bounds[i] : bounds[i + 1]]
-        if seg.strip():
-            segments.append(seg)
-
-    # Empacota segmentos até max_chars; segmento gigante é sub-dividido.
-    units: list[str] = []
-    buf = ""
-    for seg in segments:
-        if len(seg) > max_chars:
-            if buf:
-                units.append(buf)
-                buf = ""
-            units.extend(split_into_units(seg, max_chars))
-            continue
-        if buf and len(buf) + len(seg) + 2 > max_chars:
-            units.append(buf)
-            buf = seg
-        else:
-            buf = f"{buf}\n\n{seg}" if buf else seg
-    if buf:
-        units.append(buf)
-    return units
-
-
 # Prefixo de numeração legal no início de um cabeçalho: "4.1.", "6.2.2)", "7)".
 _NUM_PREFIX_RE = re.compile(r"^\s*(\d+(?:\.\d+)*)[).]")
 

@@ -83,7 +83,7 @@ class EditalExtraction(BaseModel):
     native_id: str
     # Discriminador do tipo de oportunidade-EVENTO. Os 3
     # tipos-evento compartilham este schema/pipeline; só os campos opcionais abaixo
-    # ramificam. ENTIDADE (investidor) NÃO usa este model — ver domain/investor_entity.
+    # ramificam. ENTIDADES (como investidor) usam os schemas diretos do gold.
     opportunity_type: str = "edital"   # "edital" | "desafio" | "programa"
 
     # --- DECISÃO (alimentam elegibilidade/ranking determinístico) ---

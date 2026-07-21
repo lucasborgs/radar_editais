@@ -256,7 +256,7 @@ Substituição concreta das arestas semânticas — 4 tools sobre SQL (via `enti
 3. **`get_node_neighborhood(entity_id, depth)`** — BFS estrutural via CTE recursiva sobre `entity_relationships`.
 4. **RAG leve sobre `description`/`match_chunks`** para o "por quê" (o agente cita o texto).
 
-`entity_catalog.py` mantém as assinaturas de `hypergraph_catalog.py` (`list_editais`, `get_edital`, `get_opportunity`, `list_entity_catalog`, `get_stats`, `investment_offers_by_fund`, …) lendo de `entities` — migração de consumidores sem quebra. `find_matching_entities` (writing) é substituído por `search_entities` com filtro de kind.
+`entity_catalog.py` mantém as assinaturas consumidas de `hypergraph_catalog.py` (`list_editais`, `get_edital`, `get_opportunity`, `list_entity_catalog`, `get_stats`, …) lendo de `entities` — migração de consumidores sem quebra. `find_matching_entities` (writing) é substituído por `search_entities` com filtro de kind.
 
 ## 9. O que morre / fica / é novo
 

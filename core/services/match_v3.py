@@ -176,11 +176,6 @@ def _get_snapshot() -> _Snapshot:
     return _SNAPSHOT
 
 
-def invalidate_snapshot() -> None:
-    global _SNAPSHOT
-    _SNAPSHOT = None
-
-
 # ===========================================================================
 # Stages 0-1 (determinísticos, testáveis sem DB)
 # ===========================================================================

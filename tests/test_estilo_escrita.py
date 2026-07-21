@@ -112,8 +112,6 @@ def _make_session(estilo: str = "") -> WritingSession:
     s._plan = None
     s._plan_pending_confirmation = False
     s._tool_results = []
-    s._critic_block_count = 0
-    s._critic_pass_count = 0
     s._critic_fail_open_count = 0
     s._playbook_writer_block = ""
     s._playbook_monitor_block = ""
@@ -141,21 +139,6 @@ def test_generation_messages_contem_estilo_quando_preenchido():
 def test_generation_messages_sem_bloco_quando_estilo_vazio():
     s = _make_session(estilo="")
     msgs = s._build_generation_section_messages("2. Objeto")
-    joined = _joined(msgs)
-    assert "ESTILO DA EMPRESA" not in joined
-
-
-def test_agent_initial_messages_contem_estilo_quando_preenchido():
-    s = _make_session(estilo="prefere números concretos a adjetivos")
-    msgs = s._build_agent_initial_messages("escreva a seção", None, "")
-    joined = _joined(msgs)
-    assert "ESTILO DA EMPRESA" in joined
-    assert "prefere números concretos a adjetivos" in joined
-
-
-def test_agent_initial_messages_sem_bloco_quando_estilo_vazio():
-    s = _make_session(estilo="")
-    msgs = s._build_agent_initial_messages("escreva a seção", None, "")
     joined = _joined(msgs)
     assert "ESTILO DA EMPRESA" not in joined
 

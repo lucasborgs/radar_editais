@@ -1,7 +1,7 @@
 # Plano de tasks — dispatch de skills sem parede (cirúrgico)
 
-**Status:** planejado · **Data:** 2026-07-20 · **Planejador:** Opus 4.8
-**Fonte:** [docs/specs/skills-dispatch-cirurgico.md](skills-dispatch-cirurgico.md)
+**Status:** implementado e mergeado · **Data:** 2026-07-20 · **Planejador:** Opus 4.8
+**Fonte:** [docs/specs/skills-dispatch-cirurgico.md](../specs/skills-dispatch-cirurgico.md)
 **Fluxo SDD:** spec (Fable) → **este plano (Opus)** → implementação (Sonnet 5) → gate/git (Fable).
 
 **Restrição desta fase (Lucas):** zero eval/golden longo. Critério de aceite por task = **wiring** — a

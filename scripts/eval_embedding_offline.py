@@ -315,7 +315,7 @@ def _rrf_fuse(dense_idx: list[int], sparse_idx: list[int], chunks: list[dict]) -
 # Profundidades de recall medidas. POOL_K=20 = DEFAULT_RERANK_CANDIDATES de prod
 # (retriever.py): recall@20 mede se o chunk certo ENTRA no pool que o reranker
 # reordena → discrimina FALSO-NEGATIVO (perde no top-5 mas o rerank salvaria) de
-# REJECT real (não entra nem no pool). Ver critério em llm-embedding-bakeoff.md §1.
+# REJECT real (não entra nem no pool). Ver critério em docs/historical/embedding-bakeoff.md §1.
 POOL_K = 20
 _KS = (1, 3, 5, POOL_K)
 _GOLD_KS = (3, 5, POOL_K)

@@ -439,20 +439,6 @@ export const startWritingSession = (
 
 export type ModelTier = "fast" | "auto" | "pro";
 
-export interface ModelTierInfo {
-  tier: ModelTier;
-  model: string;
-  label: string;
-  use_case: string;
-}
-
-export interface CommandsResponse {
-  commands: Array<{ name: string; description: string; endpoint: string }>;
-  model_tiers: ModelTierInfo[];
-}
-
-export const getCommands = () => apiFetch<CommandsResponse>("/commands");
-
 export const sendWritingTurn = (
   sessionId: string,
   userMessage: string,

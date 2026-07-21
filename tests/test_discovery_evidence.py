@@ -3,17 +3,7 @@ from __future__ import annotations
 import json
 
 from core.services import discovery_materializer as materializer
-from core.services.discovery_evidence import build_evidence_package, compose_fields
-
-
-def test_field_composition_keeps_adapter_and_reports_conflict():
-    fields, conflicts = compose_fields(
-        {"prazo_envio": {"value": "01/08/2026", "origin": "page"}},
-        {"prazo_envio": {"value": "15/08/2026", "origin": "adapter"}},
-    )
-    assert fields["prazo_envio"]["value"] == "15/08/2026"
-    assert fields["prazo_envio"]["origin"] == "adapter"
-    assert conflicts[0]["field"] == "prazo_envio"
+from core.services.discovery_evidence import build_evidence_package
 
 
 def test_materialize_evidence_writes_web_contract_and_source_document(monkeypatch, tmp_path):

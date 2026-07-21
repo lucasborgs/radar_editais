@@ -112,28 +112,6 @@ def _mode_history(
         return []
 
 
-def _mode_history_all(
-    db,
-    session_id: str,
-    window: int = 8,
-) -> list[dict]:
-    """Retorna últimas N entradas de TODOS os modos (fallback)."""
-    try:
-        rows = (
-            db.table("session_turns")
-            .select("role, content, mode")
-            .eq("session_id", session_id)
-            .order("turn_index", ascending=False)
-            .limit(window)
-            .execute()
-        )
-        data = rows.data if rows else []
-        return list(reversed(data))
-    except Exception as e:
-        logger.debug("mode_history_all erro: %s", e)
-        return []
-
-
 def _save_turn(
     db,
     session_id: str,

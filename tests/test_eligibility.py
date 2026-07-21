@@ -93,7 +93,6 @@ def test_aggregate_inelegivel_on_any_unsat():
     out = el.evaluate_opportunity(cons, {"tamanho_empresa": "GRANDE", "uf": "SP"})
     assert out["status"] == el.INELEGIVEL
     assert out["unsat"] and not out["unknown"]
-    assert el.is_eliminated(cons, {"tamanho_empresa": "GRANDE", "uf": "SP"}) is True
 
 
 def test_aggregate_nao_verificada_when_unknown_only():
@@ -101,8 +100,6 @@ def test_aggregate_nao_verificada_when_unknown_only():
     out = el.evaluate_opportunity(cons, {})  # perfil vazio
     assert out["status"] == el.NAO_VERIFICADA
     assert out["unknown"] and not out["unsat"]
-    # unknown NUNCA elimina (PR5)
-    assert el.is_eliminated(cons, {}) is False
 
 
 def test_aggregate_elegivel_when_all_sat_or_empty():
@@ -111,10 +108,3 @@ def test_aggregate_elegivel_when_all_sat_or_empty():
     # sem constraints → elegível
     assert el.evaluate_opportunity([], {"tamanho_empresa": "GRANDE"})["status"] == el.ELEGIVEL
     assert el.evaluate_opportunity(None, {})["status"] == el.ELEGIVEL
-
-
-def test_accepts_object_profile_not_just_dict():
-    class P:
-        tamanho_empresa = "GRANDE"
-    cons = [{"tipo": "porte", "op": "in", "valor": ["me"]}]
-    assert el.is_eliminated(cons, P()) is True

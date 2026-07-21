@@ -1,19 +1,18 @@
 # Filtro PME — regras determinísticas
 
-Estende [WIKI.md](../WIKI.md). Define os sinais usados por
-[core/pme_filter.py](../core/pme_filter.py) para decidir se uma chamada serve
-PME/startup (`accept`), é puramente acadêmica (`reject`), ou ambígua (`unclear`).
+Estende [WIKI.md](../WIKI.md). Preserva o vocabulário histórico que classificava
+uma chamada como PME/startup (`accept`), puramente acadêmica (`reject`) ou
+ambígua (`unclear`).
 
-**Onde mora:** utilitário puro `core/pme_filter.py`, preservado para
-classificação explícita em tooling e testes. Não é um gate implícito do ingest
+**Estado:** não há consumidor ativo nem gate implícito no ingest gold. O bloco
+YAML permanece legível por `core.kg.schema.pme_filter_rules()` apenas por
+compatibilidade de schema.
+
+**Política de dados:** estas regras não escrevem nem removem bronze, silver ou
 gold.
 
-**Política de dados:** a função só retorna `accept`/`reject`/`unclear`; o caller
-decide o destino. Ela não escreve nem remove bronze, silver ou gold.
-
-**Mudou regra? Edita este doc, código se adapta.** O leitor está em
-`core.kg.schema.pme_filter_rules()`. O comportamento é coberto por
-`tests/test_pme_filter.py`.
+**Mudou regra? Edite este doc.** O leitor de compatibilidade está em
+`core.kg.schema.pme_filter_rules()`.
 
 ---
 

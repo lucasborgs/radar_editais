@@ -17,9 +17,11 @@ from core.environment import assert_runtime_environment, load_environment_profil
 load_environment_profile()
 
 
+import asyncio
 import logging
 import os
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,9 +37,7 @@ from backend.routers.catalog import router as catalog_router
 from backend.routers.conversations import router as conversations_router
 from backend.routers.discovered import router as discovered_router
 from backend.routers.explore import router as explore_router
-from backend.routers.files import router as files_router
 from backend.routers.planning import router as planning_router
-from backend.routers.playbooks import router as playbooks_router
 from backend.routers.profile import router as profile_router
 from backend.routers.radar import router as radar_router
 from backend.routers.research import router as research_router
@@ -48,6 +48,24 @@ from core.logging_config import request_id_var, setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 assert_runtime_environment("backend API")
+
+
+def _check_database_health() -> None:
+    """Abre uma conexão curta e confirma que o Postgres aceita queries."""
+    import psycopg
+
+    dsn = os.environ["DATABASE_URL"]
+    with psycopg.connect(dsn, connect_timeout=3) as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1")
+        cur.fetchone()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    yield
+    from core.llm.agent_graph import shutdown_writing_runtime
+
+    await asyncio.to_thread(shutdown_writing_runtime)
 
 
 def _guard_demo_mode() -> None:
@@ -77,7 +95,18 @@ app = FastAPI(
     title="Radar Editais API",
     description="Plataforma de matching e escrita de propostas para editais de fomento (FINEP, FAPESP, FAPESC, web)",
     version="2.0.0",
+    lifespan=lifespan,
 )
+
+
+@app.get("/health", include_in_schema=False)
+async def health():
+    try:
+        await asyncio.to_thread(_check_database_health)
+    except Exception as exc:  # noqa: BLE001 — health deve degradar para 503
+        logger.warning("Healthcheck do Postgres falhou: %s", exc)
+        return JSONResponse(status_code=503, content={"status": "unhealthy"})
+    return {"status": "ok"}
 
 
 class RequestIdMiddleware:
@@ -182,9 +211,7 @@ app.include_router(applications_router)
 app.include_router(workspace_router)
 app.include_router(writing_router)
 app.include_router(conversations_router)
-app.include_router(files_router)
 app.include_router(profile_router)
 app.include_router(radar_router)
 app.include_router(research_router)
 app.include_router(discovered_router)
-app.include_router(playbooks_router)

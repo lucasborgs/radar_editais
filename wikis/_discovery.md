@@ -6,7 +6,7 @@ pelo Brasil. **Regra vive aqui (doc), não no `.py`** — ajuste sem deploy.
 
 Princípio: queries amplas o bastante para recall, específicas o bastante para não
 afogar em ruído. Resultados passam por triagem agêntica + entram no KG como
-`provisorio` (§5.11). Ver `docs/spec_descoberta_oportunidades.md`.
+`provisorio` (§5.11). Ver `docs/historical/discovery-opportunities.md`.
 
 **Divisão de trabalho com o feeder DOU (spec_dou_feeder.md §6.1):** com
 `DISCOVERY_DOU_ENABLED=1`, o DOU é a *espinha de alta precisão* do fomento

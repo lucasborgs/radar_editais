@@ -1,7 +1,7 @@
 # Plano de tasks — Item 6: Guarda por estado (budget consciente / anti-truncamento)
 
-**Status:** plano de execução · **Data:** 2026-07-18 · **Autor do plano:** Opus 4.8
-**Fonte-contrato:** `docs/specs/langgraph-levers-spec.md` § Item 6 · **Dados:** `spikes/lever2_context/FINDINGS.md`
+**Status:** implementado e mergeado · **Data:** 2026-07-18 · **Autor do plano:** Opus 4.8
+**Fonte-contrato:** `docs/specs/langgraph-levers-spec.md` § Item 6 · **Dados:** `docs/historical/spikes/lever2_context/FINDINGS.md`
 **Implementação:** Sonnet 5 (nenhuma task qualifica para Opus — não toca produtores de risco/RLS)
 **Régua:** forma (b) da spec dispensa spike (mecânica conhecida) → direto plan→impl.
 
@@ -73,7 +73,7 @@ O contrato manda "preferir o caminho mais barato (span Langfuse **ou** coluna em
 
 **Critério de aceite (verificável):**
 1. `pytest tests/test_agent_graph_golden.py -q` verde (o kwarg é opcional; `test_graph_honors_span_name` [:259](../../tests/test_agent_graph_golden.py#L259) não regride).
-2. Rodar um turno de explore e um de writing pelo caminho real (script em `spikes/lever6_budget/` ou `verify`) e
+2. Rodar um turno de explore e um de writing pelo caminho real (script histórico em `docs/historical/spikes/lever6_budget/` ou `verify`) e
    confirmar **no stdout/log** a linha `turn_end mode=explore stop_reason=… llm_calls=… max_steps=15` e
    `turn_end mode=writing … max_steps=10`.
 3. Com Langfuse habilitado (se disponível localmente), o span do turno mostra `mode` no metadata; se off, a linha de log
@@ -136,7 +136,7 @@ subagentes (critic/deep_research, `max_steps=5`) receberão o aviso no passo 4 �
 ### Task 3 — COMPARAR: smoke de taxa de truncamento antes/depois, por modo
 **Depende de:** Task 1 (log estruturado) + Task 2 (o aviso a ser medido) · **Modelo:** Sonnet
 
-**Abordagem.** Script throwaway em `spikes/lever6_budget/` que dirige um **conjunto fixo** de turnos representativos
+**Abordagem.** Script throwaway em `docs/historical/spikes/lever6_budget/` que dirige um **conjunto fixo** de turnos representativos
 por modo — incluindo o caso reproduzido no spike (writing pedindo "Equipe técnica" com instrução que força
 `search_edital` + `read_exact_chunk` múltiplos; explore multi-hop que dispara `list_icts`/`list_investidores`).
 Rodar a bateria **duas vezes** — com o nó `budget_notice` desligado (baseline, ex. via env/monkeypatch do
@@ -148,7 +148,7 @@ linha `turn_end` da Task 1.
 2. **Sinal de sucesso da spec:** queda (ou não-aumento) da taxa de truncamento **sem inflar a média de `llm_calls`/turno**
    (a média de passos vem do mesmo log). Se a taxa baseline já for ~0 em todos os modos → registrar e **arquivar o item**
    (gatilho previsto na spec § Item 6, forma (a)).
-3. Resultado salvo em `spikes/lever6_budget/FINDINGS.md` (keep: os números; throwaway: o script).
+3. Resultado salvo em `docs/historical/spikes/lever6_budget/FINDINGS.md` (keep: os números; throwaway: o script).
 
 **Nota de gate.** Conforme a spec, **nenhum eval** (o aviso não muda a evidência normativa que o modelo vê — só
 sinaliza budget). Gate de promoção = smoke via `verify` dirigindo chat/writing reais + esta comparação (c).

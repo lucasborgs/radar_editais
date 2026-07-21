@@ -3,15 +3,15 @@
 #   app    → usa o CMD abaixo (uvicorn).
 #   worker → sobrescreve o CMD no docker-compose.yml
 #            (python -m procrastinate --app=core.tasks.app worker).
-# See ADR-001-decisoes-iniciais.md (D1, D3, D4).
+# See docs/historical/ADR-001-decisoes-iniciais.md (D1, D3, D4).
 
-FROM python:3.11-slim AS base
+FROM python:3.12-slim AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+COPY pyproject.toml requirements.lock.txt requirements.worker.lock.txt ./
 COPY config.py ./
 COPY backend/ ./backend/
 COPY core/ ./core/
@@ -21,7 +21,7 @@ COPY scripts/ ./scripts/
 COPY wikis/ ./wikis/
 COPY WIKI.md ./
 
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock.txt
 
 FROM base AS app
 
@@ -41,7 +41,7 @@ FROM base AS worker
 # Compartilhado entre a instalação (root) e o processo do worker (app).
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-RUN pip install --no-cache-dir crawl4ai \
+RUN pip install --no-cache-dir --require-hashes -r requirements.worker.lock.txt \
     && python -m playwright install --with-deps chromium \
     && useradd -m -u 1000 app \
     && chown -R app:app /app /ms-playwright

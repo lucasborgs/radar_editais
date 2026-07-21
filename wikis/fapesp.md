@@ -138,9 +138,8 @@ graph_overrides:
   para `/{id}/{slug}`. Scraper deve seguir o meta-refresh; alternativa é gerar
   o slug a partir do título e fazer fetch direto na URL completa.
 - **`publico_alvo` ausente.** FAPESP não declara público-alvo como campo
-  estruturado nem na listagem nem na página individual. Filtro PME apoia-se
-  em `modalidade` (PIPE, Auxílio Regular etc.) — vocabulário em
-  `wikis/_pme_filter.md` precisa cobrir aliases FAPESP-específicos.
+  estruturado nem na listagem nem na página individual. O vocabulário legado
+  em `wikis/_pme_filter.md` registra aliases FAPESP-específicos.
 - **`data_limite` em ISO.** Bronze emite `yyyy-mm-dd`; o schema canônico
   (§4.1 WIKI.md) exige `dd/mm/yyyy`. `wiki_schema.iso_to_br_date` converte.
 - **`fluxo_continuo == True` significa "sem prazo fixo" (programa contínuo).**

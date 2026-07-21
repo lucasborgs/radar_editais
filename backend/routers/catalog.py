@@ -1,5 +1,4 @@
-"""Catálogo público: raiz, stats, listagem/detalhe de editais e registry de
-slash commands. Sem auth — vitrine do produto."""
+"""Catálogo público: raiz, stats e listagem/detalhe de oportunidades."""
 
 from __future__ import annotations
 
@@ -53,39 +52,3 @@ def get_opportunity(opp_id: str):
     if opp is None:
         raise HTTPException(status_code=404, detail=f"Oportunidade '{opp_id}' não encontrada")
     return opp
-
-
-@router.get("/commands", summary="Lista slash commands disponíveis e LLM tiers (Fase 4 #24/#25)")
-def list_commands():
-    """Registry de slash commands + model tiers para o frontend popular UI.
-
-    Cada comando mapeia para um endpoint existente; o frontend renderiza
-    autocomplete quando o usuário digita /xxx no chat. Não exige auth (apenas
-    catálogo público de capacidades).
-    """
-    from core.llm_router import list_tiers
-    from core.skills import available_skills
-    return {
-        "commands": [
-            {
-                "name": "draft",
-                "endpoint": "POST /writing/start",
-                "description": "Inicia sessão de escrita de proposta",
-                "args": ["edital_id", "library_item_ids?"],
-            },
-            {
-                "name": "review",
-                "endpoint": "POST /writing/{session_id}/checklist/auto-review",
-                "description": "Roda 3 passes de revisão (compliance + qualidade + completude)",
-                "args": [],
-            },
-            {
-                "name": "reflect",
-                "endpoint": "POST /me/reflect",
-                "description": "Síntese de outcomes anteriores em insights",
-                "args": [],
-            },
-        ],
-        "model_tiers": list_tiers(),
-        "skills": available_skills(),
-    }

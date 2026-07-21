@@ -1,8 +1,8 @@
 # Plano de tasks — Item 3 (Thread por sessão / checkpointer como memória)
 
-**Status:** plano de execução · **Data:** 2026-07-18 · **Planejador:** Opus 4.8
+**Status:** implementado, promovido e mergeado · **Data:** 2026-07-18–20 · **Planejador:** Opus 4.8
 **Contrato-fonte:** `docs/specs/langgraph-levers-spec.md` §"Item 3 — Thread por sessão". **Racional de fundo:** `docs/specs/langgraph-intelligence-levers.md` (não normativo).
-**Pareamento absorvido:** `docs/specs/langgraph-lever1-streaming-plan.md` §"TASK 6 — Streaming da escrita" (decisão explícita abaixo: **re-adiada com o frame de interrupt já desenhado**).
+**Pareamento absorvido:** `docs/historical/langgraph-lever1-streaming-plan.md` §"TASK 6 — Streaming da escrita" (decisão explícita abaixo: **re-adiada com o frame de interrupt já desenhado**).
 **Implementação:** **Opus 4.8** — exceção à régua Sonnet, porque o item toca os dois produtores + o schema `agent_memory` + a fronteira de RLS/isolamento do checkpointer. Tasks são autocontidas com critério de aceite verificável.
 **Escopo:** SOMENTE o Item 3. Não re-litiga portfólio, sequência (#1/#6 em prod, #2 arquivado) nem itens fechados.
 
@@ -53,7 +53,7 @@ A próxima sessão parte DAQUI, não do executor anterior. Estado real:
 ### Status por task
 | Task | Estado |
 |---|---|
-| T1 spike (explore 3-turnos + fork) | ✅ **GO ratificado** (`spikes/lever3_threads/FINDINGS.md`; probe loop-binding EXPLODE) |
+| T1 spike (explore 3-turnos + fork) | ✅ **GO ratificado** (`docs/historical/spikes/lever3_threads/FINDINGS.md`; probe loop-binding EXPLODE) |
 | T2 guardrails baseline | ✅ **B1–B9 verdes** (leak-test + interrupt/resume, Postgres local) |
 | **T4 ESCRITA (1ª fatia)** | ✅ **implementada** (`dd382056e`,`574c3e532`,`e9135c173`,`c9c2116aa`) + **T4.1 opção D** (título estrutural → redirect). **fam3 fecha 3/3** (frase-conteúdo 3/3 + título-redirect 3/3). Reside na branch `feat/lever3-threads` |
 | T3 EXPLORE (2ª fatia) | ✅ **implementada + gate completo**: saver loop-local singleton-por-loop + delta-slicing + system idempotente + trim. 6 gates verdes (Postgres real, incl. concorrência) + smoke produtor + **smoke HTTP `/explore/stream` PASS**. Ver §T3 e §MERGE abaixo |
@@ -73,7 +73,7 @@ A próxima sessão parte DAQUI, não do executor anterior. Estado real:
 
 ### T4.1 (2026-07-19) — fix de PRECEDÊNCIA aplicado ao mecanismo #2 · **PARCIAL, teto 1/3**
 - **O que mudou** (`_build_stable_prefix_block`, `writing_session.py`): a âncora do outline no prefixo colapsado deixou de dizer "use o título EXATO ... não invente outra estrutura" (proibição global saliente) e passou a **escopar o "exato" ao argumento das tools** (save_draft/read_section fazem lookup por título; save_draft rejeita título fora do outline) + **regra de precedência** — "instruções do usuário na conversa têm precedência sobre esta lista quando conflitarem". Formulado como **precedência, não permissão** (lição item 6 / `project_radar_cards_persist`: enumerar "você pode renomear" induz o modelo).
-- **Re-gate econômico** (fam3 x3 treatment-only, Postgres local `:54322`, gpt-4o-mini; script throwaway `spikes/lever3_threads/regate_t41.py`):
+- **Re-gate econômico** (fam3 x3 treatment-only, Postgres local `:54322`, gpt-4o-mini; script throwaway `docs/historical/spikes/lever3_threads/regate_t41.py`):
   - case **frase** (substitui 1ª frase): **3/3 ✅** — **sem regressão** (baseline 3/3).
   - case **título** (altera título): **0/3 → 1/3 ⚠️** — melhora, mas **paridade (3/3) NÃO restaurada**.
   - 2ª iteração (framing "rótulo-de-lookup vs texto-do-conteúdo", explicitando que a lista é só lookup): também **1/3** — não moveu. Revertida para a formulação mais limpa (números idênticos, menos risco de o agente passar o título novo como argumento de save_draft).
@@ -101,7 +101,7 @@ Segue o padrão provado na T4 (delta + idempotência) e absorve a infra loop-loc
 - **`prior_n_msgs` do checkpointer, SEM coluna** (herda o desvio aprovado da T4 — explore não tem objeto de sessão persistente; cada request rehidrata stateless, o checkpointer é a única fonte durável do count).
 - **Router (`backend/routers/explore.py`):** resolve `workspace_id` (só autenticado + `session_id`) e passa `thread_id` pronto. NÃO passa `workspace_id`/`db` ao streaming → wiring de tools intocado.
 - **Gates (Postgres real, `tests/test_explore_thread_per_session.py`, 5/5 verdes):** (1) **singleton por loop** (N chamadas → mesmo saver); (2) **system idempotente** (3 rotas → 1 system refletindo a última); (3) **delta-slicing + called_match** (turno sem match NÃO herda o match do anterior; usage só do turno); (4) **leak-test estendido** (`{wsA}:sess` invisível por `{wsB}:sess`); (5) **subagente stateless** dentro da thread (sem loop-binding). Suíte inteira: **839 passed / 4 skipped**.
-- **Smoke real multi-turno (PASS):** `spikes/lever3_threads/smoke_explore_thread.py` dirige `explore_stream` real (gpt-4o-mini, Postgres local): turno 1 planta "Zephyr-9 / eólica offshore", turno 2 com `history=[]` **lembra** (checkpointer replaya, sem re-seed), e o controle `thread_id=None`/`history=[]` **não lembra** (stateless intacto).
+- **Smoke real multi-turno (PASS):** `docs/historical/spikes/lever3_threads/smoke_explore_thread.py` dirige `explore_stream` real (gpt-4o-mini, Postgres local): turno 1 planta "Zephyr-9 / eólica offshore", turno 2 com `history=[]` **lembra** (checkpointer replaya, sem re-seed), e o controle `thread_id=None`/`history=[]` **não lembra** (stateless intacto).
 - **Pendências do gate (não bloqueiam a fatia):** smoke pelo **HTTP `/explore/stream`** com app de pé (último milímetro, como o smoke `verify` da T4). Warning cosmético de teardown ("Event loop is closed") do pool loop-local no boundary do pytest — em prod o loop vive o processo todo (um saver), não ocorre.
 
 ### T5 (2026-07-20) — robustez transversal: concorrência + higiene do purge · **implementada**
@@ -178,7 +178,7 @@ O plano é contra o código, não contra memória.
 
 ### Decisão 1 — Fatiamento: spike no explore, **1ª promoção na ESCRITA** (flip 2026-07-18), explore depois
 
-- **A Task 1 (spike) é no explore**, como a régua da spec manda (conversa de 3 turnos): prova o **mecanismo LangGraph** genérico — thread acumula e é relido sem re-seed; `update_state` forka — que vale para os dois produtores. O spike roda throwaway **no bg-loop** (script), então prova o modelo de dados limpo. **Isto não mudou** (o spike rodou e ratificou GO; `spikes/lever3_threads/FINDINGS.md`).
+- **A Task 1 (spike) é no explore**, como a régua da spec manda (conversa de 3 turnos): prova o **mecanismo LangGraph** genérico — thread acumula e é relido sem re-seed; `update_state` forka — que vale para os dois produtores. O spike roda throwaway **no bg-loop** (script), então prova o modelo de dados limpo. **Isto não mudou** (o spike rodou e ratificou GO; `docs/historical/spikes/lever3_threads/FINDINGS.md`).
 - **1ª promoção: ESCRITA** (era o explore; flip ratificado pela governança em 2026-07-18). Reusa a máquina que já existe (`_writing_turn_async` já tem thread+checkpointer+delta no bg-loop) — vira **re-escopo de `thread_id` {ws}:{sess} + generalização do delta pra todo turno + idempotência do prefixo (Adendo) + trim de paridade**, sem infra nova. Risco próprio (interrupt/resume não pode regredir) é o **mais bem coberto** pela baseline (B1, B3–B7).
 - **2ª promoção: explore.** Herda o padrão de delta/idempotência já provado na escrita, e absorve a infra loop-local (saver singleton-por-loop) + as descobertas A/B abaixo.
 
@@ -243,7 +243,7 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 
 **Objetivo.** Provar, contra o grafo REAL do explore, que (a) uma thread de **escopo de sessão** sobre um checkpointer durável acumula o histórico e o **2º/3º turnos NÃO re-seedam** (o produtor manda só a mensagem nova), e (b) `update_state`/`aupdate_state` a partir de um checkpoint intermediário **forka** em duas continuações. E retirar o desconhecido de infra da descoberta #2.
 
-**Arquivo (único, throwaway):** `spikes/lever3_threads/demo.py` (+ `__init__.py`; +`FINDINGS.md` ao lado). Nada em `core/` de produção.
+**Arquivo (único, throwaway):** `docs/historical/spikes/lever3_threads/demo.py` (+ `__init__.py`; +`FINDINGS.md` ao lado). Nada em `core/` de produção.
 
 **O que o script faz:**
 1. Monta tools+system do explore como em produção (`build_explore_tools`/`EXPLORE_AGENT_SYSTEM`, sem perfil — caminho mais simples), modelo scriptado OU `gpt-4o-mini` real (barato).
@@ -411,7 +411,7 @@ event: interrupt   data: {"field": "<campo>", "prompt": "<pergunta>"}
 - O frontend, ao receber `interrupt`, renderiza a pergunta como bolha do assistente e habilita a resposta (que no próximo turno vira o `Command(resume)` — agora sobre a **mesma thread de sessão**, Task 4).
 - **Cruzamento de loop (o que torna a implementação um follow-on, não parte desta task):** o streaming da escrita precisa emitir deltas do **bg-loop** (onde o saver vive) de volta ao handler async da request via **fila thread-safe** — o mesmo wrinkle que o item 1 §Task 6 (`:209`) documentou. Só se ataca depois que a Task 4 fixou o thread-por-sessão da escrita.
 
-**Critério de "pronto" desta task:** o frame acima registrado como contrato (nesta seção) + uma nota em `docs/specs/langgraph-lever1-streaming-plan.md` §Task 6 apontando que o frame de interrupt está desenhado aqui e a dependência do Item 3 é o thread-por-sessão (Task 4), não mais um bloqueio de contrato.
+**Critério de "pronto" desta task:** o frame acima registrado como contrato (nesta seção) + uma nota em `docs/historical/langgraph-lever1-streaming-plan.md` §Task 6 apontando que o frame de interrupt está desenhado aqui e a dependência do Item 3 é o thread-por-sessão (Task 4), não mais um bloqueio de contrato.
 
 ---
 

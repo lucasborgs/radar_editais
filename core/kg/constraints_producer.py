@@ -151,7 +151,7 @@ def extract_constraints(
 # v3 (spec docs/specs/v3-unified.md) — entry point ADITIVO: lê o TEXTO das seções
 # de elegibilidade do silver e devolve (constraints, requisitos_texto). Vocabulário
 # §4.4 (10 tipos) lido do WIKI (`constraint_vocab`), separado do subconjunto v2
-# acima. `produce_for_graph`/`extract_constraints`/`_normalize` (v2) NÃO mudam.
+# acima. `extract_constraints`/`_normalize` (v2) NÃO mudam.
 # ===========================================================================
 
 _SYSTEM_V3 = """Você extrai ELEGIBILIDADE DURA de editais/programas brasileiros de \
@@ -345,29 +345,3 @@ def produce_from_text(
     exclusoes = _clean_list(data.get("exclusoes"))
     publico_alvo = _clean_list(data.get("publico_alvo"))
     return constraints, requisitos, exclusoes, publico_alvo
-
-
-def _edital_nodes(graph: dict) -> list[dict]:
-    return [
-        n for n in graph.get("nodes", [])
-        if n.get("type") == "Oportunidade" and n.get("kind") == "edital"
-    ]
-
-
-def produce_for_graph(graph: dict, *, client=None, model: str | None = None, overwrite: bool = False) -> int:
-    """Preenche `constraints[]` nas Oportunidades(edital) do grafo a partir do
-    texto residual. Muta os nós in-place. Retorna nº de nós com constraints
-    produzidas. Idempotente com `overwrite=False` (pula nós já com constraints)."""
-    n_filled = 0
-    for node in _edital_nodes(graph):
-        if node.get("constraints") and not overwrite:
-            continue
-        cons = extract_constraints(
-            node.get("requisitos_texto") or [],
-            node.get("exclusoes_texto") or [],
-            client=client, model=model,
-        )
-        if cons:
-            node["constraints"] = cons
-            n_filled += 1
-    return n_filled

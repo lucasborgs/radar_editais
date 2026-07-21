@@ -7,7 +7,6 @@ adapter pode produzir a mesma estrutura e a promoção só conhece este contrato
 from __future__ import annotations
 
 import hashlib
-from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
 
@@ -21,7 +20,6 @@ _FIELD_NAMES = (
     "title", "prazo_envio", "publico_alvo", "descricao", "status",
     "tema", "opportunity_type", "agency", "fonte",
 )
-_PRECEDENCE = {"adapter": 3, "document": 2, "page": 1}
 
 
 def _text(value: object, cap: int = TEXT_CAP) -> str:
@@ -69,39 +67,3 @@ def build_evidence_package(record: dict[str, Any], *, collector: str = "legacy_f
         "fields": fields,
         "operation": {"collector": collector, "status": "ready", "errors": []},
     }
-
-
-def compose_fields(*field_sets: dict[str, dict[str, Any]]) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
-    """Compõe fatos determinísticamente e conserva conflitos para o operador.
-
-    Adapter validado ganha de documento, que ganha de página. Valores distintos
-    nunca são descartados silenciosamente: ficam em ``conflicts``.
-    """
-    merged: dict[str, dict[str, Any]] = {}
-    conflicts: list[dict[str, Any]] = []
-    for fields in field_sets:
-        for name, candidate in (fields or {}).items():
-            value = candidate.get("value")
-            if value in (None, "", []):
-                continue
-            current = merged.get(name)
-            if current is None:
-                merged[name] = deepcopy(candidate)
-                continue
-            if current.get("value") == value:
-                continue
-            current_priority = _PRECEDENCE.get(str(current.get("origin")), 0)
-            candidate_priority = _PRECEDENCE.get(str(candidate.get("origin")), 0)
-            conflicts.append({"field": name, "kept": deepcopy(current), "candidate": deepcopy(candidate)})
-            if candidate_priority > current_priority:
-                merged[name] = deepcopy(candidate)
-    return merged, conflicts
-
-
-def apply_composed_fields(record: dict[str, Any], package: dict[str, Any]) -> dict[str, Any]:
-    """Preenche somente lacunas do record; nunca sobrescreve extração existente."""
-    out = dict(record)
-    for name, field in (package.get("fields") or {}).items():
-        if name in _FIELD_NAMES and not out.get(name) and field.get("value"):
-            out[name] = field["value"]
-    return out

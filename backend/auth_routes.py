@@ -7,10 +7,9 @@ Magic link e verificação de token são tratados diretamente pelo Supabase Auth
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from backend.rate_limit import limiter
 from core.auth import CurrentUserId, DbClient, get_current_user, is_admin_payload
 
 router = APIRouter(prefix="", tags=["auth"])
@@ -37,15 +36,6 @@ class ProfilePayload(BaseModel):
     equipe_resumo: str = ""
     trl: int | None = None
     tipos_financiamento_interesse: list[str] = []
-
-
-class FeedbackPayload(BaseModel):
-    """Feedback livre do tester (build-in-public). `context` carrega metadados
-    leves do cliente (ex.: {"page": "/pipeline"}) — sem PII."""
-    message: str
-    context: dict = {}
-
-
 
 
 # =============================================================================
@@ -91,27 +81,6 @@ def get_me(
     }
 
 
-@router.post("/feedback", summary="Feedback livre do tester (build-in-public)")
-def submit_feedback(payload: FeedbackPayload, user_id: CurrentUserId, db: DbClient):
-    """Grava feedback do usuário em `user_feedback` (RLS por user_id).
-
-    Canal de baixa fricção para o beta: o tester relata um problema/ideia e o
-    fundador lê via service role. `user_id` vem do JWT (não do payload) e casa
-    com a policy RLS de INSERT (`user_id = auth.uid()`).
-    """
-    message = payload.message.strip()[:5000]
-    if not message:
-        raise HTTPException(status_code=400, detail="Mensagem de feedback vazia")
-    result = (
-        db.table("user_feedback")
-        .insert({"user_id": user_id, "message": message, "context": payload.context or {}})
-        .execute()
-    )
-    if not result.data:
-        raise HTTPException(status_code=500, detail="Falha ao salvar feedback")
-    return {"success": True, "id": result.data[0]["id"]}
-
-
 @router.put("/me/profile", summary="Salva perfil da empresa no workspace")
 def update_profile(payload: ProfilePayload, user_id: CurrentUserId, db: DbClient):
     workspace = _ensure_workspace(user_id, db)
@@ -126,60 +95,6 @@ def update_profile(payload: ProfilePayload, user_id: CurrentUserId, db: DbClient
         raise HTTPException(status_code=500, detail="Falha ao salvar perfil")
 
     return {"success": True, "profile": result.data[0]["profile"]}
-
-
-@router.post("/me/reflect", summary="Dispara ReflectionService on-demand (Fase 2 #17)")
-@limiter.limit("10/minute")
-def trigger_reflection(request: Request, user_id: CurrentUserId, db: DbClient):
-    """Roda síntese de outcomes do workspace e persiste em reflection_insights.
-
-    Inline (não via fila procrastinate) para retornar o resultado imediatamente
-    ao usuário. Custo: 1 chamada LLM (~1500 tokens). Se nenhum outcome
-    qualificado existir (< 5), retorna skipped sem chamar LLM.
-
-    F6 (D3 — congelamento): sob AUTO_MEMORY_WRITE=0 (default), este endpoint
-    torna-se no-op — retorna skipped_reason="auto_memory_write_disabled" sem
-    chamar LLM. O gate está em `reflect_workspace` (o código não muda aqui
-    para manter o contrato da API). O religamento pós-beta (fila de curadoria
-    + TTL) está registrado na docstring do módulo reflection_service.
-    """
-    from core.reflection_service import reflect_workspace
-    workspace = _ensure_workspace(user_id, db)
-    result = reflect_workspace(db, workspace["id"])
-    return result
-
-
-@router.post(
-    "/me/synthesize",
-    summary="Dispara a síntese de padrões (level 2) on-demand (Gap 1)",
-)
-async def trigger_synthesis(user_id: CurrentUserId, db: DbClient):
-    """Enfileira `synthesize_patterns_task` para o workspace do usuário.
-
-    Diferente de /me/reflect (que roda inline e gera observações level 1), a
-    síntese destila padrões (level 2) sobre o corpus acumulado de observações.
-    Vai pela fila procrastinate porque a síntese é uma etapa de longo prazo
-    (não precisa de retorno imediato) e self-gateia se houver poucas
-    observações ativas.
-
-    F6 (D3 — congelamento): sob AUTO_MEMORY_WRITE=0 (default), a task
-    enfileirada torna-se no-op no worker (gate em synthesize_patterns_task
-    + synthesize_patterns). O defer ainda acontece para manter o contrato
-    da API; o congelamento está no executor, não no trigger.
-    """
-    workspace = _ensure_workspace(user_id, db)
-    try:
-        from core.tasks import app as tasks_app
-        async with tasks_app.open_async():
-            await tasks_app.configure_task("synthesize_patterns").defer_async(
-                workspace_id=str(workspace["id"])
-            )
-    except Exception as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Falha ao enfileirar a síntese — tente novamente.",
-        ) from e
-    return {"status": "enqueued", "workspace_id": workspace["id"]}
 
 
 # =============================================================================

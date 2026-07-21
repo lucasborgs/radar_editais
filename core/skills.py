@@ -209,10 +209,6 @@ class Playbook:
         """Payload para o ComplianceMonitor: Heurísticas + Anti-padrões + Praxe."""
         return self._render(_MONITOR_ORDER, include_lente=False)
 
-    def is_empty(self) -> bool:
-        return not self.lente and not any(self.sections.values())
-
-
 @dataclass
 class PlaybookLayer:
     """Uma camada resolvida do playbook (para auditoria visual camada-por-camada).
@@ -370,7 +366,7 @@ def resolve_playbook_layers(
 ) -> tuple[str | None, str | None, list[PlaybookLayer]]:
     """Resolve o playbook CAMADA POR CAMADA (git base, git source, learned overlay).
 
-    Para a auditoria visual "o que veio de onde" (endpoint /playbooks/.../layers).
+    Preserva a origem de cada camada para inspeção e diagnóstico.
     NÃO mergeia — devolve cada camada separada na ordem de aplicação. O acesso ao
     banco é guardado (sem overlays / sem DB → só as camadas git).
 

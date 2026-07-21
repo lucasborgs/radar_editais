@@ -31,9 +31,9 @@ O sistema atende dois propósitos:
 no silver reconstruível; a vigência é aplicada no Stage 0 do match, não por um
 índice JSON separado.
 
-> **Classificação PME/startup:** as regras do utilitário explícito vivem em
-> `wikis/_pme_filter.md`. O helper é puro e não altera o destino dos dados sem
-> um caller que aplique a decisão.
+> **Classificação PME/startup (legado):** o vocabulário preservado em
+> `wikis/_pme_filter.md` continua parseável para compatibilidade, mas não há
+> classificador PME ativo no pipeline gold.
 
 > **Arquitetura de camadas:** o vocabulário oficial das camadas, a fronteira
 > agnóstico/individualizado e o contrato de Documento Canônico estão em **§12**.
@@ -388,7 +388,7 @@ nem por regras temporais. A curadoria versionada vive em
 O match usa a afinidade semântica entre o perfil da empresa e a entidade, além
 dos atributos normalizados. Populado por **curadoria manual** (~30-50 fundos, decisão
 spec_multi_quadrante §8 #3), não descoberta automática. Valores PLANOS (o wrapper
-`Extracted` de `domain/investor_entity` é só do caminho de extração-LLM futuro).
+O artefato curado é materializado diretamente, sem schema paralelo de extração LLM.
 
 ```yaml
 investidor_schema:

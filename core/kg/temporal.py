@@ -25,10 +25,6 @@ def _index_entry(edital_id: str) -> dict | None:
     return entity_catalog.get_entity_temporal(edital_id)
 
 
-def _reference_date() -> date | None:
-    return None
-
-
 @dataclass
 class TemporalContext:
     """Estado temporal de um edital relativo a hoje.
@@ -38,7 +34,6 @@ class TemporalContext:
     """
     edital_id: str
     today: date
-    reference_date: date | None
     deadline: date | None
     deadline_raw: str | None
     status: str | None
@@ -68,7 +63,6 @@ def temporal_context(edital_id: str) -> TemporalContext | None:
     return TemporalContext(
         edital_id=edital_id,
         today=today,
-        reference_date=_reference_date(),
         deadline=deadline,
         deadline_raw=deadline_raw,
         status=status,
