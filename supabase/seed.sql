@@ -20,14 +20,22 @@ on conflict (id) do update set
 insert into auth.users
     (instance_id, id, aud, role, email, encrypted_password,
      email_confirmed_at, created_at, updated_at,
-     raw_app_meta_data, raw_user_meta_data)
+     raw_app_meta_data, raw_user_meta_data,
+     confirmation_token, email_change, email_change_token_new,
+     email_change_token_current, recovery_token,
+     phone_change, phone_change_token)
 values
     ('00000000-0000-0000-0000-000000000000',
      'aee5a3b3-b9b4-44a2-b793-7f41721fbaca',
      'authenticated', 'authenticated', 'eval@local.test',
      crypt('eval-local-fake-password', gen_salt('bf')),
      now(), now(), now(),
-     '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb)
+     '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+     -- GoTrue (Go's sql.Scan) não aceita NULL nestas colunas texto — precisa
+     -- de string vazia explícita, senão "/otp" (magic link) quebra com
+     -- "converting NULL to string is unsupported" (achado ao demonstrar
+     -- os comandos do workspace ao vivo, 2026-07-20).
+     '', '', '', '', '', '', '')
 on conflict (id) do nothing;
 
 insert into public.workspaces (id, user_id)
