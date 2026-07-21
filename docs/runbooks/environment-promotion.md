@@ -7,7 +7,7 @@ Este runbook materializa a promoção
 ## Bootstrap local
 
 ```bash
-cp .env.local.example .env.local
+cp envs/.env.local.example .env.local
 supabase start
 ENVIRONMENT=local DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
   SUPABASE_URL=http://127.0.0.1:54321 python scripts/supabase_safe.py reset

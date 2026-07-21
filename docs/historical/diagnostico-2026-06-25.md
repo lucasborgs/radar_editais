@@ -59,7 +59,7 @@ Problemas estruturais que não quebram hoje mas acumulam dívida ou podem quebra
 | # | Risco | Detalhe | Prioridade |
 |---|---|---|---|
 | R1 | **Isolamento multi-tenant via `thread_id`/namespace** em vez de RLS (LangGraph checkpointer + Store) | Risco #1 da spec de migração. Leak test cross-workspace com Postgres real ainda não rodado. Um bug aqui expõe dados de um workspace para outro | **Alta** |
-| R2 | **57 env vars críticas ausentes do `.env.example`** | `RERANK_BACKEND`, `KG_STORE_BACKEND`, `AGENT_MAX_STEPS`, `WRITING_SEMANTIC_MEMORY`, `CNPJ_LOOKUP_ENABLED`, `DEMO_MODE`, `INLABS_EMAIL/PASSWORD`, `TAVILY_API_KEY`, `WEB_SEARCH_BACKEND`, `ELIGIBILITY_BACKEND`, `HYDE_*`, etc. Deploy cold sem documentação = configuração por adivinhação | **Alta** |
+| R2 | **57 env vars críticas ausentes do `envs/.env.example`** | `RERANK_BACKEND`, `KG_STORE_BACKEND`, `AGENT_MAX_STEPS`, `WRITING_SEMANTIC_MEMORY`, `CNPJ_LOOKUP_ENABLED`, `DEMO_MODE`, `INLABS_EMAIL/PASSWORD`, `TAVILY_API_KEY`, `WEB_SEARCH_BACKEND`, `ELIGIBILITY_BACKEND`, `HYDE_*`, etc. Deploy cold sem documentação = configuração por adivinhação | **Alta** |
 | R3 | **`writing_session.py` — 2.400 linhas** | DB + LLM + HTTP client + geração em uma classe. Qualquer mudança tem superfície de regressão enorme. A ausência de testes unitários granulares agrava | **Média** |
 | R4 | **16 scripts com `sys.path.insert(0, ROOT)`** | Viola o gotcha explícito do CLAUDE.md. Se o editable install estiver stale, importam versão diferente de `core/` sem avisar | **Baixa** |
 | R5 | **Sem testes de rota nos routers de backend** | Módulos em `backend/routers/` não têm testes diretos — cobertura só por caminhos de integração indireta, o que não captura regressões de contrato de API | **Média** |

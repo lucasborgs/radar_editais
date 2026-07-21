@@ -42,7 +42,7 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
 ### Manter a escrita automática de memória congelada até haver evidência real
 
 - **Evidência atual:** `AUTO_MEMORY_WRITE=0` é o default em
-  `core/reflection_service.py`, `core/tasks.py` e `.env.example`; leitura de
+  `core/reflection_service.py`, `core/tasks.py` e `envs/.env.example`; leitura de
   memória permanece ativa. As tabelas `playbook_overlays` e
   `meta_reflection_runs` existem, mas o job `run_meta_reflection` continua apenas
   documentado como scaffold na migration 024.

@@ -251,7 +251,7 @@ ANTHROPIC_API_KEY**. Consequências para o PR2:
 - Gate de eval `writing` DISPENSADO para este PR (única mudança comportamental
   no OpenAI = posição do temporal, coberta por unit tests + teste manual).
   Criar `EVAL_WORKSPACE_ID` fica como backlog — baseline para futuras mudanças
-  de prompt (a var nem estava documentada no .env.example).
+  de prompt (a var nem estava documentada no envs/.env.example).
 
 ## Decisões fechadas (respostas do Lucas, 2026-07-01)
 

@@ -345,7 +345,7 @@ simultaneamente o novo critério e a aprovação do pipeline sem revisão explí
 3. fazer o relatório comparar somente manifests compatíveis e respeitar direção
    de cada métrica;
 4. documentar triggers, comandos, prereqs, custo e publicação; e
-5. reconciliar `AGENTS.md`, `docs/architecture.md`, `.env.example` e CI.
+5. reconciliar `AGENTS.md`, `docs/architecture.md`, `envs/.env.example` e CI.
 
 ## 13. Reversibilidade
 

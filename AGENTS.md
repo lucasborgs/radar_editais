@@ -119,7 +119,7 @@ AGENT_PROFILE_EXTRACTOR_DEFAULT_ENABLED=false  # experimental; não promover sem
 # Tier 5: Agente de escrita (base_url sobrescreve endpoint; ZDR/pago apenas)
 # AGENT_OPENAI_BASE_URL=https://api.deepseek.com/v1
 ```
-Ver `.env.example` para referência completa com todos os overrides.
+Ver `envs/.env.example` para referência completa com todos os overrides.
 
 ## Architecture
 

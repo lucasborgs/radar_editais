@@ -79,7 +79,7 @@ spec.
 | lookup CNPJ/BrasilAPI | experimental subordinada, default off | necessidade comprovada, contrato de indisponibilidade e medição de ganho sobre os campos do perfil |
 | embeddings locais `sentence_transformers` | experimental de laboratório | dataset comparável, dimensão compatível ou migration explícita, rebuild e gate de retrieval |
 
-Esta spec apenas torna o estado explícito em `.env.example`, `AGENTS.md` e
+Esta spec apenas torna o estado explícito em `envs/.env.example`, `AGENTS.md` e
 referências técnicas. Ativação continua exigindo uma decisão independente.
 
 ### 3.3 Dormentes — preservar congeladas
@@ -134,7 +134,7 @@ deve herdar silenciosamente esta preferência.
 ## 4. Escopo de execução
 
 1. criar uma referência curta com o inventário e as definições de estado;
-2. reconciliar `README.md`, `AGENTS.md`, `.env.example`, arquitetura, memória e
+2. reconciliar `README.md`, `AGENTS.md`, `envs/.env.example`, arquitetura, memória e
    comentários de runtime;
 3. remover a superfície `contribute_to_global_weights` do frontend e backend;
 4. adicionar migration que remova `contribute_to_global_weights` e

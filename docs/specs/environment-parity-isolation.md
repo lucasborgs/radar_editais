@@ -75,8 +75,8 @@ Perfis locais:
 .env.local                 # gerado/ajustado pelo desenvolvedor; gitignored
 .env.test                  # somente Supabase efêmero e chaves dummy
 .env.staging-local         # pré-produção descartável; ENVIRONMENT=test
-.env.staging.example       # nomes e defaults não secretos
-.env.production.example    # nomes e defaults não secretos
+envs/.env.staging.example       # nomes e defaults não secretos
+envs/.env.production.example    # nomes e defaults não secretos
 ```
 
 O `.env` legado será aceito durante a transição, mas `scripts/env_doctor.py`

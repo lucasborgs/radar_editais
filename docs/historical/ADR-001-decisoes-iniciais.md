@@ -101,7 +101,7 @@
 **Justificativa:** Preparado para ReflectionService (Fase 2) e automação ETL futura. Investimento de ~2-3h de setup.
 
 ### D4 — Secrets management
-**Decisão:** Vercel secrets (frontend) + Fly secrets (backend). `.env.example` versionado no git para onboarding de devs.
+**Decisão:** Vercel secrets (frontend) + Fly secrets (backend). `envs/.env.example` versionado no git para onboarding de devs.
 **Justificativa:** Nativos da hospedagem (D1), zero custo. Migrar para Doppler/Infisical é trivial quando compliance exigir.
 
 ---
@@ -138,7 +138,7 @@
 | #6 `/review` em 3 passes | C4 (paralelo via asyncio.gather) |
 | #7 `@ mentions` | — |
 | #8 `/archive` | B5 (RLS), B2 (soft-delete coerente com schema) |
-| **(novas tasks)** | A5 (tabela `matching_weights` global), B5 (RLS policies em todas tabelas), D1 (deploy Vercel+Fly), D3 (pg-boss worker), D4 (`.env.example` + secrets) |
+| **(novas tasks)** | A5 (tabela `matching_weights` global), B5 (RLS policies em todas tabelas), D1 (deploy Vercel+Fly), D3 (pg-boss worker), D4 (`envs/.env.example` + secrets) |
 
 ### Fase 2 — Decisões que destravam
 
@@ -215,6 +215,6 @@ Após investigação do código, descobriu-se que M1 (Auth), M2 (Workspace ↔ E
 | Drift | Onde | Ação |
 |---|---|---|
 | `CompanyProfile` duplicado (dataclass + JSONB) | [domain/user_profile.py](../../domain/user_profile.py) ainda tem `save/load` em disco; [workspaces.profile](../../supabase/migrations/001_init.sql) é a fonte real | Remover `save/load/load_default` do dataclass; ajustar call sites |
-| `LLM_BACKEND` default inconsistente | [core/writing_session.py:41](../../core/services/writing_session.py#L41) default `ollama`; [core/content_library.py:53](../../core/services/content_library.py#L53) default `openai`; CLAUDE.md diz ollama; [.env.example](../../.env.example) diz openai | Normalizar tudo para `openai` (conforme A1) |
+| `LLM_BACKEND` default inconsistente | [core/writing_session.py:41](../../core/services/writing_session.py#L41) default `ollama`; [core/content_library.py:53](../../core/services/content_library.py#L53) default `openai`; CLAUDE.md diz ollama; [envs/.env.example](../../envs/.env.example) diz openai | Normalizar tudo para `openai` (conforme A1) |
 | `pgvector` extension | Provavelmente não habilitada no Supabase | `CREATE EXTENSION vector` na migration 002 |
 | Sessão WritingSession em memória do processo | [backend/api.py](../../backend/api.py) `_writing_sessions: dict = {}` | Resolvido pela task B1 (session_turns) |

@@ -76,7 +76,7 @@ esse índice quando o leitor precisar de documentação aprofundada.
 | Qual mudança foi aceita ou ainda está em decisão? | `docs/specs/` | intenção até implementação; contrato vigente depois dela |
 | Como operar ou compreender um subsistema atual? | `docs/reference/` | explicação derivada; não redefine arquitetura ou domínio |
 | Por que uma decisão passada foi tomada? | `docs/historical/` | registro sem autoridade atual |
-| Qual configuração é suportada? | `.env.example` e manifests | docs apontam; não copiam defaults extensos |
+| Qual configuração é suportada? | `envs/.env.example` e manifests | docs apontam; não copiam defaults extensos |
 | Qual é o contrato visual implementado? | `frontend/DESIGN_SYSTEM.md` | referência colocada junto ao frontend |
 
 ### 4.3 Precedência em divergências

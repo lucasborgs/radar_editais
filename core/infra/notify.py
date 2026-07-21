@@ -10,7 +10,7 @@ Contrato de resiliência:
   - Falha de envio → loga erro e retorna False, NUNCA propaga: um alerta jamais
     pode derrubar o cron que ele deveria observar.
 
-Env vars (ver .env.example):
+Env vars (ver envs/.env.example):
   ALERT_SMTP_HOST      default smtp.gmail.com
   ALERT_SMTP_PORT      default 587 (STARTTLS)
   ALERT_SMTP_USER      conta SMTP (Gmail: o próprio e-mail)

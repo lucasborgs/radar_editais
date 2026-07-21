@@ -13,12 +13,12 @@ build/
 # Environment
 .env
 .env.*
-!.env.example
-!.env.local.example
-!.env.test.example
-!.env.staging.example
-!.env.staging-local.example
-!.env.production.example
+!envs/.env.example
+!envs/.env.local.example
+!envs/.env.test.example
+!envs/.env.staging.example
+!envs/.env.staging-local.example
+!envs/.env.production.example
 
 # Cloudflare Tunnel — credentials sensíveis
 cloudflared/
