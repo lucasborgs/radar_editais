@@ -1,8 +1,8 @@
 # Plano de tasks — Item 3 (Thread por sessão / checkpointer como memória)
 
-**Status:** plano de execução · **Data:** 2026-07-18 · **Planejador:** Opus 4.8
+**Status:** implementado, promovido e mergeado · **Data:** 2026-07-18–20 · **Planejador:** Opus 4.8
 **Contrato-fonte:** `docs/specs/langgraph-levers-spec.md` §"Item 3 — Thread por sessão". **Racional de fundo:** `docs/specs/langgraph-intelligence-levers.md` (não normativo).
-**Pareamento absorvido:** `docs/specs/langgraph-lever1-streaming-plan.md` §"TASK 6 — Streaming da escrita" (decisão explícita abaixo: **re-adiada com o frame de interrupt já desenhado**).
+**Pareamento absorvido:** `docs/historical/langgraph-lever1-streaming-plan.md` §"TASK 6 — Streaming da escrita" (decisão explícita abaixo: **re-adiada com o frame de interrupt já desenhado**).
 **Implementação:** **Opus 4.8** — exceção à régua Sonnet, porque o item toca os dois produtores + o schema `agent_memory` + a fronteira de RLS/isolamento do checkpointer. Tasks são autocontidas com critério de aceite verificável.
 **Escopo:** SOMENTE o Item 3. Não re-litiga portfólio, sequência (#1/#6 em prod, #2 arquivado) nem itens fechados.
 
@@ -411,7 +411,7 @@ event: interrupt   data: {"field": "<campo>", "prompt": "<pergunta>"}
 - O frontend, ao receber `interrupt`, renderiza a pergunta como bolha do assistente e habilita a resposta (que no próximo turno vira o `Command(resume)` — agora sobre a **mesma thread de sessão**, Task 4).
 - **Cruzamento de loop (o que torna a implementação um follow-on, não parte desta task):** o streaming da escrita precisa emitir deltas do **bg-loop** (onde o saver vive) de volta ao handler async da request via **fila thread-safe** — o mesmo wrinkle que o item 1 §Task 6 (`:209`) documentou. Só se ataca depois que a Task 4 fixou o thread-por-sessão da escrita.
 
-**Critério de "pronto" desta task:** o frame acima registrado como contrato (nesta seção) + uma nota em `docs/specs/langgraph-lever1-streaming-plan.md` §Task 6 apontando que o frame de interrupt está desenhado aqui e a dependência do Item 3 é o thread-por-sessão (Task 4), não mais um bloqueio de contrato.
+**Critério de "pronto" desta task:** o frame acima registrado como contrato (nesta seção) + uma nota em `docs/historical/langgraph-lever1-streaming-plan.md` §Task 6 apontando que o frame de interrupt está desenhado aqui e a dependência do Item 3 é o thread-por-sessão (Task 4), não mais um bloqueio de contrato.
 
 ---
 

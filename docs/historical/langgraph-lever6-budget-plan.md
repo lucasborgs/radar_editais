@@ -1,6 +1,6 @@
 # Plano de tasks — Item 6: Guarda por estado (budget consciente / anti-truncamento)
 
-**Status:** plano de execução · **Data:** 2026-07-18 · **Autor do plano:** Opus 4.8
+**Status:** implementado e mergeado · **Data:** 2026-07-18 · **Autor do plano:** Opus 4.8
 **Fonte-contrato:** `docs/specs/langgraph-levers-spec.md` § Item 6 · **Dados:** `spikes/lever2_context/FINDINGS.md`
 **Implementação:** Sonnet 5 (nenhuma task qualifica para Opus — não toca produtores de risco/RLS)
 **Régua:** forma (b) da spec dispensa spike (mecânica conhecida) → direto plan→impl.

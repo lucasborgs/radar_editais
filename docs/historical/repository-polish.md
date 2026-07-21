@@ -23,7 +23,7 @@ históricos comprovadamente sem uso.
 Não fazem parte deste trabalho: funcionalidades, redesign, roadmap, levantamento
 de gaps, refatoração por preferência, alteração de regras de domínio fora de
 `WIKI.md`/`wikis/`, mudanças de API, schema ou migration, e os artefatos locais de
-avaliação `docs/specs/crawl4ai-eval.md`, `scripts/eval_crawl4ai*`,
+avaliação `docs/historical/crawl4ai-eval.md`, `scripts/eval_crawl4ai*`,
 `scripts/eval_comparison_scrapers*` e `scripts/eval_discovery_pipeline*`.
 
 ## Critérios objetivos para remoção

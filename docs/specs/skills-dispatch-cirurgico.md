@@ -1,6 +1,6 @@
 # Spec — dispatch de skills sem parede (versão cirúrgica)
 
-**Status:** proposta · **Data:** 2026-07-20 · **Fluxo SDD:** spec (Fable) → planejamento de tasks (Opus 4.8) → implementação (Sonnet 5) → governança (Fable) gate/git.
+**Status:** implementado e mergeado · **Data:** 2026-07-20 · **Fluxo SDD:** spec (Fable) → planejamento de tasks (Opus 4.8) → implementação (Sonnet 5) → governança (Fable) gate/git.
 **Origem:** discussão de produto 2026-07-20 — comparação com Grantable (`docs/reference/grantable-benchmark.md`) revelou que os "3 modos" do Radar são **paredes**, não capacidades; o Grantable roda 6 skills invocáveis por slash-command num chat contínuo, sem bloqueio cross-skill.
 **Restrição desta fase (Lucas):** zero eval/golden longo. Validação = `--limit 1` por caso, garantindo só o *wiring* (a skill dispara o produtor certo, com o toolset certo). Qualidade de escrita/matching fica para o lote final de validação (junto com o Item #3).
 

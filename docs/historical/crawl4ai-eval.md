@@ -1,5 +1,7 @@
 # Avaliação: Crawl4AI como extrator universal de oportunidades
 
+**Status:** exploratório concluído — hipótese de extrator universal refutada · **Data:** 2026-07-15
+
 ## Contexto
 
 O Discovery pipeline atual (`core/opportunity_discovery.py`) extrai dados de oportunidades via:

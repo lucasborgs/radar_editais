@@ -1,6 +1,6 @@
 # Plano de tasks — Item 1 (Streaming, `astream_events`)
 
-**Status:** plano de execução · **Data:** 2026-07-18 · **Planejador:** Opus 4.8
+**Status:** implementado e promovido (Explore); streaming da escrita permanece follow-on · **Data:** 2026-07-18 · **Planejador:** Opus 4.8
 **Contrato-fonte:** `docs/specs/langgraph-levers-spec.md` §"Item 1 — Streaming". **Racional:** `docs/specs/langgraph-intelligence-levers.md` (fundo, não normativo).
 **Implementação:** Sonnet 5 (item não-crítico; não toca produtores de RLS). **Escopo:** SOMENTE o Item 1 + carona opcional do Item 6b.
 
@@ -201,7 +201,7 @@ O deploy real é **Docker + Cloudflare Tunnel** (memória `project_v3_progress`)
 
 ## TASK 6 — Streaming da escrita (2º produtor) · dep: TASK 2 · **adiável**
 
-> **Dependência DESTRAVADA (Item 3, 2026-07-20):** o bloqueio declarado desta task era "um frame de `interrupt` no contrato SSE" que o explore não tinha. Esse frame está **desenhado** no apêndice do plano do Item 3 (`docs/specs/langgraph-lever3-threads-plan.md` §APÊNDICE (T6-design)). Além disso, o thread-por-sessão da escrita (Item 3 / T4) já converge interrupt/resume no thread `{ws}:{session}` — a Task 6 agora depende só desse thread estabilizado + do cruzamento bg-loop→fila (wrinkle abaixo), não mais de um contrato faltante.
+> **Dependência DESTRAVADA (Item 3, 2026-07-20):** o bloqueio declarado desta task era "um frame de `interrupt` no contrato SSE" que o explore não tinha. Esse frame está **desenhado** no apêndice do plano do Item 3 (`docs/historical/langgraph-lever3-threads-plan.md` §APÊNDICE (T6-design)). Além disso, o thread-por-sessão da escrita (Item 3 / T4) já converge interrupt/resume no thread `{ws}:{session}` — a Task 6 agora depende só desse thread estabilizado + do cruzamento bg-loop→fila (wrinkle abaixo), não mais de um contrato faltante.
 
 **Objetivo.** Estender o streaming ao turno de escrita, reusando a máquina da TASK 2. **Follow-on**: não bloqueia o valor do explore (tasks 3-4). Marcada adiável porque tem wrinkles próprios.
 
@@ -269,4 +269,3 @@ Checkpoint da TASK 1: **GO ratificado** (governança). Fonte: `spikes/lever1_str
 3. **Critério de paridade REVISADO:** campos estruturais (`stop_reason`/`n_steps`/`tools`) comparáveis 1:1; para `final_text`/`usage`, o sinal é **ausência de zeragem/vazio**, não igualdade entre execuções independentes (variância residual do LLM, mesmo com temp=0).
 4. **`stream_usage=True` mantido como defensivo** (langchain-openai 1.3.3 já popula usage em stream por padrão — premissa do plano não reproduziu; o fix é inócuo e protege contra regressão de lib).
 5. **Smoke Anthropic — REBAIXADO a condição diferida (correção 2026-07-18, gate):** verificado nos containers que **não existe `ANTHROPIC_API_KEY` em nenhum ambiente** (prod/staging/local — só `OPENAI_API_KEY`; confirmado por Lucas). O `resolve_agent_provider` sempre cai no fallback OpenAI: **o caminho testado no spike É o caminho real de produção**, e o Anthropic é intestável hoje. Condição registrada: **quando uma `ANTHROPIC_API_KEY` for introduzida em qualquer ambiente, rodar o smoke de streaming Anthropic antes de ativá-la** (risco residual: extração de texto de content-blocks em `_msg_text` nunca exercitada em stream). O gate do item fica: smoke SSE via Docker (staging) pré-merge + smoke via Cloudflare Tunnel pós-deploy (aceitável porque o frontend tem fallback automático pro sync).
-
