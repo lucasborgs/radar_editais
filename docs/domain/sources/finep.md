@@ -1,6 +1,6 @@
 # FINEP — Schema específico
 
-Estende [WIKI.md](../WIKI.md). Só documenta o que diverge do schema global.
+Estende [docs/domain/schema.md](../schema.md). Só documenta o que diverge do schema global.
 
 ---
 
@@ -34,19 +34,19 @@ Bronze é JSON com lista de chamadas. Dedup por `link` (primeiro arquivo lido em
 
 ## 3. Mapeamento bronze → schema comum
 
-Campos do JSON bronze FINEP e sua correspondência no schema do índice (§4 do WIKI.md). Não há necessidade de adaptador — scraper já emite nos nomes esperados.
+Campos do JSON bronze FINEP e sua correspondência no schema do índice (§4 do docs/domain/schema.md). Não há necessidade de adaptador — scraper já emite nos nomes esperados.
 
 ```yaml
 bronze_mapping:
   chamada_id:       id
   titulo:           title
-  status:           status        # normalizado depois (§7.2 WIKI.md)
+  status:           status        # normalizado depois (§7.2 docs/domain/schema.md)
   prazo_envio:      deadline
   data_publicacao:  pub_date
   link:             link
   tema:             themes_raw    # split por [;,|], canonicalizado em themes via radar.domain.vocabulary
   publico_alvo:     publico_alvo  # split por [;,|]
-  fonte_recurso:    fonte_recurso # split por [;,] + normalização para siglas canônicas (§5.4 WIKI.md)
+  fonte_recurso:    fonte_recurso # split por [;,] + normalização para siglas canônicas (§5.4 docs/domain/schema.md)
 ```
 
 Campo derivado:
@@ -126,7 +126,7 @@ document_authority_overrides:
 
 ## 5. Metadados enviados ao prompt
 
-Campos do edital expostos à LLM como `{metadata}` no prompt (§8.1 WIKI.md). Serializados como JSON com indent=2, ensure_ascii=False.
+Campos do edital expostos à LLM como `{metadata}` no prompt (§8.1 docs/domain/schema.md). Serializados como JSON com indent=2, ensure_ascii=False.
 
 ```yaml
 metadata_to_llm:
@@ -143,7 +143,7 @@ metadata_to_llm:
 
 ## 6. Prompt de extração
 
-Usa o prompt global (§8.1 WIKI.md) sem overrides.
+Usa o prompt global (§8.1 docs/domain/schema.md) sem overrides.
 
 ---
 
@@ -184,14 +184,14 @@ Limpeza: antes de re-exportar, todos os `.md` das 7 subpastas são deletados.
 
 ## 8. Gotchas específicos
 
-- **Status do portal é pouco confiável.** Muitos editais aparecem como "Desconhecido" mesmo vigentes. Regra de normalização (§7.2 WIKI.md) recupera isso via prazo futuro.
+- **Status do portal é pouco confiável.** Muitos editais aparecem como "Desconhecido" mesmo vigentes. Regra de normalização (§7.2 docs/domain/schema.md) recupera isso via prazo futuro.
 - **`chamada_id`** nem sempre vem preenchido. Fallbacks: regex `/chamadapublica/(\d+)` no link, depois último segmento do link.
 - **`fonte_recurso` mistura quatro dimensões numa string.** O portal FINEP emite strings como `"FNDCT – Subvenção Econômica ; BNDES"`, `"FINEP/FNDCT"`, `"CT-Infra"` ou `"Petrobras – Cláusula de PD&I, conforme Resolução nº 918/2023 da ANP."`. O normalizador aplica três extractors em cascata sobre a mesma string bruta (após split por `[;|]`):
-  1. Fontes canônicas (§5.4 WIKI.md) — `FNDCT`, `BNDES`, `Petrobras` etc.
-  2. Subprogramas (§5.6 WIKI.md) — `CT-Infra`, `MOVER` etc.
-  3. Drop-list de modalidades (§5.7 WIKI.md) — `subvenção`, `reembolsável`, `recursos próprios` etc.
+  1. Fontes canônicas (§5.4 docs/domain/schema.md) — `FNDCT`, `BNDES`, `Petrobras` etc.
+  2. Subprogramas (§5.6 docs/domain/schema.md) — `CT-Infra`, `MOVER` etc.
+  3. Drop-list de modalidades (§5.7 docs/domain/schema.md) — `subvenção`, `reembolsável`, `recursos próprios` etc.
 
   Cada extractor pode emitir múltiplas matches da mesma string (sem early-break no regex). Fragmentos que não casam com nenhum são descartados silenciosamente. Contexto regulatório não-financiador (ex.: ANP em editais de Cláusula PD&I da Petrobras) não vira nó do grafo — fica apenas em `key_facts` / `key_requirements` da wiki page, extraído pela LLM dos PDFs.
-- **`publico_alvo`** pode vir com qualificadores específicos (ex.: `"ICT (Pública ou Privada) credenciada na ANP"`). Normalizador colapsa para canônico (§5.5 WIKI.md); detalhe específico preserva-se em `key_requirements` da wiki page.
+- **`publico_alvo`** pode vir com qualificadores específicos (ex.: `"ICT (Pública ou Privada) credenciada na ANP"`). Normalizador colapsa para canônico (§5.5 docs/domain/schema.md); detalhe específico preserva-se em `key_requirements` da wiki page.
 - **`tema`** frequentemente tem vírgula dentro do nome composto (ex.: `"Agricultura, agronegócio e saúde animal"`, `"Petróleo, gás e etanol"`). Por isso o splitter usa apenas `[;|]`, nunca vírgula. A canonicalização (em `src/radar/domain/vocabulary.py`) mapeia cada variação completa para o tema canônico.
-- **Wiki pages armazenam inherited fields congelados no momento da geração** (§4.1 WIKI.md). Quando a ingestão do índice muda (nova canonicalização, novo vocabulário), as wiki pages existentes ficam defasadas em `fonte_recurso`, `publico_alvo`, `themes`, `subprogramas`. O exporter Obsidian resolve isso **mesclando** card + índice a cada export: synthesized fields vêm do card (§4.2), inherited fields + `subprogramas` vêm do índice (autoridade). Não é necessário reprocessar com `--skip-cache` só por mudanças de vocabulário.
+- **Wiki pages armazenam inherited fields congelados no momento da geração** (§4.1 docs/domain/schema.md). Quando a ingestão do índice muda (nova canonicalização, novo vocabulário), as wiki pages existentes ficam defasadas em `fonte_recurso`, `publico_alvo`, `themes`, `subprogramas`. O exporter Obsidian resolve isso **mesclando** card + índice a cada export: synthesized fields vêm do card (§4.2), inherited fields + `subprogramas` vêm do índice (autoridade). Não é necessário reprocessar com `--skip-cache` só por mudanças de vocabulário.

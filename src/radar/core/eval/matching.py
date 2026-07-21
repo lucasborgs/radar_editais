@@ -2,7 +2,7 @@
 
 Roda o funil de produção (`radar.core.services.match_v3.find_matching_opportunities`,
 Stage 0→1→2) por empresa contra o golden de AFINIDADE DE CONTEÚDO em
-`eval_data/golden/matching.json` + os hard negatives de ELEGIBILIDADE em
+`data/evaluation/golden/matching.json` + os hard negatives de ELEGIBILIDADE em
 `matching_hard_negatives.json`. Pré-beta: mede CORREÇÃO ABSOLUTA do v3 — sem
 célula de comparação com o motor v2 (deletado nesta fase; rollback = git revert).
 
@@ -32,8 +32,8 @@ from typing import Any
 from radar.core.config import ROOT
 from radar.core.eval.harness import Criterion, Evaluation, Suite, get_input
 
-GOLDEN = ROOT / "eval_data" / "golden" / "matching.json"
-HARDNEG = ROOT / "eval_data" / "golden" / "matching_hard_negatives.json"
+GOLDEN = ROOT / "data" / "evaluation" / "golden" / "matching.json"
+HARDNEG = ROOT / "data" / "evaluation" / "golden" / "matching_hard_negatives.json"
 
 # Data de curadoria do golden — pina o Stage 0 (ver docstring).
 AS_OF = datetime.date(2026, 7, 5)

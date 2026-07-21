@@ -464,7 +464,7 @@ async def purge_agent_checkpoints(timestamp: int) -> None:
 # =============================================================================
 
 # Extração de PDF (table-aware, descoberta, dedup de versão) é L1 FINEP —
-# vive em pipeline/adapters/finep.py via o Source Adapter (WIKI.md §12).
+# vive em pipeline/adapters/finep.py via o Source Adapter (docs/domain/schema.md §12).
 
 
 def _build_chunks_for_edital(edital_id: str) -> list[dict]:
@@ -1025,7 +1025,7 @@ async def fetch_discovery_promotion_task(promotion_run_id: str) -> None:
 # =============================================================================
 # Procrastinate periodic: cron diário 04:00 UTC (após o ETL das 03:00). Roda a
 # busca livre (Tavily), grava os achados em web_raw/ como `provisorio`, enfileira
-# o chunking de cada um e reconstrói o índice. É a Opção A (WIKI.md §12.4): a
+# o chunking de cada um e reconstrói o índice. É a Opção A (docs/domain/schema.md §12.4): a
 # Descoberta não tem pipeline próprio — alimenta a MESMA fonte `web` que a seed
 # list manual. Requer TAVILY_API_KEY + chave LLM; sem elas, degrada para no-op.
 

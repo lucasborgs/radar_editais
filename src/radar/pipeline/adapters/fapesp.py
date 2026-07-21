@@ -1,5 +1,5 @@
 """
-FAPESP Source Adapter — L1 (WIKI.md §12, wikis/fapesp.md).
+FAPESP Source Adapter — L1 (docs/domain/schema.md §12, docs/domain/sources/fapesp.md).
 
 Diferente do FINEP (que extrai PDFs página-a-página), FAPESP serve o texto
 autoritativo do edital inline no HTML da página individual. O bronze grava
@@ -62,7 +62,7 @@ class Adapter(SourceAdapter):
         if not bronze:
             return []
 
-        # Dedup interno por URL — primeira ocorrência vence (gotcha §8 wikis/fapesp.md)
+        # Dedup interno por URL — primeira ocorrência vence (gotcha §8 docs/domain/sources/fapesp.md)
         seen: set[str] = set()
         match: dict | None = None
         for ch in bronze:

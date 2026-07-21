@@ -28,9 +28,8 @@ ENV PYTHONPATH=/app/src
 COPY pyproject.toml requirements.lock.txt requirements.worker.lock.txt ./
 COPY src/ ./src/
 COPY scripts/ ./scripts/
-COPY wikis/ ./wikis/
-COPY WIKI.md ./
-COPY skills/ ./skills/
+COPY docs/domain/ ./docs/domain/
+COPY docs/playbooks/ ./docs/playbooks/
 
 RUN pip install --no-cache-dir --require-hashes -r requirements.lock.txt \
     && pip install --no-cache-dir --no-deps /wheels/*.whl \

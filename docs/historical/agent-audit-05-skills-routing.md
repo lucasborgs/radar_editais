@@ -8,7 +8,7 @@
 **mesmo conceito** (instrução em markdown, externa, carregada contextualmente),
 reinventado no produto. A diferença é o *binding*:
 
-| | Claude Code skill | `skills/<fonte>_*.md` (hoje) |
+| | Claude Code skill | `docs/playbooks/<fonte>_*.md` (hoje) |
 |---|---|---|
 | Quem decide carregar | o **modelo** (match por descrição) | o **código** (`load_skill(source)` por chave) |
 | Disclosure | metadado visível → corpo sob demanda | injeta o `.md` **inteiro** sempre |

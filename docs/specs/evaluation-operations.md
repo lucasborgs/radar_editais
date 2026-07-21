@@ -189,7 +189,7 @@ runs anteriores.
 
 ### 7.1 Versionado no Git
 
-- `eval_data/golden/`: datasets e goldens autoritativos;
+- `data/evaluation/golden/`: datasets e goldens autoritativos;
 - manifesto de critérios/baselines aceitos, em path único definido durante a
   implementação;
 - definição das suítes e evaluators;
@@ -197,7 +197,7 @@ runs anteriores.
 - documentação do trigger operacional.
 
 Os casos de escrita hoje em `tests/fixtures/eval_cases*.json` devem ser
-reclassificados: se forem goldens de avaliação, migram para `eval_data/golden/`
+reclassificados: se forem goldens de avaliação, migram para `data/evaluation/golden/`
 com referências atualizadas; fixtures puramente de teste permanecem em `tests/`.
 
 ### 7.2 Não versionado
@@ -212,11 +212,11 @@ um dump integral de resultados.
 
 ### 7.3 Artefatos sem consumidor atual
 
-Os antigos `eval_data/golden/compliance_monitor.json` e
+Os antigos `data/evaluation/golden/compliance_monitor.json` e
 `tests/fixtures/eval_investor_match.json` possuíam resultados históricos locais,
 mas nenhuma suíte registrada ou consumidor atual fora do histórico. Foram
-preservados em `eval_data/historical/`, com sua condição documentada em
-`eval_data/README.md`; não governam os pipelines atuais.
+preservados em `data/evaluation/historical/`, com sua condição documentada em
+`data/evaluation/README.md`; não governam os pipelines atuais.
 
 Os goldens `finep_relaxed`, `finep_independent` e `fapesp` possuem consumidores
 em benchmarks atuais e permanecem como datasets diagnósticos.
@@ -402,8 +402,8 @@ Implementado:
 - matching classificado como candidato, com cinco critérios aceitos: MRR,
   recall, hard negatives, zero falsos positivos confirmados e zero resultados
   sem julgamento no top-8;
-- goldens de escrita movidos para `eval_data/golden/` e corpora sem consumidor
-  movidos, sem exclusão, para `eval_data/historical/`; e
+- goldens de escrita movidos para `data/evaluation/golden/` e corpora sem consumidor
+  movidos, sem exclusão, para `data/evaluation/historical/`; e
 - relatório limitado a runs de manifesto compatível e à direção declarada de
   cada métrica.
 

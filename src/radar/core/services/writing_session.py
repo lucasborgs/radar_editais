@@ -615,7 +615,7 @@ class WritingSession:
         # [edital_id] silenciosamente (KG indisponível ≠ sessão quebrada).
         self._scope_edital_ids: list[str] = self._resolve_edital_scope()
 
-        # F5: resolve o playbook (skills/playbook) do mecanismo na construção.
+        # F5: resolve o playbook (docs/playbooks/playbook) do mecanismo na construção.
         # Reusa a lógica de resolução de mechanism que antes alimentava a tool
         # load_skill (writing_tools.py:107-129). O bloco for_writer vai no
         # prefixo estável; for_monitor vai no checklist automático.

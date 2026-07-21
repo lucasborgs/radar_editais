@@ -1,12 +1,12 @@
 """
-Structurer — camada silver (WIKI.md §11), L2 do stack §12.
+Structurer — camada silver (docs/domain/schema.md §11), L2 do stack §12.
 
 Uma passada LLM por unidade (página) do Documento Canônico → blocos
 estruturados (texto verbatim + section_path + kind). Artefato neutro e burro,
 consumido pela Knowledge gold (síntese wiki) e pela Retrieval gold
 (chunkeamento RAG), com caches independentes (§11.4).
 
-Schema, prompt e parâmetros vêm de WIKI.md §11 via radar.core.kg.schema —
+Schema, prompt e parâmetros vêm de docs/domain/schema.md §11 via radar.core.kg.schema —
 mudança de regra é no doc, não aqui.
 
 Agnóstico à fonte (§12): consome Documento Canônico (§12.3). Não abre

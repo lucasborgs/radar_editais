@@ -2,7 +2,7 @@
 
 > **Autoridade:** regras de domínio e vocabulários consumidos pelo código. Para
 > runtime e demais documentos, consulte o
-> [índice da documentação](docs/README.md).
+> [índice da documentação](../README.md).
 
 Este documento é o **schema autoritativo** dos vocabulários e contratos de
 ingestão. O catálogo ativo é o gold relacional (`entities`,
@@ -32,7 +32,7 @@ no silver reconstruível; a vigência é aplicada no Stage 0 do match, não por 
 índice JSON separado.
 
 > **Classificação PME/startup (legado):** o vocabulário preservado em
-> `wikis/_pme_filter.md` continua parseável para compatibilidade, mas não há
+> `docs/domain/sources/_pme_filter.md` continua parseável para compatibilidade, mas não há
 > classificador PME ativo no pipeline gold.
 
 > **Arquitetura de camadas:** o vocabulário oficial das camadas, a fronteira
@@ -57,14 +57,14 @@ no silver reconstruível; a vigência é aplicada no Stage 0 do match, não por 
 
 ## 3. Fontes
 
-Cada fonte tem um schema específico em `wikis/<fonte>.md` que **estende** este doc global. Regras definidas aqui valem para todas; regras em `wikis/<fonte>.md` sobrescrevem quando aplicável.
+Cada fonte tem um schema específico em `docs/domain/sources/<fonte>.md` que **estende** este doc global. Regras definidas aqui valem para todas; regras em `docs/domain/sources/<fonte>.md` sobrescrevem quando aplicável.
 
 | Fonte | Schema | Status |
 |---|---|---|
-| FINEP | [wikis/finep.md](wikis/finep.md) | ativo (v1) |
-| FAPESP | [wikis/fapesp.md](wikis/fapesp.md) | ativo (v1) |
-| FAPESC | [wikis/fapesc.md](wikis/fapesc.md) | ativo (v1) |
-| Web | regras globais §12.4 + [wikis/_discovery.md](wikis/_discovery.md) | ativo, com gate humano |
+| FINEP | [sources/finep.md](sources/finep.md) | ativo (v1) |
+| FAPESP | [sources/fapesp.md](sources/fapesp.md) | ativo (v1) |
+| FAPESC | [sources/fapesc.md](sources/fapesc.md) | ativo (v1) |
+| Web | regras globais §12.4 + [sources/_discovery.md](sources/_discovery.md) | ativo, com gate humano |
 | EMBRAPII | extractor curado `src/radar/pipeline/extractors/ict_embrapii.py` | ativo para ICTs |
 
 ---
@@ -77,8 +77,8 @@ estão no §13 e na implementação de `src/radar/core/kg/gold.py`.
 
 O schema das wiki pages e os índices JSON pertencem à linhagem hyper-extract,
 removida no v3. A descrição histórica foi preservada em
-[`docs/historical/kg-entity-wiki-pages.md`](docs/historical/kg-entity-wiki-pages.md)
-e [`docs/historical/hypergraph-architecture.md`](docs/historical/hypergraph-architecture.md).
+[`docs/historical/kg-entity-wiki-pages.md`](../historical/kg-entity-wiki-pages.md)
+e [`docs/historical/hypergraph-architecture.md`](../historical/hypergraph-architecture.md).
 Esses documentos não são autoridade de runtime.
 
 ---
@@ -308,13 +308,13 @@ de extração. Quando o texto afirmar a exigência, o valor deve vir acompanhado
 de estado `stated` e evidência verbatim; quando não afirmar, o extrator deve se
 abster (`absent`, valor/evidência nulos). O campo não é gate do match nem relação
 gold. O histórico da antiga heurística e da sugestão proativa de parceiros está
-em [`docs/historical/ict-phase-c.md`](docs/historical/ict-phase-c.md).
+em [`docs/historical/ict-phase-c.md`](../historical/ict-phase-c.md).
 
 ### 5.11 Confiança da fonte (`verificacao`)
 
 Campo do edital indicando o nível de confiança da origem (item 2.2 — descoberta
 de oportunidades, ver
-[discovery-opportunities.md](docs/historical/discovery-opportunities.md)):
+[discovery-opportunities.md](../historical/discovery-opportunities.md)):
 
 ```yaml
 verificacao_values: [verificado, provisorio, promovido]
@@ -512,8 +512,8 @@ Motivação: status bruto do portal nem sempre é confiável; prazo futuro é ev
 
 O produtor de wiki pages (`etl_process.py` / `build_knowledge_graph`) foi
 removido e não integra o data plane atual. O registro arquitetural completo
-está em [`docs/historical/kg-entity-wiki-pages.md`](docs/historical/kg-entity-wiki-pages.md)
-e [`docs/historical/hypergraph-migration.md`](docs/historical/hypergraph-migration.md).
+está em [`docs/historical/kg-entity-wiki-pages.md`](../historical/kg-entity-wiki-pages.md)
+e [`docs/historical/hypergraph-migration.md`](../historical/hypergraph-migration.md).
 O prompt e as regras de atualização dessa linhagem permanecem apenas nesses
 documentos históricos; os produtores ativos estão descritos nos §§11–13.
 
@@ -546,7 +546,7 @@ Por `link`. Primeiro arquivo bronze lido (ordem alfabética) vence.
 
 ## 10. Como adicionar uma nova fonte
 
-1. Criar `wikis/<fonte>.md` espelhando a estrutura de `wikis/finep.md`.
+1. Criar `docs/domain/sources/<fonte>.md` espelhando a estrutura de `docs/domain/sources/finep.md`.
 2. Escrever scraper em `src/radar/pipeline/extractors/<fonte>.py` produzindo JSON bronze em `data/bronze/<fonte>_raw/`.
 3. Escrever o `SourceAdapter` correspondente e registrá-lo em §12.4.
 4. Cobrir os vocabulários/accessors afetados com testes direcionados.

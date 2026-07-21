@@ -35,7 +35,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_SKILLS_DIR = Path(__file__).resolve().parents[3] / "skills"
+_SKILLS_DIR = Path(__file__).resolve().parents[3] / "docs" / "playbooks"
 
 # ── Seções canônicas (nome do `##` → tipo → consumidor) ─────────────────────
 SECTION_LENTE = "Lente"

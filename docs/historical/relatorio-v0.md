@@ -163,8 +163,8 @@ flowchart TD
 | P15 | [checklist_service.py](../../core/services/checklist_service.py#L105) | COMPLETENESS pass | 105–138 | 8/16 | D5,D7 fracos |
 | P16 | opportunity_brief_service.py | BRIEF sys+user | 36–70 | 10/16 | D5,D8 fracos |
 | P17 | [content_library.py](../../core/services/content_library.py#L22) | ENRICH sys+user | 22–48 | 8/16 | D6,D7 ausentes |
-| P18 | [WIKI.md](../../WIKI.md#L375) | extraction_prompt (wiki) | 375–414 | 10/16 | D7 ausente (vigência!) |
-| P19 | [WIKI.md](../../WIKI.md#L538) | structurer_prompt (silver) | 538–590 | 10/16 | D6/D7/D8 n/a |
+| P18 | [docs/domain/schema.md](../domain/schema.md#L375) | extraction_prompt (wiki) | 375–414 | 10/16 | D7 ausente (vigência!) |
+| P19 | [docs/domain/schema.md](../domain/schema.md#L538) | structurer_prompt (silver) | 538–590 | 10/16 | D6/D7/D8 n/a |
 | P20 | [writing_tools.py](../../core/llm/agent_tools/writing_tools.py) | Tool descriptions (6) | — | 11/16 | D7 ausente |
 | P21 | [explore_tools.py](../../core/llm/agent_tools/explore_tools.py) | Tool descriptions (4) | — | 10/16 | D7 ausente |
 | P22 | [profile_tools.py](../../core/llm/agent_tools/profile_tools.py) | Tool descriptions (4) | — | 11/16 | D8 n/a |
@@ -250,7 +250,7 @@ Destaques: **D3 2/2** (sem catálogo no prompt — busca via tools, resolve o ov
 ### P12 — MONITOR (ComplianceMonitor)
 **Arquivo:** compliance_monitor.py:34 · **Papel:** compliance inline · **Score: 10/16**
 
-Forte em D2/D4/D5 (rubrica ok/at_risk/violation conservadora; "violation só com evidência clara"; retorna só ≠ ok). **Falha de design, não de prompt:** avalia a *mensagem do usuário*, não o texto gerado pelo LLM — não detecta alucinação na proposta. D7 0/2 (não vê prazos). Skills por fonte ([skills/*_compliance.md](../../skills)) são anexadas ao system — bom mecanismo de procedural memory.
+Forte em D2/D4/D5 (rubrica ok/at_risk/violation conservadora; "violation só com evidência clara"; retorna só ≠ ok). **Falha de design, não de prompt:** avalia a *mensagem do usuário*, não o texto gerado pelo LLM — não detecta alucinação na proposta. D7 0/2 (não vê prazos). Skills por fonte ([docs/playbooks/*_compliance.md](../playbooks/)) são anexadas ao system — bom mecanismo de procedural memory.
 
 **Recomendação (alvo/D2):** rodar um segundo pass do monitor sobre o `draft_content` gerado, não só sobre o input do usuário.
 
@@ -260,14 +260,14 @@ Forte em D2/D4/D5 (rubrica ok/at_risk/violation conservadora; "violation só com
 Destaque D2 ("NÃO seja diplomático demais — se o ajuste é fraco, diga") e a instrução de **riscos não-óbvios** ("TRL declarado vs comprovável", "contrapartida que a empresa sinaliza mas pode não ter") — proto-grounding sofisticado. D5 1/2 (pede análise de risco mas sem constraint de fonte). D8 0/2.
 
 ### P18 — extraction_prompt (síntese de wiki page)
-**Arquivo:** [WIKI.md:375](../../WIKI.md#L375) · **Papel:** geração de memória semântica · **Score: 10/16**
+**Arquivo:** [docs/domain/schema.md:375](../domain/schema.md#L375) · **Papel:** geração de memória semântica · **Score: 10/16**
 
 Forte: D2 (regras por campo), D4 (JSON + 6–12 seções + tipos), D5 ("null se não mencionado" por campo). **D3 mitigado** por `model_char_budgets` (truncagem typed por modelo). **D7 0/2 é o achado mais grave:** a wiki page é a fonte autoritativa de `deadline`/`value_range`/`trl_range` para matching e compliance, mas a síntese **não carimba nem valida vigência** — uma wiki page nunca "expira" sozinha.
 
 **Recomendação (D7):** adicionar campos `extracted_at` e `deadline_confidence` ao schema, e instruir: *"Se o documento não contém prazo de submissão explícito, marque deadline=null e deadline_confidence='ausente' — não infira de datas de publicação."*
 
 ### P19 — structurer_prompt (silver)
-**Arquivo:** [WIKI.md:538](../../WIKI.md#L538) · **Score: 10/16**
+**Arquivo:** [docs/domain/schema.md:538](../domain/schema.md#L538) · **Score: 10/16**
 
 **Melhor prompt anti-alucinação do sistema (D5 2/2):** *"NÃO resuma, NÃO interprete, NÃO invente. Preserve o texto VERBATIM."* D2 cirúrgico (regras de `section_path`/`kind` precisas). D6/D7/D8 não aplicáveis (é segmentação determinística com estado `carry_section_path`). Per-página → sem overflow.
 
@@ -280,7 +280,7 @@ Tool descriptions **são prompts** (o modelo as lê para decidir). Qualidade alt
 
 ### 3A — Hierarquia e Consistência
 - **Não há master system prompt** do qual os demais herdem. Cada serviço define o seu. Resultado: repetição de "especialista em fomento à inovação no Brasil" em P05/P08/P16 com fraseado ligeiramente diferente, e duplicação de `WRITER_SYSTEM`/`WRITER_AGENT_SYSTEM`.
-- **Vocabulário de domínio consistente** (edital, proponente, PME, fomento, vigente, TRL, subvenção, contrapartida) — forte ponto positivo; o schema autoritativo em [WIKI.md](../../WIKI.md) ancora os termos.
+- **Vocabulário de domínio consistente** (edital, proponente, PME, fomento, vigente, TRL, subvenção, contrapartida) — forte ponto positivo; o schema autoritativo em [docs/domain/schema.md](../domain/schema.md) ancora os termos.
 - **Sem contradições graves** entre estágios, mas o legacy e o agente coexistem com instruções divergentes sobre a mesma tarefa (tag `<draft>` vs tool `save_draft`) — risco de comportamento bimodal conforme o flag.
 
 ### 3B — Mapa de Fragilidade

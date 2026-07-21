@@ -1,6 +1,6 @@
 # Filtro PME — regras determinísticas
 
-Estende [WIKI.md](../WIKI.md). Preserva o vocabulário histórico que classificava
+Estende [docs/domain/schema.md](../schema.md). Preserva o vocabulário histórico que classificava
 uma chamada como PME/startup (`accept`), puramente acadêmica (`reject`) ou
 ambígua (`unclear`).
 
@@ -51,7 +51,7 @@ target_relevance_rules:
     mover:                "Programa MOVER (Mobilidade Verde)"
 
   # 1.2 Públicos-whitelist. Match contra os valores canonicalizados do campo
-  # `publico_alvo` do metadata (após normalização §5.5 do WIKI.md). Interseção
+  # `publico_alvo` do metadata (após normalização §5.5 do docs/domain/schema.md). Interseção
   # não-vazia → accept.
   publicos_pme_canonicos:
     - Empresas
@@ -99,7 +99,7 @@ Algoritmo de `is_target_relevant(metadata) -> Literal["accept","reject","unclear
    **accept**.
 
 3. **Sinal de público**: se `publico_alvo` (após canonicalização §5.5 do
-   WIKI.md) tem interseção não-vazia com `publicos_pme_canonicos` → **accept**.
+   docs/domain/schema.md) tem interseção não-vazia com `publicos_pme_canonicos` → **accept**.
 
 4. **Sinal de exclusor**: se algum termo de `exclusores_academicos` aparece
    como substring no `search_text` → **reject**.
@@ -126,7 +126,7 @@ filter_metadata_shape:
   programa:          str | null
   categoria:         str | null   # ex.: rótulo de seção/accordion na listagem
   descricao_resumo:  str | null   # primeiros parágrafos, se disponível
-  publico_alvo:      list[str]    # após canonicalização §5.5 WIKI.md
+  publico_alvo:      list[str]    # após canonicalização §5.5 docs/domain/schema.md
 ```
 
 Campos ausentes não são erro — só não contribuem com sinal.

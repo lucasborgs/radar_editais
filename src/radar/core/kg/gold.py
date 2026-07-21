@@ -12,7 +12,7 @@ Caráter: **ingestor com mapeadores determinísticos por fonte + tagger LLM só 
 editais.** 3 das 4 fontes já são gold de fábrica. NÃO é extrator — Hyper-Extract
 não é tocado; este módulo é ADITIVO (o match v2 segue intocado).
 
-Vocabulários vivem no WIKI.md (§13), lidos por `radar.core.kg.schema` accessors:
+Vocabulários vivem no docs/domain/schema.md (§13), lidos por `radar.core.kg.schema` accessors:
   - setores (taxonomia fechada de 16)   → `normalize_setores`
   - normalização de tags (+ anti_class) → `normalize_tags`
   - seções temáticas/elegibilidade      → `classify_section`

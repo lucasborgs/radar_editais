@@ -9,7 +9,7 @@ normativo do edital inline (estratégia §12.4 `html_body`).
 Spike validado em 2026-05-29 — ver memory: project_multi_fonte_fase1.
 
 Output bronze: JSON com chamadas no contrato da fonte documentado em
-`wikis/fapesp.md`, consumido pelo Source Adapter:
+`docs/domain/sources/fapesp.md`, consumido pelo Source Adapter:
   titulo, url, data_limite (yyyy-mm-dd), status (ABERTA|FLUXO_CONTINUO),
   modalidades (string), areas (string), texto_cru, fluxo_continuo (bool),
   fonte, data_extracao.
@@ -65,7 +65,7 @@ class FAPESPScraper(BaseScraper):
     # ------------------------------------------------------------------
 
     def _fetch_decoded(self, url: str) -> str:
-        """Fetch + detecta encoding via Content-Type (gotcha §8 wikis/fapesp.md)."""
+        """Fetch + detecta encoding via Content-Type (gotcha §8 docs/domain/sources/fapesp.md)."""
         resp = requests.get(url, headers=self.headers, timeout=30)
         resp.raise_for_status()
         # requests auto-detecta charset; força fallback razoável se vier vazio

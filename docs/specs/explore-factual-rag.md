@@ -228,7 +228,7 @@ top-k puramente relevancia.
 
 #### PR 2 - autoridade e frescor documental (pre-requisito do RAG factual)
 
-- Editar primeiro `wikis/finep.md`/`wikis/fapesc.md`, conforme autoridade das
+- Editar primeiro `docs/domain/sources/finep.md`/`docs/domain/sources/fapesc.md`, conforme autoridade das
   regras por fonte.
 - Estender `CanonicalDocEntry` com metadata opcional de familia, revisao, data,
   URL e estado `vigente | superseded`, preservando compatibilidade do JSONB
@@ -302,7 +302,7 @@ O override desse tier é `FACTUAL_SYNTHESIS_MODEL`.
 
 | Area | Arquivos principais |
 |---|---|
-| Regras por fonte | `wikis/finep.md`, `wikis/fapesc.md`, `WIKI.md` se o contrato global mudar |
+| Regras por fonte | `docs/domain/sources/finep.md`, `docs/domain/sources/fapesc.md`, `docs/domain/schema.md` se o contrato global mudar |
 | Roteamento | novo modulo em `src/radar/core/services/`, `workspace_service.py`, `explore_agent.py` |
 | Entidades | `explore_tools.py`, `entity_catalog.py` |
 | Autoridade | `src/radar/pipeline/adapters/base.py`, adapters/extractors FINEP e FAPESC, `source_docs.py` |
@@ -390,7 +390,7 @@ a dos PRs acima.
 
 ### Fase A - autoridade e versoes
 
-1. Documentar em `wikis/finep.md` as familias normativas (`Regulamento`,
+1. Documentar em `docs/domain/sources/finep.md` as familias normativas (`Regulamento`,
    `Anexo 1`, FAQ e equivalentes), a precedencia de rerratificacoes e o uso de
    metadados oficiais de publicacao quando disponiveis.
 2. Revisar a regra FAPESC que hoje inclui `retificacao` e `errata` na skip-list:

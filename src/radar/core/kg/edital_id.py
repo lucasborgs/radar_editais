@@ -1,7 +1,7 @@
 """
 Identidade de edital cross-source — prefixo `{source}:{native_id}`.
 
-A partir da Fase 1 multi-fonte (WIKI.md §12), o sistema deixa de assumir
+A partir da Fase 1 multi-fonte (docs/domain/schema.md §12), o sistema deixa de assumir
 FINEP-only. IDs nativos das fontes (FAPESP usa `18064`, FINEP usa `782`,
 BNDES usa slugs) podem colidir entre si; o prefixo elimina ambiguidade.
 
@@ -16,7 +16,7 @@ _SEP = ":"
 def make_id(source: str, native_id: str | int) -> str:
     """Constrói o edital_id prefixado a partir de fonte + id nativo do portal.
 
-    `source` deve ser a chave canônica registrada em WIKI.md §12.4
+    `source` deve ser a chave canônica registrada em docs/domain/schema.md §12.4
     (ex.: 'finep', 'fapesp', 'bndes'). `native_id` aceita int por conveniência
     de portais que retornam numérico — convertido pra str.
     """

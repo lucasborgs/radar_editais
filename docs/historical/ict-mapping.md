@@ -2,7 +2,7 @@
 
 > **Objetivo:** adicionar ao KG as instituições de C&T (ICTs) que muitos editais FINEP/FAPESP exigem como parceiras, para que o sistema possa sugerir parceiros compatíveis por afinidade temática. ICT **não lança** edital — apenas participa de projetos.
 > **Base:** branch `test-integration`. **Data:** 2026-06-03.
-> **Pré-leitura:** [WIKI.md §6 (schema do grafo)](../../WIKI.md), [WIKI.md §10 (adicionar fonte)](../../WIKI.md), [WIKI.md §12.4 (source adapters)](../../WIKI.md).
+> **Pré-leitura:** [docs/domain/schema.md §6 (schema do grafo)](../domain/schema.md), [docs/domain/schema.md §10 (adicionar fonte)](../domain/schema.md), [docs/domain/schema.md §12.4 (source adapters)](../domain/schema.md).
 
 ## Premissa que muda o desenho
 
@@ -29,7 +29,7 @@ Não há aresta direta edital↔ICT. Editais exigem *uma* ICT (não uma nomeada)
 
 ## Schema (mudança de doc primeiro — CLAUDE.md)
 
-Toda mudança abaixo vai em [WIKI.md](../../WIKI.md) **antes** do código, validada por tests/test_wiki_schema_consistency.py.
+Toda mudança abaixo vai em [docs/domain/schema.md](../domain/schema.md) **antes** do código, validada por tests/test_wiki_schema_consistency.py.
 
 ### Novo tipo de nó (§6.1)
 ```yaml
@@ -67,7 +67,7 @@ link_types:
 | `themes` | **LLM** | mapeia "área de atuação"/"técnicas" cruas → slugs canônicos de `tema` |
 | `techniques_raw` | bronze | principais técnicas (texto livre, não normalizado) |
 
-**Invariante:** a normalização LLM só mapeia áreas cruas → `tema` canônico e gera um `summary`. Não inventa fato sobre a instituição. Mesmo espírito "burro" do structurer (WIKI.md §11).
+**Invariante:** a normalização LLM só mapeia áreas cruas → `tema` canônico e gera um `summary`. Não inventa fato sobre a instituição. Mesmo espírito "burro" do structurer (docs/domain/schema.md §11).
 
 ---
 
@@ -114,7 +114,7 @@ Especificar em spec separada após a ingestão estar verde.
 
 | Fase | Escopo | Gate |
 |------|--------|------|
-| **A** | Schema (WIKI.md) + `ict_embrapii` + normalização + KG build + dedup | validador verde; nós `ict` navegáveis no grafo ligados a `tema` |
+| **A** | Schema (docs/domain/schema.md) + `ict_embrapii` + normalização + KG build + dedup | validador verde; nós `ict` navegáveis no grafo ligados a `tema` |
 | **B** | `ict_pnipe` com estratégia de filtro/paginação | volume controlado; precisão da extração amostrada manualmente |
 | **C** | Flag `requires_ict_partner` + tool `find_ict_partners` + matchmaking | spec própria |
 
@@ -127,7 +127,7 @@ Especificar em spec separada após a ingestão estar verde.
 
 ## Critérios de aceitação (Fase A)
 
-- `wikis/` ou WIKI.md documentam `ict` + `ict_has_expertise`; `pytest tests/test_wiki_schema_consistency.py` verde.
+- `docs/domain/sources/` ou docs/domain/schema.md documentam `ict` + `ict_has_expertise`; `pytest tests/test_wiki_schema_consistency.py` verde.
 - `python -m radar.pipeline.extractors.ict_embrapii` produz `bronze_data/ict_raw/embrapii_*.json`.
 - `build_knowledge_graph` emite nós `ict` no `index.json` e wiki pages em `icts/`, com arestas para `tema`.
 - Dedup testada (mesma ICT em 2 fontes → 1 nó).

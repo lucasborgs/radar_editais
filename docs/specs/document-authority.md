@@ -71,7 +71,7 @@ esse índice quando o leitor precisar de documentação aprofundada.
 | O que é o produto e como começar? | `README.md` | visão resumida; não duplica runbook |
 | Como instalar, executar, validar e operar em desenvolvimento? | `AGENTS.md` | comandos e cuidados atuais |
 | Como o runtime e os fluxos atuais funcionam? | `docs/architecture.md` | estado implementado, não proposta |
-| Quais são as regras e vocabulários de domínio? | `WIKI.md` e `wikis/` | conteúdo lido pelo código e regras por fonte |
+| Quais são as regras e vocabulários de domínio? | `docs/domain/schema.md` e `docs/domain/sources/` | conteúdo lido pelo código e regras por fonte |
 | Qual é o trabalho técnico adiado e comprovado? | `docs/BACKLOG.md` | não é roadmap de produto |
 | Qual mudança foi aceita ou ainda está em decisão? | `docs/specs/` | intenção até implementação; contrato vigente depois dela |
 | Como operar ou compreender um subsistema atual? | `docs/reference/` | explicação derivada; não redefine arquitetura ou domínio |
@@ -81,7 +81,7 @@ esse índice quando o leitor precisar de documentação aprofundada.
 
 ### 4.3 Precedência em divergências
 
-1. Regras de negócio e vocabulários: `WIKI.md`/`wikis/` são normativos; a
+1. Regras de negócio e vocabulários: `docs/domain/schema.md`/`docs/domain/sources/` são normativos; a
    implementação deve ser reconciliada com eles.
 2. Runtime existente: código, migrations e manifests provam o comportamento;
    `docs/architecture.md` deve descrevê-lo com fidelidade.
@@ -156,7 +156,7 @@ um documento cuja aderência ao código ainda não foi comprovada.
 
 | Lote | Conteúdo atual | Destino candidato | Prova exigida |
 |---|---|---|---|
-| A | `README.md`, `AGENTS.md`, `docs/architecture.md`, `WIKI.md`, `wikis/`, `docs/BACKLOG.md` | permanecer | leitura cruzada e referências válidas |
+| A | `README.md`, `AGENTS.md`, `docs/architecture.md`, `docs/domain/schema.md`, `docs/domain/sources/`, `docs/BACKLOG.md` | permanecer | leitura cruzada e referências válidas |
 | B | specs já marcadas como substituídas pela v3 | `docs/historical/` | vínculo explícito com `v3-unified.md` e ausência de contrato exclusivo vivo |
 | C | specs marcadas como implementadas/concluídas | `docs/specs/` ou `docs/historical/` | contrato ainda consumido por código/teste/operação |
 | D | specs antigas ainda marcadas como proposta/design review | spec atual, histórico ou remoção por duplicidade | confronto com implementação, backlog e iniciativa ativa |
@@ -247,7 +247,7 @@ Para cada lote:
 
 Não há validação Python ou frontend obrigatória enquanto as mudanças forem
 exclusivamente documentais e não alterarem manifests ou arquivos consumidos em
-runtime. Como `WIKI.md` é lido pelo código, qualquer mudança futura em seus
+runtime. Como `docs/domain/schema.md` é lido pelo código, qualquer mudança futura em seus
 blocos YAML continua exigindo os testes de schema correspondentes.
 
 ## 11. Critérios de conclusão
@@ -255,7 +255,7 @@ blocos YAML continua exigindo os testes de schema correspondentes.
 O eixo de autoridade documental estará concluído quando:
 
 1. `docs/README.md` responder onde encontrar cada tipo de informação;
-2. `README.md`, `AGENTS.md`, `docs/architecture.md` e `WIKI.md` não mantiverem
+2. `README.md`, `AGENTS.md`, `docs/architecture.md` e `docs/domain/schema.md` não mantiverem
    contratos concorrentes;
 3. não houver documentação operacional duplicada por ferramenta de autoria;
 4. toda spec corrente tiver status e autoridade claros;

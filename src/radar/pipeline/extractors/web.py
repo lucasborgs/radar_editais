@@ -1,5 +1,5 @@
 """
-WebScraper — fonte web genérica (L0, WIKI.md §12.4 strategy=html_clean).
+WebScraper — fonte web genérica (L0, docs/domain/schema.md §12.4 strategy=html_clean).
 
 Diferente de FINEP/FAPESP (que têm listagem estruturada própria), a fonte web
 não descobre editais: ela indexa uma seed list CURADA de URLs, mantida na

@@ -3,7 +3,7 @@ Vocabulário canônico de temas.
 
 Stub funcional: faz limpeza básica (strip, lowercase, dedupe preservando ordem).
 A canonicalização sofisticada (agrupamento por sinônimo, mapping pra taxonomia)
-vive em WIKI.md como schema autoritativo e pode ser implementada incrementalmente
+vive em docs/domain/schema.md como schema autoritativo e pode ser implementada incrementalmente
 adicionando o `_SYNONYMS` map abaixo.
 
 Usada por `radar.core.vocab_lint` para normalizar evidências antes de propor alterações
@@ -11,7 +11,7 @@ humanas no vocabulário autoritativo.
 """
 from __future__ import annotations
 
-# Mapa de sinônimos → canônico (variações do corpus → tema_vocab, WIKI.md §5.9).
+# Mapa de sinônimos → canônico (variações do corpus → tema_vocab, docs/domain/schema.md §5.9).
 _SYNONYMS: dict[str, str] = {
     # Taxonomia Liferay da FINEP nomeia assim o tema-macro de materiais
     # (auditoria 2026-06-11 das api_taxonomy_categories do bronze).

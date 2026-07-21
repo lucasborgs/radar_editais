@@ -76,7 +76,7 @@ def test_barn_golden_esta_preservado_no_catalogo_curado():
 
 def test_golden_declara_quatro_casos_sem_compensacao_por_media():
     golden = json.loads(
-        (ROOT / "eval_data/golden/explore.json").read_text(encoding="utf-8")
+        (ROOT / "data/evaluation/golden/explore.json").read_text(encoding="utf-8")
     )
     assert [c["id"] for c in golden["cases"]] == [
         "finep-745-itens-financiaveis",

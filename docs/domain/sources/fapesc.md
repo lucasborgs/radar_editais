@@ -1,6 +1,6 @@
 # FAPESC — Schema específico
 
-Estende [WIKI.md](../WIKI.md). Só documenta o que diverge do schema global.
+Estende [docs/domain/schema.md](../schema.md). Só documenta o que diverge do schema global.
 A listagem é WordPress (como FAPESP), mas o edital normativo vive num **PDF
 anexo** (como FINEP) — estratégia `pdf`, não `html_body`. Ver §8 (gotchas).
 
@@ -98,14 +98,14 @@ em ordem cronológica; não são descartadas nem tratadas isoladamente.
 
 ## 5. Metadados enviados ao prompt
 
-Mesma lista do FAPESP (§5 wikis/fapesp.md): title, status, deadline, themes,
+Mesma lista do FAPESP (§5 docs/domain/sources/fapesp.md): title, status, deadline, themes,
 publico_alvo, fonte_recurso, link.
 
 ---
 
 ## 6. Prompt de extração
 
-Usa o prompt global (§8.1 WIKI.md) sem overrides.
+Usa o prompt global (§8.1 docs/domain/schema.md) sem overrides.
 
 ---
 
@@ -147,7 +147,7 @@ graph_overrides:
   de prazo agora roda sobre o `texto_cru` (= texto do PDF), captura datas em
   contexto de submissão/encerramento ("até …", "prazo …", "submissão …") e pega
   a MAIS DISTANTE (rerratificações empurram pra frente). Sem data → `None`; a
-  normalização (§7.1 WIKI.md) trata sem-prazo + ABERTA como vigente.
+  normalização (§7.1 docs/domain/schema.md) trata sem-prazo + ABERTA como vigente.
 - **Retificações/erratas são normativas.** O scraper preserva o edital-base e
   todas as emendas anexadas à página. O Documento Canônico marca a família e a
   data de cada peça; o conteúdo vigente é a composição cronológica. Resultado,

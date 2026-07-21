@@ -1,8 +1,8 @@
 # Guia de autoria de playbooks (skills de competência)
 
 Receita reutilizável para escrever a skill de cada mecanismo. Gabarito de
-referência: [skills/mechanism/subvencao.md](../../skills/mechanism/subvencao.md)
-(+ overlay [skills/source/finep/subvencao.md](../../skills/source/finep/subvencao.md)).
+referência: [docs/playbooks/mechanism/subvencao.md](../playbooks/mechanism/subvencao.md)
+(+ overlay [docs/playbooks/source/finep/subvencao.md](../playbooks/source/finep/subvencao.md)).
 O loader e a composição vigentes estão em `src/radar/core/skills.py`; a decisão de design
 original está preservada em
 [`skills-by-mechanism.md`](../historical/skills-by-mechanism.md).

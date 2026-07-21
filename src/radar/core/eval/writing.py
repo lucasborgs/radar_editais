@@ -26,8 +26,8 @@ from radar.core.eval.harness import Evaluation, Suite, get_input
 
 logger = logging.getLogger(__name__)
 
-GOLDEN = ROOT / "eval_data" / "golden" / "writing.json"
-GOLDEN_V2 = ROOT / "eval_data" / "golden" / "writing_v2.json"
+GOLDEN = ROOT / "data" / "evaluation" / "golden" / "writing.json"
+GOLDEN_V2 = ROOT / "data" / "evaluation" / "golden" / "writing_v2.json"
 
 
 def _build_profile(raw: dict):
@@ -221,7 +221,7 @@ def _prereqs() -> str | None:
     if not os.getenv("EVAL_WORKSPACE_ID"):
         return "requer EVAL_WORKSPACE_ID (workspace de eval para as sessões)"
     if not GOLDEN.exists():
-        return "golden eval_data/golden/writing.json ausente"
+        return "golden data/evaluation/golden/writing.json ausente"
     return None
 
 
@@ -397,7 +397,7 @@ def _prereqs_v2() -> str | None:
     if not os.getenv("EVAL_WORKSPACE_ID"):
         return "requer EVAL_WORKSPACE_ID (workspace de eval para as sessões)"
     if not GOLDEN_V2.exists():
-        return "golden eval_data/golden/writing_v2.json ausente"
+        return "golden data/evaluation/golden/writing_v2.json ausente"
     return None
 
 

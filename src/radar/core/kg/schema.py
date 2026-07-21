@@ -1,4 +1,4 @@
-"""Loader do schema autoritativo definido em WIKI.md e wikis/<source>.md.
+"""Loader do schema autoritativo em docs/domain/schema.md e sources/<source>.md.
 
 Extrai blocos ```yaml``` dos docs e expõe helpers.
 
@@ -6,7 +6,7 @@ Substitui `wiki_schema.py` (removido) — mesma lógica de parse, sem as funçõ
 que só serviam ao ETL legacy (build_knowledge_graph, etl_process).
 
 Contrato:
-- Mudou WIKI.md → comportamento muda sem tocar em .py.
+- Mudou docs/domain/schema.md → comportamento muda sem tocar em .py.
 """
 from __future__ import annotations
 
@@ -20,8 +20,8 @@ import yaml
 
 from radar.core.config import ROOT as _ROOT
 
-_WIKI_MD = _ROOT / "WIKI.md"
-_WIKIS_DIR = _ROOT / "wikis"
+_WIKI_MD = _ROOT / "docs" / "domain" / "schema.md"
+_WIKIS_DIR = _ROOT / "docs" / "domain" / "sources"
 _PME_FILTER_MD = _WIKIS_DIR / "_pme_filter.md"
 _DISCOVERY_MD = _WIKIS_DIR / "_discovery.md"
 
@@ -42,7 +42,7 @@ def _parse_md(md_path: Path) -> dict:
 
 @lru_cache(maxsize=16)
 def load(source: str | None = None) -> dict:
-    """Schema global (WIKI.md) + overrides da fonte (wikis/<source>.md)."""
+    """Schema global + overrides em docs/domain/sources/<source>.md."""
     schema = _parse_md(_WIKI_MD)
     if source:
         schema.update(_parse_md(_WIKIS_DIR / f"{source}.md"))
@@ -54,7 +54,7 @@ def load(source: str | None = None) -> dict:
 # ---------------------------------------------------------------------------
 
 def iso_to_br_date(value: str | None) -> str:
-    """ISO yyyy-mm-dd → dd/mm/yyyy (WIKI.md §9.3). Já-BR passa direto."""
+    """ISO yyyy-mm-dd → dd/mm/yyyy (docs/domain/schema.md §9.3). Já-BR passa direto."""
     if not value:
         return ""
     s = str(value).strip()
@@ -92,7 +92,7 @@ def document_authority_overrides(source: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Documento estruturado (silver — WIKI.md §11)
+# Documento estruturado (silver — docs/domain/schema.md §11)
 # ---------------------------------------------------------------------------
 
 def structured_doc_schema() -> dict:
@@ -116,7 +116,7 @@ def tema_vocab() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Constraints de elegibilidade dura (D6/PR5, WIKI.md §6.4) — vocab validado pelo
+# Constraints de elegibilidade dura (D6/PR5, docs/domain/schema.md §6.4) — vocab validado pelo
 # produtor (core/kg/constraints_producer). Único resíduo vivo do antigo bloco de
 # schema do hipergrado, que morreu com a linhagem hyper-extract (v3 PR-C).
 # ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ def estagio_vocab() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Vocabulários gold v3 (WIKI.md §13) — lidos pelo ingest core/kg/gold.py
+# Vocabulários gold v3 (docs/domain/schema.md §13) — lidos pelo ingest core/kg/gold.py
 # ---------------------------------------------------------------------------
 
 def setores_taxonomia() -> dict:
@@ -219,7 +219,7 @@ def slugify(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Filtro PME (wikis/_pme_filter.md)
+# Filtro PME (docs/domain/sources/_pme_filter.md)
 # ---------------------------------------------------------------------------
 
 @lru_cache(maxsize=1)
@@ -229,7 +229,7 @@ def pme_filter_rules() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Descoberta (wikis/_discovery.md)
+# Descoberta (docs/domain/sources/_discovery.md)
 # ---------------------------------------------------------------------------
 
 @lru_cache(maxsize=1)

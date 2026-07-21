@@ -103,8 +103,7 @@ domain/      CompanyProfile (dataclass)
 pipeline/    ETL multi-fonte (extractors + adapters)
 frontend/    Next.js 14
 supabase/    Migrações + config CLI
-docs/        índice, arquitetura atual, specs, referências e histórico
-wikis/       Schema/vocabulários por fonte (doc-as-config)
+docs/        documentação, schema de domínio e playbooks consumidos em runtime
 ```
 
 ---

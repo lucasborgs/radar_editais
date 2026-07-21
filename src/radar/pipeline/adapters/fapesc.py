@@ -1,8 +1,8 @@
 """
-FAPESC Source Adapter — L1 (WIKI.md §12, wikis/fapesc.md).
+FAPESC Source Adapter — L1 (docs/domain/schema.md §12, docs/domain/sources/fapesc.md).
 
 O texto autoritativo do edital FAPESC vive num PDF anexo (não no HTML do post —
-ver wikis/fapesc.md §8). O scraper (pipeline/extractors/fapesc.py) já baixa esse
+ver docs/domain/sources/fapesc.md §8). O scraper (pipeline/extractors/fapesc.py) já baixa esse
 PDF e extrai o texto inline, gravando-o em `texto_cru`. Este adapter lê o bronze,
 encontra a chamada pelo `native_id` (gravado pelo scraper) e retorna 1 entrada de
 Documento Canônico (§12.3) com o corpo fatiado em units — agnóstico de onde o

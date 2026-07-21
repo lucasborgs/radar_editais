@@ -9,7 +9,7 @@ DECIDE. O lint NUNCA aplica mudanças — ele só:
   2. pede UMA proposta à LLM (tier barato "fast"),
   3. grava um RELATÓRIO markdown pronto-pra-decisão, com diff colável no doc.
 
-O doc (WIKI.md §5.9) é o DONO do vocabulário: a aplicação é manual (editar o
+O doc (docs/domain/schema.md §5.9) é o DONO do vocabulário: a aplicação é manual (editar o
 doc; opcionalmente _SYNONYMS em domain/vocabulary.py) e fica gated pelo
 testes de accessors/consumidores (`test_vocab_lint.py`, `test_gold_mappers.py`)
 + evals de não-regressão.
@@ -290,7 +290,7 @@ def _fmt_evidence_table(title: str, agg: dict) -> list[str]:
 
 
 def _fmt_yaml_diff(novos_temas: list[dict], vocab: list[str]) -> list[str]:
-    """Bloco yaml pronto-pra-colar no tema_vocab do WIKI.md §5.9 (vocab + novos)."""
+    """Bloco yaml pronto-pra-colar no tema_vocab do docs/domain/schema.md §5.9 (vocab + novos)."""
     novos = [t.get("tema", "").strip() for t in novos_temas if t.get("tema")]
     if not novos:
         return ["_(sem novos temas a adicionar)_", ""]
@@ -384,14 +384,14 @@ def build_report(evidence: dict, proposal: dict | None) -> str:
 
     # 4. Diff pronto-pra-aplicar
     lines += ["## 4. Diff pronto-para-aplicar", "",
-          "### WIKI.md §5.9 — bloco `tema_vocab` completo (substituir):", ""]
+          "### docs/domain/schema.md §5.9 — bloco `tema_vocab` completo (substituir):", ""]
     lines += _fmt_yaml_diff(proposal.get("novos_temas") or [], evidence["vocab"])
     lines += ["### domain/vocabulary.py — `_SYNONYMS`:", ""]
     lines += _fmt_synonyms_diff(proposal.get("sinonimos") or [])
 
     # 5. Checklist de aplicação
     lines += ["## 5. Checklist de aplicação", "",
-          "1. [ ] Editar `WIKI.md` §5.9 (o doc é o DONO do vocabulário) com o "
+          "1. [ ] Editar `docs/domain/schema.md` §5.9 (o doc é o DONO do vocabulário) com o "
           "bloco `tema_vocab` acima.",
           "2. [ ] Se houver sinônimos: acrescentar as entradas em "
           "`domain/vocabulary._SYNONYMS`.",

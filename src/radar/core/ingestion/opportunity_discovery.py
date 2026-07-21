@@ -11,7 +11,7 @@ a trata como fonte curada (HTML cru → chunk → KG). Link morto / notícia ras
 duplicata morrem na fila sem nunca tocar o RAG ("a IA mostra, o humano decide").
 
 Pipeline:
-  queries (wikis/_discovery.md) → web_search (Tavily) → dedup (ledger + KG)
+  queries (docs/domain/sources/_discovery.md) → web_search (Tavily) → dedup (ledger + KG)
     → triagem (LLM barato: é fomento? agência?) → extração (LLM capaz: campos)
     → full-fetch do texto da página → discovered_opportunities (pending) + ledger
 
@@ -46,7 +46,7 @@ _LEGACY_LEDGER = BRONZE_DIR / "discovery_raw" / ".ledger.json"
 _TEXTO_CRU_CAP = 60_000
 
 # TTL default do cache negativo (dias) — sobrescrito por
-# `reject_cache_ttl_days` em wikis/_discovery.md. Após o TTL, uma URL antes
+# `reject_cache_ttl_days` em docs/domain/sources/_discovery.md. Após o TTL, uma URL antes
 # rejeitada volta a ser triada (o conteúdo da página pode ter mudado).
 _DEFAULT_REJECT_TTL_DAYS = 30
 
@@ -484,7 +484,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     reject_ttl_days = int(cfg.get("reject_cache_ttl_days", _DEFAULT_REJECT_TTL_DAYS))
     hub_enabled = os.getenv("DISCOVERY_HUB_CRAWL_ENABLED", "0") == "1"
     if not queries:
-        logger.warning("descoberta: sem queries em wikis/_discovery.md")
+        logger.warning("descoberta: sem queries em docs/domain/sources/_discovery.md")
         return []
 
     known = _known_urls()

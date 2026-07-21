@@ -6,7 +6,7 @@ Mede se o pipeline de Descoberta rotula corretamente o tipo-evento
 rotulados — é a peça da Fase B que é rodável hoje (o MATCH de desafio/programa
 fica bloqueado por dados: a torneira web está inerte no launch).
 
-Golden: `eval_data/golden/opportunity_type.json` (trechos rotulados à mão).
+Golden: `data/evaluation/golden/opportunity_type.json` (trechos rotulados à mão).
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from typing import Any
 from radar.core.config import ROOT
 from radar.core.eval.harness import Evaluation, Suite, get_input
 
-GOLDEN = ROOT / "eval_data" / "golden" / "opportunity_type.json"
+GOLDEN = ROOT / "data" / "evaluation" / "golden" / "opportunity_type.json"
 
 
 def load_data() -> list[dict]:

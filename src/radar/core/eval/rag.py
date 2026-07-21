@@ -3,7 +3,7 @@
 Porta `scripts/eval_rag.py` para o harness unificado: `task` chama
 `retrieve_chunks` (mede latência); os `evaluators` reaproveitam
 `radar.core.eval.metrics_rag` (Recall/Hit@K + reciprocal rank + faithfulness via juiz LLM).
-Golden em `eval_data/golden/<source>.json` (gerado por scripts/generate_golden.py).
+Golden em `data/evaluation/golden/<source>.json` (gerado por scripts/generate_golden.py).
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from typing import Any
 from radar.core.config import ROOT
 from radar.core.eval.harness import Evaluation, Suite, get_input
 
-GOLDEN_DIR = ROOT / "eval_data" / "golden"
+GOLDEN_DIR = ROOT / "data" / "evaluation" / "golden"
 SOURCE = os.getenv("EVAL_RAG_SOURCE", "finep")
 
 

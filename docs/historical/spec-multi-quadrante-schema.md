@@ -3,7 +3,7 @@
 > **Status:** diff PROPOSTO (2026-06-09). **Não aplicar ao vivo isolado** — cada
 > bloco entra na PR da fase que o usa, junto do código que o consome, com
 > `tests/test_wiki_schema_consistency.py` **verde** no mesmo commit. Aplicar o
-> diff no WIKI.md sem o código que trata os `node_types` novos quebra o validador
+> diff no docs/domain/schema.md sem o código que trata os `node_types` novos quebra o validador
 > e o `build_knowledge_graph`. Este doc é a ponte entre
 > [spec_multi_quadrante.md](spec-multi-quadrante.md) (arquitetura) e a 1ª PR.
 > Honra as 6 invariantes de de-risk (§6-bis da spec): **aditivo, nunca rename**.
@@ -34,7 +34,7 @@ entidade = {investidor}
 
 ---
 
-## 1. Diff — `WIKI.md` §6.1 `node_types`
+## 1. Diff — `docs/domain/schema.md` §6.1 `node_types`
 
 Adiciona 4 tipos (`kind_class` anotado nos que carregam oportunidade; nós-ponte e
 `ict`/`home` ficam sem). **Existentes inalterados** exceto a anotação `kind_class`
@@ -91,7 +91,7 @@ node_types:
 
 ---
 
-## 2. Diff — `WIKI.md` §6.2 `link_types`
+## 2. Diff — `docs/domain/schema.md` §6.2 `link_types`
 
 Generaliza os links de evento (aceitam os 3 tipos-evento) e adiciona os de `setor`
 e `investidor`. **Backward-compat:** `from: edital` continua válido onde já existe;
@@ -143,7 +143,7 @@ link_types:
 
 ---
 
-## 3. Diff — `WIKI.md` §12.4 `source_adapters` (quase nada muda)
+## 3. Diff — `docs/domain/schema.md` §12.4 `source_adapters` (quase nada muda)
 
 ```yaml
 source_adapters:
@@ -248,7 +248,7 @@ p/ edital ≠ completo p/ investidor) — sinal de UX.
 
 ---
 
-## 5. NOVO — `investidores.json` (espelha `icts.json`, WIKI.md §6.1.2)
+## 5. NOVO — `investidores.json` (espelha `icts.json`, docs/domain/schema.md §6.1.2)
 
 ```yaml
 investidor_schema:
@@ -266,7 +266,7 @@ investidor_schema:
 
 ---
 
-## 6. Vocabulários novos (`WIKI.md` §5)
+## 6. Vocabulários novos (`docs/domain/schema.md` §5)
 
 ```yaml
 setor_vocab:        # verticais de indústria (distinto de tema_vocab)

@@ -1,4 +1,4 @@
--- Fase 1 multi-fonte (WIKI.md §12): prefixa edital_id com `{source}:` em todas
+-- Fase 1 multi-fonte (docs/domain/schema.md §12): prefixa edital_id com `{source}:` em todas
 -- as tabelas que armazenam referência file-based ao KG. IDs nativos das fontes
 -- (FAPESP 18064, FINEP 782, BNDES slugs) colidem entre si — prefixo elimina
 -- ambiguidade.

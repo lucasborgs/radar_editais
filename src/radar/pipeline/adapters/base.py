@@ -1,5 +1,5 @@
 """
-SourceAdapter — L1 do stack (WIKI.md §12).
+SourceAdapter — L1 do stack (docs/domain/schema.md §12).
 
 Cada fonte de fomento implementa um adapter que converte seu bronze cru
 (PDFs, HTML, API) no contrato agnóstico do Documento Canônico (§12.3). Tudo
@@ -7,7 +7,7 @@ acima (structurer, chunker, síntese) consome o contrato — não sabe qual é a
 fonte.
 
 Adicionar fonte: escrever `pipeline/adapters/<source>.py` com classe
-`Adapter` herdando `SourceAdapter`, e registrar em WIKI.md §12.4. Nada
+`Adapter` herdando `SourceAdapter`, e registrar em docs/domain/schema.md §12.4. Nada
 em L2/L3 muda.
 """
 from __future__ import annotations
@@ -66,14 +66,14 @@ def coletado_em(rec: dict) -> str:
 
 
 def get_adapter(source: str) -> SourceAdapter:
-    """Resolve o adapter pelo `source_adapters` registry (§12.4 WIKI.md).
+    """Resolve o adapter pelo `source_adapters` registry (§12.4 docs/domain/schema.md).
 
     Convenção: cada módulo de adapter expõe uma classe `Adapter`.
     """
     registry = schema.source_adapters()
     entry = registry.get(source)
     if not entry or not entry.get("module"):
-        raise ValueError(f"Source adapter não registrado em WIKI.md §12.4: {source!r}")
+        raise ValueError(f"Source adapter não registrado em docs/domain/schema.md §12.4: {source!r}")
     module = importlib.import_module(entry["module"])
     return module.Adapter()
 

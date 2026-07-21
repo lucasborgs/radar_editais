@@ -35,7 +35,7 @@ fino→macro do `build_ict_graph` deixou **140 áreas sem tema-macro** (→ ICTs
 ### Fase 0 — Limpeza de grafo (sem eval gate)
 - **público-alvo: nó → tag.** É enum de baixa cardinalidade — vira tag
   (`publico/<slug>`) como mechanism/ano/trl (§6.1.1). Remove o folder `publicos/`
-  do export, o `publico_index` como nós, e o nó no KG. WIKI.md é autoritativo →
+  do export, o `publico_index` como nós, e o nó no KG. docs/domain/schema.md é autoritativo →
   editar lá primeiro; `test_wiki_schema_consistency` guarda.
 - **Nó-pai de fonte para entidades.** Editais têm nó de fonte (FINEP/FAPESP/WEB
   via `source_of`); ICTs e investidores ganham o seu (EMBRAPII, INVESTIDORES) —

@@ -339,7 +339,7 @@ FASE 4 — Maturidade (roadmap)
   ├── Model tier selection por mensagem (Auto/Pro/Fast)
   ├── Slash command UI (/match, /brief, /draft, /review, /reflect)
   ├── Expansão para outras fontes (BNDES, FAPESP, CNPq)
-  └── Skills por fonte: arquivos skills/<fonte>_compliance.md carregados
+  └── Skills por fonte: arquivos docs/playbooks/<fonte>_compliance.md carregados
       condicionalmente na WritingSession com base na fonte do edital,
       permitindo regras de aderência específicas sem reescrita de código
 ```

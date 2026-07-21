@@ -179,7 +179,7 @@ deve herdar silenciosamente esta preferência.
 - `git diff --check`;
 - `ruff check .` para Python alterado;
 - `cd frontend && npx tsc --noEmit`;
-- testes de `/me`, auth, perfil, memória, tasks e skills/playbooks;
+- testes de `/me`, auth, perfil, memória, tasks e docs/playbooks/playbooks;
 - busca final sem consumidores de `agent_explore_enabled` ou
   `contribute_to_global_weights` fora das migrations históricas;
 - teste dos defaults `AUTO_MEMORY_WRITE=0`, profile agent off e CNPJ off;

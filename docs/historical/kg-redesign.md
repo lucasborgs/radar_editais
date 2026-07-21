@@ -150,7 +150,7 @@ Mesmo schema v2, mesmo extractor. `_COMPANY_NODE_PROMPT` (hyper_extractor) passa
 
 ### Fonte da verdade do schema
 
-`WIKI.md` (bloco YAML lido por `core/kg/schema.py`) é atualizado para o schema v2 **no mesmo PR** da consolidação — a auditoria de 2026-07-03 já tinha flagrado o WIKI desatualizado em relação ao schema real; não repetir o erro.
+`docs/domain/schema.md` (bloco YAML lido por `core/kg/schema.py`) é atualizado para o schema v2 **no mesmo PR** da consolidação — a auditoria de 2026-07-03 já tinha flagrado o WIKI desatualizado em relação ao schema real; não repetir o erro.
 
 ## Funil de match v2
 
@@ -204,7 +204,7 @@ Ordem pensada para: (1) destravar pré-requisitos técnicos antes de qualquer re
 **Pronto quando:** todos os arquivos migrados validam (todo member resolve para um id existente); suíte de testes verde; `find_matching_editais` devolve os mesmos resultados de antes (transformação é isomórfica).
 
 ### PR2 — Consolidação de schema (migração mecânica dos tipos)
-**O quê:** aplicar o mapa de migração acima nos dados (mesmo script, fase 2) e no código: prompts do `hyper_extractor` (edital + empresa) emitem schema v2; grep-and-fix nos consumidores tipados — `AFFINITY_TYPES` → `{"Conceito"}`, `find_matching_entities` (kinds de Ator/Oportunidade), `explore_tools`, `graph_service`/router, exibição de kind no frontend, goldens da suíte matching (rename mecânico dos `frozen_nodes`), `WIKI.md` + `core/kg/schema.py`. Inclui o fix do bug de colisão em `core/skills.py` (sinônimo `"investimento"→credito` × display `equity→"Investimento"`): "investimento" passa a mapear para `equity`, e o display de equity vira "Equity/Investimento".
+**O quê:** aplicar o mapa de migração acima nos dados (mesmo script, fase 2) e no código: prompts do `hyper_extractor` (edital + empresa) emitem schema v2; grep-and-fix nos consumidores tipados — `AFFINITY_TYPES` → `{"Conceito"}`, `find_matching_entities` (kinds de Ator/Oportunidade), `explore_tools`, `graph_service`/router, exibição de kind no frontend, goldens da suíte matching (rename mecânico dos `frozen_nodes`), `docs/domain/schema.md` + `core/kg/schema.py`. Inclui o fix do bug de colisão em `core/skills.py` (sinônimo `"investimento"→credito` × display `equity→"Investimento"`): "investimento" passa a mapear para `equity`, e o display de equity vira "Equity/Investimento".
 **Por quê antes da higiene:** a higiene deve escrever formas canônicas uma vez só, já no schema final — não em Tema/Tecnologia/Aplicação que serão renomeados depois.
 **Pronto quando:** grep por tipos v1 em `core/`/`backend/` retorna zero (fora do migrador); suíte matching roda (sanity — resultado pode variar marginalmente pela reclassificação de Entidade, documentar o delta); ExploreAgent navega um subgrafo v2 ao vivo.
 
@@ -212,7 +212,7 @@ Ordem pensada para: (1) destravar pré-requisitos técnicos antes de qualquer re
 **O quê:** passe build-time `scripts/canonicalize_concepts.py` sobre os nós `Conceito`:
 1. **Validação** (LLM, batch): descartar não-conceito (geografia, boilerplate legal/administrativo, nomes de sistema/formulário, siglas orçamentárias) e corrigir `dim` errada. Descartes viram log auditável, não deleção cega.
 2. **Canonicalização** (embedding-cluster + adjudicação LLM): fundir duplicatas semânticas cross-arquivo (TRL ×2 formas, ML em duas línguas) para forma canônica única → mesmo `id` em todos os subgrafos. Arestas re-apontadas via id (seguro pós-PR1).
-3. **Macro-temas (D8)**: vocabulário controlado semeado pelo `themes_index` dos curados, versionado em `WIKI.md`; cada Oportunidade ganha `macro_temas[]` por mapeamento embedding+LLM dos seus Conceitos.
+3. **Macro-temas (D8)**: vocabulário controlado semeado pelo `themes_index` dos curados, versionado em `docs/domain/schema.md`; cada Oportunidade ganha `macro_temas[]` por mapeamento embedding+LLM dos seus Conceitos.
 O passe roda também no fluxo de ingest (oportunidade nova entra canonicalizada), como etapa do build — não em runtime.
 **Por quê:** ruído de 20-30% é o teto de qualidade do cosseno, da travessia e do veredito ao mesmo tempo — maior alavanca isolada do sistema. Guardrail: registrar merges com score, amostrar manualmente ~30 antes de aplicar (risco de over-merge).
 **Pronto quando:** taxa de ruído amostrada cai para <5%; fan-in médio de Conceito sobe (medir antes/depois — é a métrica de que o "mapa" ganhou estradas); suíte matching como sanity.
@@ -246,7 +246,7 @@ Os itens da seção "Guardrails de travessia" entram junto: serialização de pr
 
 | Risco | Mitigação |
 |---|---|
-| Soft typing degenera (`kind` vira zona franca) | enums de `kind`/`aperture`/`dim` validados no build (rejeita valor fora da lista); adicionar valor = editar WIKI.md (fonte da verdade) conscientemente. Quando um kind ganhar topologia própria (não só campos opcionais), promover a split formal — não empilhar campos |
+| Soft typing degenera (`kind` vira zona franca) | enums de `kind`/`aperture`/`dim` validados no build (rejeita valor fora da lista); adicionar valor = editar docs/domain/schema.md (fonte da verdade) conscientemente. Quando um kind ganhar topologia própria (não só campos opcionais), promover a split formal — não empilhar campos |
 | Over-merge na canonicalização | merges logados com score + amostragem manual antes de aplicar (PR3) |
 | Super-nós inundam contexto dos agentes | cap de grau no BFS (PR3) |
 | Latência do veredito no radar | async + cache por par; card renderiza sem ele (PR7) |
@@ -305,10 +305,10 @@ Os itens da seção "Guardrails de travessia" entram junto: serialização de pr
 2. **Bug latente do PR1 corrigido de passagem:** `_entity_attribution` indexava membros de aresta por **name**, mas em v2 são **ids** → a atribuição "ICT casa via tema" estava quebrada na main (sem gate de entidade, passou batido). Reescrita id-based; agora funciona (SENAI/SP volta a carregar temas).
 3. **`migrate_to_v2` passou a compor formato + tipos** (`_migrate_format` → `consolidate_to_v2_types`, ambos idempotentes), em vez de duas funções separadas nos call-sites. Zero mudança nos leitores (upgrade-on-read via `migrate_to_v2` já era o ponto único). Detecção de "já consolidado" por inspeção de tipo (`is_types_v2`), não por bump de `format_version` (segue 2).
 4. **`EntityMatch.kind` virou slug v2** (`investidor`/`programa`/`ict`, era `Investidor`/…) — mudança de contrato que cruza o stack: `explore.py`, `opportunity_service`, `match_tools`, e o **frontend** (`MatchedEntityCard` com mapa slug→label de display, `api.ts`).
-5. **WIKI.md §6.4 nova** (schema do hipergrado v2 + enums `kind`/`aperture`/`dim`) + `schema.py::validate_v2_node` (sanity de enum no build, loga não bloqueia). O migrador reportou **0 violações de enum**.
+5. **docs/domain/schema.md §6.4 nova** (schema do hipergrado v2 + enums `kind`/`aperture`/`dim`) + `schema.py::validate_v2_node` (sanity de enum no build, loga não bloqueia). O migrador reportou **0 violações de enum**.
 6. **Dados:** 35 arquivos reescritos in-place p/ v2 (4379→4003 nós, 376 facetas foldadas; 4552→3859 arestas). Backup fresco `data/knowledge_graph.bak.pr2_<ts>` (31M, fora do git) — MANTER com o do PR1 até o **PR3** terminar.
 
-**Toca (código):** `core/kg/migrate_v2.py`, `core/kg/schema.py`, `core/kg/hypergraph_catalog.py`, `core/kg/temporal.py`, `core/services/hypergraph_match.py`, `core/services/opportunity_service.py`, `core/skills.py`, `core/retrieval/hyper_extractor.py`, `core/llm/agent_tools/explore_tools.py`, `core/llm/agent_tools/match_tools.py`, `backend/routers/explore.py`, `scripts/migrate_hypergraphs_v2.py`, `WIKI.md`, `frontend/src/components/frontdoor/MatchedEntityCard.tsx`, `frontend/src/lib/api.ts`, `eval_data/golden/matching.json` (frozen_nodes), `tests/{test_kg_store,test_get_node_neighborhood,test_find_matching_entities,test_temporal,test_load_skill_tool}.py`.
+**Toca (código):** `core/kg/migrate_v2.py`, `core/kg/schema.py`, `core/kg/hypergraph_catalog.py`, `core/kg/temporal.py`, `core/services/hypergraph_match.py`, `core/services/opportunity_service.py`, `core/skills.py`, `core/retrieval/hyper_extractor.py`, `core/llm/agent_tools/explore_tools.py`, `core/llm/agent_tools/match_tools.py`, `backend/routers/explore.py`, `scripts/migrate_hypergraphs_v2.py`, `docs/domain/schema.md`, `frontend/src/components/frontdoor/MatchedEntityCard.tsx`, `frontend/src/lib/api.ts`, `data/evaluation/golden/matching.json` (frozen_nodes), `tests/{test_kg_store,test_get_node_neighborhood,test_find_matching_entities,test_temporal,test_load_skill_tool}.py`.
 
 ### PR3 — Higiene + canonicalização de descritores (2026-07-04)
 
@@ -329,7 +329,7 @@ Os itens da seção "Guardrails de travessia" entram junto: serialização de pr
 7. **Fix latente do PR2 foldado no commit do PR2 (#50):** extração fresca (tipos v2 sem ids) ganhava prefixo-fallback `no:` no upgrade-on-read — `_TYPE_PREFIX` ganhou os tipos v2 (`op:/ator:/con:`), senão a resolução cross-fonte por id quebraria em todo edital novo.
 8. **Dados/backup:** reescrita in-place dos 35 arquivos; rollback pré-PR3 em `data/knowledge_graph.bak.pr3_20260704_022409` (fora do git). Com o PR3 fechado, os backups do PR1/PR2 podem ser removidos após o merge (critério da spec atendido).
 
-**Toca (código):** `core/kg/canonicalize.py` (novo), `scripts/canonicalize_concepts.py` (novo), `core/kg/schema.py`, `core/kg/kg_store.py`, `core/kg/migrate_v2.py` (PR2, fix 7), `core/retrieval/hyper_extractor.py`, `core/llm/agent_tools/explore_tools.py`, `WIKI.md` (§6.4 macro_temas), `tests/unit/test_canonicalize.py` (novo), `tests/unit/test_kg_store.py`.
+**Toca (código):** `core/kg/canonicalize.py` (novo), `scripts/canonicalize_concepts.py` (novo), `core/kg/schema.py`, `core/kg/kg_store.py`, `core/kg/migrate_v2.py` (PR2, fix 7), `core/retrieval/hyper_extractor.py`, `core/llm/agent_tools/explore_tools.py`, `docs/domain/schema.md` (§6.4 macro_temas), `tests/unit/test_canonicalize.py` (novo), `tests/unit/test_kg_store.py`.
 
 ### PR4 — Proveniência/URL ponta a ponta (2026-07-04)
 
@@ -370,7 +370,7 @@ Os catálogos curados (investidores/programas) NÃO foram reconstruídos determi
 8. **Testes:** `tests/unit/test_eligibility.py` (11 casos: sat/unsat/unknown por tipo, região, agregação, perfil-objeto). Suíte: **657 passed** (+11), 37 skipped; os 3 errors em `test_memory_store_postgres` são pré-existentes (env-gated `DATABASE_URL`, flake de teardown async no full-run — reproduzidos idênticos no base PR3, não são desta PR).
 9. **Dados/backup:** backup pré-PR5 em `data/knowledge_graph.bak.pr5_20260704_104523` (fora do git); corpus reescrito in-place com `constraints[]`.
 
-**Toca (código):** `WIKI.md` (§6.4 constraint schema), `core/kg/schema.py` (accessors + validate), `core/kg/constraints_producer.py` (novo), `core/services/eligibility.py` (novo), `core/services/hypergraph_match.py` (Estágio 0 + `EditalMatch.elegibilidade`), `core/retrieval/hyper_extractor.py` (`_produce_constraints` + wiring), `core/kg/hypergraph_catalog.py` (card expõe `constraints`), `backend/routers/explore.py` (passa `profile`), `scripts/extract_constraints.py` (novo), `tests/unit/test_eligibility.py` (novo), `frontend/src/lib/api.ts`, `frontend/src/components/frontdoor/MatchedEditalCard.tsx`.
+**Toca (código):** `docs/domain/schema.md` (§6.4 constraint schema), `core/kg/schema.py` (accessors + validate), `core/kg/constraints_producer.py` (novo), `core/services/eligibility.py` (novo), `core/services/hypergraph_match.py` (Estágio 0 + `EditalMatch.elegibilidade`), `core/retrieval/hyper_extractor.py` (`_produce_constraints` + wiring), `core/kg/hypergraph_catalog.py` (card expõe `constraints`), `backend/routers/explore.py` (passa `profile`), `scripts/extract_constraints.py` (novo), `tests/unit/test_eligibility.py` (novo), `frontend/src/lib/api.ts`, `frontend/src/components/frontdoor/MatchedEditalCard.tsx`.
 
 ### PR6 — MaxSim (Estágio 1) (2026-07-04)
 

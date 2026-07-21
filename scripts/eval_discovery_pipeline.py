@@ -26,7 +26,7 @@ from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_PATH = os.path.join(SCRIPT_DIR, "eval_discovery_pipeline_results.json")
-WIKIS_DIR = Path(__file__).resolve().parent.parent / "wikis"
+WIKIS_DIR = Path(__file__).resolve().parent.parent / "docs" / "domain" / "sources"
 
 TEST_URLS = [
     {

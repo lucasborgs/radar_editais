@@ -96,7 +96,7 @@ Todos os ambientes ativos usam:
 Paridade de dados será obtida por seed, não por acesso ao banco produtivo:
 
 - editais e investidores públicos podem ser reproduzidos integralmente;
-- os quatro casos de `eval_data/golden/explore.json` integram o seed canônico;
+- os quatro casos de `data/evaluation/golden/explore.json` integram o seed canônico;
 - Auth, workspaces, library e propostas usam usuários/documentos sintéticos;
 - qualquer snapshot derivado de produção precisa ser anonimizado, revisado e
   armazenado fora do repositório quando contiver material privado;

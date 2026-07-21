@@ -1,5 +1,5 @@
 """
-FINEP Source Adapter — L1 (WIKI.md §12).
+FINEP Source Adapter — L1 (docs/domain/schema.md §12).
 
 Converte PDFs em `bronze_data/finep_pdfs/{edital_id}/` em Documento Canônico
 (§12.3): por PDF, lista de texto por página. Faz a descoberta (skip por
@@ -47,7 +47,7 @@ def _load_latest_bronze() -> list[dict]:
 
 # Skip por keyword: arquivos que não acrescentam ao RAG nem à síntese
 # (minuta, declarações, cartas, slides, ofícios, telas, ebook, peças judiciais).
-# FONTE AUTORITATIVA = wikis/finep.md §4.2 (lido via wiki_schema.skip_keywords).
+# FONTE AUTORITATIVA = docs/domain/sources/finep.md §4.2 (lido via wiki_schema.skip_keywords).
 # Esta constante é só FALLBACK defensivo se o doc estiver ausente/ilegível.
 _SKIP_KEYWORDS_FALLBACK = [
     "minuta", "declaracao", "carta_de_manifestacao",
@@ -59,7 +59,7 @@ _SKIP_KEYWORDS_FALLBACK = [
 
 
 def _skip_keywords() -> list[str]:
-    """Skip-list autoritativa do doc (wikis/finep.md §4.2); fallback à constante."""
+    """Skip-list autoritativa do doc (docs/domain/sources/finep.md §4.2); fallback à constante."""
     from radar.core.kg import schema  # import tardio: evita ciclo no import do pipeline
     return schema.skip_keywords("finep") or _SKIP_KEYWORDS_FALLBACK
 

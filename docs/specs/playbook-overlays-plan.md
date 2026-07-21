@@ -150,7 +150,7 @@ loga e não quebra o save (mesmo padrão do `set_section_content` atual).
 
 ### Por que a tabela `playbook_overlays` não é tocada
 O tier 2 (praxe da agência/mecanismo) foi decidido **permanecer no git**, escrito pelo
-operador (como [skills/source/finep/global.md](../../skills/source/finep/global.md) hoje). A
+operador (como [docs/playbooks/source/finep/global.md](../playbooks/source/finep/global.md) hoje). A
 tabela foi desenhada (migration 024) para o caso "sistema destila padrão de vários clientes e
 promove como conhecimento global" — exatamente a esteira automática que Lucas adiou. Ativá-la
 agora seria construir a casa antes do morador. O reader dormente

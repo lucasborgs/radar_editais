@@ -60,7 +60,7 @@ load_dotenv()
 
 from radar.core.config import ROOT  # noqa: E402
 
-GOLDEN_DIR = ROOT / "eval_data" / "golden"
+GOLDEN_DIR = ROOT / "data" / "evaluation" / "golden"
 RESULTS_DIR = ROOT / "eval_results"
 
 BASELINE = "text-embedding-3-large"
