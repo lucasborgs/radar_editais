@@ -2,7 +2,7 @@
 # Imagem única para os 2 serviços do docker-compose.yml:
 #   app    → usa o CMD abaixo (uvicorn).
 #   worker → sobrescreve o CMD no docker-compose.yml
-#            (python -m procrastinate --app=core.tasks.app worker).
+#            (python -m procrastinate --app=radar.core.tasks.app worker).
 # See docs/historical/ADR-001-decisoes-iniciais.md (D1, D3, D4).
 
 FROM python:3.12-slim AS base
@@ -12,15 +12,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 WORKDIR /app
 
 COPY pyproject.toml requirements.lock.txt requirements.worker.lock.txt ./
-COPY backend/ ./backend/
-COPY core/ ./core/
-COPY domain/ ./domain/
-COPY pipeline/ ./pipeline/
+COPY src/ ./src/
 COPY scripts/ ./scripts/
 COPY wikis/ ./wikis/
 COPY WIKI.md ./
 
 RUN pip install --no-cache-dir --require-hashes -r requirements.lock.txt
+RUN pip install --no-cache-dir --no-deps --no-build-isolation .
 
 FROM base AS app
 
@@ -31,7 +29,7 @@ EXPOSE 8000
 
 # Shell-form para expandir ${PORT}, caso o ambiente injete uma porta dinâmica;
 # local cai no fallback 8000. O serviço worker sobrescreve este CMD (ver cabeçalho).
-CMD uvicorn backend.api:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD uvicorn radar.api.app:app --host 0.0.0.0 --port ${PORT:-8000}
 
 # O Crawl4AI é uma capacidade opcional da Descoberta. Fica exclusivamente no
 # worker para não aumentar a imagem nem a superfície da API síncrona.
@@ -46,4 +44,4 @@ RUN pip install --no-cache-dir --require-hashes -r requirements.worker.lock.txt 
     && chown -R app:app /app /ms-playwright
 USER app
 
-CMD python -m procrastinate --app=core.tasks.app worker
+CMD python -m procrastinate --app=radar.core.tasks.app worker
