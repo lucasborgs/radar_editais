@@ -56,7 +56,7 @@ Suba então app e worker paralelos ao stack publicado. Eles usam porta, nomes e
 volume separados; não suba o serviço `tunnel`:
 
 ```bash
-docker compose --env-file .env.staging-local -p radar-staging-local up -d app worker
+scripts/compose.sh staging-local up -d app worker
 ```
 
 O frontend local usa `http://127.0.0.1:8001` para a API e
@@ -73,8 +73,29 @@ cobrança, tunnel e promoção automática de descoberta permanecem desligados.
 Para encerrar apenas a pré-produção:
 
 ```bash
-docker compose --env-file .env.staging-local -p radar-staging-local down
+scripts/compose.sh staging-local down
 ```
+
+## Identidade dos projetos Compose
+
+Use sempre [`scripts/compose.sh`](../../scripts/compose.sh) para os serviços do
+Radar. O wrapper fixa o arquivo de ambiente e o nome do projeto, impedindo que
+um teardown de validação encontre os containers públicos:
+
+| Alvo | Projeto Compose | Perfil |
+| --- | --- | --- |
+| Produção | `radar-production` | `.env` (`ENVIRONMENT=production`) |
+| Pré-produção local | `radar-staging-local` | `.env.staging-local` (`ENVIRONMENT=test`) |
+
+Um `down` de produção exige confirmação explícita e deliberada:
+
+```bash
+ALLOW_PRODUCTION_DOWN=radar-production scripts/compose.sh production down
+```
+
+Comandos `docker compose` sem o wrapper não compartilham a identidade
+`radar-production` e, portanto, não removem os containers públicos. O wrapper
+também rejeita tentativas de sobrescrever `--project-name` ou `--env-file`.
 
 ## Staging Cloud futuro
 
