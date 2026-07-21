@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+COPY pyproject.toml requirements.lock.txt ./
 COPY config.py ./
 COPY backend/ ./backend/
 COPY core/ ./core/
@@ -21,7 +21,7 @@ COPY scripts/ ./scripts/
 COPY wikis/ ./wikis/
 COPY WIKI.md ./
 
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock.txt
 
 FROM base AS app
 
