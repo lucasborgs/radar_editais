@@ -136,11 +136,6 @@ class WritingSectionSaveRequest(BaseModel):
     content: str
 
 
-class ChecklistUpdateRequest(BaseModel):
-    item_id: str
-    status: str  # "pending" | "addressed" | "not_applicable"
-
-
 class WritingRefineRequest(BaseModel):
     session_id: str
     section_title: str
@@ -385,61 +380,6 @@ def writing_delete_session(session_id: str, user_id: CurrentUserId, db: DbClient
     return {"ok": True}
 
 
-@router.get(
-    "/writing/sessions/{session_id}/document",
-    summary="Retorna documento (section_drafts) salvo da sessão",
-)
-def writing_session_document(
-    session_id: str,
-    user_id: CurrentUserId,
-    db: DbClient,
-):
-    workspace_id = get_workspace_id(db, user_id)
-    doc = get_session_document(db, session_id, workspace_id)
-    if doc is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Sessão '{session_id}' não encontrada",
-        )
-    return doc
-
-
-@router.get("/writing/{session_id}/checklist", summary="Checklist de requisitos do edital")
-def writing_checklist(session_id: str, user_id: CurrentUserId, db: DbClient):
-    """Reconstrói o checklist a partir do edital. Estado de marcação não é
-    persistido nesta wave — o frontend deve re-aplicar as marcações localmente.
-    """
-    from core.services.checklist_service import build_checklist
-    workspace_id = get_workspace_id(db, user_id)
-    doc = get_session_document(db, session_id, workspace_id)
-    if doc is None:
-        raise HTTPException(status_code=404, detail=f"Sessão '{session_id}' não encontrada")
-    return {"session_id": session_id, "items": build_checklist(doc["edital_id"])}
-
-
-@router.put("/writing/{session_id}/checklist/{item_id}", summary="Atualiza status de requisito")
-def writing_checklist_update(
-    session_id: str,
-    item_id: str,
-    req: ChecklistUpdateRequest,
-    user_id: CurrentUserId,
-    db: DbClient,
-):
-    """Stateless — devolve o item atualizado. Persistência do checklist será
-    adicionada em uma wave posterior (não existe coluna dedicada hoje).
-    """
-    from core.services.checklist_service import build_checklist
-    workspace_id = get_workspace_id(db, user_id)
-    doc = get_session_document(db, session_id, workspace_id)
-    if doc is None:
-        raise HTTPException(status_code=404, detail=f"Sessão '{session_id}' não encontrada")
-    for item in build_checklist(doc["edital_id"]):
-        if item["id"] == item_id:
-            item["status"] = req.status
-            return {"success": True, "item": item}
-    raise HTTPException(status_code=404, detail=f"Item '{item_id}' não encontrado")
-
-
 @router.post(
     "/writing/{session_id}/checklist/auto-review",
     summary="LLM revisa documento em 3 passes paralelas (compliance, qualidade, completude)",
@@ -498,42 +438,6 @@ async def writing_checklist_auto_review(
     )
     _attach_issue_sections(review, outline)
     return {"session_id": session_id, "review": review}
-
-
-@router.get(
-    "/writing/{session_id}/compliance",
-    summary="Retorna resultado do compliance check (background)",
-)
-def writing_compliance(
-    session_id: str,
-    user_id: CurrentUserId,
-    db: DbClient,
-):
-    """Retorna o resultado do compliance auto-review executado em background
-    após o primeiro turno.
-
-    Status possíveis:
-      - "pending": ainda sendo processado
-      - "ready": resultado disponível em `review`
-      - "unavailable": sessão não encontrada ou sem requisitos
-    """
-    workspace_id = get_workspace_id(db, user_id)
-    result = (
-        db.table("writing_sessions")
-        .select("compliance_result")
-        .eq("id", session_id)
-        .eq("workspace_id", workspace_id)
-        .maybe_single()
-        .execute()
-    )
-    row = result.data if result else None
-    if not row:
-        raise HTTPException(status_code=404, detail="Sessão não encontrada")
-
-    review = row.get("compliance_result")
-    if not review:
-        return {"session_id": session_id, "status": "pending", "review": None}
-    return {"session_id": session_id, "status": "ready", "review": review}
 
 
 def _attach_issue_sections(review: dict, outline: list[str]) -> None:
@@ -652,48 +556,6 @@ def writing_save_to_storage(session_id: str, user_id: CurrentUserId, db: DbClien
         ) from e
 
     return {"path": path, "signed_url": signed.get("signedURL"), "session_id": session_id}
-
-
-@router.post("/writing/{session_id}/close", summary="Fecha a sessão e extrai sinal episódico")
-def writing_close(session_id: str, user_id: CurrentUserId, db: DbClient):
-    """Marca a sessão como `completed` e extrai sinal episódico da janela viva.
-
-    Item 4 (Sprint 2): a compressão (`_compress_history`) já extrai sinal de
-    turnos que saíram da janela. Mas sessões curtas (abaixo do threshold de
-    compressão) nunca disparam compressão — seu sinal se perderia. Este endpoint
-    cobre esse caso: roda `extract_session_signal` sobre o `_history` ainda na
-    janela viva.
-
-    Idempotência best-effort: pode haver leve sobreposição com o que a compressão
-    já extraiu (os turnos comprimidos saem de `_history`, mas a janela viva pode
-    conter turnos parcialmente já vistos em runs anteriores deste endpoint). O
-    custo é um insight duplicado, não corrupção — aceitável dado o sinal heurístico.
-    """
-    workspace_id = get_workspace_id(db, user_id)
-    profile = profile_from_workspace(db, workspace_id)
-    try:
-        session = WritingSession(
-            db=db,
-            workspace_id=workspace_id,
-            profile=profile,
-            session_id=session_id,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-
-    # Marca a sessão como fechada. `status` aceita active | completed | abandoned
-    # (ver list_sessions); 'completed' é o terminal de uma sessão concluída.
-    try:
-        db.table("writing_sessions").update({"status": "completed"}).eq(
-            "id", session_id
-        ).execute()
-    except Exception:
-        pass
-
-    # Extrai sinal da janela viva (turnos que nunca foram comprimidos).
-    signals = session.extract_session_signal(session._history)
-    inserted = session._persist_session_signals(signals) if signals else 0
-    return {"closed": True, "signals_extracted": inserted}
 
 
 @router.post("/writing/section-start", summary="Mensagem inicial para uma seção da proposta")

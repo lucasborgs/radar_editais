@@ -252,12 +252,6 @@ def evaluate_opportunity(constraints: list[dict] | None, profile: Any) -> dict:
     return {"status": status, "unsat": unsat, "unknown": unknown}
 
 
-def is_eliminated(constraints: list[dict] | None, profile: Any) -> bool:
-    """Atalho do Estágio 0: True só quando há incompatibilidade COMPROVADA
-    (`unsat`). `unknown` nunca elimina (PR5)."""
-    return evaluate_opportunity(constraints, profile)["status"] == INELEGIVEL
-
-
 # ── Regras curadas (KG v2 resíduos PR-E.2, R4) ───────────────────────────────
 
 _CACHED_RULES: dict | None = None
@@ -286,13 +280,6 @@ def load_curated_rules() -> dict:
     return _CACHED_RULES
 
 
-def porte_info(porte_slug: str) -> dict:
-    """Metadados de um porte (label, faturamento_max, descricao) das regras curadas.
-    Retorna dict vazio se o porte não estiver na tabela."""
-    rules = load_curated_rules()
-    return rules.get("portes", {}).get(porte_slug, {})
-
-
 def contrapartida_minima(porte: str, uf: str) -> dict:
     """Percentual de contrapartida mínima esperado dado porte + UF.
 
@@ -314,20 +301,6 @@ def contrapartida_minima(porte: str, uf: str) -> dict:
             return {"pct": row["contrapartida_pct"], "regiao": None, "uf": uf.upper(),
                     "fonte": "regras_elegibilidade.json v1"}
     return {}
-
-
-def format_receita_regra(profile: Any) -> str:
-    """Interpreta o campo `receita = último exercício` das regras curadas,
-    devolvendo o texto da regra + o valor do perfil (se disponível)."""
-    rules = load_curated_rules()
-    texto = rules.get("interpretacoes", {}).get("receita", "")
-    raw = _profile_get(profile, "faturamento_anual")
-    if raw is not None:
-        try:
-            texto += f" (perfil: R$ {float(raw):,.0f})"
-        except (ValueError, TypeError):
-            pass
-    return texto
 
 
 def format_curated_rules_block(profile: Any, constraints: list[dict] | None = None) -> str:

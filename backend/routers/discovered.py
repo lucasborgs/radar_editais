@@ -313,16 +313,6 @@ def promote_discovered(opp_id: str, user_id: AdminUserId, body: PromoteBody | No
     return resp
 
 
-@router.get("/{opp_id}/promotion", summary="Estado técnico da promoção aprovada")
-def get_promotion(opp_id: str, user_id: AdminUserId):
-    """Detalhe administrativo seguro: estados, artefatos e linha do tempo."""
-    db = get_supabase_service()
-    run = discovery_promotion.latest_run(db, opp_id)
-    if not run:
-        raise HTTPException(status_code=404, detail="Nenhuma promoção encontrada")
-    return {"run": run, "events": discovery_promotion.events_for_run(db, run["id"])}
-
-
 class RetryPromotionBody(BaseModel):
     stage: str
 

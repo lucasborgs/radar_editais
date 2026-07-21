@@ -1,7 +1,7 @@
 """Testes das regras curadas de elegibilidade (KG v2 resíduos PR-E.2, R4).
 
 Cobrem as funções novas em core/services/eligibility.py: load_curated_rules,
-porte_info, contrapartida_minima, format_receita_regra.
+contrapartida_minima e formatação do bloco de regras.
 """
 from __future__ import annotations
 
@@ -11,10 +11,7 @@ from core.services.eligibility import (
     evaluate_constraint,
     evaluate_opportunity,
     format_curated_rules_block,
-    format_receita_regra,
-    is_eliminated,
     load_curated_rules,
-    porte_info,
 )
 
 
@@ -24,22 +21,6 @@ def test_load_rules_returns_dict():
     assert "portes" in rules
     assert "contrapartida" in rules
     assert "interpretacoes" in rules
-
-
-def test_porte_info_known():
-    info = porte_info("me")
-    assert info["label"] == "ME (Microempresa)"
-    assert info["faturamento_max"] == 4800000
-
-
-def test_porte_info_unknown():
-    assert porte_info("nonexistent") == {}
-
-
-def test_porte_info_all_defined():
-    for slug in ("me", "epp", "media", "grande"):
-        info = porte_info(slug)
-        assert info.get("label"), f"{slug} should have a label"
 
 
 def test_contrapartida_minima_finds_by_porte_and_region():
@@ -62,20 +43,6 @@ def test_contrapartida_minima_fallback_generic():
 
 def test_contrapartida_minima_unknown_porte():
     assert contrapartida_minima("nonexistent", "SP") == {}
-
-
-def test_format_receita_regra():
-    class FakeProfile:
-        faturamento_anual = 5000000
-
-    texto = format_receita_regra(FakeProfile())
-    assert "exercício" in texto or "exercicio" in texto.lower()
-    assert "5,000,000" in texto
-
-
-def test_format_receita_regra_sem_perfil():
-    texto = format_receita_regra(None)
-    assert "exercício" in texto or "exercicio" in texto.lower()
 
 
 def test_evaluate_constraint_porte_me():
@@ -131,14 +98,6 @@ def test_evaluate_opportunity_aggregates():
     result = evaluate_opportunity(constraints, profile)
     assert result["status"] == "inelegivel"
     assert any("SP" in r for r in result["unsat"])
-
-
-def test_is_eliminated():
-    constraints = [{"tipo": "porte", "op": "in", "valor": ["me"]}]
-    profile = {"tamanho_empresa": "grande"}
-    assert is_eliminated(constraints, profile) is True
-    profile2 = {"tamanho_empresa": "me"}
-    assert is_eliminated(constraints, profile2) is False
 
 
 def test_unknown_constraint_type_is_safe():

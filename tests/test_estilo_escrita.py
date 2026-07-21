@@ -143,21 +143,6 @@ def test_generation_messages_sem_bloco_quando_estilo_vazio():
     assert "ESTILO DA EMPRESA" not in joined
 
 
-def test_agent_initial_messages_contem_estilo_quando_preenchido():
-    s = _make_session(estilo="prefere números concretos a adjetivos")
-    msgs = s._build_agent_initial_messages("escreva a seção", None, "")
-    joined = _joined(msgs)
-    assert "ESTILO DA EMPRESA" in joined
-    assert "prefere números concretos a adjetivos" in joined
-
-
-def test_agent_initial_messages_sem_bloco_quando_estilo_vazio():
-    s = _make_session(estilo="")
-    msgs = s._build_agent_initial_messages("escreva a seção", None, "")
-    joined = _joined(msgs)
-    assert "ESTILO DA EMPRESA" not in joined
-
-
 def test_estilo_nao_referenciado_em_paths_de_monitor_ou_critic():
     """Checagem arquitetural: estilo_escrita/_estilo_empresa_block não podem
     aparecer no código que alimenta ComplianceMonitor/Critic — nem por

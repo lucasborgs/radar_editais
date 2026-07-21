@@ -56,13 +56,3 @@ def resolve_model(tier: str | None = None) -> str:
         logger.debug("resolve_model: tier desconhecido %r → auto", tier)
         tier_lower = "auto"
     return mapping[tier_lower]
-
-
-def list_tiers() -> list[dict]:
-    """Para /commands ou UI de seleção: retorna metadata dos tiers."""
-    mapping = _tier_map()
-    return [
-        {"tier": "fast", "model": mapping["fast"], "label": "Rápido", "use_case": "Tarefas comuns, baixa latência"},
-        {"tier": "auto", "model": mapping["auto"], "label": "Automático", "use_case": "Default — mesmo que rápido por enquanto"},
-        {"tier": "pro",  "model": mapping["pro"],  "label": "Pro",      "use_case": "Tarefas de alto valor (brief, draft final, review crítico)"},
-    ]

@@ -135,14 +135,12 @@ tipada durante a implementação, mas o contrato inclui:
 - `POST /discovered-opportunities/{id}/promote`: mantém a aprovação humana,
   retorna `promotion_run` inicial e seus próximos passos; a resposta não
   promete ingestão concluída apenas porque jobs foram enfileirados.
-- `GET /discovered-opportunities/{id}/promotion`: retorna a execução mais
-  recente, etapas, artefatos seguros e eventos de auditoria.
 - `POST /discovered-opportunities/{id}/promotion/retry`: recebe a etapa
   elegível (`fetch`, `silver`, `radar` ou `rag`), cria um evento de retry e
   enfileira apenas o trabalho necessário. Não aceita retry para `pending` ou
   `rejected`.
-- `GET /discovered-opportunities?include_reviewed=true`: acrescenta um resumo
-  do último run para a fila administrativa, sem carregar eventos completos.
+- `GET /discovered-opportunities?include_reviewed=true`: expõe na própria fila
+  administrativa o resumo do último run, sem carregar eventos completos.
 
 O endpoint de rejeição continua exclusivamente editorial. Uma tentativa de
 promover/rejeitar de novo continua retornando conflito, evitando duas rotas de

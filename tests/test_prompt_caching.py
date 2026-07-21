@@ -1,7 +1,7 @@
 """Testes do prompt caching Anthropic (PR2 — hardening pré-beta).
 
 Cobrem o contrato produtor/consumidor da flag `cache_hint`:
-  • produtor (`writing_session._build_agent_initial_messages` / explore) marca
+  • produtores de escrita/explore marcam
     os dicts-breakpoint com `"cache_hint": True`;
   • consumidor (`agent_graph._to_lc_messages` / `_build_system_message`) consome
     a flag SEMPRE (ela nunca vaza para a API) e só a converte em `cache_control`
@@ -161,79 +161,6 @@ def _make_session() -> WritingSession:
 
 def _index_of(msgs: list[dict], text: str) -> int:
     return next(i for i, m in enumerate(msgs) if text in str(m["content"]))
-
-
-def test_temporal_after_history_in_agent_builder(monkeypatch):
-    monkeypatch.setenv("WRITING_SEMANTIC_MEMORY", "0")
-    s = _make_session()
-    s._history = [
-        {"role": "user", "content": "h_user"},
-        {"role": "assistant", "content": "h_assistant"},
-    ]
-    s._history_summary = "[Resumo anterior: conversa antiga]"
-
-    msgs = s._build_agent_initial_messages("nova pergunta", None, "")
-
-    i_temporal = _index_of(msgs, "CONTEXTO TEMPORAL")
-    i_last_history = _index_of(msgs, "h_assistant")
-    i_summary = _index_of(msgs, "Resumo anterior")
-    assert i_temporal > i_last_history, "temporal deve vir DEPOIS do history (tail)"
-    assert i_temporal > i_summary, "temporal saiu do prefixo estável (§2.1)"
-    # Mensagem atual segue sendo a última.
-    assert msgs[-1]["content"] == "nova pergunta"
-
-
-def test_agent_builder_marks_two_breakpoints(monkeypatch):
-    """cache_hint na última msg do prefixo estável + na mensagem atual (e só)."""
-    monkeypatch.setenv("WRITING_SEMANTIC_MEMORY", "0")
-    s = _make_session()
-    s._history = [{"role": "user", "content": "h1"}]
-    s._history_summary = "[Resumo anterior: x]"
-
-    msgs = s._build_agent_initial_messages("oi", None, "")
-
-    hinted = [m for m in msgs if m.get("cache_hint")]
-    assert len(hinted) == 2
-    # Breakpoint 2: fim do prefixo estável = summary (última entre
-    # perfil/card/programa/library/summary presentes).
-    assert "Resumo anterior" in hinted[0]["content"]
-    # Breakpoint 3: mensagem do usuário atual.
-    assert hinted[1]["content"] == "oi"
-    # History não é breakpoint.
-    assert not any(m.get("cache_hint") for m in msgs if m["content"] == "h1")
-
-
-def test_agent_builder_breakpoint_falls_back_to_profile(monkeypatch):
-    """Sem card/programa/library/outline/summary, o breakpoint 2 cai no perfil
-    (1ª msg). Nota: o outline entrou no prefixo estável depois do PR2 (fix de
-    2026-07-02, ced080386) — quando presente, ELE é a última msg estável e leva o
-    breakpoint (coberto por test_agent_builder_marks_two_breakpoints via summary).
-    Aqui esvaziamos o outline para exercitar de fato o caso degenerado só-perfil."""
-    monkeypatch.setenv("WRITING_SEMANTIC_MEMORY", "0")
-    s = _make_session()
-    s._proposal_outline = []  # só-perfil: sem outline no prefixo estável
-
-    msgs = s._build_agent_initial_messages("oi", None, "")
-
-    assert msgs[0].get("cache_hint") is True
-    assert "PERFIL DA EMPRESA" in msgs[0]["content"]
-
-
-def test_agent_builder_breakpoint_on_outline_when_no_summary(monkeypatch):
-    """Interação PR2 × fix de outline (ced080386): com outline presente e SEM
-    summary, o outline é a última msg estável → leva o breakpoint 2 (não o perfil).
-    Trava a regressão que a integração das branches expôs."""
-    monkeypatch.setenv("WRITING_SEMANTIC_MEMORY", "0")
-    s = _make_session()  # _make_session já seta _proposal_outline; sem summary
-    s._history_summary = ""
-
-    msgs = s._build_agent_initial_messages("oi", None, "")
-
-    hinted = [m for m in msgs if m.get("cache_hint")]
-    assert len(hinted) == 2
-    assert "OUTLINE COMPLETO" in hinted[0]["content"]
-    assert hinted[1]["content"] == "oi"
-    assert msgs[0].get("cache_hint") is None  # perfil não é o breakpoint aqui
 
 
 def test_temporal_in_tail_of_generation_builder():

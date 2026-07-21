@@ -220,7 +220,6 @@ def _format_outcomes_for_prompt(outcomes: list[dict]) -> str:
         )
     return "\n".join(parts)
 
-
 def reflect_workspace(db: Client, workspace_id: str) -> dict:
     """Gera observações (level 1) sobre outcomes do workspace e persiste.
 
@@ -597,48 +596,3 @@ def search_insights_for_tool(db: Client, workspace_id: str, query: str = "") -> 
         label = "Padrão estratégico" if ins.get("level") == 2 else "Observação"
         parts.append(f"• [{label}] {ins.get('insight', '')}")
     return "\n".join(parts)
-
-
-def deactivate_insight(
-    db: Client,
-    insight_id: str,
-    deactivated_by_insight_id: str | None,
-    reason: str,
-) -> bool:
-    """Marca um reflection_insight como desativado, com audit trail (Gap 3b).
-
-    Consumido por Gap 3a (full mode reflection) quando um insight novo supera
-    um antigo. Idempotente sobre insights já desativados — o filtro
-    `is_("deactivated_at", "null")` garante que o timestamp original seja
-    preservado.
-
-    Args:
-        insight_id: id do insight a desativar.
-        deactivated_by_insight_id: id do insight que substituiu este (audit).
-            Pode ser None se a desativação for manual/admin.
-        reason: justificativa em texto livre.
-
-    Returns:
-        True se uma row foi atualizada, False se já estava desativado, não
-        existe, ou pertence a outro workspace (RLS).
-    """
-    payload: dict = {
-        "deactivated_at": "now()",
-        "deactivation_reason": reason,
-    }
-    if deactivated_by_insight_id:
-        payload["deactivated_by_insight_id"] = deactivated_by_insight_id
-
-    result = (
-        db.table("reflection_insights")
-        .update(payload)
-        .eq("id", insight_id)
-        .is_("deactivated_at", "null")
-        .execute()
-    )
-    # Espelha a desativação no Store (Etapa 5). A row atualizada traz o workspace_id.
-    if result.data:
-        ws = result.data[0].get("workspace_id")
-        if ws:
-            _project_to_store(str(ws), deleted=result.data)
-    return bool(result.data)

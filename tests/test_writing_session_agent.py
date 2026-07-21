@@ -622,5 +622,5 @@ def test_search_edital_returns_fund_node_in_pitch():
 
 def test_pitch_context_injected_in_initial_messages():
     s = _make_pitch_session()
-    msgs = s._build_agent_initial_messages("escreva o problema", None, "")
+    msgs = s._build_thread_initial_messages("escreva o problema", None, "")
     assert any("FUNDO-ALVO" in m["content"] for m in msgs)

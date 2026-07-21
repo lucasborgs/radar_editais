@@ -79,25 +79,6 @@ def library_list(
     return items
 
 
-@router.get("/recommend", summary="Recupera items mais relevantes via scoring multi-critério (Fase 2 #16)")
-def library_recommend(
-    user_id: CurrentUserId,
-    db: DbClient,
-    q: str,
-    k: int = 10,
-):
-    """Multi-criteria retrieval: 0.4·recency + 0.3·importance(decay) + 0.3·cosine.
-
-    Usado para autocomplete de @ mentions (substitui o ilike simples quando
-    embeddings estão populados) e seleção automática de library_items para
-    WritingSession. Items sem embedding ainda gerado são silenciosamente
-    excluídos — retorna lista possivelmente menor que k até backfill completar.
-    """
-    workspace_id = get_workspace_id(db, user_id)
-    from core.retrieval.retriever import retrieve_library_items
-    return retrieve_library_items(workspace_id, query=q, k=k)
-
-
 @router.get("/{item_id}", summary="Retorna item completo (com key_facts)")
 def library_get(item_id: str, user_id: CurrentUserId, db: DbClient):
     workspace_id = get_workspace_id(db, user_id)

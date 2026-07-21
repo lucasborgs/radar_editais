@@ -258,7 +258,7 @@ async def reflect_workspace_task(workspace_id: str) -> None:
     Triggers:
       - Automático: cada transição de status para outcome (submetida/aprovada/
         reprovada) em PUT /applications/{id}/status enfileira esta task.
-      - On-demand: POST /me/reflect ou agendamento manual.
+      - Manual: enfileiramento operacional da task.
 
     A task self-gateia em MIN_OUTCOMES_FOR_REFLECTION (pula se há poucos
     outcomes) e supersede o lote de insights anterior, então é seguro
@@ -300,7 +300,7 @@ async def synthesize_patterns_task(workspace_id: str) -> None:
     Triggers:
       - Periódico: cron semanal (domingo 05:00 UTC) para todos os workspaces
         ativos (ver synthesize_patterns_cron).
-      - On-demand: POST /me/synthesize.
+      - Manual: enfileiramento operacional da task.
 
     Self-gateia em MIN_LEVEL1_FOR_SYNTHESIS (pula se há poucas observações
     ativas), então é seguro enfileirar livremente.

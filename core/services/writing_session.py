@@ -229,11 +229,6 @@ DADOS EXTERNOS
 # KG (tese + portfólio), injetado como contexto. Selecionado por opportunity_type
 # (id `investidor:` → kind_class=entidade) — spec §3.5.
 
-PITCH_OUTLINE_SYSTEM = """Você é um especialista em captação de investimento (venture capital) para startups deep-tech.
-Com base no perfil da startup e na tese do fundo-alvo, gere o outline das seções de um pitch/one-pager outbound.
-Retorne APENAS um JSON array de strings com os títulos das seções, na ordem correta.
-Exemplo: ["1. Problema", "2. Solução", "3. Mercado (TAM)", "4. Tração", "5. Time", "6. Ask e uso dos recursos"]"""
-
 _PITCH_SECTION_STARTER_SYSTEM = """Você é um especialista em captação de investimento (venture capital) para startups deep-tech.
 Gere mensagens curtas e acionáveis para orientar o início de uma seção do pitch, conectando o perfil da startup à tese do fundo-alvo."""
 
@@ -1736,7 +1731,7 @@ class WritingSession:
         disponível para complemento. O comando final instrui o JSON structured
         output {content, citations} com referências aos chunk_ids injetados.
 
-        Espelha o prefixo estável de `_build_agent_initial_messages` (perfil,
+        Espelha o prefixo estável da thread de escrita (perfil,
         alvo, biblioteca, outline) — idêntico entre seções para preservar prompt
         caching — e fecha com chunks + comando de escrita. Sem histórico
         de conversa (não há diálogo no batch); com consciência do outline completo
@@ -2191,8 +2186,7 @@ class WritingSession:
         mentions_context: str,
         include_history: bool = False,
     ) -> list[dict]:
-        """Item 3 (thread-por-sessão): mensagens de um turno FRESCO numa thread
-        durável. Diferente de `_build_agent_initial_messages` (legacy/por-turno):
+        """Mensagens de um turno fresco numa thread durável.
 
           • Normalmente NÃO re-injeta `self._history` — o checkpointer replaya o
             episódico. EXCEÇÃO (`include_history=True`): PONTE de semeadura na 1ª
@@ -2241,99 +2235,6 @@ class WritingSession:
             "cache_hint": True,
         }
         return [prefix, *history_msgs, current]
-
-    def _build_agent_initial_messages(
-        self,
-        user_message: str,
-        section_hint: str | None,
-        mentions_context: str,
-    ) -> list[dict]:
-        """Prefixo estável + mensagem atual, no formato esperado pelo Anthropic
-        (sem system; ele vai como parâmetro top-level do run_writing_turn).
-
-        A ordem espelha `_build_messages` (legacy), com 2 diferenças:
-          • Sem RAG / sem retrieval auto de library: o agente busca via tools
-          • Prefixo estável (perfil + card + programa + library_anexada + summary
-            + history) antes da mensagem para preservar prompt caching; insights
-            (Etapa 5) e o bloco temporal (PR2 §2.1 — muda diariamente, `hoje é
-            {today}`/days_remaining) ficam no tail dinâmico.
-
-        Breakpoints de cache (PR2 §2.2): `cache_hint: True` marca a última mensagem
-        do prefixo estável e a mensagem do usuário atual; o consumidor
-        (`agent_graph._to_lc_messages`) consome a flag SEMPRE e só a converte em
-        `cache_control` quando provider == "anthropic".
-        """
-        messages: list[dict] = [
-            {"role": "user", "content": f"PERFIL DA EMPRESA:\n{self._profile_context}"},
-        ]
-        if self._source_card_context:
-            messages.append({"role": "user", "content": self._source_card_context})
-        if self._programa_context:
-            messages.append({"role": "user", "content": self._programa_context})
-        if self._library_context:
-            messages.append({"role": "user", "content": self._library_context})
-        if self._proposal_outline:
-            outline_str = "\n".join(f"- {t}" for t in self._proposal_outline)
-            messages.append({
-                "role": "user",
-                "content": (
-                    f"OUTLINE COMPLETO DA PROPOSTA (para save_draft/read_section — "
-                    f"use o título EXATO como está aqui, não invente outra estrutura):"
-                    f"\n{outline_str}"
-                ),
-            })
-        if self._history_summary:
-            messages.append({"role": "user", "content": self._history_summary})
-
-        # F5: for_writer do playbook — estável por sessão, entra ANTES do
-        # breakpoint de cache (Breakpoint 2 abaixo) para o bloco entrar no
-        # prefixo cacheável. ~1.5k tokens estáveis; degrade limpo se vazio.
-        if self._playbook_writer_block:
-            messages.append({
-                "role": "user",
-                "content": f"PLAYBOOK DE ESCRITA:\n{self._playbook_writer_block}",
-            })
-
-        # Estilo de escrita da empresa (craft, não elegibilidade) — bloco
-        # irmão do playbook acima, só para o Redator. Vazio quando o dono não
-        # preencheu (regressão-zero). NUNCA entra em for_monitor()/Critic.
-        if self._estilo_empresa_block:
-            messages.append({
-                "role": "user",
-                "content": self._estilo_empresa_block,
-            })
-
-        # Breakpoint 2 (PR2 §2.2): fim do prefixo estável entre turnos — a última
-        # mensagem entre perfil/card/programa/library/summary/playbook. O history
-        # vem depois (append-mostly): o cache incremental da Anthropic reaproveita
-        # o maior prefixo comum entre turnos a partir daqui.
-        messages[-1]["cache_hint"] = True
-
-        messages.extend(self._history)
-
-        # Tail dinâmico — tudo daqui pra baixo varia por turno e ficaria caro no
-        # prefixo:
-        #   • temporal (PR2 §2.1): muda diariamente (days_remaining) — correto,
-        #     mas invalidaria o prefixo inteiro se viesse antes;
-        #   • insights query-conditioned (Etapa 5): a busca semântica muda o bloco
-        #     a cada turno;
-        #   • mentions/section: já variam por turno.
-        if self._temporal_block:
-            messages.append({"role": "user", "content": self._temporal_block})
-
-        reflection_block = self._build_reflection_context_for_turn(user_message, section_hint)
-        if reflection_block:
-            messages.append({"role": "user", "content": reflection_block})
-
-        if mentions_context:
-            messages.append({"role": "user", "content": mentions_context})
-        if section_hint:
-            messages.append({"role": "user", "content": f"[Seção ativa: {section_hint}]"})
-
-        # Breakpoint 3 (PR2 §2.2): mensagem do usuário atual — faz as iterações
-        # 2..N do mesmo turno ReAct lerem TODO o prefixo do cache (TTL 5 min).
-        messages.append({"role": "user", "content": user_message, "cache_hint": True})
-        return messages
 
     def _persist_turn(
         self,
@@ -2991,7 +2892,7 @@ def get_session_document(
 ) -> dict | None:
     """Lê writing_sessions.section_drafts + proposal_outline (sem reconstruir
     o objeto WritingSession). Útil para o endpoint leve
-    GET /writing/sessions/{id}/document.
+    GET /writing/{id}/document.
     """
     result = (
         db.table("writing_sessions")

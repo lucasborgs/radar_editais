@@ -63,7 +63,6 @@ class RubricVerdict:
     fit_tematico: int       # 0-2
     elegibilidade: int      # 0-2
     vigente: bool           # determinístico
-    rationale: str = ""
 
     def is_hit(self) -> bool:
         """Resultado 'bom': vigente E elegibilidade≥1 E fit≥1."""

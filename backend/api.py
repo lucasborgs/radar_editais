@@ -37,9 +37,7 @@ from backend.routers.catalog import router as catalog_router
 from backend.routers.conversations import router as conversations_router
 from backend.routers.discovered import router as discovered_router
 from backend.routers.explore import router as explore_router
-from backend.routers.files import router as files_router
 from backend.routers.planning import router as planning_router
-from backend.routers.playbooks import router as playbooks_router
 from backend.routers.profile import router as profile_router
 from backend.routers.radar import router as radar_router
 from backend.routers.research import router as research_router
@@ -213,9 +211,7 @@ app.include_router(applications_router)
 app.include_router(workspace_router)
 app.include_router(writing_router)
 app.include_router(conversations_router)
-app.include_router(files_router)
 app.include_router(profile_router)
 app.include_router(radar_router)
 app.include_router(research_router)
 app.include_router(discovered_router)
-app.include_router(playbooks_router)
