@@ -111,24 +111,11 @@ class CompanyProfile:
 
         return "\n".join(parts) if parts else "Perfil da empresa nao preenchido."
 
-    def is_complete(self) -> bool:
-        """Verifica se os campos mínimos para um match de qualidade estão preenchidos."""
-        return bool(
-            self.nome
-            and self.tipo_entidade
-            and self.tamanho_empresa
-            and self.one_liner
-            and self.solution_summary
-            and self.descricao_atividades
-            and self.trl is not None
-            and self.tipos_financiamento_interesse
-        )
-
     # Campos mínimos para INICIAR uma WritingSession (Fase 2 — gate determinístico).
     # Ordem canônica: identificação → classificação dura → descrição. A API
     # devolve `missing` ao front quando o gate barra (mesmo padrão de
-    # request_user_info). Difere de is_complete() (que mira qualidade do match):
-    # aqui o foco é o mínimo para a escrita arrancar com perfil + elegibilidade.
+    # request_user_info). O foco é o mínimo para a escrita arrancar com perfil
+    # + elegibilidade.
     _WRITING_MIN_FIELDS = (
         "nome", "tipo_entidade", "trl", "tamanho_empresa", "uf", "descricao_atividades",
     )
@@ -148,17 +135,3 @@ class CompanyProfile:
 
         missing = [f for f in self._WRITING_MIN_FIELDS if not _present(f)]
         return (not missing, missing)
-
-    def completion_pct(self) -> int:
-        """Retorna percentual de preenchimento do perfil."""
-        fields_check = [
-            bool(self.nome),
-            bool(self.tipo_entidade),
-            bool(self.one_liner),
-            bool(self.solution_summary),
-            bool(self.descricao_atividades),
-            bool(self.tamanho_empresa),
-            self.trl is not None,
-            len(self.tipos_financiamento_interesse) > 0,
-        ]
-        return int(sum(fields_check) / len(fields_check) * 100)

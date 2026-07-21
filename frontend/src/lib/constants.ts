@@ -26,14 +26,6 @@ export const STATUS_CONFIG: Record<
   },
 };
 
-/** Score color for KG match results (0-10 scale) */
-export function scoreColor(score: number): string {
-  if (score >= 7.5) return "#1DB954";
-  if (score >= 5) return "#f59e0b";
-  if (score >= 3) return "#f97316";
-  return "#ef4444";
-}
-
 /** Company size labels */
 export const PORTE_LABELS: Record<string, string> = {
   MEI: "MEI",

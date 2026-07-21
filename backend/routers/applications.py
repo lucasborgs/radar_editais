@@ -92,8 +92,7 @@ async def update_application_status(
 def _session_progress_pct(session: dict | None) -> int:
     """Calcula % de conclusão de uma proposta a partir da writing_session.
 
-    Espelha a semântica de `completionStats` (frontend/src/lib/writing.ts):
-    total = nº de seções do outline; preenchidas = seções com draft não-vazio.
+    Total = nº de seções do outline; preenchidas = seções com draft não-vazio.
     Sem sessão ou outline vazio → 0.
     """
     if not session:

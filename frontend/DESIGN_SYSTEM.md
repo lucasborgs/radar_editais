@@ -265,9 +265,7 @@ Tailwind defaults:
 | Função | Descrição |
 |---|---|
 | `cn(...inputs)` | Merge de classes Tailwind (clsx + twMerge) |
-| `formatBRL(value)` | Formata como Real brasileiro sem decimais |
-| `formatDate(iso)` | ISO → dd/mm/yyyy |
-| `daysUntil(iso)` | Dias até o prazo a partir de hoje |
+| `parseDeadline(raw)` | Normaliza prazos conhecidos para dd/mm/aaaa |
 | `truncate(text, max)` | Trunca com ellipsis |
 
 ---
@@ -279,6 +277,6 @@ Tailwind defaults:
 | `tailwind.config.ts` | Tokens customizados (cores, fontes, raios, sombras) |
 | `src/app/globals.css` | CSS variables + `@layer base` + `@layer utilities` |
 | `src/lib/constants.ts` | `SOURCE_COLORS`, `STATUS_CONFIG`, `SCORE_CONFIG` |
-| `src/lib/utils.ts` | Funções utilitárias (`cn`, `formatBRL`, etc.) |
+| `src/lib/utils.ts` | Funções utilitárias (`cn`, `parseDeadline`, `truncate`) |
 | `src/components/ui/` | Componentes reutilizáveis |
 | `src/components/layout/` | `AppSidebar`, `DashboardLayout` |

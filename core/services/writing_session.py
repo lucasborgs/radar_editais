@@ -500,9 +500,7 @@ class WritingSession:
         # _extract_tool_trace. Resetado a cada turno.
         self._tool_results: list[dict] = []
 
-        # Contadores de critic por sessão (resetados no recarregamento).
-        self._critic_block_count: int = 0
-        self._critic_pass_count: int = 0
+        # Contador de falhas abertas do critic por sessão (resetado no recarregamento).
         self._critic_fail_open_count: int = 0
 
         # F1 — anotações do critic pós-save no batch de geração. {section: dict}
@@ -1691,12 +1689,8 @@ class WritingSession:
                     "feedback": cr.feedback,
                     "fail_open": cr.fail_open,
                 }
-                if not cr.approved:
-                    self._critic_block_count += 1
-                elif cr.fail_open:
+                if cr.approved and cr.fail_open:
                     self._critic_fail_open_count += 1
-                else:
-                    self._critic_pass_count += 1
             except Exception as e:
                 logger.warning("[%s] generation: critic annotation falhou para '%s': %s",
                                self.session_id, section, e)
@@ -2043,59 +2037,6 @@ class WritingSession:
             "turn_number": self._turn_count,
             "success": True,
         }
-
-    def _first_turn_summary(self, outcome: dict) -> str:
-        """Mensagem do assistente para o primeiro turno."""
-        done = outcome.get("sections_done", [])
-        failed = outcome.get("failed_sections", [])
-        parts: list[str] = []
-        if done:
-            parts.append(
-                f"Pronto! Gerei o rascunho completo com base na sua descrição. "
-                f"{len(done)} seção(ões) escrita(s): {', '.join(done)}."
-            )
-        if failed:
-            parts.append(
-                f"{len(failed)} seção(ões) precisei de ajuda: {', '.join(failed)}. "
-                "Podemos trabalhar nelas no chat."
-            )
-        if not parts:
-            parts.append("Não consegui gerar nenhuma seção. Pode descrever melhor o projeto?")
-        parts.append(
-            "Revise cada seção e me diga o que ajustar — tom, escopo, "
-            "informações que faltam. Estou aqui para refinar."
-        )
-        return " ".join(parts)
-
-    def _record_first_turn(self, user_message: str, outcome: dict) -> None:
-        """Persiste o par (user, assistant) do primeiro turno no transcript."""
-        try:
-            self._turn_count += 1
-            idx = self._turn_count
-            assistant_msg = self._first_turn_summary(outcome)
-
-            self._history.append({"role": "user", "content": user_message})
-            self._history.append({"role": "assistant", "content": assistant_msg})
-            self._persist_turn(idx, "user", user_message, None)
-            self._persist_turn(idx, "assistant", assistant_msg, None)
-        except Exception as e:
-            logger.warning(
-                "[%s] _record_first_turn falhou: %s", self.session_id, e,
-            )
-
-    def _schedule_checklist_async(self) -> None:
-        """Agenda a execução do checklist auto-review em background.
-
-        Resultado disponível via GET /writing/{session_id}/compliance."""
-        import asyncio
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self._run_checklist_async())
-        except RuntimeError:
-            logger.debug(
-                "[%s] Sem event loop para checklist background",
-                self.session_id,
-            )
 
     async def _run_checklist_async(self) -> None:
         """Executa o checklist em background e armazena o resultado no DB."""
@@ -2553,13 +2494,6 @@ class WritingSession:
                 "[%s] Falha ao persistir section_drafts (%s): %s",
                 self.session_id, section_title, e,
             )
-
-    def get_export(self) -> str:
-        parts = []
-        for title in self._proposal_outline:
-            content = self._doc_sections.get(title, "")
-            parts.append(f"## {title}\n\n{content}" if content else f"## {title}\n\n*[A preencher]*")
-        return "\n\n---\n\n".join(parts)
 
     # ------------------------------------------------------------------
     # Montagem do prompt (prefixo estático → prompt caching)
