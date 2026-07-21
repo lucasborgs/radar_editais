@@ -1,5 +1,6 @@
 services:
   app:
+    image: "${APP_IMAGE:-radar-editais-app}:${IMAGE_TAG:-local}"
     build:
       context: .
       target: app
@@ -15,6 +16,7 @@ services:
     restart: unless-stopped
 
   worker:
+    image: "${WORKER_IMAGE:-radar-editais-worker}:${IMAGE_TAG:-local}"
     build:
       context: .
       target: worker
