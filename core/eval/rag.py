@@ -2,7 +2,7 @@
 
 Porta `scripts/eval_rag.py` para o harness unificado: `task` chama
 `retrieve_chunks` (mede latência); os `evaluators` reaproveitam
-`core.rag_eval` (Recall/Hit@K + reciprocal rank + faithfulness via juiz LLM).
+`core.eval.metrics_rag` (Recall/Hit@K + reciprocal rank + faithfulness via juiz LLM).
 Golden em `eval_data/golden/<source>.json` (gerado por scripts/generate_golden.py).
 """
 from __future__ import annotations
@@ -74,7 +74,7 @@ def eval_retrieval(*, output, expected_output, **_) -> list[Evaluation]:
     if not isinstance(output, dict) or "error" in output:
         return [{"name": "reciprocal_rank", "value": 0.0,
                  "comment": (output or {}).get("error", "output inválido")}]
-    from core.rag_eval import DEFAULT_KS, evaluate_query
+    from core.eval.metrics_rag import DEFAULT_KS, evaluate_query
 
     res = evaluate_query(output.get("retrieved", []), expected_output or [], ks=DEFAULT_KS)
     evals: list[Evaluation] = [
@@ -94,7 +94,7 @@ def eval_gold_text(*, output, metadata, **_) -> list[Evaluation]:
     gold = (metadata or {}).get("gold_text", "")
     if not gold:
         return []
-    from core.rag_eval import gold_best_chunk_recall_at_k, gold_recall_at_k
+    from core.eval.metrics_rag import gold_best_chunk_recall_at_k, gold_recall_at_k
     retrieved = output.get("retrieved", [])
     evals: list[Evaluation] = []
     for k in (3, 5):
@@ -113,7 +113,7 @@ def eval_faithfulness(*, output, **_) -> Evaluation | None:
         return None
     if not isinstance(output, dict) or "error" in output:
         return None
-    from core.rag_eval import judge_faithfulness
+    from core.eval.metrics_rag import judge_faithfulness
     return {"name": "faithfulness",
             "value": judge_faithfulness(output.get("query", ""), output.get("retrieved", []))}
 

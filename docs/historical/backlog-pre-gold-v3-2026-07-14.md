@@ -468,7 +468,7 @@
   → modelo de blocos tipado → melhor `section_path` → melhor retrieval. Motivada pela
   patologia de "unit gigante" (FAPESP texto_cru achatado → units de ~24k chars).
 - **Metodologia (no harness existente):** métrica **chunking-invariante** — token-recall
-  sobre `gold_text` (estilo Chroma) em `core/rag_eval.py` (`gold_recall_at_k`,
+  sobre `gold_text` (estilo Chroma) em `core/eval/metrics_rag.py` (`gold_recall_at_k`,
   `gold_best_chunk_recall_at_k`); golden FINEP (24q) + FAPESP (15q) regenerados com
   `gold_text`. Benches em `scripts/bench_parsing.py` / `bench_fapesp.py` / `bench_contextual.py`
   (dense-only, isola a variável chunking).
@@ -495,7 +495,7 @@
   - **Upload multi-formato** (docx/txt/md+pdf) — `core/content_library.extract_document_text`,
     nos endpoints de upload da library e `/profile/extract-from-document`. Resolve o gap real
     (cliente sobe proposta `.docx`).
-  - **Infra de eval**: token-recall chunking-invariante + `core/parsing_eval.py` (métricas
+  - **Infra de eval**: token-recall chunking-invariante + `core/eval/metrics_parsing.py` (métricas
     intrínsecas) + `gold_text` no `generate_golden`.
 - **Revisitar SÓ se:** (a) corpus de **docs do cliente** (heterogêneo, multi-formato) for
   benchmarkado com docs reais — é onde a tese de parsing PODE render (editais são estruturados
@@ -786,7 +786,7 @@
 
 ### RAG — golden `finep` com sections obsoletas (brittle a re-chunk)
 - **O quê:** a suíte `rag` casa `expected` por `source_file` + `section` EXATA
-  (`core/rag_eval.py::_matches`). O golden `eval_data/golden/finep.json` (03/06) tem
+  (`core/eval/metrics_rag.py::_matches`). O golden `eval_data/golden/finep.json` (03/06) tem
   13/24 queries com `section` específica que **não existe mais** nos chunks atuais —
   os editais foram re-chunkados e as labels de section deslocaram. Resultado: hit@5
   aparenta 0.50 mesmo o retriever acertando o PDF no rank 1.
@@ -1078,7 +1078,7 @@ de fora — nenhum bloqueia o que foi entregue.
 - **Gatilho para retomar:** querer usar `pct_grounded` como gate de merge real (falta
   só domar variância, item b), OU mexer no Redator.
 - **Ponto de entrada:** `tests/fixtures/eval_cases.json`, `core/eval/writing.py`
-  (`task`), `core/writing_eval.py` (juízes).
+  (`task`), `core/eval/metrics_writing.py` (juízes).
 - **Status:** parcialmente resolvido (2026-06-14): fixture bem-casada feita; resta
   domar variância (b). Ver memory `project-agent-patterns-deepagents`.
 - **Corroboração (2026-06-15, PR #26):** o gate do Item 5 (Critic sub-agente) rodou um
@@ -1106,7 +1106,7 @@ de fora — nenhum bloqueia o que foi entregue.
   tipo de claim antes do save.
 - **Gatilho:** próxima rodada de melhoria do Redator, ou se grounding virar gate.
 - **Ponto de entrada:** prompt do redator em `core/services/writing_session.py`,
-  juiz `judge_factual_errors` em `core/writing_eval.py`.
+  juiz `judge_factual_errors` em `core/eval/metrics_writing.py`.
 - **Status:** aberto (2026-06-14).
 
 ---

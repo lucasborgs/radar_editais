@@ -1,4 +1,4 @@
-"""Testes das métricas intrínsecas de parsing/chunking (core/parsing_eval.py)."""
+"""Testes das métricas intrínsecas de parsing/chunking (core/eval/metrics_parsing.py)."""
 from __future__ import annotations
 
 import re
@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.parsing_eval import boundary_alignment, section_coverage, size_distribution
+from core.eval.metrics_parsing import boundary_alignment, section_coverage, size_distribution
 
 
 def test_size_distribution_pega_patologias():
@@ -45,7 +45,7 @@ def test_boundary_alignment():
 
 
 def test_gold_recall_e_best_chunk():
-    from core.rag_eval import gold_best_chunk_recall_at_k, gold_recall_at_k
+    from core.eval.metrics_rag import gold_best_chunk_recall_at_k, gold_recall_at_k
     gold = "prazo de submissão das propostas encerra dia trinta"
     # resposta espalhada em 2 chunks (cada um metade) → union alta, best baixa
     spread = [{"text": "prazo de submissão das"}, {"text": "propostas encerra dia trinta"}]

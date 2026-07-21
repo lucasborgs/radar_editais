@@ -5,7 +5,7 @@ agregação). Sem rede.
 """
 from __future__ import annotations
 
-from core.matching_eval import (
+from core.eval.metrics_matching import (
     RubricVerdict,
     _parse_rubric,
     aggregate_matching_runs,

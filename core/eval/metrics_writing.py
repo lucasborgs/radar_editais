@@ -1,5 +1,5 @@
 """
-core/writing_eval.py — Métricas da rúbrica de SEÇÃO (Front 1.5).
+core/eval/metrics_writing.py — Métricas da rúbrica de SEÇÃO (Front 1.5).
 
 Habilitador da aposentadoria do legacy (Front 1): sem métrica, trocar o path
 de escrita é fé, não engenharia. Este módulo mede a qualidade de uma seção

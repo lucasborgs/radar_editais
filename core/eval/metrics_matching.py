@@ -1,5 +1,5 @@
 """
-core/matching_eval.py — Rúbrica e métricas do eval de matching (Front 2).
+core/eval/metrics_matching.py — Rúbrica e métricas do eval de matching (Front 2).
 
 Nunca validamos se o `/match` rankeia bem — é o topo do funil. Este módulo
 julga o top-K de um match contra a rúbrica única da spec (por edital):

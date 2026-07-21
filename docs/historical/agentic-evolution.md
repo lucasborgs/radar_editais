@@ -114,7 +114,7 @@ Adicionar o scorer `grounding_faithfulness` à suíte `writing` no harness:
 Rodar sobre o golden atual. O score é registrado como Experiment no Langfuse. Esta fase **não muda comportamento em produção** — só mede.
 
 ### Arquivos
-- `core/eval/writing_eval.py` — adicionar scorer `grounding_faithfulness`
+- `core/eval/metrics_writing.py` — adicionar scorer `grounding_faithfulness`
 - `core/eval/registry.py` — adicionar scorer à suíte `writing`
 
 ### Gate de eval

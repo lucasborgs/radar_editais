@@ -24,7 +24,7 @@ Por isso mede recall@20 (=POOL_K, pool do reranker em prod) além de @5. Critér
 de promoção (WIN/CLOSE/REJECT). Quem passa a triagem
 ainda precisa do `core.eval rag` real (FTS+RRF+rerank) antes de promover.
 
-Métricas (reusa core.rag_eval, mesmas do gate `rag`):
+Métricas (reusa core.eval.metrics_rag, mesmas do gate `rag`):
   • recall@{1,3,5} + MRR   — contra `expected` (source_file + section) do golden
   • gold_recall@{3,5}      — token-recall sobre `gold_text` (chunking-invariante)
 
@@ -322,7 +322,7 @@ _GOLD_KS = (3, 5, POOL_K)
 
 
 def _eval_arm(arm: dict, golden: dict, corpus: dict[str, list[dict]]) -> dict:
-    from core.rag_eval import (
+    from core.eval.metrics_rag import (
         aggregate_runs,
         evaluate_query,
         gold_best_chunk_recall_at_k,
