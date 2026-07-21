@@ -67,7 +67,7 @@ def load(edital_id: str) -> CanonicalDoc | None:
     if not _pg_configured():
         return None
     try:
-        from core.db import get_supabase_service
+        from core.infra.db import get_supabase_service
         resp = (
             get_supabase_service()
             .table(_TABLE)
@@ -94,7 +94,7 @@ def save(edital_id: str, source: str, doc: CanonicalDoc) -> bool:
     if not doc or not _pg_configured():
         return False
     try:
-        from core.db import get_supabase_service
+        from core.infra.db import get_supabase_service
         get_supabase_service().table(_TABLE).upsert(
             {
                 "edital_id": edital_id,

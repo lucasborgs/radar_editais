@@ -101,7 +101,7 @@ def set_edital_id(db, run: dict[str, Any], edital_id: str) -> dict[str, Any]:
 def mark_by_edital(edital_id: str, stage: str, status: str, *, error: Exception | str | None = None) -> None:
     """Observabilidade não pode fazer o job nativo falhar."""
     try:
-        from core.db import get_supabase_service
+        from core.infra.db import get_supabase_service
         db = get_supabase_service()
         response = (db.table("discovery_promotion_runs").select("*").eq("edital_id", edital_id)
                     .order("started_at", desc=True).limit(1).execute())

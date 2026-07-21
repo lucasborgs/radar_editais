@@ -6,7 +6,7 @@ Workers run with:
     python -m procrastinate --app=core.tasks.app worker
 
 Implements ADR M8 (procrastinate replaces pg-boss for background jobs). The
-worker uses the service-role Supabase client (via core.db.get_supabase_service)
+worker uses the service-role Supabase client (via core.infra.db.get_supabase_service)
 because it has no request context — see ADR M7. Tasks MUST therefore enforce
 tenant boundaries explicitly when relevant (e.g. by scoping queries with
 workspace_id).
@@ -33,9 +33,9 @@ import os  # noqa: E402
 
 from procrastinate import App, PsycopgConnector, RetryStrategy  # noqa: E402
 
-from core.db import get_supabase_service  # noqa: E402
-from core.logging_config import setup_logging  # noqa: E402
-from core.notify import send_alert  # noqa: E402
+from core.infra.db import get_supabase_service  # noqa: E402
+from core.infra.logging_config import setup_logging  # noqa: E402
+from core.infra.notify import send_alert  # noqa: E402
 from core.retrieval.chunker import chunk_from_blocks  # noqa: E402
 from core.retrieval.embedder import EMBEDDING_MODEL, embed_texts  # noqa: E402
 from core.retrieval.retriever import RETRIEVAL_EMBEDDING_COLUMN  # noqa: E402
@@ -806,7 +806,7 @@ async def _run_daily_etl(timestamp: int) -> None:
     próprio), mas são acumuladas em `step_errors` e viram UM e-mail agregado
     ao final (spec hardening-pre-beta 4.3).
     """
-    from core.pipeline_errors import (
+    from core.infra.pipeline_errors import (
         PipelineError,
         classify_requests_error,
         log_pipeline_error,

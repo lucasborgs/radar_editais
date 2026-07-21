@@ -11,7 +11,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from core.auth import DbClient
+from core.infra.auth import DbClient
 from core.kg.planning_node import generate_plan
 from core.llm.llm_client import make_client
 

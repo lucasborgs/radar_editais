@@ -29,9 +29,9 @@ Trabalho **sequencial**, não paralelo — cada frente exige um modo distinto
 | V2 | `thread_id` = `"{workspace_id}:{session_id}:{turn_index}"` (turnos) e `"{ws}:{sid}:generation"` (batch) | `core/services/writing_session.py:1112,1247`, `agent_graph.py:498` |
 | V3 | Store de memória cross-session: namespace `(workspace_id, "insights")`; `memory_put/delete/search` recebem `workspace_id` do caller | `core/llm/agent_graph.py:690-698,778-815` |
 | V4 | Tabelas do checkpointer+Store vivem no schema `agent_memory`, fora da lista do PostgREST (`public, storage, graphql_public`) → invisíveis pela REST API por construção. Migration 027 (band-aid RLS em `public`) obsoleta | `supabase/migrations/028_agent_memory_schema.sql` |
-| V5 | `get_db` devolve cliente Supabase carregando o JWT do usuário → RLS avaliado por request. Esta é a camada real de defesa nas tabelas `public` | `core/auth.py:194-219` |
+| V5 | `get_db` devolve cliente Supabase carregando o JWT do usuário → RLS avaliado por request. Esta é a camada real de defesa nas tabelas `public` | `core/infra/auth.py:194-219` |
 | V6 | `workspace_id` é derivado server-side (`get_workspace_id(db, user_id)`, user_id do JWT); `WritingSession._load_from_db` rejeita mismatch de workspace | `backend/routers/writing.py:180,235`, `writing_session.py:628` |
-| V7 | DEMO_MODE usa service-role (RLS bypass); scoping vira responsabilidade exclusiva dos handlers | `core/auth.py:148-149,208-214` |
+| V7 | DEMO_MODE usa service-role (RLS bypass); scoping vira responsabilidade exclusiva dos handlers | `core/infra/auth.py:148-149,208-214` |
 | V8 | Migrations com policy "own" por workspace: workspaces, content_items, writing_sessions, session_turns, application_log/events, matching_weights, reflection_insights, weight_change_log, research_findings, user_feedback, exploration_log, company_hypergraphs. `read_authenticated` (dado compartilhado): edital_chunks, discovered_opportunities, web_sources, playbook_overlays. **Não conferidas policy-a-policy**: kg_artifacts (016), edital_source_docs (032), conversations (020), agent_writing_state (014) — o inventário completo é parte da Frente 1 | grep em `supabase/migrations/` |
 | V9 | Eval de grounding: suíte `writing` (`python -m core.eval writing`), evaluator `eval_grounding` per-claim; prereqs SUPABASE+LLM+`EVAL_WORKSPACE_ID` | `core/eval/writing.py:119,155,213` |
 

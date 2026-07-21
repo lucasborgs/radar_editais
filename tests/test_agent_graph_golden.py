@@ -337,7 +337,7 @@ def test_graph_honors_span_name(monkeypatch):
     """span_name chega na telemetria (igual ao legado → nesting de subagente)."""
     import contextlib
 
-    import core.telemetry as telemetry
+    import core.infra.telemetry as telemetry
 
     captured: list[str] = []
 

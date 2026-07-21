@@ -270,7 +270,7 @@ def reflect_workspace(db: Client, workspace_id: str) -> dict:
     user_msg = _REFLECT_USER.format(outcomes=_format_outcomes_for_prompt(outcomes))
 
     try:
-        from core import telemetry
+        from core.infra import telemetry
         with telemetry.llm_span(
             "reflection.reflect_workspace",
             model=model,
@@ -438,7 +438,7 @@ def synthesize_patterns(db: Client, workspace_id: str) -> dict:
     user_msg = _SYNTHESIZE_USER.format(observations=_format_level1_for_prompt(level1))
 
     try:
-        from core import telemetry
+        from core.infra import telemetry
         with telemetry.llm_span(
             "reflection.synthesize_patterns",
             model=model,

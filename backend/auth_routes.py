@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from core.auth import CurrentUserId, DbClient, get_current_user, is_admin_payload
+from core.infra.auth import CurrentUserId, DbClient, get_current_user, is_admin_payload
 
 router = APIRouter(prefix="", tags=["auth"])
 

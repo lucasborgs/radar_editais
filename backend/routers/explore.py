@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 
 from backend.common import CompanyProfileSchema, explore_agent
 from backend.rate_limit import get_client_ip, limiter
-from core.auth import CurrentUserId, DbClient, OptionalDbClient, OptionalUserId
+from core.infra.auth import CurrentUserId, DbClient, OptionalDbClient, OptionalUserId
 from core.kg.planning_node import is_complex_proposal
 from core.profile_extractor import ProfileExtractor
 from core.services import match_v3, match_verdict

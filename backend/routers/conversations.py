@@ -17,7 +17,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from core.auth import CurrentUserId, DbClient
+from core.infra.auth import CurrentUserId, DbClient
 from core.services.content_library import get_workspace_id
 from core.services.writing_session import (
     append_entry,

@@ -62,7 +62,7 @@ def load_data() -> list[dict]:
 
 def task(*, item: Any, **_) -> dict:
     inp = get_input(item)
-    from core.db import get_supabase_service
+    from core.infra.db import get_supabase_service
     from core.kg.temporal import render_temporal_block
     from core.llm.agent_tools.critic_agent import _build_proposal_context
     from core.retrieval.retriever import format_chunks_for_prompt, retrieve_chunks

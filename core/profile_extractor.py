@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
 
-from core.net_guard import safe_get
+from core.infra.net_guard import safe_get
 from domain.user_profile import CompanyProfile
 
 logger = logging.getLogger(__name__)
@@ -367,7 +367,7 @@ class ProfileExtractor:
         humano PT-BR. Campos sem informação nova ficam de fora; nada extraído → [].
 
         Usa o tier BARATO (endpoint público — controle de custo, decisão B5):
-        `_call_diff_llm` resolve o modelo via `core.llm_router` no tier "fast".
+        `_call_diff_llm` resolve o modelo via `core.infra.llm_router` no tier "fast".
         """
         current_profile = current_profile or {}
         if not message or len(message.strip()) < self.DIFF_MIN_MESSAGE_LEN:
@@ -408,13 +408,13 @@ class ProfileExtractor:
         """LLM focado de extração de diff, no tier BARATO (B5).
 
         Endpoint público nunca usa tier caro: o modelo vem de
-        `core.llm_router.resolve_model("fast")` (gpt-4o-mini por default).
+        `core.infra.llm_router.resolve_model("fast")` (gpt-4o-mini por default).
         Reaproveita o mesmo client OpenAI/Gemini do `_call_llm`.
         """
         backend = os.getenv("LLM_BACKEND", "openai").lower()
         try:
+            from core.infra.llm_router import resolve_model
             from core.llm.llm_client import make_client
-            from core.llm_router import resolve_model
             if backend == "gemini":
                 api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
                 if not api_key:

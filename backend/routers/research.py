@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException
 
-from core.auth import CurrentUserId, DbClient
+from core.infra.auth import CurrentUserId, DbClient
 from core.services.content_library import create_item, get_workspace_id
 
 router = APIRouter(prefix="/research-findings", tags=["research"])

@@ -168,7 +168,7 @@
   Et.3 (subagente herdava o checkpointer do pai; fix `checkpointer=False`). Falta o gate
   estatístico (N casos) + Langfuse real.
 - **Se a parity de usage falhar:** escrever um callback de usage custom (o `record_usage` em
-  `core/telemetry.py` já tem a lógica de extração como referência).
+  `core/infra/telemetry.py` já tem a lógica de extração como referência).
 - **Status:** aberto (2026-06-20). Não bloqueia o merge do código da migração.
 
 ### Deploy — aplicar migrations 021-024 no Supabase remoto (knowledge-evolution)

@@ -91,7 +91,7 @@ def contextualize_chunks(chunks: list[dict]) -> list[str]:
             logger.debug("contextual_retrieval: chunk falhou (%s) — embed cru", e)
             return text
 
-    from core import telemetry
+    from core.infra import telemetry
 
     # 1 span por BATCH (não por chunk — spec PR5): usage agregado do lote.
     with telemetry.llm_span(

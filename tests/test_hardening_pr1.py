@@ -9,8 +9,8 @@ import types
 import pytest
 from pydantic import ValidationError
 
-from core import net_guard
-from core.net_guard import PrivateAddressError, assert_public_url
+from core.infra import net_guard
+from core.infra.net_guard import PrivateAddressError, assert_public_url
 
 
 def _fake_addrinfo(ip: str):

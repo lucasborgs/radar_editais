@@ -435,7 +435,7 @@ def _stage_records(records: list[dict]) -> int:
     if not records:
         return 0
     try:
-        from core.db import get_supabase_service  # noqa: PLC0415
+        from core.infra.db import get_supabase_service  # noqa: PLC0415
         db = get_supabase_service()
     except Exception as e:
         logger.warning("staging: sem cliente Supabase (%s) — achados NÃO persistidos", e)

@@ -55,7 +55,7 @@ trace_ctx = telemetry.current_trace_context()
 result = await run_agent_graph_async(..., trace_context=trace_ctx)
 ```
 
-`current_trace_context()` já existe em `core/telemetry.py` — é o seam projetado para isso (ver comentário em [`agent_graph.py:306`](../../core/llm/agent_graph.py#L306)). Sem Langfuse configurado, retorna `None` e o grafo roda sem overhead.
+`current_trace_context()` já existe em `core/infra/telemetry.py` — é o seam projetado para isso (ver comentário em [`agent_graph.py:306`](../../core/llm/agent_graph.py#L306)). Sem Langfuse configurado, retorna `None` e o grafo roda sem overhead.
 
 ### Arquivos
 - `core/llm/agent_tools/writing_tools.py` — todos os call sites para o critic dentro de `save_draft`

@@ -14,7 +14,7 @@ import time
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from core.net_guard import safe_get
+from core.infra.net_guard import safe_get
 from core.services.discovery_evidence import (
     DOCUMENT_TEXT_CAP,
     build_evidence_package,

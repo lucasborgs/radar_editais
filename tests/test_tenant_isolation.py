@@ -76,7 +76,7 @@ import jwt as pyjwt  # noqa: E402  (só importa quando o gate passa)
 import psycopg  # noqa: E402
 from postgrest.exceptions import APIError  # noqa: E402
 
-from core.db import get_supabase_service, get_supabase_user  # noqa: E402
+from core.infra.db import get_supabase_service, get_supabase_user  # noqa: E402
 
 
 # ─────────────────────────────────────────────────────────────────────────────

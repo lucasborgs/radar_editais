@@ -263,7 +263,7 @@ def _load_golden_profile(profile_key: str):
 def run_writing_variant(variant: dict) -> None:
     import os
 
-    from core.db import get_supabase_service
+    from core.infra.db import get_supabase_service
     from core.services.writing_session import WritingSession
 
     db = get_supabase_service()

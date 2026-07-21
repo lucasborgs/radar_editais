@@ -45,7 +45,7 @@
 | **Slash commands / Skill picker** | Não existe interface de skills | 🔧 Camada de UI sobre serviços existentes | — |
 | **@ mentions de arquivos** | Não existe; `library_items` passados por ID na API | 🔧 Adicionar resolução de @ no frontend + `WritingSession` | — |
 | **Model tiers (Auto/Pro/Fast)** | LLM configurável via env var (OpenAI/Gemini/Ollama) | 🟡 Funcional mas sem escolha por mensagem | `core/kg_match_service.py`, `core/writing_session.py` |
-| **Multi-tenancy / Workspaces** | Supabase workspaces por `user_id` | 🟡 Estrutura existe; profiles não persistem em DB (JSON em disco) | `core/content_library.py`, `core/db.py` |
+| **Multi-tenancy / Workspaces** | Supabase workspaces por `user_id` | 🟡 Estrutura existe; profiles não persistem em DB (JSON em disco) | `core/content_library.py`, `core/infra/db.py` |
 | **Feedback loop / aprendizado de outcomes** | Não existe | 🏗️ Prioritário segundo objetivo do produto | — |
 | **Funder database (externo)** | Apenas FINEP (knowledge graph local) | ➖ Fora de escopo intencional | `pipeline/build_knowledge_graph.py` |
 | **Criação de arquivos no workspace** | Não existe; outputs são respostas de API | 🏗️ Mudança de paradigma (doc viewer + file tree) | — |

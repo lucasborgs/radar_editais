@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # ===========================================================================
 
 def _client():
-    from core.db import get_supabase_service
+    from core.infra.db import get_supabase_service
     return get_supabase_service()
 
 

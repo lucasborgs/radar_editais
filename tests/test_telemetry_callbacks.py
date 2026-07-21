@@ -11,9 +11,9 @@ import asyncio
 
 from langchain_core.messages import AIMessage
 
+import core.infra.telemetry as telemetry
 import core.llm.agent_graph as ag
 import core.llm.agent_runtime as art
-import core.telemetry as telemetry
 
 
 class _FakeGraph:

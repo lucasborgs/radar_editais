@@ -593,7 +593,7 @@ eval não regridem. Portão final da migração.
   `harness.py`). Rodam **real end-to-end** (a suíte `writing` cria uma WritingSession
   real, sem monkeypatch — [writing.py](../../core/eval/writing.py)). Langfuse vira
   Experiment se `LANGFUSE_*` setado; senão grava `eval_results/*.json`.
-- **Telemetria**: context managers custom em [telemetry.py](../../core/telemetry.py)
+- **Telemetria**: context managers custom em [telemetry.py](../../core/infra/telemetry.py)
   — `agent_run`, `llm_generation` (`llm.step_N`), `tool_call` (`tool.X`),
   `record_usage` (extrai cache/reasoning tokens da resposta crua). Spans nomeados
   `agent.{provider}.{model}` / `subagent.{name}`.
@@ -614,7 +614,7 @@ eval não regridem. Portão final da migração.
 ## O que muda por módulo
 | Módulo | Mudança |
 |---|---|
-| `core/telemetry.py` | context managers → `CallbackHandler` factory; `record_usage` aposentado se usage automático cobrir |
+| `core/infra/telemetry.py` | context managers → `CallbackHandler` factory; `record_usage` aposentado se usage automático cobrir |
 | `agent_runtime`/grafo | injeta `callbacks=[handler]` no `config` de cada `invoke` |
 | `core/eval/*` | inalterado em lógica; valida não-regressão |
 | dashboards Langfuse | **descontinuidade de nomes de span** (`llm.step_N` → spans nativos LangChain) — comparabilidade histórica corta aqui |
@@ -637,7 +637,7 @@ produto: meta-pacote `langchain` oficial, não handler custom) — spans por-ste
 timing real + usage automático, substituindo o `_replay_step_spans` pós-hoc da Etapa 1.
 
 - **Dep**: `+ langchain>=1.0` (o `CallbackHandler` faz `import langchain`; resolveu 1.3.10).
-- **[telemetry.py](../../core/telemetry.py)**: `make_callback_handler()` (factory da
+- **[telemetry.py](../../core/infra/telemetry.py)**: `make_callback_handler()` (factory da
   CallbackHandler; None se Langfuse off), `current_trace_context()` (captura
   `{trace_id, parent_span_id}` do span corrente), `agent_run(trace_context=)` (enraíza
   sob parent remoto). Removidos `llm_generation`/`tool_call` (mortos pós-handler);

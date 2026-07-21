@@ -180,7 +180,7 @@ Após investigação do código, descobriu-se que M1 (Auth), M2 (Workspace ↔ E
 **Justificativa:** Setup padrão Python, free para repo privado até 2000min/mês, gates standard.
 
 ### M7 — RLS real vs service_role bypass
-**Decisão:** Refatorar [core/db.py](../../core/db.py) para criar client per-request com `anon-key` + JWT do usuário (`Authorization: Bearer <jwt>`). RLS torna-se a defesa real. Jobs ETL e workers procrastinate usam `service-role` key separadamente.
+**Decisão:** Refatorar [core/infra/db.py](../../core/infra/db.py) para criar client per-request com `anon-key` + JWT do usuário (`Authorization: Bearer <jwt>`). RLS torna-se a defesa real. Jobs ETL e workers procrastinate usam `service-role` key separadamente.
 **Justificativa:** Conforma com ADR B5 (defense-in-depth real). O código atual usa `service_role` no backend, bypassando RLS — segurança hoje é só app-level por filter manual de `workspace_id`. Refactor de ~1 dia paga-se na primeira tentativa de acessar dado de outro workspace.
 
 ### M9 — Escopo de RAG: apenas Writing, nunca Match

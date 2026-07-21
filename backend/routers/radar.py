@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from backend.common import CompanyProfileSchema
 from backend.rate_limit import get_client_ip, limiter
-from core.auth import OptionalDbClient, OptionalUserId
+from core.infra.auth import OptionalDbClient, OptionalUserId
 from core.services import match_v3, match_verdict
 from core.services.content_library import get_workspace_id
 

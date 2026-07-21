@@ -302,7 +302,7 @@ def _alert_if_degraded(source: str, edital_id: str, page_stats: dict) -> None:
     )
     logger.error("structurer: %s", msg)
     try:
-        from core.pipeline_errors import ParseError, log_pipeline_error
+        from core.infra.pipeline_errors import ParseError, log_pipeline_error
         log_pipeline_error(
             source=source,
             error=ParseError(msg),

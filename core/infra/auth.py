@@ -23,7 +23,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.algorithms import ECAlgorithm
 
-from core.db import get_supabase_user
+from core.infra.db import get_supabase_user
 from supabase import Client
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ def _demo_identity() -> dict:
     if _demo_identity_cache is not None:
         return _demo_identity_cache
 
-    from core.db import get_supabase_service
+    from core.infra.db import get_supabase_service
     db = get_supabase_service()
     q = db.table("workspaces").select("id, user_id")
     wid = os.getenv("DEMO_WORKSPACE_ID")
@@ -250,7 +250,7 @@ def get_db(
     explicitamente; o RLS é só uma segunda camada, dispensável no modo demo.
     """
     if DEMO_MODE:
-        from core.db import get_supabase_service
+        from core.infra.db import get_supabase_service
         return get_supabase_service()
     if credentials is None:
         raise HTTPException(
@@ -272,7 +272,7 @@ def get_optional_db(
     workspace só no caminho autenticado. Em DEMO_MODE usa o service-role.
     """
     if DEMO_MODE:
-        from core.db import get_supabase_service
+        from core.infra.db import get_supabase_service
         return get_supabase_service()
     if credentials is None:
         return None

@@ -134,7 +134,7 @@ Somente após nova busca de referências:
 1. remover `wiki_page_path()` e `iter_wiki_pages()`;
 2. remover seus testes exclusivos e `KG_WIKI_DIR` se nenhum consumidor restar;
 3. remover o script one-shot `migrate_existing_ids.py`; e
-4. remover `core.db.get_supabase()`.
+4. remover `core.infra.db.get_supabase()`.
 
 `make_id`, `parse_id`, `source_of`, `native_id_of`, `id_to_slug` e
 `slug_to_id` permanecem: são contratos vivos de identidade cross-source e do

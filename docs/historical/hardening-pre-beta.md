@@ -27,7 +27,7 @@ Cada item abaixo foi conferido linha a linha — a spec não assume nada de segu
 | F3 | Bloco temporal embute `hoje é {today}` + `days_remaining` e fica na posição 3-4 do prefixo "estável"; a WritingSession é reconstruída a cada request (5 call sites no router) → o prefixo de cache quebra diariamente | `core/kg/temporal.py:96-122`, `core/services/writing_session.py:452-455,1703-1704` |
 | F4 | Geração batch = StateGraph com self-loop `generate→generate`, 1 seção por vez | `core/llm/agent_graph.py:1073-1080` |
 | F5 | `user_message` e `message` sem `max_length` | `backend/routers/writing.py:55`, `backend/routers/explore.py:38` |
-| F6 | `DEMO_MODE=1` bypassa auth+RLS (service-role) sem guard de ambiente | `core/auth.py:35-43` |
+| F6 | `DEMO_MODE=1` bypassa auth+RLS (service-role) sem guard de ambiente | `core/infra/auth.py:35-43` |
 | F7 | Triagem do discovery: exceção → `is_opportunity=False` → rejeição gravada no ledger (TTL 30d). Falha transiente vira rejeição persistente | `core/opportunity_discovery.py:130-145,391-397` |
 | F8 | SSRF: fetch de URL controlada por usuário sem bloqueio de IP privado/metadata | `backend/routers/discovered.py:56-73`, `core/profile_extractor.py:189-199` |
 | F9 | Sem purge de checkpoints LangGraph (só `adelete` de insights do Store) | `core/llm/agent_graph.py:738` (único delete) |
@@ -43,7 +43,7 @@ Cada item abaixo foi conferido linha a linha — a spec não assume nada de segu
 
 ### 1.1 Guard anti-SSRF (F8)
 
-Novo helper `core/net_guard.py`:
+Novo helper `core/infra/net_guard.py`:
 - `assert_public_url(url)` — valida scheme http/https, resolve DNS e rejeita
   loopback, RFC1918, link-local (`169.254.0.0/16`, inclui metadata de cloud) e
   `::1`/ULA. Levanta `ValueError` com mensagem segura.
@@ -167,7 +167,7 @@ run. Auditar os demais call sites de `_record_rejection` pela mesma confusão
 
 ### 4.3 Alertas por e-mail (F14)
 
-Novo `core/notify.py`: `send_alert(subject, body)` via `smtplib` + env
+Novo `core/infra/notify.py`: `send_alert(subject, body)` via `smtplib` + env
 (`ALERT_SMTP_HOST/PORT/USER/PASSWORD`, `ALERT_EMAIL_FROM/TO`). Sem env → no-op
 com warning (dev não quebra). Call sites:
 
@@ -182,7 +182,7 @@ re-executa; URL com triagem explodida NÃO entra no ledger.
 
 ## PR5 — Observabilidade de custo (P2)
 
-Instrumentar as chamadas 1-shot (F11) com o helper existente de `core/telemetry.py`
+Instrumentar as chamadas 1-shot (F11) com o helper existente de `core/infra/telemetry.py`
 (novo wrapper leve `llm_span`): `writing_session._call_openai`,
 `reflection_service`, `checklist_service`, `hyde` (1 span/query),
 `contextual_retrieval` (1 span por **batch**, não por chunk), `scope_classifier`.

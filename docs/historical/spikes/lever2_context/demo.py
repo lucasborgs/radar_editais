@@ -102,7 +102,7 @@ def _load_golden_profile(profile_key: str) -> dict:
 def build_writing_history() -> list:
     import os
 
-    from core.db import get_supabase_service
+    from core.infra.db import get_supabase_service
     from core.services.writing_session import WritingSession
     from domain.user_profile import CompanyProfile
 

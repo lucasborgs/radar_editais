@@ -8,7 +8,7 @@ silenciosamente ou com `Exception` genérico, e a lógica de retry era cega
 
 Uso típico em código de pipeline:
 
-    from core.pipeline_errors import (
+    from core.infra.pipeline_errors import (
         ParseError, TimeoutError, log_pipeline_error,
     )
 
@@ -119,7 +119,7 @@ def log_pipeline_error(
         tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
 
     try:
-        from core.db import get_supabase_service
+        from core.infra.db import get_supabase_service
         db = get_supabase_service()
         db.table("pipeline_errors").insert({
             "source": source,

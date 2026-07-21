@@ -59,7 +59,7 @@ class WebScraper(BaseScraper):
         """Lê as URLs `active` de `web_sources` via service-role. [] se a tabela
         estiver vazia ou o DB indisponível (degrada como qualquer scraper)."""
         try:
-            from core.db import get_supabase_service
+            from core.infra.db import get_supabase_service
 
             db = get_supabase_service()
             res = (

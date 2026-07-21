@@ -94,7 +94,7 @@ def _load_pg(key: str) -> dict | None:
         if cached is not None and (now - cached[0]) < _PG_TTL:
             return cached[1]
     try:
-        from core.db import get_supabase_service
+        from core.infra.db import get_supabase_service
         resp = (
             get_supabase_service()
             .table(_TABLE)
@@ -163,7 +163,7 @@ def save(key: str, blob: dict) -> None:
         _file_cache[key] = (path.stat().st_mtime, blob)
 
     if _pg_configured():
-        from core.db import get_supabase_service
+        from core.infra.db import get_supabase_service
         get_supabase_service().table(_TABLE).upsert(
             {"key": key, "blob": blob}, on_conflict="key"
         ).execute()

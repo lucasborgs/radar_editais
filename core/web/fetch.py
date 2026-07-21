@@ -32,7 +32,7 @@ from typing import Any
 from bs4 import BeautifulSoup
 
 from core import web_search as _ws
-from core.net_guard import safe_get
+from core.infra.net_guard import safe_get
 from core.web_search import SearchHit, WebSearchError  # re-export p/ chamadores
 
 logger = logging.getLogger(__name__)

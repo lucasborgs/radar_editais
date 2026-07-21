@@ -104,7 +104,7 @@ def test_run_subagent_propagates_span_name(monkeypatch):
         captured.append(name)
         yield None
 
-    import core.telemetry as telemetry
+    import core.infra.telemetry as telemetry
     monkeypatch.setattr(telemetry, "agent_run", fake_agent_run)
 
     run_subagent(

@@ -223,7 +223,7 @@ async def _call_llm(
     span_meta: dict | None = None,
 ) -> dict:
     """Chama o LLM e parseia o JSON da resposta. 1 span Langfuse por pass."""
-    from core import telemetry
+    from core.infra import telemetry
 
     with telemetry.llm_span(span_name, model=model, metadata=span_meta) as span:
         response = await client.chat.completions.create(

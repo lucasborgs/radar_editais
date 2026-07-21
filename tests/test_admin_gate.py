@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from core.auth import get_admin_user_id, is_admin_payload
+from core.infra.auth import get_admin_user_id, is_admin_payload
 
 
 def test_admin_email_allowed(monkeypatch):
@@ -56,7 +56,7 @@ def test_discovered_endpoints_require_admin():
     CurrentUserId, este teste quebra.
     """
     from backend.routers import discovered
-    from core.auth import get_admin_user_id as gate
+    from core.infra.auth import get_admin_user_id as gate
 
     routes = [r for r in discovered.router.routes if hasattr(r, "endpoint")]
     assert routes, "router de descoberta não expõe endpoints"

@@ -1,4 +1,4 @@
-"""Testes do helper core.telemetry.record_usage.
+"""Testes do helper core.infra.telemetry.record_usage.
 
 Garante que usage_details é extraído de forma consistente das respostas LLM
 (OpenAI e Anthropic) e registrado no span no formato que o Langfuse usa pra
@@ -17,7 +17,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core import telemetry  # noqa: E402
+from core.infra import telemetry  # noqa: E402
 
 # ============================================================================
 # Fakes

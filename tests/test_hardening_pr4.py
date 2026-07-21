@@ -5,7 +5,7 @@ Cobre os três eixos da spec histórica (docs/historical/hardening-pre-beta.md �
       wrappers de cron (cron re-roda no dia seguinte; falha vira alerta);
   4.2 falha TRANSIENTE de triagem não vira rejeição persistente no ledger
       (o bug do cache de rejeição) — rejeição REAL continua indo ao ledger;
-  4.3 send_alert (core/notify.py): no-op sem env, envia via SMTP com env,
+  4.3 send_alert (core/infra/notify.py): no-op sem env, envia via SMTP com env,
       e NUNCA propaga falha de envio.
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-import core.notify as notify
+import core.infra.notify as notify
 import core.opportunity_discovery as od
 import core.tasks as tasks
 from core.web_search import SearchHit
@@ -181,7 +181,7 @@ def test_transient_extract_failure_does_not_touch_ledger(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 4.3 — send_alert (core/notify.py)
+# 4.3 — send_alert (core/infra/notify.py)
 # ---------------------------------------------------------------------------
 
 _ALERT_VARS = ("ALERT_SMTP_HOST", "ALERT_SMTP_PORT", "ALERT_SMTP_USER",
