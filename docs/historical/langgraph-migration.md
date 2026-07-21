@@ -133,7 +133,7 @@ com `tool` por ordem.
 |---|---|
 | `core/llm/agent_runtime.py` | **+** `_build_react_graph`, `AgentState`, nós, `_model_factory`, `_to_langchain_tool` (bridge), `_messages_to_agent_result`. **−** `_call_openai`, `_call_anthropic`, `_format_tool_results_*`, `_LLMStep`, corpo do loop. **=** `run_agent*`/`run_subagent` (facade), `AgentResult`/`TraceStep`, `Tool`/`@tool`/`ToolRegistry`/`_cap`, shim sync |
 | 5 call sites (writing/kg_match/profile/deep_research/critic) | **nenhuma** |
-| `tests/test_agent_runtime.py`, `test_context_budget.py`, `test_subagent.py` | reescritos no seam de chat-model fake (`GenericFakeChatModel`) |
+| `tests/unit/test_agent_runtime.py`, `test_context_budget.py`, `test_subagent.py` | reescritos no seam de chat-model fake (`GenericFakeChatModel`) |
 | `tests/test_{explore,profile_extractor,writing_session}_agent.py` | **inalterados** (mockam a facade) |
 | `pyproject.toml` | + `langgraph`, `langchain-core`, `langchain-anthropic`, `langchain-openai` |
 
@@ -168,7 +168,7 @@ LangGraph é o **runtime default**; legado intacto como rollback via `AGENT_RUNT
   ficam pra Etapa 6, quando se decide adicionar essa dep.
 
 ### Validação
-- **Golden** [test_agent_graph_golden.py](../../tests/test_agent_graph_golden.py) —
+- **Golden** [test_agent_graph_golden.py](../../tests/unit/test_agent_graph_golden.py) —
   `AgentResult` equivalente legado-vs-grafo (no-tool / 1-tool / tool-error / max_steps
   com trace completo `llm,tool,llm,tool`) + reflexão + cap no grafo + degradação por
   erro de modelo + span_name.
@@ -362,13 +362,13 @@ WritingSession invoca o grafo com checkpointer durável; `request_user_info` vir
   Isolamento real = namespacing do `thread_id`.
 
 ### Validação
-- [test_agent_graph_checkpointer.py](../../tests/test_agent_graph_checkpointer.py) (zero
+- [test_agent_graph_checkpointer.py](../../tests/unit/test_agent_graph_checkpointer.py) (zero
   rede, InMemorySaver + modelo scriptado): interrupt pausa com payload → `Command(resume)`
   retoma → texto final; **custo só do delta** no resume; **re-execução do batch** (risco #1
   documentado); **isolamento por thread_id**.
 - `test_writing_session_agent` adaptado (stub `run_writing_turn`→`WritingTurnOutcome`) +
   ciclo interrupt→persistência(turno N=pergunta) → resume(turno N+1, pending limpo).
-- [test_checkpointer_postgres.py](../../tests/test_checkpointer_postgres.py) — integração
+- [test_checkpointer_postgres.py](../../tests/integration/test_checkpointer_postgres.py) — integração
   **gated em `DATABASE_URL`** (skip no CI): AsyncPostgresSaver REAL — interrupt→resume
   durável + **leak test cross-workspace** (state de A invisível pelo thread_id de B). Rodou
   local: 2 passed. **setup_checkpointer.py validado**: 4 tabelas + RLS=True + grants
@@ -439,14 +439,14 @@ checkpointer só entra via `run_writing_turn`, não via `run_agent`).
 - **Degradação graciosa**: `run_subagent` mantém o try/except → `AgentResult(error)`;
   `run_critic` mapeia `error`/parse inválido → `approved=True`. Coberto por
   `test_run_critic_degrades_on_subagent_error` / `..._unparseable_verdict`
-  ([test_critic_coherence.py](../../tests/test_critic_coherence.py)) e
-  `test_run_subagent_degrades_*` ([test_subagent.py](../../tests/test_subagent.py)).
+  ([test_critic_coherence.py](../../tests/unit/test_critic_coherence.py)) e
+  `test_run_subagent_degrades_*` ([test_subagent.py](../../tests/unit/test_subagent.py)).
 - **Provider/endpoint próprios** (critic: OpenAI gpt-4o ZDR `CRITIC_OPENAI_*`): já
   parametrizados via `run_subagent(openai_base_url/key=)`; o subgrafo tem sua própria
   factory de modelo.
 - **`span_name=subagent.{name}`**: já propagado (`test_run_subagent_propagates_span_name`).
 - **Novo teste (interação Etapa 4 × Etapa 3)**:
-  `test_subagent_inside_checkpointed_writing_turn` ([test_agent_graph_checkpointer.py](../../tests/test_agent_graph_checkpointer.py))
+  `test_subagent_inside_checkpointed_writing_turn` ([test_agent_graph_checkpointer.py](../../tests/unit/test_agent_graph_checkpointer.py))
   — prova que o subagente (run_subagent → `asyncio.run` em worker thread, sem
   checkpointer) roda DENTRO do grafo de escrita com checkpointer (no bg-loop) sem
   conflito de event loop; é o caminho real do critic dentro de `save_draft`. Verde.
@@ -559,16 +559,16 @@ do grafo — o grafo compartilhado fica intocado; a query existe na WritingSessi
   checkpointer no schema dedicado e **removeu** o `_lock_down_rls`.
 
 ### Validação
-- [test_memory_store.py](../../tests/test_memory_store.py) (11, zero rede — InMemoryStore +
+- [test_memory_store.py](../../tests/unit/test_memory_store.py) (11, zero rede — InMemoryStore +
   embed fake injetados): namespace/leak, relevância semântica, delete, degradação (Store
   off / query vazia), projeção (`_project_to_store` espelha put/delete), tool semântica vs
   fallback, e os 3 caminhos da injeção da WritingSession (semântico / fallback estático /
   flag off).
-- [test_memory_store_postgres.py](../../tests/test_memory_store_postgres.py) (gated em
+- [test_memory_store_postgres.py](../../tests/integration/test_memory_store_postgres.py) (gated em
   DATABASE_URL, embed fake → zero token): put/search/delete durável, **leak cross-workspace**
   contra o Postgres real, e tabelas em `agent_memory` (não `public`). Dims do fake alinhados
   aos do Store (`index_config`).
-- [test_checkpointer_postgres.py](../../tests/test_checkpointer_postgres.py) atualizado:
+- [test_checkpointer_postgres.py](../../tests/integration/test_checkpointer_postgres.py) atualizado:
   `_delete_threads` agora aponta para `agent_memory.*` (tabelas migraram de `public`).
 - **Suíte: 699 passed** + gated (3 store run local / 2 ckpt skip por ordem de coleta); só a
   flake pré-existente `test_contextual_retrieval` (ambiental, não tocada).
@@ -656,7 +656,7 @@ timing real + usage automático, substituindo o `_replay_step_spans` pós-hoc da
   Experiments/scores (Langfuse) com fallback local — **inalterado**.
 
 ### Validação
-- [test_telemetry_callbacks.py](../../tests/test_telemetry_callbacks.py) (5, zero rede):
+- [test_telemetry_callbacks.py](../../tests/unit/test_telemetry_callbacks.py) (5, zero rede):
   handler entra no `config["callbacks"]`; sem handler quando off (sem overhead);
   `trace_context` repassado ao `agent_run`; `run_subagent` captura e propaga o trace do
   pai (`span_name=subagent.critic`); factories viram no-op com Langfuse off.

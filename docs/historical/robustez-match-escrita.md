@@ -36,7 +36,7 @@ Remover o path legacy e tornar o agente o único fluxo de escrita.
 **Não remover o legacy sem antes ter o eval harness do Front 1.5 verde.** A remoção é irreversível; precisamos de evidência de que o agente entrega ≥ a qualidade do legacy.
 
 ### Arquivos
-`core/writing_session.py`, `supabase/migrations/*_drop_agent_writing_flag.sql`, `scripts/agent_rollout.py`, `scripts/eval_agent_writing.py`, `tests/test_writing_session_agent.py` (remover asserts de dispatcher legacy).
+`core/writing_session.py`, `supabase/migrations/*_drop_agent_writing_flag.sql`, `scripts/agent_rollout.py`, `scripts/eval_agent_writing.py`, `tests/unit/test_writing_session_agent.py` (remover asserts de dispatcher legacy).
 
 ### Critérios de aceitação
 - `turn()` sempre roda o agente; nenhum caminho lê `agent_writing_enabled`.
@@ -138,7 +138,7 @@ Inserir um estágio de rerank entre a fusão RRF e o corte top-k:
 Métrica de validação reusa o harness do Front 1.5 (% de afirmações com respaldo em chunk) + recall@k num conjunto rotulado pequeno.
 
 ### Arquivos
-`core/retriever.py`, `core/reranker.py` (novo), `pyproject.toml` (dep do cross-encoder), `tests/test_reranker.py`.
+`core/retriever.py`, `core/reranker.py` (novo), `pyproject.toml` (dep do cross-encoder), `tests/unit/test_reranker.py`.
 
 ### Critérios de aceitação
 - `retrieve_chunks` aceita `rerank=True` (default) e degrada graciosamente se o backend falha (volta ao RRF puro).

@@ -17,7 +17,7 @@ chamada LLM para confirmar o óbvio.
   (`checklist_service.py:363`) — compliance, qualidade, completude em paralelo.
 - **Modelo único** nos 3 passes (gpt-4o-mini default); sem roteamento por passe.
 - **Input idêntico:** `proposal[:6000]` alimenta os 3 passes.
-- **Sem testes:** não existe `tests/test_checklist_service.py`.
+- **Sem testes:** não existe `tests/unit/test_checklist_service.py`.
 
 ## Mudança proposta
 
@@ -42,7 +42,7 @@ puramente determinístico (custo ~zero) vs o custo do passe LLM evitado.
 
 ## Validação
 
-- **Testes (pré-requisito):** criar `tests/test_checklist_service.py` cobrindo o
+- **Testes (pré-requisito):** criar `tests/unit/test_checklist_service.py` cobrindo o
   comportamento atual **antes** de mexer — sem rede de segurança hoje. Casos:
   edital sem requisitos → compliance pulado; seções completas → completude pulada;
   proposta parcial → 3 passes.

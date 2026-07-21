@@ -378,7 +378,7 @@ explore_agent = ExploreAgent()
 - `backend/routers/frontdoor.py` — rota `/frontdoor/turn` vira `/explore`
 
 #### Testes
-- `tests/test_explore_agent.py` — `KGMatchService` → `ExploreAgent`
+- `tests/unit/test_explore_agent.py` — `KGMatchService` → `ExploreAgent`
 - `tests/test_explore_grounded.py` — `KGMatchService` → `ExploreAgent`
 - `tests/test_resolve_scope.py` — `KGMatchService` → `GraphService`
 - Criar `tests/test_graph_service.py`

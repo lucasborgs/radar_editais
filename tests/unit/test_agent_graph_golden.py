@@ -1,0 +1,368 @@
+"""Testes de runtime do grafo LangGraph (core.llm.agent_graph).
+
+Pós-Etapa 2 o grafo é o único runtime; estes testes exercitam o loop + tradutor
+de contrato com um chat model scriptado (zero rede): no-tool, 1-tool, tool-error,
+max_steps (com trace completo), anti-leak estrutural, cap central, degradação
+por erro de modelo, span_name. Equivalência ao runtime legado foi provada na Etapa
+1 (antes de o legado ser aposentado) e está congelada nas asserções diretas abaixo.
+"""
+from __future__ import annotations
+
+import asyncio
+
+import pytest
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.tools import tool
+from pydantic import PrivateAttr
+
+import core.llm.agent_graph as ag
+from core.llm.agent_graph import run_agent_graph_async
+from core.llm.agent_runtime import TOOL_RESULT_CHAR_CAP
+
+pytestmark = pytest.mark.unit
+
+# ---------------------------------------------------------------------------
+# Chat model scriptado (zero rede)
+# ---------------------------------------------------------------------------
+
+class ScriptedChatModel(BaseChatModel):
+    """Devolve `responses[i]` na i-ésima chamada; registra as mensagens recebidas."""
+    responses: list
+    _idx: int = PrivateAttr(default=0)
+    _received: list = PrivateAttr(default_factory=list)
+
+    @property
+    def _llm_type(self) -> str:
+        return "scripted"
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+        self._received.append(list(messages))
+        msg = self.responses[self._idx]
+        self._idx += 1
+        return ChatResult(generations=[ChatGeneration(message=msg)])
+
+    def bind_tools(self, tools, **kwargs):  # noqa: ANN001
+        return self
+
+
+def _graph_msg(turn: dict) -> AIMessage:
+    return AIMessage(
+        content=turn["text"],
+        tool_calls=[
+            {"id": tc["id"], "name": tc["name"], "args": tc["args"], "type": "tool_call"}
+            for tc in turn["tool_calls"]
+        ],
+        usage_metadata={
+            "input_tokens": turn["usage"]["input_tokens"],
+            "output_tokens": turn["usage"]["output_tokens"],
+            "total_tokens": turn["usage"]["input_tokens"] + turn["usage"]["output_tokens"],
+        },
+    )
+
+
+def _run_graph(monkeypatch, turns, tools, *, max_steps=8):
+    scripted = ScriptedChatModel(responses=[_graph_msg(t) for t in turns])
+    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: scripted)
+    result = asyncio.run(run_agent_graph_async(
+        system="sys", initial_messages=[{"role": "user", "content": "vai"}],
+        tools=tools, model="m", provider="anthropic",
+        max_steps=max_steps,
+    ))
+    return result, scripted
+
+
+# ---------------------------------------------------------------------------
+# Loop + tradutor de contrato
+# ---------------------------------------------------------------------------
+
+def test_no_tool_one_step(monkeypatch):
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return "x"
+
+    turns = [{"text": "Olá!", "tool_calls": [], "usage": {"input_tokens": 30, "output_tokens": 10}}]
+    graph, _ = _run_graph(monkeypatch, turns, [search])
+    assert graph.final_text == "Olá!"
+    assert graph.stop_reason == "end_turn"
+    assert [s.kind for s in graph.steps] == ["llm"]
+    assert graph.usage == {"input_tokens": 30, "output_tokens": 10}
+
+
+def test_one_tool_then_response(monkeypatch):
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return f"resultado para {q}"
+
+    turns = [
+        {"text": "Vou buscar.",
+         "tool_calls": [{"id": "tu_1", "name": "search", "args": {"q": "prazo"}}],
+         "usage": {"input_tokens": 100, "output_tokens": 20}},
+        {"text": "O prazo é 30/06.", "tool_calls": [],
+         "usage": {"input_tokens": 150, "output_tokens": 15}},
+    ]
+    graph, _ = _run_graph(monkeypatch, turns, [search])
+    assert graph.final_text == "O prazo é 30/06."
+    assert [s.kind for s in graph.steps] == ["llm", "tool", "llm"]
+    assert graph.steps[1].output == "resultado para prazo"
+    assert graph.steps[1].input == {"q": "prazo"}
+    assert graph.usage == {"input_tokens": 250, "output_tokens": 35}
+
+
+def test_tool_error_recovers(monkeypatch):
+    @tool
+    def flaky(q: str) -> str:
+        """Tool que falha."""
+        raise ValueError("boom")
+
+    turns = [
+        {"text": "", "tool_calls": [{"id": "tu_1", "name": "flaky", "args": {"q": "z"}}],
+         "usage": {"input_tokens": 50, "output_tokens": 5}},
+        {"text": "Não consegui, mas sigo.", "tool_calls": [],
+         "usage": {"input_tokens": 60, "output_tokens": 8}},
+    ]
+    graph, _ = _run_graph(monkeypatch, turns, [flaky])
+    # degradação graciosa: tool que levanta vira string de erro (ToolNode handler)
+    assert "Erro ao executar a tool" in graph.steps[1].output
+    assert graph.final_text == "Não consegui, mas sigo."
+
+
+def test_last_step_notice_injected(monkeypatch):
+    """Item 6/T2 — no penúltimo passo (llm_calls == max_steps-1), o grafo injeta o
+    aviso de última chance de chamar tools antes do backstop cego (`finalize`)."""
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return "mais"
+
+    turns = [
+        {"text": "t1", "tool_calls": [{"id": "a", "name": "search", "args": {"q": "1"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "t2", "tool_calls": [{"id": "b", "name": "search", "args": {"q": "2"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "t3", "tool_calls": [{"id": "c", "name": "search", "args": {"q": "3"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "melhor resposta possível", "tool_calls": [],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+    ]
+    graph, scripted = _run_graph(monkeypatch, turns, [search], max_steps=3)
+    assert graph.stop_reason == "max_steps"
+    third_call_msgs = scripted._received[2]
+    assert any(
+        isinstance(m, HumanMessage) and "esta é a última rodada" in str(m.content)
+        for m in third_call_msgs
+    ), "budget_notice não injetou o aviso de penúltimo passo"
+
+
+def test_last_step_notice_never_leaks(monkeypatch):
+    """ANTI-LEAK (obrigatório) — mesmo com o aviso injetado, ele nunca vaza para
+    `final_text` (mesma classe do bug de vazamento da reflexão)."""
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return "mais"
+
+    turns = [
+        {"text": "t1", "tool_calls": [{"id": "a", "name": "search", "args": {"q": "1"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "t2", "tool_calls": [{"id": "b", "name": "search", "args": {"q": "2"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "t3", "tool_calls": [{"id": "c", "name": "search", "args": {"q": "3"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "melhor resposta possível", "tool_calls": [],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+    ]
+    graph, _ = _run_graph(monkeypatch, turns, [search], max_steps=3)
+    assert "não é mensagem do usuário" not in graph.final_text
+    assert "esta é a última rodada" not in graph.final_text
+    assert graph.final_text == "melhor resposta possível"
+
+
+def test_no_notice_when_max_steps_2(monkeypatch):
+    """ADENDO DE GOVERNANÇA — com max_steps=2 (batch de geração), o aviso NUNCA é
+    injetado (viraria fixture constante em toda seção que chame tool)."""
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return "mais"
+
+    turns = [
+        {"text": "t1", "tool_calls": [{"id": "a", "name": "search", "args": {"q": "1"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "t2", "tool_calls": [{"id": "b", "name": "search", "args": {"q": "2"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "melhor resposta possível", "tool_calls": [],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+    ]
+    graph, scripted = _run_graph(monkeypatch, turns, [search], max_steps=2)
+    assert graph.stop_reason == "max_steps"
+    for received in scripted._received:
+        assert not any(
+            "esta é a última rodada" in str(m.content)
+            for m in received
+        ), "budget_notice não deveria disparar com max_steps=2"
+
+
+def test_max_steps_stop_reason(monkeypatch):
+    """Modelo insiste em tool além do teto → stop_reason=max_steps; tools da última
+    rodada SÃO executadas (trace llm,tool,llm,tool), e uma rodada final SEM tools
+    é forçada (`finalize`/`agent_final`) para o usuário nunca ficar sem resposta."""
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return "mais"
+
+    turns = [
+        {"text": "t1", "tool_calls": [{"id": "a", "name": "search", "args": {"q": "1"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "t2", "tool_calls": [{"id": "b", "name": "search", "args": {"q": "2"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "melhor resposta possível", "tool_calls": [],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+    ]
+    graph, scripted = _run_graph(monkeypatch, turns, [search], max_steps=2)
+    assert graph.stop_reason == "max_steps"
+    assert [s.kind for s in graph.steps] == ["llm", "tool", "llm", "tool", "llm"]
+    # A resposta final é a da rodada forçada, nunca vazia.
+    assert graph.final_text == "melhor resposta possível"
+    third_call_msgs = scripted._received[2]
+    assert any(
+        isinstance(m, HumanMessage) and "Aviso interno" in str(m.content)
+        for m in third_call_msgs
+    ), "finalize não injetou o aviso de rodada final"
+
+
+# ---------------------------------------------------------------------------
+# Anti-leak estrutural / cap / degradação / span_name
+# ---------------------------------------------------------------------------
+
+def test_no_internal_human_message_injected_in_turn(monkeypatch):
+    """A classe do bug de vazamento morre por CONSTRUÇÃO, não por prompt.
+
+    Num turno normal (agent→tools→agent), o grafo NÃO injeta nenhuma HumanMessage
+    interna no meio do raciocínio (os nós reflect/reflect_followup foram deletados).
+    A única HumanMessage no histórico é a mensagem original do usuário; nenhuma nota
+    marcada como "não é mensagem do usuário" aparece — logo não há nota interna que
+    possa vazar como resposta final."""
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return "resultado da busca"
+
+    turns = [
+        {"text": "buscando", "tool_calls": [{"id": "a", "name": "search", "args": {"q": "x"}}],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+        {"text": "resposta final ao usuário", "tool_calls": [],
+         "usage": {"input_tokens": 10, "output_tokens": 2}},
+    ]
+    graph, scripted = _run_graph(monkeypatch, turns, [search])
+    # O histórico visto pela última chamada do modelo é o estado completo do turno.
+    all_msgs = scripted._received[-1]
+    human = [m for m in all_msgs if isinstance(m, HumanMessage)]
+    assert len(human) == 1, "só a mensagem original do usuário deve ser HumanMessage"
+    assert human[0].content == "vai"
+    assert not any(
+        "não é mensagem do usuário" in str(m.content) for m in all_msgs
+    ), "nenhuma nota interna (reflect/finalize) deve ser injetada num turno normal"
+    assert graph.final_text == "resposta final ao usuário"
+
+
+def test_graph_topology_has_no_reflect_or_prune_nodes(monkeypatch):
+    """A topologia final do grafo é START→agent→{END,tools}; tools→{finalize,
+    agent,budget_notice}; finalize→agent_final→END; budget_notice→agent (Item 6/T2).
+    Sem reflect/reflect_followup/manage_memory."""
+    @tool
+    def noop(x: str = "") -> str:
+        """noop."""
+        return x
+
+    scripted = ScriptedChatModel(responses=[])
+    compiled = ag._build_graph(scripted, [noop], max_steps=8)
+    node_names = set(compiled.get_graph().nodes.keys())
+    assert {"agent", "agent_final", "tools", "finalize", "budget_notice"} <= node_names
+    assert not (
+        {"reflect", "reflect_followup", "manage_memory"} & node_names
+    ), f"nós removidos do runtime ainda presentes: {node_names}"
+
+
+def test_graph_caps_tool_result(monkeypatch):
+    """Tool que devolve 50k chars → output capado no trace (cap central no nó tools)."""
+    @tool
+    def big_tool(_: str = "") -> str:
+        """Devolve um output enorme."""
+        return "y" * 50_000
+
+    turns = [
+        {"text": "", "tool_calls": [{"id": "t1", "name": "big_tool", "args": {}}],
+         "usage": {"input_tokens": 5, "output_tokens": 1}},
+        {"text": "pronto", "tool_calls": [], "usage": {"input_tokens": 5, "output_tokens": 1}},
+    ]
+    graph, _ = _run_graph(monkeypatch, turns, [big_tool])
+    tool_step = next(s for s in graph.steps if s.kind == "tool")
+    assert len(tool_step.output) <= TOOL_RESULT_CHAR_CAP + 80
+    assert "…[truncado:" in tool_step.output
+    assert graph.final_text == "pronto"
+
+
+class RaisingChatModel(BaseChatModel):
+    """Modelo que sempre levanta — exercita a degradação graciosa do grafo."""
+    @property
+    def _llm_type(self) -> str:
+        return "raising"
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+        raise RuntimeError("modelo explodiu")
+
+    def bind_tools(self, tools, **kwargs):  # noqa: ANN001
+        return self
+
+
+def test_graph_degrades_on_model_error(monkeypatch):
+    """Modelo levanta no nó agent → AgentResult error, sem propagar exceção."""
+    @tool
+    def search(q: str) -> str:
+        """Busca."""
+        return "x"
+
+    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: RaisingChatModel())
+    graph = asyncio.run(run_agent_graph_async(
+        system="sys", initial_messages=[{"role": "user", "content": "vai"}],
+        tools=[search], model="m", provider="anthropic",
+    ))
+    assert graph.stop_reason == "error"
+    assert graph.final_text == "" and graph.steps == []
+
+
+def test_graph_honors_span_name(monkeypatch):
+    """span_name chega na telemetria (igual ao legado → nesting de subagente)."""
+    import contextlib
+
+    import core.infra.telemetry as telemetry
+
+    captured: list[str] = []
+
+    @contextlib.contextmanager
+    def fake_agent_run(name, **kw):
+        captured.append(name)
+        yield None
+
+    monkeypatch.setattr(telemetry, "agent_run", fake_agent_run)
+
+    @tool
+    def noop(x: str) -> str:
+        """noop."""
+        return x
+
+    turns = [{"text": "ok", "tool_calls": [], "usage": {"input_tokens": 1, "output_tokens": 1}}]
+    scripted = ScriptedChatModel(responses=[_graph_msg(t) for t in turns])
+    monkeypatch.setattr(ag, "_build_chat_model", lambda *a, **k: scripted)
+
+    asyncio.run(run_agent_graph_async(
+        system="sys", initial_messages=[{"role": "user", "content": "x"}],
+        tools=[noop], model="claude-sonnet-4-6", provider="anthropic",
+        span_name="subagent.deep_research",
+    ))
+    assert captured == ["subagent.deep_research"]

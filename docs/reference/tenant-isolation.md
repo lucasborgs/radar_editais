@@ -5,7 +5,7 @@
 (P0). Este doc é o inventário de tabela × política efetiva, das quatro
 superfícies de defesa e do furo P0 encontrado e corrigido.
 
-Suíte que verifica tudo aqui: [`tests/test_tenant_isolation.py`](../../tests/test_tenant_isolation.py).
+Suíte que verifica tudo aqui: [`tests/integration/test_tenant_isolation.py`](../../tests/integration/test_tenant_isolation.py).
 
 ## Modelo de ameaça
 
@@ -169,7 +169,7 @@ export SUPABASE_URL="$LOCAL_API_URL" \
        SUPABASE_SERVICE_KEY="$LOCAL_SERVICE_ROLE_KEY" \
        SUPABASE_JWT_SECRET="$LOCAL_JWT_SECRET" \
        DATABASE_URL="$LOCAL_DB_URL"
-pytest tests/test_tenant_isolation.py -v
+pytest tests/integration/test_tenant_isolation.py -v
 ```
 
 Contra staging: aponte as mesmas envs ao projeto remoto. `SUPABASE_JWT_SECRET`

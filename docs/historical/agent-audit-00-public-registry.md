@@ -33,7 +33,7 @@ build_scratchpad_tools, build_writing_tools`.
 
 ## Validação
 
-Novo `tests/test_agent_tools_registry.py`: assert que cada `build_*_tools`/factory
+Novo `tests/unit/test_agent_tools_registry.py`: assert que cada `build_*_tools`/factory
 pública existente no pacote está em `__all__` (ou explicitamente numa allowlist de
 "internos documentados"). Trava o drift futuro.
 

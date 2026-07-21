@@ -83,7 +83,7 @@ A defesa é namespacing (V1-V3). Trabalho:
 
 **Entregáveis**:
 1. Inventário tabela × policy (seção neste doc ou `docs/security/` — decidir).
-2. Suíte `tests/test_tenant_isolation.py` (integration, dois usuários de teste,
+2. Suíte `tests/integration/test_tenant_isolation.py` (integration, dois usuários de teste,
    roda contra Supabase local; documentar como rodar contra staging).
 3. Fixes do que o teste pegar (PRs pequenos, um por furo).
 4. Wiring no CI (job opcional/manual se depender de Supabase local).

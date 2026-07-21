@@ -561,7 +561,7 @@ O codebase principal tem apenas 3 ocorrências relevantes:
 |---------------|------|----------|
 | `core/infra/db.py:68` | DEPRECATED | `get_supabase()` alias retrocompat — código novo deve usar `DbClient`. Ainda referenciado por pipelines/scripts legados. |
 | `core/skills.py:198` | TODO | Acesso ao banco de overlays de skills faz fallback silencioso para `[]` — sem regressão mas sem cobertura de erro. |
-| `tests/test_retriever.py:7` | TODO | Integração com pgvector real exige fixture com DB ativo — não existe. |
+| `tests/unit/test_retriever.py:7` | TODO | Integração com pgvector real exige fixture com DB ativo — não existe. |
 
 ---
 

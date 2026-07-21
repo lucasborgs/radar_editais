@@ -146,7 +146,7 @@ sobre `data/knowledge_graph/` real.
 Branch `feat/kg-v2-residuos-pr-b` (empilhada sobre PR-A). **Code-only** (Wave 1): o
 validador/merge foi reforçado + fixtures, **sem rodar sobre o corpus**. Sanity
 `python -m core.eval matching`: `recall@k 0.8334`, `noise 3.0`, exit 0 (baseline inalterado
-— o passe não roda aqui). `ruff` limpo; `pytest tests/test_canonicalize.py` 15/15.
+— o passe não roda aqui). `ruff` limpo; `pytest tests/unit/test_canonicalize.py` 15/15.
 
 **Frente 1 — descarte determinístico por classe errada** (`core/kg/canonicalize.py`).
 - `anti_class_verdict(name)`: a "lista de padrões" da spec — **metrica** (TRL/readiness/

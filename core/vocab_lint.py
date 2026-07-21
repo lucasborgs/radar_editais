@@ -395,7 +395,7 @@ def build_report(evidence: dict, proposal: dict | None) -> str:
           "bloco `tema_vocab` acima.",
           "2. [ ] Se houver sinônimos: acrescentar as entradas em "
           "`domain/vocabulary._SYNONYMS`.",
-          "3. [ ] `python -m pytest tests/test_vocab_lint.py tests/test_gold_mappers.py` "
+          "3. [ ] `python -m pytest tests/unit/test_vocab_lint.py tests/unit/test_gold_mappers.py` "
           "(doc × accessors/consumidores não divergem).",
           "4. [ ] Reingestão deliberada: `python -m core.kg.gold --no-skip`.",
           "5. [ ] Gate de não-regressão: `python -m core.eval matching --no-push` "

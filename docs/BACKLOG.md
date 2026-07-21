@@ -63,7 +63,7 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
   `discovery_ledger` e consulta `load_index()` na deduplicação; `core/vocab_lint.py`
   também lê `index.json`/`index_historico.json` por esse seam. Não há outros
   consumidores de produção/tooling no repositório; `load_icts()` aparece apenas
-  nos testes. `tests/test_kg_store.py` cobre os contratos ainda expostos.
+  nos testes. `tests/unit/test_kg_store.py` cobre os contratos ainda expostos.
 - **Motivo do adiamento:** remover `kg_store`, `kg_artifacts` ou os helpers de
   índice agora alteraria deduplicação/observabilidade da Descoberta e quebraria
   tooling offline. Não são arquivos mortos.

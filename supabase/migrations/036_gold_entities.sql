@@ -119,7 +119,7 @@ create policy "match_chunks_read_authenticated" on public.match_chunks
 -- ────────────────────────────────────────────────────────────
 -- 4. company_chunks — lado empresa (dado de tenant, §5.4)
 --    População é da Fase 2; nasce VAZIA mas com RLS desde já (critério de
---    aceite: leak-test durável, tests/test_company_chunks_rls.py).
+--    aceite: leak-test durável, tests/integration/test_company_chunks_rls.py).
 -- ────────────────────────────────────────────────────────────
 create table if not exists public.company_chunks (
     id            uuid primary key default gen_random_uuid(),

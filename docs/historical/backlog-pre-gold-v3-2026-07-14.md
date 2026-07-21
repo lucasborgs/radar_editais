@@ -22,7 +22,7 @@
 - **O quê:** a [migration 034](../../supabase/migrations/034_procrastinate_lockdown.sql)
   (RLS + REVOKE nas tabelas/funções `procrastinate*`) foi aplicada e verificada só no
   Supabase **local**. O leak-test apontado ao **remoto** ainda REPROVA
-  (`tests/test_tenant_isolation.py::...::test_procrastinate_surface_negada`) — ou seja,
+  (`tests/integration/test_tenant_isolation.py::...::test_procrastinate_surface_negada`) — ou seja,
   **em produção a anon key ainda lê `procrastinate_jobs.args` (workspace_id/payloads
   cross-tenant) e deleta/enfileira jobs**. Junto sobem 032/033 (pendentes no ledger remoto).
 - **Por que importa:** é o furo P0 da Frente 1 do leak-test pré-beta — vazamento

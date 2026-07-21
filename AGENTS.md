@@ -35,7 +35,7 @@ python -m procrastinate --app=core.tasks.app worker   # background job worker
 ### Tests
 ```bash
 pytest                                          # run all tests
-pytest tests/test_match_v3.py                  # single file
+pytest tests/unit/test_match_v3.py                  # single file
 pytest -k "test_name"                          # single test by name
 pytest -x                                      # stop on first failure
 ```

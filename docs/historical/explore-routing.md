@@ -178,7 +178,7 @@ Visitante → POST /explore
 | `core/services/explore_agent.py` | +`_classify_intent()`, +`_factual_route()`, +`_format_edital_card()`, +`_format_edital_table()`. `explore()` vira dispatcher das 3 rotas. `agent_enabled` removido. |
 | `core/services/writing_session.py` | `_resolve_edital_scope()` → `return [self.edital_id]`. |
 | `backend/routers/explore.py` | `agent_enabled` removido do modelo. Handler simplificado: sempre chama `explore()` + extração de perfil via `ProfileExtractor`. |
-| `tests/test_explore_agent.py` | 9 novos testes: `_classify_intent` (factual/reasoning/agent/fallback/edital_ids) + dispatcher (3 rotas + fallback factual→reasoning). |
+| `tests/unit/test_explore_agent.py` | 9 novos testes: `_classify_intent` (factual/reasoning/agent/fallback/edital_ids) + dispatcher (3 rotas + fallback factual→reasoning). |
 
 ---
 
