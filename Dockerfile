@@ -5,7 +5,7 @@
 #            (python -m procrastinate --app=core.tasks.app worker).
 # See docs/historical/ADR-001-decisoes-iniciais.md (D1, D3, D4).
 
-FROM python:3.11-slim AS base
+FROM python:3.12-slim AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
 
