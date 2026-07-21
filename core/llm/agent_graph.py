@@ -111,7 +111,7 @@ def _build_chat_model(
         "model": model, "timeout": _TIMEOUT, "max_retries": _MAX_RETRIES,
         # Defensivo (Item 1, TASK 2): protege o usage em streaming caso a lib
         # regrida — langchain-openai 1.3.3 já popula usage_metadata em stream
-        # por padrão (achado do spike, spikes/lever1_streaming/FINDINGS.md),
+        # por padrão (achado em docs/historical/spikes/lever1_streaming/FINDINGS.md),
         # então isto é inócuo no path não-streaming e no streaming de hoje.
         "stream_usage": True,
     }
@@ -543,7 +543,7 @@ async def run_agent_graph_streaming(
         conversa toda). O produtor lê `prior_n_msgs` do checkpointer antes do turno.
 
     Transporte decidido na TASK 1 do item 1 (checkpoint GO, ver
-    `spikes/lever1_streaming/FINDINGS.md`): `graph.astream(stream_mode=
+    `docs/historical/spikes/lever1_streaming/FINDINGS.md`): `graph.astream(stream_mode=
     ["messages", "values"])`. `astream_events(version="v3")` não está
     disponível como async iterator direto na versão pinada do langgraph
     (retorna um `AsyncGraphRunStream` experimental); `values` garante o
@@ -874,7 +874,7 @@ def _get_writing_checkpointer():
 # ---------------------------------------------------------------------------
 # Checkpointer LOOP-LOCAL para o explore streaming (Item 3, TASK 3)
 # ---------------------------------------------------------------------------
-# O probe da TASK 1 (spikes/lever3_threads/FINDINGS.md) confirmou: reusar o saver
+# O probe (docs/historical/spikes/lever3_threads/FINDINGS.md) confirmou: reusar o saver
 # do bg-loop (acima) a partir do loop da request/uvicorn explode com "Lock is bound
 # to a different event loop" — o pool/lock do AsyncPostgresSaver fica bound ao loop
 # onde foi criado. A escrita cruza inteiro pro bg-loop (run_writing_turn é sync); o

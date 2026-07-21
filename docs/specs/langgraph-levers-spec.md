@@ -40,7 +40,7 @@
 
 ## Item 2 — Gestão de contexto (`trim_messages` + nó de resumo) — ⏸️ ARQUIVADO COM GATILHOS (governança, 2026-07-18)
 
-**Decisão pós-spike** (`spikes/lever2_context/FINDINGS.md`): **NO-GO para promoção agora.**
+**Decisão pós-spike** (`docs/historical/spikes/lever2_context/FINDINGS.md`): **NO-GO para promoção agora.**
 - `trim_messages` puro **REFUTADO**: corta por idade, não importância — derruba citação real (`get_edital`) em orçamento apertado e mantém navegação redundante; perda silenciosa. Falha o sinal de sucesso do próprio item. Achado adicional: `start_on="human"` colapsa no shape intra-turno (transferido ao Item 3, onde é a ferramenta certa).
 - Resumo seletivo por densidade: mecânica provada (~380 tok/chamada), mas detector confiável é **o cerne do trabalho** — construí-lo = "motor de compaction" = o harness-smell que esta spec manda parar e reavaliar (candidato a gatilho de SDK, não a construção à mão).
 - Premissa empírica caiu: o único truncamento real observado foi por **contagem de passos** (`max_steps`, 7.520 tokens — longe de janela), não contexto. O teto de hoje é o do Item 6.

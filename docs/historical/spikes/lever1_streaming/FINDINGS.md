@@ -1,6 +1,6 @@
 # TASK 1 — Findings (Streaming, item 1)
 
-**Data:** 2026-07-18 · **Script:** `spikes/lever1_streaming/demo.py` · **Grafo:** real (`_build_graph`, tools/system do explore, sem perfil)
+**Data:** 2026-07-18 · **Script:** `docs/historical/spikes/lever1_streaming/demo.py` · **Grafo:** real (`_build_graph`, tools/system do explore, sem perfil)
 **Pergunta de teste:** "Quais editais estão abertos agora? Liste até 3 com um resumo breve de cada um." (força ≥1 tool call, geralmente 3: `list_editais` + `get_edital`×3)
 **Runs:** 2 execuções limpas após o fix de filtro (ver Wrinkle 2), `temperature=0`.
 

@@ -24,7 +24,7 @@ Decisão do modelo cross-encoder (questão aberta #3 da spec): default
 mMARCO (inclui português), ~118M params, leve o suficiente para rodar em CPU
 por turno. Sobrescrevível via `RERANK_MODEL`.
 
-Benchmark 2026-06-12 (golden reranker, 20 casos; scripts/bench_reranker.py):
+Benchmark de 2026-06-12 (golden reranker, 20 casos):
   • mMiniLM (este default): ndcg@3 0.931, top1 1.00, ~1.1s/chamada CPU
     (20 passagens ~800 tok), custo zero.
   • backend llm (gpt-4o-mini): ndcg@3 0.870, top1 1.00, ~2.6s/chamada +

@@ -196,16 +196,6 @@ Classes base: inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-m
 Cor: definida por STATUS_CONFIG em src/lib/constants.ts
 ```
 
-### SidebarFilter (`src/components/ui/SidebarFilter.tsx`)
-
-- Container: `bg-white rounded-xl border border-border p-4`
-- Seção título: `text-xs font-semibold uppercase tracking-wider text-content-secondary`
-- Checkbox (Radix): `w-4 h-4 rounded border-2`
-  - Checked: `bg-primary border-primary`
-  - Unchecked: `border-border bg-white hover:border-primary/50`
-- Input de data: `w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary/50`
-- Dot de cor por fonte: `w-2 h-2 rounded-full` com `backgroundColor: SOURCE_COLORS[src]`
-
 ### AppSidebar (`src/components/layout/AppSidebar.tsx`)
 
 - Container: `w-64 flex-col bg-white border-r border-border`

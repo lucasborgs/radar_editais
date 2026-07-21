@@ -3,7 +3,7 @@ Contextual Retrieval (Anthropic 2024) — contexto-no-chunk antes do embed.
 
 Para cada chunk, gera por LLM um contexto curto que o situa no documento e o
 prepende ANTES de embeddar. O texto ARMAZENADO (coluna `text`) continua o
-original; só o vetor muda. Bake-off (scripts/bench_contextual.py): +1-2pp
+original; só o vetor muda. Bake-off de 2026-06-15: +1-2pp
 consistente em gold_recall/best_chunk no FINEP — único lever com ganho de
 retrieval medido (parser estrutura-aware não rendeu).
 

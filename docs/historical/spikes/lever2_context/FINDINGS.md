@@ -1,6 +1,6 @@
 # Item 2 — Findings (Gestão de contexto)
 
-**Data:** 2026-07-18 · **Script:** `spikes/lever2_context/demo.py` · **Runtime real:**
+**Data:** 2026-07-18 · **Script:** `docs/historical/spikes/lever2_context/demo.py` · **Runtime real:**
 `ExploreAgent.explore_with_meta` / `WritingSession.turn` → `core/llm/agent_graph.py`
 (mesmo `_build_graph`, mesmos system prompts/tools de produção). Captura sem
 tocar `core/`: monkeypatch de `agent_graph._messages_to_agent_result` (chamada

@@ -74,7 +74,7 @@ Régua de "pronto" (herdada da spec): comportamento-preservador ⇒ **sem gate d
 
 **Objetivo.** Provar, contra o grafo REAL do explore, que (a) dá para emitir tokens antes de o turno terminar e (b) o estado final do stream permite reconstruir `AgentResult` com paridade de `usage`/`trace` — nos dois transportes de provider do sistema.
 
-**Arquivo (único, throwaway):** `spikes/lever1_streaming/demo.py` (+ `__init__.py` se necessário). Nada em `core/` de produção.
+**Arquivo (único, throwaway):** `docs/historical/spikes/lever1_streaming/demo.py` (+ `__init__.py` se necessário). Nada em `core/` de produção.
 
 **O que o script faz:**
 1. Monta as tools e o system do explore como em produção — importa `EXPLORE_AGENT_SYSTEM` e `build_explore_tools()` (`core/services/explore_agent.py:194-203`), sem perfil (caminho mais simples).
@@ -262,7 +262,7 @@ O deploy real é **Docker + Cloudflare Tunnel** (memória `project_v3_progress`)
 
 ## Adendo pós-checkpoint (2026-07-18) — decisões ratificadas
 
-Checkpoint da TASK 1: **GO ratificado** (governança). Fonte: `spikes/lever1_streaming/FINDINGS.md`.
+Checkpoint da TASK 1: **GO ratificado** (governança). Fonte: `docs/historical/spikes/lever1_streaming/FINDINGS.md`.
 
 1. **Transporte decidido: `graph.astream(init, config, stream_mode=["messages","values"])`.** `astream_events(version="v3")` está indisponível na versão pinada (`langgraph==1.2.6`, retorna objeto experimental não-iterável); v2 funciona mas exige heurística de estado final. No astream multimode o último item de `values` é o estado terminal **garantido pela API**.
 2. **Critério de aceite ADICIONADO à TASK 2/3:** filtro `isinstance(msg, AIMessageChunk)` no modo `"messages"` — sem ele, `ToolMessage` bruto vaza como texto do assistente (bug real observado no spike; mesma classe do reflect-leak, memória `project_reflect_leak_bug`).

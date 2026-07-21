@@ -1,6 +1,6 @@
 # TASK 1 — Findings (Thread por sessão / checkpointer como memória, Item 3)
 
-**Data:** 2026-07-18 · **Script:** `spikes/lever3_threads/demo.py` (throwaway)
+**Data:** 2026-07-18 · **Script:** `docs/historical/spikes/lever3_threads/demo.py` (throwaway)
 **Grafo:** real (`_build_graph` + tools/system reais do explore, sem perfil) · **Saver:** **AsyncPostgresSaver real** (`_get_writing_checkpointer`, sobre `DATABASE_URL`) · **Modelo:** `gpt-4o-mini` real (fallback OpenAI — sem `ANTHROPIC_API_KEY` local, gap conhecido) · `temperature=0`.
 **Thread única:** `wsSPIKE:{sess}` para os 3 turnos. Cenário roda no **bg-loop** (`_run_on_bg_loop`); o probe roda num loop novo (`asyncio.run`) de propósito.
 

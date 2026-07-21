@@ -2,7 +2,7 @@
 
 **Status:** VEREDITO APLICADO (regra pré-registrada, iteração única) · **Data:** 2026-07-18
 
-Throwaway: `spikes/lever6_budget/demo.py`. Rodado contra os produtores reais
+Throwaway: `docs/historical/spikes/lever6_budget/demo.py`. Rodado contra os produtores reais
 (`ExploreAgent`/`WritingSession`), provider resolvido para `openai`/`gpt-4o-mini`
 (único disponível no ambiente). Duas iterações: a 1ª motivou um reword do
 prompt (achado: menção a "uma última chamada" induzia o modelo a exercê-la);
