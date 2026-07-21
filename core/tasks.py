@@ -917,7 +917,7 @@ async def _run_daily_etl(timestamp: int) -> None:
     #    entity_relationships). Uso pessoal (Graph View); sem consumidor no app.
     #    `scripts` é importável como namespace package a partir da raiz.
     try:
-        from config import OBSIDIAN_VAULT_DIR  # noqa: PLC0415
+        from core.config import OBSIDIAN_VAULT_DIR  # noqa: PLC0415
         from scripts.export_to_obsidian import run as export_obsidian  # noqa: PLC0415
         OBSIDIAN_VAULT_DIR.mkdir(parents=True, exist_ok=True)
         await asyncio.to_thread(export_obsidian, OBSIDIAN_VAULT_DIR)

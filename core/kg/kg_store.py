@@ -36,7 +36,7 @@ import os
 import threading
 import time
 
-from config import KNOWLEDGE_GRAPH_DIR
+from core.config import KNOWLEDGE_GRAPH_DIR
 
 logger = logging.getLogger(__name__)
 

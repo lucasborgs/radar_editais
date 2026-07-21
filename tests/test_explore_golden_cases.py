@@ -6,7 +6,7 @@ import unicodedata
 
 import pytest
 
-from config import ROOT
+from core.config import ROOT
 
 
 def _fold(text: str) -> str:

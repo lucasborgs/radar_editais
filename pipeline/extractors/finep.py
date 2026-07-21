@@ -28,7 +28,7 @@ import os
 import time
 from pathlib import Path
 
-from config import FINEP_PDFS_DIR
+from core.config import FINEP_PDFS_DIR
 from core.kg.schema import iso_to_br_date
 
 from .base import BaseScraper

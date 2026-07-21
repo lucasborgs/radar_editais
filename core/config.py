@@ -10,7 +10,7 @@ SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
 SUPABASE_JWT_SECRET  = os.getenv("SUPABASE_JWT_SECRET", "")
 SUPABASE_ANON_KEY    = os.getenv("SUPABASE_ANON_KEY", "")
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parents[1]
 
 # Dados locais (medallion): data/bronze (raw imutável) e data/silver (derivado,
 # reconstruível do bronze). Camadas separadas como subpastas de um único dir.

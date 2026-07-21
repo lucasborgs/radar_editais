@@ -15,7 +15,7 @@ import json
 import logging
 import re
 
-from config import BRONZE_DIR
+from core.config import BRONZE_DIR
 
 from .base import CanonicalDoc, SourceAdapter, coletado_em, split_into_units
 

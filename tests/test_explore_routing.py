@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from config import ROOT
+from core.config import ROOT
 from core.services.explore_routing import (
     Intent,
     RouteContext,

@@ -29,7 +29,7 @@ import json
 from functools import lru_cache
 from typing import Any
 
-from config import ROOT
+from core.config import ROOT
 from core.eval.harness import Criterion, Evaluation, Suite, get_input
 
 GOLDEN = ROOT / "eval_data" / "golden" / "matching.json"

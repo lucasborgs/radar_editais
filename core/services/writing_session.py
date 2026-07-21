@@ -40,7 +40,7 @@ from pathlib import Path
 
 import requests
 
-from config import FINEP_PDFS_DIR
+from core.config import FINEP_PDFS_DIR
 from core.reflection_service import _auto_memory_write_enabled, load_active_insights
 from core.retrieval.retriever import (
     format_chunks_for_prompt,

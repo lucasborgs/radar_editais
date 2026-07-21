@@ -148,7 +148,7 @@ Edital chunks (para RAG na WritingSession — índice independente do gold):
   → tabela edital_chunks (pgvector + tsvector)
   → aquecimento diário 05:00 UTC + ensure/prefetch sob demanda (mesmo produtor idempotente)
 ```
-Paths em `config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR).
+Paths em `core/config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR).
 
 ### Package layout
 ```

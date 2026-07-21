@@ -29,7 +29,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from config import BRONZE_DIR
+from core.config import BRONZE_DIR
 from core.infra.auth import AdminUserId
 from core.infra.db import get_supabase_service
 from core.infra.net_guard import safe_get, safe_head

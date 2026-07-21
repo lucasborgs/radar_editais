@@ -251,7 +251,7 @@ WRITING_VARIANTS_ORIGINAL_KEYS = {"tratorbr", "biotecstartup"}
 def _load_golden_profile(profile_key: str):
     import json
 
-    from config import ROOT
+    from core.config import ROOT
     from domain.user_profile import CompanyProfile
 
     data = json.loads((ROOT / "eval_data" / "golden" / "writing_v2.json").read_text(encoding="utf-8"))

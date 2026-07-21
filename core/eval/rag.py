@@ -12,7 +12,7 @@ import os
 import time
 from typing import Any
 
-from config import ROOT
+from core.config import ROOT
 from core.eval.harness import Evaluation, Suite, get_input
 
 GOLDEN_DIR = ROOT / "eval_data" / "golden"

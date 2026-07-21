@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import core.llm.agent_graph as agent_graph_mod  # noqa: E402
-from config import ROOT  # noqa: E402
+from core.config import ROOT  # noqa: E402
 from core.llm.agent_graph import _build_chat_model, shutdown_writing_runtime  # noqa: E402
 from core.llm.agent_runtime import resolve_agent_provider  # noqa: E402
 

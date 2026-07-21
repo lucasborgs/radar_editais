@@ -53,7 +53,7 @@ def _stub_etl(monkeypatch, ingest_calls):
 def test_run_daily_etl_calls_ingest_all(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
-    import config
+    from core import config
     monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
     ingest_calls: list = []
     _stub_etl(monkeypatch, ingest_calls)
@@ -66,7 +66,7 @@ def test_run_daily_etl_calls_ingest_all(monkeypatch, tmp_path):
 def test_run_daily_etl_skips_gold_without_database_url(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.delenv("DATABASE_URL", raising=False)
-    import config
+    from core import config
     monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
     ingest_calls: list = []
     _stub_etl(monkeypatch, ingest_calls)

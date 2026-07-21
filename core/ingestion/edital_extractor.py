@@ -19,7 +19,7 @@ import logging
 import os
 from pathlib import Path
 
-from config import BRONZE_DIR
+from core.config import BRONZE_DIR
 from domain.edital_extraction import EditalExtraction
 
 logger = logging.getLogger(__name__)

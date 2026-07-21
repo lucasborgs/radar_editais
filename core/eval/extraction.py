@@ -18,7 +18,7 @@ import json
 import os
 from typing import Any
 
-from config import ROOT
+from core.config import ROOT
 from core.eval.harness import Criterion, Evaluation, Suite, get_input
 from domain.edital_extraction import DECISION_FIELDS
 

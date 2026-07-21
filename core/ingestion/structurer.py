@@ -22,7 +22,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from config import SILVER_DIR
+from core.config import SILVER_DIR
 from core.kg import schema
 from pipeline.adapters.base import CanonicalDoc
 

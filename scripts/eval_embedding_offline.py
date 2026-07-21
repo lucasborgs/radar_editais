@@ -58,7 +58,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from config import ROOT  # noqa: E402
+from core.config import ROOT  # noqa: E402
 
 GOLDEN_DIR = ROOT / "eval_data" / "golden"
 RESULTS_DIR = ROOT / "eval_results"

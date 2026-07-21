@@ -12,7 +12,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 WORKDIR /app
 
 COPY pyproject.toml requirements.lock.txt requirements.worker.lock.txt ./
-COPY config.py ./
 COPY backend/ ./backend/
 COPY core/ ./core/
 COPY domain/ ./domain/

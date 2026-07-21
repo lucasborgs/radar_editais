@@ -18,7 +18,7 @@ from pathlib import Path
 
 import yaml
 
-from config import ROOT as _ROOT
+from core.config import ROOT as _ROOT
 
 _WIKI_MD = _ROOT / "WIKI.md"
 _WIKIS_DIR = _ROOT / "wikis"

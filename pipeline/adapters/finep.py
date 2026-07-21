@@ -18,7 +18,7 @@ import unicodedata
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-from config import BRONZE_DIR, FINEP_PDFS_DIR
+from core.config import BRONZE_DIR, FINEP_PDFS_DIR
 
 from .base import CanonicalDoc, SourceAdapter, coletado_em
 
