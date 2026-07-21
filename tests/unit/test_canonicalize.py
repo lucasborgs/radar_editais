@@ -2,13 +2,13 @@
 
 Os passes LLM/grafo da higiene de Conceitos morreram com o hipergrado (PR-C v3).
 O que fica é `anti_class_verdict` — descarte determinístico consumido por
-`core.kg.gold.normalize_tags`.
+`radar.core.kg.gold.normalize_tags`.
 """
 from __future__ import annotations
 
 import pytest
 
-from core.kg.canonicalize import anti_class_verdict
+from radar.core.kg.canonicalize import anti_class_verdict
 
 pytestmark = pytest.mark.unit
 

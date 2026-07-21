@@ -39,7 +39,7 @@ Estado da arte (2024-2026) endossa a direção: funil hard-filter → denso → 
 5. **Postgres é a source of truth única.** Nada de runtime lê JSON de disco.
 6. **Duas superfícies de embedding com ciclos de vida distintos:** match (cru, eager, barato) e writing (contextual, lazy, caro). Não se misturam.
 7. **Fronteira redefinida:** match consome `match_chunks` e `entities`; **nunca** `edital_chunks` (writing). Writing não muda.
-8. **Vocabulários vivem nos docs** (WIKI.md via `core/kg/schema.py`): taxonomia de setores, regras de normalização de tags, vocabulário de constraints.
+8. **Vocabulários vivem nos docs** (WIKI.md via `src/radar/core/kg/schema.py`): taxonomia de setores, regras de normalização de tags, vocabulário de constraints.
 
 ## 3. Escopo pré-beta (fontes fixas)
 
@@ -163,7 +163,7 @@ CREATE TABLE match_chunks (
 );
 ```
 
-- ~~Embed cru do texto do silver, sem contextual retrieval.~~ **REVOGADO pelo gate da Fase 1.5 (2026-07-10):** a célula `contextual` venceu o cru em TODAS as métricas (MRR 0.505→0.666) — o embedding dos `match_chunks` é **contextualizado** (`core/contextual_retrieval.py`, doc de contexto = blocos temáticos do próprio silver; texto armazenado segue cru, só o vetor muda — mesma convenção de `edital_chunks`). Os motivos originais do cru ((a) contexto institucional como anti-sinal, (c) simetria com o lado empresa) eram hipóteses e foram refutados empiricamente; o custo (d) foi aceito (~US$0,7/corpus, pago só no re-ingest por `source_hash`).
+- ~~Embed cru do texto do silver, sem contextual retrieval.~~ **REVOGADO pelo gate da Fase 1.5 (2026-07-10):** a célula `contextual` venceu o cru em TODAS as métricas (MRR 0.505→0.666) — o embedding dos `match_chunks` é **contextualizado** (`src/radar/core/contextual_retrieval.py`, doc de contexto = blocos temáticos do próprio silver; texto armazenado segue cru, só o vetor muda — mesma convenção de `edital_chunks`). Os motivos originais do cru ((a) contexto institucional como anti-sinal, (c) simetria com o lado empresa) eram hipóteses e foram refutados empiricamente; o custo (d) foi aceito (~US$0,7/corpus, pago só no re-ingest por `source_hash`).
 - **Só seções temáticas entram** (objetivos, temas, linhas, escopo). Boilerplate (cronograma, documentação exigida, disposições gerais) é excluído por `section_path`/`kind` — regra no WIKI.md.
 - Editais e programas geram chunks (programas: description curada = 1-2 chunks). Investidores/ICTs usam só `entities.embedding` (descrições curtas — single-vector basta).
 
@@ -183,9 +183,9 @@ CREATE TABLE company_chunks (
 -- Critério de aceite: leak-test durável (mesmo protocolo do checkpointer LangGraph).
 ```
 
-Fontes: texto do perfil + documentos da ContentLibrary do workspace (mesmo chunker do silver). **Cold start** (sem docs): HyDE gera pseudo-doc a partir do perfil (`origin='hyde'`, reusa `core/retrieval/hyde.py`), regenerado quando o perfil muda.
+Fontes: texto do perfil + documentos da ContentLibrary do workspace (mesmo chunker do silver). **Cold start** (sem docs): HyDE gera pseudo-doc a partir do perfil (`origin='hyde'`, reusa `src/radar/core/retrieval/hyde.py`), regenerado quando o perfil muda.
 
-## 6. Ingestão gold (`core/kg/gold.py` — `ingest_all()`)
+## 6. Ingestão gold (`src/radar/core/kg/gold.py` — `ingest_all()`)
 
 Caráter do módulo: **ingestor com mapeadores determinísticos por fonte + tagger LLM só para editais.** Não é extrator. 3 das 4 fontes já são gold de fábrica.
 
@@ -264,7 +264,7 @@ Substituição concreta das arestas semânticas — 4 tools sobre SQL (via `enti
 
 **Fica:** structurer (silver — inalterado) · `eligibility.py` (avaliador único, mesma semântica) · `constraints_producer` (adaptado: input = seções de elegibilidade do silver; output = colunas de entities) · `match_verdict.py` (adaptado: lê entities + matched_excerpts) · `embedder`/`chunker` · **WritingSession inalterada** (RAG contextual lazy sobre `edital_chunks` — intacto, incl. PR #44) · memória do agente (PostgresStore/checkpointer) · `anti_class_verdict` como filtro pós-LLM de tags · a *curadoria* do canon (vira mapa de normalização).
 
-**Novo:** `entities` + `entity_relationships` + `match_chunks` + `company_chunks` (migration 036) · `core/kg/gold.py` · `core/kg/entity_catalog.py` · Stage 0-3 do match · tools §8 · blocos novos no WIKI.md (`setores_taxonomia`, `tag_normalization`, `match_sections`) · flags `MATCH_ENGINE=v2|v3` e `CATALOG_BACKEND=hypergraph|sql`.
+**Novo:** `entities` + `entity_relationships` + `match_chunks` + `company_chunks` (migration 036) · `src/radar/core/kg/gold.py` · `src/radar/core/kg/entity_catalog.py` · Stage 0-3 do match · tools §8 · blocos novos no WIKI.md (`setores_taxonomia`, `tag_normalization`, `match_sections`) · flags `MATCH_ENGINE=v2|v3` e `CATALOG_BACKEND=hypergraph|sql`.
 
 ## 10. Plano de migração (eval-first)
 
@@ -316,7 +316,7 @@ SELECT count(*) FROM entities WHERE kind='conceito';     -- erro: kind não exis
 
 - Fase 1.5: Stage 0+1 recall ~100% dos positivos do golden; baseline v3 de ranking estabelecido; hard negatives de elegibilidade passam.
 - `MATCH_ENGINE=v3` + eval matching ≥ baseline v3 da Fase 1.5.
-- `grep -r "hypergraph_catalog\|load_all_hypergraphs\|hyperextract" core/ backend/` → vazio após Fase 5.
+- `grep -r "hypergraph_catalog\|load_all_hypergraphs\|hyperextract" src/radar/core/ src/radar/api/` → vazio após Fase 5.
 - Leak-test de `company_chunks` passa.
 - Lazy chunking do writing comprovadamente intacto (nenhum caminho novo escreve em `edital_chunks`).
 

@@ -169,7 +169,7 @@ migra, fluxo MERGED_FLAG atual).
 
 - Painel direito na conversa (`kind='writing'`): seletor de seção, edição
   inline + salvar, export, checklist como aba. Mata `/chat`.
-- Gate: **`python -m core.eval writing` antes de remover a página legada**
+- Gate: **`python -m radar.core.eval writing` antes de remover a página legada**
   (coração do produto; padrão do repo para matar superfície legada).
 
 ### Fase 4 — Anexos + gerenciador mínimo (depois de 1)

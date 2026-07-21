@@ -18,8 +18,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-import core.retrieval.chunker as chunker  # noqa: E402
-from core.retrieval.chunker import (  # noqa: E402
+import radar.core.retrieval.chunker as chunker  # noqa: E402
+from radar.core.retrieval.chunker import (  # noqa: E402
     MAX_TOKENS,
     _approx_tokens,
     _split_oversize,

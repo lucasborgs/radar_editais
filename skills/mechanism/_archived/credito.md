@@ -2,7 +2,7 @@
      REEMBOLSÁVEL). COMPETÊNCIA (craft), não conhecimento. Delta sobre a persona-base
      (system prompt do Redator). Fato do edital → RAG; fato de praxe → rationale curto.
      NUNCA taxa/prazo/carência/garantia%/índice-de-corte/rubrica (muda por edital → RAG).
-     Cada `##` é um TIPO e roteia para um consumidor. Carregado por core.skills.load_playbook (loader ativo 2026-06-14); SEED até validação por outcome.
+     Cada `##` é um TIPO e roteia para um consumidor. Carregado por radar.core.skills.load_playbook (loader ativo 2026-06-14); SEED até validação por outcome.
      Destilado de entrevista a especialistas + 2 LLMs (2026-06-14); pendente validação
      por outcome real (learning loop, BACKLOG). -->
 

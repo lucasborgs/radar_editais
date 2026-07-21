@@ -16,7 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.ingestion import dou_feeder as dou
+from radar.core.ingestion import dou_feeder as dou
 
 pytestmark = pytest.mark.unit
 

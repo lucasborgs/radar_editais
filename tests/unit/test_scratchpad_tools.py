@@ -13,7 +13,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.llm.agent_tools.scratchpad_tools import Scratchpad, build_scratchpad_tools
+from radar.core.llm.agent_tools.scratchpad_tools import Scratchpad, build_scratchpad_tools
 
 pytestmark = pytest.mark.unit
 

@@ -12,11 +12,11 @@ import asyncio
 
 import pytest
 
-import core.kg.gold as gold
-import core.kg.source_docs as source_docs
-import core.tasks as tasks
-import pipeline.adapters.base as adapters_base
-import pipeline.extractors as extractors
+import radar.core.kg.gold as gold
+import radar.core.kg.source_docs as source_docs
+import radar.core.tasks as tasks
+import radar.pipeline.adapters.base as adapters_base
+import radar.pipeline.extractors as extractors
 
 pytestmark = pytest.mark.unit
 
@@ -57,7 +57,7 @@ def _stub_etl(monkeypatch, ingest_calls):
 def test_run_daily_etl_calls_ingest_all(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
-    from core import config
+    from radar.core import config
     monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
     ingest_calls: list = []
     _stub_etl(monkeypatch, ingest_calls)
@@ -70,7 +70,7 @@ def test_run_daily_etl_calls_ingest_all(monkeypatch, tmp_path):
 def test_run_daily_etl_skips_gold_without_database_url(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.delenv("DATABASE_URL", raising=False)
-    from core import config
+    from radar.core import config
     monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
     ingest_calls: list = []
     _stub_etl(monkeypatch, ingest_calls)

@@ -32,8 +32,8 @@ Rodar a extração **tipada** (`EditalExtractor` / [domain/edital_extraction.py]
 ## Plano de implementação (PRs)
 
 1. **PR1 — schema**: WIKI.md + `wiki_schema.py` declaram `eligibility_constraints`; validator verde. (sem comportamento, destrava o resto)
-2. **PR2 — golden de match**: caso(s) de elegibilidade em `eval_matching.json` + rodar `core.eval matching` para registrar o baseline COM a dimensão ainda dormente (deve permanecer estável). Estabelece a régua.
-3. **PR3 — produtor**: wiring do extrator no silver (D1) + cache; popula `eligibility_constraints`. **GATE**: `core.eval extraction` (qualidade da extração) **e** `core.eval matching` (o golden de D3 melhora; nada mais regride).
+2. **PR2 — golden de match**: caso(s) de elegibilidade em `eval_matching.json` + rodar `radar.core.eval matching` para registrar o baseline COM a dimensão ainda dormente (deve permanecer estável). Estabelece a régua.
+3. **PR3 — produtor**: wiring do extrator no silver (D1) + cache; popula `eligibility_constraints`. **GATE**: `radar.core.eval extraction` (qualidade da extração) **e** `radar.core.eval matching` (o golden de D3 melhora; nada mais regride).
 
 ## Fora de escopo (Fase 2+)
 

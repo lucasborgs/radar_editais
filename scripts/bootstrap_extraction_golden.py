@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bootstrap do golden de extração (Fase 2.3).
 
-Pega N editais de cada fonte (input cru via core.ingestion.edital_extractor), roda o
+Pega N editais de cada fonte (input cru via radar.core.ingestion.edital_extractor), roda o
 extrator contra o schema `EditalExtraction` e grava um **rascunho** de golden
 para o humano CORRIGIR. O golden corrigido (não este rascunho) é a verdade que
 a suíte `extraction` mede.
@@ -27,8 +27,12 @@ from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv()
 
-from core.ingestion.edital_extractor import GATHERERS, extract_edital, gather_source  # noqa: E402
-from domain.edital_extraction import DECISION_FIELDS  # noqa: E402
+from radar.core.ingestion.edital_extractor import (  # noqa: E402
+    GATHERERS,
+    extract_edital,
+    gather_source,
+)
+from radar.domain.edital_extraction import DECISION_FIELDS  # noqa: E402
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("bootstrap_golden")

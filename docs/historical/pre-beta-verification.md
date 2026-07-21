@@ -33,7 +33,7 @@ Trabalho **sequencial**, não paralelo — cada frente exige um modo distinto
 | V6 | `workspace_id` é derivado server-side (`get_workspace_id(db, user_id)`, user_id do JWT); `WritingSession._load_from_db` rejeita mismatch de workspace | `backend/routers/writing.py:180,235`, `writing_session.py:628` |
 | V7 | DEMO_MODE usa service-role (RLS bypass); scoping vira responsabilidade exclusiva dos handlers | `core/infra/auth.py:148-149,208-214` |
 | V8 | Migrations com policy "own" por workspace: workspaces, content_items, writing_sessions, session_turns, application_log/events, matching_weights, reflection_insights, weight_change_log, research_findings, user_feedback, exploration_log, company_hypergraphs. `read_authenticated` (dado compartilhado): edital_chunks, discovered_opportunities, web_sources, playbook_overlays. **Não conferidas policy-a-policy**: kg_artifacts (016), edital_source_docs (032), conversations (020), agent_writing_state (014) — o inventário completo é parte da Frente 1 | grep em `supabase/migrations/` |
-| V9 | Eval de grounding: suíte `writing` (`python -m core.eval writing`), evaluator `eval_grounding` per-claim; prereqs SUPABASE+LLM+`EVAL_WORKSPACE_ID` | `core/eval/writing.py:119,155,213` |
+| V9 | Eval de grounding: suíte `writing` (`python -m radar.core.eval writing`), evaluator `eval_grounding` per-claim; prereqs SUPABASE+LLM+`EVAL_WORKSPACE_ID` | `core/eval/writing.py:119,155,213` |
 
 ---
 
@@ -110,7 +110,7 @@ livre — são candidatos fortes a causa raiz: reflexão interna vazada como
 bisectar.**
 
 **Sequência**:
-1. Rodar `python -m core.eval writing` na branch atual (prereqs V9).
+1. Rodar `python -m radar.core.eval writing` na branch atual (prereqs V9).
 2. Se grounding recuperou (≥ ~0.9): documentar causa = bugs de 2026-07-02,
    fechar a investigação, registrar baseline novo.
 3. Se NÃO recuperou: bisect `a1c8d5308..main` rodando a suíte (custo LLM por

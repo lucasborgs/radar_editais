@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.eval.writing import (
+from radar.core.eval.writing import (
     eval_misfit_honesty,
     eval_section_hallucination,
     eval_tools0_sections,

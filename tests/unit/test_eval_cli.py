@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.eval import __main__ as cli
+from radar.core.eval import __main__ as cli
 
 pytestmark = pytest.mark.unit
 

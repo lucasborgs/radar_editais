@@ -3,7 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from pipeline.adapters.finep import _filter_to_latest_versions, _version_info, _versioned_documents
+from radar.pipeline.adapters.finep import (
+    _filter_to_latest_versions,
+    _version_info,
+    _versioned_documents,
+)
 
 pytestmark = pytest.mark.unit
 

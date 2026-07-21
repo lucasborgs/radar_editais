@@ -195,7 +195,7 @@ LangGraph é o **runtime default**; legado intacto como rollback via `AGENT_RUNT
 # Etapa 2 — Tools: troca de import para `@tool` LangChain
 
 ## Objetivo
-Trocar `from core.llm.agent_runtime import tool` por `from langchain_core.tools
+Trocar `from radar.core.llm.agent_runtime import tool` por `from langchain_core.tools
 import tool` nos 7 módulos de tools, removendo o bridge da Etapa 1.
 
 ## Módulos afetados
@@ -243,7 +243,7 @@ com closures sobre o estado — **compatível com o `@tool` LangChain** (closure
 LangGraph é o **runtime único**; o loop legado, adapters, `Tool`/`@tool`/
 `ToolRegistry`/`_LLMStep` foram **deletados** de `agent_runtime.py` (agora facade
 fina: contrato + `resolve_agent_provider` + shims + `run_subagent` + `_cap`).
-- 8 arquivos com `from core.llm.agent_runtime import tool` → `from
+- 8 arquivos com `from radar.core.llm.agent_runtime import tool` → `from
   langchain_core.tools import tool`; `list[Tool]` → `list[BaseTool]`. Zero
   override `@tool(...)` → swap trivial.
 - `agent_graph`: bridge removido (ToolNode consome tools nativas); cap central
@@ -533,7 +533,7 @@ do grafo — o grafo compartilhado fica intocado; a query existe na WritingSessi
   NOT EXISTS`, defensivo) e `min_size=1` (< `max_size=2` do Store).
 - **Store singleton no bg-loop** ([agent_graph.py](../../core/llm/agent_graph.py)):
   `_get_memory_store` (AsyncPostgresStore sobre o mesmo loop dedicado do checkpointer),
-  `_aembed_for_store` = embeddings **OS** (`core.retrieval.embedder` via `asyncio.to_thread`
+  `_aembed_for_store` = embeddings **OS** (`radar.core.retrieval.embedder` via `asyncio.to_thread`
   — `embed_texts` é bloqueante; rodá-lo no bg-loop o travaria). **Sem fallback InMemory**
   (diferente do checkpointer): sem DATABASE_URL → `None` e a injeção cai no bloco estático.
   Um InMemoryStore embedaria a query a cada turno (premissa MVP: não queimar OpenAI).

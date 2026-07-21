@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import pytest  # noqa: E402
 
-from core.services.content_library import extract_document_text  # noqa: E402
+from radar.core.services.content_library import extract_document_text  # noqa: E402
 
 pytestmark = pytest.mark.unit
 

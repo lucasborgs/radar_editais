@@ -12,7 +12,7 @@ services:
       DATABASE_URL: ${DOCKER_DATABASE_URL:-${DATABASE_URL}}
     volumes:
       - ${DATA_DIR:-./data}:/app/data
-    command: uvicorn backend.api:app --host 0.0.0.0 --port ${PORT:-8000}
+    command: uvicorn radar.api.app:app --host 0.0.0.0 --port ${PORT:-8000}
     restart: unless-stopped
 
   worker:
@@ -27,7 +27,7 @@ services:
       DISCOVERY_CRAWL4AI_ENABLED: ${DISCOVERY_CRAWL4AI_ENABLED:-1}
     volumes:
       - ${DATA_DIR:-./data}:/app/data
-    command: python -m procrastinate --app=core.tasks.app worker
+    command: python -m procrastinate --app=radar.core.tasks.app worker
     restart: unless-stopped
     depends_on:
       - app

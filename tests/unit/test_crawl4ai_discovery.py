@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from core.services.crawl4ai_discovery import _document_links
+from radar.core.services.crawl4ai_discovery import _document_links
 
 pytestmark = pytest.mark.unit
 

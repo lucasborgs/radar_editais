@@ -42,7 +42,7 @@ Query: `Quais os itens financiaveis pelo edital?`
 - A versao original permitia pessoal, diarias/locomocao e servicos PJ com
   recursos Finep, e tambem obras/equipamentos na contrapartida. A 3a
   rerratificacao restringiu ambos os lados a pagamento de pessoal.
-- A heuristica de `pipeline/adapters/finep.py::_version_info` somente agrupa
+- A heuristica de `src/radar/pipeline/adapters/finep.py::_version_info` somente agrupa
   documentos com o token `edital`; nomes reais baseados em `Regulamento` passam
   como nao versionados e coexistem no corpus.
 
@@ -212,7 +212,7 @@ top-k puramente relevancia.
 - Cobrir route decision, tools disponiveis, corpus selecionado e resposta
   esperada em camadas separadas.
 - Registrar os casos no harness unificado: ampliar `rag` para retrieval e criar
-  uma Suite `explore` no mesmo `core.eval` para roteamento/grounding end-to-end.
+  uma Suite `explore` no mesmo `radar.core.eval` para roteamento/grounding end-to-end.
 - Nenhuma mudanca de comportamento neste pacote.
 
 #### PR 1 - roteamento e entidades (corrige Barn)
@@ -280,11 +280,11 @@ top-k puramente relevancia.
 Runbook para os casos motivadores, em ambiente com credenciais:
 
 ```bash
-python -m core.kg.gold --source investidor
+python -m radar.core.kg.gold --source investidor
 python scripts/reindex_all.py --edital-id finep:745 --edital-id fapesc:31-2026 --force
-python -m core.kg.gold --source edital --edital-id finep:745 --edital-id fapesc:31-2026
-python -m core.eval run rag --publish
-EVAL_EXPLORE_CONNECTED=true python -m core.eval run explore --publish
+python -m radar.core.kg.gold --source edital --edital-id finep:745 --edital-id fapesc:31-2026
+python -m radar.core.eval run rag --publish
+EVAL_EXPLORE_CONNECTED=true python -m radar.core.eval run explore --publish
 ```
 
 Depois do backfill, inspecionar `edital_chunks.metadata` dos dois editais antes
@@ -303,14 +303,14 @@ O override desse tier é `FACTUAL_SYNTHESIS_MODEL`.
 | Area | Arquivos principais |
 |---|---|
 | Regras por fonte | `wikis/finep.md`, `wikis/fapesc.md`, `WIKI.md` se o contrato global mudar |
-| Roteamento | novo modulo em `core/services/`, `workspace_service.py`, `explore_agent.py` |
+| Roteamento | novo modulo em `src/radar/core/services/`, `workspace_service.py`, `explore_agent.py` |
 | Entidades | `explore_tools.py`, `entity_catalog.py` |
-| Autoridade | `pipeline/adapters/base.py`, adapters/extractors FINEP e FAPESC, `source_docs.py` |
+| Autoridade | `src/radar/pipeline/adapters/base.py`, adapters/extractors FINEP e FAPESC, `source_docs.py` |
 | Silver/chunks | `structurer.py`, `chunker.py`, `tasks.py` |
 | Retrieval | `retriever.py`, nucleo extraido de `writing_tools.py` |
 | API/trace | router de workspace/explore e schemas de resposta, se necessario |
 | Testes | `test_workspace_service.py`, `test_explore_agent.py`, `test_finep_adapter.py`, `test_retriever.py` e novos testes de rota/autoridade |
-| Avaliacao | `core/eval/rag.py`, nova Suite `core/eval/explore.py`, registry e golden versionado |
+| Avaliacao | `src/radar/core/eval/rag.py`, nova Suite `src/radar/core/eval/explore.py`, registry e golden versionado |
 
 ### 5.5 Contrato do golden dos casos motivadores
 

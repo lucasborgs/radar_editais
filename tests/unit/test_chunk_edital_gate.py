@@ -1,5 +1,5 @@
 """
-Unit tests pro gate de re-indexação de `core.tasks._index_is_current`.
+Unit tests pro gate de re-indexação de `radar.core.tasks._index_is_current`.
 
 O gate decide se `chunk_edital_task` pode pular o re-embed: exige (1) hash do
 conteúdo batendo com o marcador do chunk 0 e (2) count(*) íntegro. O marcador
@@ -19,7 +19,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.tasks import _index_is_current  # noqa: E402
+from radar.core.tasks import _index_is_current  # noqa: E402
 
 pytestmark = pytest.mark.unit
 

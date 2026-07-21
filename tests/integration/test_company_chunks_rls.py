@@ -56,7 +56,7 @@ import jwt as pyjwt  # noqa: E402  (só importa quando o gate passa)
 import psycopg  # noqa: E402
 from postgrest.exceptions import APIError  # noqa: E402
 
-from core.infra.db import get_supabase_service, get_supabase_user  # noqa: E402
+from radar.core.infra.db import get_supabase_service, get_supabase_user  # noqa: E402
 
 _DUMMY_EMB = [0.1] + [0.0] * 1535  # 1536d — evita norma zero
 
@@ -144,8 +144,8 @@ class TestCaminhoNovoV3:
     daquele workspace — mesmo com outro tenant populado ao lado."""
 
     def test_refresh_e_load_escopados_por_workspace(self, two_tenants, monkeypatch):
-        import core.retrieval.embedder as embedder
-        from core.services.company_chunks import ensure_company_chunks, load_company_chunks
+        import radar.core.retrieval.embedder as embedder
+        from radar.core.services.company_chunks import ensure_company_chunks, load_company_chunks
 
         # sem rede: embedding fake determinístico (o alvo do teste é o escopo)
         monkeypatch.setattr(

@@ -16,7 +16,7 @@ produto cartesiano.
 
 ## Instrumento de medição
 
-`python -m core.eval <suite> --no-push` (grava em `eval_results/*.json`).
+`python -m radar.core.eval <suite> --no-push` (grava em `eval_results/*.json`).
 **Sempre rodar o baseline primeiro** (config atual) e guardar os números — toda
 comparação é contra ele.
 
@@ -64,7 +64,7 @@ Slots de env por tier:
 Maior win provável (coração do RAG; Qwen3-0.6B já mede acima no MTEB) e **isolado**.
 - **Pré-req (bloqueante):** parametrizar `embedder.py` (modelo/base_url por env) — hoje hardcoded.
 - **Pré-req 2 (dimensão):** a coluna `edital_chunks.embedding` é `vector(1536)`. Qwen3-0.6B/BGE-M3 são **1024** → mismatch. Não dá pra reusar a coluna. Opções: (a) eval **offline** em numpy sobre o corpus golden (cosseno, mede só o braço dense — decide o teto barato); (b) coluna-sombra `embedding_<modelo>` com a dim certa p/ eval end-to-end (RRF+rerank).
-- **Gate:** `core.eval rag` — Recall@K/MRR ≥ baseline. **Não re-indexar prod até ganhar.**
+- **Gate:** `radar.core.eval rag` — Recall@K/MRR ≥ baseline. **Não re-indexar prod até ganhar.**
 
 #### Critério de promoção do filtro offline (revisado 2026-06-16)
 
@@ -84,7 +84,7 @@ Por isso medir o candidato em **dois `--top-k`**: `5` (qualidade final) **e `20`
 
 | Resultado dense-only | Decisão |
 |---|---|
-| **WIN** — ≥ baseline em gold_recall@5 & recall@5 & MRR | promove ao `core.eval rag` (coluna-sombra), prioridade alta |
+| **WIN** — ≥ baseline em gold_recall@5 & recall@5 & MRR | promove ao `radar.core.eval rag` (coluna-sombra), prioridade alta |
 | **CLOSE** — abaixo no top-5 mas dentro do ruído (~≤0.05 em gold_recall@5) **ou** empata baseline em recall@20 / gold_recall@20 | **NÃO rejeita** — promove ao end-to-end varrendo `fts_weight`; rerank+fusão podem fechar o gap |
 | **REJECT** — claramente abaixo **mesmo em k=20** (chunk certo não entra no pool) | descarta — o reranker não tem o que salvar (caso Qwen3-0.6B) |
 
@@ -102,23 +102,23 @@ braço léxico), não escolha de embedding.
 ### 3. 🟡 Raciocínio — `matching` suite
 - Slot: `OPENAI_MODEL` / `OPENAI_MODEL_PRO` (+ base_url).
 - Candidatos: DeepSeek V3.2, Qwen3.5-397B, Gemini Flash (free).
-- **Gate:** `core.eval matching`.
+- **Gate:** `radar.core.eval matching`.
 
 ### 4. 🟡 Extração — `extraction` suite
 - Slot: `OPENAI_MODEL_PRO` (role extract).
 - Candidatos: DeepSeek V3.2, Qwen3.5, Gemini Flash.
-- **Gate:** `core.eval extraction`.
+- **Gate:** `radar.core.eval extraction`.
 
 ### 5. 🔴 Agêntico — `writing` suite (POR ÚLTIMO)
 - Slot: `ANTHROPIC_MODEL_AGENT` / provider, ou fallback OpenAI.
 - Candidatos: Qwen3.5-397B (melhor open tool-calling), DeepSeek V4.
-- **Gate:** `core.eval writing` **+ gate de grounding**.
+- **Gate:** `radar.core.eval writing` **+ gate de grounding**.
 - **Bloqueios:** (a) tool-calling open é frágil em loop — o risco real; (b) o gate de grounding **ainda não é detector confiável** (BACKLOG) → domar antes; (c) writing/profile = **dado de cliente** → proibido free-tier-com-treino (usar provider ZDR/pago).
 
 ## Mecânica de um combo
 
 1. Set env (model + base_url + key) ou `LLM_BACKEND`.
-2. `python -m core.eval <suite> --no-push --limit N` (smoke) → depois full.
+2. `python -m radar.core.eval <suite> --no-push --limit N` (smoke) → depois full.
 3. Comparar `aggregate` vs baseline salvo em `eval_results/`.
 4. Promove se ≥ baseline **e** custo/latência aceitáveis.
 

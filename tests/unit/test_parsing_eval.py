@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from core.eval.metrics_parsing import boundary_alignment, section_coverage, size_distribution
+from radar.core.eval.metrics_parsing import boundary_alignment, section_coverage, size_distribution
 
 pytestmark = pytest.mark.unit
 
@@ -49,7 +49,7 @@ def test_boundary_alignment():
 
 
 def test_gold_recall_e_best_chunk():
-    from core.eval.metrics_rag import gold_best_chunk_recall_at_k, gold_recall_at_k
+    from radar.core.eval.metrics_rag import gold_best_chunk_recall_at_k, gold_recall_at_k
     gold = "prazo de submissão das propostas encerra dia trinta"
     # resposta espalhada em 2 chunks (cada um metade) → union alta, best baixa
     spread = [{"text": "prazo de submissão das"}, {"text": "propostas encerra dia trinta"}]

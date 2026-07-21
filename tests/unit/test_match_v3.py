@@ -16,8 +16,8 @@ import datetime
 import numpy as np
 import pytest
 
-from core.services import match_v3
-from core.services.match_v3 import (
+from radar.core.services import match_v3
+from radar.core.services.match_v3 import (
     InvestorMatch,
     OpportunityMatch,
     _EntityChunks,

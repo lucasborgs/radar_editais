@@ -19,7 +19,7 @@ source:
 
 ```yaml
 scraper:
-  module: pipeline/extractors/fapesp.py
+  module: radar.pipeline.extractors.fapesp
   portal: "https://fapesp.br/chamadas/"
 
 paths:
@@ -47,7 +47,7 @@ bronze_mapping:
   data_limite:   deadline          # bronze emite ISO (yyyy-mm-dd); convertido p/ dd/mm/yyyy
   status:        status            # "ABERTA" | "FLUXO_CONTINUO" → normalizado §7.2
   modalidades:   modalidade        # string única, usada pelo filtro PME (programa)
-  areas:         themes_raw        # canonicalizado em themes via domain/vocabulary
+  areas:         themes_raw        # canonicalizado em themes via src/radar/domain/vocabulary
   texto_cru:     html_body         # consumido pelo Source Adapter como unit única
   fluxo_continuo: flag             # interno; influência na vigência (sem prazo ≠ encerrado)
 ```

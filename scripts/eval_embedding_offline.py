@@ -22,9 +22,9 @@ FALSO-NEGATIVO: em prod o rerank (pool top-20) + a fusão (fts_weight) podem
 socorrer um candidato levemente abaixo. Logo "perdeu aqui" ≠ "perde end-to-end".
 Por isso mede recall@20 (=POOL_K, pool do reranker em prod) além de @5. Critério
 de promoção (WIN/CLOSE/REJECT). Quem passa a triagem
-ainda precisa do `core.eval rag` real (FTS+RRF+rerank) antes de promover.
+ainda precisa do `radar.core.eval rag` real (FTS+RRF+rerank) antes de promover.
 
-Métricas (reusa core.eval.metrics_rag, mesmas do gate `rag`):
+Métricas (reusa radar.core.eval.metrics_rag, mesmas do gate `rag`):
   • recall@{1,3,5} + MRR   — contra `expected` (source_file + section) do golden
   • gold_recall@{3,5}      — token-recall sobre `gold_text` (chunking-invariante)
 
@@ -58,7 +58,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from core.config import ROOT  # noqa: E402
+from radar.core.config import ROOT  # noqa: E402
 
 GOLDEN_DIR = ROOT / "eval_data" / "golden"
 RESULTS_DIR = ROOT / "eval_results"
@@ -105,7 +105,7 @@ def _load_embedder(embed: dict):
         os.environ["EMBEDDING_BASE_URL"] = embed["base_url"]
     else:
         os.environ.pop("EMBEDDING_BASE_URL", None)
-    from core.retrieval import embedder
+    from radar.core.retrieval import embedder
     importlib.reload(embedder)
     return embedder.embed_texts, embedder.embed_query
 
@@ -127,7 +127,7 @@ def _load_embedder(embed: dict):
 
 # Fonte de verdade em core/retrieval/embedder.py — importamos daqui para evitar
 # divergência de prefixos entre o eval offline e o caminho de prod/bake-off.
-from core.retrieval.embedder import _ST_REGISTRY  # noqa: E402
+from radar.core.retrieval.embedder import _ST_REGISTRY  # noqa: E402
 
 
 def _load_st_embedder(model_name: str):
@@ -174,7 +174,7 @@ def _load_contextualizer(ctx: dict | None):
         os.environ.pop("CONTEXTUAL_RETRIEVAL_BASE_URL", None)
     if ctx["key"]:
         os.environ["CONTEXTUAL_RETRIEVAL_API_KEY"] = ctx["key"]
-    from core import contextual_retrieval
+    from radar.core import contextual_retrieval
     importlib.reload(contextual_retrieval)
     return contextual_retrieval.contextualize_chunks
 
@@ -258,7 +258,7 @@ def _cosine_order(query_vec, chunk_vecs) -> list[int]:
 
 def _bm25_order(query: str, chunks: list[dict], limit: int) -> list[int]:
     """Índices dos chunks por BM25 Okapi (reusa o ranker do retriever de prod)."""
-    from core.retrieval.retriever import _bm25_retrieve
+    from radar.core.retrieval.retriever import _bm25_retrieve
     pairs = [(str(i), c["text"]) for i, c in enumerate(chunks)]
     return [int(i) for i in _bm25_retrieve(pairs, query, limit)]
 
@@ -272,7 +272,7 @@ def _fts_order(query: str, edital_id: str, chunks: list[dict], limit: int) -> li
     """
     import psycopg
 
-    from core.retrieval.retriever import _build_or_tsquery
+    from radar.core.retrieval.retriever import _build_or_tsquery
     ts_or = _build_or_tsquery(query)
     if not ts_or:
         return []
@@ -322,7 +322,7 @@ _GOLD_KS = (3, 5, POOL_K)
 
 
 def _eval_arm(arm: dict, golden: dict, corpus: dict[str, list[dict]]) -> dict:
-    from core.eval.metrics_rag import (
+    from radar.core.eval.metrics_rag import (
         aggregate_runs,
         evaluate_query,
         gold_best_chunk_recall_at_k,

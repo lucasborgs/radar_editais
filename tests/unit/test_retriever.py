@@ -1,5 +1,5 @@
 """
-Unit tests pra helpers de `core.retrieval.retriever`:
+Unit tests pra helpers de `radar.core.retrieval.retriever`:
   • `_build_or_tsquery`  — query rewrite para OR-tsquery (Fix A)
   • `_dedup_by_source`   — diversidade no top-K (Fix B)
 
@@ -16,7 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.retrieval.retriever import (  # noqa: E402
+from radar.core.retrieval.retriever import (  # noqa: E402
     _apply_metadata_boost,
     _build_or_tsquery,
     _dedup_by_source,
@@ -31,7 +31,7 @@ pytestmark = pytest.mark.unit
 
 def test_hyde_so_altera_query_dense(monkeypatch):
     monkeypatch.setattr(
-        "core.retrieval.retriever.generate_hyde_doc",
+        "radar.core.retrieval.retriever.generate_hyde_doc",
         lambda _q: "pseudo documento com rubricas hipotéticas",
     )
     raw, dense = _prepare_retrieval_queries(
@@ -43,7 +43,7 @@ def test_hyde_so_altera_query_dense(monkeypatch):
 
 def test_query_vec_precomputada_nao_chama_hyde(monkeypatch):
     monkeypatch.setattr(
-        "core.retrieval.retriever.generate_hyde_doc",
+        "radar.core.retrieval.retriever.generate_hyde_doc",
         lambda _q: (_ for _ in ()).throw(AssertionError("HyDE indevido")),
     )
     assert _prepare_retrieval_queries("prazo", hyde=True, has_query_vec=True) == (

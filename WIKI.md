@@ -8,9 +8,9 @@ Este documento é o **schema autoritativo** dos vocabulários e contratos de
 ingestão. O catálogo ativo é o gold relacional (`entities`,
 `entity_relationships`, `match_chunks`); blocos anteriores ao v3 permanecem
 identificados como compatibilidade somente quando ainda são lidos por
-`core/kg/schema.py` ou por ferramentas locais.
+`src/radar/core/kg/schema.py` ou por ferramentas locais.
 
-O código consome os blocos YAML deste doc em runtime via `core.kg.schema`; os
+O código consome os blocos YAML deste doc em runtime via `radar.core.kg.schema`; os
 testes de schema e vocabulário cobrem os accessors ativos. **Mudanças de regra
 devem começar aqui**, e não em constantes paralelas no código.
 
@@ -65,7 +65,7 @@ Cada fonte tem um schema específico em `wikis/<fonte>.md` que **estende** este 
 | FAPESP | [wikis/fapesp.md](wikis/fapesp.md) | ativo (v1) |
 | FAPESC | [wikis/fapesc.md](wikis/fapesc.md) | ativo (v1) |
 | Web | regras globais §12.4 + [wikis/_discovery.md](wikis/_discovery.md) | ativo, com gate humano |
-| EMBRAPII | extractor curado `pipeline/extractors/ict_embrapii.py` | ativo para ICTs |
+| EMBRAPII | extractor curado `src/radar/pipeline/extractors/ict_embrapii.py` | ativo para ICTs |
 
 ---
 
@@ -73,7 +73,7 @@ Cada fonte tem um schema específico em `wikis/<fonte>.md` que **estende** este 
 
 O catálogo atual não produz nem consome wiki pages JSON. Editais, programas,
 investidores e ICTs são entidades do gold relacional; seus contratos ativos
-estão no §13 e na implementação de `core/kg/gold.py`.
+estão no §13 e na implementação de `src/radar/core/kg/gold.py`.
 
 O schema das wiki pages e os índices JSON pertencem à linhagem hyper-extract,
 removida no v3. A descrição histórica foi preservada em
@@ -232,7 +232,7 @@ Regra de mapeamento: edital com `trl_range = {min: a, max: b}` recebe a faixa `f
 Vocabulário **canônico e autoritativo** de temas-macro (`tema`, §6.1). É o alvo
 único para o qual TODOS os produtores de tema convergem:
 - **Editais**: hoje as fontes (FINEP/FAPESP) já rotulam com essas macro-áreas;
-  `domain/vocabulary.canonicalize_themes` (stub) deve, ao evoluir, mapear
+  `src/radar/domain/vocabulary.canonicalize_themes` (stub) deve, ao evoluir, mapear
   variações para esta lista.
 - **ICTs** (§6.1.2): o normalizador fino→macro de `build_ict_graph` mira nesta
   lista — é o que garante que `ict.themes` e `edital.themes` compartilhem
@@ -259,7 +259,7 @@ Invariante (test_wiki_schema_consistency): todo tema usado por editais ou ICTs
 deve estar nesta lista. Tema novo no corpus sem entrada aqui = quebra o
 validador → decida (adicionar ao vocab ou corrigir o produtor).
 
-Variações conhecidas mapeadas em `domain/vocabulary._SYNONYMS` (2026-06-11):
+Variações conhecidas mapeadas em `src/radar/domain/vocabulary._SYNONYMS` (2026-06-11):
 a taxonomia Liferay da FINEP usa "Indústria e Materiais Avançados" para o
 tema de materiais. As demais categorias da taxonomia fora do vocab são
 mecanismos/programas ("Subvenção Econômica", "Seleção de Gestores…") ou temas
@@ -267,7 +267,7 @@ sem cobertura ("Meio Ambiente - Água e Clima", "Cidades…", "Educação…") �
 filtro de vocabulário do build os descarta por design; entram no vocab apenas
 com evidência de cobertura (regra acima).
 
-**Evolução do vocabulário (vocab lint):** `python -m core.vocab_lint` coleta o
+**Evolução do vocabulário (vocab lint):** `python -m radar.core.vocab_lint` coleta o
 sinal de demanda (variações fora do vocab no índice + `tema_livre` da Descoberta
 web + oportunidades sem-tema), pede UMA proposta à LLM (tier barato) e grava um
 relatório em `data/vocab_lint/` com diff pronto-pra-colar. O lint NUNCA aplica
@@ -275,7 +275,7 @@ nada — ele PROPÕE; o humano aplica AQUI (o doc é o dono) e em `_SYNONYMS` se
 o caso ("AI drafts, humans decide"). Barra conservadora: tema novo só com **≥3
 evidências independentes**; sinônimo só com equivalência semântica clara a um
 tema existente. Aplicação fica gated por `test_wiki_schema_consistency` + evals
-de não-regressão (`core.eval matching`, `opportunity_type`).
+de não-regressão (`radar.core.eval matching`, `opportunity_type`).
 
 ### 5.9.1 Vocabulários do multi-quadrante
 
@@ -458,7 +458,7 @@ O KG é relacional (tabelas gold `entities`/`entity_relationships`/`match_chunks
 migration 036); o hipergrado N-ário e seu schema de nós/arestas morreram com a
 linhagem hyper-extract (v3 PR-C). Spec: `docs/specs/v3-unified.md`. O único
 vocabulário deste bloco ainda vivo é o das **constraints de elegibilidade dura**
-(coluna `entities.constraints`), lido pelo produtor `core/kg/constraints_producer.py`
+(coluna `entities.constraints`), lido pelo produtor `src/radar/core/kg/constraints_producer.py`
 via `schema.constraint_tipos()` / `schema.constraint_ops()`. É o SUBCONJUNTO que o
 produtor valida (`_valid`), distinto do vocab completo §13.4 (`constraint_vocab`).
 
@@ -467,7 +467,7 @@ constraint_enums:
   # Elegibilidade DURA (D6/PR5) — coluna `entities.constraints` (jsonb): objetos
   # AVALIÁVEIS `{tipo, op, valor}`, distintos do texto residual `requisitos_texto`
   # (que só informa). Um constraint se AVALIA contra o perfil da empresa
-  # (sat/unsat/unknown) no Stage 1 do match (`core/services/eligibility.py`):
+  # (sat/unsat/unknown) no Stage 1 do match (`src/radar/core/services/eligibility.py`):
   # `unsat` elimina; `unknown` (campo faltando no perfil) NUNCA elimina — marca
   # "elegibilidade não verificada" no card. Semântica por tipo:
   #   porte         op in|not_in   valor=[mei,me,epp,media,grande]  (perfil: tamanho_empresa)
@@ -547,17 +547,17 @@ Por `link`. Primeiro arquivo bronze lido (ordem alfabética) vence.
 ## 10. Como adicionar uma nova fonte
 
 1. Criar `wikis/<fonte>.md` espelhando a estrutura de `wikis/finep.md`.
-2. Escrever scraper em `pipeline/extractors/<fonte>.py` produzindo JSON bronze em `data/bronze/<fonte>_raw/`.
+2. Escrever scraper em `src/radar/pipeline/extractors/<fonte>.py` produzindo JSON bronze em `data/bronze/<fonte>_raw/`.
 3. Escrever o `SourceAdapter` correspondente e registrá-lo em §12.4.
 4. Cobrir os vocabulários/accessors afetados com testes direcionados.
-5. Validar o caminho bronze → silver → `core.kg.gold.ingest_all()`.
+5. Validar o caminho bronze → silver → `radar.core.kg.gold.ingest_all()`.
 
 ---
 
 ## 11. Documento estruturado (camada silver)
 
 Artefato intermediário entre o bronze e dois consumidores: a ingestão gold
-(`core.kg.gold`) e o chunkeamento RAG (`chunker`). Uma única estruturação dos
+(`radar.core.kg.gold`) e o chunkeamento RAG (`chunker`). Uma única estruturação dos
 documentos serve aos dois.
 
 **Invariante — a camada é "burra":** ela só lineariza, limpa e rotula
@@ -737,19 +737,19 @@ fonte = escrever o adapter + registrar aqui; nada em L2/L3 muda.
 ```yaml
 source_adapters:
   finep:
-    module: "pipeline.adapters.finep"
+    module: "radar.pipeline.adapters.finep"
     raw_dir: "finep_raw"
     strategy: "pdf"          # lê FINEP_PDFS_DIR/{id}/*.pdf, 1 unit/página
   fapesp:
-    module: "pipeline.adapters.fapesp"
+    module: "radar.pipeline.adapters.fapesp"
     raw_dir: "fapesp_raw"
     strategy: "html_body"    # texto_cru do bronze como 1 doc
   fapesc:
-    module: "pipeline.adapters.fapesc"
+    module: "radar.pipeline.adapters.fapesc"
     raw_dir: "fapesc_raw"
     strategy: "pdf"          # texto vem do PDF anexo (extraído no scraper) → texto_cru
   web:
-    module: "pipeline.adapters.web"
+    module: "radar.pipeline.adapters.web"
     raw_dir: "web_raw"
     strategy: "html_clean"   # HTML cru do bronze → html_to_text → split em units
 ```
@@ -763,16 +763,16 @@ source_adapters:
 
 Os adapters resolvem PDF/HTML e entregam o Documento Canônico; `source_docs`
 persiste esse conteúdo de forma durável, e o structurer e o chunker operam sobre
-o mesmo contrato sem selecionar a fonte. `core/tasks.py` descobre as fontes pelo
+o mesmo contrato sem selecionar a fonte. `src/radar/core/tasks.py` descobre as fontes pelo
 registry, encaminha o silver ao ingest gold e aquece `edital_chunks` às 05:00 UTC.
 Os pontos de entrada de brief/escrita também garantem o chunking sob demanda,
 como fallback de disponibilidade.
 
 ## 13. Vocabulários gold v3 (spec `docs/specs/v3-unified.md`)
 
-Blocos lidos por `core/kg/schema.py` (accessors `setores_taxonomia()`,
+Blocos lidos por `src/radar/core/kg/schema.py` (accessors `setores_taxonomia()`,
 `tag_normalization()`, `match_sections()`, `constraint_vocab_v3()`) e aplicados
-no ingest gold (`core/kg/gold.py`). **Mudou a regra → edite estes blocos, não o
+no ingest gold (`src/radar/core/kg/gold.py`). **Mudou a regra → edite estes blocos, não o
 código.** Estes são os vocabulários do pipeline ativo. Blocos anteriores
 permanecem apenas quando um accessor de compatibilidade ainda os consome.
 
@@ -882,7 +882,7 @@ setores_taxonomia:
 
 Passe DETERMINÍSTICO aplicado a TODA `tecnologias_tags` de TODA fonte
 (`gold.normalize_tags`): lowercase, trim, singular simples, mapa de sinônimos.
-Depois do mapa, `anti_class_verdict()` (`core/kg/canonicalize.py`) filtra o que
+Depois do mapa, `anti_class_verdict()` (`src/radar/core/kg/canonicalize.py`) filtra o que
 sobrou de genérico/legal/métrica. Seed do mapa = curadoria do `concept_canon`
 (vazio no disco local — mora no PG); o mapa abaixo é a semente inicial e cresce
 com a curadoria. `synonyms`: variante (lowercase+trim) → forma canônica.

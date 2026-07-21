@@ -225,7 +225,7 @@ Numa proposta com 6 seções já redigidas (600–1.500 words cada):
 ```python
 @tool
 def recall_company_learnings(topic: str = "") -> str:
-    from core.reflection_service import search_insights_for_tool
+    from radar.core.reflection_service import search_insights_for_tool
     return search_insights_for_tool(session._db, session.workspace_id, query=topic)
 ```
 

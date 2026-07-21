@@ -40,7 +40,7 @@ cresce sem teto — o mesmo problema de ">150k" no nível do produto.
 ## Validação
 
 - **Teste:** tool que retorna 50k chars → result capado com marcador.
-- **Eval gate (essencial):** `python -m core.eval writing` — truncar pode derrubar
+- **Eval gate (essencial):** `python -m radar.core.eval writing` — truncar pode derrubar
   qualidade se cortar informação necessária. Promover só se score se mantém.
 
 ## Risco

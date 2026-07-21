@@ -13,7 +13,7 @@ errada e **sem cache** — a mesma URL/busca é paga toda vez.
 - `deep_research.fetch_url` (cap 3k, `deep_research.py:25,101`) — **reusa
   `_fetch_and_parse` de `profile_tools`**: uma tool de pesquisa dependendo de
   internals de uma tool de perfil (acoplamento invertido).
-- `deep_research.web_search` → `core.web_search.web_search`.
+- `deep_research.web_search` → `radar.core.web_search.web_search`.
 - Nenhum cache em nenhum caminho.
 
 ## Mudança proposta
@@ -33,7 +33,7 @@ errada e **sem cache** — a mesma URL/busca é paga toda vez.
 
 - **Teste:** `fetch_url` respeita `char_limit`; segunda chamada à mesma URL é cache
   hit (não faz I/O — mockar transporte e assert 1 chamada).
-- **Eval:** `python -m core.eval extraction` (usa fetch no Extrator) — sem
+- **Eval:** `python -m radar.core.eval extraction` (usa fetch no Extrator) — sem
   regressão. Comportamento é preservado; eval é rede de segurança.
 
 ## Risco

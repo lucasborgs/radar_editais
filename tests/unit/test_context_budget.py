@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.llm.agent_runtime import _cap
+from radar.core.llm.agent_runtime import _cap
 
 pytestmark = pytest.mark.unit
 
@@ -52,7 +52,7 @@ class _FakeSession:
 
 def test_search_edital_pointer_reference(monkeypatch):
     """search_edital retorna APENAS um snippet curto, nunca o texto completo."""
-    from core.llm.agent_tools import writing_tools
+    from radar.core.llm.agent_tools import writing_tools
 
     big_chunk_text = "z" * 10_000
     fake_chunks = [
@@ -85,7 +85,7 @@ def test_search_edital_snippet_centers_on_query_term(monkeypatch):
     tem que incluí-lo — não só o prefixo cru (bug real: agente via só o
     início do chunk e reportava "não encontrei" sobre conteúdo que o
     retriever já tinha achado)."""
-    from core.llm.agent_tools import writing_tools
+    from radar.core.llm.agent_tools import writing_tools
 
     filler = "lorem ipsum dolor sit amet " * 20  # ~540 chars, sem o termo buscado
     chunk_text = filler + "regras de propriedade intelectual dos resultados." + filler

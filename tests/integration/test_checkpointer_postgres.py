@@ -31,7 +31,7 @@ from langchain_core.tools import tool  # noqa: E402
 from langgraph.types import interrupt  # noqa: E402
 from pydantic import PrivateAttr  # noqa: E402
 
-import core.llm.agent_graph as ag  # noqa: E402
+import radar.core.llm.agent_graph as ag  # noqa: E402
 
 
 class ScriptedChatModel(BaseChatModel):

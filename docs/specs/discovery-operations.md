@@ -63,7 +63,7 @@ implementação acoplada:
 **Decisão de implementação:** preservar os scrapers dedicados e manter
 Crawl4AI como enriquecimento opcional do worker, atrás de flag. A rota
 `direct_pdf`, o modelo de execução, a auditoria e a separação Radar/RAG não
-dependem do coletor. Crawl4AI não é dependência obrigatória do backend.
+dependem do coletor. Crawl4AI não é dependência obrigatória do radar.api.
 
 ## 3. Decisões propostas
 

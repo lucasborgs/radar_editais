@@ -62,8 +62,8 @@ discovery = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["backend*", "pipeline*", "core*", "domain*", "scripts*"]
+where = ["src"]
+include = ["radar*"]
 
 [tool.ruff]
 line-length = 100
@@ -86,7 +86,7 @@ ignore = [
 "tests/*" = ["E402"]
 "scripts/*" = ["E402"]
 # load_dotenv() must run before module imports that read os.environ at import time
-"backend/api.py" = ["E402"]
+"src/radar/api/app.py" = ["E402"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency injection helpers are evaluated once per request, not at definition time
@@ -109,7 +109,7 @@ ignore_missing_imports = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-exclude = ["pipeline/", "data/bronze/", "data/silver/", "data/knowledge_graph/"]
+exclude = ["src/radar/pipeline/", "data/bronze/", "data/silver/", "data/knowledge_graph/"]
 
 [tool.pytest.ini_options]
 markers = [
@@ -119,5 +119,5 @@ markers = [
 ]
 
 [[tool.mypy.overrides]]
-module = "pipeline.*"
+module = "radar.pipeline.*"
 ignore_errors = true

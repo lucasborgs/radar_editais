@@ -147,9 +147,9 @@ link_types:
 
 ```yaml
 source_adapters:
-  finep:  {module: pipeline.adapters.finep, raw_dir: finep_raw, strategy: pdf}        # (existe)
-  fapesp: {module: pipeline.adapters.fapesp, raw_dir: fapesp_raw, strategy: html_body} # (existe)
-  web:    {module: pipeline.adapters.web, raw_dir: web_raw, strategy: html_clean}      # (existe)
+  finep:  {module: radar.pipeline.adapters.finep, raw_dir: finep_raw, strategy: pdf}        # (existe)
+  fapesp: {module: radar.pipeline.adapters.fapesp, raw_dir: fapesp_raw, strategy: html_body} # (existe)
+  web:    {module: radar.pipeline.adapters.web, raw_dir: web_raw, strategy: html_clean}      # (existe)
   # SEM adapter novo. desafio/programa vêm via `web` (HTML de página de desafio/
   # programa → html_clean). DOU é FEEDER de descoberta, não fonte: produz
   # candidatos no web_raw (texto + agency rica do XML INLABS) e o adapter `web`

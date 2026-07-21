@@ -19,10 +19,10 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-import core.infra.notify as notify
-import core.ingestion.opportunity_discovery as od
-import core.tasks as tasks
-from core.web_search import SearchHit
+import radar.core.infra.notify as notify
+import radar.core.ingestion.opportunity_discovery as od
+import radar.core.tasks as tasks
+from radar.core.web_search import SearchHit
 
 pytestmark = pytest.mark.unit
 

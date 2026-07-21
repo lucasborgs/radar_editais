@@ -14,8 +14,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-import core.reranker as reranker  # noqa: E402
-from core.retrieval.retriever import _apply_rerank  # noqa: E402
+import radar.core.reranker as reranker  # noqa: E402
+from radar.core.retrieval.retriever import _apply_rerank  # noqa: E402
 
 pytestmark = pytest.mark.unit
 
@@ -67,7 +67,7 @@ def test_apply_rerank_reorders_by_relevance(monkeypatch):
     # RRF tinha c1 na frente; reranker dá c2 (relevante) score alto.
     ranked = [("c1", 0.9), ("c2", 0.8)]
     monkeypatch.setattr(
-        "core.reranker.rerank_scores",
+        "radar.core.reranker.rerank_scores",
         lambda q, texts, backend=None: [0.1, 0.9],
     )
     out = _apply_rerank(ranked, by_id, "query", 20)
@@ -77,7 +77,7 @@ def test_apply_rerank_reorders_by_relevance(monkeypatch):
 def test_apply_rerank_none_keeps_rrf_order(monkeypatch):
     by_id = _by_id([("c1", "finep:1", "x"), ("c2", "finep:1", "y")])
     ranked = [("c1", 0.9), ("c2", 0.8)]
-    monkeypatch.setattr("core.reranker.rerank_scores", lambda q, texts, backend=None: None)
+    monkeypatch.setattr("radar.core.reranker.rerank_scores", lambda q, texts, backend=None: None)
     out = _apply_rerank(ranked, by_id, "query", 20)
     assert out == ranked
 
@@ -87,7 +87,7 @@ def test_apply_rerank_tail_preserved(monkeypatch):
     ranked = [(f"c{i}", 1.0 - i * 0.1) for i in range(5)]
     # Pool de 2 → reordena; cauda (c2,c3,c4) mantém ordem RRF após o pool.
     monkeypatch.setattr(
-        "core.reranker.rerank_scores",
+        "radar.core.reranker.rerank_scores",
         lambda q, texts, backend=None: [0.2, 0.9],  # inverte c0,c1
     )
     out = _apply_rerank(ranked, by_id, "query", 2)

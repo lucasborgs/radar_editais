@@ -39,7 +39,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult  # noqa: E402
 from langchain_core.tools import tool  # noqa: E402
 from pydantic import PrivateAttr  # noqa: E402
 
-import core.llm.agent_graph as ag  # noqa: E402
+import radar.core.llm.agent_graph as ag  # noqa: E402
 
 EXPLORE_SYS_ID = "explore:system"
 
@@ -128,7 +128,7 @@ async def _read_thread(saver, thread_id: str) -> list:
 async def _turn(saver, thread_id, *, system, user, tools, chat) -> object:
     """Espelha o produtor do explore em modo-thread: prior_n_msgs do checkpointer,
     system com id determinístico, só a msg nova no payload."""
-    import core.llm.agent_graph as agmod
+    import radar.core.llm.agent_graph as agmod
 
     def _fake_build(*a, **k):
         return chat
@@ -293,7 +293,7 @@ async def test_explore_subagent_stateless_in_thread(explore_saver, monkeypatch):
     uma tool DENTRO de um turno de explore com thread NÃO quebra por loop-binding e
     não vaza para a thread (só o resultado da tool volta)."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-x")
-    from core.llm.agent_runtime import run_subagent
+    from radar.core.llm.agent_runtime import run_subagent
 
     @tool
     def _noop(x: str) -> str:

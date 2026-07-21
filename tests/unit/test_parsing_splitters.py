@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 def test_blocks_from_typed_section_path_por_numeracao():
-    from pipeline.adapters.base import blocks_from_typed
+    from radar.pipeline.adapters.base import blocks_from_typed
     items = [
         ("heading", "1. Objetivo"),
         ("paragraph", "Texto do objetivo."),
@@ -38,7 +38,7 @@ def test_blocks_from_typed_section_path_por_numeracao():
 
 
 def test_blocks_from_numbered_text():
-    from pipeline.adapters.base import blocks_from_numbered_text
+    from radar.pipeline.adapters.base import blocks_from_numbered_text
     text = "Preâmbulo.\n\n1) Objetivo\nFomentar.\n\n2) Elegibilidade\nEmpresas.\n\n2.1) Porte\nME e EPP."
     blocks = blocks_from_numbered_text(text)
     sp = {b["text"][:20]: b["section_path"] for b in blocks if b["kind"] == "paragraph"}

@@ -18,7 +18,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.ingestion.profile_extractor import ProfileExtractor  # noqa: E402
+from radar.core.ingestion.profile_extractor import ProfileExtractor  # noqa: E402
 
 pytestmark = pytest.mark.unit
 
@@ -118,7 +118,7 @@ def test_extract_from_text_llm_none_marks_missing(monkeypatch):
 # ============================================================================
 
 def test_serialize_extract_result_shape(monkeypatch):
-    from backend.routers.profile import _serialize_extract_result
+    from radar.api.routers.profile import _serialize_extract_result
 
     extractor = ProfileExtractor()
     monkeypatch.setattr(extractor, "_call_llm", lambda text: dict(_FULL_LLM))

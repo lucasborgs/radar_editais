@@ -187,7 +187,7 @@ Não escolho entre as opções abaixo — os dados:
 | Não fazer nada (status quo: `_cap` cego + `max_steps` baixo) | N/A — corta a resposta inteira, não seletivamente | Zero | É o problema que o item existe pra resolver; e o truncamento real observado nem era de contexto (ver acima) |
 
 **Pré-requisito do gate (writing golden + grounding), status real verificado
-neste spike**: rodei `python -m core.eval run writing_v2 --limit 1` — RODA e
+neste spike**: rodei `python -m radar.core.eval run writing_v2 --limit 1` — RODA e
 produz métricas reais (`mean_pct_grounded=1.0`, `mean_n_factual_errors=1`
 numa amostra de 1). **Isto já corrige parcialmente a memória
 `project_writing_agent_evolution`** ("golden N=3 nunca rodou"): o mecanismo

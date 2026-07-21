@@ -11,8 +11,8 @@
 Investigação no código real (2026-07-20) corrigiu a premissa inicial:
 
 1. **O usuário já digita slash-commands num chat único.** `frontend/src/app/workspace/[sessionId]/page.tsx:264-296` já detecta `/explorer`, `/plan`, `/escrita` na MESMA caixa de texto e troca `activeMode`. A superfície de "um chat, comandos dentro dele" **já existe** — não é preciso construir UI nova.
-2. **A parede não é um bloqueio de código — é uma INSTRUÇÃO DE PROMPT.** `core/services/workspace_service.py:29-39` (`_REDIRECT_BLOCK`) é injetado no system prompt de cada modo mandando o LLM **recusar educadamente** pedidos fora do escopo declarado (`MODE_CONFIG[mode]["out_of_scope"]`) e devolver uma mensagem fixa de redirect. Não há `if` no `dispatch()` (`:171-235`) que impeça a ação — é o próprio modelo, instruído, que se recusa.
-3. **`/plan` não é um grafo.** `core/kg/planning_node.py::generate_plan` é uma chamada LLM avulsa (`client.chat.completions.create`), sem tools, sem loop ReAct — estruturalmente diferente dos outros dois "modos", que são o grafo LangGraph compartilhado (`core/llm/agent_graph.py::_build_graph`) com toolsets distintos.
+2. **A parede não é um bloqueio de código — é uma INSTRUÇÃO DE PROMPT.** `src/radar/core/services/workspace_service.py:29-39` (`_REDIRECT_BLOCK`) é injetado no system prompt de cada modo mandando o LLM **recusar educadamente** pedidos fora do escopo declarado (`MODE_CONFIG[mode]["out_of_scope"]`) e devolver uma mensagem fixa de redirect. Não há `if` no `dispatch()` (`:171-235`) que impeça a ação — é o próprio modelo, instruído, que se recusa.
+3. **`/plan` não é um grafo.** `src/radar/core/kg/planning_node.py::generate_plan` é uma chamada LLM avulsa (`client.chat.completions.create`), sem tools, sem loop ReAct — estruturalmente diferente dos outros dois "modos", que são o grafo LangGraph compartilhado (`src/radar/core/llm/agent_graph.py::_build_graph`) com toolsets distintos.
 
 Consequência: a cirurgia é **menor** do que uma reescrita de dispatcher — é (a) trocar a instrução de recusa por uma de transição fluida, (b) promover capacidades que já existem mas não são invocáveis pelo usuário, e (c) dissolver o `/plan` (que nunca foi um par estrutural dos outros dois) para dentro do fluxo de escrita.
 
@@ -24,8 +24,8 @@ Consequência: a cirurgia é **menor** do que uma reescrita de dispatcher — é
 |---|---|---|
 | `/explorer` (rebatizável `/prospecting` ou mantido) | `ExploreAgent` — RAG+KG, já tem `find_matching_editais`/`find_matching_entities` como tools condicionais | Sem mudança de produtor; só sai da parede |
 | `/grant-writing` (rebatiza `/escrita`) | `WritingSession` | **Absorve o `/plan`** como fase interna (ver abaixo) |
-| `/review` — **NOVO comando do usuário** | Critic **já existe**, mas roda só automaticamente dentro de `save_draft` ([writing_tools.py:373](../../core/llm/agent_tools/writing_tools.py#L373)) — usuário nunca pode pedir "revise agora" | Expor como comando: dispara `run_critic` sobre a seção corrente sob demanda |
-| `/profile` | `ProfileExtractor` ([core/ingestion/profile_extractor.py:190](../../core/ingestion/profile_extractor.py#L190)) — já é um produtor isolado, third mode fora do workspace hoje | Vira comando dentro do MESMO chat, em vez de fluxo separado de onboarding |
+| `/review` — **NOVO comando do usuário** | Critic **já existe**, mas roda só automaticamente dentro de `save_draft` ([writing_tools.py:373](../../src/radar/core/llm/agent_tools/writing_tools.py#L373)) — usuário nunca pode pedir "revise agora" | Expor como comando: dispara `run_critic` sobre a seção corrente sob demanda |
+| `/profile` | `ProfileExtractor` ([src/radar/core/ingestion/profile_extractor.py:190](../../src/radar/core/ingestion/profile_extractor.py#L190)) — já é um produtor isolado, third mode fora do workspace hoje | Vira comando dentro do MESMO chat, em vez de fluxo separado de onboarding |
 | `/boilerplate` | Gap conhecido (perfil←proposta é parcial) | **Fora de escopo** desta spec — não construir agora |
 | `/archive` | Sem equivalente identificado | **Fora de escopo** — sem demanda de produto ainda |
 
@@ -46,11 +46,11 @@ NÃO recuse — responda reconhecendo o pedido e informe que está trocando para
 /{skill} para atendê-lo. O sistema troca de contexto automaticamente.
 ```
 
-A detecção de "isto pertence a outra skill" já existe parcialmente: `core/services/explore_routing.py::route_message` (keywords + classificador LLM opcional) resolve *dentro* do explore quando a pergunta é de escrita. Generalizar esse roteador para os 3(agora N) produtores é o coração técnico da task.
+A detecção de "isto pertence a outra skill" já existe parcialmente: `src/radar/core/services/explore_routing.py::route_message` (keywords + classificador LLM opcional) resolve *dentro* do explore quando a pergunta é de escrita. Generalizar esse roteador para os 3(agora N) produtores é o coração técnico da task.
 
 ### 2. `/profile` entra no chat do workspace
 
-Hoje `ProfileExtractor` roda num fluxo separado (onboarding). Task: expor como 4º branch do `dispatch()` (`core/services/workspace_service.py:171`), reusando o produtor tal como está — sem tocar `core/llm/agent_graph.py` nem o runtime compartilhado (é aditivo, mesmo padrão dos itens da trilha LangGraph).
+Hoje `ProfileExtractor` roda num fluxo separado (onboarding). Task: expor como 4º branch do `dispatch()` (`src/radar/core/services/workspace_service.py:171`), reusando o produtor tal como está — sem tocar `src/radar/core/llm/agent_graph.py` nem o runtime compartilhado (é aditivo, mesmo padrão dos itens da trilha LangGraph).
 
 ### 3. `/review` — promover o Critic a comando do usuário
 
@@ -58,14 +58,14 @@ Hoje `run_critic` só dispara dentro de `save_draft`. Task: nova branch de dispa
 
 ### 4. `/plan` dissolve — sem branch própria no dispatch
 
-Task: remover `MODE_PLAN`/`_dispatch_plan` como modo peer; `generate_plan` (`core/kg/planning_node.py`) vira uma **tool ou chamada interna** do fluxo de escrita, acionada quando o usuário pede "planeje" dentro de `/grant-writing` (ou automaticamente no primeiro turno, como já ocorre parcialmente via `_first_turn_with_generation`). Isto elimina a inconsistência estrutural (modo que não é grafo) e o "menos contexto do que a função suporta" (`analysis=""`) encontrado nesta sessão.
+Task: remover `MODE_PLAN`/`_dispatch_plan` como modo peer; `generate_plan` (`src/radar/core/kg/planning_node.py`) vira uma **tool ou chamada interna** do fluxo de escrita, acionada quando o usuário pede "planeje" dentro de `/grant-writing` (ou automaticamente no primeiro turno, como já ocorre parcialmente via `_first_turn_with_generation`). Isto elimina a inconsistência estrutural (modo que não é grafo) e o "menos contexto do que a função suporta" (`analysis=""`) encontrado nesta sessão.
 
 ---
 
 ## Fora de escopo (explícito)
 
 - **Qualquer troca dinâmica de toolset DENTRO de uma thread viva do LangGraph.** O toolset é vinculado (`bind_tools`) na compilação do grafo (`agent_graph.py:145`) — trocar de skill continua significando **trocar de produtor/recompilar**, não um mecanismo de "progressive disclosure" à la Agent SDK `SKILL.md`. Tentar replicar isso à mão é o harness-smell que a trilha já rejeitou (mesma classe de decisão do Item #2 arquivado).
-- **Playbooks** (`core/skills.py`) — intocados. Skill (o que fazer) e playbook (como escrever, uma vez dentro do "fazer") são eixos ortogonais; nenhuma skill nova muda o merge de competência por mecanismo/agência.
+- **Playbooks** (`src/radar/core/skills.py`) — intocados. Skill (o que fazer) e playbook (como escrever, uma vez dentro do "fazer") são eixos ortogonais; nenhuma skill nova muda o merge de competência por mecanismo/agência.
 - **`/boilerplate` e `/archive`** — sem produtor existente; não nascem nesta spec.
 - **Item #3 (threads) e seu lote final de gate** — trilha paralela, não tocada aqui.
 - **Migração para Claude Agent SDK** — decisão já tomada (não agora); esta spec não a reabre.

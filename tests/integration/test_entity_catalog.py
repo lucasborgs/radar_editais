@@ -13,7 +13,7 @@ Duas camadas:
    Como rodar a camada 2:
        supabase start && supabase migration up
        DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \\
-       OPENAI_API_KEY=... python -m core.kg.gold
+       OPENAI_API_KEY=... python -m radar.core.kg.gold
        SUPABASE_URL=http://127.0.0.1:54321 \\
        SUPABASE_SERVICE_KEY=<service_role de `supabase status -o env`> \\
        DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \\
@@ -26,7 +26,7 @@ import os
 
 import pytest
 
-from core.kg import entity_catalog
+from radar.core.kg import entity_catalog
 
 pytestmark = pytest.mark.integration
 
@@ -66,7 +66,7 @@ def _skip_reason() -> str | None:
     ):
         return (
             "entity_catalog SQL — exige ingest gold explícito; rode `python -m "
-            "core.kg.gold` e defina ENTITY_CATALOG_TEST_GOLD_READY=1"
+            "radar.core.kg.gold` e defina ENTITY_CATALOG_TEST_GOLD_READY=1"
         )
     return None
 
@@ -218,7 +218,7 @@ class TestRankBySimilarity:
 class TestSqlBackendContract:
     def test_list_editais_nonempty_and_shape(self):
         cards = entity_catalog.list_editais(limit=200)
-        assert cards, "entities (kind=edital) vazia — rodou `python -m core.kg.gold`?"
+        assert cards, "entities (kind=edital) vazia — rodou `python -m radar.core.kg.gold`?"
         for card in cards[:3]:
             assert set(card) == CARD_KEYS
             assert isinstance(card["exclusoes"], list)

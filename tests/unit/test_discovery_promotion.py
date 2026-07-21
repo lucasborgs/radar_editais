@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.services.discovery_promotion import aggregate_status, initial_stages
+from radar.core.services.discovery_promotion import aggregate_status, initial_stages
 
 pytestmark = pytest.mark.unit
 

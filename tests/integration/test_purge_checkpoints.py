@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-import core.tasks as tasks
+import radar.core.tasks as tasks
 
 pytestmark = pytest.mark.integration
 

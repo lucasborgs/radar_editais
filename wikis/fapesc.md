@@ -21,7 +21,7 @@ source:
 
 ```yaml
 scraper:
-  module: pipeline/extractors/fapesc.py
+  module: radar.pipeline.extractors.fapesc
   portal: "https://fapesc.sc.gov.br/chamadas-abertas/"
 
 paths:

@@ -157,7 +157,7 @@ edital_chunks (pgvector + tsvector)
 - **Sparse**: BM25 Okapi em Python (`rank_bm25`)
 - **Fusão**: RRF k=60, `fts_weight=0.3`
 - **Boosts**: `primary_boost=1.5` (edital primário), `metadata_boost=1.2` (intent detection regex)
-- **Rerank**: `core.reranker.rerank_scores()` sobre top-20 (degradação graciosa)
+- **Rerank**: `radar.core.reranker.rerank_scores()` sobre top-20 (degradação graciosa)
 - **Dedup**: máx 2 chunks por `source_file`
 - **HyDE (Hypothetical Document Embeddings)**: gera um pseudo-trecho de edital via
   LLM e embeda *esse trecho* no lugar da query crua (Gao et al., 2022). Atua
@@ -270,7 +270,7 @@ Também expõe: `CompanyProfileSchema` (Pydantic), `to_py_profile()`, `load_libr
 | `profile.py` | POST /profile/extract · extract-from-document · extract-from-library | `ProfileExtractor`, `profile_inference`, `content_library` |
 | `research.py` | GET /research-findings · POST /{id}/promote | `content_library.create_item` |
 | `discovered.py` | GET /discovered-opportunities · POST /{id}/promote · reject | Supabase service-role direto |
-| `playbooks.py` | GET /playbooks/{mechanism}/layers | `core.skills.resolve_playbook_layers` |
+| `playbooks.py` | GET /playbooks/{mechanism}/layers | `radar.core.skills.resolve_playbook_layers` |
 
 ### 6.4 Serviços Core
 
@@ -328,7 +328,7 @@ Dependências exportadas: `CurrentUserId`, `DbClient`, `OptionalUserId`, `Option
 | `run_daily_etl` | Cron `0 3 * * *` (03h UTC) | Scrapers FINEP+FAPESP → chunk_edital → reconstrói índice → wiki pages → Obsidian vault |
 | `discover_opportunities` | Cron `0 4 * * *` (04h UTC) | Busca livre (Tavily) → web_raw → chunk_edital → reconstrói índice |
 
-Worker: `python -m procrastinate --app=core.tasks.app worker`. Conector: `PsycopgConnector` (psycopg3 async).
+Worker: `python -m procrastinate --app=radar.core.tasks.app worker`. Conector: `PsycopgConnector` (psycopg3 async).
 
 ---
 
@@ -585,6 +585,6 @@ O codebase principal tem apenas 3 ocorrências relevantes:
 ### Histórico / ADRs (`docs/historical/`)
 - [Multi-quadrante (ADR)](spec-multi-quadrante.md) · [Agent patterns](spec-agent-patterns.md) · [Mechanism scope decisions (ADR)](mechanism-scope-decisions.md)
 - [Extraction schema v2](extraction-schema.md) · [ICT mapping base](ict-mapping.md) · [KG entity wiki pages](kg-entity-wiki-pages.md)
-- [Backend reorg](refactor-backend.md) · [DOU feeder](dou-feeder.md) · [Onboarding input UX](onboarding-input-ux.md)
+- [Backend reorg](refactor-radar.api.md) · [DOU feeder](dou-feeder.md) · [Onboarding input UX](onboarding-input-ux.md)
 
 *Gerado por auditoria de 6 agentes paralelos em 2026-06-22. Para atualizar: re-rodar os agentes e mergear findings.*

@@ -48,7 +48,7 @@ contexto economizado em sessões longas.
 
 ## Validação
 
-- **Eval gate:** `python -m core.eval writing` — qualidade de compliance não pode
+- **Eval gate:** `python -m radar.core.eval writing` — qualidade de compliance não pode
   cair (o risco é o modelo *não* puxar a regra que precisava).
 - **Shadow:** medir tamanho de contexto por turno (com injeção total vs pull) e
   taxa de "puxou a skill certa".

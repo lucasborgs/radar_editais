@@ -14,7 +14,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.eval.metrics_writing import (  # noqa: E402
+from radar.core.eval.metrics_writing import (  # noqa: E402
     GroundingResult,
     _parse_claims,
     _parse_coherence,
@@ -76,7 +76,7 @@ def test_score_grounding_per_claim_uses_retrieve_fn(monkeypatch):
         return [{"text": "respaldo"}] if "B" in query else []
 
     monkeypatch.setattr(
-        "core.eval.metrics_writing.judge_claim_grounded",
+        "radar.core.eval.metrics_writing.judge_claim_grounded",
         lambda claim, chunks: bool(chunks),  # grounded sse há evidência
     )
     res = score_grounding(["claim A", "claim B"], retrieve_fn=fake_retrieve)

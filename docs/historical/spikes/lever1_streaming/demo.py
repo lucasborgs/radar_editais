@@ -28,7 +28,7 @@ load_dotenv()
 
 from langchain_core.messages import AIMessageChunk  # noqa: E402
 
-from core.llm.agent_graph import (  # noqa: E402
+from radar.core.llm.agent_graph import (  # noqa: E402
     _build_chat_model,
     _build_graph,
     _build_system_message,
@@ -37,8 +37,8 @@ from core.llm.agent_graph import (  # noqa: E402
     _to_lc_messages,
     shutdown_writing_runtime,
 )
-from core.llm.agent_runtime import AgentResult, resolve_agent_provider  # noqa: E402
-from core.services.explore_agent import (  # noqa: E402
+from radar.core.llm.agent_runtime import AgentResult, resolve_agent_provider  # noqa: E402
+from radar.core.services.explore_agent import (  # noqa: E402
     EXPLORE_AGENT_SYSTEM,
     ExploreAgent,
 )

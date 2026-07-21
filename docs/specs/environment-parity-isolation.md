@@ -170,7 +170,7 @@ Cloud; ele deve ser reavaliado antes de ampliar tráfego, equipe ou criticidade.
 
 ### Estado da implementação (2026-07-15)
 
-- PR A: implementada (`core/environment.py`, migration 040, `env_doctor`,
+- PR A: implementada (`src/radar/core/environment.py`, migration 040, `env_doctor`,
   perfis e guards dos CLIs mutantes).
 - PR B: implementada (seed, isolamento em `tests/conftest.py`, marcadores e job
   Supabase efêmero no CI).

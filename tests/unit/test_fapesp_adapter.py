@@ -31,13 +31,13 @@ def _make_bronze(tmp_path: Path, chamadas: list[dict]) -> Path:
 
 def _patch_bronze(monkeypatch, fake_root: Path):
     """Aponta o adapter para o bronze fake."""
-    import pipeline.adapters.fapesp as fapesp_mod
+    import radar.pipeline.adapters.fapesp as fapesp_mod
     monkeypatch.setattr(fapesp_mod, "_BRONZE_DIR", fake_root / "fapesp_raw")
 
 
 @pytest.fixture
 def adapter():
-    from pipeline.adapters.fapesp import Adapter
+    from radar.pipeline.adapters.fapesp import Adapter
     return Adapter()
 
 
@@ -46,7 +46,7 @@ def adapter():
 # =============================================================================
 
 def test_extract_native_id_basic():
-    from pipeline.adapters.fapesp import _extract_native_id
+    from radar.pipeline.adapters.fapesp import _extract_native_id
     assert _extract_native_id("https://fapesp.br/18064") == "18064"
     assert _extract_native_id("https://fapesp.br/18064/slug") == "18064"
     assert _extract_native_id("http://www.fapesp.br/18064/") == "18064"

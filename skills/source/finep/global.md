@@ -2,7 +2,7 @@
      Só craft tácito de praxe FINEP que vale em qualquer instrumento. Regra dura
      (documentos, contrapartida %, rubricas, TRL exigido, vedações do edital vigente)
      é do edital/RAG — NÃO entra aqui. Migrado da parte tácita do antigo
-     finep_compliance.md. Carregado por core.skills.load_playbook (loader ativo 2026-06-14). -->
+     finep_compliance.md. Carregado por radar.core.skills.load_playbook (loader ativo 2026-06-14). -->
 
 # Overlay — FINEP × (global)
 

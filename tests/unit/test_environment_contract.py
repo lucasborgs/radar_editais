@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from core import environment as env
+from radar.core import environment as env
 
 pytestmark = pytest.mark.unit
 

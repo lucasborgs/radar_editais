@@ -34,8 +34,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import core.llm.agent_graph as ag  # noqa: E402
-from core.llm.agent_graph import shutdown_writing_runtime  # noqa: E402
+import radar.core.llm.agent_graph as ag  # noqa: E402
+from radar.core.llm.agent_graph import shutdown_writing_runtime  # noqa: E402
 
 # =============================================================================
 # Captura do log `turn_end` (Task 1) — handler dedicado, zero dependência de
@@ -178,7 +178,7 @@ EXPLORE_QUESTIONS = [
 
 
 def run_explore_turn(question: str) -> None:
-    from core.services.explore_agent import ExploreAgent
+    from radar.core.services.explore_agent import ExploreAgent
     agent = ExploreAgent()
     answer, meta = agent.explore_with_meta(question)
     print(f"    [explore] stop_reason={meta.get('stop_reason')} "
@@ -251,8 +251,8 @@ WRITING_VARIANTS_ORIGINAL_KEYS = {"tratorbr", "biotecstartup"}
 def _load_golden_profile(profile_key: str):
     import json
 
-    from core.config import ROOT
-    from domain.user_profile import CompanyProfile
+    from radar.core.config import ROOT
+    from radar.domain.user_profile import CompanyProfile
 
     data = json.loads((ROOT / "eval_data" / "golden" / "writing_v2.json").read_text(encoding="utf-8"))
     raw = data["profiles"][profile_key]
@@ -263,8 +263,8 @@ def _load_golden_profile(profile_key: str):
 def run_writing_variant(variant: dict) -> None:
     import os
 
-    from core.infra.db import get_supabase_service
-    from core.services.writing_session import WritingSession
+    from radar.core.infra.db import get_supabase_service
+    from radar.core.services.writing_session import WritingSession
 
     db = get_supabase_service()
     workspace_id = os.environ["EVAL_WORKSPACE_ID"]
@@ -289,7 +289,7 @@ def run_writing_variant(variant: dict) -> None:
 
 def run_battery(label: str) -> list[TurnEndEvent]:
     capture = _TurnEndCapture()
-    graph_logger = logging.getLogger("core.llm.agent_graph")
+    graph_logger = logging.getLogger("radar.core.llm.agent_graph")
     graph_logger.addHandler(capture)
     graph_logger.setLevel(logging.INFO)
     try:

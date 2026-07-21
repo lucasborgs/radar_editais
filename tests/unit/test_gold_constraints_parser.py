@@ -12,7 +12,7 @@ import json
 
 import pytest
 
-from core.kg import constraints_producer as cp
+from radar.core.kg import constraints_producer as cp
 
 pytestmark = pytest.mark.unit
 

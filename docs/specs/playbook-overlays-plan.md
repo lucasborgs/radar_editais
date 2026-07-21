@@ -41,7 +41,7 @@ teste de montagem/round-trip, sem chamar LLM.
 
 ## Arquitetura do objeto
 
-- `workspaces.profile` é um **JSONB** ([backend/common.py:97](../../backend/common.py#L97)).
+- `workspaces.profile` é um **JSONB** ([src/radar/api/common.py:97](../../src/radar/api/common.py#L97)).
   Um campo novo de perfil = uma chave a mais no blob + entrada na allowlist. **Sem migration.**
 - O estilo é **craft de escrita**, não dado de matching: entra **só** no prompt do Redator,
   ao lado do bloco `PLAYBOOK DE ESCRITA`. **Não** entra em `CompanyProfile.to_context()`
@@ -56,10 +56,10 @@ teste de montagem/round-trip, sem chamar LLM.
 ### Task 1 — Campo `estilo_escrita` no modelo de perfil (backend)
 **Depende de:** nada.
 **Arquivos:**
-- [domain/user_profile.py](../../domain/user_profile.py) — adicionar `estilo_escrita: str = ""`
+- [src/radar/domain/user_profile.py](../../src/radar/domain/user_profile.py) — adicionar `estilo_escrita: str = ""`
   ao dataclass `CompanyProfile` (perto dos campos de descrição, l. ~29-31).
   **NÃO** adicionar em `to_context()` (l. ~78+) — matching não vê estilo.
-- [backend/common.py](../../backend/common.py) — adicionar `estilo_escrita: str = ""` ao
+- [src/radar/api/common.py](../../src/radar/api/common.py) — adicionar `estilo_escrita: str = ""` ao
   `CompanyProfileSchema` (l. ~28); mapear em `to_py_profile` (l. ~54); incluir `"estilo_escrita"`
   no set `allowed` de `profile_from_workspace` (l. ~106-112).
 
@@ -75,9 +75,9 @@ teste de montagem/round-trip, sem chamar LLM.
 ### Task 2 — Injetar o estilo no prompt do Redator
 **Depende de:** Task 1.
 **Arquivos:**
-- [core/services/writing_session.py](../../core/services/writing_session.py) — nos dois pontos
-  onde o bloco `PLAYBOOK DE ESCRITA` é montado ([l. 1667](../../core/services/writing_session.py#L1667)
-  e [l. 2132](../../core/services/writing_session.py#L2132)), acrescentar, **quando**
+- [src/radar/core/services/writing_session.py](../../src/radar/core/services/writing_session.py) — nos dois pontos
+  onde o bloco `PLAYBOOK DE ESCRITA` é montado ([l. 1667](../../src/radar/core/services/writing_session.py#L1667)
+  e [l. 2132](../../src/radar/core/services/writing_session.py#L2132)), acrescentar, **quando**
   `self.profile.estilo_escrita` estiver preenchido, um bloco irmão:
   `ESTILO DA EMPRESA (como esta empresa gosta de contar sua história):\n{estilo}`.
   Guardar o texto num atributo resolvido junto de `_playbook_writer_block`
@@ -91,7 +91,7 @@ teste de montagem/round-trip, sem chamar LLM.
 - Teste de montagem: com `profile.estilo_escrita="X"`, a lista de mensagens do Redator
   contém "ESTILO DA EMPRESA" e o texto "X"; com estilo vazio, não contém.
 - Teste de não-vazamento: o payload do Monitor (`for_monitor` / auto-review em
-  [backend/routers/writing.py:487](../../backend/routers/writing.py#L487)) **não** contém o texto de estilo.
+  [src/radar/api/routers/writing.py:487](../../src/radar/api/routers/writing.py#L487)) **não** contém o texto de estilo.
 
 ---
 
@@ -119,8 +119,8 @@ teste de montagem/round-trip, sem chamar LLM.
 vazio quando o botão "aprimorar estilo com insights" for construído. **Não é lido por nada
 nesta fase.**
 **Arquivos:**
-- [core/services/writing_session.py](../../core/services/writing_session.py) —
-  em `set_section_content` ([l. 2287](../../core/services/writing_session.py#L2287)), **antes** de
+- [src/radar/core/services/writing_session.py](../../src/radar/core/services/writing_session.py) —
+  em `set_section_content` ([l. 2287](../../src/radar/core/services/writing_session.py#L2287)), **antes** de
   sobrescrever `_doc_sections[section_title]`: se já houver rascunho gerado por IA para a seção
   e o novo conteúdo diferir, anexar `{section, ai_draft, user_edited, ts}` a um campo JSONB de
   log na própria linha de `writing_sessions` (ex.: `style_edit_log`). **Sem migration** se
@@ -154,7 +154,7 @@ operador (como [skills/source/finep/global.md](../../skills/source/finep/global.
 tabela foi desenhada (migration 024) para o caso "sistema destila padrão de vários clientes e
 promove como conhecimento global" — exatamente a esteira automática que Lucas adiou. Ativá-la
 agora seria construir a casa antes do morador. O reader dormente
-([core/skills.py:233](../../core/skills.py#L233)) segue pronto para quando esse futuro chegar.
+([src/radar/core/skills.py:233](../../src/radar/core/skills.py#L233)) segue pronto para quando esse futuro chegar.
 
 ---
 

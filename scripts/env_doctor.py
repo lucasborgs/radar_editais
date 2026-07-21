@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from core.environment import load_environment_profile, redacted_environment_report
+from radar.core.environment import load_environment_profile, redacted_environment_report
 
 
 def main() -> int:

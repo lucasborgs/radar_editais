@@ -10,10 +10,10 @@ import asyncio
 
 import pytest
 
-import backend.routers.discovered as disc
-import core.kg.gold as gold
-import core.kg.source_docs as source_docs
-import core.tasks as tasks
+import radar.api.routers.discovered as disc
+import radar.core.kg.gold as gold
+import radar.core.kg.source_docs as source_docs
+import radar.core.tasks as tasks
 
 pytestmark = pytest.mark.unit
 

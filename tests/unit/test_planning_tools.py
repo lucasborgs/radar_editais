@@ -16,7 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
+from radar.core.llm.agent_tools.planning_tools import PlanState, build_planning_tools
 
 pytestmark = pytest.mark.unit
 
@@ -100,14 +100,14 @@ def test_empty_list_renders_vazio():
 
 def test_build_writing_tools_inclui_write_todos():
     """Mesmo padrão de test_redator_inclui_deep_research: a tool DEVE estar lá."""
-    from core.llm.agent_tools import writing_tools
+    from radar.core.llm.agent_tools import writing_tools
     src = inspect.getsource(writing_tools.build_writing_tools)
     assert "build_planning_tools" in src
 
 
 def test_extractor_tools_incluem_write_todos_e_write_note():
     """As tools do agente de extração somam planning + scratchpad."""
-    import core.ingestion.profile_extractor as pe
+    import radar.core.ingestion.profile_extractor as pe
     src = inspect.getsource(pe.ProfileExtractor._extract_agent)
     assert "build_planning_tools" in src
     assert "build_scratchpad_tools" in src

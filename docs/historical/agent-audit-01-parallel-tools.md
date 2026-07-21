@@ -43,7 +43,7 @@ Dois limites acoplados no loop do agente:
   1.0s.
 - **Teste async:** tool definida `async def` executa e retorna string.
 - **Teste shim:** `run_agent` sync ainda funciona (sem regressão de call sites).
-- **Eval gate:** rodar `python -m core.eval writing` e `extraction` — scores não
+- **Eval gate:** rodar `python -m radar.core.eval writing` e `extraction` — scores não
   regridem (mudança é de perf, não de comportamento).
 
 ## Risco

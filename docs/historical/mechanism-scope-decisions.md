@@ -60,7 +60,7 @@ vira trilha paralela; EMBRAPII/ICT vira camada de parceria sobre o match.
 | Invariante | Onde vive | Regra |
 |---|---|---|
 | **Schema do KG é autoritativo nos docs** | WIKI.md / `wikis/` | Campo/regra novo (flag EMBRAPII) vai no **doc**, não no código; `tests/test_wiki_schema_consistency.py` continua verde |
-| **`_MECHANISM_MAP`/ranking → gate de eval** | CLAUDE.md / `core.eval` | Qualquer edit que mude o scoring roda `python -m core.eval matching` antes do merge |
+| **`_MECHANISM_MAP`/ranking → gate de eval** | CLAUDE.md / `radar.core.eval` | Qualquer edit que mude o scoring roda `python -m radar.core.eval matching` antes do merge |
 | **ICT é sugestão no match, nunca na escrita** | guard-rail `project_ict_mapping` | O Redator não recebe `find_ict_partners` nem lê `icts.json`; complemento é display + decisão humana |
 | **Aditivo e isolado onde der** | de-risk multi-quadrante | Trilha de investidor e complemento ICT não tocam o caminho de scoring do edital |
 | **Sem migração de perfil** | pré-lançamento | Remoção de enum é livre; valor legado num perfil seed só deixa de casar (inócuo) |
@@ -119,7 +119,7 @@ membro na union. Custo trivial (~3 linhas). Registrar item em `docs/BACKLOG.md` 
 crédito reembolsável — reativar quando houver fonte de crédito no KG").
 
 ## Gate
-`python -m core.eval matching` (convenção CLAUDE.md — toca `_MECHANISM_MAP`). Risco
+`python -m radar.core.eval matching` (convenção CLAUDE.md — toca `_MECHANISM_MAP`). Risco
 analítico nulo no corpus atual (sem editais `reembolsavel`/`misto`), mas o gate é
 mandatório por regra.
 
@@ -176,7 +176,7 @@ já existem no schema).
 - Switch + cluster de display = **PR 2** (sem eval gate; é UI/agrupamento).
 
 ## Gate
-A parte de scoring está no PR 1 → `python -m core.eval matching` **obrigatório** (impacto
+A parte de scoring está no PR 1 → `python -m radar.core.eval matching` **obrigatório** (impacto
 real nos 5 FIPs: de `investimento`-casado para neutro). Conferir que o ranking dos FIPs
 não regride além do esperado (eles devem cair levemente, não sumir).
 
@@ -274,7 +274,7 @@ não regride além do esperado (eles devem cair levemente, não sumir).
   (sem eval gate; passa pelo validator de schema).
 
 ## Gate
-- `python -m core.eval matching` cobre a remoção de `matching_embrapii` do map (no PR 1).
+- `python -m radar.core.eval matching` cobre a remoção de `matching_embrapii` do map (no PR 1).
 - `python tests/test_wiki_schema_consistency.py` (validator) **verde** após adicionar
   `brings_cofinancing` e regenerar `icts.json` (PR 3).
 - ICT como **ranking** no radar (perfil→ICT) **fica diferido** (BACKLOG Fase 3,
@@ -294,7 +294,7 @@ não regride além do esperado (eles devem cair levemente, não sumir).
 
 | Gate | Quando | Cobre |
 |---|---|---|
-| `python -m core.eval matching` | antes de mergear **PR 1** | toda edição do `_MECHANISM_MAP` + `_score_mecanismo` (D1 + scoring D2 + map D3); foco: ranking dos 5 FIPs cai levemente, não some |
+| `python -m radar.core.eval matching` | antes de mergear **PR 1** | toda edição do `_MECHANISM_MAP` + `_score_mecanismo` (D1 + scoring D2 + map D3); foco: ranking dos 5 FIPs cai levemente, não some |
 | `python tests/test_wiki_schema_consistency.py` | antes de mergear **PR 3** | `brings_cofinancing` em `node_fields` + `icts.json` regenerado consistente |
 | Suíte completa (`pytest`) | cada PR | regressão-zero; `test_hybrid_match`/`test_ict_match`/`test_radar_service` |
 

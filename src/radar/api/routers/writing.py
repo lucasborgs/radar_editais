@@ -1,0 +1,630 @@
+"""Writing Session (persistida em Postgres — ADR B1): sessões, turnos,
+documento, checklist e export."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+from radar.api.common import (
+    CompanyProfileSchema,
+    load_library_items,
+    profile_from_workspace,
+    to_py_profile,
+)
+from radar.api.rate_limit import limiter
+from radar.core.infra.auth import CurrentUserId, DbClient
+from radar.core.kg import entity_catalog
+from radar.core.services.content_library import get_workspace_id
+from radar.core.services.writing_session import (
+    ProfileIncompleteError,
+    WritingSession,
+    delete_session,
+    get_session_document,
+    list_sessions,
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["writing"])
+
+
+# =============================================================================
+# SCHEMAS
+# =============================================================================
+
+
+class WritingStartRequest(BaseModel):
+    edital_id: str
+    profile: CompanyProfileSchema
+    library_item_ids: list[str] = []
+    # W-D3: modo de escrita explícito ('proposal' | 'pitch'). Opcional — quando
+    # ausente (default), a WritingSession deriva o modo do namespace do id
+    # (`investidor:<slug>` → pitch; demais → proposal). Hoje todo pitch entra por
+    # um id `investidor:`, então o override raramente é necessário; expomos o
+    # campo para o front poder sinalizar a intenção (badge/header) sem depender
+    # de inspecionar o id. Não altera a lógica do pitch em si.
+    mode: str | None = None
+    # PR1 (four-phase-workflow): plano de proposta gerado pelo Planning.
+    # Se presente, WritingSession usa suas seções como outline.
+    plan: dict | None = None
+    # PR1: ajustes do usuário ao plano (merge sobre o plan antes de usar).
+    user_adjustments: dict | None = None
+
+
+class WritingTurnRequest(BaseModel):
+    session_id: str
+    # Caps (PR1.2 hardening-pre-beta): o rate limit é por minuto; o cap limita
+    # o custo LLM de UM request.
+    user_message: str = Field(max_length=16_000)
+    section_hint: str | None = Field(default=None, max_length=200)
+    profile: CompanyProfileSchema | None = None
+    library_item_ids: list[str] = []
+    model_tier: str | None = None  # Fase 4 #24: 'fast' | 'auto' | 'pro'
+
+
+# Sprint 2 do Cenário B: response do /writing/turn passa a carregar 2 campos
+# opcionais (só presentes no path agente). Frontend usa `pending_user_input`
+# para renderizar prompt destacado; `tool_trace` é exposto para observabilidade
+# (debug + futura visualização). Campos legacy (draft_content) seguem iguais.
+class PendingUserInput(BaseModel):
+    field: str
+    prompt: str
+
+
+class ToolTraceEntry(BaseModel):
+    id: str
+    name: str
+    input: dict
+    output: str
+    # W-D1: presente só em entradas save_draft bem-sucedidas — título normalizado
+    # da seção persistida (usado pela co-edição do workspace p/ highlight + undo).
+    saved_section: str | None = None
+    # F3: veredito estruturado do critic (approved, issues, feedback) — presente
+    # em entradas save_draft que passaram pelo critic.
+    critic_result: dict | None = None
+
+
+class WritingTurnResponse(BaseModel):
+    session_id: str
+    assistant_message: str
+    turn_number: int
+    success: bool
+    error: str | None = None
+    error_type: str | None = None
+    draft_content: str | None = None
+    pending_user_input: PendingUserInput | None = None
+    tool_trace: list[ToolTraceEntry] | None = None
+    compliance_flags: list[dict] = []
+    # First-turn generation (Parte A)
+    sections_done: list[str] = []
+    failed_sections: list[str] = []
+    # Sinaliza que um draft completo foi gerado neste turno
+    draft_ready: bool = False
+    # F4: plano gerado no 1º turno (plan-first). Presente quando o primeiro
+    # turno propõe um plano em vez de gerar diretamente.
+    plan: dict | None = None
+    plan_pending: bool = False
+    # PR6.2 (F10): turno cortado no teto de passos do agente (stop_reason ==
+    # "max_steps") — o front mostra aviso discreto ("continue a conversa").
+    truncated: bool = False
+
+
+class WritingGenerateRequest(BaseModel):
+    # Subconjunto explícito de seções a gerar. Ausente (default) → todas as
+    # seções do outline ainda vazias (não clobbera o que já foi redigido).
+    sections: list[str] | None = None
+    profile: CompanyProfileSchema | None = None
+    library_item_ids: list[str] = []
+    model_tier: str | None = None
+
+
+class WritingSectionStartRequest(BaseModel):
+    session_id: str
+    section_title: str
+    profile: CompanyProfileSchema | None = None
+    library_item_ids: list[str] = []
+
+
+class WritingSectionSaveRequest(BaseModel):
+    session_id: str
+    section_title: str
+    content: str
+
+
+class WritingRefineRequest(BaseModel):
+    session_id: str
+    section_title: str
+    instruction: str = Field(max_length=4_000)
+
+
+# =============================================================================
+# ENDPOINTS
+# =============================================================================
+
+
+@router.post("/writing/start", summary="Inicia sessão de escrita de proposta")
+@limiter.limit("10/minute")
+def writing_start(
+    request: Request,
+    req: WritingStartRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """
+    Cria uma sessão de escrita persistida em Postgres para o edital selecionado.
+    Retorna session_id, títulos das seções e contexto da sessão.
+    """
+    # Alvo de escrita: evento (edital/desafio/programa, no índice) OU entidade
+    # (investidor:<slug>/programa:<slug>, em JSON curado → modo derivado do id).
+    # Fundos/programas não encontrados no JSON curado prosseguem sem dados do nó
+    # (WritingSession tolera contexto vazio — os builders retornam "" graciosamente).
+    if req.edital_id.startswith("investidor:"):
+        if entity_catalog.get_investidor(req.edital_id) is None:
+            logger.warning("writing/start: fundo '%s' não encontrado em entities — sessão prossegue sem dados do fundo", req.edital_id)
+    elif req.edital_id.startswith("programa:"):
+        if entity_catalog.get_programa(req.edital_id) is None:
+            logger.warning("writing/start: programa '%s' não encontrado em entities — sessão prossegue sem dados do programa", req.edital_id)
+    else:
+        if entity_catalog.get_edital(req.edital_id) is None:
+            raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
+        # Chunking inline (síncrono): verifica se já existem chunks no banco;
+        # se não, roda o pipeline completo (PDF → Documento Canônico → silver →
+        # chunk → contextual retrieval → embed → upsert). Leva ~1min na primeira
+        # vez; idempotente (re-chunking só força com force=True).
+        try:
+            from radar.core.infra.db import get_supabase_service
+            svc = get_supabase_service()
+            existing = svc.table("edital_chunks").select("id", count="exact").eq(
+                "edital_id", req.edital_id,
+            ).limit(1).execute()
+            if existing.count == 0:
+                import asyncio
+
+                from radar.core.tasks import chunk_edital_task
+                asyncio.run(chunk_edital_task(req.edital_id))
+        except Exception as e:
+            logger.warning("falha ao chunkear %s inline: %s", req.edital_id, e)
+
+    workspace_id = get_workspace_id(db, user_id)
+    profile = to_py_profile(req.profile)
+    library_items = load_library_items(db, workspace_id, req.library_item_ids)
+
+    # Gate de perfil (Fase 2): perfil sem os campos mínimos não inicia sessão.
+    # Devolve payload estruturado (não um 500) para o front renderizar o
+    # formulário inline / acionar o ProfileAgent — mesmo padrão de
+    # request_user_info. 422 = entidade compreendida mas não-processável.
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            edital_id=req.edital_id,
+            library_items=library_items,
+            mode=req.mode,  # W-D3: opcional; None → modo derivado do id
+            plan=req.plan,  # PR1: plano do Planning (se houver)
+            user_adjustments=req.user_adjustments,  # PR1: ajustes do usuário
+        )
+    except ProfileIncompleteError as e:
+        return JSONResponse(
+            status_code=422,
+            content={"error": "profile_incomplete", "missing_fields": e.missing_fields},
+        )
+    return session.get_info()
+
+
+@router.post(
+    "/writing/turn",
+    summary="Turno da sessão de escrita",
+    response_model=WritingTurnResponse,
+    response_model_exclude_none=True,
+)
+@limiter.limit("10/minute")
+async def writing_turn(
+    request: Request,
+    req: WritingTurnRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """
+    Processa um turno da conversa de escrita.
+
+    Roda LLM principal + ComplianceMonitor em paralelo via asyncio.gather (ADR A4).
+    Como ComplianceMonitor avalia a mensagem do USUÁRIO (não a resposta do LLM),
+    ambos podem rodar simultaneamente — latência total ≈ max(LLM, monitor) ≈ LLM.
+    Retorna draft + compliance_flags numa única resposta.
+
+    Constrói o objeto WritingSession a partir do estado em Postgres (sem cache
+    de instâncias entre requests). Esta abordagem troca uma pequena latência
+    de carregamento por correção em deploys multi-instância.
+    """
+    import asyncio
+
+    from radar.core.infra.llm_router import resolve_model
+
+    workspace_id = get_workspace_id(db, user_id)
+    profile = (
+        to_py_profile(req.profile) if req.profile
+        else profile_from_workspace(db, workspace_id)
+    )
+    library_items = load_library_items(db, workspace_id, req.library_item_ids)
+
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            session_id=req.session_id,
+            library_items=library_items,
+            model=resolve_model(req.model_tier),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    # PR3 (four-phase-workflow): compliance integrado ao Critic (executado dentro
+    # de save_draft). Removeu o ComplianceMonitor paralelo.
+    turn_result = await asyncio.to_thread(session.turn, req.user_message, req.section_hint)
+    sections_done = turn_result.get("sections_done", [])
+    return {**turn_result, "compliance_flags": [],
+            "draft_ready": bool(sections_done)}
+
+
+@router.post(
+    "/writing/{session_id}/generate",
+    summary="Gera a proposta completa (batch de todas as seções do outline)",
+)
+@limiter.limit("3/minute")
+async def writing_generate(
+    request: Request,
+    session_id: str,
+    req: WritingGenerateRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """Modo "gerar proposta completa": escreve todas as seções do outline de uma
+    vez (orquestrador determinístico + agente interno por seção).
+
+    Operação LONGA — uma run de agente por seção. Roda em thread para não
+    bloquear o event loop (espelha /writing/turn). Reconstrói a WritingSession a
+    partir do DB (sem cache de instâncias). Retorna as seções geradas/falhas e o
+    documento atualizado.
+    """
+    import asyncio
+
+    from radar.core.infra.llm_router import resolve_model
+
+    workspace_id = get_workspace_id(db, user_id)
+    profile = (
+        to_py_profile(req.profile) if req.profile
+        else profile_from_workspace(db, workspace_id)
+    )
+    library_items = load_library_items(db, workspace_id, req.library_item_ids)
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            session_id=session_id,
+            library_items=library_items,
+            model=resolve_model(req.model_tier),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    return await asyncio.to_thread(session.generate_full_proposal, req.sections)
+
+
+@router.get("/writing/sessions", summary="Lista sessões de escrita do workspace")
+def writing_list_sessions(
+    user_id: CurrentUserId,
+    db: DbClient,
+    status: str | None = Query(None, description="active | completed | abandoned"),
+):
+    """Lista sessões do workspace, cada uma já com `edital_id` + um título
+    utilizável (`edital_title`).
+
+    W-D2: a listagem resolve o título do alvo no servidor — evita o front ter
+    que disparar N getEditalById (e cobre alvos `investidor:` que não vivem no
+    índice de editais). Resolução best-effort: alvo não encontrado fica sem
+    título e o front cai no id.
+    """
+    workspace_id = get_workspace_id(db, user_id)
+    sessions = list_sessions(db, workspace_id, status=status)
+    _attach_target_titles(sessions)
+    return {"sessions": sessions}
+
+
+def _attach_target_titles(sessions: list[dict]) -> None:
+    """Preenche `edital_title` em cada sessão a partir do alvo (edital ou fundo).
+
+    Resolve eventos (editais/desafios/programas) e entidades (`investidor:<slug>`)
+    via entity_catalog/SQL. Falha graciosa: erro de carga deixa as sessões sem
+    título (o front mostra o id)."""
+    if not sessions:
+        return
+
+    ids = {s["edital_id"] for s in sessions if s.get("edital_id")}
+    titles: dict[str, str] = {}
+
+    investor_ids = {i for i in ids if i.startswith("investidor:")}
+    for iid in investor_ids:
+        try:
+            fund = entity_catalog.get_investidor(iid)
+            if fund and fund.get("name"):
+                titles[iid] = fund["name"]
+        except Exception:
+            pass  # sem título de fundo — front cai no id
+
+    for eid in ids - investor_ids:
+        try:
+            card = entity_catalog.get_edital(eid)
+            if card and card.get("title"):
+                titles[eid] = card["title"]
+        except Exception:
+            pass
+
+    for s in sessions:
+        s["edital_title"] = titles.get(s.get("edital_id"))
+
+
+@router.delete("/writing/sessions/{session_id}", summary="Apaga sessão de escrita")
+def writing_delete_session(session_id: str, user_id: CurrentUserId, db: DbClient):
+    workspace_id = get_workspace_id(db, user_id)
+    ok = delete_session(db, session_id, workspace_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    return {"ok": True}
+
+
+@router.post(
+    "/writing/{session_id}/checklist/auto-review",
+    summary="LLM revisa documento em 3 passes paralelas (compliance, qualidade, completude)",
+)
+@limiter.limit("10/minute")
+async def writing_checklist_auto_review(
+    request: Request,
+    session_id: str,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """
+    Roda 3 passes de revisão em paralelo (ADR C4):
+      - compliance:   requisitos obrigatórios do edital cobertos?
+      - quality:      clareza, coerência, persuasão, tom
+      - completeness: seções presentes e com profundidade adequada
+    """
+    from radar.core.services.checklist_service import (
+        auto_review_checklist,
+        build_checklist,
+    )
+    workspace_id = get_workspace_id(db, user_id)
+    doc = get_session_document(db, session_id, workspace_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"Sessão '{session_id}' não encontrada")
+
+    document = "\n\n---\n\n".join(
+        f"## {s['title']}\n\n{s['content']}" if s["content"]
+        else f"## {s['title']}\n\n*[A preencher]*"
+        for s in doc["sections"]
+    )
+    outline = [s["title"] for s in doc["sections"]]
+
+    # Carrega o playbook de monitoramento para enriquecer o pass de compliance
+    # com as heurísticas e anti-padrões do mecanismo (ex: reembolso vs subvenção).
+    # Falha silenciosa: playbook ausente → compliance roda sem regras adicionais.
+    playbook_monitor = ""
+    try:
+        from radar.core.kg.edital_id import source_of
+        from radar.core.skills import load_playbook
+        edital_id = doc["edital_id"]
+        card = entity_catalog.get_edital(edital_id) or {}
+        mechanism = str(card.get("mechanism", "") or "")
+        source = source_of(edital_id)
+        playbook_monitor = load_playbook(mechanism, source).for_monitor()
+    except Exception:
+        pass
+
+    review = await auto_review_checklist(
+        proposal=document,
+        edital_requirements=build_checklist(doc["edital_id"]),
+        outline=outline,
+        playbook_context=playbook_monitor,
+        workspace_id=workspace_id,
+        session_id=session_id,
+    )
+    _attach_issue_sections(review, outline)
+    return {"session_id": session_id, "review": review}
+
+
+def _attach_issue_sections(review: dict, outline: list[str]) -> None:
+    """Anexa um campo `section` a cada issue do auto-review, ancorando os
+    findings no editor do workspace (spec §F4/W6 — reusa `_infer_section`).
+
+    - completeness: a própria seção do outline (campo `title`).
+    - compliance:   inferida do texto do requisito.
+    - quality:      inferida do trecho (excerpt); cai em "Geral" se nada casar.
+
+    A seção inferida só vira âncora se bater com um título do outline; caso
+    contrário o front a trata como "Geral" (bloco no topo do documento)."""
+    from radar.core.services.checklist_service import _infer_section
+
+    outline_set = set(outline)
+
+    def anchor(raw: str) -> str:
+        sec = _infer_section(raw or "")
+        return sec if sec in outline_set else "Geral"
+
+    for issue in review.get("compliance", {}).get("issues", []) or []:
+        if isinstance(issue, dict):
+            issue["section"] = anchor(issue.get("requirement", ""))
+
+    for issue in review.get("quality", {}).get("issues", []) or []:
+        if isinstance(issue, dict):
+            issue["section"] = anchor(issue.get("excerpt", ""))
+
+    for sec in review.get("completeness", {}).get("sections", []) or []:
+        if isinstance(sec, dict):
+            title = sec.get("title", "")
+            sec["section"] = title if title in outline_set else "Geral"
+
+
+@router.get("/writing/{session_id}/document", summary="Retorna estado atual do documento")
+def writing_get_document(session_id: str, user_id: CurrentUserId, db: DbClient):
+    workspace_id = get_workspace_id(db, user_id)
+    doc = get_session_document(db, session_id, workspace_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"Sessão '{session_id}' não encontrada")
+    return doc
+
+
+@router.put("/writing/{session_id}/section", summary="Salva conteúdo editado de uma seção")
+def writing_save_section(
+    session_id: str,
+    req: WritingSectionSaveRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    workspace_id = get_workspace_id(db, user_id)
+    profile = profile_from_workspace(db, workspace_id)
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            session_id=req.session_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    session.set_section_content(req.section_title, req.content)
+    return {"success": True, "section_title": req.section_title}
+
+
+@router.get("/writing/{session_id}/export", summary="Exporta documento completo como Markdown")
+def writing_export(session_id: str, user_id: CurrentUserId, db: DbClient):
+    workspace_id = get_workspace_id(db, user_id)
+    doc = get_session_document(db, session_id, workspace_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"Sessão '{session_id}' não encontrada")
+    parts = []
+    for s in doc["sections"]:
+        if s["content"]:
+            parts.append(f"## {s['title']}\n\n{s['content']}")
+        else:
+            parts.append(f"## {s['title']}\n\n*[A preencher]*")
+    return {"markdown": "\n\n---\n\n".join(parts), "session_id": session_id}
+
+
+@router.post("/writing/{session_id}/save-to-storage", summary="Salva export da sessão em Supabase Storage")
+def writing_save_to_storage(session_id: str, user_id: CurrentUserId, db: DbClient):
+    """Exporta a sessão como markdown e faz upload para o bucket `proposals`.
+
+    Path: <workspace_id>/<session_id>/<timestamp>.md
+    RLS em storage.objects garante isolamento por workspace (ver migration 006).
+    Retorna o path final + signed URL com TTL de 1 hora.
+    """
+    from datetime import datetime
+
+    workspace_id = get_workspace_id(db, user_id)
+    doc = get_session_document(db, session_id, workspace_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"Sessão '{session_id}' não encontrada")
+    parts = []
+    for s in doc["sections"]:
+        if s["content"]:
+            parts.append(f"## {s['title']}\n\n{s['content']}")
+        else:
+            parts.append(f"## {s['title']}\n\n*[A preencher]*")
+    markdown = "\n\n---\n\n".join(parts)
+
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+    path = f"{workspace_id}/{session_id}/proposal_{ts}.md"
+
+    try:
+        db.storage.from_("proposals").upload(
+            path,
+            markdown.encode("utf-8"),
+            file_options={"content-type": "text/markdown", "upsert": "true"},
+        )
+        signed = db.storage.from_("proposals").create_signed_url(path, 3600)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Falha ao salvar no storage: {e}",
+        ) from e
+
+    return {"path": path, "signed_url": signed.get("signedURL"), "session_id": session_id}
+
+
+@router.post("/writing/section-start", summary="Mensagem inicial para uma seção da proposta")
+@limiter.limit("10/minute")
+def writing_section_start(
+    request: Request,
+    req: WritingSectionStartRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """
+    Gera a mensagem de boas-vindas contextualizada para a seção selecionada.
+    Reconstrói a WritingSession a partir do DB para reaproveitar o contexto.
+    """
+    workspace_id = get_workspace_id(db, user_id)
+    profile = (
+        to_py_profile(req.profile) if req.profile
+        else profile_from_workspace(db, workspace_id)
+    )
+    library_items = load_library_items(db, workspace_id, req.library_item_ids)
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            session_id=req.session_id,
+            library_items=library_items,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    starter = session.get_section_starter(req.section_title)
+    return {"starter_message": starter, "section_title": req.section_title}
+
+
+@router.post(
+    "/writing/{session_id}/refine",
+    summary="Refina uma seção específica com instrução do usuário (FASE 3)",
+)
+@limiter.limit("10/minute")
+async def writing_refine(
+    request: Request,
+    session_id: str,
+    req: WritingRefineRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """Refinement mode: reescreve uma seção específica seguindo instrução do
+    usuário. A seção passa pelo Critic (qualidade + compliance) antes de ser
+    salva.
+
+    - MAX_STEPS = 20 (vs 10 do turno normal)
+    - Critic roda automaticamente via save_draft
+    - Retorna o novo conteúdo + feedback do Critic
+    """
+    workspace_id = get_workspace_id(db, user_id)
+    profile = profile_from_workspace(db, workspace_id)
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            session_id=session_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    result = await asyncio.to_thread(
+        session.refine_section,
+        req.section_title,
+        req.instruction,
+    )
+    return result

@@ -128,7 +128,7 @@ Especificar em spec separada após a ingestão estar verde.
 ## Critérios de aceitação (Fase A)
 
 - `wikis/` ou WIKI.md documentam `ict` + `ict_has_expertise`; `pytest tests/test_wiki_schema_consistency.py` verde.
-- `python -m pipeline.extractors.ict_embrapii` produz `bronze_data/ict_raw/embrapii_*.json`.
+- `python -m radar.pipeline.extractors.ict_embrapii` produz `bronze_data/ict_raw/embrapii_*.json`.
 - `build_knowledge_graph` emite nós `ict` no `index.json` e wiki pages em `icts/`, com arestas para `tema`.
 - Dedup testada (mesma ICT em 2 fontes → 1 nó).
 - Nenhuma ICT vira `edital`; nenhum edital ganha aresta direta para ICT.

@@ -22,9 +22,9 @@ from pydantic import PrivateAttr
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-import core.llm.agent_graph as ag
-import core.llm.agent_runtime as ar
-from core.llm.agent_runtime import run_subagent
+import radar.core.llm.agent_graph as ag
+import radar.core.llm.agent_runtime as ar
+from radar.core.llm.agent_runtime import run_subagent
 
 pytestmark = pytest.mark.unit
 
@@ -107,7 +107,7 @@ def test_run_subagent_propagates_span_name(monkeypatch):
         captured.append(name)
         yield None
 
-    import core.infra.telemetry as telemetry
+    import radar.core.infra.telemetry as telemetry
     monkeypatch.setattr(telemetry, "agent_run", fake_agent_run)
 
     run_subagent(

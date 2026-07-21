@@ -9,8 +9,8 @@ import types
 import pytest
 from pydantic import ValidationError
 
-from core.infra import net_guard
-from core.infra.net_guard import PrivateAddressError, assert_public_url
+from radar.core.infra import net_guard
+from radar.core.infra.net_guard import PrivateAddressError, assert_public_url
 
 pytestmark = pytest.mark.unit
 
@@ -128,14 +128,14 @@ class TestSafeRequestRedirects:
 
 class TestInputCaps:
     def test_writing_user_message_cap(self):
-        from backend.routers.writing import WritingTurnRequest
+        from radar.api.routers.writing import WritingTurnRequest
 
         WritingTurnRequest(session_id="s", user_message="x" * 16_000)  # no cap
         with pytest.raises(ValidationError):
             WritingTurnRequest(session_id="s", user_message="x" * 16_001)
 
     def test_writing_section_hint_cap(self):
-        from backend.routers.writing import WritingTurnRequest
+        from radar.api.routers.writing import WritingTurnRequest
 
         with pytest.raises(ValidationError):
             WritingTurnRequest(
@@ -143,14 +143,14 @@ class TestInputCaps:
             )
 
     def test_explore_message_cap(self):
-        from backend.routers.explore import ExploreRequest
+        from radar.api.routers.explore import ExploreRequest
 
         ExploreRequest(message="x" * 4_000)  # no cap
         with pytest.raises(ValidationError):
             ExploreRequest(message="x" * 4_001)
 
     def test_explore_history_cap(self):
-        from backend.routers.explore import ExploreRequest
+        from radar.api.routers.explore import ExploreRequest
 
         with pytest.raises(ValidationError):
             ExploreRequest(message="oi", history=[{"role": "user"}] * 51)
@@ -166,7 +166,7 @@ class TestDemoModeGuard:
             monkeypatch.delenv(var, raising=False)
 
     def test_recusa_demo_em_producao(self, monkeypatch):
-        from backend.api import _guard_demo_mode
+        from radar.api.app import _guard_demo_mode
 
         self._clean(monkeypatch)
         monkeypatch.setenv("DEMO_MODE", "1")
@@ -175,7 +175,7 @@ class TestDemoModeGuard:
             _guard_demo_mode()
 
     def test_override_deliberado_passa(self, monkeypatch):
-        from backend.api import _guard_demo_mode
+        from radar.api.app import _guard_demo_mode
 
         self._clean(monkeypatch)
         monkeypatch.setenv("DEMO_MODE", "1")
@@ -184,14 +184,14 @@ class TestDemoModeGuard:
         _guard_demo_mode()  # não levanta
 
     def test_demo_fora_de_producao_passa(self, monkeypatch):
-        from backend.api import _guard_demo_mode
+        from radar.api.app import _guard_demo_mode
 
         self._clean(monkeypatch)
         monkeypatch.setenv("DEMO_MODE", "1")
         _guard_demo_mode()  # não levanta
 
     def test_producao_sem_demo_passa(self, monkeypatch):
-        from backend.api import _guard_demo_mode
+        from radar.api.app import _guard_demo_mode
 
         self._clean(monkeypatch)
         monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")

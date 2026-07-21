@@ -25,7 +25,7 @@ Onde **dói** (alvos da reorg):
 
 ## Proposta de agrupamento (a validar, não cravada)
 
-Migração **só de organização** (imports são absolutos `from core...`; mover = ajustar imports + um passe de teste). Candidato:
+Migração **só de organização** (imports são absolutos `from radar.core...`; mover = ajustar imports + um passe de teste). Candidato:
 
 ```
 core/

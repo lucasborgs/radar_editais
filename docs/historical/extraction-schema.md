@@ -102,7 +102,7 @@ Implicações:
   só pela contrapartida).
 
 > ⚠️ Isso muda o comportamento do matching atual (FINEP/FAPESP também) → **mudança
-> gated por eval**: rodar `python -m core.eval matching` antes/depois e só promover se
+> gated por eval**: rodar `python -m radar.core.eval matching` antes/depois e só promover se
 > a precisão@K segurar. A normalização exata (e o valor 0,25) é detalhe de Fase 3 a
 > pinar com o eval.
 
@@ -140,7 +140,7 @@ campo de decisão no edital só rende com o par no perfil. Itens adiados no BACK
 ## Próximas fases (após validar este schema)
 
 - **Fase 2:** golden rotulado (bootstrap + correção humana; FINEP+FAPESP+web) + suíte
-  `extraction` no harness (`python -m core.eval extraction`): precisão/recall por campo
+  `extraction` no harness (`python -m radar.core.eval extraction`): precisão/recall por campo
   + faithfulness (não inventar) + taxa de abstenção correta.
 - **Fase 3:** extrator LLM (structured outputs + abstenção), 1×/edital, congelado.
 - **Fase 4:** shadow vs normalizadores atuais; promoção gated por eval.

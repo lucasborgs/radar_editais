@@ -22,7 +22,7 @@ limitação, não escondido.
 |---|---|---|---|---|
 | **Embeddings** (t1) | `EMBEDDING_MODEL` | `rag` offline | baseline OpenAI **vence** (Qwen3-0.6B/BGE-M3 reprovam) | **mantém** `text-embedding-3-large` |
 | **Contextualização** (t2) | `CONTEXTUAL_RETRIEVAL_MODEL` (+`_BASE_URL`/`_API_KEY`) | `rag` offline | Gemini Flash-Lite **empata** com gpt-4o-mini | **troca → Gemini Flash-Lite** (free, editais públicos) |
-| Contextualização — desligar | `CONTEXTUAL_RETRIEVAL=false` | parcial | cru ≈ contexto no offline; **não** confirmado e2e | candidato — precisa `core.eval rag` e2e antes |
+| Contextualização — desligar | `CONTEXTUAL_RETRIEVAL=false` | parcial | cru ≈ contexto no offline; **não** confirmado e2e | candidato — precisa `radar.core.eval rag` e2e antes |
 | **Matching** (t3) | `LLM_BACKEND`/`GEMINI_MODEL` | `matching` | **inconclusivo** (golden N=2 + Gemini trunca por thinking-tokens) | **mantém** OpenAI |
 | **Extração** (t4) | `LLM_BACKEND`/`GEMINI_MODEL` (slot `OPENAI_MODEL_PRO`) | `extraction` | Gemini **não rodou** (quota free diária estourou) | **mantém** `gpt-4o` — destravar com chave paga |
 | **Writing + critic** (t5) | `ANTHROPIC_MODEL_AGENT`, `OPENAI_MODEL_CRITIC` (+ base_url, ver abaixo) | `writing`+grounding | gate de grounding **não confiável** (BACKLOG) + dado de cliente | **mantém** modelo confiável — não promover |

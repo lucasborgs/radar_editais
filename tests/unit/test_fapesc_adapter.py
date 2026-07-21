@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pipeline.adapters import fapesc
+from radar.pipeline.adapters import fapesc
 
 pytestmark = pytest.mark.unit
 

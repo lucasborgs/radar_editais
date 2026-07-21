@@ -24,7 +24,7 @@ pytestmark = [
     ),
 ]
 
-import core.llm.agent_graph as ag  # noqa: E402
+import radar.core.llm.agent_graph as ag  # noqa: E402
 
 _SIGNAL = ["trl", "contrapartida", "orcamento", "prazo"]
 # Dim do embed fake — alinhado em runtime aos dims que o Store configurou (= coluna

@@ -11,7 +11,7 @@ Calibração escolhida (perguntas de 2026-07-18):
 
 | Eixo | Escolha | Consequência para este mapa |
 |---|---|---|
-| Superfície | **Runtime compartilhado** | Foco no `_build_graph` de `core/llm/agent_graph.py`, que serve explore e writing. Melhorias que servem os dois de uma vez são priorizadas. |
+| Superfície | **Runtime compartilhado** | Foco no `_build_graph` de `src/radar/core/llm/agent_graph.py`, que serve explore e writing. Melhorias que servem os dois de uma vez são priorizadas. |
 | Foco | **Equilíbrio** (valor × aprendizado) | Cada alavanca é pontuada por valor no sistema **e** por ensinar uma feature nova do LangGraph. |
 | Régua | **Spike-first calibrado** (revista 2026-07-18) | Spike throwaway onde há incógnita comportamental ou feature nova a aprender; direto a plan→impl onde a mecânica é conhecida. O gate formal entra na promoção. Detalhes na spec de execução. |
 
@@ -21,7 +21,7 @@ Escopo do "ecossistema": apenas o que **já está instalado** — LangGraph core
 
 **Recorte importante:** "camada de inteligência via LangGraph" = os dois grafos ReAct (explore + writing). O **matching é deliberadamente sem-LLM** (KG + RRF, ver memória `project_match_rag_boundary`) — não é um grafo LangGraph, então melhorá-lo é outra trilha, e boa parte dela é a parte 2 (extração → KG → match). As duas frentes do Lucas se encontram no KG, não aqui.
 
-Base de diagnóstico do estado atual: leitura de `core/llm/agent_graph.py` (runtime único de produção) — ver também `docs/reference/grantable-benchmark.md` §3, que ranqueia as mesmas debilidades.
+Base de diagnóstico do estado atual: leitura de `src/radar/core/llm/agent_graph.py` (runtime único de produção) — ver também `docs/reference/grantable-benchmark.md` §3, que ranqueia as mesmas debilidades.
 
 ---
 
@@ -52,7 +52,7 @@ Ordenado por valor × aprendizado × durabilidade (sobrevive a uma futura migra�
 
 **Feature que ensina.** `graph.astream_events(input, version="v3")` e suas projeções tipadas: `messages` (saída do modelo em content blocks), `values` (updates de estado), `subgraphs` (execução aninhada — relevante porque o critic é subagente), `lifecycle`. É API nova para você.
 
-**Spike (validação barata).** Num script throwaway, rodar um turno de explore com `astream_events` e imprimir os eventos no terminal, lado a lado com o `ainvoke` atual — sentir a diferença de latência-até-primeiro-token. Não tocar `core/` de produção; só provar o mecanismo. Sucesso = ver tokens saindo antes do turno terminar.
+**Spike (validação barata).** Num script throwaway, rodar um turno de explore com `astream_events` e imprimir os eventos no terminal, lado a lado com o `ainvoke` atual — sentir a diferença de latência-até-primeiro-token. Não tocar `src/radar/core/` de produção; só provar o mecanismo. Sucesso = ver tokens saindo antes do turno terminar.
 
 **Risco.** Baixo. É aditivo; o contrato `AgentResult` pode ser reconstruído do stream no fim (`values`/`messages` finais).
 
@@ -112,7 +112,7 @@ Ordenado por valor × aprendizado × durabilidade (sobrevive a uma futura migra�
 
 **Estado atual.** A geração de proposta em lote (`run_generation_turn`) faz o paralelismo **fora do grafo**: `asyncio.gather` + `Semaphore` (`GENERATION_CONCURRENCY`), com o grafo interno stateless por seção. Funciona, mas evidencia que o grafo é um while-loop — não há estado/checkpoint/trace por ramo.
 
-**O que muda.** Trazer o fan-out para dentro do grafo com `Send`: o mesmo nó é invocado N vezes em paralelo com estados diferentes, e os resultados agregam de volta no estado principal — com checkpoint e span por ramo. Habilita expansão paralela em multi-hop no explore e, principalmente, **fan-out de subagentes** — como `run_subagent` já existe (`core/llm/agent_runtime.py:327`; usado por critic e deep_research), `Send` paralelizaria vários `deep_research` ou uma comparação multi-edital de uma vez, hoje impossível no loop sequencial.
+**O que muda.** Trazer o fan-out para dentro do grafo com `Send`: o mesmo nó é invocado N vezes em paralelo com estados diferentes, e os resultados agregam de volta no estado principal — com checkpoint e span por ramo. Habilita expansão paralela em multi-hop no explore e, principalmente, **fan-out de subagentes** — como `run_subagent` já existe (`src/radar/core/llm/agent_runtime.py:327`; usado por critic e deep_research), `Send` paralelizaria vários `deep_research` ou uma comparação multi-edital de uma vez, hoje impossível no loop sequencial.
 
 **Feature que ensina.** A classe `Send` em conditional edges, o padrão map-reduce nativo (mapa gera lista → nó aplicado a cada item em paralelo → redução).
 
@@ -151,11 +151,11 @@ Ordenado por valor × aprendizado × durabilidade (sobrevive a uma futura migra�
 
 Ao comparar com o harness do Claude, ficou claro que boa parte do que o Claude "tem a mais" o Radar **já construiu**, em versão domínio-específica — não são gaps nem justificam SDK:
 
-- **Sistema de playbook/skills** (`core/skills.py`): markdown por mecanismo + overlay de agência, merge por seção com roteamento por consumidor (Redator/ComplianceMonitor/Critic). Já é um "interpretador de skills" domínio-específico. **Diferença vs SKILL.md do Claude:** edição hoje é git (dev) ou overlay no banco (dormante), não o usuário final no produto; escopo é craft de escrita, não slash-commands genéricos.
-- **Subagentes** (`run_subagent`, `core/llm/agent_runtime.py:327`): subagente-como-tool com provider/modelo/`max_steps` próprios, span aninhado, isolamento (`checkpointer=False`) e degradação graciosa. Critic e deep_research já são subagentes. O que o Claude adiciona é compaction *dentro* do subagente (= alavanca #2) e orquestração paralela nativa (= alavanca #4) — não a primitiva.
-- **Pesquisa web** (`core/deep_research.py`): subagente com tools reais `web_search` + `fetch_url`, findings persistidos em `research_findings`. Diferença vs Claude é só hospedagem (client-side vs server-side Anthropic), não capacidade.
+- **Sistema de playbook/skills** (`src/radar/core/skills.py`): markdown por mecanismo + overlay de agência, merge por seção com roteamento por consumidor (Redator/ComplianceMonitor/Critic). Já é um "interpretador de skills" domínio-específico. **Diferença vs SKILL.md do Claude:** edição hoje é git (dev) ou overlay no banco (dormante), não o usuário final no produto; escopo é craft de escrita, não slash-commands genéricos.
+- **Subagentes** (`run_subagent`, `src/radar/core/llm/agent_runtime.py:327`): subagente-como-tool com provider/modelo/`max_steps` próprios, span aninhado, isolamento (`checkpointer=False`) e degradação graciosa. Critic e deep_research já são subagentes. O que o Claude adiciona é compaction *dentro* do subagente (= alavanca #2) e orquestração paralela nativa (= alavanca #4) — não a primitiva.
+- **Pesquisa web** (`src/radar/core/deep_research.py`): subagente com tools reais `web_search` + `fetch_url`, findings persistidos em `research_findings`. Diferença vs Claude é só hospedagem (client-side vs server-side Anthropic), não capacidade.
 
-**Alavanca adjacente (fora do LangGraph, mas de inteligência):** os `playbook_overlays` no banco são uma **camada dormente** de skills aprendidas/editáveis em runtime, já lida por `core/skills.py::_load_overlays` mas nunca escrita por um produtor. Ativá-la (um produtor que grava overlays a partir de correção humana ou de padrões aprendidos) daria editabilidade de skills em runtime **sem** LangGraph nem SDK — reusa infra que já existe. Não entra na fila das 5 alavancas (não é feature LangGraph), mas fica registrada aqui como enriquecimento de baixo custo quando fizer sentido.
+**Alavanca adjacente (fora do LangGraph, mas de inteligência):** os `playbook_overlays` no banco são uma **camada dormente** de skills aprendidas/editáveis em runtime, já lida por `src/radar/core/skills.py::_load_overlays` mas nunca escrita por um produtor. Ativá-la (um produtor que grava overlays a partir de correção humana ou de padrões aprendidos) daria editabilidade de skills em runtime **sem** LangGraph nem SDK — reusa infra que já existe. Não entra na fila das 5 alavancas (não é feature LangGraph), mas fica registrada aqui como enriquecimento de baixo custo quando fizer sentido.
 
 ## Débitos e observações de código (achados ao diagnosticar)
 
@@ -173,4 +173,4 @@ Nota sobre os docs: a fonte canônica atual é `docs.langchain.com/oss/python` (
 
 ## Próximo passo
 
-Abrir o **spike da Alavanca 1 (streaming)**: `astream_events` num entry point, eventos no terminal, throwaway, sem tocar `core/` de produção. É o de menor risco, ensina uma feature nova e sobrevive a qualquer decisão futura.
+Abrir o **spike da Alavanca 1 (streaming)**: `astream_events` num entry point, eventos no terminal, throwaway, sem tocar `src/radar/core/` de produção. É o de menor risco, ensina uma feature nova e sobrevive a qualquer decisão futura.

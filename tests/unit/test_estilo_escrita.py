@@ -24,13 +24,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from backend.common import (  # noqa: E402
+from radar.api.common import (  # noqa: E402
     CompanyProfileSchema,
     profile_from_workspace,
     to_py_profile,
 )
-from core.services.writing_session import WritingSession  # noqa: E402
-from domain.user_profile import CompanyProfile  # noqa: E402
+from radar.core.services.writing_session import WritingSession  # noqa: E402
+from radar.domain.user_profile import CompanyProfile  # noqa: E402
 
 pytestmark = pytest.mark.unit
 
@@ -151,8 +151,8 @@ def test_estilo_nao_referenciado_em_paths_de_monitor_ou_critic():
     """Checagem arquitetural: estilo_escrita/_estilo_empresa_block não podem
     aparecer no código que alimenta ComplianceMonitor/Critic — nem por
     coincidência de refactor futuro."""
-    from core.llm.agent_tools import critic_agent
-    from core.services import checklist_service
+    from radar.core.llm.agent_tools import critic_agent
+    from radar.core.services import checklist_service
 
     for mod in (critic_agent, checklist_service):
         src = inspect.getsource(mod)

@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import pytest
 
-from core.eval import extraction as ex
-from domain.edital_extraction import (
+from radar.core.eval import extraction as ex
+from radar.domain.edital_extraction import (
     Counterpart,
     EditalExtraction,
     Extracted,

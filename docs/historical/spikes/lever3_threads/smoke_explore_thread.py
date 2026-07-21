@@ -17,11 +17,11 @@ import uuid
 
 sys.path.insert(0, os.getcwd())
 
-from core.environment import load_environment_profile  # noqa: E402
+from radar.core.environment import load_environment_profile  # noqa: E402
 
 load_environment_profile()
 
-from core.services.explore_agent import ExploreAgent  # noqa: E402
+from radar.core.services.explore_agent import ExploreAgent  # noqa: E402
 
 FACT = "Meu projeto se chama Zephyr-9 e atua na área de energia eólica offshore."
 WS = os.environ.get("EVAL_WORKSPACE_ID", "dca65d63-a340-498f-92df-f2634316df32")
@@ -66,5 +66,5 @@ if __name__ == "__main__":
     try:
         sys.exit(asyncio.run(main()))
     finally:
-        from core.llm.agent_graph import shutdown_writing_runtime
+        from radar.core.llm.agent_graph import shutdown_writing_runtime
         shutdown_writing_runtime()

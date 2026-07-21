@@ -1,5 +1,5 @@
 """
-Unidade pra `core.eval.metrics_rag` — métricas de avaliação do RAG.
+Unidade pra `radar.core.eval.metrics_rag` — métricas de avaliação do RAG.
 
 Testes puros: NÃO chamam OpenAI nem o DB. `judge_faithfulness` é testado
 apenas no nível do parser de resposta (`_parse_faithfulness_score`).
@@ -14,7 +14,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.eval.metrics_rag import (  # noqa: E402
+from radar.core.eval.metrics_rag import (  # noqa: E402
     _matches,
     _parse_faithfulness_score,
     _percentile,

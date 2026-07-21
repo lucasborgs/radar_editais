@@ -1,4 +1,4 @@
-"""Testes do wrapper core.infra.telemetry.llm_span (spec hardening PR5).
+"""Testes do wrapper radar.core.infra.telemetry.llm_span (spec hardening PR5).
 
 Contratos: no-op (yield None) com Langfuse desconfigurado; abre/fecha span de
 generation quando habilitado; exceção do CALLER propaga intacta (span fecha com
@@ -16,7 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from core.infra import telemetry  # noqa: E402
+from radar.core.infra import telemetry  # noqa: E402
 
 pytestmark = pytest.mark.unit
 

@@ -14,7 +14,7 @@ import pkgutil
 
 import pytest
 
-import core.llm.agent_tools as agent_tools
+import radar.core.llm.agent_tools as agent_tools
 
 pytestmark = pytest.mark.unit
 

@@ -58,8 +58,8 @@ resolvido 1×); no explore o agente **navega livre**, então o escopo vem como
 ```python
 # dentro de build_explore_tools(...)
 
-from core.retrieval.retriever import retrieve_chunks
-from core.retrieval import format_chunks_for_prompt   # mesmo formatter do writing
+from radar.core.retrieval.retriever import retrieve_chunks
+from radar.core.retrieval import format_chunks_for_prompt   # mesmo formatter do writing
 
 CHUNK_CHAR_CAP = int(os.getenv("EXPLORE_CHUNK_CHAR_CAP", "800"))     # por trecho
 TOOL_CHAR_CAP  = int(os.getenv("EXPLORE_TRECHOS_CHAR_CAP", "6000"))  # total da tool-result
@@ -133,8 +133,8 @@ Registro: adicionar `search_edital_trechos` à lista retornada por
 
 | Peça | Origem | Status |
 |---|---|---|
-| `retrieve_chunks` | `core.retrieval.retriever` | reusa as-is (`db=None`, ignorado) |
-| `format_chunks_for_prompt` | `core.retrieval` | reusa as-is (mesmo do writing) |
+| `retrieve_chunks` | `radar.core.retrieval.retriever` | reusa as-is (`db=None`, ignorado) |
+| `format_chunks_for_prompt` | `radar.core.retrieval` | reusa as-is (mesmo do writing) |
 | degradação erro→string | padrão explore/writing | reusa o padrão |
 | escopo por **argumento** | — | novo (writing usa estado de sessão) |
 | recuperação **por edital** (loop) | — | novo (lógica de comparação balanceada) |

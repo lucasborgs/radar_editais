@@ -140,8 +140,8 @@ polling. A resposta HTTP do primeiro turno nunca fica bloqueada esperando o comp
 def _schedule_checklist_async(self) -> None:
     """Agenda o checklist auto-review em background. O resultado é entregue
     via SSE (evento `compliance_ready`) ou consultado via GET /writing/{id}/checklist."""
-    from core.services.checklist_service import build_checklist, auto_review_checklist
-    from core.tasks import procrastinate  # ou Celery, ou asyncio.create_task
+    from radar.core.services.checklist_service import build_checklist, auto_review_checklist
+    from radar.core.tasks import procrastinate  # ou Celery, ou asyncio.create_task
 
     requirements = build_checklist(self.edital_id)
     if not requirements:

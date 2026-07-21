@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from core import vocab_lint
+from radar.core import vocab_lint
 
 pytestmark = pytest.mark.unit
 
@@ -194,8 +194,8 @@ def test_build_report_with_proposal():
     assert '"quântica e fotônica": "saúde e ciências da vida",' in report
     # 5. checklist com gates
     assert "tests/unit/test_vocab_lint.py tests/unit/test_gold_mappers.py" in report
-    assert "python -m core.kg.gold --no-skip" in report
-    assert "core.eval matching" in report
+    assert "python -m radar.core.kg.gold --no-skip" in report
+    assert "radar.core.eval matching" in report
 
 
 def test_build_report_sem_acao():

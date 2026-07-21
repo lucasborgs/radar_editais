@@ -26,8 +26,8 @@ import re
 import unicodedata
 from pathlib import Path
 
-from core.config import OBSIDIAN_VAULT_DIR
-from core.kg import entity_catalog
+from radar.core.config import OBSIDIAN_VAULT_DIR
+from radar.core.kg import entity_catalog
 
 # folder → (emoji, rótulo singular, rótulo plural, tag YAML). Plurais em PT-BR são
 # irregulares demais p/ derivar do singular. Pastas de tema/tecnologia/aplicação

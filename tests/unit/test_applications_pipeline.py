@@ -13,7 +13,7 @@ from datetime import date, timedelta
 
 import pytest
 
-import backend.routers.applications as api
+import radar.api.routers.applications as api
 
 pytestmark = pytest.mark.unit
 

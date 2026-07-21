@@ -5,14 +5,14 @@ uma chamada como PME/startup (`accept`), puramente acadêmica (`reject`) ou
 ambígua (`unclear`).
 
 **Estado:** não há consumidor ativo nem gate implícito no ingest gold. O bloco
-YAML permanece legível por `core.kg.schema.pme_filter_rules()` apenas por
+YAML permanece legível por `radar.core.kg.schema.pme_filter_rules()` apenas por
 compatibilidade de schema.
 
 **Política de dados:** estas regras não escrevem nem removem bronze, silver ou
 gold.
 
 **Mudou regra? Edite este doc.** O leitor de compatibilidade está em
-`core.kg.schema.pme_filter_rules()`.
+`radar.core.kg.schema.pme_filter_rules()`.
 
 ---
 

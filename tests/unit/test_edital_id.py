@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 import pytest  # noqa: E402
 
-from core.kg.edital_id import (  # noqa: E402
+from radar.core.kg.edital_id import (  # noqa: E402
     make_id,
     native_id_of,
     parse_id,

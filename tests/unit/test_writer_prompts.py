@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.services.writing_session import (
+from radar.core.services.writing_session import (
     PITCH_WRITER_AGENT_SYSTEM,
     WRITER_AGENT_SYSTEM,
 )

@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 import pytest  # noqa: E402
 
-from pipeline.extractors.fapesp import FAPESPScraper  # noqa: E402
+from radar.pipeline.extractors.fapesp import FAPESPScraper  # noqa: E402
 
 pytestmark = pytest.mark.unit
 

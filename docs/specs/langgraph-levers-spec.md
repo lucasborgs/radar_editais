@@ -9,15 +9,15 @@
 - **Fluxo SDD.** Spec: Fable 5 (este documento). Planejamento de tasks: Opus 4.8. Implementação: Sonnet 5; itens críticos com Opus — hoje só o **#3** qualifica (toca produtores + RLS do checkpointer). Spikes são interativos (Lucas + modelo), fora da esteira SDD; a esteira entra na promoção.
 - **Simplicidade / praticidade / eficácia.** Menor mudança que prova o valor. Nada de configurável/genérico onde um caso concreto resolve.
 - **Não construir harness.** Só usar features prontas do LangGraph. Se um item começar a virar subsistema genérico (motor de compaction, sistema de skills, framework de permissões), **para e reavalia** — é sinal de gatilho de SDK, não de construir à mão.
-- **Runtime compartilhado.** Toda mudança mira `_build_graph`/entry points de `core/llm/agent_graph.py`, servindo explore e writing. Mudanças que tocam só um produtor são sinalizadas.
-- **Não re-especificar o que já existe.** Subagentes (`run_subagent`), pesquisa web (`deep_research`) e playbook/skills (`core/skills.py`) estão construídos — a spec os *usa*, não os reconstrói.
+- **Runtime compartilhado.** Toda mudança mira `_build_graph`/entry points de `src/radar/core/llm/agent_graph.py`, servindo explore e writing. Mudanças que tocam só um produtor são sinalizadas.
+- **Não re-especificar o que já existe.** Subagentes (`run_subagent`), pesquisa web (`deep_research`) e playbook/skills (`src/radar/core/skills.py`) estão construídos — a spec os *usa*, não os reconstrói.
 
 ## Régua: "spike pronto" vs "promoção pronta"
 
 | Estágio | Critério de pronto |
 |---|---|
-| **Spike pronto** | Sinal de sucesso do item observado num script/variação throwaway; anotação curta do achado (custo/latência/comportamento); decisão go/no-go de promoção. Sem tocar `core/` de produção. |
-| **Promoção pronta** | Mudança no `core/` de produção + o **gate do eixo afetado** rodado (coluna "Gate de promoção" por item). Comportamento-preservador (streaming) dispensa gate de eval, mas pede smoke via skill `verify`. |
+| **Spike pronto** | Sinal de sucesso do item observado num script/variação throwaway; anotação curta do achado (custo/latência/comportamento); decisão go/no-go de promoção. Sem tocar `src/radar/core/` de produção. |
+| **Promoção pronta** | Mudança no `src/radar/core/` de produção + o **gate do eixo afetado** rodado (coluna "Gate de promoção" por item). Comportamento-preservador (streaming) dispensa gate de eval, mas pede smoke via skill `verify`. |
 
 ## Sequência e dependências
 
@@ -47,7 +47,7 @@
 
 **Gatilhos de reabertura:** (i) telemetria do #6 mostrar truncamento real por overflow de tokens; (ii) subida de `max_steps` (pós-#6) criar pressão de contexto real. Na reabertura, caminho = density-aware, começando pela pergunta "é o momento-SDK?".
 
-**Legado do spike (não perder):** writing golden **RODA** (`--limit 1` produz métricas — corrige a memória "nunca rodou"); suíte N=12 ~25-35min por ser sequencial (`core/eval/harness.py`, loop `for` confirmado no código) — paralelizar é chore pequeno/isolado, carona no próximo plano. Comportamentos de desperdício observados (`read_exact_chunk`×5 por busca; `list_icts`/`list_investidores`×6 sem dedup) anotados como motivação do #6.
+**Legado do spike (não perder):** writing golden **RODA** (`--limit 1` produz métricas — corrige a memória "nunca rodou"); suíte N=12 ~25-35min por ser sequencial (`src/radar/core/eval/harness.py`, loop `for` confirmado no código) — paralelizar é chore pequeno/isolado, carona no próximo plano. Comportamentos de desperdício observados (`read_exact_chunk`×5 por busca; `list_icts`/`list_investidores`×6 sem dedup) anotados como motivação do #6.
 
 *(Contrato original abaixo, mantido para a eventual reabertura.)*
 
@@ -117,7 +117,7 @@
 
 ## Item adjacente — Ativar `playbook_overlays` (skills editáveis em runtime)
 
-**Fora do escopo LangGraph, mas é enriquecimento de inteligência de baixo custo.** O reader já existe (`core/skills.py::_load_overlays`, `load_playbook` mergeia overlays do banco por seção); falta só um **produtor** que grava em `playbook_overlays`.
+**Fora do escopo LangGraph, mas é enriquecimento de inteligência de baixo custo.** O reader já existe (`src/radar/core/skills.py::_load_overlays`, `load_playbook` mergeia overlays do banco por seção); falta só um **produtor** que grava em `playbook_overlays`.
 
 - **Objetivo do spike.** Provar o ciclo completo: gravar um overlay de teste → `load_playbook` mergeia na competência do Redator/Monitor.
 - **Abordagem.** Inserir uma linha de teste em `playbook_overlays` (mechanism/source/section/body) e confirmar que `load_playbook(mech, src)` traz a seção mergeada; depois, um produtor mínimo que grava overlay a partir de uma correção humana.

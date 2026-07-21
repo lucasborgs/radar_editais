@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from core.infra.auth import get_admin_user_id, is_admin_payload
+from radar.core.infra.auth import get_admin_user_id, is_admin_payload
 
 pytestmark = pytest.mark.unit
 
@@ -57,8 +57,8 @@ def test_discovered_endpoints_require_admin():
     Inspeciona as dependencies das rotas do router — se alguém reverter para
     CurrentUserId, este teste quebra.
     """
-    from backend.routers import discovered
-    from core.infra.auth import get_admin_user_id as gate
+    from radar.api.routers import discovered
+    from radar.core.infra.auth import get_admin_user_id as gate
 
     routes = [r for r in discovered.router.routes if hasattr(r, "endpoint")]
     assert routes, "router de descoberta não expõe endpoints"
