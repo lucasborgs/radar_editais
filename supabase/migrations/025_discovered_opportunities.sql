@@ -1,6 +1,6 @@
 -- 025: discovered_opportunities — staging da torneira de descoberta (Parte C)
 --
--- A torneira (core/opportunity_discovery) deixa de escrever direto no KG
+-- A torneira (core/ingestion/opportunity_discovery) deixa de escrever direto no KG
 -- (web_raw/ provisorio → chunk → índice). Em vez disso, cada achado pousa AQUI
 -- como `pending`. Um humano revê a fila e PROMOVE o que vale: a promoção insere
 -- a URL em `web_sources` (migration 018), e o WebScraper a trata como fonte

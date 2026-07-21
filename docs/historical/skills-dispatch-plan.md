@@ -52,9 +52,9 @@ standalone `/workspace/planning` continua viva. Consolidar/aposentar isso é fol
 - Critic sob demanda: [critic_agent.py:312](../../core/llm/agent_tools/critic_agent.py#L312)
   (`run_critic(draft, section_title, session, trace_context=None)`), hoje só chamado dentro de `save_draft`
   ([writing_tools.py:373](../../core/llm/agent_tools/writing_tools.py#L373)).
-- Perfil: [profile_extractor.py:190](../../core/profile_extractor.py#L190) (`ProfileExtractor`),
-  `.extract(url, agent_enabled=False)` em [:206](../../core/profile_extractor.py#L206); `extract_from_text`
-  em [:231](../../core/profile_extractor.py#L231). Filosofia: **só retorna sugestão, nunca salva.**
+- Perfil: [profile_extractor.py:190](../../core/ingestion/profile_extractor.py#L190) (`ProfileExtractor`),
+  `.extract(url, agent_enabled=False)` em [:206](../../core/ingestion/profile_extractor.py#L206); `extract_from_text`
+  em [:231](../../core/ingestion/profile_extractor.py#L231). Filosofia: **só retorna sugestão, nunca salva.**
 - Endpoint do modo: [backend/routers/workspace.py:42](../../backend/routers/workspace.py#L42)
   (valida `req.mode not in VALID_MODES` → 422).
 - Frontend: `parseCommand` (regex `explorer|plan|escrita|help`) em

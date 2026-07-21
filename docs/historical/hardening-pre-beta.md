@@ -28,8 +28,8 @@ Cada item abaixo foi conferido linha a linha — a spec não assume nada de segu
 | F4 | Geração batch = StateGraph com self-loop `generate→generate`, 1 seção por vez | `core/llm/agent_graph.py:1073-1080` |
 | F5 | `user_message` e `message` sem `max_length` | `backend/routers/writing.py:55`, `backend/routers/explore.py:38` |
 | F6 | `DEMO_MODE=1` bypassa auth+RLS (service-role) sem guard de ambiente | `core/infra/auth.py:35-43` |
-| F7 | Triagem do discovery: exceção → `is_opportunity=False` → rejeição gravada no ledger (TTL 30d). Falha transiente vira rejeição persistente | `core/opportunity_discovery.py:130-145,391-397` |
-| F8 | SSRF: fetch de URL controlada por usuário sem bloqueio de IP privado/metadata | `backend/routers/discovered.py:56-73`, `core/profile_extractor.py:189-199` |
+| F7 | Triagem do discovery: exceção → `is_opportunity=False` → rejeição gravada no ledger (TTL 30d). Falha transiente vira rejeição persistente | `core/ingestion/opportunity_discovery.py:130-145,391-397` |
+| F8 | SSRF: fetch de URL controlada por usuário sem bloqueio de IP privado/metadata | `backend/routers/discovered.py:56-73`, `core/ingestion/profile_extractor.py:189-199` |
 | F9 | Sem purge de checkpoints LangGraph (só `adelete` de insights do Store) | `core/llm/agent_graph.py:738` (único delete) |
 | F10 | `stop_reason="max_steps"` não é exposto no response do turno — truncamento invisível na UI | grep vazio em `backend/routers/writing.py` |
 | F11 | Chamadas LLM 1-shot sem telemetria (reflection, checklist, HyDE, contextual retrieval, `_call_openai`) — sem visão de custo por sessão/workspace | grep `telemetry\|langfuse` vazio nesses módulos |

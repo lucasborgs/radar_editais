@@ -372,7 +372,7 @@ explore_agent = ExploreAgent()
 - `core/services/writing_session.py` — lazy import troca para `GraphService`
 - `backend/common.py` — troca `kg_service = KGMatchService()` por `graph_service` + `explore_agent`
 - `backend/routers/graph.py` — usa `graph_service` em vez de `kg_service`
-- `core/profile_extractor.py` — docstring update (referencia `explore_turn` do ExploreAgent)
+- `core/ingestion/profile_extractor.py` — docstring update (referencia `explore_turn` do ExploreAgent)
 
 #### Remover
 - `backend/routers/frontdoor.py` — rota `/frontdoor/turn` vira `/explore`

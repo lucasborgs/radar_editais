@@ -501,7 +501,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     # publicação da edição do dia (manhã BRT) — "hoje" seria sempre vazio; D-1 é
     # determinístico e o ledger mantém a idempotência.
     if os.getenv("DISCOVERY_DOU_ENABLED", "0") == "1":
-        from core.dou_feeder import dou_candidates  # noqa: PLC0415
+        from core.ingestion.dou_feeder import dou_candidates  # noqa: PLC0415
         day = datetime.now(timezone.utc).date() - timedelta(days=1)
         for h in dou_candidates(day):
             if len(candidates) >= max_dou:

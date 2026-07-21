@@ -98,7 +98,7 @@ def test_dispatch_handoff_escrita_para_explorer(monkeypatch):
 
 def test_dispatch_profile_sem_url_nao_chama_llm(monkeypatch):
     """dispatch(profile, '') sem URL pede URL sem chamar ProfileExtractor."""
-    from core.profile_extractor import ProfileExtractor
+    from core.ingestion.profile_extractor import ProfileExtractor
 
     called = []
     monkeypatch.setattr(ProfileExtractor, "extract", lambda *a, **kw: called.append(1))
@@ -116,7 +116,7 @@ def test_dispatch_profile_sem_url_nao_chama_llm(monkeypatch):
 
 def test_dispatch_profile_com_url_chama_extractor(monkeypatch):
     """dispatch(profile, 'https://acme.com') chama ProfileExtractor.extract com a URL."""
-    from core.profile_extractor import ExtractResult, ProfileExtractor
+    from core.ingestion.profile_extractor import ExtractResult, ProfileExtractor
     from domain.user_profile import CompanyProfile
 
     extract_called = []

@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import core.infra.notify as notify
-import core.opportunity_discovery as od
+import core.ingestion.opportunity_discovery as od
 import core.tasks as tasks
 from core.web_search import SearchHit
 

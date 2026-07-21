@@ -109,6 +109,6 @@ def get_profile_drift(user_id: CurrentUserId, db: DbClient):
     """Heurística simples (sem LLM): combina idade do profile + volume de
     items novos na library. Retorna sinal pro frontend exibir banner —
     decisão de atualizar fica com o usuário."""
-    from core.profile_drift import detect_profile_drift
+    from core.ingestion.profile_drift import detect_profile_drift
     workspace = _ensure_workspace(user_id, db)
     return detect_profile_drift(db, workspace["id"])

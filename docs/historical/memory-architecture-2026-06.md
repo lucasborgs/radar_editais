@@ -8,7 +8,7 @@ São **6 camadas**, cada uma com semântica e granularidade próprias. Não exis
 |---|---|
 | **O que guarda** | [CompanyProfile](../../domain/user_profile.py) estruturada (nome, tipo_entidade, TRL, descricao_atividades, etc.) |
 | **Granularidade** | 1 row por workspace |
-| **Trigger de escrita** | `PUT /me/profile` (manual) **ou** `POST /profile/extract` (LLM extrai do site via [ProfileExtractor.extract](../../core/profile_extractor.py#L70)) |
+| **Trigger de escrita** | `PUT /me/profile` (manual) **ou** `POST /profile/extract` (LLM extrai do site via [ProfileExtractor.extract](../../core/ingestion/profile_extractor.py#L70)) |
 | **Trigger de leitura** | Toda construção de [WritingSession](../../core/services/writing_session.py#L154) → `profile.to_context()` vira prefixo cacheable do prompt |
 
 ## 2. Curadoria — `content_items` (Content Library)

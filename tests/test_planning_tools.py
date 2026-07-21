@@ -105,7 +105,7 @@ def test_build_writing_tools_inclui_write_todos():
 
 def test_extractor_tools_incluem_write_todos_e_write_note():
     """As tools do agente de extração somam planning + scratchpad."""
-    import core.profile_extractor as pe
+    import core.ingestion.profile_extractor as pe
     src = inspect.getsource(pe.ProfileExtractor._extract_agent)
     assert "build_planning_tools" in src
     assert "build_scratchpad_tools" in src

@@ -16,10 +16,10 @@ Verificados diretamente no código fonte.
 |---|---|---|---|
 | B1 | `core/infra/auth.py:94` | JWKS fetch via `urllib` sem retry, timeout=5s. Um blip no endpoint derruba toda autenticação até o server reiniciar | **Alta** |
 | B2 | `core/infra/db.py:49,55,59` | Três `except Exception: pass` aninhados em `get_supabase_user`. JWT quebrado ou SDK com bug passa silenciosamente; queries subsequentes falham de forma imprevisível | **Alta** |
-| B3 | `core/opportunity_discovery.py:425` | Quando o cliente Supabase está indisponível, findings da discovery são descartados silenciosamente — sem re-queue, sem alarme. Data loss garantido em falhas de rede | **Alta** |
+| B3 | `core/ingestion/opportunity_discovery.py:425` | Quando o cliente Supabase está indisponível, findings da discovery são descartados silenciosamente — sem re-queue, sem alarme. Data loss garantido em falhas de rede | **Alta** |
 | B4 | `core/services/writing_session.py:1974–1994` | `_call_ollama` usa `requests.post(timeout=300)` sem retry. O resto da classe usa `make_client`. Inconsistência silenciosa em falhas Ollama | **Média** |
 | B5 | `backend/routers/discovered.py:61` | `requests.head/get` com timeout=10s fixo, sem retry. Falha transiente de um host de PDF vira HTTP 500 para o frontend | **Média** |
-| B6 | `core/dou_feeder.py:214` | `requests.Session()` sem retry adapter, apesar do docstring mencionar retry handling | **Média** |
+| B6 | `core/ingestion/dou_feeder.py:214` | `requests.Session()` sem retry adapter, apesar do docstring mencionar retry handling | **Média** |
 | B7 | `structurer.py:57`, `edital_extractor.py:211`, `entity_matcher.py:45`, `explore_agent.py:227` | URL Ollama hardcoded `http://localhost:11434/v1` em 4 arquivos. `writing_session.py:61` lê `OLLAMA_BASE_URL` corretamente — os outros não | **Baixa** |
 | B8 | `core/llm/agent_graph.py:8–9` | Comentário menciona `AGENT_RUNTIME` env var e modo `legacy`. Nenhum dos dois existe no código | **Baixa** |
 | B9 | `core/retrieval/retriever.py:357` | Docstring menciona `fts_weight=0.3` mas `DEFAULT_FTS_WEIGHT = 0.5` (linha 44). Stale desde algum ajuste de tuning | **Baixa** |
@@ -73,7 +73,7 @@ Problemas estruturais que não quebram hoje mas acumulam dívida ou podem quebra
 
 - **B1** `core/infra/auth.py:94` — JWKS sem retry → derruba auth em blip
 - **B2** `core/infra/db.py:49,55,59` — exception swallow em `get_supabase_user` → auth silenciosamente quebrada
-- **B3** `core/opportunity_discovery.py:425` — data loss na discovery sem alarme
+- **B3** `core/ingestion/opportunity_discovery.py:425` — data loss na discovery sem alarme
 - **P1** `core/compliance_monitor.py` — swallow silencioso → resultados falsos de compliance
 - **I5** Migrations 021–024 não aplicadas no remoto
 - **R1** Isolamento multi-tenant não validado → risco de data leak entre workspaces

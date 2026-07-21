@@ -403,7 +403,7 @@ def _dispatch_profile(
     """
     import re
 
-    from core.profile_extractor import ProfileExtractor
+    from core.ingestion.profile_extractor import ProfileExtractor
 
     url_match = re.search(r'https?://[^\s]+', message)
     if not url_match:

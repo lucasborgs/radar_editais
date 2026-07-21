@@ -245,8 +245,8 @@ Sem `_cap()` no retorno. Workspaces com muitos insights acumulados podem gerar o
 | WritingSession Signal | [writing_session.py](../../core/services/writing_session.py) | `gpt-4o-mini` | Stateless 1-shot | 2K–4K tokens | Baixo |
 | ChecklistService (3 passes paralelos) | [checklist_service.py](../../core/services/checklist_service.py) | `gemini-2.5-flash` / `gpt-4o-mini` | Stateless paralelo | 4K–12K por pass = **12K–36K total** | Médio (chamada manual) |
 | Explore/KGMatch Agent | kg_match_service.py | `claude-sonnet-4-6` | Stateless por turno | 3K–8K/turn | Baixo |
-| Profile Extractor Agent | [profile_extractor.py](../../core/profile_extractor.py) | `claude-sonnet-4-6` | Stateless | 3K–12K | Baixo (1× por submit) |
-| Edital Extractor | [edital_extractor.py](../../core/edital_extractor.py) | `gpt-4o` / `gemini-2.5-flash` | Stateless | 5K–20K por edital | **ALTO** (batch em pipeline) |
+| Profile Extractor Agent | [profile_extractor.py](../../core/ingestion/profile_extractor.py) | `claude-sonnet-4-6` | Stateless | 3K–12K | Baixo (1× por submit) |
+| Edital Extractor | [edital_extractor.py](../../core/ingestion/edital_extractor.py) | `gpt-4o` / `gemini-2.5-flash` | Stateless | 5K–20K por edital | **ALTO** (batch em pipeline) |
 | ContextualRetrieval | [contextual_retrieval.py](../../core/contextual_retrieval.py) | `gpt-4o-mini` | Stateless por chunk | 400–800 tokens/chunk | **ALTO** (1 call/chunk no reindex) |
 | Deep Research (sub-agent) | [research_tools.py](../../core/llm/agent_tools/research_tools.py) | `anthropic`/`openai` | Stateless (max_steps=5) | 2K–8K | Médio (por chamada no turno) |
 | HybridMatch Stage 2 | hybrid_match_service.py | `gemini-2.5-flash` / `gpt-4o-mini` | Stateless | 3K–6K por empresa | Baixo (1× por match) |

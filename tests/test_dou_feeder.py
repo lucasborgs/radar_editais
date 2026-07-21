@@ -1,4 +1,4 @@
-"""Testes do feeder DOU/INLABS (core/dou_feeder) — parse + pré-filtro + SearchHit.
+"""Testes do feeder DOU/INLABS (core/ingestion/dou_feeder) — parse + pré-filtro + SearchHit.
 
 Tudo offline: o zip do INLABS é sintetizado em memória (1 XML por matéria, schema
 real do INLABS). Login/download não são testados aqui (rede; validados ao vivo
@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core import dou_feeder as dou
+from core.ingestion import dou_feeder as dou
 
 
 def _art(art_type="Aviso de Chamamento Público",

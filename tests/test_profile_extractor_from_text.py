@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.profile_extractor import ProfileExtractor  # noqa: E402
+from core.ingestion.profile_extractor import ProfileExtractor  # noqa: E402
 
 # ============================================================================
 # Fixtures de texto

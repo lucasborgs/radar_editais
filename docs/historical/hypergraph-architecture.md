@@ -191,9 +191,9 @@ viabiliza, resolve
 
 ## Componentes alterados
 
-### 1. Pipeline ETL (`core/structurer.py` → `core/retrieval/hyper_extractor.py`)
+### 1. Pipeline ETL (`core/ingestion/structurer.py` → `core/retrieval/hyper_extractor.py`)
 
-**Input:** silver `*.jsonl` em `data/silver/structured_docs/{source}/` — produzido pelo `core/structurer.py` a partir do bronze. Mesmo insumo que o RAG usa. Sem leitura de bronze diretamente.
+**Input:** silver `*.jsonl` em `data/silver/structured_docs/{source}/` — produzido pelo `core/ingestion/structurer.py` a partir do bronze. Mesmo insumo que o RAG usa. Sem leitura de bronze diretamente.
 
 **Remove:**
 - `pipeline/etl_process.py` — inteiro (síntese LLM de wiki_pages)

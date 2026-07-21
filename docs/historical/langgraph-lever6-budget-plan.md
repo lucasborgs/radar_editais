@@ -16,7 +16,7 @@
   repetidos até 6× sem dedup. Budget-awareness ataca os dois padrões.
 - Só existe `OPENAI_API_KEY` (gpt-4o-mini) em todos os ambientes.
 - Tetos por modo (constantes reais): **10** chat/writing (`AGENT_MAX_STEPS`, [writing_session.py:76](../../core/services/writing_session.py#L76)),
-  **12** profile (`EXTRACTOR_AGENT_MAX_STEPS`, [profile_extractor.py:123](../../core/profile_extractor.py#L123)),
+  **12** profile (`EXTRACTOR_AGENT_MAX_STEPS`, [profile_extractor.py:123](../../core/ingestion/profile_extractor.py#L123)),
   **15** explore (`EXPLORE_AGENT_MAX_STEPS`, [explore_agent.py:154](../../core/services/explore_agent.py#L154)),
   **5** deep_research ([deep_research.py:27](../../core/deep_research.py#L27)); refine 20 / batch 2 conforme a spec.
 

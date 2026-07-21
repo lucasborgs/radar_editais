@@ -15,7 +15,7 @@ O sistema tem **três superfícies de input**, todas alimentando o `CompanyProfi
 1. **Extract por URL** — `POST /profile/extract`
    ([profile.py:55](../../backend/routers/profile.py#L55)) → `ProfileExtractor`
    legacy (1 fetch + 1 LLM) ou agente
-   ([profile_extractor.py:201](../../core/profile_extractor.py#L201)).
+   ([profile_extractor.py:201](../../core/ingestion/profile_extractor.py#L201)).
 2. **Conversa do front-door** — `POST /frontdoor/turn`
    (frontdoor.py:69) →
    `KGMatchService.explore_turn` devolve resposta + `profile_updates` numa só
@@ -135,7 +135,7 @@ infer_financiamento(p):
         out += [pesquisa_colaborativa]
     return dedup(out) or [subvencao_nao_reembolsavel]  # fallback p/ tech sem desambiguação
 ```
-- Localização: nova função pura em `core/profile_inference.py` (ou método estático
+- Localização: nova função pura em `core/ingestion/profile_inference.py` (ou método estático
   no `ProfileExtractor`). Chamada em `_serialize_extract_result`
   ([profile.py:24](../../backend/routers/profile.py#L24)) — todos os 3 endpoints de
   extract herdam. **Não** roda no `explore_turn` (lá o LLM já decide pelo texto).
@@ -146,7 +146,7 @@ infer_financiamento(p):
 ## Mudanças concretas
 | Arquivo | Mudança |
 |---|---|
-| `core/profile_inference.py` (novo) | `infer_financiamento(profile)` puro + testes de tabela |
+| `core/ingestion/profile_inference.py` (novo) | `infer_financiamento(profile)` puro + testes de tabela |
 | `backend/routers/profile.py:24` | chamar a inferência no `_serialize_extract_result` quando o campo vier vazio |
 | Frontend (review Etapa 1) | mecanismos inferidos chegam pré-marcados no `DiffCard`/review; copy "inferimos — ajuste se quiser" |
 

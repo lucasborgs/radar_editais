@@ -51,7 +51,7 @@ cd frontend && npx tsc --noEmit         # TypeScript check (use this, NOT npm ru
 
 ### Data pipeline
 ```bash
-python -m core.opportunity_discovery       # torneira web (DOU com DISCOVERY_DOU_ENABLED=1)
+python -m core.ingestion.opportunity_discovery       # torneira web (DOU com DISCOVERY_DOU_ENABLED=1)
 ```
 Em prod, scrapers e Descoberta rodam pelos crons do worker (`run_daily_etl`
 03:00 UTC, `discover_opportunities` 04:00 UTC — core/tasks.py). O `run_daily_etl`
@@ -129,7 +129,7 @@ Para diagramas Mermaid detalhados do data plane, AI core, runtime agêntico e ev
 ```
 Catálogo/match (gold — v3, produzido pelo run_daily_etl):
 Bronze (FINEP/FAPESP/FAPESC/web raw via adapters por fonte)
-  → core/structurer.py                 (silver: data/silver/structured_docs/*.jsonl)
+  → core/ingestion/structurer.py                 (silver: data/silver/structured_docs/*.jsonl)
   → core/kg/gold.py `ingest_all()`     (incremental, diff por source_hash)
     → mapeadores determinísticos (metadados, agência, programa)
     → tagger LLM (setores/tecnologias) + constraints_producer (elegibilidade)
@@ -240,7 +240,7 @@ ProfileExtractor, CNPJ e embeddings locais, vive em
 Não ative capacidades experimentais ou dormentes apenas porque o wiring existe.
 
 ### Discovery staging
-`core/opportunity_discovery.py` escreve em staging (tabela `discovered_opportunities`), não no KG. O gate humano em `/discovered-opportunities` promove/rejeita antes de tocar o pipeline de build.
+`core/ingestion/opportunity_discovery.py` escreve em staging (tabela `discovered_opportunities`), não no KG. O gate humano em `/discovered-opportunities` promove/rejeita antes de tocar o pipeline de build.
 
 ### KG = tabelas gold
 O KG ativo é relacional: `entities` + `entity_relationships` + `match_chunks`

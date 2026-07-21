@@ -90,7 +90,7 @@ Schema bronze (comum às duas fontes):
 ```
 
 ### Silver/normalização
-1 passo LLM por ICT (leve — é metadado HTML, não PDF): `areas_raw + techniques_raw → themes` (slugs canônicos do vocabulário de `tema`) + `summary`. Reaproveita o cliente/padrão de [core/content_library.py](../../core/services/content_library.py) `_enrich`/[core/structurer.py](../../core/structurer.py). Cache por hash do bronze (não re-chamar LLM em ICT inalterada).
+1 passo LLM por ICT (leve — é metadado HTML, não PDF): `areas_raw + techniques_raw → themes` (slugs canônicos do vocabulário de `tema`) + `summary`. Reaproveita o cliente/padrão de [core/content_library.py](../../core/services/content_library.py) `_enrich`/[core/ingestion/structurer.py](../../core/ingestion/structurer.py). Cache por hash do bronze (não re-chamar LLM em ICT inalterada).
 
 ### KG build
 pipeline/build_knowledge_graph.py: adicionar nós `ict` + arestas `ict_has_expertise` ao `index.json` e gerar wiki pages em `icts/`. Os nós `tema` referenciados passam a listar ICTs (`aggregator_lists_ict`).

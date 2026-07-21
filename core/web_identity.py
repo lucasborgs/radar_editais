@@ -5,7 +5,7 @@ A fonte `web` (WIKI.md §12.4, strategy=html_clean) identifica cada página por 
 hash do URL normalizado: `web:<url_hash>`. Vive em `core/` (não em
 `pipeline/extractors/web.py`) porque DOIS produtores precisam do mesmo hash —
 o WebScraper (seed list manual, em `pipeline/`) e a Descoberta
-(`core/opportunity_discovery.py`, busca livre por termos). Centralizar aqui
+(`core/ingestion/opportunity_discovery.py`, busca livre por termos). Centralizar aqui
 evita um import `core → pipeline` e garante que as duas torneiras produzam o
 MESMO `url_hash` para a mesma página (senão viram dois editais).
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from core import edital_extractor
+from core.ingestion import edital_extractor
 
 
 def test_fapesp_raw_index_composes_historical_snapshots(tmp_path, monkeypatch):

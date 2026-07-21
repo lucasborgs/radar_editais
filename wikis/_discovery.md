@@ -1,6 +1,6 @@
 # Descoberta de Oportunidades — vocabulário de busca (item 2.2)
 
-Config autoritativa do agente de descoberta (`core/opportunity_discovery.py`).
+Config autoritativa do agente de descoberta (`core/ingestion/opportunity_discovery.py`).
 Queries que varrem a web atrás de editais/chamadas/desafios de fomento espalhados
 pelo Brasil. **Regra vive aqui (doc), não no `.py`** — ajuste sem deploy.
 

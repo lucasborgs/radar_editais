@@ -37,7 +37,7 @@ def load_data() -> list[dict]:
 
 def task(*, item: Any, **_) -> dict:
     inp = get_input(item)
-    from core.structurer import _make_client, structure_page
+    from core.ingestion.structurer import _make_client, structure_page
     client, model = _make_client()
     blocks = structure_page(client, model, "Edital.pdf", 1, inp["page_text"], [])
     return {"blocks": blocks}

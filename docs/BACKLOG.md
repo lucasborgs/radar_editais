@@ -59,7 +59,7 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
 ### Reduzir o seam legado de `kg_store` somente após migrar os consumidores vivos
 
 - **Evidência atual:** catálogo e match usam as tabelas gold, mas
-  `core/opportunity_discovery.py` ainda usa `kg_store` para o
+  `core/ingestion/opportunity_discovery.py` ainda usa `kg_store` para o
   `discovery_ledger` e consulta `load_index()` na deduplicação; `core/vocab_lint.py`
   também lê `index.json`/`index_historico.json` por esse seam. Não há outros
   consumidores de produção/tooling no repositório; `load_icts()` aparece apenas
@@ -69,7 +69,7 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
   tooling offline. Não são arquivos mortos.
 - **Gatilho:** substituir os dois consumidores de índice por consultas gold e
   dar ao ledger um store explícito com teste de compatibilidade/migração.
-- **Ponto de entrada:** `core/kg/kg_store.py`, `core/opportunity_discovery.py`,
+- **Ponto de entrada:** `core/kg/kg_store.py`, `core/ingestion/opportunity_discovery.py`,
   `core/vocab_lint.py`, migrations 016 e 033.
 - **Restrição:** preservar leitura do ledger existente durante qualquer migração.
 

@@ -36,7 +36,7 @@ def task(*, item: Any, **_) -> dict:
     inp = get_input(item)
     from dataclasses import asdict
 
-    from core.profile_extractor import ProfileExtractor
+    from core.ingestion.profile_extractor import ProfileExtractor
     result = ProfileExtractor().extract_from_text(inp["text"])
     return asdict(result.profile)
 

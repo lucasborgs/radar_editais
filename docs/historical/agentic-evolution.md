@@ -270,10 +270,10 @@ Converter para grafo ReAct usando `_build_graph` (mesmo runtime do WritingAgent,
 |---|---|---|
 | `web_search(query)` | existe | `core/web_search.py` |
 | `fetch_page(url)` | existe | `core/web_search.py` |
-| `triage(url, snippet)` | existe como LLM call | `core/opportunity_discovery.py` |
+| `triage(url, snippet)` | existe como LLM call | `core/ingestion/opportunity_discovery.py` |
 | `decide_depth(url, context)` | **novo** | a criar — decide se vale crawl em hub |
-| `extract(url, text)` | existe como LLM call | `core/opportunity_discovery.py` |
-| `stage(opportunity)` | existe | `core/opportunity_discovery.py` |
+| `extract(url, text)` | existe como LLM call | `core/ingestion/opportunity_discovery.py` |
+| `stage(opportunity)` | existe | `core/ingestion/opportunity_discovery.py` |
 
 O agente recebe as queries de `wikis/_discovery.md` no system prompt (estável → prefixo, D6) e decide a sequência de execução. O gate humano (`POST /promote`) permanece intacto.
 
@@ -283,7 +283,7 @@ Flag `DISCOVERY_SHADOW_RUN=1` roda os dois em paralelo e registra: coverage (URL
 Flag de rollout: `DISCOVERY_REACT_ENABLED=1` (default OFF).
 
 ### Arquivos
-- `core/opportunity_discovery.py` — funções LLM existentes viram tools LangChain; nova função `decide_depth`
+- `core/ingestion/opportunity_discovery.py` — funções LLM existentes viram tools LangChain; nova função `decide_depth`
 - `core/llm/agent_tools/discovery_tools.py` — novo arquivo com as tools
 - `core/tasks.py` — `discover_opportunities` despacha para o grafo quando `DISCOVERY_REACT_ENABLED=1`, para o shadow-run quando `DISCOVERY_SHADOW_RUN=1`, para o pipeline fixo como default
 

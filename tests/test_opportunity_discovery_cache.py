@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-import core.opportunity_discovery as od
+import core.ingestion.opportunity_discovery as od
 from core.web_search import SearchHit
 
 # ---------------------------------------------------------------------------

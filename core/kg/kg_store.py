@@ -3,7 +3,7 @@
 O catálogo e o match ativos usam as tabelas gold SQL; este módulo não é mais a
 fonte do knowledge graph. Há dois consumidores fora dos testes:
 
-* ``core.opportunity_discovery`` persiste ``discovery_ledger`` e ainda consulta
+* ``core.ingestion.opportunity_discovery`` persiste ``discovery_ledger`` e ainda consulta
   ``index.json`` para complementar a deduplicação por URL;
 * ``core.vocab_lint`` lê ``index.json``/``index_historico.json`` como corpus
   offline de evidências.

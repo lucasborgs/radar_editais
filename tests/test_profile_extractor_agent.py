@@ -18,9 +18,9 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from core.ingestion.profile_extractor import ProfileExtractor  # noqa: E402
 from core.llm.agent_runtime import AgentResult  # noqa: E402
 from core.llm.agent_tools import ExtractionState, build_profile_tools  # noqa: E402
-from core.profile_extractor import ProfileExtractor  # noqa: E402
 
 # ============================================================================
 # Helpers
@@ -480,7 +480,7 @@ def test_extract_dispatches_to_legacy_by_default(monkeypatch):
 
 
 def _make_dummy_result():
-    from core.profile_extractor import ExtractResult
+    from core.ingestion.profile_extractor import ExtractResult
     from domain.user_profile import CompanyProfile
     return ExtractResult(
         profile=CompanyProfile(),

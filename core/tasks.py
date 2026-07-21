@@ -36,11 +36,11 @@ from procrastinate import App, PsycopgConnector, RetryStrategy  # noqa: E402
 from core.infra.db import get_supabase_service  # noqa: E402
 from core.infra.logging_config import setup_logging  # noqa: E402
 from core.infra.notify import send_alert  # noqa: E402
+from core.ingestion.structurer import build_or_load_structured_doc  # noqa: E402
 from core.retrieval.chunker import chunk_from_blocks  # noqa: E402
 from core.retrieval.embedder import EMBEDDING_MODEL, embed_texts  # noqa: E402
 from core.retrieval.retriever import RETRIEVAL_EMBEDDING_COLUMN  # noqa: E402
 from core.services.content_library import enrich_content  # noqa: E402
-from core.structurer import build_or_load_structured_doc  # noqa: E402
 from pipeline.adapters.base import get_adapter  # noqa: E402
 
 setup_logging()
@@ -1043,7 +1043,7 @@ async def discover_opportunities_task(timestamp: int) -> None:
     Falha total → 1 e-mail de alerta + re-raise (spec hardening-pre-beta 4.3).
     Sem retry= de propósito: o cron re-roda no dia seguinte.
     """
-    from core.opportunity_discovery import discover_opportunities  # noqa: PLC0415
+    from core.ingestion.opportunity_discovery import discover_opportunities  # noqa: PLC0415
 
     logger.info("discover_opportunities_task: iniciando (timestamp=%s)", timestamp)
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.profile_inference import (
+from core.ingestion.profile_inference import (
     CAPITAL_RISCO,
     PESQUISA_COLABORATIVA,
     SUBVENCAO,
@@ -92,7 +92,7 @@ def test_tipo_entidade_vazio_sem_sinal():
 
 
 def _make_extract_result(profile: CompanyProfile):
-    from core.profile_extractor import ExtractResult
+    from core.ingestion.profile_extractor import ExtractResult
 
     return ExtractResult(
         profile=profile,
