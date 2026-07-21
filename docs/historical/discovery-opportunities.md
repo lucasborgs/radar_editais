@@ -72,7 +72,7 @@ Task diária (procrastinate, ao lado de `run_daily_etl` em [core/tasks.py](../..
 
 ### Arquivos
 `supabase/migrations/016_discovery_ledger.sql` (ledger de dedup: url, dedup_key,
-first_seen_at, ingested_edital_id), `core/opportunity_discovery.py` (descoberta +
+first_seen_at, ingested_edital_id), `core/ingestion/opportunity_discovery.py` (descoberta +
 triagem + extração), `core/tasks.py` (task `discover_opportunities`), doc do
 vocabulário + WIKI.md §5.11, `pipeline/build_knowledge_graph.py` (carregar
 `verificacao` do bronze), `wikis/web.md` (bronze_mapping da fonte genérica).

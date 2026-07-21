@@ -21,7 +21,7 @@ OnboardingPage
   /matching
 ```
 
-## Novo módulo: `core/profile_extractor.py`
+## Novo módulo: `core/ingestion/profile_extractor.py`
 
 Responsabilidade única: dado um texto de página web, retornar `CompanyProfile` parcial + confidence.
 

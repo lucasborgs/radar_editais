@@ -3,7 +3,7 @@
 O catálogo e o match ativos usam as tabelas gold SQL; este módulo não é mais a
 fonte do knowledge graph. Há dois consumidores fora dos testes:
 
-* ``core.opportunity_discovery`` persiste ``discovery_ledger`` e ainda consulta
+* ``core.ingestion.opportunity_discovery`` persiste ``discovery_ledger`` e ainda consulta
   ``index.json`` para complementar a deduplicação por URL;
 * ``core.vocab_lint`` lê ``index.json``/``index_historico.json`` como corpus
   offline de evidências.
@@ -36,7 +36,7 @@ import os
 import threading
 import time
 
-from config import KNOWLEDGE_GRAPH_DIR
+from core.config import KNOWLEDGE_GRAPH_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def _load_pg(key: str) -> dict | None:
         if cached is not None and (now - cached[0]) < _PG_TTL:
             return cached[1]
     try:
-        from core.db import get_supabase_service
+        from core.infra.db import get_supabase_service
         resp = (
             get_supabase_service()
             .table(_TABLE)
@@ -163,7 +163,7 @@ def save(key: str, blob: dict) -> None:
         _file_cache[key] = (path.stat().st_mtime, blob)
 
     if _pg_configured():
-        from core.db import get_supabase_service
+        from core.infra.db import get_supabase_service
         get_supabase_service().table(_TABLE).upsert(
             {"key": key, "blob": blob}, on_conflict="key"
         ).execute()

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from config import BRONZE_DIR
+from core.config import BRONZE_DIR
 from core.web_identity import normalize_web_url, web_url_hash
 from pipeline.adapters.base import CanonicalDoc, split_into_units
 

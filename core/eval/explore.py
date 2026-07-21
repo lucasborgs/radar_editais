@@ -10,7 +10,7 @@ import json
 import os
 from typing import Any
 
-from config import ROOT
+from core.config import ROOT
 from core.eval.harness import Evaluation, Suite, get_input
 
 GOLDEN = ROOT / "eval_data" / "golden" / "explore.json"

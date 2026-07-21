@@ -5,7 +5,7 @@ Endpoints da Content Library.
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from core.auth import CurrentUserId, DbClient
+from core.infra.auth import CurrentUserId, DbClient
 from core.services.content_library import (
     CONTENT_TYPES,
     SUPPORTED_UPLOAD_EXTS,

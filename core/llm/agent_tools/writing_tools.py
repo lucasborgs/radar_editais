@@ -365,7 +365,7 @@ def build_writing_tools(session: WritingSession) -> list[BaseTool]:
         # Critic review — só pula se force=True (decisão explícita do usuário).
         critic_verdict = None
         if not force:
-            from core import telemetry
+            from core.infra import telemetry
             from core.llm.agent_tools.critic_agent import run_critic
             # Captura o contexto Langfuse antes de chamar o critic: o contextvar OTel
             # não é garantido no thread pool do LangGraph para tools síncronas.

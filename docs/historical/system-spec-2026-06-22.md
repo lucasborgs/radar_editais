@@ -34,7 +34,7 @@ Radar de Editais conecta empresas brasileiras a oportunidades de financiamento p
 │    └─ pipeline/extractors/{finep,fapesp,fapesc,web}.py           │
 │                                                                  │
 │  Silver (blocos estruturados)                                    │
-│    └─ core/structurer.py  +  pipeline/adapters/{source}.py       │
+│    └─ core/ingestion/structurer.py  +  pipeline/adapters/{source}.py       │
 │                                                                  │
 │  Gold — KG index                                                 │
 │    └─ pipeline/build_knowledge_graph.py                          │
@@ -128,7 +128,7 @@ Output: `index.json` (vigentes) e `index_historico.json` (todos aceitos).
 Para cada edital em index.json:
   get_adapter(source)
     ↓ FINEP: pdfplumber · FAPESP/FAPESC/Web: html_to_text
-  core/structurer.build_or_load_structured_doc()  → blocos silver (L2)
+  core/ingestion/structurer.build_or_load_structured_doc()  → blocos silver (L2)
     ↓
   _call_llm()   extrai wiki page estruturada (gemini-2.5-flash padrão)
     ↓ cache por content_hash (MD5 metadata+silver_meta) → pula se inalterado
@@ -140,7 +140,7 @@ Para cada edital em index.json:
 ```
 Source Adapter → Documento Canônico (L1)
   ↓
-core/structurer  → blocos silver (L2)
+core/ingestion/structurer  → blocos silver (L2)
   ↓
 core/retrieval/chunker.py  ~800 tokens/chunk, overlap 150
   flags por chunk: contem_data · contem_valor_financeiro · contem_elegibilidade
@@ -303,7 +303,7 @@ Também expõe: `CompanyProfileSchema` (Pydantic), `to_py_profile()`, `load_libr
 
 ### 6.5 Auth
 
-**Arquivo:** `core/auth.py`
+**Arquivo:** `core/infra/auth.py`
 
 Fluxo:
 1. Frontend → Supabase magic link (OTP email) → JWT.
@@ -433,7 +433,7 @@ Não confirmados como mortos (podem ter callers via scripts/CLI), mas sem import
 
 | Símbolo | Localização | Observação |
 |---------|-------------|------------|
-| `get_supabase()` | `core/db.py` | Alias deprecated para `get_supabase_service()` |
+| `get_supabase()` | `core/infra/db.py` | Alias deprecated para `get_supabase_service()` |
 | `load_finep_bronze` | `pipeline/build_knowledge_graph.py:98` | Marcado explicitamente como "alias depreciado — mantido por compat" |
 | Docstring `core/llm/__init__.py` | linha 2 | Diz "runtime Anthropic (agent_runtime)" — desatualizado; runtime hoje é LangGraph |
 | Flag `AGENT_RUNTIME=legacy` | Só em changelog histórico (`langgraph-migration.md`) | Não existe mais no código — o path legacy foi removido (docstrings/comentários já limpos) |
@@ -446,14 +446,14 @@ Além dos services em `core/services/`, existem módulos flat em `core/` com pap
 
 | Módulo | Papel | Onde é chamado |
 |--------|-------|----------------|
-| `core/profile_extractor.py` | Extrai `CompanyProfile` de URL/PDF/texto via agente | `profile.py` router, `frontdoor.py` |
-| `core/profile_inference.py` | Infere `mecanismo_interesse` e `financiamento_hist` | `profile.py` router |
-| `core/opportunity_discovery.py` | Busca livre (Tavily) → oportunidades web | cron `discover_opportunities` |
-| `core/dou_feeder.py` | Scraper DOU (desabilitado por padrão, `DISCOVERY_DOU_ENABLED=1`) | Chamado por `opportunity_discovery` |
+| `core/ingestion/profile_extractor.py` | Extrai `CompanyProfile` de URL/PDF/texto via agente | `profile.py` router, `frontdoor.py` |
+| `core/ingestion/profile_inference.py` | Infere `mecanismo_interesse` e `financiamento_hist` | `profile.py` router |
+| `core/ingestion/opportunity_discovery.py` | Busca livre (Tavily) → oportunidades web | cron `discover_opportunities` |
+| `core/ingestion/dou_feeder.py` | Scraper DOU (desabilitado por padrão, `DISCOVERY_DOU_ENABLED=1`) | Chamado por `opportunity_discovery` |
 | `core/deep_research.py` | Subagente de pesquisa web profunda | `research_tools.py` |
-| `core/edital_extractor.py` | Extrai campos de edital para enriquecimento | `etl_process.py` |
+| `core/ingestion/edital_extractor.py` | Extrai campos de edital para enriquecimento | `etl_process.py` |
 | `core/eligibility_producer.py` | Produz `eligibility_constraints` via LLM | pipeline/ETL |
-| `core/structurer.py` | Converte documento canônico em blocos silver | `etl_process.py`, `tasks.py` |
+| `core/ingestion/structurer.py` | Converte documento canônico em blocos silver | `etl_process.py`, `tasks.py` |
 | `core/reranker.py` | Cross-encoder rerank de chunks RAG | `retriever.py` |
 | `core/reflection_service.py` | Gera reflexões sobre outcomes e learning | `auth_routes.py`, `applications.py` |
 | `core/weight_approval.py` | Aprovação de sugestões de pesos pelo usuário | `auth_routes.py` |
@@ -461,7 +461,7 @@ Além dos services em `core/services/`, existem módulos flat em `core/` com pap
 | `core/opportunity_brief_service.py` | Gera brief GO/NO-GO por edital | `brief.py` |
 | `core/skills.py` | Resolve playbooks e skills de escrita | `playbooks.py`, `writing_tools.py` |
 | `core/web_search.py` | Abstração Tavily para pesquisa web | `deep_research.py`, `opportunity_discovery.py` |
-| `core/telemetry.py` | Logging/telemetria | Utilitário interno |
+| `core/infra/telemetry.py` | Logging/telemetria | Utilitário interno |
 | `core/vocab_lint.py` | Valida vocabulários do schema wiki | `wiki_schema.py` |
 | `core/web_identity.py` | Resolve identidade web de empresa | `profile_extractor.py` |
 
@@ -559,9 +559,9 @@ O codebase principal tem apenas 3 ocorrências relevantes:
 
 | Arquivo:linha | Tipo | Conteúdo |
 |---------------|------|----------|
-| `core/db.py:68` | DEPRECATED | `get_supabase()` alias retrocompat — código novo deve usar `DbClient`. Ainda referenciado por pipelines/scripts legados. |
+| `core/infra/db.py:68` | DEPRECATED | `get_supabase()` alias retrocompat — código novo deve usar `DbClient`. Ainda referenciado por pipelines/scripts legados. |
 | `core/skills.py:198` | TODO | Acesso ao banco de overlays de skills faz fallback silencioso para `[]` — sem regressão mas sem cobertura de erro. |
-| `tests/test_retriever.py:7` | TODO | Integração com pgvector real exige fixture com DB ativo — não existe. |
+| `tests/unit/test_retriever.py:7` | TODO | Integração com pgvector real exige fixture com DB ativo — não existe. |
 
 ---
 

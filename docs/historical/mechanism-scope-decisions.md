@@ -95,7 +95,7 @@ caminho de scoring e podem ir depois, em paralelo.
 - Domínio: comentário de valores em
   [user_profile.py:48](../../domain/user_profile.py#L48).
 - Extrator: enum de doc em
-  [profile_extractor.py:162](../../core/profile_extractor.py#L162) (string livre, sem enum
+  [profile_extractor.py:162](../../core/ingestion/profile_extractor.py#L162) (string livre, sem enum
   duro no backend — `backend/common.py:48` é `list[str]`).
 - **KG: 0 editais `reembolsavel`, 0 `misto`** → a entrada do map é dead-weight no corpus atual.
 

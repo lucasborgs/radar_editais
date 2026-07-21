@@ -4,7 +4,7 @@
 
 ## Contexto
 
-O Discovery pipeline atual (`core/opportunity_discovery.py`) extrai dados de oportunidades via:
+O Discovery pipeline atual (`core/ingestion/opportunity_discovery.py`) extrai dados de oportunidades via:
 
 1. **Tavily web search** → URLs candidatas
 2. **Triage LLM** → "é oportunidade?"
@@ -188,7 +188,7 @@ projeto, **sem agente ReAct** — apenas um pipeline fixo de 6 passos:
   não-determinismo do `_extract` atual).
 - **Sem novas dependências** — reusa `requests`, `beautifulsoup4`,
   `pdfplumber` e `core/web/fetch.py` já existentes.
-- **Código novo:** ~150 linhas em `core/opportunity_discovery.py` ou
+- **Código novo:** ~150 linhas em `core/ingestion/opportunity_discovery.py` ou
   módulo separado `core/discovery_extractor.py`.
 - **Mesmo padrão de saída** que o Crawl4AI testaria: seções
   estruturadas + PDFs + campos extraídos.

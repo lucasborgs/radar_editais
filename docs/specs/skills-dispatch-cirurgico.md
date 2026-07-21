@@ -25,7 +25,7 @@ Consequência: a cirurgia é **menor** do que uma reescrita de dispatcher — é
 | `/explorer` (rebatizável `/prospecting` ou mantido) | `ExploreAgent` — RAG+KG, já tem `find_matching_editais`/`find_matching_entities` como tools condicionais | Sem mudança de produtor; só sai da parede |
 | `/grant-writing` (rebatiza `/escrita`) | `WritingSession` | **Absorve o `/plan`** como fase interna (ver abaixo) |
 | `/review` — **NOVO comando do usuário** | Critic **já existe**, mas roda só automaticamente dentro de `save_draft` ([writing_tools.py:373](../../core/llm/agent_tools/writing_tools.py#L373)) — usuário nunca pode pedir "revise agora" | Expor como comando: dispara `run_critic` sobre a seção corrente sob demanda |
-| `/profile` | `ProfileExtractor` ([core/profile_extractor.py:190](../../core/profile_extractor.py#L190)) — já é um produtor isolado, third mode fora do workspace hoje | Vira comando dentro do MESMO chat, em vez de fluxo separado de onboarding |
+| `/profile` | `ProfileExtractor` ([core/ingestion/profile_extractor.py:190](../../core/ingestion/profile_extractor.py#L190)) — já é um produtor isolado, third mode fora do workspace hoje | Vira comando dentro do MESMO chat, em vez de fluxo separado de onboarding |
 | `/boilerplate` | Gap conhecido (perfil←proposta é parcial) | **Fora de escopo** desta spec — não construir agora |
 | `/archive` | Sem equivalente identificado | **Fora de escopo** — sem demanda de produto ainda |
 

@@ -92,7 +92,7 @@ def build_research_tools(workspace_id: str | None = None, db=None) -> list[BaseT
         Args:
             question: a pergunta a pesquisar, específica e autocontida.
         """
-        from core import telemetry
+        from core.infra import telemetry
         # Captura o contexto Langfuse antes de chamar o sub-agente: o contextvar OTel
         # não é garantido no thread pool do LangGraph para tools síncronas.
         _trace_ctx = telemetry.current_trace_context()

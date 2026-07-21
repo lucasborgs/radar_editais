@@ -35,7 +35,7 @@ python -m procrastinate --app=core.tasks.app worker   # background job worker
 ### Tests
 ```bash
 pytest                                          # run all tests
-pytest tests/test_match_v3.py                  # single file
+pytest tests/unit/test_match_v3.py                  # single file
 pytest -k "test_name"                          # single test by name
 pytest -x                                      # stop on first failure
 ```
@@ -51,7 +51,7 @@ cd frontend && npx tsc --noEmit         # TypeScript check (use this, NOT npm ru
 
 ### Data pipeline
 ```bash
-python -m core.opportunity_discovery       # torneira web (DOU com DISCOVERY_DOU_ENABLED=1)
+python -m core.ingestion.opportunity_discovery       # torneira web (DOU com DISCOVERY_DOU_ENABLED=1)
 ```
 Em prod, scrapers e Descoberta rodam pelos crons do worker (`run_daily_etl`
 03:00 UTC, `discover_opportunities` 04:00 UTC — core/tasks.py). O `run_daily_etl`
@@ -119,7 +119,7 @@ AGENT_PROFILE_EXTRACTOR_DEFAULT_ENABLED=false  # experimental; não promover sem
 # Tier 5: Agente de escrita (base_url sobrescreve endpoint; ZDR/pago apenas)
 # AGENT_OPENAI_BASE_URL=https://api.deepseek.com/v1
 ```
-Ver `.env.example` para referência completa com todos os overrides.
+Ver `envs/.env.example` para referência completa com todos os overrides.
 
 ## Architecture
 
@@ -129,7 +129,7 @@ Para diagramas Mermaid detalhados do data plane, AI core, runtime agêntico e ev
 ```
 Catálogo/match (gold — v3, produzido pelo run_daily_etl):
 Bronze (FINEP/FAPESP/FAPESC/web raw via adapters por fonte)
-  → core/structurer.py                 (silver: data/silver/structured_docs/*.jsonl)
+  → core/ingestion/structurer.py                 (silver: data/silver/structured_docs/*.jsonl)
   → core/kg/gold.py `ingest_all()`     (incremental, diff por source_hash)
     → mapeadores determinísticos (metadados, agência, programa)
     → tagger LLM (setores/tecnologias) + constraints_producer (elegibilidade)
@@ -148,7 +148,7 @@ Edital chunks (para RAG na WritingSession — índice independente do gold):
   → tabela edital_chunks (pgvector + tsvector)
   → aquecimento diário 05:00 UTC + ensure/prefetch sob demanda (mesmo produtor idempotente)
 ```
-Paths em `config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR).
+Paths em `core/config.py` (ROOT, BRONZE_DIR, SILVER_DIR, FINEP_PDFS_DIR, KNOWLEDGE_GRAPH_DIR).
 
 ### Package layout
 ```
@@ -240,7 +240,7 @@ ProfileExtractor, CNPJ e embeddings locais, vive em
 Não ative capacidades experimentais ou dormentes apenas porque o wiring existe.
 
 ### Discovery staging
-`core/opportunity_discovery.py` escreve em staging (tabela `discovered_opportunities`), não no KG. O gate humano em `/discovered-opportunities` promove/rejeita antes de tocar o pipeline de build.
+`core/ingestion/opportunity_discovery.py` escreve em staging (tabela `discovered_opportunities`), não no KG. O gate humano em `/discovered-opportunities` promove/rejeita antes de tocar o pipeline de build.
 
 ### KG = tabelas gold
 O KG ativo é relacional: `entities` + `entity_relationships` + `match_chunks`

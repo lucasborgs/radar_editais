@@ -35,7 +35,7 @@
 | Capability (Grantable) | Equivalente no Radar | Status | Arquivo(s) |
 |---|---|---|---|
 | **Organizational Memory** — contexto persistente acumulado por organização | `CompanyProfile` (perfil estruturado) + `ContentLibrary` (Supabase) | 🟡 Exists mas sem acumulação temporal de outcomes | `domain/user_profile.py`, `core/content_library.py` |
-| **`/profile`** — construção de perfil da organização via URL ou entrevista | `ProfileExtractor` (extração por URL via LLM) | ✅ | `core/profile_extractor.py` |
+| **`/profile`** — construção de perfil da organização via URL ou entrevista | `ProfileExtractor` (extração por URL via LLM) | ✅ | `core/ingestion/profile_extractor.py` |
 | **`/boilerplate`** — biblioteca de conteúdo reutilizável | `ContentLibrary` com enrichment LLM (summary, key_facts, themes) | ✅ | `core/content_library.py`, `backend/library_routes.py` |
 | **`/grant-writing`** — drafting estruturado em 5 fases | `WritingSession` (multi-turn, prompt caching, history compression) + `ProposalDrafter` (one-shot) | 🟡 Falta estrutura formal de fases e outline de compliance | `core/writing_session.py`, `agents/writer_agent.py` |
 | **`/prospecting`** — pesquisa e scoring de financiadores | `HybridMatchService` (Stage 1 determinístico + Stage 2 LLM) e `KGMatchService` | ✅ Para FINEP. Sem base de 800k financiadores (fora de escopo) | `core/hybrid_match_service.py`, `core/kg_match_service.py` |
@@ -45,7 +45,7 @@
 | **Slash commands / Skill picker** | Não existe interface de skills | 🔧 Camada de UI sobre serviços existentes | — |
 | **@ mentions de arquivos** | Não existe; `library_items` passados por ID na API | 🔧 Adicionar resolução de @ no frontend + `WritingSession` | — |
 | **Model tiers (Auto/Pro/Fast)** | LLM configurável via env var (OpenAI/Gemini/Ollama) | 🟡 Funcional mas sem escolha por mensagem | `core/kg_match_service.py`, `core/writing_session.py` |
-| **Multi-tenancy / Workspaces** | Supabase workspaces por `user_id` | 🟡 Estrutura existe; profiles não persistem em DB (JSON em disco) | `core/content_library.py`, `core/db.py` |
+| **Multi-tenancy / Workspaces** | Supabase workspaces por `user_id` | 🟡 Estrutura existe; profiles não persistem em DB (JSON em disco) | `core/content_library.py`, `core/infra/db.py` |
 | **Feedback loop / aprendizado de outcomes** | Não existe | 🏗️ Prioritário segundo objetivo do produto | — |
 | **Funder database (externo)** | Apenas FINEP (knowledge graph local) | ➖ Fora de escopo intencional | `pipeline/build_knowledge_graph.py` |
 | **Criação de arquivos no workspace** | Não existe; outputs são respostas de API | 🏗️ Mudança de paradigma (doc viewer + file tree) | — |

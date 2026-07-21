@@ -15,7 +15,7 @@
 --     fila a partir de um chamador anônimo.
 --
 -- Reproduzido ao vivo no Supabase local: `curl` com a anon key leu `args` e
--- deletou um job (HTTP 204). Ver tests/test_tenant_isolation.py::TestProcrastinate.
+-- deletou um job (HTTP 204). Ver tests/integration/test_tenant_isolation.py::TestProcrastinate.
 --
 -- DEFESA (mesma filosofia da migration 027 p/ o checkpointer — band-aid de
 -- REVOKE + RLS, já que relocar o schema do procrastinate é invasivo e arriscado

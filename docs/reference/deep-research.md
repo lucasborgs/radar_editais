@@ -37,6 +37,6 @@ de staging não quebra o núcleo de escrita ou exploração.
 ## Autoridade
 
 Este documento explica o caminho implementado. Configuração suportada vive em
-`.env.example`; contratos gerais do runtime vivem em
+`envs/.env.example`; contratos gerais do runtime vivem em
 [`architecture.md`](../architecture.md). O desenho original está preservado em
 [`deep-research-design.md`](../historical/deep-research-design.md).

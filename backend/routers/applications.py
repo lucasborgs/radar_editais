@@ -8,7 +8,7 @@ from datetime import date
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from core.auth import CurrentUserId, DbClient
+from core.infra.auth import CurrentUserId, DbClient
 from core.kg import entity_catalog
 from core.kg.schema import parse_deadline
 

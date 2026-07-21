@@ -443,7 +443,7 @@ def run_subagent(
         AgentResult(final_text="", steps=[], stop_reason="error", usage={}).
     """
     try:
-        from core import telemetry
+        from core.infra import telemetry
         # Usa o trace_context fornecido pelo chamador (capturado antes de entrar no
         # thread pool do LangGraph, onde o contextvar OTel ainda está disponível).
         # Fallback para current_trace_context() quando não fornecido (preserva

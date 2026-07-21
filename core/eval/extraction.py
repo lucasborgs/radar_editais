@@ -18,7 +18,7 @@ import json
 import os
 from typing import Any
 
-from config import ROOT
+from core.config import ROOT
 from core.eval.harness import Criterion, Evaluation, Suite, get_input
 from domain.edital_extraction import DECISION_FIELDS
 
@@ -34,7 +34,7 @@ def _present(field: dict | None) -> bool:
 def load_data() -> list[dict]:
     if not GOLDEN.exists():
         return []
-    from core.edital_extractor import raw_by_native_id
+    from core.ingestion.edital_extractor import raw_by_native_id
     golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
 
     raw_idx: dict[str, dict] = {}
@@ -59,7 +59,7 @@ def load_data() -> list[dict]:
 
 def task(*, item: Any, **_) -> dict:
     inp = get_input(item)
-    from core.edital_extractor import extract_edital
+    from core.ingestion.edital_extractor import extract_edital
     return extract_edital(inp["source"], inp["native_id"], inp["raw"]).model_dump()
 
 
@@ -198,6 +198,6 @@ SUITE = Suite(
     manifest_env=["LLM_BACKEND", "OPENAI_MODEL_PRO", "GEMINI_MODEL", "OLLAMA_MODEL"],
     manifest_config={
         "decision_fields": list(DECISION_FIELDS),
-        "raw_source": "core.edital_extractor.raw_by_native_id",
+        "raw_source": "core.ingestion.edital_extractor.raw_by_native_id",
     },
 )

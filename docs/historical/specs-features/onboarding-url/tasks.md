@@ -1,13 +1,13 @@
 # Tasks: Onboarding por URL
 
-## T1 — `core/profile_extractor.py` (backend)
+## T1 — `core/ingestion/profile_extractor.py` (backend)
 **O quê:** Novo módulo com `ProfileExtractor.extract(url)`.
 - Adiciona `fetch_text(url) -> str` ao `LiveFetcher` (texto limpo, sem seções)
 - `ProfileExtractor` chama `fetch_text` + LLM com o prompt de extração
 - Retorna `ExtractResult(profile: CompanyProfile, confidence: dict, source_title: str, error: str | None)`
 - Sem LLM disponível → retorna EMPTY_PROFILE + `error="llm_unavailable"`
 
-**Onde:** `core/profile_extractor.py`, `core/live_fetcher.py`
+**Onde:** `core/ingestion/profile_extractor.py`, `core/live_fetcher.py`
 **Done when:** `ProfileExtractor().extract("https://exemplo.com.br")` retorna profile com ≥1 campo preenchido para um site real
 
 ---

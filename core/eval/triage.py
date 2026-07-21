@@ -1,6 +1,6 @@
 """Suíte de avaliação da TRIAGEM da Descoberta (é oportunidade real?).
 
-Roda o MESMO `_triage` de produção (`core.opportunity_discovery`) sobre
+Roda o MESMO `_triage` de produção (`core.ingestion.opportunity_discovery`) sobre
 candidatos golden rotulados (DOU + Tavily de 2026-06-10, auditados à mão) e
 mede acurácia + guarda de falso negativo. O FN é o erro CARO (oportunidade
 perdida, irreversível); o FP é absorvido pelo funil (extração ~US$0,007 +
@@ -19,7 +19,7 @@ import json
 import os
 from typing import Any
 
-from config import ROOT
+from core.config import ROOT
 from core.eval.harness import Evaluation, Suite, get_input
 
 GOLDEN = ROOT / "eval_data" / "golden" / "triage.json"
@@ -45,7 +45,7 @@ def load_data() -> list[dict]:
 
 def task(*, item: Any, **_) -> dict:
     inp = get_input(item)
-    from core.opportunity_discovery import _make_client, _triage
+    from core.ingestion.opportunity_discovery import _make_client, _triage
     from core.web_search import SearchHit
 
     client, model = _make_client("triage")

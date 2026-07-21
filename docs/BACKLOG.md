@@ -42,7 +42,7 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
 ### Manter a escrita automática de memória congelada até haver evidência real
 
 - **Evidência atual:** `AUTO_MEMORY_WRITE=0` é o default em
-  `core/reflection_service.py`, `core/tasks.py` e `.env.example`; leitura de
+  `core/reflection_service.py`, `core/tasks.py` e `envs/.env.example`; leitura de
   memória permanece ativa. As tabelas `playbook_overlays` e
   `meta_reflection_runs` existem, mas o job `run_meta_reflection` continua apenas
   documentado como scaffold na migration 024.
@@ -59,17 +59,17 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
 ### Reduzir o seam legado de `kg_store` somente após migrar os consumidores vivos
 
 - **Evidência atual:** catálogo e match usam as tabelas gold, mas
-  `core/opportunity_discovery.py` ainda usa `kg_store` para o
+  `core/ingestion/opportunity_discovery.py` ainda usa `kg_store` para o
   `discovery_ledger` e consulta `load_index()` na deduplicação; `core/vocab_lint.py`
   também lê `index.json`/`index_historico.json` por esse seam. Não há outros
   consumidores de produção/tooling no repositório; `load_icts()` aparece apenas
-  nos testes. `tests/test_kg_store.py` cobre os contratos ainda expostos.
+  nos testes. `tests/unit/test_kg_store.py` cobre os contratos ainda expostos.
 - **Motivo do adiamento:** remover `kg_store`, `kg_artifacts` ou os helpers de
   índice agora alteraria deduplicação/observabilidade da Descoberta e quebraria
   tooling offline. Não são arquivos mortos.
 - **Gatilho:** substituir os dois consumidores de índice por consultas gold e
   dar ao ledger um store explícito com teste de compatibilidade/migração.
-- **Ponto de entrada:** `core/kg/kg_store.py`, `core/opportunity_discovery.py`,
+- **Ponto de entrada:** `core/kg/kg_store.py`, `core/ingestion/opportunity_discovery.py`,
   `core/vocab_lint.py`, migrations 016 e 033.
 - **Restrição:** preservar leitura do ledger existente durante qualquer migração.
 

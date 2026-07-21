@@ -154,8 +154,8 @@ flowchart TD
 | P06 | kg_match_service.py | EXPLORE legacy | 44–67 | 8/16 | D3 overflow, D4 |
 | P07 | kg_match_service.py | EXPLORE_AGENT_SYSTEM | 74–111 | 11/16 | D7,D8 ausentes |
 | P08 | hybrid_match_service.py | STAGE2 temático | 369–398 | 9/16 | D5,D7 fracos |
-| P09 | [profile_extractor.py](../../core/profile_extractor.py#L22) | EXTRACT legacy | 22–40 | 8/16 | D6,D7 ausentes |
-| P10 | [profile_extractor.py](../../core/profile_extractor.py#L47) | EXTRACTOR_AGENT_SYSTEM | 47–90 | 9/16 | D7,D8 ausentes |
+| P09 | [profile_extractor.py](../../core/ingestion/profile_extractor.py#L22) | EXTRACT legacy | 22–40 | 8/16 | D6,D7 ausentes |
+| P10 | [profile_extractor.py](../../core/ingestion/profile_extractor.py#L47) | EXTRACTOR_AGENT_SYSTEM | 47–90 | 9/16 | D7,D8 ausentes |
 | P11 | [reflection_service.py](../../core/reflection_service.py#L40) | REFLECT sys+user | 40–87 | 14/16 | D7 parcial |
 | P12 | compliance_monitor.py | MONITOR sys+user | 34–62 | 10/16 | D7 ausente; alvo errado |
 | P13 | [checklist_service.py](../../core/services/checklist_service.py#L48) | COMPLIANCE pass | 48–75 | 10/16 | D7,D8 ausentes |

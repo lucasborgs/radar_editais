@@ -27,9 +27,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from config import FINEP_PDFS_DIR  # noqa: E402
-from core.db import get_supabase_service  # noqa: E402
+from core.config import FINEP_PDFS_DIR  # noqa: E402
 from core.environment import assert_database_target  # noqa: E402
+from core.infra.db import get_supabase_service  # noqa: E402
 from core.tasks import chunk_edital_task  # noqa: E402
 
 # Historical cost estimate retained for the CLI's existing output contract.

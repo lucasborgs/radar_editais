@@ -48,7 +48,7 @@ def generate_hyde_doc(query: str) -> str:
     if not query or not query.strip():
         return ""
     try:
-        from core import telemetry
+        from core.infra import telemetry
         from core.llm.llm_client import make_client
 
         api_key = os.environ.get("HYDE_API_KEY") or os.environ.get("OPENAI_API_KEY")

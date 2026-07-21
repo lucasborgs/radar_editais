@@ -1,7 +1,7 @@
 # spec_dou_feeder.md — Feeder DOU/INLABS (Descoberta, Fase A)
 
 > **Status:** módulo IMPLEMENTADO e validado ao vivo (2026-06-09) —
-> [core/dou_feeder.py](../../core/dou_feeder.py). Wiring no `discover_opportunities()`
+> [core/ingestion/dou_feeder.py](../../core/ingestion/dou_feeder.py). Wiring no `discover_opportunities()`
 > **FEITO** (2026-06-10, atrás de `DISCOVERY_DOU_ENABLED`; §6). Ativação em prod
 > via **shadow-run** (§9). Credenciais em `.env` (`INLABS_EMAIL`/`INLABS_PASSWORD`),
 > carregadas por `load_dotenv()` (já em `backend/api.py` e `core/tasks.py`).
@@ -83,12 +83,12 @@ content = Texto (HTML stripado)   ← JÁ é o corpo completo; dispensa full-fet
 
 ## 6. Wiring no `discover_opportunities()` (PENDENTE — aditivo)
 
-Mudança mínima em [core/opportunity_discovery.py](../../core/opportunity_discovery.py):
+Mudança mínima em [core/ingestion/opportunity_discovery.py](../../core/ingestion/opportunity_discovery.py):
 
 1. **Segundo gerador de candidatos**, ao lado do loop Tavily, atrás de flag:
    ```python
    if os.getenv("DISCOVERY_DOU_ENABLED", "0") == "1":
-       from core.dou_feeder import dou_candidates
+       from core.ingestion.dou_feeder import dou_candidates
        for h in dou_candidates():
            nu = _norm_url(h.url)
            if nu and nu not in known and nu not in seen_now:
@@ -210,7 +210,7 @@ entrarem no Railway.
 # INLABS_PASSWORD, DISCOVERY_DOU_ENABLED=1
 
 # 1×/dia (manual ou worker local), de manhã (o wiring busca o DOU de D-1 UTC):
-python -m core.opportunity_discovery       # grava data/bronze/web_raw/web_discovery_*.json
+python -m core.ingestion.opportunity_discovery       # grava data/bronze/web_raw/web_discovery_*.json
 python pipeline/build_knowledge_graph.py   # ingere no índice local (badge aparece na UI local)
 ```
 

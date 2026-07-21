@@ -10,7 +10,7 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
-from config import BRONZE_DIR
+from core.config import BRONZE_DIR
 
 
 class BaseScraper(ABC):

@@ -423,7 +423,7 @@ async def run_agent_graph_async(
     }
 
     # Import lazy (evita custo de telemetria em testes que não a exercem).
-    from core import telemetry
+    from core.infra import telemetry
 
     result: AgentResult
     with telemetry.agent_run(
@@ -585,7 +585,7 @@ async def run_agent_graph_streaming(
         "documents": {},
     }
 
-    from core import telemetry
+    from core.infra import telemetry
 
     with telemetry.agent_run(
         name=span_name or f"agent.{provider}.{model}",
@@ -809,7 +809,7 @@ def shutdown_writing_runtime(timeout: float = 10.0) -> None:
     # Flush de traces pendentes do Langfuse antes do exit (Etapa 6): em scripts/CLI
     # curtos o batch exporter pode não esvaziar sozinho. No-op se Langfuse off.
     try:
-        from core import telemetry
+        from core.infra import telemetry
         telemetry.flush()
     except Exception:  # noqa: BLE001 — teardown best-effort
         pass
@@ -1351,7 +1351,7 @@ async def _writing_turn_async(
             "documents": {},
         }
 
-    from core import telemetry
+    from core.infra import telemetry
 
     with telemetry.agent_run(
         name=span_name or f"agent.{provider}.{model}",
@@ -1643,7 +1643,7 @@ async def _generation_turn_async(
             )
         status[section] = ok
 
-    from core import telemetry
+    from core.infra import telemetry
 
     with telemetry.agent_run(
         name=span_name or f"generation.{provider}.{model}",

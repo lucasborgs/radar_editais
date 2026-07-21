@@ -236,7 +236,7 @@ def _load_overlays(mechanism: str, source: str) -> list[tuple[str, str]]:
     if not mechanism:
         return []
     try:
-        from core.db import get_supabase_service
+        from core.infra.db import get_supabase_service
 
         db = get_supabase_service()
         res = (

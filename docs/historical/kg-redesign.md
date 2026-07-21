@@ -284,7 +284,7 @@ Os itens da seção "Guardrails de travessia" entram junto: serialização de pr
 
 6. **Entrega dos dados:** como hypergraphs/ não é versionado, os 35 arquivos migrados são locais; a publicação p/ prod é via `kg_store`→Postgres pelo build (não por commit git). Backup de `data/knowledge_graph/` feito antes da reescrita (`data/knowledge_graph.bak.<ts>`, fora do git).
 
-**Toca (código):** `core/kg/migrate_v2.py` (novo), `scripts/migrate_hypergraphs_v2.py` (novo), `core/kg/kg_store.py`, `core/kg/hypergraph_catalog.py`, `core/llm/agent_tools/explore_tools.py`, `core/services/hypergraph_match.py`, `tests/test_kg_store.py`.
+**Toca (código):** `core/kg/migrate_v2.py` (novo), `scripts/migrate_hypergraphs_v2.py` (novo), `core/kg/kg_store.py`, `core/kg/hypergraph_catalog.py`, `core/llm/agent_tools/explore_tools.py`, `core/services/hypergraph_match.py`, `tests/unit/test_kg_store.py`.
 
 ### PR2 — Consolidação de schema (migração mecânica dos tipos) (2026-07-03)
 
@@ -329,7 +329,7 @@ Os itens da seção "Guardrails de travessia" entram junto: serialização de pr
 7. **Fix latente do PR2 foldado no commit do PR2 (#50):** extração fresca (tipos v2 sem ids) ganhava prefixo-fallback `no:` no upgrade-on-read — `_TYPE_PREFIX` ganhou os tipos v2 (`op:/ator:/con:`), senão a resolução cross-fonte por id quebraria em todo edital novo.
 8. **Dados/backup:** reescrita in-place dos 35 arquivos; rollback pré-PR3 em `data/knowledge_graph.bak.pr3_20260704_022409` (fora do git). Com o PR3 fechado, os backups do PR1/PR2 podem ser removidos após o merge (critério da spec atendido).
 
-**Toca (código):** `core/kg/canonicalize.py` (novo), `scripts/canonicalize_concepts.py` (novo), `core/kg/schema.py`, `core/kg/kg_store.py`, `core/kg/migrate_v2.py` (PR2, fix 7), `core/retrieval/hyper_extractor.py`, `core/llm/agent_tools/explore_tools.py`, `WIKI.md` (§6.4 macro_temas), `tests/test_canonicalize.py` (novo), `tests/test_kg_store.py`.
+**Toca (código):** `core/kg/canonicalize.py` (novo), `scripts/canonicalize_concepts.py` (novo), `core/kg/schema.py`, `core/kg/kg_store.py`, `core/kg/migrate_v2.py` (PR2, fix 7), `core/retrieval/hyper_extractor.py`, `core/llm/agent_tools/explore_tools.py`, `WIKI.md` (§6.4 macro_temas), `tests/unit/test_canonicalize.py` (novo), `tests/unit/test_kg_store.py`.
 
 ### PR4 — Proveniência/URL ponta a ponta (2026-07-04)
 
@@ -367,10 +367,10 @@ Os catálogos curados (investidores/programas) NÃO foram reconstruídos determi
 5. **PR5.5 (campos de perfil) foi no-op:** todos os 5 campos necessários (`tamanho_empresa`, `uf`, `faturamento_anual`, `trl`, `tipo_entidade`) já existiam em `CompanyProfile` (domain) E `CompanyProfileSchema` (backend). Nada a adicionar. (`company_age`/`ano_fundacao` não virou tipo de constraint — nenhum edital do corpus o exigiu; a enum é extensível no WIKI quando aparecer.)
 6. **Produtor build-time, fail-open, gated.** `core/kg/constraints_producer.py` (irmão de `canonicalize.py`): gpt-4o-mini (`CONSTRAINTS_MODEL`), JSON mode, temp 0. No ETL fresco, `run_hyper_extract` chama via gate `ELIG_CONSTRAINTS_LLM` (default on) + fail-open (sem key/erro → sem constraints → "unknown não elimina", ETL nunca morre). Passe de corpus: `scripts/extract_constraints.py`.
 7. **Frontend:** `MatchedEdital.elegibilidade?` (tipo novo em `api.ts`) + chip "⚠️ Elegibilidade não verificada — complete o perfil (…)" no `MatchedEditalCard` quando `nao_verificada`. `tsc --noEmit` limpo.
-8. **Testes:** `tests/test_eligibility.py` (11 casos: sat/unsat/unknown por tipo, região, agregação, perfil-objeto). Suíte: **657 passed** (+11), 37 skipped; os 3 errors em `test_memory_store_postgres` são pré-existentes (env-gated `DATABASE_URL`, flake de teardown async no full-run — reproduzidos idênticos no base PR3, não são desta PR).
+8. **Testes:** `tests/unit/test_eligibility.py` (11 casos: sat/unsat/unknown por tipo, região, agregação, perfil-objeto). Suíte: **657 passed** (+11), 37 skipped; os 3 errors em `test_memory_store_postgres` são pré-existentes (env-gated `DATABASE_URL`, flake de teardown async no full-run — reproduzidos idênticos no base PR3, não são desta PR).
 9. **Dados/backup:** backup pré-PR5 em `data/knowledge_graph.bak.pr5_20260704_104523` (fora do git); corpus reescrito in-place com `constraints[]`.
 
-**Toca (código):** `WIKI.md` (§6.4 constraint schema), `core/kg/schema.py` (accessors + validate), `core/kg/constraints_producer.py` (novo), `core/services/eligibility.py` (novo), `core/services/hypergraph_match.py` (Estágio 0 + `EditalMatch.elegibilidade`), `core/retrieval/hyper_extractor.py` (`_produce_constraints` + wiring), `core/kg/hypergraph_catalog.py` (card expõe `constraints`), `backend/routers/explore.py` (passa `profile`), `scripts/extract_constraints.py` (novo), `tests/test_eligibility.py` (novo), `frontend/src/lib/api.ts`, `frontend/src/components/frontdoor/MatchedEditalCard.tsx`.
+**Toca (código):** `WIKI.md` (§6.4 constraint schema), `core/kg/schema.py` (accessors + validate), `core/kg/constraints_producer.py` (novo), `core/services/eligibility.py` (novo), `core/services/hypergraph_match.py` (Estágio 0 + `EditalMatch.elegibilidade`), `core/retrieval/hyper_extractor.py` (`_produce_constraints` + wiring), `core/kg/hypergraph_catalog.py` (card expõe `constraints`), `backend/routers/explore.py` (passa `profile`), `scripts/extract_constraints.py` (novo), `tests/unit/test_eligibility.py` (novo), `frontend/src/lib/api.ts`, `frontend/src/components/frontdoor/MatchedEditalCard.tsx`.
 
 ### PR6 — MaxSim (Estágio 1) (2026-07-04)
 
@@ -436,7 +436,7 @@ Branch **empilhada** (divergência de processo): PR6 (#55) e PR4.1 (#56) ainda e
 7. **Pendência de deploy:** migration 035 aplicada só no local — aplicar no PG de prod (`supabase db push`) junto com a publicação do canon/hipergrafos (pendência do PR3).
 8. **`docs/architecture.md` atualizado** para o estado v2 (data plane com pós-processos build-time, funil de 3 estágios, tools por domínio, task `compute_match_verdicts`) — a auditoria de 2026-07-03 tinha flagrado doc desatualizado; não repetir o erro.
 
-**Toca (código):** `core/services/match_verdict.py` (novo: serializador D10/D12 + `input_hash` + `compute_verdict` + cache + reorder), `supabase/migrations/035_match_verdicts.sql` (nova), `core/tasks.py` (task `compute_match_verdicts`), `backend/routers/explore.py` (attach cache + reorder top-K + defer com `queueing_lock` + `POST /match/verdicts`), `frontend/src/lib/api.ts` (`MatchVerdict` + `fetchMatchVerdicts`), `frontend/src/components/frontdoor/MatchedEditalCard.tsx` (`VerdictBlock`), `frontend/src/app/page.tsx` (poll + re-hidratação no resume), `tests/test_match_verdict.py` (novo, 10 casos), `docs/architecture.md`.
+**Toca (código):** `core/services/match_verdict.py` (novo: serializador D10/D12 + `input_hash` + `compute_verdict` + cache + reorder), `supabase/migrations/035_match_verdicts.sql` (nova), `core/tasks.py` (task `compute_match_verdicts`), `backend/routers/explore.py` (attach cache + reorder top-K + defer com `queueing_lock` + `POST /match/verdicts`), `frontend/src/lib/api.ts` (`MatchVerdict` + `fetchMatchVerdicts`), `frontend/src/components/frontdoor/MatchedEditalCard.tsx` (`VerdictBlock`), `frontend/src/app/page.tsx` (poll + re-hidratação no resume), `tests/unit/test_match_verdict.py` (novo, 10 casos), `docs/architecture.md`.
 
 ### PR8 — Ficha por oportunidade + unificação D1 do card (2026-07-04)
 
@@ -477,6 +477,6 @@ Carve registrado do PR8 (div. 5). Estende o Estágio 2 às `Oportunidade(kind=in
 5. **Um defer só** no `explore.py`: os misses de editais e de ofertas entram na MESMA fila (`compute_match_verdicts`) — o `queueing_lock` por workspace segue valendo, e o dispatcher separa os dois na task.
 6. **Escopo estrito a investimento** (fiel ao carve): programa/ICT sem veredito. A ficha e o card já buscam veredito genericamente — quando programa entrar, é só incluir no `attach`/poll.
 
-**Toca (código):** `core/services/match_verdict.py` (`_ticket_label` + facetas de oferta na serialização + `investment_offer_subgraph` + `serialize_for_verdict` + `attach_cached_verdicts_entities`), `core/kg/hypergraph_catalog.py` (`investment_offer` público), `core/tasks.py` (task via `serialize_for_verdict`), `backend/routers/explore.py` (attach+enqueue das ofertas, defer combinado), `frontend/src/lib/api.ts` (`MatchedEntity.verdict`), `frontend/src/components/frontdoor/MatchedEntityCard.tsx` (`VerdictBlock`), `frontend/src/app/page.tsx` (poll + apply + resume por `entity_id`), `tests/test_match_verdict.py` (+3 casos de investimento).
+**Toca (código):** `core/services/match_verdict.py` (`_ticket_label` + facetas de oferta na serialização + `investment_offer_subgraph` + `serialize_for_verdict` + `attach_cached_verdicts_entities`), `core/kg/hypergraph_catalog.py` (`investment_offer` público), `core/tasks.py` (task via `serialize_for_verdict`), `backend/routers/explore.py` (attach+enqueue das ofertas, defer combinado), `frontend/src/lib/api.ts` (`MatchedEntity.verdict`), `frontend/src/components/frontdoor/MatchedEntityCard.tsx` (`VerdictBlock`), `frontend/src/app/page.tsx` (poll + apply + resume por `entity_id`), `tests/unit/test_match_verdict.py` (+3 casos de investimento).
 
 **Deploy:** nenhuma migration nova (035 já cobre); pendências herdadas inalteradas (035 + canon/hipergrafos no PG de prod).

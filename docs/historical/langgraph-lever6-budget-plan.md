@@ -16,7 +16,7 @@
   repetidos até 6× sem dedup. Budget-awareness ataca os dois padrões.
 - Só existe `OPENAI_API_KEY` (gpt-4o-mini) em todos os ambientes.
 - Tetos por modo (constantes reais): **10** chat/writing (`AGENT_MAX_STEPS`, [writing_session.py:76](../../core/services/writing_session.py#L76)),
-  **12** profile (`EXTRACTOR_AGENT_MAX_STEPS`, [profile_extractor.py:123](../../core/profile_extractor.py#L123)),
+  **12** profile (`EXTRACTOR_AGENT_MAX_STEPS`, [profile_extractor.py:123](../../core/ingestion/profile_extractor.py#L123)),
   **15** explore (`EXPLORE_AGENT_MAX_STEPS`, [explore_agent.py:154](../../core/services/explore_agent.py#L154)),
   **5** deep_research ([deep_research.py:27](../../core/deep_research.py#L27)); refine 20 / batch 2 conforme a spec.
 
@@ -31,7 +31,7 @@
 | A força de `finalize` já injeta `_FINALIZE_PROMPT` prefixado `[Aviso interno — não é mensagem do usuário]` | nó `finalize` em [agent_graph.py:198-202](../../core/llm/agent_graph.py#L198-L202); prompt em [agent_runtime.py:131-137](../../core/llm/agent_runtime.py#L131-L137) |
 | `after_tools` é o ponto de ramificação por budget (`llm_calls >= max_steps → finalize`) | [agent_graph.py:188-217](../../core/llm/agent_graph.py#L188-L217) |
 | Contador `llm_calls` incrementa em `agent`/`agent_final`, vive no estado | [agent_graph.py:151](../../core/llm/agent_graph.py#L151), [agent_graph.py:161](../../core/llm/agent_graph.py#L161); campo em [agent_graph.py:67](../../core/llm/agent_graph.py#L67) |
-| Já existe teste anti-leak estrutural + teste de finalize (harness reutilizável) | `test_no_internal_human_message_injected_in_turn` [test_agent_graph_golden.py:163](../../tests/test_agent_graph_golden.py#L163); `test_max_steps_stop_reason` [test_agent_graph_golden.py:130](../../tests/test_agent_graph_golden.py#L130) |
+| Já existe teste anti-leak estrutural + teste de finalize (harness reutilizável) | `test_no_internal_human_message_injected_in_turn` [test_agent_graph_golden.py:163](../../tests/unit/test_agent_graph_golden.py#L163); `test_max_steps_stop_reason` [test_agent_graph_golden.py:130](../../tests/unit/test_agent_graph_golden.py#L130) |
 | Harness roda casos em **loop sequencial** `for item in items` | `_run_local` [harness.py:316](../../core/eval/harness.py#L316); casos são stateless (sessões distintas) |
 
 ---
@@ -72,7 +72,7 @@ O contrato manda "preferir o caminho mais barato (span Langfuse **ou** coluna em
 **Fora de escopo desta task:** migration; coluna em `session_turns`; qualquer consulta programática a Langfuse.
 
 **Critério de aceite (verificável):**
-1. `pytest tests/test_agent_graph_golden.py -q` verde (o kwarg é opcional; `test_graph_honors_span_name` [:259](../../tests/test_agent_graph_golden.py#L259) não regride).
+1. `pytest tests/unit/test_agent_graph_golden.py -q` verde (o kwarg é opcional; `test_graph_honors_span_name` [:259](../../tests/unit/test_agent_graph_golden.py#L259) não regride).
 2. Rodar um turno de explore e um de writing pelo caminho real (script histórico em `docs/historical/spikes/lever6_budget/` ou `verify`) e
    confirmar **no stdout/log** a linha `turn_end mode=explore stop_reason=… llm_calls=… max_steps=15` e
    `turn_end mode=writing … max_steps=10`.
@@ -108,21 +108,21 @@ fechar graciosamente com uma última tool — atacando exatamente o padrão do s
 
 **Arquivos:** [core/llm/agent_graph.py](../../core/llm/agent_graph.py) (nó + edge + condição em `after_tools` + registro no
 `add_conditional_edges` [:214-217](../../core/llm/agent_graph.py#L214-L217)); [core/llm/agent_runtime.py](../../core/llm/agent_runtime.py) (constante);
-[tests/test_agent_graph_golden.py](../../tests/test_agent_graph_golden.py) (novos testes).
+[tests/unit/test_agent_graph_golden.py](../../tests/unit/test_agent_graph_golden.py) (novos testes).
 
 **Critério de aceite (verificável):**
 1. **Injeção:** novo teste `test_last_step_notice_injected` — script de 3 tools com `max_steps=3`; asserta que a chamada
    do modelo no passo `max_steps-1` recebeu uma `HumanMessage` contendo `"último passo em que você pode chamar tools"`
-   (padrão de `test_max_steps_stop_reason` [:152-156](../../tests/test_agent_graph_golden.py#L152-L156)).
+   (padrão de `test_max_steps_stop_reason` [:152-156](../../tests/unit/test_agent_graph_golden.py#L152-L156)).
 2. **ANTI-LEAK (OBRIGATÓRIO):** novo teste `test_last_step_notice_never_leaks` — asserta que `graph.final_text` **não**
    contém `"não é mensagem do usuário"` nem o texto do aviso, mesmo quando o aviso foi injetado (mesma classe do bug
    `_REFLECT_PROMPT`, memória `project_reflect_leak_bug`; estende a garantia de `test_no_internal_human_message_injected_in_turn`
-   [:163-191](../../tests/test_agent_graph_golden.py#L163-L191) para o caso em que a nota **é** injetada).
-3. **Não-regressão de topologia:** `test_graph_topology_has_no_reflect_or_prune_nodes` [:194](../../tests/test_agent_graph_golden.py#L194)
+   [:163-191](../../tests/unit/test_agent_graph_golden.py#L163-L191) para o caso em que a nota **é** injetada).
+3. **Não-regressão de topologia:** `test_graph_topology_has_no_reflect_or_prune_nodes` [:194](../../tests/unit/test_agent_graph_golden.py#L194)
    atualizado para incluir `budget_notice` no conjunto esperado; nenhum nó `reflect`/`prune` reintroduzido.
 4. **Turno curto intocado:** em turno que termina naturalmente antes de `max_steps-1`, nenhuma nota é injetada
    (o `test_no_internal_human_message_injected_in_turn` continua verde sem alteração).
-5. `pytest tests/test_agent_graph_golden.py tests/test_agent_runtime.py -q` verde.
+5. `pytest tests/unit/test_agent_graph_golden.py tests/unit/test_agent_runtime.py -q` verde.
 
 **ADENDO DE GOVERNANÇA (2026-07-18) — threshold obrigatório na T2:** o aviso só é injetado quando **`max_steps >= 3`**.
 Motivo: com `max_steps=2` (batch de geração), `llm_calls == 1 == max_steps-1` dispara o aviso em **toda** seção do batch

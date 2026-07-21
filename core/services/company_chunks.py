@@ -21,7 +21,7 @@ Escrita/leitura via psycopg (DATABASE_URL) — supabase-py corrompe colunas
 `vector` (mesma razão do `_insert_chunks_psycopg` de core/tasks.py). A fronteira
 de tenant nas escritas service-side é o próprio workspace_id (postura das tasks);
 a RLS da tabela continua sendo a defesa real contra leitura cross-tenant via
-PostgREST (leak-test: tests/test_company_chunks_rls.py).
+PostgREST (leak-test: tests/integration/test_company_chunks_rls.py).
 
 O caminho ANÔNIMO (explore público, eval) não toca a tabela: `ephemeral_company_
 chunks` produz os mesmos textos em memória (cache por hash do perfil).

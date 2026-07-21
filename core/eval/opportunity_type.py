@@ -2,7 +2,7 @@
 
 Mede se o pipeline de Descoberta rotula corretamente o tipo-evento
 (edital | desafio | programa) a partir do texto de uma página. Roda o MESMO
-`_extract` de produção (`core.opportunity_discovery`) sobre trechos golden
+`_extract` de produção (`core.ingestion.opportunity_discovery`) sobre trechos golden
 rotulados — é a peça da Fase B que é rodável hoje (o MATCH de desafio/programa
 fica bloqueado por dados: a torneira web está inerte no launch).
 
@@ -14,7 +14,7 @@ import json
 import os
 from typing import Any
 
-from config import ROOT
+from core.config import ROOT
 from core.eval.harness import Evaluation, Suite, get_input
 
 GOLDEN = ROOT / "eval_data" / "golden" / "opportunity_type.json"
@@ -37,7 +37,7 @@ def load_data() -> list[dict]:
 
 def task(*, item: Any, **_) -> dict:
     inp = get_input(item)
-    from core.opportunity_discovery import _extract, _make_client
+    from core.ingestion.opportunity_discovery import _extract, _make_client
     from core.web_search import SearchHit
 
     client, model = _make_client("extract")

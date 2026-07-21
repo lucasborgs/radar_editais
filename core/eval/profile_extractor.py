@@ -12,7 +12,7 @@ import json
 import os
 from typing import Any
 
-from config import ROOT
+from core.config import ROOT
 from core.eval.harness import Evaluation, Suite, get_input
 
 GOLDEN = ROOT / "eval_data" / "golden" / "profile_extractor.json"
@@ -36,7 +36,7 @@ def task(*, item: Any, **_) -> dict:
     inp = get_input(item)
     from dataclasses import asdict
 
-    from core.profile_extractor import ProfileExtractor
+    from core.ingestion.profile_extractor import ProfileExtractor
     result = ProfileExtractor().extract_from_text(inp["text"])
     return asdict(result.profile)
 

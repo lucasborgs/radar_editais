@@ -31,7 +31,7 @@ import os
 import re
 from datetime import datetime, timezone
 
-from config import ROOT
+from core.config import ROOT
 from core.kg import kg_store
 from core.kg import schema as ws
 from domain.vocabulary import canonicalize_themes
@@ -99,7 +99,7 @@ def _fetch_discovered_rows() -> list[dict]:
     """Rows NÃO-rejeitadas da staging `discovered_opportunities` (Parte C).
     Isolada para teste (monkeypatch). [] sem acesso ao Supabase (degrada)."""
     try:
-        from core.db import get_supabase_service  # noqa: PLC0415
+        from core.infra.db import get_supabase_service  # noqa: PLC0415
         db = get_supabase_service()
         res = (db.table("discovered_opportunities")
                  .select("url_hash, url, raw, status")
@@ -230,8 +230,8 @@ def _build_proposal_user(evidence: dict) -> str:
 
 def _make_client():
     """(client, model) tier 'fast'. (None, None) se sem credencial — caller degrada."""
+    from core.infra.llm_router import resolve_model
     from core.llm.llm_client import make_client
-    from core.llm_router import resolve_model
     try:
         client = make_client(api_key=os.environ["OPENAI_API_KEY"])
     except KeyError:
@@ -395,7 +395,7 @@ def build_report(evidence: dict, proposal: dict | None) -> str:
           "bloco `tema_vocab` acima.",
           "2. [ ] Se houver sinônimos: acrescentar as entradas em "
           "`domain/vocabulary._SYNONYMS`.",
-          "3. [ ] `python -m pytest tests/test_vocab_lint.py tests/test_gold_mappers.py` "
+          "3. [ ] `python -m pytest tests/unit/test_vocab_lint.py tests/unit/test_gold_mappers.py` "
           "(doc × accessors/consumidores não divergem).",
           "4. [ ] Reingestão deliberada: `python -m core.kg.gold --no-skip`.",
           "5. [ ] Gate de não-regressão: `python -m core.eval matching --no-push` "

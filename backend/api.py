@@ -43,7 +43,7 @@ from backend.routers.radar import router as radar_router
 from backend.routers.research import router as research_router
 from backend.routers.workspace import router as workspace_router
 from backend.routers.writing import router as writing_router
-from core.logging_config import request_id_var, setup_logging
+from core.infra.logging_config import request_id_var, setup_logging
 
 setup_logging()
 logger = logging.getLogger(__name__)

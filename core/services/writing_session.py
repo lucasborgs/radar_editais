@@ -40,7 +40,7 @@ from pathlib import Path
 
 import requests
 
-from config import FINEP_PDFS_DIR
+from core.config import FINEP_PDFS_DIR
 from core.reflection_service import _auto_memory_write_enabled, load_active_insights
 from core.retrieval.retriever import (
     format_chunks_for_prompt,
@@ -1673,7 +1673,7 @@ class WritingSession:
                 # Captura trace_context do thread atual para aninhamento Langfuse
                 trace_ctx = None
                 try:
-                    from core import telemetry
+                    from core.infra import telemetry
                     trace_ctx = telemetry.get_current_trace_context()
                 except Exception:
                     pass
@@ -2770,7 +2770,7 @@ class WritingSession:
         if not OPENAI_API_KEY:
             return False, "OPENAI_API_KEY não configurada", "CONFIG_ERROR"
         try:
-            from core import telemetry
+            from core.infra import telemetry
             from core.llm.llm_client import make_client
             client = make_client(api_key=OPENAI_API_KEY)
             with telemetry.llm_span(

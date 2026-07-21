@@ -17,7 +17,7 @@ from backend.common import (
     to_py_profile,
 )
 from backend.rate_limit import limiter
-from core.auth import CurrentUserId, DbClient
+from core.infra.auth import CurrentUserId, DbClient
 from core.kg import entity_catalog
 from core.services.content_library import get_workspace_id
 from core.services.writing_session import (
@@ -177,7 +177,7 @@ def writing_start(
         # chunk → contextual retrieval → embed → upsert). Leva ~1min na primeira
         # vez; idempotente (re-chunking só força com force=True).
         try:
-            from core.db import get_supabase_service
+            from core.infra.db import get_supabase_service
             svc = get_supabase_service()
             existing = svc.table("edital_chunks").select("id", count="exact").eq(
                 "edital_id", req.edital_id,
@@ -244,7 +244,7 @@ async def writing_turn(
     """
     import asyncio
 
-    from core.llm_router import resolve_model
+    from core.infra.llm_router import resolve_model
 
     workspace_id = get_workspace_id(db, user_id)
     profile = (
@@ -295,7 +295,7 @@ async def writing_generate(
     """
     import asyncio
 
-    from core.llm_router import resolve_model
+    from core.infra.llm_router import resolve_model
 
     workspace_id = get_workspace_id(db, user_id)
     profile = (

@@ -29,10 +29,10 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from config import BRONZE_DIR
-from core.auth import AdminUserId
-from core.db import get_supabase_service
-from core.net_guard import safe_get, safe_head
+from core.config import BRONZE_DIR
+from core.infra.auth import AdminUserId
+from core.infra.db import get_supabase_service
+from core.infra.net_guard import safe_get, safe_head
 from core.services import discovery_promotion
 from core.services.discovery_materializer import materialize_approved_evidence
 from core.web_identity import normalize_web_url, web_url_hash

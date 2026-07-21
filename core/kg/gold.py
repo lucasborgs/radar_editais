@@ -48,7 +48,7 @@ from functools import lru_cache
 
 import psycopg
 
-from config import BRONZE_DIR, SILVER_DIR
+from core.config import BRONZE_DIR, SILVER_DIR
 from core.environment import assert_database_target
 from core.kg import schema
 from core.kg.canonicalize import anti_class_verdict

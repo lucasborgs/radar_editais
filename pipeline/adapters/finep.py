@@ -6,7 +6,7 @@ Converte PDFs em `bronze_data/finep_pdfs/{edital_id}/` em Documento Canônico
 keyword + dedup por versão) e a extração per-página com pdfplumber.
 
 Esta lógica era FINEP-específica e vivia espalhada em core/tasks.py
-(descoberta) e core/structurer.py (extração) — consolidada aqui por ser
+(descoberta) e core/ingestion/structurer.py (extração) — consolidada aqui por ser
 L1 (per-fonte), não L2 (agnóstico).
 """
 from __future__ import annotations
@@ -18,7 +18,7 @@ import unicodedata
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-from config import BRONZE_DIR, FINEP_PDFS_DIR
+from core.config import BRONZE_DIR, FINEP_PDFS_DIR
 
 from .base import CanonicalDoc, SourceAdapter, coletado_em
 

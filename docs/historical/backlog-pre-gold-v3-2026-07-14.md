@@ -22,7 +22,7 @@
 - **O quê:** a [migration 034](../../supabase/migrations/034_procrastinate_lockdown.sql)
   (RLS + REVOKE nas tabelas/funções `procrastinate*`) foi aplicada e verificada só no
   Supabase **local**. O leak-test apontado ao **remoto** ainda REPROVA
-  (`tests/test_tenant_isolation.py::...::test_procrastinate_surface_negada`) — ou seja,
+  (`tests/integration/test_tenant_isolation.py::...::test_procrastinate_surface_negada`) — ou seja,
   **em produção a anon key ainda lê `procrastinate_jobs.args` (workspace_id/payloads
   cross-tenant) e deleta/enfileira jobs**. Junto sobem 032/033 (pendentes no ledger remoto).
 - **Por que importa:** é o furo P0 da Frente 1 do leak-test pré-beta — vazamento
@@ -168,7 +168,7 @@
   Et.3 (subagente herdava o checkpointer do pai; fix `checkpointer=False`). Falta o gate
   estatístico (N casos) + Langfuse real.
 - **Se a parity de usage falhar:** escrever um callback de usage custom (o `record_usage` em
-  `core/telemetry.py` já tem a lógica de extração como referência).
+  `core/infra/telemetry.py` já tem a lógica de extração como referência).
 - **Status:** aberto (2026-06-20). Não bloqueia o merge do código da migração.
 
 ### Deploy — aplicar migrations 021-024 no Supabase remoto (knowledge-evolution)
@@ -468,7 +468,7 @@
   → modelo de blocos tipado → melhor `section_path` → melhor retrieval. Motivada pela
   patologia de "unit gigante" (FAPESP texto_cru achatado → units de ~24k chars).
 - **Metodologia (no harness existente):** métrica **chunking-invariante** — token-recall
-  sobre `gold_text` (estilo Chroma) em `core/rag_eval.py` (`gold_recall_at_k`,
+  sobre `gold_text` (estilo Chroma) em `core/eval/metrics_rag.py` (`gold_recall_at_k`,
   `gold_best_chunk_recall_at_k`); golden FINEP (24q) + FAPESP (15q) regenerados com
   `gold_text`. Benches em `scripts/bench_parsing.py` / `bench_fapesp.py` / `bench_contextual.py`
   (dense-only, isola a variável chunking).
@@ -495,7 +495,7 @@
   - **Upload multi-formato** (docx/txt/md+pdf) — `core/content_library.extract_document_text`,
     nos endpoints de upload da library e `/profile/extract-from-document`. Resolve o gap real
     (cliente sobe proposta `.docx`).
-  - **Infra de eval**: token-recall chunking-invariante + `core/parsing_eval.py` (métricas
+  - **Infra de eval**: token-recall chunking-invariante + `core/eval/metrics_parsing.py` (métricas
     intrínsecas) + `gold_text` no `generate_golden`.
 - **Revisitar SÓ se:** (a) corpus de **docs do cliente** (heterogêneo, multi-formato) for
   benchmarkado com docs reais — é onde a tese de parsing PODE render (editais são estruturados
@@ -517,13 +517,13 @@
   "humans decide" / [[project_grantable_philosophy]]); só valida o que o humano põe.
 - **O schema já dá o envelope:** a extração captura `funding_amount` (teto),
   `counterpart {required, percentage}` (contrapartida) e `mechanism`
-  (`core/edital_extractor.py`). Falta a estrutura interna (rubricas) e a tabela de items.
+  (`core/ingestion/edital_extractor.py`). Falta a estrutura interna (rubricas) e a tabela de items.
 - **Desenho (3 peças):**
   1. **Tabela nova** `application_budget_items` (filha de `application_log`, que já é o
      header e carrega `edital_id` → herda teto/contrapartida da wiki page):
      `rubrica` · `descricao` · `valor numeric(14,2)` · `origem ('solicitado'|'contrapartida')`.
      RLS espelha o padrão de `content_items`/`application_log` (migration 004).
-  2. **Validador puro** (sem LLM, pegada do `core/profile_drift.py`): soma items, lê
+  2. **Validador puro** (sem LLM, pegada do `core/ingestion/profile_drift.py`): soma items, lê
      `funding_amount`+`counterpart.percentage` da wiki page, devolve flags
      (estouro de teto · contrapartida insuficiente · rubrica vedada).
   3. **Rubricas permitidas:** v0 hard-coded num skill `skills/finep_budget.md` (padrão
@@ -537,7 +537,7 @@
 - **Status:** aberto (desenho fechado, não construído).
 
 ### ProfileExtractor — `faturamento_anual` raramente extraído do texto
-- **O quê:** o `extract_from_text`/`_call_llm` ([core/profile_extractor.py](../../core/profile_extractor.py))
+- **O quê:** o `extract_from_text`/`_call_llm` ([core/ingestion/profile_extractor.py](../../core/ingestion/profile_extractor.py))
   extrai bem `uf`/`ano_fundacao` mas perde `faturamento_anual` mesmo quando o texto
   o afirma. **Evidência (walkthrough 2026-06-06):** proposta com "Faturamento anual
   R$ 2 milhões" → `uf='SP'` e `ano_fundacao=2019` vieram `high`, mas
@@ -546,7 +546,7 @@
   a cadeia UI/save foi fechada (o campo flui de ponta a ponta), o gargalo restante é
   só a extração. Mitigação atual: o usuário digita no campo novo do onboarding.
 - **Ponto de entrada:** prompt `_EXTRACT_SYSTEM`/`_EXTRACT_USER` e o schema de saída em
-  [core/profile_extractor.py](../../core/profile_extractor.py) — instruir a capturar valores
+  [core/ingestion/profile_extractor.py](../../core/ingestion/profile_extractor.py) — instruir a capturar valores
   monetários (R$ X milhões → número) e normalizar a escala. Medir com um caso de golden
   de extração de perfil (não existe ainda — criar fixture mínima).
 - **Status:** aberto (qualidade de extração, não wiring).
@@ -595,7 +595,7 @@
 - **Por que adiado:** o golden roda bem no tier atual; só vira gargalo ao
   produtizar o extrator (Fase 3/4).
 - **Ponto de entrada:** subir o tier no painel OpenAI (quase imediato após
-  uso/pagamento) OU paralelizar com throttle respeitando o TPM. `core/edital_extractor.py`
+  uso/pagamento) OU paralelizar com throttle respeitando o TPM. `core/ingestion/edital_extractor.py`
   já tem `max_retries=6` + `RAW_CAP` via env como mitigações.
 - **Status:** aberto.
 
@@ -645,7 +645,7 @@
   presente) quando `_extract` devolver vazio. Fix melhor: investigar por que o título
   não sai da página (provável débito da qualidade do chunk HTML — ver entrada de
   parsing/chunking HTML).
-- **Onde:** `core/opportunity_discovery.py` (`_extract`, `_page_text`).
+- **Onde:** `core/ingestion/opportunity_discovery.py` (`_extract`, `_page_text`).
 - **Revisão (2026-06-10):** o fallback `or hit.title` EXISTE desde a origem do
   engine (`_extract`, linha do `"title"`), e o parsing do Tavily preenche
   `hit.title` — por leitura, o sintoma não se explica. Hipótese: o dry-run
@@ -746,7 +746,7 @@
 - **Status:** aberto.
 
 ### Descoberta de Oportunidades (item 2.2) — Fase B + graduação (A e C feitas)
-- **Feito (Fase A):** engine `core/opportunity_discovery.py` (web_search → triagem
+- **Feito (Fase A):** engine `core/ingestion/opportunity_discovery.py` (web_search → triagem
   → extração → bronze + ledger de dedup). Vocab em `wikis/_discovery.md`.
 - **Feito (Unificação Opção A + Fase C/recorrência):** a Descoberta deixou de ter
   bronze/índice próprios — virou a **torneira automática da fonte `web`** (WIKI.md
@@ -786,7 +786,7 @@
 
 ### RAG — golden `finep` com sections obsoletas (brittle a re-chunk)
 - **O quê:** a suíte `rag` casa `expected` por `source_file` + `section` EXATA
-  (`core/rag_eval.py::_matches`). O golden `eval_data/golden/finep.json` (03/06) tem
+  (`core/eval/metrics_rag.py::_matches`). O golden `eval_data/golden/finep.json` (03/06) tem
   13/24 queries com `section` específica que **não existe mais** nos chunks atuais —
   os editais foram re-chunkados e as labels de section deslocaram. Resultado: hit@5
   aparenta 0.50 mesmo o retriever acertando o PDF no rank 1.
@@ -870,7 +870,7 @@
 
 ### Descoberta — dedup cross-fonte (mesma oportunidade, URLs diferentes)
 - **O quê:** o ledger da Descoberta dedupa por URL normalizada (`_norm_url` em
-  `core/opportunity_discovery.py`). Mas a MESMA oportunidade chega por fontes
+  `core/ingestion/opportunity_discovery.py`). Mas a MESMA oportunidade chega por fontes
   diferentes com URLs diferentes — `pdfPage` do DOU (feeder Fase A) ≠ página HTML
   da agência (achada pelo Tavily). Dedup por URL **não pega** esse duplicado →
   dois `web:<url_hash>`, dois nós no grafo, duplicata no radar.
@@ -886,7 +886,7 @@
   abaixo e com `verificacao`.
 - **Por que adiado:** só morde quando DOU + Tavily rodam juntos no federal; a
   mitigação imediata (encolher Tavily) já segura o MVP. **Ponto de entrada:**
-  `core/opportunity_discovery.py` (`_known_urls`/`_norm_url`/ledger), `wikis/_discovery.md`
+  `core/ingestion/opportunity_discovery.py` (`_known_urls`/`_norm_url`/ledger), `wikis/_discovery.md`
   (queries do Tavily). **Status:** aberto (destrava quando a flag `DISCOVERY_DOU_ENABLED` ligar).
 
 ### DOU — sync de ciclo de vida (retificação/prorrogação/encerramento → temporal)
@@ -913,7 +913,7 @@
 - **Por que adiado:** identidade unit-level + parse de cross-ref no corpo é
   trabalho real; e o rendimento de ciclo de vida de FOMENTO (vs licitação) é baixo
   por dia. Não bloqueia o MVP de descoberta.
-- **Ponto de entrada:** `core/dou_feeder.py` (parse dos artType de ciclo),
+- **Ponto de entrada:** `core/ingestion/dou_feeder.py` (parse dos artType de ciclo),
   `core/temporal.py` (aplicar transição), `core/edital_id.py` (id estável).
   **Status:** aberto; decisão de id é P-agora, sync é pós-MVP.
 
@@ -943,7 +943,7 @@
   intermitente (visto ao vivo: ora furou na 1ª, ora sustentado >12s). O retry
   atual (`_login`, 4×/3s) é fino p/ um cron diário → backoff maior + tolerância
   a dia perdido (descoberta não pode quebrar por manutenção do INLABS).
-- **Ponto de entrada:** `core/dou_feeder.py`, `core/opportunity_discovery.py`
+- **Ponto de entrada:** `core/ingestion/dou_feeder.py`, `core/ingestion/opportunity_discovery.py`
   (`_triage`/`_extract`). **Status:** aberto (destrava com a Fase A em prod).
 
 ### Fontes — proveniência/confiança por campo (dissolver "estruturada vs. cega")
@@ -1078,7 +1078,7 @@ de fora — nenhum bloqueia o que foi entregue.
 - **Gatilho para retomar:** querer usar `pct_grounded` como gate de merge real (falta
   só domar variância, item b), OU mexer no Redator.
 - **Ponto de entrada:** `tests/fixtures/eval_cases.json`, `core/eval/writing.py`
-  (`task`), `core/writing_eval.py` (juízes).
+  (`task`), `core/eval/metrics_writing.py` (juízes).
 - **Status:** parcialmente resolvido (2026-06-14): fixture bem-casada feita; resta
   domar variância (b). Ver memory `project-agent-patterns-deepagents`.
 - **Corroboração (2026-06-15, PR #26):** o gate do Item 5 (Critic sub-agente) rodou um
@@ -1106,7 +1106,7 @@ de fora — nenhum bloqueia o que foi entregue.
   tipo de claim antes do save.
 - **Gatilho:** próxima rodada de melhoria do Redator, ou se grounding virar gate.
 - **Ponto de entrada:** prompt do redator em `core/services/writing_session.py`,
-  juiz `judge_factual_errors` em `core/writing_eval.py`.
+  juiz `judge_factual_errors` em `core/eval/metrics_writing.py`.
 - **Status:** aberto (2026-06-14).
 
 ---

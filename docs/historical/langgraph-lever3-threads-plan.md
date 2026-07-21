@@ -100,7 +100,7 @@ Segue o padrão provado na T4 (delta + idempotência) e absorve a infra loop-loc
 - **`explore_stream`:** `thread_id` chega PRONTO do router (`{ws}:{session}`; recebido pronto — não derivado de `workspace_id` aqui — para manter o wiring de match/log tools **byte-idêntico**, T3 ortogonal). Modo-thread: para de re-seedar `[-8:]`, hint dobrado na msg atual (evita hint stale na thread), trim na fronteira, `prior_n_msgs` do checkpointer. Anônimo/sem sessão → `thread_id=None` → stateless de hoje. **Cópia sync `_explore_agent` fica DELIBERADAMENTE stateless** (o vivo é o streaming; unificação = TASK 6).
 - **`prior_n_msgs` do checkpointer, SEM coluna** (herda o desvio aprovado da T4 — explore não tem objeto de sessão persistente; cada request rehidrata stateless, o checkpointer é a única fonte durável do count).
 - **Router (`backend/routers/explore.py`):** resolve `workspace_id` (só autenticado + `session_id`) e passa `thread_id` pronto. NÃO passa `workspace_id`/`db` ao streaming → wiring de tools intocado.
-- **Gates (Postgres real, `tests/test_explore_thread_per_session.py`, 5/5 verdes):** (1) **singleton por loop** (N chamadas → mesmo saver); (2) **system idempotente** (3 rotas → 1 system refletindo a última); (3) **delta-slicing + called_match** (turno sem match NÃO herda o match do anterior; usage só do turno); (4) **leak-test estendido** (`{wsA}:sess` invisível por `{wsB}:sess`); (5) **subagente stateless** dentro da thread (sem loop-binding). Suíte inteira: **839 passed / 4 skipped**.
+- **Gates (Postgres real, `tests/integration/test_explore_thread_per_session.py`, 5/5 verdes):** (1) **singleton por loop** (N chamadas → mesmo saver); (2) **system idempotente** (3 rotas → 1 system refletindo a última); (3) **delta-slicing + called_match** (turno sem match NÃO herda o match do anterior; usage só do turno); (4) **leak-test estendido** (`{wsA}:sess` invisível por `{wsB}:sess`); (5) **subagente stateless** dentro da thread (sem loop-binding). Suíte inteira: **839 passed / 4 skipped**.
 - **Smoke real multi-turno (PASS):** `docs/historical/spikes/lever3_threads/smoke_explore_thread.py` dirige `explore_stream` real (gpt-4o-mini, Postgres local): turno 1 planta "Zephyr-9 / eólica offshore", turno 2 com `history=[]` **lembra** (checkpointer replaya, sem re-seed), e o controle `thread_id=None`/`history=[]` **não lembra** (stateless intacto).
 - **Pendências do gate (não bloqueiam a fatia):** smoke pelo **HTTP `/explore/stream`** com app de pé (último milímetro, como o smoke `verify` da T4). Warning cosmético de teardown ("Event loop is closed") do pool loop-local no boundary do pytest — em prod o loop vive o processo todo (um saver), não ocorre.
 
@@ -158,9 +158,9 @@ O plano é contra o código, não contra memória.
 | **Explore — VIVO/streaming:** re-seed do histórico `for turn in (history or [])[-8:]`; SEM `thread_id`, SEM checkpointer | `core/services/explore_agent.py:218` `explore_stream`, `:292`, `:362` `run_agent_streaming_async` |
 | **Explore — cópia sync espelhada** (fallback): mesmo re-seed, warned no docstring "qualquer mudança tem que ser replicada" | `core/services/explore_agent.py` `_explore_agent` (~L428) |
 | `/explore` sync + `/explore/stream` async no router | `backend/routers/explore.py:118`, rota stream (item 1) |
-| **Leak-test de isolamento durável** (GATE de segurança): interrupt de A invisível pelo `thread_id` de B contra o Postgres real | `tests/test_checkpointer_postgres.py:132` `test_cross_workspace_isolation_durable` (gated em `DATABASE_URL`; exige `scripts/setup_checkpointer.py` antes) |
-| Interrupt/resume durável (custo só do delta) | `tests/test_checkpointer_postgres.py:102` |
-| Interrupt/resume unit (InMemorySaver): pausa, resume, delta-usage, thread isola estado, subagente stateless dentro da escrita | `tests/test_agent_graph_checkpointer.py:69,84,116,146,191,215,265` |
+| **Leak-test de isolamento durável** (GATE de segurança): interrupt de A invisível pelo `thread_id` de B contra o Postgres real | `tests/integration/test_checkpointer_postgres.py:132` `test_cross_workspace_isolation_durable` (gated em `DATABASE_URL`; exige `scripts/setup_checkpointer.py` antes) |
+| Interrupt/resume durável (custo só do delta) | `tests/integration/test_checkpointer_postgres.py:102` |
+| Interrupt/resume unit (InMemorySaver): pausa, resume, delta-usage, thread isola estado, subagente stateless dentro da escrita | `tests/unit/test_agent_graph_checkpointer.py:69,84,116,146,191,215,265` |
 | **Purge de checkpoints** (cron semanal): deleta threads cujo último `ts` > `retention_days`; comentário assume "**cada turno é um thread permanente** … threads velhos são lixo puro" | `core/tasks.py:379` `_purge_stale_checkpoints`, cron `:428` |
 | Telemetria `turn_end` (item 6): `stop_reason`/`llm_calls`/`max_steps` por turno, em prod | `core/llm/agent_graph.py:1097-1100` |
 
@@ -277,10 +277,10 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 
 **Objetivo.** Estabelecer que os dois guardrails de segurança/comportamento **passam hoje**, para que qualquer regressão nas Tasks 3/4 seja atribuível à mudança. Nenhum código de produção nesta task — é execução + (se preciso) reparo de fixture.
 
-**Arquivos:** só execução — `tests/test_checkpointer_postgres.py`, `tests/test_agent_graph_checkpointer.py`. Pré-passo: `scripts/setup_checkpointer.py` (cria tabelas do saver) + `DATABASE_URL` local.
+**Arquivos:** só execução — `tests/integration/test_checkpointer_postgres.py`, `tests/unit/test_agent_graph_checkpointer.py`. Pré-passo: `scripts/setup_checkpointer.py` (cria tabelas do saver) + `DATABASE_URL` local.
 
 **Passos:**
-1. Rodar `scripts/setup_checkpointer.py`; depois `pytest tests/test_checkpointer_postgres.py -v` (leak-test durável + interrupt/resume durável) e `pytest tests/test_agent_graph_checkpointer.py -v`.
+1. Rodar `scripts/setup_checkpointer.py`; depois `pytest tests/integration/test_checkpointer_postgres.py -v` (leak-test durável + interrupt/resume durável) e `pytest tests/unit/test_agent_graph_checkpointer.py -v`.
 2. Confirmar que `test_cross_workspace_isolation_durable` (`:132`) e os 7 unit de interrupt/resume passam **antes** de qualquer mudança.
 
 **Critérios de aceite:**
@@ -294,7 +294,7 @@ TASK 6-design (frame de interrupt no SSE — DESENHO, quita o pareamento; implem
 ```
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
 SUPABASE_URL=http://127.0.0.1:54321 ENVIRONMENT=test INTEGRATION_TARGET=local \
-.venv/bin/python -m pytest tests/test_checkpointer_postgres.py tests/test_agent_graph_checkpointer.py -v
+.venv/bin/python -m pytest tests/integration/test_checkpointer_postgres.py tests/unit/test_agent_graph_checkpointer.py -v
 ```
 **Resultado: 9 passed / 0 failed / 0 skipped (3.15s).** Qualquer regressão nas Tasks 3-5 é atribuída contra estes números:
 

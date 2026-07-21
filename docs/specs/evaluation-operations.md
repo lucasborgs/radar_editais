@@ -345,7 +345,7 @@ simultaneamente o novo critério e a aprovação do pipeline sem revisão explí
 3. fazer o relatório comparar somente manifests compatíveis e respeitar direção
    de cada métrica;
 4. documentar triggers, comandos, prereqs, custo e publicação; e
-5. reconciliar `AGENTS.md`, `docs/architecture.md`, `.env.example` e CI.
+5. reconciliar `AGENTS.md`, `docs/architecture.md`, `envs/.env.example` e CI.
 
 ## 13. Reversibilidade
 
@@ -360,7 +360,7 @@ simultaneamente o novo critério e a aprovação do pipeline sem revisão explí
 
 - `git diff --check`;
 - `ruff check` nos arquivos Python alterados;
-- `pytest tests/test_eval_harness.py` e testes novos de CLI/manifesto;
+- `pytest tests/unit/test_eval_harness.py` e testes novos de CLI/manifesto;
 - testes de exit code para passed, failed, error, skipped e suíte não-gate;
 - teste de sanitização que impeça chaves e URLs secretas no manifesto;
 - teste de hash/contagem/omissões de dataset;

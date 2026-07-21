@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from backend.common import profile_from_workspace
 from backend.rate_limit import limiter
-from core.auth import CurrentUserId, DbClient
+from core.infra.auth import CurrentUserId, DbClient
 from core.services.content_library import get_workspace_id, list_items
 from core.services.workspace_service import (
     VALID_ACTIONS,

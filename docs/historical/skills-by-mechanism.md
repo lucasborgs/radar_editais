@@ -56,7 +56,7 @@ até haver outcomes reais e curadoria compartilhada.
   (wiki_schema.py:46), extraído no Stage 1.
 - **Distribuição real (41 editais):** `subvencao`=13, `investimento`=5, `None`=23
   (**todos os 21 da web** + 2 FINEP). Vocabulário limpo onde existe; **web 100%
-  vazio** — o extrator da Descoberta ([opportunity_discovery._extract](../../core/opportunity_discovery.py))
+  vazio** — o extrator da Descoberta ([opportunity_discovery._extract](../../core/ingestion/opportunity_discovery.py))
   não preenche `mechanism`.
 - **Consumidores já existem (chave do desenho):** Redator (gera) ·
   ComplianceMonitor (paralelo, advisory, **já carrega skill** —
