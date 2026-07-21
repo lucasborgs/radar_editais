@@ -17,6 +17,7 @@ Duas camadas:
        SUPABASE_URL=http://127.0.0.1:54321 \\
        SUPABASE_SERVICE_KEY=<service_role de `supabase status -o env`> \\
        DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \\
+       ENTITY_CATALOG_TEST_GOLD_READY=1 \\
        pytest tests/integration/test_entity_catalog.py -v
 """
 from __future__ import annotations
@@ -59,6 +60,13 @@ def _skip_reason() -> str | None:
             "entity_catalog SQL — DATABASE_URL não é local (o .env aponta pro remoto "
             "sem a migration 036). Rode contra Supabase local, ou force com "
             "ENTITY_CATALOG_TEST_ALLOW_REMOTE=1."
+        )
+    if os.getenv("ENTITY_CATALOG_TEST_GOLD_READY", "").strip().lower() not in (
+        "1", "true", "yes",
+    ):
+        return (
+            "entity_catalog SQL — exige ingest gold explícito; rode `python -m "
+            "core.kg.gold` e defina ENTITY_CATALOG_TEST_GOLD_READY=1"
         )
     return None
 
