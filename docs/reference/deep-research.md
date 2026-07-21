@@ -10,7 +10,7 @@ Não é um agente top-level nem uma fonte que publique diretamente no catálogo.
 ```text
 WritingAgent ou ExploreAgent
   → tool deep_research(question)
-  → subagente em core.deep_research
+  → subagente em radar.core.deep_research
   → web_search (Tavily) + fetch compartilhado
   → resposta com fontes no turno
   → research_findings (verified=false, quando há workspace + DB)
@@ -20,14 +20,14 @@ WritingAgent ou ExploreAgent
 
 ## Contratos
 
-- `core/llm/agent_tools/research_tools.py` expõe a tool e persiste findings sem
+- `src/radar/core/llm/agent_tools/research_tools.py` expõe a tool e persiste findings sem
   bloquear a resposta quando staging falha;
-- `core/deep_research.py` executa o subagente e exige síntese apoiada nas fontes;
-- `core/web_search.py` usa Tavily e falha de forma controlada sem
+- `src/radar/core/deep_research.py` executa o subagente e exige síntese apoiada nas fontes;
+- `src/radar/core/web_search.py` usa Tavily e falha de forma controlada sem
   `TAVILY_API_KEY`;
-- `core/web/fetch.py` é o fetch compartilhado por pesquisa, perfil e Descoberta;
+- `src/radar/core/web/fetch.py` é o fetch compartilhado por pesquisa, perfil e Descoberta;
 - `research_findings` é isolada por workspace e recebe itens não verificados;
-- `backend/routers/research.py` lista, promove e rejeita findings; e
+- `src/radar/api/routers/research.py` lista, promove e rejeita findings; e
 - a promoção cria um item curado na Content Library, nunca conhecimento global.
 
 O WritingAgent recebe a tool no conjunto padrão. O ExploreAgent só a recebe com

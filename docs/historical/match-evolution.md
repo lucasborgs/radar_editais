@@ -84,7 +84,7 @@ Move de `kg_match_service.py` para `graph_service.py`:
 Instância única em `backend/common.py`:
 
 ```python
-from core.services.graph_service import GraphService
+from radar.core.services.graph_service import GraphService
 graph_service = GraphService()
 ```
 
@@ -117,7 +117,7 @@ Move de `kg_match_service.py` para `explore_agent.py`:
 `backend/common.py`:
 
 ```python
-from core.services.explore_agent import ExploreAgent
+from radar.core.services.explore_agent import ExploreAgent
 explore_agent = ExploreAgent()
 ```
 
@@ -285,7 +285,7 @@ catalog_programas = EntityCatalog(
 
 ```python
 # backend/routers/matching.py
-from core.services.entity_matcher import EntityMatcher, catalog_investidores, catalog_programas
+from radar.core.services.entity_matcher import EntityMatcher, catalog_investidores, catalog_programas
 
 @router.post("/match/investidores")
 def match_investidores_endpoint(...):
@@ -320,11 +320,11 @@ Os formatadores `_format_investidor` e `_format_programa` extraem os campos espe
 
 ```python
 # Atual (writing_session.py:450)
-from core.services.kg_match_service import KGMatchService
+from radar.core.services.kg_match_service import KGMatchService
 return KGMatchService().resolve_scope(edital_id=self.edital_id, max_analogues=3)
 
 # Novo
-from core.services.graph_service import GraphService
+from radar.core.services.graph_service import GraphService
 return GraphService().resolve_scope(edital_id=self.edital_id, max_analogues=3)
 ```
 
@@ -344,9 +344,9 @@ def build_explore_tools(
 ### backend/common.py
 
 ```python
-from core.services.hybrid_match_service import HybridMatchService
-from core.services.graph_service import GraphService
-from core.services.explore_agent import ExploreAgent
+from radar.core.services.hybrid_match_service import HybridMatchService
+from radar.core.services.graph_service import GraphService
+from radar.core.services.explore_agent import ExploreAgent
 
 wiki_matcher = HybridMatchService()
 graph_service = GraphService()
@@ -441,8 +441,8 @@ Fase 4 depende de Fase 3, e Fase 5 depende de tudo.
 | R7 | Rate limit condicional não suportado pelo `@limiter.limit` padrão | Middleware customizado que inspeciona `request.state.user_id` e escolhe o bucket (3/min anônimo vs 10/min autenticado). Fallback: dois decorators com branch no router handler |
 | R8 | Divergência de dados entre ExploreAgent e HybridMatch se um introduzir cache separado | D6b: ambos consomem `kg_store.load_index()` como source única. Nunca criar cache privado nos métodos de catálogo |
 | R9 | `/explore` sem sessão perde continuidade da extração de perfil entre turns anônimos | D9: o cliente (frontend) mantém `profile` + `history` em `sessionStorage` / `localStorage` e reenvia a cada request. Servidor não armazena estado anônimo. Funciona como o `frontdoor` atual — não há amnésia |
-| R10 | EntityMatcher muda comportamento de match de investidores/programas ao unificar `_make_client` e `_parse` | Manter os prompts, formatadores e enriquecedores EXATOS dos módulos originais — a unificação é estrutural, não funcional. Validar com `python -m core.eval investor_match` e `python -m core.eval programa_match` |
-| R11 | `investor_match.py` e `programa_match.py` removidos — risco de quebrar import de notebooks/scripts que importam `match_investidores` de lá | Stub de deprecation: manter `from core.services.entity_matcher import match_investidores as _` nos arquivos originais por 1 ciclo com deprecation warning. Depois remover |
+| R10 | EntityMatcher muda comportamento de match de investidores/programas ao unificar `_make_client` e `_parse` | Manter os prompts, formatadores e enriquecedores EXATOS dos módulos originais — a unificação é estrutural, não funcional. Validar com `python -m radar.core.eval investor_match` e `python -m radar.core.eval programa_match` |
+| R11 | `investor_match.py` e `programa_match.py` removidos — risco de quebrar import de notebooks/scripts que importam `match_investidores` de lá | Stub de deprecation: manter `from radar.core.services.entity_matcher import match_investidores as _` nos arquivos originais por 1 ciclo com deprecation warning. Depois remover |
 | R12 | EntityMatcher acopla investidores e programas num único módulo, mas catálogos futuros podem ter schema diferente | O design é aberto por composição: `EntityCatalog` é um dataclass, não uma hierarquia. Qualquer nova entidade só precisa implementar as 4 callbacks — sem herança, sem acoplamento |
 
 ---

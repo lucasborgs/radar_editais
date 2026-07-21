@@ -143,7 +143,7 @@ namespace:
 ## S4 — DEMO_MODE
 
 `DEMO_MODE=1` usa service-role (RLS bypass) e colapsa todos os tenants num
-workspace único sem login. `backend.api._guard_demo_mode()` **recusa o boot** se
+workspace único sem login. `radar.api.app._guard_demo_mode()` **recusa o boot** se
 `DEMO_MODE` + ambiente de produção (`RAILWAY_ENVIRONMENT`/`ENVIRONMENT=production`)
 sem override `DEMO_MODE_ALLOW_PROD=1`. **Checklist de deploy do beta: garantir
 `DEMO_MODE` ausente/`0` em produção.**

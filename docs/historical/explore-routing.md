@@ -208,8 +208,8 @@ Fase 1  Remover resolve_scope do WritingSession              ✅
           └── router simplificado (sem agent_enabled, sem explore_turn)
           ↓
 Fase 2  Validar com eval                                     ⏳
-          ├── python -m core.eval writing  (precisa API keys)
-          ├── python -m core.eval matching (precisa API keys)
+          ├── python -m radar.core.eval writing  (precisa API keys)
+          ├── python -m radar.core.eval matching (precisa API keys)
           └── se regressão em writing → reavaliar D5
 ```
 
@@ -218,8 +218,8 @@ Fase 2  Validar com eval                                     ⏳
 ## Gate de eval
 
 - `python -m pytest tests/ -x --tb=short` — **712 pass, 2 skip, 0 regressão** ✅
-- `python -m core.eval matching` — sem mudança nos scores (ExploreAgent.match não muda) ⏳
-- `python -m core.eval writing` — verificar se qualidade textual cai sem análogos ⏳
+- `python -m radar.core.eval matching` — sem mudança nos scores (ExploreAgent.match não muda) ⏳
+- `python -m radar.core.eval writing` — verificar se qualidade textual cai sem análogos ⏳
 
 ---
 

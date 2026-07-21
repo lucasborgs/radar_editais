@@ -10,7 +10,7 @@ implementável isolada, salvo dependências anotadas.
 ## Barra de validação (vale para todas)
 
 - **Plumbing** (correção/perf): testes unitários/integração.
-- **Comportamento/qualidade** (toca output): **eval gate** via `python -m core.eval <suíte>` antes de merge.
+- **Comportamento/qualidade** (toca output): **eval gate** via `python -m radar.core.eval <suíte>` antes de merge.
 - **Roteamento** (decide "rodar ou não X"): **shadow/dry-run** comparando decisão nova vs antiga, sem afetar usuário; só promove se não perde sinal.
 
 ## Índice

@@ -91,7 +91,7 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
 
 - `RERANK_BACKEND=off` em produção e o extra opcional `.[rerank]` são uma escolha
   operacional documentada, não uma pendência automática.
-- `domain.vocabulary.canonicalize_themes` é um normalizador parcial usado pelo
+- `radar.domain.vocabulary.canonicalize_themes` é um normalizador parcial usado pelo
   vocab lint; novos sinônimos só entram com evidência do corpus e atualização do
   vocabulário autoritativo em `WIKI.md`.
 - `requires_ict_partner` permanece no contrato avaliado de extração e não é gate

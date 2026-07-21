@@ -16,7 +16,7 @@ alternativas equivalentes:
    schema, prompt e workflow de geração de wiki pages JSON; em §12 continua
    chamando wiki page de “Knowledge gold”, embora o produtor hyper-extract e
    `build_knowledge_graph` tenham sido removidos;
-2. `core/kg/edital_id.py` ainda expõe `wiki_page_path()` e
+2. `src/radar/core/kg/edital_id.py` ainda expõe `wiki_page_path()` e
    `iter_wiki_pages()`. Seus únicos consumidores são testes e o script one-shot
    `scripts/migrate_existing_ids.py`; não existe diretório rastreado
    `data/knowledge_graph/wiki/` nem consumidor de runtime;
@@ -24,14 +24,14 @@ alternativas equivalentes:
    `etl_process`, enquanto a main já contém a migration 036 e não contém
    `etl_process`;
 4. `docs/specs/lazy-chunking.md` se declara vigente e descreve ingestão
-   exclusivamente sob demanda, mas `core/tasks.py` possui o cron vivo
+   exclusivamente sob demanda, mas `src/radar/core/tasks.py` possui o cron vivo
    `warm_edital_chunks` às 05:00 UTC. O runtime atual é híbrido: aquecimento do
    catálogo mais ensure/prefetch sob demanda;
 5. comentários e docstrings de `run_daily_etl` ainda dizem que o cron enfileira
    chunking, apesar de o próprio corpo declarar que essa etapa não ocorre ali;
-6. `core/db.get_supabase()` está marcado deprecated e não possui consumidor;
+6. `src/radar/core/db.get_supabase()` está marcado deprecated e não possui consumidor;
 7. `scripts/generate_golden.py`, tooling ativo da suíte RAG, instancia
-   `OpenAI()` diretamente apesar do contrato único de `core.llm.llm_client`; e
+   `OpenAI()` diretamente apesar do contrato único de `radar.core.llm.llm_client`; e
 8. paths distintos que têm responsabilidades legítimas — bronze,
    `edital_source_docs`, silver, gold, `match_chunks` e `edital_chunks` — não
    estão descritos em uma única fronteira, favorecendo a leitura incorreta de
@@ -65,15 +65,15 @@ como catálogo, fallback de produto ou etapa intermediária do v3.
 
 | Responsabilidade | Caminho canônico | Papel |
 |---|---|---|
-| captura por fonte | `pipeline/extractors/` → `data/bronze/` | evidência bruta imutável |
-| normalização documental | `pipeline/adapters/` | `CanonicalDoc` agnóstico por fonte |
-| durabilidade do documento | `edital_source_docs` via `core/kg/source_docs.py` | autoridade durável; disco é fallback/cache local |
+| captura por fonte | `src/radar/pipeline/extractors/` → `data/bronze/` | evidência bruta imutável |
+| normalização documental | `src/radar/pipeline/adapters/` | `CanonicalDoc` agnóstico por fonte |
+| durabilidade do documento | `edital_source_docs` via `src/radar/core/kg/source_docs.py` | autoridade durável; disco é fallback/cache local |
 | estrutura intermediária | `data/silver/structured_docs/*.jsonl` | derivado reproduzível para ingestão |
 | catálogo e relações | `entities` + `entity_relationships` | leitura de catálogo e Explore |
 | ranking de match | `match_chunks` | índice contextual do match v3 |
 | RAG de escrita | `edital_chunks` | índice documental fino, aquecido e garantido sob demanda |
 | descoberta antes do catálogo | `discovered_opportunities` | staging com gate humano |
-| jobs | `core/tasks.py` + Procrastinate | única orquestração periódica/de fila |
+| jobs | `src/radar/core/tasks.py` + Procrastinate | única orquestração periódica/de fila |
 
 `match_chunks` e `edital_chunks` não serão unificados: possuem produtores,
 granularidade, custo e consumidores diferentes. `edital_source_docs` e bronze
@@ -84,7 +84,7 @@ a evidência específica da fonte.
 
 ### 4.1 `kg_store`
 
-`core/kg/kg_store.py` permanece nesta spec. Seus consumidores vivos são:
+`src/radar/core/kg/kg_store.py` permanece nesta spec. Seus consumidores vivos são:
 
 - ledger operacional e deduplicação complementar da Descoberta; e
 - corpus offline de evidências do vocab lint.
@@ -134,7 +134,7 @@ Somente após nova busca de referências:
 1. remover `wiki_page_path()` e `iter_wiki_pages()`;
 2. remover seus testes exclusivos e `KG_WIKI_DIR` se nenhum consumidor restar;
 3. remover o script one-shot `migrate_existing_ids.py`; e
-4. remover `core.infra.db.get_supabase()`.
+4. remover `radar.core.infra.db.get_supabase()`.
 
 `make_id`, `parse_id`, `source_of`, `native_id_of`, `id_to_slug` e
 `slug_to_id` permanecem: são contratos vivos de identidade cross-source e do
@@ -151,7 +151,7 @@ vault Obsidian.
 
 ### Etapa 4 — Convergir tooling comprovado
 
-1. migrar `scripts/generate_golden.py` para `core.llm.llm_client.make_client`;
+1. migrar `scripts/generate_golden.py` para `radar.core.llm.llm_client.make_client`;
 2. verificar scripts rastreados que alegam consumir wiki pages ou pipelines
    removidos;
 3. preservar benchmarks independentes quando sua independência for parte do

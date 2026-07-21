@@ -13,7 +13,7 @@ O repositório possui um harness unificado funcional, dez suítes registradas,
 goldens versionados, fallback local e integração com Langfuse. A suíte hermética
 do harness passa com nove testes. A divergência está na semântica operacional:
 
-- `python -m core.eval` sempre termina com sucesso quando ao menos uma suíte
+- `python -m radar.core.eval` sempre termina com sucesso quando ao menos uma suíte
   roda, mesmo se métricas ficarem abaixo dos pisos descritos, casos falharem ou
   `presence_regression=true`;
 - apenas o cenário em que todas as suítes são puladas retorna exit code não zero;
@@ -123,7 +123,7 @@ não pode acontecer automaticamente a partir do “melhor resultado histórico�
 Comando pretendido:
 
 ```bash
-python -m core.eval run <suite> [--limit N] [--publish]
+python -m radar.core.eval run <suite> [--limit N] [--publish]
 ```
 
 - roda qualquer suíte registrada;
@@ -134,7 +134,7 @@ python -m core.eval run <suite> [--limit N] [--publish]
   credenciais estão presentes; e
 - erros de execução aparecem no status, mesmo quando outros casos continuam.
 
-Compatibilidade: a forma atual `python -m core.eval <suite>` pode permanecer
+Compatibilidade: a forma atual `python -m radar.core.eval <suite>` pode permanecer
 temporariamente como alias de `run`, com aviso de depreciação. `--no-push`
 permanece durante a migração, mas o default novo já é local.
 
@@ -143,8 +143,8 @@ permanece durante a migração, mas o default novo já é local.
 Comando pretendido:
 
 ```bash
-python -m core.eval gate matching --publish
-python -m core.eval gate extraction --publish
+python -m radar.core.eval gate matching --publish
+python -m radar.core.eval gate extraction --publish
 ```
 
 - só aceita suítes classificadas como gate e com contrato completo;

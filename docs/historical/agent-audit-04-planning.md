@@ -39,7 +39,7 @@ copiar manualmente para `write_todos`. Dois afordances competindo pela atenção
 
 ## Validação
 
-- **Eval gate:** `python -m core.eval writing` — comparar score entre baseline
+- **Eval gate:** `python -m radar.core.eval writing` — comparar score entre baseline
   (atual), Opção 1 e Opção 2. **GATE:** não mergear se qualidade cair (ver
   precedente em `[[project-robustez-spec]]`).
 - **Shadow:** logar nº de turns / chamadas LLM por sessão antes vs depois para

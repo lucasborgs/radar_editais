@@ -1,6 +1,6 @@
 # Descoberta de Oportunidades — vocabulário de busca (item 2.2)
 
-Config autoritativa do agente de descoberta (`core/ingestion/opportunity_discovery.py`).
+Config autoritativa do agente de descoberta (`src/radar/core/ingestion/opportunity_discovery.py`).
 Queries que varrem a web atrás de editais/chamadas/desafios de fomento espalhados
 pelo Brasil. **Regra vive aqui (doc), não no `.py`** — ajuste sem deploy.
 
@@ -20,7 +20,7 @@ Descoberta: investidor é diretório curado, não cabe no schema de oportunidade
 da fonte `web` — não tem bronze/índice próprios. Grava em `data/bronze/web_raw/`
 (prefixo `web_discovery_`) no schema web (`url`/`url_hash`/`texto_cru`/
 `verificacao=provisorio`), e daí entra como qualquer página web: chunkada pro RAG
-pelo adapter `pipeline.adapters.web` e indexada por `_build_editais("web")`. A
+pelo adapter `radar.pipeline.adapters.web` e indexada por `_build_editais("web")`. A
 outra torneira do mesmo bronze é a seed list manual (`web_sources`).
 
 ```yaml

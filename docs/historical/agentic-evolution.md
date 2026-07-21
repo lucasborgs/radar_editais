@@ -91,7 +91,7 @@ Critic e ChecklistService permanecem como processos distintos por ora — a unif
 - `core/services/writing_session.py` — passar o playbook correto ao `ChecklistService`
 
 ### Gate de eval
-`python -m core.eval writing` — nenhuma regressão. O compliance pass deve detectar ≥ as mesmas violações que antes.
+`python -m radar.core.eval writing` — nenhuma regressão. O compliance pass deve detectar ≥ as mesmas violações que antes.
 
 ### Riscos
 - **Latência do Critic:** draft maior = mais tokens = mais tempo. O Critic roda no bg-loop (thread dedicada do checkpointer); se demorar muito, atrasa o retorno do turno. Monitorar P95 de latência de turno após o deploy.
@@ -146,7 +146,7 @@ O ProfileAgent (grafo com tools) permanece como caminho de enriquecimento rico v
 - `backend/routers/writing.py` — propagar o erro como payload JSON `{error: "profile_incomplete", missing_fields: [...]}`
 
 ### Gate de eval
-`python -m core.eval writing` — nenhuma regressão. Testar explicitamente: perfil incompleto → payload correto; perfil completo → sessão criada normalmente.
+`python -m radar.core.eval writing` — nenhuma regressão. Testar explicitamente: perfil incompleto → payload correto; perfil completo → sessão criada normalmente.
 
 ### Risco
 Usuários com sessões ativas e perfil incompleto não são afetados (sessões existentes não passam pelo gate). Apenas novos starts são bloqueados. Verificar se o frontend já tem tela de edição de perfil acessível antes de mergear.
@@ -223,7 +223,7 @@ Registrar a tool também no conjunto de tools do ExploreAgent via `build_explore
 - `core/services/kg_match_service.py` — registrar a tool no explore agent
 
 ### Gate de eval
-`python -m core.eval rag` — nenhuma regressão no ResearchAgent via WritingAgent. Verificar no Langfuse que o trace do ExploreAgent mostra o ResearchAgent aninhado (requer Fase 0 em prod).
+`python -m radar.core.eval rag` — nenhuma regressão no ResearchAgent via WritingAgent. Verificar no Langfuse que o trace do ExploreAgent mostra o ResearchAgent aninhado (requer Fase 0 em prod).
 
 ### Dependência
 Fase 0 (config propagado) deve estar em prod — sem ela o trace aninhado não aparece e a verificação não é possível.
@@ -251,7 +251,7 @@ O threshold começa permissivo e aperta conforme os dados mostram que o modelo �
 - Remover a métrica antiga e thresholds associados
 
 ### Gate de eval
-`python -m core.eval writing` — score de `grounding_faithfulness` ≥ baseline registrado na Fase 1B. Nenhuma regressão em qualidade de escrita.
+`python -m radar.core.eval writing` — score de `grounding_faithfulness` ≥ baseline registrado na Fase 1B. Nenhuma regressão em qualidade de escrita.
 
 ### Dependência
 Fase 1B (baseline em Langfuse) é pré-requisito duro. A PR de Fase 4 deve ser bloqueada no code review se o baseline não estiver registrado.
@@ -288,7 +288,7 @@ Flag de rollout: `DISCOVERY_REACT_ENABLED=1` (default OFF).
 - `core/tasks.py` — `discover_opportunities` despacha para o grafo quando `DISCOVERY_REACT_ENABLED=1`, para o shadow-run quando `DISCOVERY_SHADOW_RUN=1`, para o pipeline fixo como default
 
 ### Gate de eval
-`python -m core.eval triage` — nenhuma regressão na precisão da triage. Shadow-run: coverage ≥ pipeline atual, custo ≤ 1.5× o atual por run.
+`python -m radar.core.eval triage` — nenhuma regressão na precisão da triage. Shadow-run: coverage ≥ pipeline atual, custo ≤ 1.5× o atual por run.
 
 ### Riscos (maiores desta spec)
 - **Coverage gap:** o grafo pode pular queries ou parar cedo num turno ruim. Shadow-run é a única proteção — sem ≥ 1 semana de dados, não desligar o pipeline fixo.
@@ -320,7 +320,7 @@ O MVP é implementável em 3-4 semanas sequenciais. As Fases 1A e 1B podem rodar
 
 ### R1 — DiscoveryAgent sem shadow-run (Fase 5)
 **Risco:** conversão para ReAct sem validação empírica pode reduzir coverage de editais descobertos — o pipeline atual tem meses de operação estabilizada.
-**Mitigação:** shadow-run mandatório ≥ 1 semana com flag separada. Se o shadow-run mostrar regressão de coverage, manter o pipeline fixo e adicionar apenas o `decide_depth` como pós-processamento incremental — sem substituir o pipeline.
+**Mitigação:** shadow-run mandatório ≥ 1 semana com flag separada. Se o shadow-run mostrar regressão de coverage, manter o pipeline fixo e adicionar apenas o `decide_depth` como pós-processamento incremental — sem substituir o radar.pipeline.
 
 ### R2 — Critic paralelo quebrando o contrato do WritingAgent (Fase 1A)
 **Risco:** "Critic paralelo" pode ser mal interpretado. Nesta spec, o Critic do `save_draft` permanece serial — o que muda é que não trunca o draft. O paralelo que existe é no ChecklistService (3 passes em `asyncio.gather`). A unificação real (Critic + Checklist num único processo paralelo com insumos compartilhados) é uma mudança maior, fora desta spec — requer avaliação de impacto no contrato de resposta da tool `save_draft` (que é síncrona no LangGraph).

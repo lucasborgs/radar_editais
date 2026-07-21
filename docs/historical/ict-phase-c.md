@@ -108,7 +108,7 @@ def find_ict_partners(edital_id: str) -> str:
     """Sugere ICTs parceiras para um edital que exige parceria, por afinidade
     temática. Use quando o edital tem requires_ict_partner=true."""
 ```
-- Chama `core.ict_match.find_partners`, formata string com candidatas + por que
+- Chama `radar.core.ict_match.find_partners`, formata string com candidatas + por que
   (temas em comum) + contato.
 - Exposta **só** ao Explorador (não ao Redator — peça 4 explica).
 - Se o edital tem `requires_ict_partner=false`, a tool diz isso (não inventa

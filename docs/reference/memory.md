@@ -19,7 +19,7 @@ e regra de confiança próprios.
 
 Leitura de memória curada permanece ativa. A escrita automática de reflexão e
 síntese fica desligada por padrão com `AUTO_MEMORY_WRITE=0` e possui
-short-circuits em `core/reflection_service.py` e `core/tasks.py`. Isso é uma
+short-circuits em `src/radar/core/reflection_service.py` e `src/radar/core/tasks.py`. Isso é uma
 decisão de segurança entre workspaces, não ausência acidental de wiring.
 
 O seam `playbook_overlays`/`meta_reflection_runs` não possui job de escrita

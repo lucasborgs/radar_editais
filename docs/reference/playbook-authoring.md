@@ -3,7 +3,7 @@
 Receita reutilizável para escrever a skill de cada mecanismo. Gabarito de
 referência: [skills/mechanism/subvencao.md](../../skills/mechanism/subvencao.md)
 (+ overlay [skills/source/finep/subvencao.md](../../skills/source/finep/subvencao.md)).
-O loader e a composição vigentes estão em `core/skills.py`; a decisão de design
+O loader e a composição vigentes estão em `src/radar/core/skills.py`; a decisão de design
 original está preservada em
 [`skills-by-mechanism.md`](../historical/skills-by-mechanism.md).
 

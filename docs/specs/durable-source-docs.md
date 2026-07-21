@@ -84,7 +84,7 @@ uma coleta nova sempre prevalece sobre o snapshot persistido anterior.
 
 O durável só popula após um scrape com disco fresco. Após deploy:
 - automático: o cron 03:00 (scrape → build → `persist_all_current`); ou
-- manual: `python -m core.kg.source_docs` (roda `persist_all_current` agora).
+- manual: `python -m radar.core.kg.source_docs` (roda `persist_all_current` agora).
 
 Antes disso, o read-path faz backfill on-demand quando o disco ainda tem o
 bronze (ex.: logo após um scrape manual).

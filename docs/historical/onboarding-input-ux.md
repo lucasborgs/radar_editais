@@ -56,7 +56,7 @@ em **2 camadas**.
 | **AI drafts, humans decide** | Tudo que o sistema infere (mecanismo, etc.) entra como **proposta** no diff/review — nunca escrito silenciosamente. O humano confirma. |
 | **Ver valor antes de pedir** | Etapa 1 não faz NENHUMA pergunta. Toda coleta adicional é Etapa 2, disparada por intenção do usuário ("destravar mais matches"). |
 | **Não reconstruir coleta** | `explore_turn` (diff inline), `/profile/extract*`, `DiffCard`, `InvestorTrackToggle`, `profileFields.ts` já existem — esta spec **sequencia e provoca**, não reescreve o mecanismo de captura. |
-| **Inferência que alimenta scoring → eval-gated** | A inferência de `tipos_financiamento_interesse` muda a dimensão mecanismo → `python -m core.eval matching` antes do merge. O resto (UI/provocação/asks) é input, não scoring → sem eval gate. |
+| **Inferência que alimenta scoring → eval-gated** | A inferência de `tipos_financiamento_interesse` muda a dimensão mecanismo → `python -m radar.core.eval matching` antes do merge. O resto (UI/provocação/asks) é input, não scoring → sem eval gate. |
 | **Sem migração** | Pré-lançamento; novos campos/inferências não tocam perfis seed. |
 
 ---
@@ -151,7 +151,7 @@ infer_financiamento(p):
 | Frontend (review Etapa 1) | mecanismos inferidos chegam pré-marcados no `DiffCard`/review; copy "inferimos — ajuste se quiser" |
 
 ## Gate
-**`python -m core.eval matching` OBRIGATÓRIO** — a inferência muda a dimensão
+**`python -m radar.core.eval matching` OBRIGATÓRIO** — a inferência muda a dimensão
 mecanismo para perfis que antes pontuavam neutro. Conferir que p@3/p@5 não regridem
 (baseline 2026-06-21: p@3 1.0, p@5 0.9). Os goldens (`iflorestal` etc.) passam a ter
 mecanismo inferido — o gate valida que isso não embaralha o top-3.
@@ -295,7 +295,7 @@ sem campo órfão." Gatilho de reabertura: quando a Fase 3 do
 # Ordem de implementação (grafo → PRs)
 
 ```
-PR 1  infer_financiamento() + wire no extract        ← GATED por core.eval matching
+PR 1  infer_financiamento() + wire no extract        ← GATED por radar.core.eval matching
 PR 2  Etapa 1: UrlHero na home + review              ← depende de PR 1 (mecanismos pré-marcados)
 PR 3  Etapa 2: UnlockCard gap-driven + provocação    ← depende de PR 2 (roda após o radar)
        + capital_social condicional + surface do 📎
@@ -312,7 +312,7 @@ PR 3  Etapa 2: UnlockCard gap-driven + provocação    ← depende de PR 2 (roda
 
 | Gate | Quando | Cobre |
 |---|---|---|
-| `python -m core.eval matching` | antes de **PR 1** | `infer_financiamento` muda a dimensão mecanismo; p@3/p@5 não regridem vs. baseline 2026-06-21 (1.0 / 0.9) |
+| `python -m radar.core.eval matching` | antes de **PR 1** | `infer_financiamento` muda a dimensão mecanismo; p@3/p@5 não regridem vs. baseline 2026-06-21 (1.0 / 0.9) |
 | `npx tsc --noEmit` + `npx next lint` | cada PR de frontend | sem `npm run build` com dev ativo ([feedback_dev_build_conflict](../../)) |
 | `pytest` (suíte) | cada PR | regressão-zero; novos testes de `infer_financiamento` |
 

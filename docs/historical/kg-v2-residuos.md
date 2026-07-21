@@ -8,7 +8,7 @@ registro de qualidade do hipergrado v2, não descrição do runtime atual.
 > é profundidade/cobertura dos passes de qualidade e um bug de UX no radar.
 >
 > Pré-beta, sem usuários reais: **sem gates estatísticos nem testes exaustivos**. A suíte
-> `python -m core.eval matching` roda como sanity após cada passe de dados. O porquê de cada
+> `python -m radar.core.eval matching` roda como sanity após cada passe de dados. O porquê de cada
 > decisão fica documentado para reavaliação futura.
 
 ---
@@ -100,7 +100,7 @@ Execução dos passes de dados (SERIALIZADA — R5, uma conversa ou manual):
 
 ### PR-A — Ranking unificado decrescente + veredito de programa · realizado 2026-07-05
 
-Branch `feat/kg-v2-residuos-pr-a` (2 commits). Sanity `python -m core.eval matching`:
+Branch `feat/kg-v2-residuos-pr-a` (2 commits). Sanity `python -m radar.core.eval matching`:
 `recall@k 0.8334`, `noise 3.0`, exit 0 — baseline pré-existente (o PR-A não toca o
 caminho pontuado do match; só adiciona um campo de display no `to_dict` e mexe na
 ordenação/veredito do router, que o eval de matching não exercita).
@@ -145,7 +145,7 @@ sobre `data/knowledge_graph/` real.
 
 Branch `feat/kg-v2-residuos-pr-b` (empilhada sobre PR-A). **Code-only** (Wave 1): o
 validador/merge foi reforçado + fixtures, **sem rodar sobre o corpus**. Sanity
-`python -m core.eval matching`: `recall@k 0.8334`, `noise 3.0`, exit 0 (baseline inalterado
+`python -m radar.core.eval matching`: `recall@k 0.8334`, `noise 3.0`, exit 0 (baseline inalterado
 — o passe não roda aqui). `ruff` limpo; `pytest tests/unit/test_canonicalize.py` 15/15.
 
 **Frente 1 — descarte determinístico por classe errada** (`core/kg/canonicalize.py`).
@@ -184,7 +184,7 @@ zeragem/justificativa sai no `propose-merges` do passe real.
 
 Commit próprio na branch única empilhada `feat/kg-v2-residuos-pr-b` (na prática a Wave 1 não usou branches separadas; a branch `-pr-c` chegou a ser criada num worktree mas ficou vazia e foi removida). **Code-only** (Wave 1):
 o módulo de resolução + CLI + testes, **sem rodar sobre o corpus**. Sanity
-`python -m core.eval matching`: `recall@k 0.8334`, `noise 3.0`, exit 0 (baseline
+`python -m radar.core.eval matching`: `recall@k 0.8334`, `noise 3.0`, exit 0 (baseline
 inalterado — o passe não roda aqui). `ruff` limpo; `pytest tests/test_resolve_programas.py` 11/11.
 
 **core/kg/resolve_programas.py** — três passos no padrão PROPOSE/APPLY:
@@ -257,7 +257,7 @@ passthrough sem plano, aresta mantida pós-rename).
 ### Execução serializada dos passes de dados · realizada 2026-07-05 (supervisão Fable)
 
 Sequência backup → B → sanity → C → sanity → D → sanity → E.1, conforme R5. Backups por
-passe em `data/knowledge_graph.bak.*`. Sanity = `core.eval matching` (baseline 0.8334/3.0).
+passe em `data/knowledge_graph.bak.*`. Sanity = `radar.core.eval matching` (baseline 0.8334/3.0).
 
 **Passe B (higiene).** Validação: 61 descartes propostos; **3 falsos positivos revertidos
 na supervisão** (aquicultura, CEIS, curtailment — conceitos de domínio reais). Aplicado:

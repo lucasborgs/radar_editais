@@ -3,7 +3,7 @@
      COMPETÊNCIA (craft de storytelling), não conhecimento. Roteado ao agente de PITCH
      (mode=pitch), NÃO ao caminho de compliance do edital (D4). Aqui NÃO há RAG de
      fomento: o "fato" é dado do deal/empresa (valuation, métricas), não do edital.
-     Cada `##` é um TIPO e roteia para um consumidor. Carregado por core.skills.load_playbook (loader ativo 2026-06-14); SEED até validação por outcome.
+     Cada `##` é um TIPO e roteia para um consumidor. Carregado por radar.core.skills.load_playbook (loader ativo 2026-06-14); SEED até validação por outcome.
      Destilado de entrevista a especialistas + 3 LLMs (2026-06-14); pendente validação
      por outcome real (learning loop, BACKLOG). -->
 

@@ -37,7 +37,7 @@ Três blocos, sem faseamento:
 ## Riscos
 
 - **Prompt bloat no writing agent.** O Redator já tem ~10 tools; `write_todos` é a 11ª. Mitigação: instrução curta e condicional ("tarefas com múltiplas etapas"), UMA tool de planning (sem `read_todos` — a render volta a cada write e fica no histórico). Gate de eval antes de concluir.
-- **Regressão de eval do writing** (mudamos prompt + tools). Gate: `python -m core.eval writing` — regressão em `eval_save` ou explosão de `eval_tool_calls` → tornar a instrução mais condicional.
+- **Regressão de eval do writing** (mudamos prompt + tools). Gate: `python -m radar.core.eval writing` — regressão em `eval_save` ou explosão de `eval_tool_calls` → tornar a instrução mais condicional.
 - **$defs aninhados no schema Pydantic** para `list[dict]` tipado. Mitigação: annotation solta `list[dict]`; a validação real é no corpo da tool.
 
 ## Critérios de aceitação

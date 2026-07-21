@@ -1,7 +1,7 @@
 <!-- SEED / DRAFT (2026-06-14) — OVERLAY de fonte: FINEP × crédito.
      Só os DELTAS de craft da praxe FINEP que se somam ao playbook base do
      mecanismo. Tácito; regra dura (taxa, prazo, carência, garantias, ROB,
-     rubricas do edital vigente) é do edital/RAG. Carregado por core.skills.load_playbook (loader ativo 2026-06-14); SEED até validação por outcome. -->
+     rubricas do edital vigente) é do edital/RAG. Carregado por radar.core.skills.load_playbook (loader ativo 2026-06-14); SEED até validação por outcome. -->
 
 # Overlay — FINEP × Crédito
 

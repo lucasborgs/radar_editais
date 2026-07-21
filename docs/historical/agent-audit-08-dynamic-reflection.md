@@ -30,7 +30,7 @@ refinamento, não correção.
 
 ## Validação
 
-- **Eval gate:** `python -m core.eval writing` — a reflexão existe para melhorar o
+- **Eval gate:** `python -m radar.core.eval writing` — a reflexão existe para melhorar o
   output; reflexão condicional não pode derrubar a qualidade. Comparar score
   baseline (cadência fixa) vs condicional. Promover só se mantém qualidade gastando
   ≤ reflexões.

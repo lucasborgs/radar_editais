@@ -39,7 +39,7 @@ trabalho**.
 - **Undo client-side**: antes de aplicar a edição do agente na UI, guarda-se o
   conteúdo anterior da seção (snapshot em memória, pilha por seção);
   "desfazer" = `PUT section` com o conteúdo antigo. Sem versionamento novo no
-  backend.
+  radar.api.
 - **Export client-side**: markdown vem de `GET /writing/{id}/export`; PDF via
   print stylesheet (janela de impressão com CSS dedicado), DOCX via lib `docx`
   (npm), .md/copiar direto. Cabeçalho: empresa + edital + data.

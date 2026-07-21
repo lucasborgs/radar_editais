@@ -63,7 +63,7 @@ fino→macro do `build_ict_graph` deixou **140 áreas sem tema-macro** (→ ICTs
 ### Fase 3 — ICT no radar (EVAL-GATED)
 - `radar_service` normaliza `ict_match` ao item comum (hoje só `investor_match`
   cobre entidade). RRF + floor como investidor.
-- **GATE: `python -m core.eval matching` antes de mergear** — muda a mistura
+- **GATE: `python -m radar.core.eval matching` antes de mergear** — muda a mistura
   evento-vs-entidade do ranking.
 
 ---

@@ -39,7 +39,7 @@ Explorar ou preenchimento de perfil
 | D4 | Sem login, o Radar usa o perfil local e chunks efêmeros; com login, usa o workspace e `company_chunks` (incluindo biblioteca), além de habilitar vereditos cacheados. |
 | D5 | Editais, programas e investidores são exibidos em trilhas distintas; não se reordena uma trilha usando veredito LLM. |
 | D6 | O contrato canônico de cards é o payload atual de `OpportunityMatch.to_dict()` e `InvestorMatch.to_dict()`. Não haverá mudança de schema de banco nesta fase. |
-| D7 | Elegibilidade `inelegivel` continua eliminada no backend. A UI mostra apenas `elegivel` e `nao_verificada`; esta última deve ser acionável. |
+| D7 | Elegibilidade `inelegivel` continua eliminada no radar.api. A UI mostra apenas `elegivel` e `nao_verificada`; esta última deve ser acionável. |
 | D8 | O painel não altera a descoberta, o ingest gold ou o RAG. Uma oportunidade promovida aparece automaticamente quando o pipeline existente a tiver inserido no catálogo gold. |
 
 ## 3. Estado atual e lacuna
@@ -165,7 +165,7 @@ F0: contrato/API determinística
 ## 7. Fora de escopo e próximas specs
 
 - **Radar Fase 2:** timeline/urgência de prazo, filtros e comparador de
-  oportunidades. Depende do contrato F0, mas não de mudança no pipeline.
+  oportunidades. Depende do contrato F0, mas não de mudança no radar.pipeline.
 - **Discovery operations:** estados `silver_ready`, `catalog_ready`,
   `radar_ready`, `rag_ready`, retry e histórico. Depende de migration e tasks;
   deve ter spec própria.
@@ -199,4 +199,4 @@ F0: contrato/API determinística
   elegibilidade não verificada, CTA de proposta, CTA de pitch e polling de
   veredito.
 - Não rodar eval de matching nesta fase, salvo se for alterado
-  `core/services/match_v3.py`, `eligibility.py`, embeddings ou o corpus.
+  `src/radar/core/services/match_v3.py`, `eligibility.py`, embeddings ou o corpus.

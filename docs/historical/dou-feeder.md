@@ -88,7 +88,7 @@ Mudança mínima em [core/ingestion/opportunity_discovery.py](../../core/ingesti
 1. **Segundo gerador de candidatos**, ao lado do loop Tavily, atrás de flag:
    ```python
    if os.getenv("DISCOVERY_DOU_ENABLED", "0") == "1":
-       from core.ingestion.dou_feeder import dou_candidates
+       from radar.core.ingestion.dou_feeder import dou_candidates
        for h in dou_candidates():
            nu = _norm_url(h.url)
            if nu and nu not in known and nu not in seen_now:
@@ -210,7 +210,7 @@ entrarem no Railway.
 # INLABS_PASSWORD, DISCOVERY_DOU_ENABLED=1
 
 # 1×/dia (manual ou worker local), de manhã (o wiring busca o DOU de D-1 UTC):
-python -m core.ingestion.opportunity_discovery       # grava data/bronze/web_raw/web_discovery_*.json
+python -m radar.core.ingestion.opportunity_discovery       # grava data/bronze/web_raw/web_discovery_*.json
 python pipeline/build_knowledge_graph.py   # ingere no índice local (badge aparece na UI local)
 ```
 

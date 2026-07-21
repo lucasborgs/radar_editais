@@ -64,7 +64,7 @@ O frontend local usa `http://127.0.0.1:8001` para a API e
 idempotentes e os gates:
 
 ```bash
-ENV_FILE=.env.staging-local python -m core.eval run explore
+ENV_FILE=.env.staging-local python -m radar.core.eval run explore
 ```
 
 Somente corpus público e usuários/workspaces sintéticos são permitidos. E-mail,

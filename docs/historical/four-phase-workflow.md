@@ -258,8 +258,8 @@ Para cada seção:
 # WritingSession roda uma tool:
 def ask_about_edital(question: str) -> str:
     """Chama ExploreAgent como subagente pra esclarecimento lateral."""
-    from core.services.explore_agent import ExploreAgent
-    from core.llm.agent_runtime import run_subagent
+    from radar.core.services.explore_agent import ExploreAgent
+    from radar.core.llm.agent_runtime import run_subagent
     
     # Subagente + contexto da seção
     result = run_subagent(
@@ -440,8 +440,8 @@ Permitir que WritingSession (Execution + Refinement) chame ExploreAgent internam
 ```python
 # core/llm/agent_tools/writing_tools.py
 
-from core.deep_research import run_deep_research  # já existe
-from core.services.explore_agent import ExploreAgent  # novo
+from radar.core.deep_research import run_deep_research  # já existe
+from radar.core.services.explore_agent import ExploreAgent  # novo
 
 @tool
 def ask_about_edital(question: str) -> str:

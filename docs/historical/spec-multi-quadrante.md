@@ -103,7 +103,7 @@ quatro tipos no produto.**
 
 `opportunity_type` (campo no card/extração) carrega o discriminador fino para a
 UI e para os branches de match/escrita; `kind_class ∈ {evento, entidade}` é o
-discriminador grosso que decide o caminho no pipeline.
+discriminador grosso que decide o caminho no radar.pipeline.
 
 ---
 
@@ -386,7 +386,7 @@ estaduais. Mata o "fica cego" original com o pipeline que já existe.
 Adiciona dois `node_type` evento. Toca: `OpportunityExtraction` (campos novos),
 triagem per-type, formatador de índice no `KGMatchService`, `mode` de escrita.
 Depende de pagar parte da dívida §12.5 (extração ainda presa em `finep`/PDF).
-*Gate:* rodar `python -m core.eval extraction` e `matching` antes de mergear —
+*Gate:* rodar `python -m radar.core.eval extraction` e `matching` antes de mergear —
 o baseline 0.95/0.95/0.92 (spec_extraction) não pode regredir.
 
 **Fase C — `investidor` (entidade, caminho novo mas espelha `ict`)**
@@ -394,7 +394,7 @@ Cria `investidores.json` + pipeline de diretório (copy estrutural de
 `icts.json`), prompt de match por tese no `KGMatchService`, `mode=pitch` na
 escrita, campos de perfil novos. **Não toca** `temporal.py`, `HybridMatch`,
 GATE_FIELDS.
-*Gate:* `python -m core.eval writing` com um golden de pitch antes de expor —
+*Gate:* `python -m radar.core.eval writing` com um golden de pitch antes de expor —
 gênero novo, risco de alucinação alto. Exige `EVAL_WORKSPACE_ID`.
 
 ---
@@ -481,5 +481,5 @@ tipo/superfície nova — é a que melhor serve "fundação robusta primeiro".
 > reusa mais que a próxima), mas as três compõem o MVP, não A+B só. A curadoria
 > manual (#3) significa que o custo de C colapsa para: prompt de match-por-tese
 > no `KGMatchService` + `mode=pitch` na escrita + 5 campos novos de perfil — o
-> diretório em si é um JSON semeado à mão, não um pipeline.
+> diretório em si é um JSON semeado à mão, não um radar.pipeline.
 ```

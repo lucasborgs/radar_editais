@@ -19,7 +19,7 @@ source:
 
 ```yaml
 scraper:
-  module: pipeline/extractors/finep.py
+  module: radar.pipeline.extractors.finep
   portal: "http://www.finep.gov.br/chamadas-publicas"
 
 paths:
@@ -44,7 +44,7 @@ bronze_mapping:
   prazo_envio:      deadline
   data_publicacao:  pub_date
   link:             link
-  tema:             themes_raw    # split por [;,|], canonicalizado em themes via domain.vocabulary
+  tema:             themes_raw    # split por [;,|], canonicalizado em themes via radar.domain.vocabulary
   publico_alvo:     publico_alvo  # split por [;,|]
   fonte_recurso:    fonte_recurso # split por [;,] + normalização para siglas canônicas (§5.4 WIKI.md)
 ```
@@ -91,7 +91,7 @@ skip_keywords:
 
 > **`agravo`** descarta peças judiciais (ex.: `Decisão_TRF1_-Agravo_de_instrumento.pdf`) que o portal anexa à chamada — conteúdo não-normativo e ruído no RAG. `faq` e `tabela_com_requisitos` foram REMOVIDOS da lista: medição com golden de proveniência independente (NotebookLM, 2026-06-15) mostrou que o FAQ oficial é o alvo de retrieval mais alinhado a perguntas de fundador (estilo P&R), e descartá-lo derrubava o recall. A skip-list filtra o **não-normativo-e-inútil**, não o **não-normativo-mas-útil-pra-RAG**.
 >
-> **`telas`/`guia`** descartam screenshots do sistema FAP (`Telas_do_FAP.pdf`) e guias de preenchimento (`Guia_Rápido.pdf`) — auxiliares de UI, não-normativos. **Forma de escrita:** keywords são substring **sem acento e sem gap de token** — `telas` (não `telas_fap`, que não casa `Telas_do_FAP`) e termos sem acento (o filename é acentuado; o match no adapter é exato e não-dobrado, então `declaracao` só pega `Declaração` se o consumidor dobrar acento — ver `core/retrieval/hyper_extractor._deaccent`).
+> **`telas`/`guia`** descartam screenshots do sistema FAP (`Telas_do_FAP.pdf`) e guias de preenchimento (`Guia_Rápido.pdf`) — auxiliares de UI, não-normativos. **Forma de escrita:** keywords são substring **sem acento e sem gap de token** — `telas` (não `telas_fap`, que não casa `Telas_do_FAP`) e termos sem acento (o filename é acentuado; o match no adapter é exato e não-dobrado, então `declaracao` só pega `Declaração` se o consumidor dobrar acento — ver `src/radar/core/retrieval/hyper_extractor._deaccent`).
 
 ### 4.3 Autoridade e versões
 
@@ -193,5 +193,5 @@ Limpeza: antes de re-exportar, todos os `.md` das 7 subpastas são deletados.
 
   Cada extractor pode emitir múltiplas matches da mesma string (sem early-break no regex). Fragmentos que não casam com nenhum são descartados silenciosamente. Contexto regulatório não-financiador (ex.: ANP em editais de Cláusula PD&I da Petrobras) não vira nó do grafo — fica apenas em `key_facts` / `key_requirements` da wiki page, extraído pela LLM dos PDFs.
 - **`publico_alvo`** pode vir com qualificadores específicos (ex.: `"ICT (Pública ou Privada) credenciada na ANP"`). Normalizador colapsa para canônico (§5.5 WIKI.md); detalhe específico preserva-se em `key_requirements` da wiki page.
-- **`tema`** frequentemente tem vírgula dentro do nome composto (ex.: `"Agricultura, agronegócio e saúde animal"`, `"Petróleo, gás e etanol"`). Por isso o splitter usa apenas `[;|]`, nunca vírgula. A canonicalização (em `domain/vocabulary.py`) mapeia cada variação completa para o tema canônico.
+- **`tema`** frequentemente tem vírgula dentro do nome composto (ex.: `"Agricultura, agronegócio e saúde animal"`, `"Petróleo, gás e etanol"`). Por isso o splitter usa apenas `[;|]`, nunca vírgula. A canonicalização (em `src/radar/domain/vocabulary.py`) mapeia cada variação completa para o tema canônico.
 - **Wiki pages armazenam inherited fields congelados no momento da geração** (§4.1 WIKI.md). Quando a ingestão do índice muda (nova canonicalização, novo vocabulário), as wiki pages existentes ficam defasadas em `fonte_recurso`, `publico_alvo`, `themes`, `subprogramas`. O exporter Obsidian resolve isso **mesclando** card + índice a cada export: synthesized fields vêm do card (§4.2), inherited fields + `subprogramas` vêm do índice (autoridade). Não é necessário reprocessar com `--skip-cache` só por mudanças de vocabulário.

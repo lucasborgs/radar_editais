@@ -144,7 +144,7 @@
   queimar OpenAI em validação. O fallback estático cobre regressão-zero até lá, e
   `WRITING_SEMANTIC_MEMORY=0` reverte sem deploy.
 - **Como rodar barato:** embeddings 100% OS (`.env` já em `embeddinggemma-pt-br`/768, zero
-  token); agente + 2 juízes em `gpt-4o-mini` (centavos) com `--limit` baixo. `core.eval
+  token); agente + 2 juízes em `gpt-4o-mini` (centavos) com `--limit` baixo. `radar.core.eval
   writing`. Baselines (bloco fixo) já salvos em `eval_results/*_writing.json` (20260619_*).
 - **Pré-requisito que invalida a comparação se faltar:** o `EVAL_WORKSPACE_ID`
   (`3df4167e-3e43-4050-b4a6-bf766c128228`) precisa ter `reflection_insights` **backfilados
@@ -271,7 +271,7 @@
   `_theme_match` está correto e recall-first é intencional no explore). Sem dor
   bloqueante — a resposta é útil, só larga.
 - **Gate:** se mexer em tema de ICT, conferir o chat cross-dim e (quando a
-  Fase 3 entrar) `core.eval matching`.
+  Fase 3 entrar) `radar.core.eval matching`.
 - **Status:** aberto (2026-06-13).
 
 ### Golden RAG expandido — 24 → ~80 queries (item 3 da auditoria 2026-06-12)
@@ -458,7 +458,7 @@
   (recall@5 0.50→0.42 no golden FINEP com OpenAI embedding). Hipótese: golden anotado
   por `section/source_file` favorece vocabulário literal; HyDE move o vetor para
   paráfrases formais que divergem das anotações. Re-avaliar com pipeline completo
-  (rerank ativo, `core.eval rag`) e com embedding Gemma antes de ativar em prod.
+  (rerank ativo, `radar.core.eval rag`) e com embedding Gemma antes de ativar em prod.
   Modelo configurável via `HYDE_MODEL` / `HYDE_BASE_URL` / `HYDE_API_KEY` (Ollama-ready).
   Script `eval_embedding_offline.py` aceita `--hyde` para testes isolados.
 - **Status:** BM25 em prod. HyDE na branch, `hyde=False` até nova avaliação.
@@ -559,7 +559,7 @@
   Stage 1 tem a dimensão soft `elegibilidade_dura` (região/idade/faturamento).
 - **Pendente desta frente:** a dimensão nasce **DORMENTE** — os cards de prod ainda
   não carregam `eligibility_constraints` (vêm dos normalizadores, não do extrator v2).
-  Ela liga sozinha quando a Fase 3 do extrator popular o campo no card pipeline.
+  Ela liga sozinha quando a Fase 3 do extrator popular o campo no card radar.pipeline.
   Até lá, ranking idêntico ao legado (provado por teste + eval).
 - **Adiados (curadoria Gemini+ChatGPT reconciliada com o código):**
   - **Gate sobre `eligibility_constraints`** (região/idade/faturamento): wirado como
@@ -620,7 +620,7 @@
   Os outros 11: notícia recente de edital específico × política anti-notícia;
   vigência incerta. Cada caso tem `note` explicando o dilema.
 - **Como resolver:** editar `expected` no JSON e re-rodar
-  `python -m core.eval triage` (baseline atual: accuracy 0.8525, fn_guard
+  `python -m radar.core.eval triage` (baseline atual: accuracy 0.8525, fn_guard
   0.9836 — os 2 FNs são exatamente casos em review).
 - **Por que importa:** o A/B de 2026-06-10 (snippet × reason × content) provou
   que mudança de input só move erros de lugar; sem golden estável, nenhuma
@@ -690,7 +690,7 @@
   2. **Latência/disponibilidade não some.** O Stage 2b (explicação do top-K) continua
      sendo chamada-LLM no MESMO request → trocar só o 2a não tira o LLM do caminho
      crítico. Troca precisão por quase nada operacional.
-- **Experimento (`core.eval matching`, mesmo golden, 2 casos):** LLM p@3=0.834/p@5=0.800
+- **Experimento (`radar.core.eval matching`, mesmo golden, 2 casos):** LLM p@3=0.834/p@5=0.800
   vs Embeddings p@3=0.500/p@5=0.600 → embeddings perde. (Fixture minúscula → confiar só
   no *sinal* "não ganhou", não nos números.) `objective` ausente (0/34) handicapa o
   embedding, mas o gap é grande demais p/ o campo explicar sozinho.
@@ -716,7 +716,7 @@
 - **Ponto de entrada:** investigar o `score_tematico` que o Stage 2 dá a
   finep:612 vs o breakdown do Stage 1; revisar pesos (`matching_weights`) ou a
   expectativa em `tests/fixtures/eval_matching.json`. Medir com `python -m
-  core.eval matching`.
+  radar.core.eval matching`.
 - **Status:** aberto.
 
 ### ICT — Fase C.2: ICT na escrita (peça 4)
@@ -860,7 +860,7 @@
   char-count cego; (b) merge de chunks órfãos sub-`MIN_TOKENS` ATRAVÉS de
   fronteira de seção quando o chunk anterior/seguinte é da mesma raiz; (c)
   anexar heading ao corpo da seção em vez de virar chunk próprio; (d) medir o
-  impacto no `core.eval rag` (golden FAPESP) antes/depois — não tunar às cegas.
+  impacto no `radar.core.eval rag` (golden FAPESP) antes/depois — não tunar às cegas.
 - **Por que adiado:** não bloqueia o beta (FINEP+FAPESP rendem retrieval útil
   hoje, 19/20 vigentes com chunks); mas é dívida que cresce com o nº de fontes
   HTML (web genérica + Descoberta entram pelo mesmo `html_clean`).
@@ -1038,7 +1038,7 @@ de fora — nenhum bloqueia o que foi entregue.
      [[project_hyperedges_underused]]. Pode ficar moot se a exploração de schema
      em andamento consolidar os tipos-eixo.
   2. Dois dicionários de canonicalização de Fonte divergentes: `WIKI.md §5.4
-     fontes_canonicas` (via `core.kg.schema`) vs `hypergraph_catalog._FONTE_CANONICAL`
+     fontes_canonicas` (via `radar.core.kg.schema`) vs `hypergraph_catalog._FONTE_CANONICAL`
      (hardcoded, usado de fato pelo normalizador vivo). Viola o princípio do
      projeto ("regra vive no doc") — risco de drift silencioso.
   3. Output do hipergrado (`hypergraphs/{id}.json`) não versiona schema/prompt
@@ -1050,7 +1050,7 @@ de fora — nenhum bloqueia o que foi entregue.
 
 ### Gate de grounding (writing eval) confiável — investigado 2026-06-13
 
-- **O quê:** `pct_grounded` do `core.eval writing` não é gate confiável. Investigação
+- **O quê:** `pct_grounded` do `radar.core.eval writing` não é gate confiável. Investigação
   (PR #25) provou que NÃO é regressão de produto nem do retriever (finep:774=83
   chunks, finep:769=151, `retrieve_chunks` saudável; suspeitos `1eb00699a`/`8e29384b6`
   LIMPOS). A instabilidade (medido 0.05–0.625 entre runs do MESMO fixture) tem duas

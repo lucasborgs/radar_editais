@@ -146,7 +146,7 @@ versão do pacote.
   não está instalado.
 - `DISCOVERY_CRAWL4AI_ENABLED=1` habilita o enriquecimento apenas no worker da
   descoberta. O import é tardio, portanto Crawl4AI não entrou nas dependências
-  padrão do backend. Falhas retornam à evidência legada e ficam registradas no
+  padrão do radar.api. Falhas retornam à evidência legada e ficam registradas no
   pacote, sem publicar conteúdo pendente.
 - A promoção materializa a versão aprovada em bronze `web` e grava a página e
   os PDFs selecionados como Documento Canônico em `edital_source_docs` quando
