@@ -29,6 +29,7 @@ tests
 *.md
 !CLAUDE.md
 !WIKI.md
+!skills/**/*.md
 .DS_Store
 .vscode
 .idea
