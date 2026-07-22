@@ -1,6 +1,6 @@
 from radar.domain.relevance import (
     CLASSIFIER_VERSION,
-    ActorReasonCode,
+    ActorEvidence,
     ActorVerdict,
     AgencyVerdict,
     ClassificationKind,
@@ -10,7 +10,6 @@ from radar.domain.relevance import (
     IctVerdict,
     InclusionCode,
     InvestorVerdict,
-    OpportunityReasonCode,
     ProgramVerdict,
     RelevanceDecision,
     RelevanceEvidence,
@@ -21,7 +20,7 @@ from radar.domain.relevance import (
 
 __all__ = [
     "CLASSIFIER_VERSION",
-    "ActorReasonCode",
+    "ActorEvidence",
     "ActorVerdict",
     "AgencyVerdict",
     "ClassificationKind",
@@ -31,7 +30,6 @@ __all__ = [
     "IctVerdict",
     "InclusionCode",
     "InvestorVerdict",
-    "OpportunityReasonCode",
     "ProgramVerdict",
     "RelevanceDecision",
     "RelevanceEvidence",

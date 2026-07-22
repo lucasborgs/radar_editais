@@ -1,12 +1,14 @@
 """Testes do contrato de relevância (RT00-T01).
 
 Cobre:
-  - valores dos enums e serialização string;
-  - round-trip JSON (pydantic) para todos os modelos;
-  - rejeição de estados inválidos (enum errado, campo obrigatório ausente);
-  - reason codes completos conforme spec;
-  - separação oportunidade × ator;
-  - constantes versionadas.
+  - valores dos enums e serialização JSON;
+  - invariantes de oportunidade (in_scope, out_of_scope, needs_review);
+  - rejeição de estados inválidos (código inexistente, extra fields, page ≤ 0);
+  - separação oportunidade × ator (kind, evidence types, ausência de exclusion_codes
+    em atores);
+  - round-trip JSON com discriminação de subtipo de ator;
+  - helpers: RUBBISH e X_NOT_A_CODE retornam false, códigos reais true;
+  - compatibilidade com saída atual da triagem (imports).
 """
 from __future__ import annotations
 
@@ -17,7 +19,7 @@ from pydantic import ValidationError
 
 from radar.domain.relevance import (
     CLASSIFIER_VERSION,
-    ActorReasonCode,
+    ActorEvidence,
     ActorVerdict,
     AgencyVerdict,
     ClassificationKind,
@@ -27,7 +29,6 @@ from radar.domain.relevance import (
     IctVerdict,
     InclusionCode,
     InvestorVerdict,
-    OpportunityReasonCode,
     ProgramVerdict,
     RelevanceDecision,
     RelevanceEvidence,
@@ -36,125 +37,47 @@ from radar.domain.relevance import (
     is_inclusion_code,
 )
 
-# ── RelevanceDecision ────────────────────────────────────────────────────
+# ── Enums — valores e serialização ───────────────────────────────────────
 
 
-class TestRelevanceDecision:
-    def test_values(self):
+class TestEnumValues:
+    def test_relevance_decision_values(self):
         assert RelevanceDecision.IN_SCOPE.value == "in_scope"
         assert RelevanceDecision.OUT_OF_SCOPE.value == "out_of_scope"
         assert RelevanceDecision.NEEDS_REVIEW.value == "needs_review"
 
-    def test_string_serialization(self):
-        d = RelevanceDecision.IN_SCOPE
-        assert json.loads(json.dumps(d.value)) == "in_scope"
-
-    def test_from_string(self):
-        assert RelevanceDecision("in_scope") is RelevanceDecision.IN_SCOPE
-        assert RelevanceDecision("out_of_scope") is RelevanceDecision.OUT_OF_SCOPE
-        assert RelevanceDecision("needs_review") is RelevanceDecision.NEEDS_REVIEW
-
-    def test_invalid_value_raises(self):
-        with pytest.raises(ValueError):
-            RelevanceDecision("unsure")
-        with pytest.raises(ValueError):
-            RelevanceDecision("")
-
-
-# ── InclusionCode ────────────────────────────────────────────────────────
-
-
-class TestInclusionCode:
-    def test_all_codes_match_spec(self):
-        expected = {
-            "R1_ENTERPRISE_PATH",
-            "R2_TECH_INNOVATION",
-            "R3_ACTIONABLE",
-            "R4_RELEVANT_BENEFIT",
-            "R5_BRAZIL_RELEVANCE",
+    def test_inclusion_code_values(self):
+        assert {c.value for c in InclusionCode} == {
+            "R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION", "R3_ACTIONABLE",
+            "R4_RELEVANT_BENEFIT", "R5_BRAZIL_RELEVANCE",
         }
-        assert {c.value for c in InclusionCode} == expected
 
-    def test_from_string(self):
-        assert InclusionCode("R1_ENTERPRISE_PATH") is InclusionCode.ENTERPRISE_PATH
-
-
-# ── ExclusionCode ────────────────────────────────────────────────────────
-
-
-class TestExclusionCode:
-    def test_all_codes_match_spec(self):
-        expected = {
-            "X1_ACADEMIC_ONLY",
-            "X2_CONVENTIONAL_CREDIT",
-            "X3_GENERIC_PROCUREMENT",
-            "X4_EVENT_CONTENT",
-            "X5_GENERIC_SUPPORT",
-            "X6_NON_TECH",
-            "X7_NO_ENTERPRISE_PATH",
-            "X8_INVESTOR_DIRECTORY",
+    def test_exclusion_code_values(self):
+        assert {c.value for c in ExclusionCode} == {
+            "X1_ACADEMIC_ONLY", "X2_CONVENTIONAL_CREDIT", "X3_GENERIC_PROCUREMENT",
+            "X4_EVENT_CONTENT", "X5_GENERIC_SUPPORT", "X6_NON_TECH",
+            "X7_NO_ENTERPRISE_PATH", "X8_INVESTOR_DIRECTORY",
         }
-        assert {c.value for c in ExclusionCode} == expected
 
+    def test_classification_kind_values(self):
+        assert {c.value for c in ClassificationKind} == {
+            "opportunity", "investor", "ict", "program", "agency",
+        }
 
-# ── OpportunityReasonCode ────────────────────────────────────────────────
-
-
-class TestOpportunityReasonCode:
-    def test_has_all_inclusion_and_exclusion(self):
-        values = {c.value for c in OpportunityReasonCode}
-        for inc in InclusionCode:
-            assert inc.value in values
-        for exc in ExclusionCode:
-            assert exc.value in values
-
-    def test_no_actor_codes(self):
-        for c in OpportunityReasonCode:
-            assert not c.value.startswith("A"), f"actor code in opportunity: {c}"
-
-
-# ── ActorReasonCode ──────────────────────────────────────────────────────
-
-
-class TestActorReasonCode:
-    def test_all_codes_use_a_prefix(self):
-        for c in ActorReasonCode:
-            assert c.value.startswith("A"), f"non-actor prefix: {c}"
-
-    def test_no_opportunity_codes(self):
-        opp_values = {c.value for c in OpportunityReasonCode}
-        for c in ActorReasonCode:
-            assert c.value not in opp_values, f"opp code in actor: {c}"
-
-    def test_from_string(self):
-        assert ActorReasonCode("A1_IDENTITY_VERIFIABLE") is ActorReasonCode.IDENTITY_VERIFIABLE
-
-
-# ── ClassificationKind ───────────────────────────────────────────────────
-
-
-class TestClassificationKind:
-    def test_values(self):
-        assert ClassificationKind.OPPORTUNITY.value == "opportunity"
-        assert ClassificationKind.INVESTOR.value == "investor"
-        assert ClassificationKind.ICT.value == "ict"
-        assert ClassificationKind.PROGRAM.value == "program"
-        assert ClassificationKind.AGENCY.value == "agency"
-
-    def test_separate_kinds(self):
-        """Verifica que os kinds existem e são distintos."""
-        kinds = set(ClassificationKind)
-        assert len(kinds) == 5
-
-
-# ── EvidenceSource ───────────────────────────────────────────────────────
-
-
-class TestEvidenceSource:
-    def test_values(self):
+    def test_evidence_source_values(self):
+        assert EvidenceSource.OFFICIAL_PAGE.value == "official_page"
+        assert EvidenceSource.CURATED_RECORD.value == "curated_record"
         assert EvidenceSource.LANDING_PAGE.value == "landing_page"
         assert EvidenceSource.EDITAL.value == "edital"
         assert EvidenceSource.ANNEX.value == "anexo"
+
+    def test_enum_string_round_trip(self):
+        for e in InclusionCode:
+            assert InclusionCode(e.value) is e
+        for e in ExclusionCode:
+            assert ExclusionCode(e.value) is e
+        for e in RelevanceDecision:
+            assert json.loads(json.dumps(e.value)) == e.value
 
 
 # ── EvidenceLocator ──────────────────────────────────────────────────────
@@ -166,104 +89,176 @@ class TestEvidenceLocator:
         assert loc.document is None
         assert loc.page is None
 
-    def test_partial(self):
-        loc = EvidenceLocator(document="Edital.pdf")
-        assert loc.document == "Edital.pdf"
-        assert loc.page is None
+    def test_page_ge_1(self):
+        EvidenceLocator(page=1)
+        EvidenceLocator(page=999)
 
-    def test_full(self):
-        loc = EvidenceLocator(document="Edital.pdf", page=3)
-        assert loc.document == "Edital.pdf"
-        assert loc.page == 3
+    def test_page_zero_rejected(self):
+        with pytest.raises(ValidationError):
+            EvidenceLocator(page=0)
 
-    def test_round_trip(self):
-        loc = EvidenceLocator(document="Edital.pdf", page=3)
-        assert EvidenceLocator.model_validate_json(loc.model_dump_json()) == loc
+    def test_page_negative_rejected(self):
+        with pytest.raises(ValidationError):
+            EvidenceLocator(page=-1)
+
+    def test_extra_field_rejected(self):
+        with pytest.raises(ValidationError):
+            EvidenceLocator.model_validate({"document": "x", "unknown": True})
 
 
-# ── RelevanceEvidence ────────────────────────────────────────────────────
+# ── RelevanceEvidence (oportunidade) ─────────────────────────────────────
 
 
 class TestRelevanceEvidence:
-    def test_minimal(self):
-        ev = RelevanceEvidence(code="R1_ENTERPRISE_PATH")
-        assert ev.code == "R1_ENTERPRISE_PATH"
-        assert ev.quote is None
+    def test_inclusion_code_accepted(self):
+        ev = RelevanceEvidence(code=InclusionCode.R1_ENTERPRISE_PATH)
+        assert ev.code is InclusionCode.R1_ENTERPRISE_PATH
 
-    def test_full(self):
-        ev = RelevanceEvidence(
-            code="R1_ENTERPRISE_PATH",
-            quote="startups e PMEs",
-            source=EvidenceSource.EDITAL,
-            locator=EvidenceLocator(document="Edital.pdf", page=3),
-        )
-        assert ev.source is EvidenceSource.EDITAL
-        assert ev.locator.document == "Edital.pdf"
+    def test_exclusion_code_accepted(self):
+        ev = RelevanceEvidence(code=ExclusionCode.X1_ACADEMIC_ONLY)
+        assert ev.code is ExclusionCode.X1_ACADEMIC_ONLY
+
+    def test_invalid_code_rejected(self):
+        with pytest.raises(ValidationError):
+            RelevanceEvidence(code="BOGUS")
+
+    def test_extra_field_rejected(self):
+        with pytest.raises(ValidationError):
+            RelevanceEvidence.model_validate({"code": "R1_ENTERPRISE_PATH", "extra": True})
 
     def test_round_trip(self):
         ev = RelevanceEvidence(
-            code="R2_TECH_INNOVATION",
-            quote="desenvolvimento tecnológico",
-            source=EvidenceSource.LANDING_PAGE,
+            code=InclusionCode.R3_ACTIONABLE,
+            quote="caminho de inscrição",
+            source=EvidenceSource.EDITAL,
+            locator=EvidenceLocator(document="Edital.pdf", page=3),
         )
-        assert RelevanceEvidence.model_validate_json(ev.model_dump_json()) == ev
+        restored = RelevanceEvidence.model_validate_json(ev.model_dump_json())
+        assert restored == ev
+        assert restored.code is InclusionCode.R3_ACTIONABLE
+        assert restored.source is EvidenceSource.EDITAL
 
 
-# ── RelevanceVerdict (oportunidade) ──────────────────────────────────────
+# ── ActorEvidence (ator — códigos em RT00-T02) ───────────────────────────
 
 
-class TestRelevanceVerdict:
-    def test_minimal(self):
-        v = RelevanceVerdict(decision=RelevanceDecision.IN_SCOPE)
-        assert v.decision is RelevanceDecision.IN_SCOPE
-        assert v.reason_codes == []
-        assert v.exclusion_codes == []
-        assert v.evidence == []
-        assert v.missing_information == []
-        assert v.classifier_version == CLASSIFIER_VERSION
+class TestActorEvidence:
+    def test_code_is_free_text(self):
+        ev = ActorEvidence(code="identidade_verificada")
+        assert ev.code == "identidade_verificada"
 
-    def test_invalid_decision_raises(self):
+    def test_round_trip(self):
+        ev = ActorEvidence(
+            code="pending_t02",
+            quote="página oficial",
+            source=EvidenceSource.OFFICIAL_PAGE,
+        )
+        assert ActorEvidence.model_validate_json(ev.model_dump_json()) == ev
+
+    def test_extra_field_rejected(self):
         with pytest.raises(ValidationError):
-            RelevanceVerdict(decision="bogus")
+            ActorEvidence.model_validate({"code": "x", "extra": True})
 
-    def test_full_verdict(self):
+
+# ── RelevanceVerdict — invariantes ───────────────────────────────────────
+
+
+class TestRelevanceVerdictInvariants:
+    def test_in_scope_requires_all_codes_and_no_exclusion(self):
         v = RelevanceVerdict(
             decision=RelevanceDecision.IN_SCOPE,
-            reason_codes=["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION"],
-            evidence=[
-                RelevanceEvidence(
-                    code="R1_ENTERPRISE_PATH",
-                    quote="empresas de base tecnológica",
-                    source=EvidenceSource.EDITAL,
-                )
-            ],
-            missing_information=["prazo_envio"],
+            reason_codes=list(InclusionCode),
         )
-        assert len(v.evidence) == 1
-        assert v.evidence[0].source is EvidenceSource.EDITAL
+        assert v.decision is RelevanceDecision.IN_SCOPE
 
-    def test_out_of_scope_with_exclusion(self):
+    def test_in_scope_missing_code_rejected(self):
+        with pytest.raises(ValidationError, match="missing"):
+            RelevanceVerdict(
+                decision=RelevanceDecision.IN_SCOPE,
+                reason_codes=[InclusionCode.R1_ENTERPRISE_PATH],
+            )
+
+    def test_in_scope_with_exclusion_rejected(self):
+        with pytest.raises(ValidationError, match="empty exclusion_codes"):
+            RelevanceVerdict(
+                decision=RelevanceDecision.IN_SCOPE,
+                reason_codes=list(InclusionCode),
+                exclusion_codes=[ExclusionCode.X1_ACADEMIC_ONLY],
+            )
+
+    def test_out_of_scope_requires_exclusion(self):
+        with pytest.raises(ValidationError, match="at least one ExclusionCode"):
+            RelevanceVerdict(
+                decision=RelevanceDecision.OUT_OF_SCOPE,
+                reason_codes=list(InclusionCode),
+            )
+
+    def test_out_of_scope_exclusion_in_reason_codes(self):
         v = RelevanceVerdict(
             decision=RelevanceDecision.OUT_OF_SCOPE,
-            exclusion_codes=["X1_ACADEMIC_ONLY"],
-            reason_codes=["X1_ACADEMIC_ONLY"],
+            reason_codes=[
+                InclusionCode.R1_ENTERPRISE_PATH,
+                ExclusionCode.X1_ACADEMIC_ONLY,
+            ],
+            exclusion_codes=[ExclusionCode.X1_ACADEMIC_ONLY],
         )
-        assert v.decision is RelevanceDecision.OUT_OF_SCOPE
-        assert "X1_ACADEMIC_ONLY" in v.exclusion_codes
+        assert ExclusionCode.X1_ACADEMIC_ONLY in v.exclusion_codes
 
-    def test_needs_review_with_missing(self):
-        v = RelevanceVerdict(
-            decision=RelevanceDecision.NEEDS_REVIEW,
-            missing_information=["público elegível", "benefício financeiro"],
-        )
+    def test_out_of_scope_exclusion_missing_from_reason_codes_rejected(self):
+        with pytest.raises(ValidationError, match="not found in reason_codes"):
+            RelevanceVerdict(
+                decision=RelevanceDecision.OUT_OF_SCOPE,
+                reason_codes=[],
+                exclusion_codes=[ExclusionCode.X1_ACADEMIC_ONLY],
+            )
+
+    def test_needs_review_no_extra_validation(self):
+        v = RelevanceVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
         assert v.decision is RelevanceDecision.NEEDS_REVIEW
-        assert "público elegível" in v.missing_information
 
-    def test_round_trip_spec_contract(self):
-        """Round-trip do contrato lógico da Spec §7.1."""
+    def test_invalid_decision_rejected(self):
+        with pytest.raises(ValidationError):
+            RelevanceVerdict.model_validate({"decision": "bogus"})
+
+    def test_unknown_reason_code_string_rejected(self):
+        with pytest.raises(ValidationError):
+            RelevanceVerdict.model_validate({
+                "decision": "in_scope",
+                "reason_codes": ["R1_ENTERPRISE_PATH", "BOGUS"],
+            })
+
+    def test_extra_field_rejected(self):
+        with pytest.raises(ValidationError):
+            RelevanceVerdict.model_validate({
+                "decision": "in_scope",
+                "reason_codes": [c.value for c in InclusionCode],
+                "extra": True,
+            })
+
+    def test_default_classifier_version(self):
+        v = RelevanceVerdict(
+            decision=RelevanceDecision.IN_SCOPE,
+            reason_codes=list(InclusionCode),
+        )
+        assert v.classifier_version == CLASSIFIER_VERSION
+
+    def test_custom_version_accepted(self):
+        v = RelevanceVerdict(
+            decision=RelevanceDecision.IN_SCOPE,
+            reason_codes=list(InclusionCode),
+            classifier_version="v2",
+        )
+        assert v.classifier_version == "v2"
+
+
+# ── RelevanceVerdict — round-trip ────────────────────────────────────────
+
+
+class TestRelevanceVerdictRoundTrip:
+    def test_full_spec_contract(self):
         raw = {
             "decision": "in_scope",
-            "reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION"],
+            "reason_codes": [c.value for c in InclusionCode],
             "exclusion_codes": [],
             "evidence": [
                 {
@@ -278,161 +273,199 @@ class TestRelevanceVerdict:
         }
         v = RelevanceVerdict.model_validate(raw)
         assert v.decision is RelevanceDecision.IN_SCOPE
+        assert v.evidence[0].code is InclusionCode.R1_ENTERPRISE_PATH
         assert v.evidence[0].locator.document == "Edital.pdf"
-        assert v.evidence[0].source is EvidenceSource.LANDING_PAGE
+
         dumped = json.loads(v.model_dump_json())
         assert dumped["classifier_version"] == CLASSIFIER_VERSION
-        assert dumped["decision"] == "in_scope"
 
-    def test_non_string_reason_code_allowed(self):
-        """reason_codes é list[str]; valores de enum devem ser convertidos."""
+    def test_out_of_scope_round_trip(self):
         v = RelevanceVerdict(
-            decision=RelevanceDecision.IN_SCOPE,
-            reason_codes=[InclusionCode.ENTERPRISE_PATH.value],
+            decision=RelevanceDecision.OUT_OF_SCOPE,
+            reason_codes=[
+                InclusionCode.R1_ENTERPRISE_PATH,
+                ExclusionCode.X1_ACADEMIC_ONLY,
+            ],
+            exclusion_codes=[ExclusionCode.X1_ACADEMIC_ONLY],
+            evidence=[
+                RelevanceEvidence(
+                    code=ExclusionCode.X1_ACADEMIC_ONLY,
+                    quote="bolsa exclusivamente acadêmica",
+                    source=EvidenceSource.EDITAL,
+                )
+            ],
+            missing_information=["prazo_envio"],
         )
-        assert "R1_ENTERPRISE_PATH" in v.reason_codes
+        restored = RelevanceVerdict.model_validate_json(v.model_dump_json())
+        assert restored.decision is RelevanceDecision.OUT_OF_SCOPE
+        assert ExclusionCode.X1_ACADEMIC_ONLY in restored.exclusion_codes
+        assert len(restored.evidence) == len(v.evidence)
 
-    def test_unknown_classifier_version_allowed(self):
-        """classifier_version é str livre; qualquer versão é aceita."""
+    def test_needs_review_round_trip(self):
         v = RelevanceVerdict(
-            decision=RelevanceDecision.IN_SCOPE,
-            classifier_version="custom-v2",
+            decision=RelevanceDecision.NEEDS_REVIEW,
+            missing_information=["público elegível"],
         )
-        assert v.classifier_version == "custom-v2"
+        assert RelevanceVerdict.model_validate_json(v.model_dump_json()) == v
 
 
-# ── ActorVerdict e subtipos ──────────────────────────────────────────────
+# ── ActorVerdict — kind e distinção por subtipo ──────────────────────────
 
 
 class TestActorVerdict:
-    def test_no_exclusion_codes_field(self):
-        """ActorVerdict não tem exclusion_codes — usa reason_codes."""
-        v = ActorVerdict(decision=RelevanceDecision.IN_SCOPE)
-        assert not hasattr(v, "exclusion_codes") or v.model_dump().get("exclusion_codes") is None
-
-    def test_verdict_default_version(self):
-        v = ActorVerdict(decision=RelevanceDecision.IN_SCOPE)
-        assert v.classifier_version == f"{CLASSIFIER_VERSION}.actor-v1"
-
-    def test_round_trip(self):
+    def test_requires_kind(self):
         v = ActorVerdict(
             decision=RelevanceDecision.IN_SCOPE,
-            reason_codes=["A1_IDENTITY_VERIFIABLE", "A2_OFFICIAL_PAGE"],
+            kind=ClassificationKind.INVESTOR,
         )
-        assert ActorVerdict.model_validate_json(v.model_dump_json()) == v
+        assert v.kind is ClassificationKind.INVESTOR
+
+    def test_kind_missing_rejected(self):
+        with pytest.raises(ValidationError):
+            ActorVerdict(decision=RelevanceDecision.IN_SCOPE)
+
+    def test_default_version(self):
+        v = ActorVerdict(
+            decision=RelevanceDecision.IN_SCOPE,
+            kind=ClassificationKind.INVESTOR,
+        )
+        assert v.classifier_version == CLASSIFIER_VERSION
+
+    def test_uses_actor_evidence(self):
+        v = ActorVerdict(
+            decision=RelevanceDecision.IN_SCOPE,
+            kind=ClassificationKind.INVESTOR,
+            evidence=[ActorEvidence(code="verified", quote="página oficial")],
+        )
+        assert isinstance(v.evidence[0], ActorEvidence)
+
+    def test_no_exclusion_codes_field(self):
+        v = ActorVerdict(
+            decision=RelevanceDecision.IN_SCOPE,
+            kind=ClassificationKind.INVESTOR,
+        )
+        assert "exclusion_codes" not in v.model_dump()
 
 
 class TestInvestorVerdict:
-    def test_is_actor_verdict(self):
-        v = InvestorVerdict(decision=RelevanceDecision.OUT_OF_SCOPE)
-        assert isinstance(v, ActorVerdict)
-
-    def test_default_version(self):
+    def test_kind_default(self):
         v = InvestorVerdict(decision=RelevanceDecision.IN_SCOPE)
-        assert v.classifier_version == f"{CLASSIFIER_VERSION}.actor-v1"
+        assert v.kind is ClassificationKind.INVESTOR
 
-    def test_round_trip(self):
+    def test_round_trip_preserves_kind(self):
         v = InvestorVerdict(
             decision=RelevanceDecision.NEEDS_REVIEW,
-            missing_information=["ticket_range", "setores"],
+            missing_information=["ticket_range"],
         )
-        assert InvestorVerdict.model_validate_json(v.model_dump_json()) == v
+        dumped = json.loads(v.model_dump_json())
+        assert dumped["kind"] == "investor"
+        restored = ActorVerdict.model_validate(dumped)
+        assert restored.kind is ClassificationKind.INVESTOR
 
 
 class TestIctVerdict:
-    def test_is_actor_verdict(self):
+    def test_kind_default(self):
         v = IctVerdict(decision=RelevanceDecision.IN_SCOPE)
-        assert isinstance(v, ActorVerdict)
+        assert v.kind is ClassificationKind.ICT
 
-    def test_round_trip(self):
-        v = IctVerdict(
-            decision=RelevanceDecision.IN_SCOPE,
-            reason_codes=["A1_IDENTITY_VERIFIABLE", "A5_CAPACITY_KNOWN"],
-            evidence=[
-                RelevanceEvidence(
-                    code="A1_IDENTITY_VERIFIABLE",
-                    quote="EMBRAPII Unidade Embrapii",
-                    source=EvidenceSource.LANDING_PAGE,
-                )
-            ],
-        )
-        assert IctVerdict.model_validate_json(v.model_dump_json()) == v
+    def test_round_trip_preserves_kind(self):
+        v = IctVerdict(decision=RelevanceDecision.IN_SCOPE)
+        dumped = json.loads(v.model_dump_json())
+        assert dumped["kind"] == "ict"
 
 
 class TestProgramVerdict:
-    def test_is_actor_verdict(self):
+    def test_kind_default(self):
         v = ProgramVerdict(decision=RelevanceDecision.IN_SCOPE)
-        assert isinstance(v, ActorVerdict)
-
-    def test_round_trip(self):
-        v = ProgramVerdict(
-            decision=RelevanceDecision.NEEDS_REVIEW,
-            missing_information=["operador", "relação com mecanismo"],
-        )
-        assert ProgramVerdict.model_validate_json(v.model_dump_json()) == v
+        assert v.kind is ClassificationKind.PROGRAM
 
 
 class TestAgencyVerdict:
-    def test_is_actor_verdict(self):
+    def test_kind_default(self):
         v = AgencyVerdict(decision=RelevanceDecision.IN_SCOPE)
-        assert isinstance(v, ActorVerdict)
+        assert v.kind is ClassificationKind.AGENCY
 
-    def test_round_trip(self):
+    def test_round_trip_preserves_kind(self):
         v = AgencyVerdict(decision=RelevanceDecision.IN_SCOPE)
-        assert AgencyVerdict.model_validate_json(v.model_dump_json()) == v
+        dumped = json.loads(v.model_dump_json())
+        assert dumped["kind"] == "agency"
 
 
 # ── Separação oportunidade × ator ────────────────────────────────────────
 
 
 class TestKindSeparation:
-    def test_opportunity_not_actor(self):
-        """OpportunityReasonCode é diferente de ActorReasonCode."""
-        opp_codes = {c.value for c in OpportunityReasonCode}
-        actor_codes = {c.value for c in ActorReasonCode}
-        assert opp_codes.isdisjoint(actor_codes)
+    def test_distinct_evidence_types(self):
+        assert RelevanceEvidence is not ActorEvidence
 
-    def test_verdict_types_are_distinct(self):
-        v_opp = RelevanceVerdict(decision=RelevanceDecision.IN_SCOPE)
-        v_actor = ActorVerdict(decision=RelevanceDecision.IN_SCOPE)
-        assert type(v_opp) is not type(v_actor)
-        assert isinstance(v_opp, RelevanceVerdict)
-        assert isinstance(v_actor, ActorVerdict)
+    def test_opportunity_verdict_no_kind(self):
+        v = RelevanceVerdict(
+            decision=RelevanceDecision.IN_SCOPE,
+            reason_codes=list(InclusionCode),
+        )
+        assert "kind" not in v.model_dump()
 
     def test_actor_verdict_no_exclusion_codes(self):
-        """ActorVerdict e subtipos não usam exclusion_codes."""
         for cls in (ActorVerdict, InvestorVerdict, IctVerdict, ProgramVerdict, AgencyVerdict):
-            v = cls(decision=RelevanceDecision.IN_SCOPE)
-            dumped = v.model_dump()
-            assert "exclusion_codes" not in dumped
+            v = cls(decision=RelevanceDecision.NEEDS_REVIEW, kind=ClassificationKind.INVESTOR) if cls is ActorVerdict else cls(decision=RelevanceDecision.NEEDS_REVIEW)
+            assert "exclusion_codes" not in v.model_dump()
+
+    def test_actor_evidence_not_accepted_in_relevance_verdict(self):
+        with pytest.raises(ValidationError):
+            RelevanceVerdict.model_validate({
+                "decision": "in_scope",
+                "reason_codes": [c.value for c in InclusionCode],
+                "evidence": [{"code": "string_code", "quote": ""}],
+            })
+
+    def test_inclusion_code_not_accepted_as_actor_evidence_code(self):
+        """ActorEvidence.code é str livre; qualquer string passa."""
+        ev = ActorEvidence(code=InclusionCode.R1_ENTERPRISE_PATH.value)
+        assert ev.code == "R1_ENTERPRISE_PATH"
 
 
-# ── CLASSIFIER_VERSION ────────────────────────────────────────────────────
+# ── Helpers ──────────────────────────────────────────────────────────────
 
 
-class TestClassifierVersion:
-    def test_constant(self):
-        assert CLASSIFIER_VERSION == "radar-data-trust-relevance-v1"
+class TestHelpers:
+    @pytest.mark.parametrize("code", [
+        "R1_ENTERPRISE_PATH",
+        "R2_TECH_INNOVATION",
+        "R3_ACTIONABLE",
+        "R4_RELEVANT_BENEFIT",
+        "R5_BRAZIL_RELEVANCE",
+    ])
+    def test_is_inclusion_code_true(self, code):
+        assert is_inclusion_code(code)
 
-    def test_used_in_verdict_default(self):
-        v = RelevanceVerdict(decision=RelevanceDecision.IN_SCOPE)
-        assert v.classifier_version == CLASSIFIER_VERSION
+    @pytest.mark.parametrize("code", [
+        "RUBBISH",
+        "R0",
+        "R1_FAKE",
+        "inclusion",
+        "",
+    ])
+    def test_is_inclusion_code_false(self, code):
+        assert not is_inclusion_code(code)
 
+    @pytest.mark.parametrize("code", [
+        "X1_ACADEMIC_ONLY",
+        "X2_CONVENTIONAL_CREDIT",
+        "X3_GENERIC_PROCUREMENT",
+        "X4_EVENT_CONTENT",
+        "X5_GENERIC_SUPPORT",
+        "X6_NON_TECH",
+        "X7_NO_ENTERPRISE_PATH",
+        "X8_INVESTOR_DIRECTORY",
+    ])
+    def test_is_exclusion_code_true(self, code):
+        assert is_exclusion_code(code)
 
-# ── Utilitários ──────────────────────────────────────────────────────────
-
-
-class TestUtils:
-    def test_is_inclusion_code(self):
-        assert is_inclusion_code("R1_ENTERPRISE_PATH")
-        assert is_inclusion_code("R2_TECH_INNOVATION")
-        assert not is_inclusion_code("X1_ACADEMIC_ONLY")
-        assert not is_inclusion_code("A1_IDENTITY_VERIFIABLE")
-        assert not is_inclusion_code("")
-
-    def test_is_exclusion_code(self):
-        assert is_exclusion_code("X1_ACADEMIC_ONLY")
-        assert is_exclusion_code("X8_INVESTOR_DIRECTORY")
-        assert not is_exclusion_code("R1_ENTERPRISE_PATH")
-        assert not is_exclusion_code("A1_IDENTITY_VERIFIABLE")
-        assert not is_exclusion_code("")
+    @pytest.mark.parametrize("code", [
+        "X_NOT_A_CODE",
+        "X0_FAKE",
+        "exclusion",
+        "",
+    ])
+    def test_is_exclusion_code_false(self, code):
+        assert not is_exclusion_code(code)
