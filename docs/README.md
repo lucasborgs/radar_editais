@@ -13,6 +13,7 @@ cada assunto; não substitui os documentos indicados.
 | vocabulários, ingestão e regras por fonte | [`domain/schema.md`](domain/schema.md) e [`domain/sources/`](domain/sources/) | domínio lido pelo código |
 | trabalho técnico adiado com evidência | [`BACKLOG.md`](BACKLOG.md) | backlog técnico atual |
 | mudanças propostas ou contratos vigentes | [`specs/`](specs/) | specs correntes |
+| planos e relatórios de implementação ativos | [`execution/`](execution/) | execução das specs, sem redefinir seus contratos |
 | operação e subsistemas atuais | [`reference/`](reference/) | referência derivada |
 | decisões e arquiteturas anteriores | [`historical/`](historical/) | registro sem autoridade atual |
 | contrato visual do frontend | [`DESIGN_SYSTEM.md`](../frontend/DESIGN_SYSTEM.md) | design system implementado |
@@ -45,6 +46,9 @@ cada assunto; não substitui os documentos indicados.
 | Spec | Status | Função |
 |---|---|---|
 | [`system-coherence.md`](specs/system-coherence.md) | vigente | propósito, capacidades e invariantes globais |
+| [`radar-data-trust.md`](specs/radar-data-trust.md) | proposta para aprovação | programa de cobertura, proveniência e qualidade do plano de dados |
+| [`radar-data-trust-00-relevance-contract.md`](specs/radar-data-trust-00-relevance-contract.md) | proposta para aprovação | relevância de oportunidades e atores para startups e PMEs tecnológicas |
+| [`radar-data-trust-01-provenance.md`](specs/radar-data-trust-01-provenance.md) | proposta para aprovação | evidência rastreável do documento ao gold e às superfícies do produto |
 | [`document-authority.md`](specs/document-authority.md) | vigente | autoridade e ciclo de vida documental |
 | [`user-mental-model.md`](specs/user-mental-model.md) | vigente | Explorar, Radar e Projetos como modelo mental do produto |
 | [`evaluation-operations.md`](specs/evaluation-operations.md) | aprovada; matching candidato | runs reproduzíveis e gates operacionais explícitos |
