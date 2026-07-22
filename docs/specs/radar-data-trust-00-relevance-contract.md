@@ -208,29 +208,68 @@ qualidade: o primeiro reflete coleta ampla do portal; o segundo contém extraç�
 LLM de páginas oficiais com curadoria básica. Ambos devem permanecer
 `legacy/unknown` nos campos ainda não revalidados.
 
-##### Critérios mínimos para ICT
+##### Semântica comum da decisão de atores
 
-- identidade e vínculo institucional verificáveis;
-- capacidade de cooperação tecnológica com empresas;
-- competências, localização e status sustentados por fonte oficial; e
-- atualização ou data de verificação explícita.
+- `in_scope`: todos os reason codes obrigatórios do `kind` estão sustentados por
+  evidência rastreável;
+- `needs_review`: ao menos um critério obrigatório está ausente ou ambíguo, sem
+  evidência suficiente para afirmar o contrário; e
+- `out_of_scope`: a identidade está suficientemente estabelecida e uma fonte
+  confiável contradiz ao menos um critério essencial do `kind`.
+
+Ausência de evidência não equivale a evidência de ausência. Identidade não
+verificável, página indisponível ou registro incompleto levam a `needs_review`,
+não a `out_of_scope`. Campos descritivos como tese, estágio, setores,
+competências, geografia e ticket permanecem `unknown` quando não houver
+evidência; sua ausência só bloqueia `in_scope` quando corresponde diretamente a
+um reason code obrigatório abaixo. Uma mesma passagem pode sustentar mais de um
+código, mas cada código deve possuir sua própria referência de evidência.
 
 ##### Critérios mínimos para investidor
 
-- identidade e página oficial verificáveis;
-- atuação material com startups/empresas de tecnologia;
-- relevância para empresas brasileiras ou operação no Brasil; e
-- tese, estágio, setores, geografia e ticket marcados como `unknown` quando não
-  houver evidência, sem completar por plausibilidade da LLM.
+| Reason code | Considera-se satisfeito quando | Evidência mínima aceitável | Força `needs_review` quando |
+|---|---|---|---|
+| `INV_IDENTITY_VERIFIED` | a organização e seu canal oficial podem ser identificados sem ambiguidade | página oficial institucional, registro oficial ou documento do próprio gestor que declare nome e atividade | há apenas diretório de terceiros, nome ambíguo, página indisponível ou registro curado sem fonte verificável |
+| `INV_TECH_STARTUP_ACTIVITY` | há atuação material de investimento em startups ou empresas de base tecnológica | tese ou mandato de investimento, portfólio verificável, fundo anunciado ou operações concretas em empresas de tecnologia | a fonte descreve apenas consultoria, crédito, aceleração sem investimento, atividade financeira genérica ou não demonstra foco tecnológico/empreendedor |
+| `INV_BRAZIL_RELEVANCE` | empresas brasileiras são investíveis ou o investidor mantém operação material no Brasil | geografia declarada na tese, escritório/operação no Brasil ou portfólio brasileiro verificável | a relação com o Brasil é apenas inferida por idioma, domínio, notícia de terceiro ou não está declarada |
 
-##### Critérios mínimos para programa, agência e demais atores
+Ticket, estágio e setores melhoram match e explicação, mas não bloqueiam
+`in_scope` quando os três códigos acima estão comprovados; ficam `unknown` até
+serem sustentados por fonte.
 
-- identidade e operador verificáveis;
-- relação demonstrável com uma oportunidade ou mecanismo relevante; e
-- campos específicos validados conforme schema próprio do `kind`.
+##### Critérios mínimos para ICT
 
-Cada tipo terá reason codes e golden próprios na implementação. Um único prompt
-genérico para todos os atores é proibido até avaliação demonstrar equivalência.
+| Reason code | Considera-se satisfeito quando | Evidência mínima aceitável | Força `needs_review` quando |
+|---|---|---|---|
+| `ICT_IDENTITY_VERIFIED` | a instituição ou unidade está identificada de forma inequívoca | página oficial da instituição/unidade ou cadastro oficial com nome e localização | existe apenas menção de terceiro, nome ambíguo ou página sem elementos suficientes para distinguir a unidade |
+| `ICT_INSTITUTIONAL_LINK_VERIFIED` | o vínculo alegado com EMBRAPII ou outra rede/operadora relevante está confirmado | diretório oficial da rede/operadora ou página institucional que declare explicitamente credenciamento ou vínculo | o vínculo é apenas inferido, histórico, autodeclarado sem confirmação ou não possui fonte recuperável |
+| `ICT_ENTERPRISE_TECH_COOP` | a ICT oferece capacidade concreta de PD&I, desenvolvimento, ensaio, validação ou transferência tecnológica em cooperação com empresas | descrição oficial de competências e modelo de atendimento, projetos empresariais verificáveis ou mecanismo formal de cooperação | há apenas pesquisa acadêmica genérica, infraestrutura sem caminho empresarial ou competências sem modalidade de cooperação demonstrada |
+| `ICT_CURRENT_STATUS_VERIFIED` | há evidência de que a unidade, o vínculo e o atendimento permanecem ativos na data de referência | listagem oficial atual, página operacional com contato vigente, data de atualização ou atividade institucional recente | a única evidência é antiga, arquivada, contraditória ou não permite distinguir situação atual de histórico |
+
+Competências e localização devem ser preservadas como `unknown` quando não
+verificadas; não podem ser completadas por plausibilidade da LLM.
+
+##### Critérios mínimos para programa
+
+| Reason code | Considera-se satisfeito quando | Evidência mínima aceitável | Força `needs_review` quando |
+|---|---|---|---|
+| `PRG_IDENTITY_OPERATOR_VERIFIED` | o programa e a organização responsável por operá-lo estão identificados | página ou documento oficial que relacione nome do programa e operador | há apenas referência de terceiro, homônimo, iniciativa passada sem operador identificável ou coexecução ambígua |
+| `PRG_RELEVANT_INNOVATION_MECHANISM` | existe mecanismo estruturado de apoio à inovação, como subvenção, investimento, aceleração, piloto, infraestrutura ou cooperação tecnológica | objetivos, instrumentos ou benefícios descritos em fonte oficial do programa | trata-se apenas de campanha, evento, conteúdo informativo, apoio empresarial genérico ou mecanismo não descrito |
+| `PRG_ENTERPRISE_RELEVANCE` | startups, PMEs ou empresas de base tecnológica são público-alvo ou beneficiárias materiais do programa | público-alvo, elegibilidade, portfólio de beneficiários ou modelo de participação empresarial declarado | a conexão empresarial é inferida, restrita a instituições acadêmicas ou depende de chamada específica ainda não verificada |
+
+Programa é a estrutura institucional; chamada, edital ou rodada concreta continua
+sendo oportunidade separada e precisa da triagem R1–R5.
+
+##### Critérios mínimos para agência
+
+| Reason code | Considera-se satisfeito quando | Evidência mínima aceitável | Força `needs_review` quando |
+|---|---|---|---|
+| `AGY_IDENTITY_VERIFIED` | a entidade e sua natureza institucional estão identificadas sem ambiguidade | página institucional, norma de criação ou cadastro oficial que declare nome e natureza | existe apenas menção de terceiro, sigla ambígua, órgão extinto ou identidade institucional não confirmada |
+| `AGY_RELEVANT_INNOVATION_MANDATE` | o mandato inclui financiar, fomentar ou operar instrumentos relevantes de ciência, tecnologia, inovação ou empreendedorismo tecnológico | missão, competência legal, instrumentos ou programas declarados oficialmente | a atuação é apoio genérico, exclusivamente regulatória, educacional ou sem mecanismo relacionado à inovação demonstrado |
+| `AGY_BRAZIL_RELEVANCE` | a agência atua no Brasil ou oferece mecanismos materialmente acessíveis a organizações brasileiras | jurisdição brasileira declarada ou regra oficial de participação/benefício para organizações brasileiras | a relação com o Brasil é apenas circunstancial, decorre de parceria isolada ou não demonstra acesso/efeito para o público-alvo |
+
+Um único prompt genérico para todos os atores é proibido até avaliação demonstrar
+equivalência entre os classificadores por `kind`.
 
 ### Explorar, Radar e Escrita
 
