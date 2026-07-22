@@ -79,8 +79,6 @@
 
 | Comando/verificação | Resultado |
 |---|---|
-| Comando/verificação | Resultado |
-|---|---|---|
 | `pytest tests/unit/test_relevance.py` | 87 passed |
 | `pytest tests/unit/test_hardening_pr4.py` (triagem) | 16 passed |
 | `ruff check src/radar/domain/relevance.py src/radar/domain/__init__.py tests/unit/test_relevance.py` | All checks passed |
@@ -93,4 +91,15 @@
 
 ## Auditoria Codex
 
-**Veredito:** `pendente`
+**Veredito:** `aprovado`
+
+- Revisados os commits `8a35e19d3`, `4c32ef89c` e `9d85ab6a7` contra a
+  spec e o plano RT00-T01.
+- Reproduzidos `103 passed` nos testes de domínio e de compatibilidade com a
+  triagem; Ruff e `git diff --check` limpos.
+- Confirmada a rejeição de `kind` incompatível nos subtipos e dos estados
+  inconsistentes entre `decision`, `reason_codes` e `exclusion_codes`.
+- Confirmado o round-trip pela união discriminada preservando os quatro
+  subtipos concretos.
+- A taxonomia de reason codes de atores permanece corretamente adiada para
+  RT00-T02; essa task não foi iniciada.
