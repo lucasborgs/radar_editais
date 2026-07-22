@@ -1,0 +1,198 @@
+[
+  {
+    "case_id": "triage-tavily-082",
+    "kind": "opportunity",
+    "source_record_id": "triage-tavily-082",
+    "source_ref": "legacy_triage_case",
+    "as_of": "2026-06-10",
+    "verdict": {
+      "decision": "in_scope",
+      "reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION", "R3_ACTIONABLE", "R4_RELEVANT_BENEFIT", "R5_BRAZIL_RELEVANCE"],
+      "exclusion_codes": [],
+      "evidence": [
+        {
+          "code": "R1_ENTERPRISE_PATH",
+          "quote": "Fapesc lança edital de apoio à internacionalização de empresas",
+          "source": "landing_page",
+          "locator": {"document": "news.confap.org.br", "page": null}
+        },
+        {
+          "code": "R4_RELEVANT_BENEFIT",
+          "quote": "investimento de até R$ 2 milhões",
+          "source": "landing_page",
+          "locator": {"document": "news.confap.org.br", "page": null}
+        }
+      ],
+      "missing_information": [],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "Extraído do golden triage existente (expected=true, review=false). Title e snippet confirmam edital Fapesc para internacionalização de empresas catarinenses com subvenção de até R$2M. Conteúdo truncado (1500 chars) — evidência de quote extraída do title/snippet. R2_TECH_INNOVATION inferido do contexto de internacionalização de inovação. R3_ACTIONABLE satisfeito por ser edital numerado com fluxo de candidatura. R5_BRAZIL_RELEVANCE: empresas catarinenses."
+  },
+  {
+    "case_id": "triage-dou-000",
+    "kind": "opportunity",
+    "source_record_id": "triage-dou-000",
+    "source_ref": "legacy_triage_case",
+    "as_of": "2026-06-10",
+    "verdict": {
+      "decision": "out_of_scope",
+      "reason_codes": ["X3_GENERIC_PROCUREMENT"],
+      "exclusion_codes": ["X3_GENERIC_PROCUREMENT"],
+      "evidence": [
+        {
+          "code": "X3_GENERIC_PROCUREMENT",
+          "quote": "Chamada Pública Nº 001/2026, destinada à aquisição de gêneros alimentícios da Agricultura Familiar e do Empreendedor Familiar Rural para atendimento ao Programa Nacional de Alimentação Escolar - PNAE",
+          "source": "edital",
+          "locator": {"document": "DOU 2026-06-10 Seção 3 p.497"}
+        }
+      ],
+      "missing_information": [],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "Extraído do golden triage (expected=false, review=false). Compra pública de alimentos para merenda escolar — sem componente de inovação, encomenda tecnológica, sandbox ou desafio de desenvolvimento. X3_GENERIC_PROCUREMENT."
+  },
+  {
+    "case_id": "triage-tavily-084",
+    "kind": "opportunity",
+    "source_record_id": "triage-tavily-084",
+    "source_ref": "legacy_triage_case",
+    "as_of": "2026-06-10",
+    "verdict": {
+      "decision": "out_of_scope",
+      "reason_codes": ["X1_ACADEMIC_ONLY"],
+      "exclusion_codes": ["X1_ACADEMIC_ONLY"],
+      "evidence": [
+        {
+          "code": "X1_ACADEMIC_ONLY",
+          "quote": "FAPERN e SESED lançam edital para bolsas de pesquisa",
+          "source": "landing_page",
+          "locator": {"document": "news.confap.org.br"}
+        }
+      ],
+      "missing_information": [],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "Extraído do golden triage (expected=false, review=false). Bolsa de pesquisa — exclusivamente para estudante/pesquisador, sem caminho material de participação empresarial. X1_ACADEMIC_ONLY."
+  },
+  {
+    "case_id": "triage-tavily-118",
+    "kind": "opportunity",
+    "source_record_id": "triage-tavily-118",
+    "source_ref": "legacy_triage_case",
+    "as_of": "2026-06-10",
+    "verdict": {
+      "decision": "out_of_scope",
+      "reason_codes": ["X7_NO_ENTERPRISE_PATH"],
+      "exclusion_codes": ["X7_NO_ENTERPRISE_PATH"],
+      "evidence": [
+        {
+          "code": "X7_NO_ENTERPRISE_PATH",
+          "quote": "credenciar incubadoras para o fornecimento de serviços em projetos apoiados pelo Programa PIPE da FAPESP",
+          "source": "landing_page",
+          "locator": {"document": "fapesp.br/pipe/2026-credenciamento"}
+        }
+      ],
+      "missing_information": [],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "Decisão do proprietário: credenciamento de incubadoras é X7_NO_ENTERPRISE_PATH porque o candidato ao instrumento é a incubadora, não a startup/PME tecnológica atendida pelo Radar."
+  },
+  {
+    "case_id": "triage-tavily-079",
+    "kind": "opportunity",
+    "source_record_id": "triage-tavily-079",
+    "source_ref": "legacy_triage_case",
+    "as_of": "2026-06-10",
+    "verdict": {
+      "decision": "needs_review",
+      "reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION"],
+      "exclusion_codes": [],
+      "evidence": [
+        {
+          "code": "R2_TECH_INNOVATION",
+          "quote": "5ª Chamada Conjunta Multitemática do grupo EU-LAC, formado por agências de fomento à CT&I",
+          "source": "landing_page",
+          "locator": {"document": "CONFAP-10-1.pdf"}
+        }
+      ],
+      "missing_information": [
+        "R1_ENTERPRISE_PATH: não está claro se empresas podem liderar propostas ou são apenas co-partícipes",
+        "R3_ACTIONABLE: prazo de maio/2025 possivelmente encerrado — sem confirmação de fluxo vigente",
+        "R4_RELEVANT_BENEFIT: valor do benefício não especificado no snippet disponível",
+        "R5_BRAZIL_RELEVANCE: agências brasileiras (CONFAP, CNPq) participam, mas elegibilidade de PMEs não está demonstrada"
+      ],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "Extraído do golden triage (expected=true, review=true). PDF de chamada EU-LAC. Evidência insuficiente para R1 (participação empresarial) e R3 (vigência). Marcar needs_review até decisão do proprietário."
+  },
+  {
+    "case_id": "triage-tavily-098",
+    "kind": "opportunity",
+    "source_record_id": "triage-tavily-098",
+    "source_ref": "legacy_triage_case",
+    "as_of": "2026-06-10",
+    "verdict": {
+      "decision": "needs_review",
+      "reason_codes": ["R2_TECH_INNOVATION"],
+      "exclusion_codes": [],
+      "evidence": [
+        {
+          "code": "R2_TECH_INNOVATION",
+          "quote": "Os Desafios de Inovação Aberta são a porta de entrada para quem busca cocriar soluções com a Claro",
+          "source": "landing_page",
+          "locator": {"document": "beon.claro.com.br/desafios"}
+        }
+      ],
+      "missing_information": [
+        "R1_ENTERPRISE_PATH: startups/empresas são elegíveis, mas é hub de múltiplos desafios — não há um desafio individual com regulamento próprio",
+        "R3_ACTIONABLE: o hub em si não é uma chamada ou fluxo de candidatura único; cada desafio teria seu próprio fluxo",
+        "R4_RELEVANT_BENEFIT: sem informação de prêmio, piloto ou benefício concreto por desafio",
+        "R5_BRAZIL_RELEVANCE: provável (Claro opera no Brasil) mas não explicitado na página"
+      ],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "Decisão do proprietário: hubs como beOn são fontes de descoberta, não oportunidades publicáveis. needs_review até que um desafio individual concreto seja identificado. O hub inteiro não pode virar oportunidade."
+  },
+  {
+    "case_id": "triage-tavily-093",
+    "kind": "opportunity",
+    "source_record_id": "triage-tavily-093",
+    "source_ref": "legacy_triage_case",
+    "as_of": "2026-06-10",
+    "verdict": {
+      "decision": "in_scope",
+      "reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION", "R3_ACTIONABLE", "R4_RELEVANT_BENEFIT", "R5_BRAZIL_RELEVANCE"],
+      "exclusion_codes": [],
+      "evidence": [
+        {
+          "code": "R1_ENTERPRISE_PATH",
+          "quote": "apoia empresas",
+          "source": "landing_page",
+          "locator": {"document": "gov.br/mcti"}
+        },
+        {
+          "code": "R2_TECH_INNOVATION",
+          "quote": "tecnologias digitais avançadas",
+          "source": "landing_page",
+          "locator": {"document": "gov.br/mcti"}
+        },
+        {
+          "code": "R4_RELEVANT_BENEFIT",
+          "quote": "R$ 300 milhões",
+          "source": "landing_page",
+          "locator": {"document": "gov.br/mcti"}
+        }
+      ],
+      "missing_information": [],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "Extraído do golden triage (expected=true, review=true). Title 'Edital de R$ 300 milhões apoia empresas no desenvolvimento de tecnologias digitais avançadas' fornece evidência de todos os 5 R codes. Conteúdo truncado (1500 chars de nav HTML do gov.br) não permite quotes adicionais. Incluído como segundo in_scope conforme autorização do plano."
+  }
+]

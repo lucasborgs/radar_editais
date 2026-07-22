@@ -369,7 +369,7 @@ class TestActorVerdict:
 
 class TestInvestorVerdict:
     def test_kind_default(self):
-        v = InvestorVerdict(decision=RelevanceDecision.IN_SCOPE)
+        v = InvestorVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
         assert v.kind is ClassificationKind.INVESTOR
 
     def test_wrong_kind_rejected(self):
@@ -389,7 +389,7 @@ class TestInvestorVerdict:
 
 class TestIctVerdict:
     def test_kind_default(self):
-        v = IctVerdict(decision=RelevanceDecision.IN_SCOPE)
+        v = IctVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
         assert v.kind is ClassificationKind.ICT
 
     def test_wrong_kind_rejected(self):
@@ -397,14 +397,14 @@ class TestIctVerdict:
             IctVerdict(decision=RelevanceDecision.IN_SCOPE, kind=ClassificationKind.INVESTOR)
 
     def test_round_trip_preserves_kind(self):
-        v = IctVerdict(decision=RelevanceDecision.IN_SCOPE)
+        v = IctVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
         dumped = json.loads(v.model_dump_json())
         assert dumped["kind"] == "ict"
 
 
 class TestProgramVerdict:
     def test_kind_default(self):
-        v = ProgramVerdict(decision=RelevanceDecision.IN_SCOPE)
+        v = ProgramVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
         assert v.kind is ClassificationKind.PROGRAM
 
     def test_wrong_kind_rejected(self):
@@ -414,7 +414,7 @@ class TestProgramVerdict:
 
 class TestAgencyVerdict:
     def test_kind_default(self):
-        v = AgencyVerdict(decision=RelevanceDecision.IN_SCOPE)
+        v = AgencyVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
         assert v.kind is ClassificationKind.AGENCY
 
     def test_wrong_kind_rejected(self):
@@ -422,7 +422,7 @@ class TestAgencyVerdict:
             AgencyVerdict(decision=RelevanceDecision.IN_SCOPE, kind=ClassificationKind.ICT)
 
     def test_round_trip_preserves_kind(self):
-        v = AgencyVerdict(decision=RelevanceDecision.IN_SCOPE)
+        v = AgencyVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
         dumped = json.loads(v.model_dump_json())
         assert dumped["kind"] == "agency"
 
@@ -444,18 +444,18 @@ class TestActorVerdictDiscriminatedUnion:
         assert restored.kind is ClassificationKind.INVESTOR
 
     def test_adapter_deserializes_ict(self):
-        raw = {"decision": "in_scope", "kind": "ict", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
+        raw = {"decision": "needs_review", "kind": "ict", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
         restored = actor_verdict_adapter.validate_json(json.dumps(raw))
         assert isinstance(restored, IctVerdict)
         assert restored.kind is ClassificationKind.ICT
 
     def test_adapter_deserializes_program(self):
-        raw = {"decision": "in_scope", "kind": "program", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
+        raw = {"decision": "needs_review", "kind": "program", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
         restored = actor_verdict_adapter.validate_json(json.dumps(raw))
         assert isinstance(restored, ProgramVerdict)
 
     def test_adapter_deserializes_agency(self):
-        raw = {"decision": "in_scope", "kind": "agency", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
+        raw = {"decision": "needs_review", "kind": "agency", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
         restored = actor_verdict_adapter.validate_json(json.dumps(raw))
         assert isinstance(restored, AgencyVerdict)
 
@@ -546,3 +546,150 @@ class TestHelpers:
     ])
     def test_is_exclusion_code_false(self, code):
         assert not is_exclusion_code(code)
+
+
+# ── Actor Reason Codes (RT00-T02) ──────────────────────────────────────────
+
+
+class TestActorReasonCodes:
+    def test_investor_reason_code_values(self):
+        from radar.domain.relevance import InvestorReasonCode
+        assert {c.value for c in InvestorReasonCode} == {
+            "INV_IDENTITY_VERIFIED", "INV_TECH_STARTUP_ACTIVITY", "INV_BRAZIL_RELEVANCE",
+        }
+
+    def test_ict_reason_code_values(self):
+        from radar.domain.relevance import IctReasonCode
+        assert {c.value for c in IctReasonCode} == {
+            "ICT_IDENTITY_VERIFIED", "ICT_INSTITUTIONAL_LINK_VERIFIED",
+            "ICT_ENTERPRISE_TECH_COOP", "ICT_CURRENT_STATUS_VERIFIED",
+        }
+
+    def test_program_reason_code_values(self):
+        from radar.domain.relevance import ProgramReasonCode
+        assert {c.value for c in ProgramReasonCode} == {
+            "PRG_IDENTITY_OPERATOR_VERIFIED", "PRG_RELEVANT_INNOVATION_MECHANISM",
+            "PRG_ENTERPRISE_RELEVANCE",
+        }
+
+    def test_agency_reason_code_values(self):
+        from radar.domain.relevance import AgencyReasonCode
+        assert {c.value for c in AgencyReasonCode} == {
+            "AGY_IDENTITY_VERIFIED", "AGY_RELEVANT_INNOVATION_MANDATE",
+            "AGY_BRAZIL_RELEVANCE",
+        }
+
+    def test_string_round_trip(self):
+        from radar.domain.relevance import (
+            AgencyReasonCode,
+            IctReasonCode,
+            InvestorReasonCode,
+            ProgramReasonCode,
+        )
+        for enum_cls in (InvestorReasonCode, IctReasonCode, ProgramReasonCode, AgencyReasonCode):
+            for e in enum_cls:
+                assert enum_cls(e.value) is e
+
+    def test_separate_enums_prevent_cross_kind_usage(self):
+        from radar.domain.relevance import IctReasonCode, InvestorReasonCode
+        assert InvestorReasonCode.INV_IDENTITY_VERIFIED.value not in {c.value for c in IctReasonCode}
+        assert IctReasonCode.ICT_IDENTITY_VERIFIED.value not in {c.value for c in InvestorReasonCode}
+
+    def test_investor_in_scope_requires_all_codes(self):
+        from radar.domain.relevance import InvestorReasonCode, InvestorVerdict, RelevanceDecision
+        with pytest.raises(ValidationError, match="requires all"):
+            InvestorVerdict(
+                decision=RelevanceDecision.IN_SCOPE,
+                reason_codes=[InvestorReasonCode.INV_IDENTITY_VERIFIED],
+            )
+
+    def test_investor_in_scope_all_codes_accepted(self):
+        from radar.domain.relevance import InvestorReasonCode, InvestorVerdict, RelevanceDecision
+        v = InvestorVerdict(
+            decision=RelevanceDecision.IN_SCOPE,
+            reason_codes=list(InvestorReasonCode),
+        )
+        assert v.decision is RelevanceDecision.IN_SCOPE
+
+    def test_ict_in_scope_requires_all_codes(self):
+        from radar.domain.relevance import IctReasonCode, IctVerdict, RelevanceDecision
+        with pytest.raises(ValidationError, match="requires all"):
+            IctVerdict(
+                decision=RelevanceDecision.IN_SCOPE,
+                reason_codes=[IctReasonCode.ICT_IDENTITY_VERIFIED],
+            )
+
+    def test_ict_in_scope_all_codes_accepted(self):
+        from radar.domain.relevance import IctReasonCode, IctVerdict, RelevanceDecision
+        v = IctVerdict(
+            decision=RelevanceDecision.IN_SCOPE,
+            reason_codes=list(IctReasonCode),
+        )
+        assert v.decision is RelevanceDecision.IN_SCOPE
+
+    def test_program_in_scope_requires_all_codes(self):
+        from radar.domain.relevance import ProgramReasonCode, ProgramVerdict, RelevanceDecision
+        with pytest.raises(ValidationError, match="requires all"):
+            ProgramVerdict(
+                decision=RelevanceDecision.IN_SCOPE,
+                reason_codes=[ProgramReasonCode.PRG_IDENTITY_OPERATOR_VERIFIED],
+            )
+
+    def test_program_in_scope_all_codes_accepted(self):
+        from radar.domain.relevance import ProgramReasonCode, ProgramVerdict, RelevanceDecision
+        v = ProgramVerdict(
+            decision=RelevanceDecision.IN_SCOPE,
+            reason_codes=list(ProgramReasonCode),
+        )
+        assert v.decision is RelevanceDecision.IN_SCOPE
+
+    def test_agency_in_scope_requires_all_codes(self):
+        from radar.domain.relevance import AgencyReasonCode, AgencyVerdict, RelevanceDecision
+        with pytest.raises(ValidationError, match="requires all"):
+            AgencyVerdict(
+                decision=RelevanceDecision.IN_SCOPE,
+                reason_codes=[AgencyReasonCode.AGY_IDENTITY_VERIFIED],
+            )
+
+    def test_agency_in_scope_all_codes_accepted(self):
+        from radar.domain.relevance import AgencyReasonCode, AgencyVerdict, RelevanceDecision
+        v = AgencyVerdict(
+            decision=RelevanceDecision.IN_SCOPE,
+            reason_codes=list(AgencyReasonCode),
+        )
+        assert v.decision is RelevanceDecision.IN_SCOPE
+
+    def test_investor_evidence_code_typed(self):
+        from radar.domain.relevance import InvestorEvidence, InvestorReasonCode
+        ev = InvestorEvidence(code=InvestorReasonCode.INV_IDENTITY_VERIFIED)
+        assert ev.code is InvestorReasonCode.INV_IDENTITY_VERIFIED
+
+    def test_ict_evidence_code_typed(self):
+        from radar.domain.relevance import IctEvidence, IctReasonCode
+        ev = IctEvidence(code=IctReasonCode.ICT_IDENTITY_VERIFIED)
+        assert ev.code is IctReasonCode.ICT_IDENTITY_VERIFIED
+
+    def test_program_evidence_code_typed(self):
+        from radar.domain.relevance import ProgramEvidence, ProgramReasonCode
+        ev = ProgramEvidence(code=ProgramReasonCode.PRG_IDENTITY_OPERATOR_VERIFIED)
+        assert ev.code is ProgramReasonCode.PRG_IDENTITY_OPERATOR_VERIFIED
+
+    def test_agency_evidence_code_typed(self):
+        from radar.domain.relevance import AgencyEvidence, AgencyReasonCode
+        ev = AgencyEvidence(code=AgencyReasonCode.AGY_IDENTITY_VERIFIED)
+        assert ev.code is AgencyReasonCode.AGY_IDENTITY_VERIFIED
+
+    def test_cross_kind_evidence_rejected_at_type_level(self):
+        from radar.domain.relevance import IctReasonCode, InvestorEvidence
+        with pytest.raises(ValidationError):
+            InvestorEvidence(code=IctReasonCode.ICT_IDENTITY_VERIFIED)
+
+    def test_needs_review_allows_subset(self):
+        from radar.domain.relevance import InvestorReasonCode, InvestorVerdict, RelevanceDecision
+        v = InvestorVerdict(
+            decision=RelevanceDecision.NEEDS_REVIEW,
+            reason_codes=[InvestorReasonCode.INV_IDENTITY_VERIFIED],
+            missing_information=["INV_TECH_STARTUP_ACTIVITY"],
+        )
+        assert v.decision is RelevanceDecision.NEEDS_REVIEW
+        assert len(v.reason_codes) == 1

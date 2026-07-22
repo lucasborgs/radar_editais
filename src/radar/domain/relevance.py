@@ -71,6 +71,31 @@ class EvidenceLocator(BaseModel):
         return v
 
 
+class InvestorReasonCode(str, Enum):
+    INV_IDENTITY_VERIFIED = "INV_IDENTITY_VERIFIED"
+    INV_TECH_STARTUP_ACTIVITY = "INV_TECH_STARTUP_ACTIVITY"
+    INV_BRAZIL_RELEVANCE = "INV_BRAZIL_RELEVANCE"
+
+
+class IctReasonCode(str, Enum):
+    ICT_IDENTITY_VERIFIED = "ICT_IDENTITY_VERIFIED"
+    ICT_INSTITUTIONAL_LINK_VERIFIED = "ICT_INSTITUTIONAL_LINK_VERIFIED"
+    ICT_ENTERPRISE_TECH_COOP = "ICT_ENTERPRISE_TECH_COOP"
+    ICT_CURRENT_STATUS_VERIFIED = "ICT_CURRENT_STATUS_VERIFIED"
+
+
+class ProgramReasonCode(str, Enum):
+    PRG_IDENTITY_OPERATOR_VERIFIED = "PRG_IDENTITY_OPERATOR_VERIFIED"
+    PRG_RELEVANT_INNOVATION_MECHANISM = "PRG_RELEVANT_INNOVATION_MECHANISM"
+    PRG_ENTERPRISE_RELEVANCE = "PRG_ENTERPRISE_RELEVANCE"
+
+
+class AgencyReasonCode(str, Enum):
+    AGY_IDENTITY_VERIFIED = "AGY_IDENTITY_VERIFIED"
+    AGY_RELEVANT_INNOVATION_MANDATE = "AGY_RELEVANT_INNOVATION_MANDATE"
+    AGY_BRAZIL_RELEVANCE = "AGY_BRAZIL_RELEVANCE"
+
+
 class _BaseEvidence(BaseModel):
     model_config = {"extra": "forbid"}
 
@@ -84,7 +109,23 @@ class RelevanceEvidence(_BaseEvidence):
 
 
 class ActorEvidence(_BaseEvidence):
-    code: str  # taxonomia de reason codes de atores definida em RT00-T02
+    code: str
+
+
+class InvestorEvidence(ActorEvidence):
+    code: InvestorReasonCode
+
+
+class IctEvidence(ActorEvidence):
+    code: IctReasonCode
+
+
+class ProgramEvidence(ActorEvidence):
+    code: ProgramReasonCode
+
+
+class AgencyEvidence(ActorEvidence):
+    code: AgencyReasonCode
 
 
 class RelevanceVerdict(BaseModel):
@@ -146,8 +187,6 @@ class RelevanceVerdict(BaseModel):
 
 class ActorVerdict(BaseModel):
     """Classificação de relevância de um ator (investidor, ICT, etc.).
-
-    Reason codes de atores serão definidos em RT00-T02.
     """
     model_config = {"extra": "forbid"}
 
@@ -161,18 +200,78 @@ class ActorVerdict(BaseModel):
 
 class InvestorVerdict(ActorVerdict):
     kind: Literal[ClassificationKind.INVESTOR] = ClassificationKind.INVESTOR
+    reason_codes: list[InvestorReasonCode] = Field(default_factory=list)
+    evidence: list[InvestorEvidence] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_investor_invariants(self) -> InvestorVerdict:
+        if self.decision is RelevanceDecision.IN_SCOPE:
+            required = set(InvestorReasonCode)
+            present = set(self.reason_codes)
+            missing = required - present
+            if missing:
+                raise ValueError(
+                    f"investor in_scope requires all InvestorReasonCodes, missing: "
+                    f"{[m.value for m in sorted(missing, key=lambda x: x.value)]}"
+                )
+        return self
 
 
 class IctVerdict(ActorVerdict):
     kind: Literal[ClassificationKind.ICT] = ClassificationKind.ICT
+    reason_codes: list[IctReasonCode] = Field(default_factory=list)
+    evidence: list[IctEvidence] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_ict_invariants(self) -> IctVerdict:
+        if self.decision is RelevanceDecision.IN_SCOPE:
+            required = set(IctReasonCode)
+            present = set(self.reason_codes)
+            missing = required - present
+            if missing:
+                raise ValueError(
+                    f"ict in_scope requires all IctReasonCodes, missing: "
+                    f"{[m.value for m in sorted(missing, key=lambda x: x.value)]}"
+                )
+        return self
 
 
 class ProgramVerdict(ActorVerdict):
     kind: Literal[ClassificationKind.PROGRAM] = ClassificationKind.PROGRAM
+    reason_codes: list[ProgramReasonCode] = Field(default_factory=list)
+    evidence: list[ProgramEvidence] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_program_invariants(self) -> ProgramVerdict:
+        if self.decision is RelevanceDecision.IN_SCOPE:
+            required = set(ProgramReasonCode)
+            present = set(self.reason_codes)
+            missing = required - present
+            if missing:
+                raise ValueError(
+                    f"program in_scope requires all ProgramReasonCodes, missing: "
+                    f"{[m.value for m in sorted(missing, key=lambda x: x.value)]}"
+                )
+        return self
 
 
 class AgencyVerdict(ActorVerdict):
     kind: Literal[ClassificationKind.AGENCY] = ClassificationKind.AGENCY
+    reason_codes: list[AgencyReasonCode] = Field(default_factory=list)
+    evidence: list[AgencyEvidence] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_agency_invariants(self) -> AgencyVerdict:
+        if self.decision is RelevanceDecision.IN_SCOPE:
+            required = set(AgencyReasonCode)
+            present = set(self.reason_codes)
+            missing = required - present
+            if missing:
+                raise ValueError(
+                    f"agency in_scope requires all AgencyReasonCodes, missing: "
+                    f"{[m.value for m in sorted(missing, key=lambda x: x.value)]}"
+                )
+        return self
 
 
 ActorVerdictUnion = Annotated[
@@ -196,10 +295,18 @@ __all__ = [
     "InclusionCode",
     "ExclusionCode",
     "ClassificationKind",
+    "InvestorReasonCode",
+    "IctReasonCode",
+    "ProgramReasonCode",
+    "AgencyReasonCode",
     "EvidenceSource",
     "EvidenceLocator",
     "RelevanceEvidence",
     "ActorEvidence",
+    "InvestorEvidence",
+    "IctEvidence",
+    "ProgramEvidence",
+    "AgencyEvidence",
     "RelevanceVerdict",
     "ActorVerdict",
     "InvestorVerdict",

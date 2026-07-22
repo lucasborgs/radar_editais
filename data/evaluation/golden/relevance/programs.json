@@ -1,0 +1,74 @@
+[
+  {
+    "case_id": "programa:pipe-fapesp",
+    "kind": "program",
+    "source_record_id": "programa:pipe-fapesp",
+    "source_ref": "curated_record",
+    "as_of": "2026-07-22",
+    "verdict": {
+      "decision": "in_scope",
+      "kind": "program",
+      "reason_codes": ["PRG_IDENTITY_OPERATOR_VERIFIED", "PRG_RELEVANT_INNOVATION_MECHANISM", "PRG_ENTERPRISE_RELEVANCE"],
+      "evidence": [
+        {
+          "code": "PRG_IDENTITY_OPERATOR_VERIFIED",
+          "quote": "PIPE (Pesquisa Inovativa em Pequenas Empresas) — operador FAPESP. Site: https://fapesp.br/pipe",
+          "source": "curated_record",
+          "locator": {"document": "data/silver/programas.json"}
+        },
+        {
+          "code": "PRG_RELEVANT_INNOVATION_MECHANISM",
+          "quote": "Subvenção econômica de alto valor para pesquisa, equipamentos e bolsas. Tipo: subvencao. Formato: fluxo-continuo. Ticket: R$300k–R$1,5M.",
+          "source": "curated_record",
+          "locator": {"document": "data/silver/programas.json"}
+        },
+        {
+          "code": "PRG_ENTERPRISE_RELEVANCE",
+          "quote": "Programa de pesquisa tecnológica em pequenas empresas, em fases de prova de conceito, desenvolvimento e comercialização",
+          "source": "curated_record",
+          "locator": {"document": "data/silver/programas.json"}
+        }
+      ],
+      "missing_information": [],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "Proposital — baseado no registro curado de programas.json. Identidade/operador (FAPESP), mecanismo (subvencao, fluxo-continuo) e relação com empresas (pequenas empresas, PIPE) estão sustentados pelo curado. Ticket_range presente."
+  },
+  {
+    "case_id": "programa:centelha",
+    "kind": "program",
+    "source_record_id": "programa:centelha",
+    "source_ref": "curated_record",
+    "as_of": "2026-07-22",
+    "verdict": {
+      "decision": "in_scope",
+      "kind": "program",
+      "reason_codes": ["PRG_IDENTITY_OPERATOR_VERIFIED", "PRG_RELEVANT_INNOVATION_MECHANISM", "PRG_ENTERPRISE_RELEVANCE"],
+      "evidence": [
+        {
+          "code": "PRG_IDENTITY_OPERATOR_VERIFIED",
+          "quote": "Programa Centelha — operador: MCTI / FINEP / FAPs estaduais. Formato: edital-periodico, cadência anual.",
+          "source": "curated_record",
+          "locator": {"document": "data/silver/programas.json"}
+        },
+        {
+          "code": "PRG_RELEVANT_INNOVATION_MECHANISM",
+          "quote": "Subvenção econômica (capital não-reembolsável), bolsas, mentorias e capacitação. Ticket: R$50k–R$130k. Tipo: subvencao.",
+          "source": "curated_record",
+          "locator": {"document": "data/silver/programas.json"}
+        },
+        {
+          "code": "PRG_ENTERPRISE_RELEVANCE",
+          "quote": "Programa nacional de estímulo à criação de empreendimentos inovadores: transforma ideias em negócios com capacitação e subvenção",
+          "source": "curated_record",
+          "locator": {"document": "data/silver/programas.json"}
+        }
+      ],
+      "missing_information": [],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "Proposital — Centelha também é subvencao (não marcar mecanismo como desconhecido). Operador triplo (MCTI/FINEP/FAPs) verificado. Relação com empreendimentos inovadores e startups confirmada."
+  }
+]

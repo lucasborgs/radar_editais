@@ -1,0 +1,65 @@
+[
+  {
+    "source_id": "src:indicator-capital-site",
+    "url": "https://indicator.capital/",
+    "retrieved_at": "2026-07-22",
+    "quote": "Indicator Capital — Venture capital de deep-tech B2B (\"boosting deep-tech heroes\")",
+    "kind": "investor",
+    "source_record_id": "investidor:indicator-capital",
+    "hash_sha256": "f246ddf91ee7250240c72c69c9be9822ee39252cfd71ee2e37c1abf87c616af6"
+  },
+  {
+    "source_id": "src:indicator-capital-tese",
+    "url": "https://indicator.capital/",
+    "retrieved_at": "2026-07-22",
+    "quote": "Venture capital de deep-tech B2B (\"boosting deep-tech heroes\"); aposta em times com risco tecnológico real.",
+    "kind": "investor",
+    "source_record_id": "investidor:indicator-capital",
+    "hash_sha256": "151010ad633770e5c4360febfa3f22bbb9ab6c521278efd3dcb4857899d05fea"
+  },
+  {
+    "source_id": "src:kptl-site",
+    "url": "https://kptl.com.br",
+    "retrieved_at": "2026-07-22",
+    "quote": "KPTL — Venture capital de deep-tech early-stage (ex-Inseed)",
+    "kind": "investor",
+    "source_record_id": "investidor:kptl",
+    "hash_sha256": "2cb5bb23cdde3d48d5f078dae6e2c2fbdcaf3988f41ce5874d35ed9b59ac9465"
+  },
+  {
+    "source_id": "src:pipe-fapesp-record",
+    "url": "https://fapesp.br/pipe",
+    "retrieved_at": "2026-07-22",
+    "quote": "PIPE (Pesquisa Inovativa em Pequenas Empresas) — operador FAPESP. Subvenção econômica, fluxo contínuo.",
+    "kind": "program",
+    "source_record_id": "programa:pipe-fapesp",
+    "hash_sha256": "5e68177605ff8875202ef142c34d1eb1786e6ae12073c5b67d903bd09d0d615f"
+  },
+  {
+    "source_id": "src:centelha-record",
+    "url": "https://programacentelha.com.br",
+    "retrieved_at": "2026-07-22",
+    "quote": "Programa Centelha — MCTI / FINEP / FAPs estaduais. Subvenção econômica para empreendimentos inovadores.",
+    "kind": "program",
+    "source_record_id": "programa:centelha",
+    "hash_sha256": "d7eb817744f029687c55ed7d9faa5dd101bda681f26739a1f9c86cb7b3f0ba96"
+  },
+  {
+    "source_id": "src:finep-schema",
+    "url": "https://finep.gov.br",
+    "retrieved_at": "2026-07-22",
+    "quote": "FINEP — Financiadora de Estudos e Projetos. Empresa pública federal vinculada ao MCTI. Fonte canônica de fomento à inovação.",
+    "kind": "agency",
+    "source_record_id": "agencia:finep",
+    "hash_sha256": "8e6633783c3adeaf8470042e55e0dfdee4ceb18201d03cbea32c8fda561b7e75"
+  },
+  {
+    "source_id": "src:fapesp-schema",
+    "url": "https://fapesp.br",
+    "retrieved_at": "2026-07-22",
+    "quote": "FAPESP — Fundação de Amparo à Pesquisa do Estado de São Paulo. Opera PIPE e demais programas de fomento.",
+    "kind": "agency",
+    "source_record_id": "agencia:fapesp",
+    "hash_sha256": "a72e9ff41281d539ba1d932013c5bbed6ba9a0f6d38d2b6eb39826c00b8b04c1"
+  }
+]

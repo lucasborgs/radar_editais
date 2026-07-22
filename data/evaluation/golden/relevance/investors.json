@@ -1,0 +1,68 @@
+[
+  {
+    "case_id": "investidor:indicator-capital",
+    "kind": "investor",
+    "source_record_id": "investidor:indicator-capital",
+    "source_ref": "curated_record",
+    "as_of": "2026-07-22",
+    "verdict": {
+      "decision": "in_scope",
+      "kind": "investor",
+      "reason_codes": ["INV_IDENTITY_VERIFIED", "INV_TECH_STARTUP_ACTIVITY", "INV_BRAZIL_RELEVANCE"],
+      "evidence": [
+        {
+          "code": "INV_IDENTITY_VERIFIED",
+          "quote": "Indicator Capital — Venture capital de deep-tech B2B; site: https://indicator.capital",
+          "source": "curated_record",
+          "locator": {"document": "data/silver/investidores.json"}
+        },
+        {
+          "code": "INV_TECH_STARTUP_ACTIVITY",
+          "quote": "Venture capital de deep-tech B2B (\"boosting deep-tech heroes\"); aposta em times com risco tecnológico real. Portfólio: https://indicator.capital/portfolio/",
+          "source": "curated_record",
+          "locator": {"document": "data/silver/investidores.json"}
+        },
+        {
+          "code": "INV_BRAZIL_RELEVANCE",
+          "quote": "Fundo brasileiro de VC com atuação em startups nacionais; site .capital sem indicação de jurisdição estrangeira",
+          "source": "curated_record",
+          "locator": {"document": "data/silver/investidores.json"}
+        }
+      ],
+      "missing_information": [
+        "ticket_range não preenchido (ticket_min/ticket_max ausentes no registro curado)"
+      ],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "Proposital — baseado no registro curado de investidores.json. Possui source_urls e site verificáveis. ticket_range em missing_information — não bloqueia in_scope por decisão do proprietário (§5)."
+  },
+  {
+    "case_id": "investidor:kptl",
+    "kind": "investor",
+    "source_record_id": "investidor:kptl",
+    "source_ref": "curated_record",
+    "as_of": "2026-07-22",
+    "verdict": {
+      "decision": "needs_review",
+      "kind": "investor",
+      "reason_codes": ["INV_TECH_STARTUP_ACTIVITY"],
+      "evidence": [
+        {
+          "code": "INV_TECH_STARTUP_ACTIVITY",
+          "quote": "Venture capital de deep-tech early-stage (ex-Inseed); aposta em startups com risco tecnológico/científico real. Site: https://kptl.com.br",
+          "source": "curated_record",
+          "locator": {"document": "data/silver/investidores.json"}
+        }
+      ],
+      "missing_information": [
+        "INV_IDENTITY_VERIFIED: registro não possui source_urls — não é possível verificar identidade contra página oficial",
+        "INV_BRAZIL_RELEVANCE: verificado_em nulo — sem data de verificação; site .com.br sugere Brasil mas não confirmado",
+        "ticket_range não preenchido; verificado_em nulo"
+      ],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "Proposital — KPTL tem tese e site mas não possui source_urls nem verificado_em no registro curado. Necessita verificação de página oficial para INV_IDENTITY_VERIFIED. Ticket ausente não bloqueia (§5 do proprietário) — a decisão é por missing_information em identidade."
+  }
+]

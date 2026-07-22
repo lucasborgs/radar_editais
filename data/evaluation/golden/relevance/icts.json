@@ -1,0 +1,60 @@
+[
+  {
+    "case_id": "ict:embrapii:senai-cimatec",
+    "kind": "ict",
+    "source_record_id": "ict:embrapii:senai-cimatec",
+    "source_ref": "official_page",
+    "as_of": "2026-07-22",
+    "verdict": {
+      "decision": "needs_review",
+      "kind": "ict",
+      "reason_codes": ["ICT_IDENTITY_VERIFIED", "ICT_ENTERPRISE_TECH_COOP"],
+      "evidence": [
+        {
+          "code": "ICT_IDENTITY_VERIFIED",
+          "quote": "SENAI CIMATEC — unidade credenciada EMBRAPII, referência nacional em inovação industrial. URL: https://embrapii.org.br/unidades/",
+          "source": "official_page",
+          "locator": {"document": "embrapii.org.br"}
+        },
+        {
+          "code": "ICT_ENTERPRISE_TECH_COOP",
+          "quote": "Atuação em cooperação tecnológica com empresas em manufatura avançada, materiais, química e TICs",
+          "source": "official_page",
+          "locator": {"document": "embrapii.org.br"}
+        }
+      ],
+      "missing_information": [
+        "ICT_INSTITUTIONAL_LINK_VERIFIED: vínculo institucional (SENAI/BA) não verificado contra página oficial atual",
+        "ICT_CURRENT_STATUS_VERIFIED: status atual de credenciamento não verificado — bronze embrapii é efêmero e não versionado",
+        "competências e localização não verificadas contra fonte oficial",
+        "data_extracao indisponível — sem snapshot de evidência"
+      ],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "Proposital — candidato a in_scope mas bronze EMBRAPII não é versionado. Os dados de unidade conhecida (SENAI CIMATEC, BA) são de conhecimento público, mas sem snapshot oficial verificado. Requer coleta de snapshot oficial via actor_sources antes de promover. human_reviewed: false."
+  },
+  {
+    "case_id": "ict:embrapii:isa-ct",
+    "kind": "ict",
+    "source_record_id": "ict:embrapii:isa-ct",
+    "source_ref": "official_page",
+    "as_of": "2026-07-22",
+    "verdict": {
+      "decision": "needs_review",
+      "kind": "ict",
+      "reason_codes": [],
+      "evidence": [],
+      "missing_information": [
+        "ICT_IDENTITY_VERIFIED: identidade não verificada — sem snapshot de página oficial",
+        "ICT_INSTITUTIONAL_LINK_VERIFIED: vínculo institucional não documentado",
+        "ICT_ENTERPRISE_TECH_COOP: áreas de cooperação com empresas desconhecidas",
+        "ICT_CURRENT_STATUS_VERIFIED: status de credenciamento desconhecido",
+        "bronze EMBRAPII não versionado — sem dados de referência no repositório"
+      ],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": false,
+    "review_note": "ICT sem evidência suficiente. Nenhum reason code pode ser verificado. Exemplo de needs_review por ausência total de snapshot de evidência oficial. O bronze efêmero não permite verificação."
+  }
+]
