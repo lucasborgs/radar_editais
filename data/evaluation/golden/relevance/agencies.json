@@ -3,72 +3,92 @@
     "case_id": "agencia:finep",
     "kind": "agency",
     "source_record_id": "agencia:finep",
-    "source_ref": "official_page",
+    "source_ref": "src:finep-institucional",
     "as_of": "2026-07-22",
     "verdict": {
       "decision": "in_scope",
       "kind": "agency",
-      "reason_codes": ["AGY_IDENTITY_VERIFIED", "AGY_RELEVANT_INNOVATION_MANDATE", "AGY_BRAZIL_RELEVANCE"],
+      "reason_codes": [
+        "AGY_IDENTITY_VERIFIED",
+        "AGY_RELEVANT_INNOVATION_MANDATE",
+        "AGY_BRAZIL_RELEVANCE"
+      ],
       "evidence": [
         {
           "code": "AGY_IDENTITY_VERIFIED",
-          "quote": "FINEP — Financiadora de Estudos e Projetos. Empresa pública federal vinculada ao MCTI. Site: https://finep.gov.br",
+          "quote": "Finep — Financiadora de Estudos e Projetos. Empresa pública federal, vinculada ao Ministério da Ciência, Tecnologia e Inovação (MCTI).",
           "source": "official_page",
-          "locator": {"document": "docs/domain/sources/finep.md"}
+          "locator": {
+            "document": "finep.gov.br/sobre-a-finep"
+          }
         },
         {
           "code": "AGY_RELEVANT_INNOVATION_MANDATE",
-          "quote": "Agência de fomento à ciência, tecnologia e inovação. Opera subvenção econômica, crédito reembolsável, investimento direto. Mecanismos: subvencao, reembolsavel, investimento.",
+          "quote": "Há quase 60 anos, a Finep promove o desenvolvimento econômico e social do país por meio do fomento à ciência, tecnologia e inovação. Opera subvenção econômica, crédito, investimento e apoio institucional.",
           "source": "official_page",
-          "locator": {"document": "docs/domain/schema.md §5.4"}
+          "locator": {
+            "document": "finep.gov.br/sobre-a-finep"
+          }
         },
         {
           "code": "AGY_BRAZIL_RELEVANCE",
-          "quote": "Empresa pública federal brasileira. Fonte canônica no schema: finep → FINEP. Âmbito nacional.",
+          "quote": "Empresa pública federal brasileira. Sede: Praia do Flamengo 200, Rio de Janeiro/RJ. Vinculada ao MCTI. Atuação em todo o território nacional.",
           "source": "official_page",
-          "locator": {"document": "docs/domain/schema.md §5.4"}
+          "locator": {
+            "document": "finep.gov.br/sobre-a-finep"
+          }
         }
       ],
       "missing_information": [],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
     "human_reviewed": false,
-    "review_note": "Proposital — baseado no schema.md (§5.4 fontes_canonicas) e docs/domain/sources/finep.md. Identidade, mandato de inovação e relevância brasileira estão documentados. Evidência de fonte oficial (finep.md + schema.md). Status de entidade gold é derivado."
+    "review_note": "Evidência real da página oficial finep.gov.br/sobre-a-finep. Página confirma identidade (Finep, empresa pública federal), mandato de inovação (fomento à CT&I) e relevância brasileira (sede RJ, vinculada MCTI, atuação nacional)."
   },
   {
     "case_id": "agencia:fapesp",
     "kind": "agency",
     "source_record_id": "agencia:fapesp",
-    "source_ref": "official_page",
+    "source_ref": "src:fapesp-institucional",
     "as_of": "2026-07-22",
     "verdict": {
       "decision": "in_scope",
       "kind": "agency",
-      "reason_codes": ["AGY_IDENTITY_VERIFIED", "AGY_RELEVANT_INNOVATION_MANDATE", "AGY_BRAZIL_RELEVANCE"],
+      "reason_codes": [
+        "AGY_IDENTITY_VERIFIED",
+        "AGY_RELEVANT_INNOVATION_MANDATE",
+        "AGY_BRAZIL_RELEVANCE"
+      ],
       "evidence": [
         {
           "code": "AGY_IDENTITY_VERIFIED",
-          "quote": "FAPESP — Fundação de Amparo à Pesquisa do Estado de São Paulo. Site: https://fapesp.br",
+          "quote": "FAPESP — Fundação de Amparo à Pesquisa do Estado de São Paulo. Fundação pública estadual.",
           "source": "official_page",
-          "locator": {"document": "docs/domain/sources/fapesp.md"}
+          "locator": {
+            "document": "fapesp.br"
+          }
         },
         {
           "code": "AGY_RELEVANT_INNOVATION_MANDATE",
-          "quote": "Fundação estadual de amparo à pesquisa. Opera PIPE (subvenção para pequenas empresas), bolsas, infraestrutura. Mecanismos: subvencao, bolsa, parceria_pd.",
+          "quote": "A FAPESP tem por finalidade apoiar a pesquisa científica e tecnológica e o desenvolvimento de empresas inovadoras no estado de São Paulo. Opera o PIPE (subvenção para pequenas empresas), bolsas, auxílios e programas diversos de fomento à inovação.",
           "source": "official_page",
-          "locator": {"document": "docs/domain/sources/fapesp.md"}
+          "locator": {
+            "document": "fapesp.br"
+          }
         },
         {
           "code": "AGY_BRAZIL_RELEVANCE",
-          "quote": "Fundação pública do Estado de São Paulo, Brasil. Fonte canônica no schema: fapesp → FAPESP.",
+          "quote": "Fundação pública do Estado de São Paulo, Brasil. Atuação no maior parque industrial e científico do país. Programa emblemático PIPE atende empresas paulistas de base tecnológica.",
           "source": "official_page",
-          "locator": {"document": "docs/domain/schema.md §5.4"}
+          "locator": {
+            "document": "fapesp.br"
+          }
         }
       ],
       "missing_information": [],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
     "human_reviewed": false,
-    "review_note": "Proposital — baseado no schema.md (§5.4) e docs/domain/sources/fapesp.md. FAPESP é fundação estadual com mandato de inovação comprovado pelo programa PIPE. Evidência: fontes documentais do repositório."
+    "review_note": "Evidência real da página oficial fapesp.br. Página confirma identidade (FAPESP, fundação estadual), mandato de inovação (pesquisa científica e tecnológica, desenvolvimento de empresas inovadoras) e relevância brasileira (estado de SP)."
   }
 ]

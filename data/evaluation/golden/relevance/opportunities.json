@@ -6,28 +6,39 @@
     "source_ref": "legacy_triage_case",
     "as_of": "2026-06-10",
     "verdict": {
-      "decision": "in_scope",
-      "reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION", "R3_ACTIONABLE", "R4_RELEVANT_BENEFIT", "R5_BRAZIL_RELEVANCE"],
+      "decision": "needs_review",
+      "reason_codes": [
+        "R1_ENTERPRISE_PATH",
+        "R4_RELEVANT_BENEFIT"
+      ],
       "exclusion_codes": [],
       "evidence": [
         {
           "code": "R1_ENTERPRISE_PATH",
           "quote": "Fapesc lança edital de apoio à internacionalização de empresas",
           "source": "landing_page",
-          "locator": {"document": "news.confap.org.br", "page": null}
+          "locator": {
+            "document": "news.confap.org.br"
+          }
         },
         {
           "code": "R4_RELEVANT_BENEFIT",
           "quote": "investimento de até R$ 2 milhões",
           "source": "landing_page",
-          "locator": {"document": "news.confap.org.br", "page": null}
+          "locator": {
+            "document": "news.confap.org.br"
+          }
         }
       ],
-      "missing_information": [],
+      "missing_information": [
+        "R2_TECH_INNOVATION: site oficial da FAPESC inacessível — não é possível confirmar componente de inovação/tecnologia do edital 02/2025",
+        "R3_ACTIONABLE: sem acesso ao regulamento oficial — não é possível confirmar fluxo de candidatura",
+        "R5_BRAZIL_RELEVANCE: provável (SC) mas não verificado contra fonte oficial"
+      ],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
     "human_reviewed": false,
-    "review_note": "Extraído do golden triage existente (expected=true, review=false). Title e snippet confirmam edital Fapesc para internacionalização de empresas catarinenses com subvenção de até R$2M. Conteúdo truncado (1500 chars) — evidência de quote extraída do title/snippet. R2_TECH_INNOVATION inferido do contexto de internacionalização de inovação. R3_ACTIONABLE satisfeito por ser edital numerado com fluxo de candidatura. R5_BRAZIL_RELEVANCE: empresas catarinenses."
+    "review_note": "Reclassificado de in_scope para needs_review: site oficial da FAPESC (fapesc.sc.gov.br) retornou erro de transporte — impossível verificar evidência literal do edital 02/2025. Evidência remanescente vem de notícia terceira (CONFAP news), não da fonte oficial. Title e snippet indicam edital de internacionalização com subvenção, mas sem acesso ao regulamento oficial não é possível confirmar R2, R3 e R5."
   },
   {
     "case_id": "triage-dou-000",
@@ -37,14 +48,20 @@
     "as_of": "2026-06-10",
     "verdict": {
       "decision": "out_of_scope",
-      "reason_codes": ["X3_GENERIC_PROCUREMENT"],
-      "exclusion_codes": ["X3_GENERIC_PROCUREMENT"],
+      "reason_codes": [
+        "X3_GENERIC_PROCUREMENT"
+      ],
+      "exclusion_codes": [
+        "X3_GENERIC_PROCUREMENT"
+      ],
       "evidence": [
         {
           "code": "X3_GENERIC_PROCUREMENT",
           "quote": "Chamada Pública Nº 001/2026, destinada à aquisição de gêneros alimentícios da Agricultura Familiar e do Empreendedor Familiar Rural para atendimento ao Programa Nacional de Alimentação Escolar - PNAE",
           "source": "edital",
-          "locator": {"document": "DOU 2026-06-10 Seção 3 p.497"}
+          "locator": {
+            "document": "DOU 2026-06-10 Seção 3 p.497"
+          }
         }
       ],
       "missing_information": [],
@@ -61,14 +78,20 @@
     "as_of": "2026-06-10",
     "verdict": {
       "decision": "out_of_scope",
-      "reason_codes": ["X1_ACADEMIC_ONLY"],
-      "exclusion_codes": ["X1_ACADEMIC_ONLY"],
+      "reason_codes": [
+        "X1_ACADEMIC_ONLY"
+      ],
+      "exclusion_codes": [
+        "X1_ACADEMIC_ONLY"
+      ],
       "evidence": [
         {
           "code": "X1_ACADEMIC_ONLY",
           "quote": "FAPERN e SESED lançam edital para bolsas de pesquisa",
           "source": "landing_page",
-          "locator": {"document": "news.confap.org.br"}
+          "locator": {
+            "document": "news.confap.org.br"
+          }
         }
       ],
       "missing_information": [],
@@ -85,14 +108,20 @@
     "as_of": "2026-06-10",
     "verdict": {
       "decision": "out_of_scope",
-      "reason_codes": ["X7_NO_ENTERPRISE_PATH"],
-      "exclusion_codes": ["X7_NO_ENTERPRISE_PATH"],
+      "reason_codes": [
+        "X7_NO_ENTERPRISE_PATH"
+      ],
+      "exclusion_codes": [
+        "X7_NO_ENTERPRISE_PATH"
+      ],
       "evidence": [
         {
           "code": "X7_NO_ENTERPRISE_PATH",
           "quote": "credenciar incubadoras para o fornecimento de serviços em projetos apoiados pelo Programa PIPE da FAPESP",
           "source": "landing_page",
-          "locator": {"document": "fapesp.br/pipe/2026-credenciamento"}
+          "locator": {
+            "document": "fapesp.br/pipe/2026-credenciamento"
+          }
         }
       ],
       "missing_information": [],
@@ -109,14 +138,19 @@
     "as_of": "2026-06-10",
     "verdict": {
       "decision": "needs_review",
-      "reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION"],
+      "reason_codes": [
+        "R1_ENTERPRISE_PATH",
+        "R2_TECH_INNOVATION"
+      ],
       "exclusion_codes": [],
       "evidence": [
         {
           "code": "R2_TECH_INNOVATION",
           "quote": "5ª Chamada Conjunta Multitemática do grupo EU-LAC, formado por agências de fomento à CT&I",
           "source": "landing_page",
-          "locator": {"document": "CONFAP-10-1.pdf"}
+          "locator": {
+            "document": "CONFAP-10-1.pdf"
+          }
         }
       ],
       "missing_information": [
@@ -138,14 +172,18 @@
     "as_of": "2026-06-10",
     "verdict": {
       "decision": "needs_review",
-      "reason_codes": ["R2_TECH_INNOVATION"],
+      "reason_codes": [
+        "R2_TECH_INNOVATION"
+      ],
       "exclusion_codes": [],
       "evidence": [
         {
           "code": "R2_TECH_INNOVATION",
           "quote": "Os Desafios de Inovação Aberta são a porta de entrada para quem busca cocriar soluções com a Claro",
           "source": "landing_page",
-          "locator": {"document": "beon.claro.com.br/desafios"}
+          "locator": {
+            "document": "beon.claro.com.br/desafios"
+          }
         }
       ],
       "missing_information": [
@@ -163,36 +201,64 @@
     "case_id": "triage-tavily-093",
     "kind": "opportunity",
     "source_record_id": "triage-tavily-093",
-    "source_ref": "legacy_triage_case",
+    "source_ref": "src:finep-chamada-779",
     "as_of": "2026-06-10",
     "verdict": {
       "decision": "in_scope",
-      "reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION", "R3_ACTIONABLE", "R4_RELEVANT_BENEFIT", "R5_BRAZIL_RELEVANCE"],
+      "reason_codes": [
+        "R1_ENTERPRISE_PATH",
+        "R2_TECH_INNOVATION",
+        "R3_ACTIONABLE",
+        "R4_RELEVANT_BENEFIT",
+        "R5_BRAZIL_RELEVANCE"
+      ],
       "exclusion_codes": [],
       "evidence": [
         {
           "code": "R1_ENTERPRISE_PATH",
-          "quote": "apoia empresas",
-          "source": "landing_page",
-          "locator": {"document": "gov.br/mcti"}
+          "quote": "Público-alvo: Empresas",
+          "source": "official_page",
+          "locator": {
+            "document": "Chamada Pública FINEP 779"
+          }
         },
         {
           "code": "R2_TECH_INNOVATION",
-          "quote": "tecnologias digitais avançadas",
-          "source": "landing_page",
-          "locator": {"document": "gov.br/mcti"}
+          "quote": "objetiva conceder recursos de subvenção econômica para o desenvolvimento de produtos ou processos inovadores que atendam as finalidades definidas neste regulamento",
+          "source": "official_page",
+          "locator": {
+            "document": "Chamada Pública FINEP 779"
+          }
+        },
+        {
+          "code": "R3_ACTIONABLE",
+          "quote": "Prazo para envio de propostas até: 2026-09-30T17:00. Inscrição: Aberta. Para apresentar sua proposta através da Plataforma de Apoio e Financiamento",
+          "source": "official_page",
+          "locator": {
+            "document": "Chamada Pública FINEP 779"
+          }
         },
         {
           "code": "R4_RELEVANT_BENEFIT",
-          "quote": "R$ 300 milhões",
-          "source": "landing_page",
-          "locator": {"document": "gov.br/mcti"}
+          "quote": "Orçamento da chamada: R$ 300.000.000,00. Recursos de subvenção econômica.",
+          "source": "official_page",
+          "locator": {
+            "document": "Chamada Pública FINEP 779"
+          }
+        },
+        {
+          "code": "R5_BRAZIL_RELEVANCE",
+          "quote": "Região: Todo Brasil. Empresa pública federal brasileira (Finep).",
+          "source": "official_page",
+          "locator": {
+            "document": "Chamada Pública FINEP 779"
+          }
         }
       ],
       "missing_information": [],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
     "human_reviewed": false,
-    "review_note": "Extraído do golden triage (expected=true, review=true). Title 'Edital de R$ 300 milhões apoia empresas no desenvolvimento de tecnologias digitais avançadas' fornece evidência de todos os 5 R codes. Conteúdo truncado (1500 chars de nav HTML do gov.br) não permite quotes adicionais. Incluído como segundo in_scope conforme autorização do plano."
+    "review_note": "Evidência real coletada da Chamada Pública FINEP 779 (Mais Inovação Brasil - Rodada 2 – Tecnologias Digitais). Página oficial finep.gov.br confirma público-alvo empresas, subvenção econômica R$300mi, prazo 2026-09-30, abrangência nacional. Vigência separada de relevância."
   }
 ]

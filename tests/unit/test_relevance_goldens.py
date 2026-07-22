@@ -13,6 +13,7 @@ Cobre:
 """
 from __future__ import annotations
 
+import hashlib
 import json
 
 import pytest
@@ -42,7 +43,7 @@ class TestGoldenLoader:
         assert set(data.keys()) == {"opportunities", "investors", "icts", "programs", "agencies"}
         assert len(data["opportunities"]) >= 6
         assert len(data["investors"]) >= 2
-        assert len(data["icts"]) >= 2
+        assert len(data["icts"]) >= 1
         assert len(data["programs"]) >= 2
         assert len(data["agencies"]) >= 2
 
@@ -62,9 +63,13 @@ class TestGoldenLoader:
         loader = RelevanceGoldenLoader()
         loader.load_all()
         dist = loader.distribution()
-        assert dist.get("in_scope", 0) >= 2
-        assert dist.get("out_of_scope", 0) >= 2
-        assert dist.get("needs_review", 0) >= 2
+        dec_counts: dict[str, int] = {}
+        for k, v in dist.items():
+            _kind, dec = k.split(":", 1)
+            dec_counts[dec] = dec_counts.get(dec, 0) + v
+        assert dec_counts.get("in_scope", 0) >= 2
+        assert dec_counts.get("out_of_scope", 0) >= 2
+        assert dec_counts.get("needs_review", 0) >= 2
 
 
 # ── Manifesto ─────────────────────────────────────────────────────────────
@@ -242,3 +247,213 @@ class TestRoundTrip:
         )
         restored = actor_verdict_adapter.validate_json(json.dumps(json.loads(v.model_dump_json())))
         assert isinstance(restored, AgencyVerdict)
+
+
+# ── Negative tests ──────────────────────────────────────────────────────────
+
+
+class TestNegativeValidation:
+    """Negative scenarios that should produce errors."""
+
+    @pytest.fixture
+    def empty_minimal_dataset(self, tmp_path):
+        """Creates skeleton golden dir with bare-minimum valid content."""
+        manifest = {
+            "dataset_ids": {"opportunities": []},
+            "corpus_stats": {"total_cases": 0, "by_kind": {"opportunities": 0}, "by_decision": {}},
+            "review_status": "pending_owner",
+        }
+        (tmp_path / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        (tmp_path / "opportunities.json").write_text("[]")
+        (tmp_path / "investors.json").write_text("[]")
+        (tmp_path / "icts.json").write_text("[]")
+        (tmp_path / "programs.json").write_text("[]")
+        (tmp_path / "agencies.json").write_text("[]")
+        (tmp_path / "actor_sources.json").write_text("[]")
+        return tmp_path
+
+    def test_nonexistent_source_id(self, empty_minimal_dataset):
+        manifest = {
+            "dataset_ids": {"opportunities": ["op:bad-src"]},
+            "corpus_stats": {"total_cases": 1, "by_kind": {"opportunities": 1}, "by_decision": {"opportunity:out_of_scope": 1}},
+            "review_status": "pending_owner",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        opportunity = {
+            "case_id": "op:bad-src",
+            "kind": "opportunity",
+            "source_ref": "src:nonexistent",
+            "as_of": "2026-07-22",
+            "human_reviewed": False,
+            "verdict": {
+                "decision": "out_of_scope",
+                "reason_codes": ["X1_ACADEMIC_ONLY"],
+                "exclusion_codes": ["X1_ACADEMIC_ONLY"],
+                "classifier_version": "radar-data-trust-relevance-v1",
+            },
+        }
+        (empty_minimal_dataset / "opportunities.json").write_text(json.dumps([opportunity], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_all()
+        assert any("not found in actor_sources" in e for e in errors), f"expected source_ref error, got: {errors}"
+
+    def test_cross_file_duplicate(self, empty_minimal_dataset):
+        manifest = {
+            "dataset_ids": {"investors": ["dup:001"], "programs": ["dup:001"]},
+            "corpus_stats": {"total_cases": 1, "by_kind": {"investors": 1, "programs": 1}, "by_decision": {"investor:needs_review": 1, "program:needs_review": 1}},
+            "review_status": "pending_owner",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        item = {
+            "case_id": "dup:001",
+            "kind": "investor",
+            "source_ref": "legacy_triage_case",
+            "as_of": "2026-07-22",
+            "human_reviewed": False,
+            "verdict": {"decision": "needs_review", "reason_codes": [], "classifier_version": "radar-data-trust-relevance-v1"},
+        }
+        (empty_minimal_dataset / "investors.json").write_text(json.dumps([item], ensure_ascii=False))
+        dup = dict(item)
+        dup["kind"] = "program"
+        (empty_minimal_dataset / "programs.json").write_text(json.dumps([dup], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_all()
+        assert any("duplicate case_id across files" in e for e in errors), f"expected cross-file dup error, got: {errors}"
+
+    def test_wrong_manifest_total(self, empty_minimal_dataset):
+        manifest = {
+            "dataset_ids": {"opportunities": ["op:001"]},
+            "corpus_stats": {"total_cases": 99, "by_kind": {"opportunities": 1}, "by_decision": {"opportunity:needs_review": 1}},
+            "review_status": "pending_owner",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        item = {
+            "case_id": "op:001",
+            "kind": "opportunity",
+            "source_ref": "legacy_triage_case",
+            "as_of": "2026-07-22",
+            "human_reviewed": False,
+            "verdict": {"decision": "needs_review", "reason_codes": [], "classifier_version": "radar-data-trust-relevance-v1"},
+        }
+        (empty_minimal_dataset / "opportunities.json").write_text(json.dumps([item], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_all()
+        assert any("total_cases" in e and "99" in e for e in errors), f"expected total_cases mismatch error, got: {errors}"
+
+    def test_human_reviewed_not_bool(self, empty_minimal_dataset):
+        manifest = {
+            "dataset_ids": {"opportunities": ["op:bad-hr"]},
+            "corpus_stats": {"total_cases": 1, "by_kind": {"opportunities": 1}, "by_decision": {"opportunity:needs_review": 1}},
+            "review_status": "pending_owner",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        item = {
+            "case_id": "op:bad-hr",
+            "kind": "opportunity",
+            "source_ref": "legacy_triage_case",
+            "as_of": "2026-07-22",
+            "human_reviewed": "yes",
+            "verdict": {"decision": "needs_review", "reason_codes": [], "classifier_version": "radar-data-trust-relevance-v1"},
+        }
+        (empty_minimal_dataset / "opportunities.json").write_text(json.dumps([item], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_all()
+        assert any("human_reviewed" in e and "bool" in e for e in errors), f"expected bool type error, got: {errors}"
+
+    def test_review_status_not_pending_when_unreviewed(self, empty_minimal_dataset):
+        manifest = {
+            "dataset_ids": {"opportunities": ["op:unreviewed"]},
+            "corpus_stats": {"total_cases": 1, "by_kind": {"opportunities": 1}, "by_decision": {"opportunity:needs_review": 1}},
+            "review_status": "approved",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        item = {
+            "case_id": "op:unreviewed",
+            "kind": "opportunity",
+            "source_ref": "legacy_triage_case",
+            "as_of": "2026-07-22",
+            "human_reviewed": False,
+            "verdict": {"decision": "needs_review", "reason_codes": [], "classifier_version": "radar-data-trust-relevance-v1"},
+        }
+        (empty_minimal_dataset / "opportunities.json").write_text(json.dumps([item], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_all()
+        assert any("pending_owner" in e for e in errors), f"expected review_status error, got: {errors}"
+
+    def test_actor_source_missing_hash(self, empty_minimal_dataset):
+        manifest = {
+            "dataset_ids": {"investors": ["inv:no-hash"]},
+            "corpus_stats": {"total_cases": 1, "by_kind": {"investors": 1}, "by_decision": {"investor:in_scope": 1}},
+            "review_status": "pending_owner",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        item = {
+            "case_id": "inv:no-hash",
+            "kind": "investor",
+            "source_ref": "src:no-hash",
+            "as_of": "2026-07-22",
+            "human_reviewed": False,
+            "verdict": {
+                "decision": "in_scope",
+                "kind": "investor",
+                "reason_codes": ["INV_IDENTITY_VERIFIED", "INV_TECH_STARTUP_ACTIVITY", "INV_BRAZIL_RELEVANCE"],
+                "classifier_version": "radar-data-trust-relevance-v1",
+            },
+        }
+        (empty_minimal_dataset / "investors.json").write_text(json.dumps([item], ensure_ascii=False))
+        source = {
+            "source_id": "src:no-hash",
+            "url": "https://example.com",
+            "retrieved_at": "2026-07-22",
+            "quote": "some quote",
+            "kind": "investor",
+            "source_record_id": "inv:no-hash",
+        }
+        (empty_minimal_dataset / "actor_sources.json").write_text(json.dumps([source], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        err1 = loader.validate_actor_sources()
+        err2 = loader.validate_all()
+        assert any("hash_sha256" in e for e in err1), f"expected hash_sha256 error in validate_actor_sources, got: {err1}"
+        assert any("no hash_sha256" in e for e in err2), f"expected no hash error in validate_all, got: {err2}"
+
+    def test_source_ref_kind_mismatch(self, empty_minimal_dataset):
+        manifest = {
+            "dataset_ids": {"programs": ["prg:kind-bad"]},
+            "corpus_stats": {"total_cases": 1, "by_kind": {"programs": 1}, "by_decision": {"program:needs_review": 1}},
+            "review_status": "pending_owner",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        item = {
+            "case_id": "prg:kind-bad",
+            "kind": "program",
+            "source_ref": "src:kind-bad",
+            "as_of": "2026-07-22",
+            "human_reviewed": False,
+            "verdict": {
+                "decision": "needs_review",
+                "kind": "program",
+                "reason_codes": [],
+                "classifier_version": "radar-data-trust-relevance-v1",
+            },
+        }
+        (empty_minimal_dataset / "programs.json").write_text(json.dumps([item], ensure_ascii=False))
+        source = {
+            "source_id": "src:kind-bad",
+            "url": "https://example.com",
+            "retrieved_at": "2026-07-22",
+            "quote": "some quote",
+            "hash_sha256": hashlib.sha256(b"some quote").hexdigest(),
+            "kind": "investor",
+            "source_record_id": "prg:kind-bad",
+        }
+        (empty_minimal_dataset / "actor_sources.json").write_text(json.dumps([source], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_all()
+        assert any("kind mismatch" in e for e in errors), f"expected kind mismatch error, got: {errors}"

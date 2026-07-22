@@ -1,65 +1,65 @@
 [
   {
-    "source_id": "src:indicator-capital-site",
-    "url": "https://indicator.capital/",
+    "source_id": "src:finep-chamada-779",
+    "url": "https://www.finep.gov.br/chamadas-publicas/chamadapublica/779",
     "retrieved_at": "2026-07-22",
-    "quote": "Indicator Capital — Venture capital de deep-tech B2B (\"boosting deep-tech heroes\")",
+    "quote": "Finep Mais Inovação Brasil - Rodada 2 – Tecnologias Digitais. Esta Seleção Pública objetiva conceder recursos de subvenção econômica para o desenvolvimento de produtos ou processos inovadores. Orçamento da chamada: R$ 300.000.000,00. Público-alvo: Empresas. Todo Brasil. Inscrição: Aberta.",
+    "kind": "opportunity",
+    "source_record_id": "triage-tavily-093",
+    "hash_sha256": "6624a764967949eaade392ecfa4d0ac99bfd047df75e904639c557605b19e2eb"
+  },
+  {
+    "source_id": "src:indicator-capital-about",
+    "url": "https://indicator.capital/pt/about",
+    "retrieved_at": "2026-07-22",
+    "quote": "A Indicator Capital é uma das principais firmas de venture capital em deep tech, investindo no futuro das tecnologias inteligentes e conectadas. Com escritórios em São Paulo e na Califórnia, a Indicator foi fundada em 2014 para apoiar startups em estágio inicial. Somos confiáveis para investidores globais (LPs) como BNDES, Qualcomm Ventures, Lenovo, Motorola, Grupo Multi e Banco do Brasil, e gerimos o maior fundo desse tipo na América Latina.",
     "kind": "investor",
     "source_record_id": "investidor:indicator-capital",
-    "hash_sha256": "f246ddf91ee7250240c72c69c9be9822ee39252cfd71ee2e37c1abf87c616af6"
+    "hash_sha256": "5d1e3c354daee08bf358748e1847e89fceccc93f1bc426f8bbe5f3cff12add15"
   },
   {
-    "source_id": "src:indicator-capital-tese",
-    "url": "https://indicator.capital/",
+    "source_id": "src:embrapii-cimatec",
+    "url": "https://embrapii.org.br/unidades/soluces-industriais-cimatec/",
     "retrieved_at": "2026-07-22",
-    "quote": "Venture capital de deep-tech B2B (\"boosting deep-tech heroes\"); aposta em times com risco tecnológico real.",
-    "kind": "investor",
-    "source_record_id": "investidor:indicator-capital",
-    "hash_sha256": "151010ad633770e5c4360febfa3f22bbb9ab6c521278efd3dcb4857899d05fea"
+    "quote": "UNIDADE EMBRAPII CIMATEC. O SENAI CIMATEC é credenciado pela EMBRAPII para atendimento na área de Soluções Industriais com um programa avançado de suporte tecnológico para promover a pesquisa aplicada nas tecnologias integradas da manufatura para atender a indústria brasileira. Mais de 100 projetos de PD&I com empresas. Contato: Silmar Baptista Nunes, Av. Orlando Gomes 1845 - Piatã, Salvador/BA, CEP 41650-010.",
+    "kind": "ict",
+    "source_record_id": "ict:embrapii:senai-cimatec",
+    "hash_sha256": "6897b06236ea56156f52d10f29eaeaf3409e839d1892f95de7186467ce928137"
   },
   {
-    "source_id": "src:kptl-site",
-    "url": "https://kptl.com.br",
-    "retrieved_at": "2026-07-22",
-    "quote": "KPTL — Venture capital de deep-tech early-stage (ex-Inseed)",
-    "kind": "investor",
-    "source_record_id": "investidor:kptl",
-    "hash_sha256": "2cb5bb23cdde3d48d5f078dae6e2c2fbdcaf3988f41ce5874d35ed9b59ac9465"
-  },
-  {
-    "source_id": "src:pipe-fapesp-record",
+    "source_id": "src:fapesp-pipe",
     "url": "https://fapesp.br/pipe",
     "retrieved_at": "2026-07-22",
-    "quote": "PIPE (Pesquisa Inovativa em Pequenas Empresas) — operador FAPESP. Subvenção econômica, fluxo contínuo.",
+    "quote": "O PIPE-FAPESP apoia a execução de pesquisa científica e/ou tecnológica em micro, pequenas e médias empresas no Estado de São Paulo. Objetivos: apoiar a pesquisa em CT como instrumento para promover inovação tecnológica e desenvolvimento empresarial. Fluxo Contínuo: submissão de propostas a qualquer momento do ano pelo SAGe.",
     "kind": "program",
     "source_record_id": "programa:pipe-fapesp",
-    "hash_sha256": "5e68177605ff8875202ef142c34d1eb1786e6ae12073c5b67d903bd09d0d615f"
+    "hash_sha256": "155f38fb9aac2d6a1dd2bfdc02bd5addb40fe8425f8ce0f233b51d183ed96655"
   },
   {
-    "source_id": "src:centelha-record",
+    "source_id": "src:programa-centelha",
     "url": "https://programacentelha.com.br",
     "retrieved_at": "2026-07-22",
-    "quote": "Programa Centelha — MCTI / FINEP / FAPs estaduais. Subvenção econômica para empreendimentos inovadores.",
+    "quote": "O Programa Centelha é uma iniciativa de empreendedorismo inovador que oferece recursos financeiros, capacitação e suporte para transformar ideias inovadoras em negócios. Promovido pelo MCTI, Finep e CNPq. Recursos financeiros via subvenção econômica. Empreendedores receberão cerca de R$ 50 mil na forma de subvenção econômica.",
     "kind": "program",
     "source_record_id": "programa:centelha",
-    "hash_sha256": "d7eb817744f029687c55ed7d9faa5dd101bda681f26739a1f9c86cb7b3f0ba96"
+    "hash_sha256": "34918f09069811532a2b2d4cca8079914e8fb22854713f3d30efb5883a46f384"
   },
   {
-    "source_id": "src:finep-schema",
-    "url": "https://finep.gov.br",
+    "source_id": "src:finep-institucional",
+    "url": "https://finep.gov.br/sobre-a-finep",
     "retrieved_at": "2026-07-22",
-    "quote": "FINEP — Financiadora de Estudos e Projetos. Empresa pública federal vinculada ao MCTI. Fonte canônica de fomento à inovação.",
+    "quote": "Finep — Financiadora de Estudos e Projetos. Empresa pública federal, vinculada ao Ministério da Ciência, Tecnologia e Inovação (MCTI). Há quase 60 anos, a Finep promove o desenvolvimento econômico e social do país por meio do fomento à ciência, tecnologia e inovação.",
     "kind": "agency",
     "source_record_id": "agencia:finep",
-    "hash_sha256": "8e6633783c3adeaf8470042e55e0dfdee4ceb18201d03cbea32c8fda561b7e75"
+    "hash_sha256": "0839d828493b73a04d758e8e471f9a7ce1695c00037d56682cc114dce9d94330"
   },
   {
-    "source_id": "src:fapesp-schema",
+    "source_id": "src:fapesp-institucional",
     "url": "https://fapesp.br",
     "retrieved_at": "2026-07-22",
-    "quote": "FAPESP — Fundação de Amparo à Pesquisa do Estado de São Paulo. Opera PIPE e demais programas de fomento.",
+    "quote": "FAPESP — Fundação de Amparo à Pesquisa do Estado de São Paulo. Fundação pública estadual que tem por finalidade apoiar a pesquisa científica e tecnológica e o desenvolvimento de empresas inovadoras no estado de São Paulo. Opera programas como PIPE (subvenção para pequenas empresas).",
     "kind": "agency",
     "source_record_id": "agencia:fapesp",
-    "hash_sha256": "a72e9ff41281d539ba1d932013c5bbed6ba9a0f6d38d2b6eb39826c00b8b04c1"
+    "hash_sha256": "a193c8e53ab82540ef3f919a298ff483ff7142803d252e719e8366d6b962d5f4"
   }
 ]

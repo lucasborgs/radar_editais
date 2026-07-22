@@ -18,8 +18,7 @@
       "investidor:kptl"
     ],
     "icts": [
-      "ict:embrapii:senai-cimatec",
-      "ict:embrapii:isa-ct"
+      "ict:embrapii:senai-cimatec"
     ],
     "programs": [
       "programa:pipe-fapesp",
@@ -31,26 +30,32 @@
     ]
   },
   "corpus_stats": {
-    "total_cases": 15,
+    "total_cases": 14,
     "by_kind": {
-      "opportunity": 7,
-      "investor": 2,
-      "ict": 2,
-      "program": 2,
-      "agency": 2
+      "opportunities": 7,
+      "investors": 2,
+      "icts": 1,
+      "programs": 2,
+      "agencies": 2
     },
     "by_decision": {
-      "in_scope": 5,
-      "out_of_scope": 3,
-      "needs_review": 7
+      "opportunity:needs_review": 3,
+      "opportunity:out_of_scope": 3,
+      "opportunity:in_scope": 1,
+      "investor:in_scope": 1,
+      "investor:needs_review": 1,
+      "ict:in_scope": 1,
+      "program:in_scope": 2,
+      "agency:in_scope": 2
     },
     "triage_legacy_preserved": 122
   },
   "notes": [
     "triage.json remains byte-identical (122 cases, boolean contract)",
     "All actor labels are propositive — human_reviewed: false",
-    "ICT golden uses needs_review for both candidates (ephemeral bronze, no official page snapshot available)",
-    "investidor:kptl marked needs_review due to missing source_urls and verificado_em",
-    "triage legacy suite is untouched"
+    "ISA-CT removed (no verifiable evidence)",
+    "triage-tavily-082 changed to needs_review (FAPESC site inaccessible)",
+    "triage-tavily-093, SENAI CIMATEC, PIPE, Centelha, FINEP, FAPESP use real official page snapshots",
+    "actor_sources.json rebuilt with cross-references, mandatory hashes, required fields"
   ]
 }
