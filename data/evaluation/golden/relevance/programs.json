@@ -16,7 +16,7 @@
       "evidence": [
         {
           "code": "PRG_IDENTITY_OPERATOR_VERIFIED",
-          "quote": "PIPE-FAPESP. A FAPESP torna público. O PIPE-FAPESP apoia a execução de pesquisa científica e/ou tecnológica em micro, pequenas e médias empresas no Estado de São Paulo.",
+          "quote": "O PIPE-FAPESP apoia a execução de pesquisa científica e/ou tecnológica em micro, pequenas e médias empresas no Estado de São Paulo.",
           "source": "official_page",
           "locator": {
             "document": "fapesp.br/pipe"
@@ -24,7 +24,7 @@
         },
         {
           "code": "PRG_RELEVANT_INNOVATION_MECHANISM",
-          "quote": "O PIPE-FAPESP apoia a execução de pesquisa científica e/ou tecnológica em micro, pequenas e médias empresas. Fluxo Contínuo: submissão de propostas a qualquer momento do ano pelo SAGe. Objetivo: apoiar a pesquisa em CT como instrumento para promover a inovação tecnológica e o desenvolvimento empresarial.",
+          "quote": "Objetivos: apoiar a pesquisa em CT como instrumento para promover inovação tecnológica e desenvolvimento empresarial. Fluxo Contínuo: submissão de propostas a qualquer momento do ano pelo SAGe.",
           "source": "official_page",
           "locator": {
             "document": "fapesp.br/pipe"
@@ -32,7 +32,7 @@
         },
         {
           "code": "PRG_ENTERPRISE_RELEVANCE",
-          "quote": "O PIPE-FAPESP apoia a execução de pesquisa científica e/ou tecnológica em micro, pequenas e médias empresas no Estado de São Paulo. Incrementar a contribuição da pesquisa para o desenvolvimento econômico e social. Possibilitar que as empresas se associem a pesquisadores em projetos de pesquisa visando inovação.",
+          "quote": "O PIPE-FAPESP apoia a execução de pesquisa científica e/ou tecnológica em micro, pequenas e médias empresas no Estado de São Paulo.",
           "source": "official_page",
           "locator": {
             "document": "fapesp.br/pipe"
@@ -62,7 +62,7 @@
       "evidence": [
         {
           "code": "PRG_IDENTITY_OPERATOR_VERIFIED",
-          "quote": "O Programa Centelha é uma iniciativa de empreendedorismo inovador. Promovido pelo Ministério da Ciência, Tecnologia e Inovação (MCTI), pela Financiadora de Estudos e Projetos (Finep) e o Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq), em parceria com o CONFAP e a Fundação CERTI.",
+          "quote": "O Programa Centelha é uma iniciativa de empreendedorismo inovador que oferece recursos financeiros, capacitação e suporte para transformar ideias inovadoras em negócios. Promovido pelo MCTI, Finep e CNPq.",
           "source": "official_page",
           "locator": {
             "document": "programacentelha.com.br"
@@ -70,7 +70,7 @@
         },
         {
           "code": "PRG_RELEVANT_INNOVATION_MECHANISM",
-          "quote": "Recursos financeiros via subvenção econômica para desenvolvimento de soluções inovadoras. Empreendedores receberão cerca de R$ 50 mil na forma de subvenção econômica. Bolsas de apoio técnico do CNPq.",
+          "quote": "Recursos financeiros via subvenção econômica. Empreendedores receberão cerca de R$ 50 mil na forma de subvenção econômica.",
           "source": "official_page",
           "locator": {
             "document": "programacentelha.com.br"
@@ -78,7 +78,7 @@
         },
         {
           "code": "PRG_ENTERPRISE_RELEVANCE",
-          "quote": "As propostas podem ser submetidas por Pessoa física que, se aprovada, deverá constituir uma Microempresa ou Empresa de Pequeno Porte (MEEPP) com sede no estado participante. Estados participantes: todos os 26 estados e DF.",
+          "quote": "O Programa Centelha é uma iniciativa de empreendedorismo inovador que oferece recursos financeiros, capacitação e suporte para transformar ideias inovadoras em negócios.",
           "source": "official_page",
           "locator": {
             "document": "programacentelha.com.br"

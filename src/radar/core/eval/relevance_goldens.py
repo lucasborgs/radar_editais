@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ from radar.domain.relevance import (
 )
 
 GOLDEN_DIR = Path(__file__).resolve().parents[4] / "data" / "evaluation" / "golden" / "relevance"
+SILVER_DIR = GOLDEN_DIR.parents[2] / "silver"
 
 DATASET_FILES = {
     "opportunities": "opportunities.json",
@@ -50,6 +52,16 @@ LEGACY_SOURCE_REFS = {"legacy_triage_case", "curated_record"}
 
 ALLOWED_DECISIONS = {"in_scope", "out_of_scope", "needs_review"}
 
+# Map dataset kind → silver catalog file + key path
+SILVER_CATALOGS: dict[str, tuple[str, str]] = {
+    "investor": ("investidores.json", "investidores"),
+    "program": ("programas.json", "programas"),
+}
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", str(s)).strip()
+
 
 def validate_verdict(item: dict) -> None:
     kind = item.get("kind", "")
@@ -70,6 +82,8 @@ class RelevanceGoldenLoader:
         self._data: dict[str, list[dict]] = {}
         self._manifest: dict[str, Any] = {}
         self._actor_sources: list[dict] = []
+        self._triage: list[dict] = []
+        self._silver_catalogs: dict[str, set[str]] = {}
         self._errors: list[str] = []
 
     def _read_json(self, filename: str) -> list[dict] | dict:
@@ -77,6 +91,30 @@ class RelevanceGoldenLoader:
         if not path.exists():
             raise FileNotFoundError(f"golden dataset not found: {path}")
         return json.loads(path.read_text(encoding="utf-8"))
+
+    def _load_silver_ids(self, kind: str) -> set[str]:
+        """Load record IDs from a silver catalog for curated_record validation."""
+        if kind in self._silver_catalogs:
+            return self._silver_catalogs[kind]
+        catalog_info = SILVER_CATALOGS.get(kind)
+        if not catalog_info:
+            self._silver_catalogs[kind] = set()
+            return set()
+        fname, key = catalog_info
+        path = SILVER_DIR / fname
+        if not path.exists():
+            self._silver_catalogs[kind] = set()
+            return set()
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        items = raw.get(key, raw) if isinstance(raw, dict) else raw
+        ids = set()
+        for item in items:
+            if isinstance(item, dict):
+                iid = item.get("id") or item.get("case_id")
+                if iid:
+                    ids.add(str(iid))
+        self._silver_catalogs[kind] = ids
+        return ids
 
     def load_all(self) -> dict[str, list[dict]]:
         self._manifest = self._read_json("manifest.json")
@@ -94,6 +132,12 @@ class RelevanceGoldenLoader:
         except FileNotFoundError:
             self._actor_sources = []
 
+        triage_path = self._dir.parent / "triage.json"
+        if triage_path.exists():
+            raw = json.loads(triage_path.read_text(encoding="utf-8"))
+            if isinstance(raw, list):
+                self._triage = raw
+
         return self._data
 
     def validate_all(self) -> list[str]:
@@ -103,17 +147,34 @@ class RelevanceGoldenLoader:
             self._errors.append("no data loaded — call load_all() first")
             return self._errors
 
-        # Build index of actor sources
-        source_ids = {s["source_id"] for s in self._actor_sources if "source_id" in s}
+        source_ids: set[str] = set()
+        source_by_id: dict[str, dict] = {}
         source_by_record: dict[str, list[dict]] = {}
+        dup_source_ids: set[str] = set()
+
         for s in self._actor_sources:
+            sid = s.get("source_id", "")
+            if not sid:
+                continue
+            if sid in source_ids:
+                dup_source_ids.add(sid)
+            source_ids.add(sid)
+            source_by_id[sid] = s
             rid = s.get("source_record_id", "")
             if rid:
                 source_by_record.setdefault(rid, []).append(s)
 
+        for sid in sorted(dup_source_ids):
+            self._errors.append(f"duplicate source_id in actor_sources: {sid}")
+
+        # Build set of all case_ids referenced in datasets
+        all_dataset_ids: set[str] = set()
+
         all_ids: dict[str, set[str]] = {}
         global_ids: set[str] = set()
         total_unreviewed = 0
+
+        triage_map: dict[str, dict] = {t["case_id"]: t for t in self._triage if "case_id" in t}
 
         for kind, items in self._data.items():
             ids = set()
@@ -125,17 +186,15 @@ class RelevanceGoldenLoader:
                     self._errors.append(f"{kind}: item without case_id")
                     continue
 
-                # Duplicate within file
                 if cid in ids:
                     self._errors.append(f"duplicate case_id in {kind}: {cid}")
                 ids.add(cid)
 
-                # Global duplicate
                 if cid in global_ids:
                     self._errors.append(f"duplicate case_id across files: {cid}")
                 global_ids.add(cid)
+                all_dataset_ids.add(cid)
 
-                # Required fields
                 hr = item.get("human_reviewed")
                 if not isinstance(hr, bool):
                     self._errors.append(f"{cid}: human_reviewed must be bool, got {type(hr).__name__}")
@@ -150,37 +209,57 @@ class RelevanceGoldenLoader:
                 if not as_of:
                     self._errors.append(f"{cid}: missing as_of date")
 
-                # Kind match
                 item_kind = item.get("kind", "")
                 expected_kind = FILE_KEY_TO_KIND.get(kind, kind)
                 if item_kind != expected_kind:
                     self._errors.append(f"{cid}: kind mismatch — file kind={kind}, item kind={item_kind}")
 
-                # Source reference validation
                 if src_ref and src_ref not in LEGACY_SOURCE_REFS and src_ref not in source_ids:
                     self._errors.append(f"{cid}: source_ref '{src_ref}' not found in actor_sources")
                 elif src_ref in source_ids:
-                    # Verify kind and source_record_id match
-                    matching = [s for s in self._actor_sources if s["source_id"] == src_ref]
+                    matching = source_by_id.get(src_ref)
                     if matching:
-                        ms = matching[0]
-                        if ms.get("kind") != item_kind:
-                            self._errors.append(f"{cid}: source_ref kind mismatch — actor_source kind={ms.get('kind')}, item kind={item_kind}")
-                        if ms.get("source_record_id") != cid:
-                            self._errors.append(f"{cid}: source_ref record_id mismatch — actor_source record={ms.get('source_record_id')}, item id={cid}")
+                        if matching.get("kind") != item_kind:
+                            self._errors.append(f"{cid}: source_ref kind mismatch — actor_source kind={matching.get('kind')}, item kind={item_kind}")
+                        if matching.get("source_record_id") != cid:
+                            self._errors.append(f"{cid}: source_ref record_id mismatch — actor_source record={matching.get('source_record_id')}, item id={cid}")
 
-                    # Check hash is present
-                    ms = matching[0] if matching else {}
-                    if not ms.get("hash_sha256"):
-                        self._errors.append(f"{cid}: source_ref '{src_ref}' has no hash_sha256")
-                    if not ms.get("url"):
-                        self._errors.append(f"{cid}: source_ref '{src_ref}' has no url")
-                    if not ms.get("retrieved_at"):
-                        self._errors.append(f"{cid}: source_ref '{src_ref}' has no retrieved_at")
-                    if not ms.get("quote"):
-                        self._errors.append(f"{cid}: source_ref '{src_ref}' has no quote")
+                        if not matching.get("hash_sha256"):
+                            self._errors.append(f"{cid}: source_ref '{src_ref}' has no hash_sha256")
+                        if not matching.get("url"):
+                            self._errors.append(f"{cid}: source_ref '{src_ref}' has no url")
+                        if not matching.get("retrieved_at"):
+                            self._errors.append(f"{cid}: source_ref '{src_ref}' has no retrieved_at")
+                        if not matching.get("quote"):
+                            self._errors.append(f"{cid}: source_ref '{src_ref}' has no quote")
 
-                # Verdict validation
+                    # Evidence quote integrity for src:*
+                    src_quote_raw = matching.get("quote", "") if matching else ""
+                    if src_quote_raw:
+                        srcq = _norm(src_quote_raw)
+                        for ev in item.get("verdict", {}).get("evidence", []):
+                            eq = _norm(ev.get("quote", ""))
+                            if eq and eq not in srcq:
+                                self._errors.append(f"{cid}/{ev.get('code','?')}: evidence quote not in source snapshot")
+
+                elif src_ref == "legacy_triage_case":
+                    sid = item.get("source_record_id", "")
+                    if sid not in triage_map:
+                        self._errors.append(f"{cid}: source_record_id '{sid}' not found in triage.json")
+                    else:
+                        t_entry = triage_map[sid]
+                        body = _norm(f"{t_entry.get('title','')} {t_entry.get('snippet','')} {t_entry.get('content','')}")
+                        for ev in item.get("verdict", {}).get("evidence", []):
+                            eq = _norm(ev.get("quote", ""))
+                            if eq and eq not in body:
+                                self._errors.append(f"{cid}/{ev.get('code','?')}: evidence quote not found in triage entry body")
+
+                elif src_ref == "curated_record":
+                    sid = item.get("source_record_id", "")
+                    silver_ids = self._load_silver_ids(item_kind)
+                    if sid and silver_ids and sid not in silver_ids:
+                        self._errors.append(f"{cid}: source_record_id '{sid}' not found in {item_kind} silver catalog")
+
                 verdict = item.get("verdict", {})
                 decision = verdict.get("decision", "")
                 if decision not in ALLOWED_DECISIONS:
@@ -194,18 +273,28 @@ class RelevanceGoldenLoader:
 
             all_ids[kind] = ids
 
-            # Manifest completeness
             if expected_ids - ids:
                 self._errors.append(f"{kind}: manifest expects IDs not in dataset: {expected_ids - ids}")
             if ids - expected_ids:
                 self._errors.append(f"{kind}: dataset has IDs not in manifest: {ids - expected_ids}")
 
-        # Global uniqueness count
+        # Orphaned actor_sources detection
+        orphaned_sources = set()
+        for s in self._actor_sources:
+            rid = s.get("source_record_id", "")
+            sid = s.get("source_id", "")
+            if rid and rid not in all_dataset_ids:
+                orphaned_sources.add((sid, rid))
+        if orphaned_sources:
+            manifest_justified = set(self._manifest.get("orphaned_sources_justified", []))
+            for sid, rid in sorted(orphaned_sources):
+                if sid not in manifest_justified:
+                    self._errors.append(f"orphaned actor_source '{sid}' (record_id={rid}) not in any dataset and not justified in manifest")
+
         all_ids_flat = set()
         for ids in all_ids.values():
             all_ids_flat.update(ids)
 
-        # Compare corpus_stats
         manifest_total = self._manifest.get("corpus_stats", {}).get("total_cases", 0)
         if manifest_total != len(all_ids_flat):
             self._errors.append(f"manifest total_cases={manifest_total} != actual unique cases={len(all_ids_flat)}")
@@ -223,7 +312,6 @@ class RelevanceGoldenLoader:
             if expected_count != count:
                 self._errors.append(f"manifest by_decision[{dec}]={expected_count} != actual={count}")
 
-        # Review status check
         review_status = self._manifest.get("review_status", "")
         if total_unreviewed > 0 and review_status != "pending_owner":
             self._errors.append(f"review_status must be 'pending_owner' when {total_unreviewed} case(s) have human_reviewed=false")
@@ -236,12 +324,18 @@ class RelevanceGoldenLoader:
             errs.append("actor_sources.json not found or not a list")
             return errs
 
+        seen_ids: set[str] = set()
+
         for s in self._actor_sources:
             sid = s.get("source_id", "?")
             required = ["source_id", "url", "retrieved_at", "quote", "hash_sha256", "kind", "source_record_id"]
             for field in required:
                 if not s.get(field):
                     errs.append(f"{sid}: missing required field '{field}'")
+
+            if sid != "?" and sid in seen_ids:
+                errs.append(f"{sid}: duplicate source_id")
+            seen_ids.add(sid)
 
             if "hash_sha256" in s and s["hash_sha256"]:
                 expected = s["hash_sha256"]

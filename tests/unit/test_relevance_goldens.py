@@ -422,6 +422,108 @@ class TestNegativeValidation:
         assert any("hash_sha256" in e for e in err1), f"expected hash_sha256 error in validate_actor_sources, got: {err1}"
         assert any("no hash_sha256" in e for e in err2), f"expected no hash error in validate_all, got: {err2}"
 
+    def test_duplicate_source_id(self, empty_minimal_dataset):
+        (empty_minimal_dataset / "actor_sources.json").write_text(json.dumps([
+            {"source_id": "src:dup", "url": "https://a.com", "retrieved_at": "2026-07-22", "quote": "same", "hash_sha256": hashlib.sha256(b"same").hexdigest(), "kind": "investor", "source_record_id": "inv:a"},
+            {"source_id": "src:dup", "url": "https://b.com", "retrieved_at": "2026-07-22", "quote": "same", "hash_sha256": hashlib.sha256(b"same").hexdigest(), "kind": "investor", "source_record_id": "inv:b"},
+        ], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_actor_sources()
+        assert any("duplicate source_id" in e for e in errors), f"expected duplicate source_id error, got: {errors}"
+
+    def test_evidence_quote_not_in_snapshot(self, empty_minimal_dataset):
+        manifest = {
+            "dataset_ids": {"investors": ["inv:bad-q"]},
+            "corpus_stats": {"total_cases": 1, "by_kind": {"investors": 1}, "by_decision": {"investor:in_scope": 1}},
+            "review_status": "pending_owner",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        item = {
+            "case_id": "inv:bad-q", "kind": "investor", "source_ref": "src:bad-q", "source_record_id": "inv:bad-q",
+            "as_of": "2026-07-22", "human_reviewed": False,
+            "verdict": {
+                "decision": "in_scope", "kind": "investor",
+                "reason_codes": ["INV_IDENTITY_VERIFIED", "INV_TECH_STARTUP_ACTIVITY", "INV_BRAZIL_RELEVANCE"],
+                "evidence": [{"code": "INV_IDENTITY_VERIFIED", "quote": "this text is NOT in the snapshot at all"}],
+                "classifier_version": "radar-data-trust-relevance-v1",
+            },
+        }
+        (empty_minimal_dataset / "investors.json").write_text(json.dumps([item], ensure_ascii=False))
+        source = {
+            "source_id": "src:bad-q", "url": "https://example.com", "retrieved_at": "2026-07-22",
+            "quote": "Real snapshot text from the official page. Only this is the actual content.",
+            "hash_sha256": hashlib.sha256(b"Real snapshot text from the official page. Only this is the actual content.").hexdigest(),
+            "kind": "investor", "source_record_id": "inv:bad-q",
+        }
+        (empty_minimal_dataset / "actor_sources.json").write_text(json.dumps([source], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_all()
+        assert any("evidence quote not in source snapshot" in e for e in errors), f"expected quote mismatch error, got: {errors}"
+
+    def test_legacy_case_id_not_in_triage(self, empty_minimal_dataset):
+        manifest = {
+            "dataset_ids": {"opportunities": ["op:no-triage"]},
+            "corpus_stats": {"total_cases": 1, "by_kind": {"opportunities": 1}, "by_decision": {"opportunity:needs_review": 1}},
+            "review_status": "pending_owner",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        item = {
+            "case_id": "op:no-triage", "kind": "opportunity", "source_ref": "legacy_triage_case",
+            "source_record_id": "nonexistent-case-id", "as_of": "2026-07-22", "human_reviewed": False,
+            "verdict": {"decision": "needs_review", "reason_codes": [], "classifier_version": "radar-data-trust-relevance-v1"},
+        }
+        (empty_minimal_dataset / "opportunities.json").write_text(json.dumps([item], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_all()
+        assert any("not found in triage.json" in e for e in errors), f"expected triage not found error, got: {errors}"
+
+    def test_legacy_quote_not_in_triage_body(self, empty_minimal_dataset):
+        import json as _j
+        # Need a real triage.json with the case
+        triage_data = [{"case_id": "triage:real-case", "title": "Real Edital Title", "snippet": "Fomento à pesquisa científica", "content": "Conteúdo completo do edital de fomento."}]
+        (empty_minimal_dataset.parent / "triage.json").write_text(_j.dumps(triage_data, ensure_ascii=False))
+        manifest = {
+            "dataset_ids": {"opportunities": ["triage:real-case"]},
+            "corpus_stats": {"total_cases": 1, "by_kind": {"opportunities": 1}, "by_decision": {"opportunity:needs_review": 1}},
+            "review_status": "pending_owner",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(_j.dumps(manifest, ensure_ascii=False))
+        item = {
+            "case_id": "triage:real-case", "kind": "opportunity", "source_ref": "legacy_triage_case",
+            "source_record_id": "triage:real-case", "as_of": "2026-07-22", "human_reviewed": False,
+            "verdict": {
+                "decision": "needs_review", "reason_codes": [],
+                "evidence": [{"code": "R4_RELEVANT_BENEFIT", "quote": "this text is nowhere in the triage entry"}],
+                "classifier_version": "radar-data-trust-relevance-v1",
+            },
+        }
+        (empty_minimal_dataset / "opportunities.json").write_text(_j.dumps([item], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_all()
+        assert any("evidence quote not found in triage entry body" in e for e in errors), f"expected triage quote error, got: {errors}"
+
+    def test_curated_record_id_not_in_silver(self, empty_minimal_dataset):
+        manifest = {
+            "dataset_ids": {"investors": ["inv:no-silver"]},
+            "corpus_stats": {"total_cases": 1, "by_kind": {"investors": 1}, "by_decision": {"investor:needs_review": 1}},
+            "review_status": "pending_owner",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        item = {
+            "case_id": "inv:no-silver", "kind": "investor", "source_ref": "curated_record",
+            "source_record_id": "investidor:nonexistent", "as_of": "2026-07-22", "human_reviewed": False,
+            "verdict": {"decision": "needs_review", "kind": "investor", "reason_codes": [], "classifier_version": "radar-data-trust-relevance-v1"},
+        }
+        (empty_minimal_dataset / "investors.json").write_text(json.dumps([item], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_all()
+        assert any("not found in" in e and "silver catalog" in e for e in errors), f"expected silver catalog error, got: {errors}"
+
     def test_source_ref_kind_mismatch(self, empty_minimal_dataset):
         manifest = {
             "dataset_ids": {"programs": ["prg:kind-bad"]},

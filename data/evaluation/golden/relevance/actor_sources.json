@@ -55,11 +55,11 @@
   },
   {
     "source_id": "src:fapesp-institucional",
-    "url": "https://fapesp.br",
+    "url": "https://centrodememoria.fapesp.br/sobre-a-fapesp/",
     "retrieved_at": "2026-07-22",
-    "quote": "FAPESP — Fundação de Amparo à Pesquisa do Estado de São Paulo. Fundação pública estadual que tem por finalidade apoiar a pesquisa científica e tecnológica e o desenvolvimento de empresas inovadoras no estado de São Paulo. Opera programas como PIPE (subvenção para pequenas empresas).",
+    "quote": "A Fundação de Amparo à Pesquisa do Estado de São Paulo (FAPESP) é uma das principais agências públicas brasileiras de fomento à pesquisa científica e tecnológica do país. A FAPESP tem como missão formar recursos humanos para C&T, financiar iniciativas de pesquisas movidas pela curiosidade do pesquisador ou orientadas por missões específicas, e contribuir para a modernização da infraestrutura de pesquisa em São Paulo. Esse apoio se dá por meio da concessão de bolsas e auxílios a projetos de pesquisa em todas as áreas do conhecimento, submetidos por pesquisadores vinculados a instituições de ensino superior e de pesquisa, públicas ou particulares, e de empresas sediadas no Estado de São Paulo.",
     "kind": "agency",
     "source_record_id": "agencia:fapesp",
-    "hash_sha256": "a193c8e53ab82540ef3f919a298ff483ff7142803d252e719e8366d6b962d5f4"
+    "hash_sha256": "43bb21359cec2506930b8a98f3ad855a0c3a705974c0d70383f0f8ff288169ec"
   }
 ]

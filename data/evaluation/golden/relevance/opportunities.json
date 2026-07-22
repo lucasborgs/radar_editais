@@ -20,19 +20,12 @@
           "locator": {
             "document": "news.confap.org.br"
           }
-        },
-        {
-          "code": "R4_RELEVANT_BENEFIT",
-          "quote": "investimento de até R$ 2 milhões",
-          "source": "landing_page",
-          "locator": {
-            "document": "news.confap.org.br"
-          }
         }
       ],
       "missing_information": [
         "R2_TECH_INNOVATION: site oficial da FAPESC inacessível — não é possível confirmar componente de inovação/tecnologia do edital 02/2025",
         "R3_ACTIONABLE: sem acesso ao regulamento oficial — não é possível confirmar fluxo de candidatura",
+        "R4_RELEVANT_BENEFIT: valor do benefício não encontrado no conteúdo do triage original — site oficial inacessível",
         "R5_BRAZIL_RELEVANCE: provável (SC) mas não verificado contra fonte oficial"
       ],
       "classifier_version": "radar-data-trust-relevance-v1"
@@ -57,7 +50,7 @@
       "evidence": [
         {
           "code": "X3_GENERIC_PROCUREMENT",
-          "quote": "Chamada Pública Nº 001/2026, destinada à aquisição de gêneros alimentícios da Agricultura Familiar e do Empreendedor Familiar Rural para atendimento ao Programa Nacional de Alimentação Escolar - PNAE",
+          "quote": "destinada à aquisição de gêneros alimentícios da Agricultura Familiar e do Empreendedor Familiar Rural para atendimento ao Programa Nacional de Alimentação Escolar - PNAE",
           "source": "edital",
           "locator": {
             "document": "DOU 2026-06-10 Seção 3 p.497"
@@ -224,7 +217,7 @@
         },
         {
           "code": "R2_TECH_INNOVATION",
-          "quote": "objetiva conceder recursos de subvenção econômica para o desenvolvimento de produtos ou processos inovadores que atendam as finalidades definidas neste regulamento",
+          "quote": "objetiva conceder recursos de subvenção econômica para o desenvolvimento de produtos ou processos inovadores",
           "source": "official_page",
           "locator": {
             "document": "Chamada Pública FINEP 779"
@@ -232,7 +225,7 @@
         },
         {
           "code": "R3_ACTIONABLE",
-          "quote": "Prazo para envio de propostas até: 2026-09-30T17:00. Inscrição: Aberta. Para apresentar sua proposta através da Plataforma de Apoio e Financiamento",
+          "quote": "Inscrição: Aberta",
           "source": "official_page",
           "locator": {
             "document": "Chamada Pública FINEP 779"
@@ -240,7 +233,7 @@
         },
         {
           "code": "R4_RELEVANT_BENEFIT",
-          "quote": "Orçamento da chamada: R$ 300.000.000,00. Recursos de subvenção econômica.",
+          "quote": "Orçamento da chamada: R$ 300.000.000,00",
           "source": "official_page",
           "locator": {
             "document": "Chamada Pública FINEP 779"
@@ -248,7 +241,7 @@
         },
         {
           "code": "R5_BRAZIL_RELEVANCE",
-          "quote": "Região: Todo Brasil. Empresa pública federal brasileira (Finep).",
+          "quote": "Todo Brasil",
           "source": "official_page",
           "locator": {
             "document": "Chamada Pública FINEP 779"

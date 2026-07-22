@@ -16,7 +16,7 @@
       "evidence": [
         {
           "code": "INV_IDENTITY_VERIFIED",
-          "quote": "A Indicator Capital é uma das principais firmas de venture capital em deep tech. Com escritórios em São Paulo e na Califórnia, a Indicator foi fundada em 2014.",
+          "quote": "A Indicator Capital é uma das principais firmas de venture capital em deep tech",
           "source": "official_page",
           "locator": {
             "document": "indicator.capital/pt/about"
@@ -24,7 +24,7 @@
         },
         {
           "code": "INV_TECH_STARTUP_ACTIVITY",
-          "quote": "investindo no futuro das tecnologias inteligentes e conectadas. A Indicator foi fundada em 2014 para apoiar startups em estágio inicial. Confiáveis para investidores globais (LPs) como BNDES, Qualcomm Ventures, Lenovo, Motorola, Grupo Multi e Banco do Brasil.",
+          "quote": "A Indicator Capital é uma das principais firmas de venture capital em deep tech, investindo no futuro das tecnologias inteligentes e conectadas. Com escritórios em São Paulo e na Califórnia, a Indicator foi fundada em 2014 para apoiar startups em estágio inicial.",
           "source": "official_page",
           "locator": {
             "document": "indicator.capital/pt/about"
@@ -32,7 +32,7 @@
         },
         {
           "code": "INV_BRAZIL_RELEVANCE",
-          "quote": "Com escritórios em São Paulo e na Califórnia. Gerimos o maior fundo desse tipo na América Latina. LPs incluem BNDES (banco de desenvolvimento brasileiro).",
+          "quote": "Com escritórios em São Paulo e na Califórnia, a Indicator foi fundada em 2014 para apoiar startups em estágio inicial. Somos confiáveis para investidores globais (LPs) como BNDES, Qualcomm Ventures, Lenovo, Motorola, Grupo Multi e Banco do Brasil, e gerimos o maior fundo desse tipo na América Latina.",
           "source": "official_page",
           "locator": {
             "document": "indicator.capital/pt/about"

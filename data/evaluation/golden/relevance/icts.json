@@ -17,7 +17,7 @@
       "evidence": [
         {
           "code": "ICT_IDENTITY_VERIFIED",
-          "quote": "UNIDADE EMBRAPII CIMATEC. SENAI CIMATEC, Av. Orlando Gomes 1845 - Piatã, Salvador/BA. Contato: Silmar Baptista Nunes, silmar@fieb.org.br. Site: http://www.senaicimatec.com.br",
+          "quote": "UNIDADE EMBRAPII CIMATEC. O SENAI CIMATEC é credenciado pela EMBRAPII para atendimento na área de Soluções Industriais",
           "source": "official_page",
           "locator": {
             "document": "embrapii.org.br/unidades/soluces-industriais-cimatec/"
@@ -25,7 +25,7 @@
         },
         {
           "code": "ICT_INSTITUTIONAL_LINK_VERIFIED",
-          "quote": "O SENAI CIMATEC é credenciado pela EMBRAPII para atendimento na área de Soluções Industriais. UNIDADE EMBRAPII.",
+          "quote": "O SENAI CIMATEC é credenciado pela EMBRAPII para atendimento na área de Soluções Industriais",
           "source": "official_page",
           "locator": {
             "document": "embrapii.org.br/unidades/soluces-industriais-cimatec/"
@@ -33,7 +33,7 @@
         },
         {
           "code": "ICT_ENTERPRISE_TECH_COOP",
-          "quote": "incubadora e aceleradora de base tecnológica com mais de 40 startups por ano e uma carteira com mais de 100 projetos de PD&I com empresas nacionais e internacionais. Atendimento nas áreas: Automação industrial, Robótica, Otimização de processos industriais.",
+          "quote": "Mais de 100 projetos de PD&I com empresas",
           "source": "official_page",
           "locator": {
             "document": "embrapii.org.br/unidades/soluces-industriais-cimatec/"
@@ -41,7 +41,7 @@
         },
         {
           "code": "ICT_CURRENT_STATUS_VERIFIED",
-          "quote": "Credenciado pela EMBRAPII. Contrato de Gestão com o Governo Federal (MCTI, MDIC, MS, MEC). Fluxo contínuo: a qualquer momento sua empresa pode realizar projetos.",
+          "quote": "UNIDADE EMBRAPII CIMATEC. O SENAI CIMATEC é credenciado pela EMBRAPII",
           "source": "official_page",
           "locator": {
             "document": "embrapii.org.br/unidades/soluces-industriais-cimatec/"
