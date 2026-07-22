@@ -5,12 +5,16 @@
 **Branch/commit-base:** `codex/radar-data-trust-00-t02` / `656c32362`
 
 | Commit | Assunto |
-|---|---|
+|---|---|---|
+| `656c32362` | docs: approve RT00-T01 audit (base) |
 | `cc61b31db` | feat: add representative relevance golden drafts |
 | `729d279c0` | docs: report RT00-T02 review packet |
 | `776d4ca6b` | fix: verify golden evidence with real official-page snapshots |
-| *hash* | fix: bind golden evidence to versioned sources |
-| *hash* | docs: finalize RT00-T02 review report |
+| `5eec3afd5` | docs: correct RT00-T02 review report |
+| `6c39698a9` | fix: bind golden evidence to versioned sources |
+| `7b1b8b3d2` | docs: finalize RT00-T02 review report |
+| `286146618` | fix: enforce reason_code/evidence correspondence |
+| *hash* | docs: update RT00-T02 report for final audit findings |
 
 ## Realizado
 
@@ -66,12 +70,19 @@ Cross-kind rejection testada: `IctReasonCode` em `InvestorVerdict` falha em vali
 | `agencia:finep` | quote de schema.md | quote real de finep.gov.br/sobre-a-finep |
 | `agencia:fapesp` | quote de fapesp.br | quote real de centrodememoria.fapesp.br/sobre-a-fapesp |
 
-**2º ciclo** (commit a criar): vinculação estrita de cada evidence.quote ao snapshot.
+**2º ciclo** (commit 6c39698a9): vinculação estrita de cada evidence.quote ao snapshot.
 
 - **Todos os `src:*`:** cada `evidence[].quote` na íntegra é substring do `actor_sources.quote` correspondente (normalização de espaços apenas).
 - **Todos os `legacy_triage_case`:** `source_record_id` confirmado em `triage.json`; cada `evidence[].quote` presente em `title | snippet | content`.
 - **`curated_record` (KPTL):** `source_record_id` confirmado em `data/silver/investidores.json`.
 - **FAPESP:** snapshot trocado de `fapesp.br` (página genérica) para `centrodememoria.fapesp.br/sobre-a-fapesp/` (página institucional histórica com conteúdo substantivo).
+
+**3º ciclo** (commit 286146618): correção de reason_codes e validação de evidência.
+
+- `triage-tavily-082`: `R4_RELEVANT_BENEFIT` removido de `reason_codes` (sem evidência disponível); permanece em `missing_information`.
+- `triage-tavily-079`: `R1_ENTERPRISE_PATH` removido de `reason_codes` (sem evidência disponível); permanece em `missing_information`.
+- Loader rejeita `reason_code` sem `evidence` com o mesmo `code`.
+- Loader rejeita `reason_code` que também aparece em `missing_information`.
 
 7 snapshots oficiais, todos com hash SHA-256 verificado:
 - `finep.gov.br/chamadas-publicas/chamadapublica/779` — `6624a764…`
@@ -80,7 +91,7 @@ Cross-kind rejection testada: `IctReasonCode` em `InvestorVerdict` falha em vali
 - `fapesp.br/pipe` — `155f38fb…`
 - `programacentelha.com.br` — `34918f09…`
 - `finep.gov.br/sobre-a-finep` — `0839d828…`
-- `centrodememoria.fapesp.br/sobre-a-fapesp/` — `76f51296…`
+- `centrodememoria.fapesp.br/sobre-a-fapesp/` — `43bb2135…`
 
 ### 4. Hermetic loader
 
@@ -110,7 +121,7 @@ Cross-kind rejection testada: `IctReasonCode` em `InvestorVerdict` falha em vali
 | `tests/unit/test_hardening_pr4.py` | 8 | all passed |
 | **Total** | **160** | **all passed** |
 
-Testes negativos (12 novos nesta task):
+Testes negativos (16 novos nesta task):
 
 | Teste | Validacão |
 |---|---|
@@ -126,6 +137,8 @@ Testes negativos (12 novos nesta task):
 | `test_legacy_case_id_not_in_triage` | source_record_id não existe em triage.json |
 | `test_legacy_quote_not_in_triage_body` | evidence quote ausente do body do triage |
 | `test_curated_record_id_not_in_silver` | source_record_id não existe no catálogo prata |
+| `test_reason_code_without_evidence` | reason_code sem evidence entry correspondente |
+| `test_reason_code_also_in_missing_information` | reason_code aparece em reason_codes e missing_information |
 
 ## Source-evidence final
 
