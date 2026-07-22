@@ -271,23 +271,32 @@ class RelevanceGoldenLoader:
                 except Exception as e:
                     self._errors.append(f"{cid}: verdict validation failed: {e}")
 
-                # Every reason_code must have evidence with the same code
+                # Every reason_code and failed_code must have evidence with the same code
                 evidence_codes = {ev.get("code") for ev in verdict.get("evidence", []) if ev.get("code")}
+                all_confirmed = []
                 for rc in verdict.get("reason_codes", []):
+                    all_confirmed.append(rc)
                     if rc not in evidence_codes:
                         self._errors.append(f"{cid}: reason_code '{rc}' has no matching evidence entry")
+                for fc in verdict.get("failed_codes", []):
+                    all_confirmed.append(fc)
+                    if fc not in evidence_codes:
+                        self._errors.append(f"{cid}: failed_code '{fc}' has no matching evidence entry")
+                # Evidence codes must be subset of reason_codes ∪ failed_codes ∪ exclusion_codes
+                all_confirmed_set = set(all_confirmed)
+                for ev_code in evidence_codes:
+                    if ev_code not in all_confirmed_set:
+                        self._errors.append(f"{cid}: evidence code '{ev_code}' not in any confirmed code list")
 
                 # If missing_information starts with a known reason code,
-                # that code must NOT also appear in reason_codes
-                known_rc_prefixes = set()
-                for rc_list in (verdict.get("reason_codes", []), verdict.get("exclusion_codes", [])):
-                    for rc in rc_list:
-                        known_rc_prefixes.add(rc.split("_")[0] if "_" in rc else rc)
+                # that code must NOT also appear in reason_codes, failed_codes, or exclusion_codes
                 for mi in verdict.get("missing_information", []):
                     mi_code = mi.split(":")[0].strip() if ":" in mi else ""
                     if mi_code:
                         if mi_code in verdict.get("reason_codes", []):
                             self._errors.append(f"{cid}: reason_code '{mi_code}' also present in missing_information")
+                        if mi_code in verdict.get("failed_codes", []):
+                            self._errors.append(f"{cid}: failed_code '{mi_code}' also present in missing_information")
                         if mi_code in verdict.get("exclusion_codes", []):
                             self._errors.append(f"{cid}: exclusion_code '{mi_code}' also present in missing_information")
 

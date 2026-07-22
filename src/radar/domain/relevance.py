@@ -185,6 +185,138 @@ class RelevanceVerdict(BaseModel):
         return self
 
 
+def _check_disjoint_codes(reason_codes, failed_codes, kind_name: str):
+    """reason_codes and failed_codes must be disjoint."""
+    overlap = set(reason_codes) & set(failed_codes)
+    if overlap:
+        raise ValueError(
+            f"{kind_name}: codes cannot appear in both reason_codes and failed_codes: "
+            f"{[c.value if hasattr(c, 'value') else c for c in sorted(overlap, key=str)]}"
+        )
+
+
+def _check_evidence_correspondence(reason_codes, failed_codes, evidence, kind_name: str):
+    """Every code in reason_codes|failed_codes must have evidence with same code.
+    Evidence codes must be subset of reason_codes ∪ failed_codes."""
+    confirmed = set()
+    for rc in reason_codes:
+        confirmed.add(rc.value if hasattr(rc, 'value') else rc)
+    for fc in failed_codes:
+        confirmed.add(fc.value if hasattr(fc, 'value') else fc)
+    evidence_codes = set()
+    for ev in evidence:
+        ec = ev.code.value if hasattr(ev.code, 'value') else ev.code
+        evidence_codes.add(ec)
+        if ec not in confirmed:
+            raise ValueError(
+                f"{kind_name}: evidence code '{ec}' not in reason_codes or failed_codes"
+            )
+    for code in confirmed:
+        if code not in evidence_codes:
+            raise ValueError(
+                f"{kind_name}: {code} has no matching evidence entry"
+            )
+
+
+def _check_no_code_overlap_missing(reason_codes, failed_codes, missing_information, enum_cls, kind_name: str):
+    """A known code cannot appear simultaneously in reason_codes, failed_codes,
+    or as a prefix in missing_information."""
+    known = {m.value for m in enum_cls}
+    confirmed = set()
+    for rc in reason_codes:
+        confirmed.add(rc.value if hasattr(rc, 'value') else rc)
+    for fc in failed_codes:
+        confirmed.add(fc.value if hasattr(fc, 'value') else fc)
+    for mi in missing_information:
+        mi_code = mi.split(":")[0].strip()
+        if mi_code in known and mi_code in confirmed:
+            raise ValueError(
+                f"{kind_name}: code '{mi_code}' appears in confirmed codes "
+                f"(reason_codes/failed_codes) and also as missing_information prefix"
+            )
+
+
+def _get_identity_code(enum_cls) -> str | None:
+    """Return the identity reason code for an actor kind's enum."""
+    for m in enum_cls:
+        if "IDENTITY" in m.value:
+            return m.value
+    return None
+
+
+def _get_non_identity_codes(enum_cls) -> set[str]:
+    return {m.value for m in enum_cls if "IDENTITY" not in m.value}
+
+
+def _check_actor_invariants(
+    self,
+    enum_cls,
+    kind_name: str,
+    reason_codes,
+    failed_codes,
+    evidence,
+    missing_information,
+    decision,
+):
+    _check_disjoint_codes(reason_codes, failed_codes, kind_name)
+    _check_no_code_overlap_missing(reason_codes, failed_codes, missing_information, enum_cls, kind_name)
+
+    all_codes = {m.value for m in enum_cls}
+    present_rc = {c.value if hasattr(c, 'value') else c for c in reason_codes}
+    present_fc = {c.value if hasattr(c, 'value') else c for c in failed_codes}
+
+    if decision is RelevanceDecision.IN_SCOPE:
+        missing_rc = all_codes - present_rc
+        if missing_rc:
+            raise ValueError(
+                f"{kind_name} in_scope requires all reason codes, missing: "
+                f"{sorted(missing_rc)}"
+            )
+        if present_fc:
+            raise ValueError(
+                f"{kind_name} in_scope requires failed_codes to be empty, got: "
+                f"{sorted(present_fc)}"
+            )
+    elif decision is RelevanceDecision.OUT_OF_SCOPE:
+        identity_code = _get_identity_code(enum_cls)
+        if identity_code and identity_code not in present_rc:
+            raise ValueError(
+                f"{kind_name} out_of_scope requires identity code '{identity_code}' "
+                f"in reason_codes"
+            )
+        non_identity = _get_non_identity_codes(enum_cls)
+        failed_non_identity = present_fc & non_identity
+        if not failed_non_identity:
+            raise ValueError(
+                f"{kind_name} out_of_scope requires at least one non-identity code "
+                f"in failed_codes"
+            )
+    elif decision is RelevanceDecision.NEEDS_REVIEW:
+        if present_fc:
+            raise ValueError(
+                f"{kind_name} needs_review requires failed_codes to be empty, got: "
+                f"{sorted(present_fc)}"
+            )
+        # At least one obligatory code prefix in missing_information
+        has_obligatory_prefix = False
+        for mi in missing_information:
+            mi_code = mi.split(":")[0].strip()
+            if mi_code in all_codes:
+                has_obligatory_prefix = True
+                break
+        if not has_obligatory_prefix:
+            raise ValueError(
+                f"{kind_name} needs_review requires at least one obligatory code "
+                f"prefix in missing_information"
+            )
+
+    # Validate evidence after the decision shape so callers receive the most
+    # fundamental contract error first (for example, missing mandatory codes
+    # before missing evidence for the subset that happened to be present).
+    _check_evidence_correspondence(reason_codes, failed_codes, evidence, kind_name)
+    return self
+
+
 class ActorVerdict(BaseModel):
     """Classificação de relevância de um ator (investidor, ICT, etc.).
     """
@@ -193,6 +325,7 @@ class ActorVerdict(BaseModel):
     decision: RelevanceDecision
     kind: ClassificationKind
     reason_codes: list[str] = Field(default_factory=list)
+    failed_codes: list[str] = Field(default_factory=list)
     evidence: list[ActorEvidence] = Field(default_factory=list)
     missing_information: list[str] = Field(default_factory=list)
     classifier_version: str = CLASSIFIER_VERSION
@@ -201,77 +334,61 @@ class ActorVerdict(BaseModel):
 class InvestorVerdict(ActorVerdict):
     kind: Literal[ClassificationKind.INVESTOR] = ClassificationKind.INVESTOR
     reason_codes: list[InvestorReasonCode] = Field(default_factory=list)
+    failed_codes: list[InvestorReasonCode] = Field(default_factory=list)
     evidence: list[InvestorEvidence] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_investor_invariants(self) -> InvestorVerdict:
-        if self.decision is RelevanceDecision.IN_SCOPE:
-            required = set(InvestorReasonCode)
-            present = set(self.reason_codes)
-            missing = required - present
-            if missing:
-                raise ValueError(
-                    f"investor in_scope requires all InvestorReasonCodes, missing: "
-                    f"{[m.value for m in sorted(missing, key=lambda x: x.value)]}"
-                )
-        return self
+        return _check_actor_invariants(
+            self, InvestorReasonCode, "investor",
+            self.reason_codes, self.failed_codes,
+            self.evidence, self.missing_information, self.decision,
+        )
 
 
 class IctVerdict(ActorVerdict):
     kind: Literal[ClassificationKind.ICT] = ClassificationKind.ICT
     reason_codes: list[IctReasonCode] = Field(default_factory=list)
+    failed_codes: list[IctReasonCode] = Field(default_factory=list)
     evidence: list[IctEvidence] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_ict_invariants(self) -> IctVerdict:
-        if self.decision is RelevanceDecision.IN_SCOPE:
-            required = set(IctReasonCode)
-            present = set(self.reason_codes)
-            missing = required - present
-            if missing:
-                raise ValueError(
-                    f"ict in_scope requires all IctReasonCodes, missing: "
-                    f"{[m.value for m in sorted(missing, key=lambda x: x.value)]}"
-                )
-        return self
+        return _check_actor_invariants(
+            self, IctReasonCode, "ict",
+            self.reason_codes, self.failed_codes,
+            self.evidence, self.missing_information, self.decision,
+        )
 
 
 class ProgramVerdict(ActorVerdict):
     kind: Literal[ClassificationKind.PROGRAM] = ClassificationKind.PROGRAM
     reason_codes: list[ProgramReasonCode] = Field(default_factory=list)
+    failed_codes: list[ProgramReasonCode] = Field(default_factory=list)
     evidence: list[ProgramEvidence] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_program_invariants(self) -> ProgramVerdict:
-        if self.decision is RelevanceDecision.IN_SCOPE:
-            required = set(ProgramReasonCode)
-            present = set(self.reason_codes)
-            missing = required - present
-            if missing:
-                raise ValueError(
-                    f"program in_scope requires all ProgramReasonCodes, missing: "
-                    f"{[m.value for m in sorted(missing, key=lambda x: x.value)]}"
-                )
-        return self
+        return _check_actor_invariants(
+            self, ProgramReasonCode, "program",
+            self.reason_codes, self.failed_codes,
+            self.evidence, self.missing_information, self.decision,
+        )
 
 
 class AgencyVerdict(ActorVerdict):
     kind: Literal[ClassificationKind.AGENCY] = ClassificationKind.AGENCY
     reason_codes: list[AgencyReasonCode] = Field(default_factory=list)
+    failed_codes: list[AgencyReasonCode] = Field(default_factory=list)
     evidence: list[AgencyEvidence] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_agency_invariants(self) -> AgencyVerdict:
-        if self.decision is RelevanceDecision.IN_SCOPE:
-            required = set(AgencyReasonCode)
-            present = set(self.reason_codes)
-            missing = required - present
-            if missing:
-                raise ValueError(
-                    f"agency in_scope requires all AgencyReasonCodes, missing: "
-                    f"{[m.value for m in sorted(missing, key=lambda x: x.value)]}"
-                )
-        return self
+        return _check_actor_invariants(
+            self, AgencyReasonCode, "agency",
+            self.reason_codes, self.failed_codes,
+            self.evidence, self.missing_information, self.decision,
+        )
 
 
 ActorVerdictUnion = Annotated[

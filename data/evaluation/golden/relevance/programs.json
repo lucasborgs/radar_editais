@@ -13,6 +13,7 @@
         "PRG_RELEVANT_INNOVATION_MECHANISM",
         "PRG_ENTERPRISE_RELEVANCE"
       ],
+      "failed_codes": [],
       "evidence": [
         {
           "code": "PRG_IDENTITY_OPERATOR_VERIFIED",
@@ -59,6 +60,7 @@
         "PRG_RELEVANT_INNOVATION_MECHANISM",
         "PRG_ENTERPRISE_RELEVANCE"
       ],
+      "failed_codes": [],
       "evidence": [
         {
           "code": "PRG_IDENTITY_OPERATOR_VERIFIED",

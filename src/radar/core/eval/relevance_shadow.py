@@ -127,6 +127,7 @@ def _assemble_input(item: dict) -> dict:
     expected_output = {
         "decision": verdict.get("decision", ""),
         "reason_codes": verdict.get("reason_codes", []),
+        "failed_codes": verdict.get("failed_codes", []),
         "exclusion_codes": verdict.get("exclusion_codes", []),
     }
 
@@ -248,8 +249,8 @@ def eval_reason_code_precision(*, output, expected_output, **_) -> Evaluation:
     exp_excl = set(exp.get("exclusion_codes", []))
     exp_all = exp_codes | exp_excl
     if not pred_all:
-        return {"name": "reason_code_precision", "value": 1.0,
-                "comment": "sem reason codes emitidos"}
+        return {"name": "reason_code_precision", "value": None,
+                "comment": "sem reason codes emitidos; precisão indefinida"}
     matched = len(pred_all & exp_all)
     precision = matched / len(pred_all)
     return {"name": "reason_code_precision", "value": precision,
@@ -257,31 +258,95 @@ def eval_reason_code_precision(*, output, expected_output, **_) -> Evaluation:
 
 
 def eval_fn_guard(*, output, expected_output, **_) -> Evaluation:
-    """Guarda de falso negativo.
+    """Guarda de falso negativo (convenção da suíte triage).
 
-    1.0 se golden=in_scope e pred não é in_scope (FN detectado).
-    0.0 se golden=in_scope e pred=in_scope (acertou).
-    0.0 se golden não é in_scope.
-    None em erro operacional.
+    1.0 = não houve falso negativo (golden in_scope foi mantido OU golden não é in_scope).
+    0.0 = golden in_scope foi perdido (pred != in_scope).
+    None = erro operacional.
     """
     if not isinstance(output, dict) or "error" in output:
         return {"name": "fn_guard", "value": None,
                 "comment": (output or {}).get("error", "output inválido")}
     pred = (output.get("verdict") or {}).get("decision")
     exp = (expected_output or {}).get("decision")
-    is_fn = (exp == "in_scope") and (pred != "in_scope")
-    return {"name": "fn_guard", "value": 1.0 if is_fn else 0.0,
-            "comment": "FN — oportunidade/ator relevante perdido" if is_fn else "ok"}
+    if exp == "in_scope" and pred != "in_scope":
+        return {"name": "fn_guard", "value": 0.0,
+                "comment": "FN — golden in_scope perdido"}
+    return {"name": "fn_guard", "value": 1.0,
+            "comment": "ok"}
 
 
-def eval_evidence_grounding(*, output, expected_output, **_) -> Evaluation:
-    """O output contém evidence com quotes? 1.0 = sim, 0.0 = vazio, None = erro."""
+def eval_evidence_grounding(*, output, expected_output, input, **_) -> Evaluation:
+    """Verifica que todas as quotes estão no material e todo código tem evidence.
+
+    Utiliza input real (material) para verificar substring.
+    1.0 = ok, 0.0 = falha, None = erro operacional.
+    """
     if not isinstance(output, dict) or "error" in output:
         return {"name": "evidence_grounding", "value": None,
                 "comment": (output or {}).get("error", "output inválido")}
-    evidence = (output.get("verdict") or {}).get("evidence", [])
-    has_quotes = any(ev.get("quote") for ev in evidence if isinstance(ev, dict))
-    return {"name": "evidence_grounding", "value": 1.0 if has_quotes else 0.0}
+    verdict = output.get("verdict")
+    if not isinstance(verdict, dict):
+        return {"name": "evidence_grounding", "value": 0.0,
+                "comment": "sem verdict no output"}
+    material = (input or {}).get("content", "")
+    if not material:
+        return {"name": "evidence_grounding", "value": 0.0,
+                "comment": "material de entrada vazio"}
+
+    evidence = verdict.get("evidence", [])
+    if not evidence:
+        return {"name": "evidence_grounding", "value": 0.0,
+                "comment": "nenhuma evidência fornecida"}
+
+    material_norm = re.sub(r"\s+", " ", str(material)).strip()
+    all_codes = set(verdict.get("reason_codes", [])) | set(verdict.get("failed_codes", []))
+    evidence_codes = set()
+
+    for ev in evidence:
+        if not isinstance(ev, dict):
+            continue
+        ec = ev.get("code", "")
+        if not ec:
+            continue
+        evidence_codes.add(ec)
+        eq = ev.get("quote", "")
+        if not eq:
+            return {"name": "evidence_grounding", "value": 0.0,
+                    "comment": f"quote de '{ec}' vazio"}
+        q_norm = re.sub(r"\s+", " ", str(eq)).strip()
+        if q_norm not in material_norm:
+            return {"name": "evidence_grounding", "value": 0.0,
+                    "comment": f"quote de '{ec}' não encontrado no material"}
+
+    # Every confirmed code must have evidence
+    for code in all_codes:
+        if code not in evidence_codes:
+            return {"name": "evidence_grounding", "value": 0.0,
+                    "comment": f"código '{code}' sem evidência correspondente"}
+    # Every evidence code must be in confirmed codes
+    for ec in evidence_codes:
+        if ec not in all_codes:
+            return {"name": "evidence_grounding", "value": 0.0,
+                    "comment": f"evidência '{ec}' não referenciada em reason_codes ou failed_codes"}
+
+    return {"name": "evidence_grounding", "value": 1.0,
+            "comment": "todas as quotes verificadas no material"}
+
+
+def eval_failed_code_exact_match(*, output, expected_output, **_) -> Evaluation:
+    """failed_codes do pred bate exatamente com o golden?
+
+    1.0 = match exato, 0.0 = divergência, None = erro operacional.
+    """
+    if not isinstance(output, dict) or "error" in output:
+        return {"name": "failed_code_exact_match", "value": None,
+                "comment": (output or {}).get("error", "output inválido")}
+    pred = set((output.get("verdict") or {}).get("failed_codes", []))
+    exp = set((expected_output or {}).get("failed_codes", []))
+    match = pred == exp
+    return {"name": "failed_code_exact_match", "value": 1.0 if match else 0.0,
+            "comment": "failed_codes ok" if match else f"pred={pred} exp={exp}"}
 
 
 def eval_operational_error(*, output, **_) -> Evaluation:
@@ -331,57 +396,76 @@ def run_eval_metrics_by_kind(item_results: list[dict]) -> list[Evaluation]:
         fn_count = 0
         error_count = 0
         coverage_sum = 0.0
-        precision_sum = 0.0
         coverage_n = 0
-        precision_n = 0
+        precision_values: list[float] = []
+        fc_exact_match_vals = []
 
         for ir in items:
             output = ir.get("output") or {}
             expected = ir.get("expected_output") or {}
+            is_error = isinstance(output, dict) and "error" in output
 
-            # accuracy
+            # accuracy (error excluded)
             pred = _verdict_decision(ir)
             exp = _expected_decision(ir)
-            if pred is not None and exp is not None:
+            if not is_error and pred is not None and exp is not None:
                 accuracy_values.append(pred == exp)
 
-            # fn
-            if exp == "in_scope" and pred != "in_scope":
+            # fn (error não vira FN)
+            if not is_error and exp == "in_scope" and pred != "in_scope":
                 fn_count += 1
 
             # error
-            if isinstance(output, dict) and "error" in output:
+            if is_error:
                 error_count += 1
 
-            # coverage
-            pred_codes = set(output.get("verdict", {}).get("reason_codes", [])) if isinstance(output, dict) else set()
-            pred_excl = set(output.get("verdict", {}).get("exclusion_codes", [])) if isinstance(output, dict) else set()
-            pred_all = pred_codes | pred_excl
-            exp_codes = set(expected.get("reason_codes", []))
-            exp_excl = set(expected.get("exclusion_codes", []))
-            exp_all = exp_codes | exp_excl
-            if exp_all and pred_all:
-                coverage_sum += len(pred_all & exp_all) / len(exp_all)
-                coverage_n += 1
-                precision_sum += len(pred_all & exp_all) / len(pred_all)
-                precision_n += 1
+            # coverage/precision (error excluded)
+            if not is_error and isinstance(output, dict):
+                pred_codes = set(output.get("verdict", {}).get("reason_codes", []))
+                pred_excl = set(output.get("verdict", {}).get("exclusion_codes", []))
+                pred_all = pred_codes | pred_excl
+                exp_codes = set(expected.get("reason_codes", []))
+                exp_excl = set(expected.get("exclusion_codes", []))
+                exp_all = exp_codes | exp_excl
+                if exp_all:
+                    if pred_all:
+                        matched = len(pred_all & exp_all)
+                        coverage_sum += matched / len(exp_all)
+                        precision_values.append(matched / len(pred_all))
+                    else:
+                        coverage_sum += 0.0  # pred vazio → coverage 0
+                    coverage_n += 1
 
+            # failed_code exact match (error excluded)
+            if not is_error:
+                pred_fc = set((output.get("verdict") or {}).get("failed_codes", []))
+                exp_fc = set(expected.get("failed_codes", []))
+                fc_exact_match_vals.append(1.0 if pred_fc == exp_fc else 0.0)
+
+        total_items = len(items)
         if accuracy_values:
             mean_acc = sum(accuracy_values) / len(accuracy_values)
             evals.append({"name": f"{kind}_mean_accuracy", "value": round(mean_acc, 4),
                           "comment": f"{sum(accuracy_values)}/{len(accuracy_values)} correct"})
-        if fn_count:
-            evals.append({"name": f"{kind}_fn_count", "value": fn_count,
-                          "comment": f"{fn_count} FN(s) in {kind}"})
-        if error_count:
-            evals.append({"name": f"{kind}_error_count", "value": error_count,
-                          "comment": f"{error_count} error(s) in {kind}"})
+        # Always emit FN count (even zero)
+        evals.append({"name": f"{kind}_fn_count", "value": fn_count,
+                      "comment": f"{fn_count} FN(s) in {kind}"})
+        # Always emit error count (even zero)
+        evals.append({"name": f"{kind}_error_count", "value": error_count,
+                      "comment": f"{error_count} error(s) in {kind}"})
         if coverage_n:
             evals.append({"name": f"{kind}_mean_coverage", "value": round(coverage_sum / coverage_n, 4),
-                          "comment": f"mean reason code coverage for {kind}"})
-        if precision_n:
-            evals.append({"name": f"{kind}_mean_precision", "value": round(precision_sum / precision_n, 4),
-                          "comment": f"mean reason code precision for {kind}"})
+                          "comment": f"mean reason code coverage for {kind} ({coverage_n}/{total_items} items)"})
+        if precision_values:
+            evals.append({
+                "name": f"{kind}_mean_precision",
+                "value": round(sum(precision_values) / len(precision_values), 4),
+                "comment": f"mean reason code precision for {kind}",
+            })
+        if fc_exact_match_vals:
+            fc_ok = sum(fc_exact_match_vals)
+            evals.append({"name": f"{kind}_fc_exact_match", "value": round(fc_ok / len(fc_exact_match_vals), 4),
+                          "comment": f"failed_code exact match {int(fc_ok)}/{len(fc_exact_match_vals)}"})
 
     return evals
 
@@ -399,17 +483,18 @@ def run_eval_divergences(item_results: list[dict]) -> list[Evaluation]:
         kind = meta.get("kind", "unknown")
         case_id = meta.get("case_id", "?")
         output = ir.get("output") or {}
+        is_error = isinstance(output, dict) and "error" in output
 
         pred = _verdict_decision(ir)
         exp = _expected_decision(ir)
 
-        if pred is not None and exp is not None and pred != exp:
+        if not is_error and pred is not None and exp is not None and pred != exp:
             divergences[kind].append(case_id)
 
-        if isinstance(output, dict) and "error" in output:
+        if is_error:
             error_ids.append(case_id)
 
-        if exp == "in_scope" and pred != "in_scope":
+        if not is_error and exp == "in_scope" and pred != "in_scope":
             fn_ids.append(case_id)
 
     evals: list[Evaluation] = []
@@ -417,12 +502,10 @@ def run_eval_divergences(item_results: list[dict]) -> list[Evaluation]:
         evals.append({"name": f"divergence_{kind}", "value": len(ids),
                       "comment": f"case_ids: {', '.join(ids)}"})
 
-    if fn_ids:
-        evals.append({"name": "fn_case_ids", "value": len(fn_ids),
-                      "comment": f"case_ids: {', '.join(fn_ids)}"})
-    if error_ids:
-        evals.append({"name": "error_case_ids", "value": len(error_ids),
-                      "comment": f"case_ids: {', '.join(error_ids)}"})
+    evals.append({"name": "fn_case_ids", "value": len(fn_ids),
+                  "comment": f"case_ids: {', '.join(fn_ids)}" if fn_ids else "nenhum FN"})
+    evals.append({"name": "error_case_ids", "value": len(error_ids),
+                  "comment": f"case_ids: {', '.join(error_ids)}" if error_ids else "nenhum erro"})
 
     return evals
 
@@ -474,6 +557,7 @@ SUITE = Suite(
         eval_reason_code_precision,
         eval_fn_guard,
         eval_evidence_grounding,
+        eval_failed_code_exact_match,
         eval_operational_error,
     ],
     run_evaluators=[

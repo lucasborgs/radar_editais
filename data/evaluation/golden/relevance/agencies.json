@@ -13,6 +13,7 @@
         "AGY_RELEVANT_INNOVATION_MANDATE",
         "AGY_BRAZIL_RELEVANCE"
       ],
+      "failed_codes": [],
       "evidence": [
         {
           "code": "AGY_IDENTITY_VERIFIED",
@@ -59,6 +60,7 @@
         "AGY_RELEVANT_INNOVATION_MANDATE",
         "AGY_BRAZIL_RELEVANCE"
       ],
+      "failed_codes": [],
       "evidence": [
         {
           "code": "AGY_IDENTITY_VERIFIED",

@@ -218,7 +218,7 @@ class TestRoundTrip:
         v = InvestorVerdict(
             decision=RelevanceDecision.IN_SCOPE,
             reason_codes=list(InvestorReasonCode),
-            evidence=[{"code": "INV_IDENTITY_VERIFIED", "quote": "verified"}],
+            evidence=[{"code": c.value, "quote": "verified"} for c in InvestorReasonCode],
         )
         dumped = json.loads(v.model_dump_json())
         restored = actor_verdict_adapter.validate_json(json.dumps(dumped))
@@ -228,6 +228,7 @@ class TestRoundTrip:
         v = IctVerdict(
             decision=RelevanceDecision.IN_SCOPE,
             reason_codes=list(IctReasonCode),
+            evidence=[{"code": c.value, "quote": "verified"} for c in IctReasonCode],
         )
         restored = actor_verdict_adapter.validate_json(json.dumps(json.loads(v.model_dump_json())))
         assert isinstance(restored, IctVerdict)
@@ -236,6 +237,7 @@ class TestRoundTrip:
         v = ProgramVerdict(
             decision=RelevanceDecision.IN_SCOPE,
             reason_codes=list(ProgramReasonCode),
+            evidence=[{"code": c.value, "quote": "verified"} for c in ProgramReasonCode],
         )
         restored = actor_verdict_adapter.validate_json(json.dumps(json.loads(v.model_dump_json())))
         assert isinstance(restored, ProgramVerdict)
@@ -244,6 +246,7 @@ class TestRoundTrip:
         v = AgencyVerdict(
             decision=RelevanceDecision.IN_SCOPE,
             reason_codes=list(AgencyReasonCode),
+            evidence=[{"code": c.value, "quote": "verified"} for c in AgencyReasonCode],
         )
         restored = actor_verdict_adapter.validate_json(json.dumps(json.loads(v.model_dump_json())))
         assert isinstance(restored, AgencyVerdict)

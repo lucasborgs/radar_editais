@@ -369,7 +369,10 @@ class TestActorVerdict:
 
 class TestInvestorVerdict:
     def test_kind_default(self):
-        v = InvestorVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
+        v = InvestorVerdict(
+            decision=RelevanceDecision.NEEDS_REVIEW,
+            missing_information=["INV_IDENTITY_VERIFIED: não verificado"],
+        )
         assert v.kind is ClassificationKind.INVESTOR
 
     def test_wrong_kind_rejected(self):
@@ -379,7 +382,10 @@ class TestInvestorVerdict:
     def test_round_trip_preserves_kind(self):
         v = InvestorVerdict(
             decision=RelevanceDecision.NEEDS_REVIEW,
-            missing_information=["ticket_range"],
+            missing_information=[
+                "INV_IDENTITY_VERIFIED: não verificado",
+                "ticket_range",
+            ],
         )
         dumped = json.loads(v.model_dump_json())
         assert dumped["kind"] == "investor"
@@ -389,7 +395,10 @@ class TestInvestorVerdict:
 
 class TestIctVerdict:
     def test_kind_default(self):
-        v = IctVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
+        v = IctVerdict(
+            decision=RelevanceDecision.NEEDS_REVIEW,
+            missing_information=["ICT_IDENTITY_VERIFIED: não verificado"],
+        )
         assert v.kind is ClassificationKind.ICT
 
     def test_wrong_kind_rejected(self):
@@ -397,14 +406,20 @@ class TestIctVerdict:
             IctVerdict(decision=RelevanceDecision.IN_SCOPE, kind=ClassificationKind.INVESTOR)
 
     def test_round_trip_preserves_kind(self):
-        v = IctVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
+        v = IctVerdict(
+            decision=RelevanceDecision.NEEDS_REVIEW,
+            missing_information=["ICT_IDENTITY_VERIFIED: não verificado"],
+        )
         dumped = json.loads(v.model_dump_json())
         assert dumped["kind"] == "ict"
 
 
 class TestProgramVerdict:
     def test_kind_default(self):
-        v = ProgramVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
+        v = ProgramVerdict(
+            decision=RelevanceDecision.NEEDS_REVIEW,
+            missing_information=["PRG_IDENTITY_OPERATOR_VERIFIED: não verificado"],
+        )
         assert v.kind is ClassificationKind.PROGRAM
 
     def test_wrong_kind_rejected(self):
@@ -414,7 +429,10 @@ class TestProgramVerdict:
 
 class TestAgencyVerdict:
     def test_kind_default(self):
-        v = AgencyVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
+        v = AgencyVerdict(
+            decision=RelevanceDecision.NEEDS_REVIEW,
+            missing_information=["AGY_IDENTITY_VERIFIED: não verificado"],
+        )
         assert v.kind is ClassificationKind.AGENCY
 
     def test_wrong_kind_rejected(self):
@@ -422,7 +440,10 @@ class TestAgencyVerdict:
             AgencyVerdict(decision=RelevanceDecision.IN_SCOPE, kind=ClassificationKind.ICT)
 
     def test_round_trip_preserves_kind(self):
-        v = AgencyVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
+        v = AgencyVerdict(
+            decision=RelevanceDecision.NEEDS_REVIEW,
+            missing_information=["AGY_IDENTITY_VERIFIED: não verificado"],
+        )
         dumped = json.loads(v.model_dump_json())
         assert dumped["kind"] == "agency"
 
@@ -432,30 +453,33 @@ class TestActorVerdictDiscriminatedUnion:
         assert isinstance(actor_verdict_adapter, TypeAdapter)
 
     def test_adapter_serializes_investor(self):
-        v = InvestorVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
+        v = InvestorVerdict(
+            decision=RelevanceDecision.NEEDS_REVIEW,
+            missing_information=["INV_IDENTITY_VERIFIED: não verificado"],
+        )
         dumped = json.loads(actor_verdict_adapter.dump_json(v))
         assert dumped["kind"] == "investor"
         assert dumped["decision"] == "needs_review"
 
     def test_adapter_deserializes_investor(self):
-        raw = {"decision": "needs_review", "kind": "investor", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
+        raw = {"decision": "needs_review", "kind": "investor", "reason_codes": [], "failed_codes": [], "evidence": [], "missing_information": ["INV_IDENTITY_VERIFIED: não verificado"], "classifier_version": CLASSIFIER_VERSION}
         restored = actor_verdict_adapter.validate_json(json.dumps(raw))
         assert isinstance(restored, InvestorVerdict)
         assert restored.kind is ClassificationKind.INVESTOR
 
     def test_adapter_deserializes_ict(self):
-        raw = {"decision": "needs_review", "kind": "ict", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
+        raw = {"decision": "needs_review", "kind": "ict", "reason_codes": [], "failed_codes": [], "evidence": [], "missing_information": ["ICT_IDENTITY_VERIFIED: não verificado"], "classifier_version": CLASSIFIER_VERSION}
         restored = actor_verdict_adapter.validate_json(json.dumps(raw))
         assert isinstance(restored, IctVerdict)
         assert restored.kind is ClassificationKind.ICT
 
     def test_adapter_deserializes_program(self):
-        raw = {"decision": "needs_review", "kind": "program", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
+        raw = {"decision": "needs_review", "kind": "program", "reason_codes": [], "failed_codes": [], "evidence": [], "missing_information": ["PRG_IDENTITY_OPERATOR_VERIFIED: não verificado"], "classifier_version": CLASSIFIER_VERSION}
         restored = actor_verdict_adapter.validate_json(json.dumps(raw))
         assert isinstance(restored, ProgramVerdict)
 
     def test_adapter_deserializes_agency(self):
-        raw = {"decision": "needs_review", "kind": "agency", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
+        raw = {"decision": "needs_review", "kind": "agency", "reason_codes": [], "failed_codes": [], "evidence": [], "missing_information": ["AGY_IDENTITY_VERIFIED: não verificado"], "classifier_version": CLASSIFIER_VERSION}
         restored = actor_verdict_adapter.validate_json(json.dumps(raw))
         assert isinstance(restored, AgencyVerdict)
 
@@ -483,8 +507,21 @@ class TestKindSeparation:
         assert "kind" not in v.model_dump()
 
     def test_actor_verdict_no_exclusion_codes(self):
-        for cls in (ActorVerdict, InvestorVerdict, IctVerdict, ProgramVerdict, AgencyVerdict):
-            v = cls(decision=RelevanceDecision.NEEDS_REVIEW, kind=ClassificationKind.INVESTOR) if cls is ActorVerdict else cls(decision=RelevanceDecision.NEEDS_REVIEW)
+        typed = {
+            InvestorVerdict: "INV_IDENTITY_VERIFIED: não verificado",
+            IctVerdict: "ICT_IDENTITY_VERIFIED: não verificado",
+            ProgramVerdict: "PRG_IDENTITY_OPERATOR_VERIFIED: não verificado",
+            AgencyVerdict: "AGY_IDENTITY_VERIFIED: não verificado",
+        }
+        for cls in (ActorVerdict, *typed):
+            v = (
+                cls(decision=RelevanceDecision.NEEDS_REVIEW, kind=ClassificationKind.INVESTOR)
+                if cls is ActorVerdict
+                else cls(
+                    decision=RelevanceDecision.NEEDS_REVIEW,
+                    missing_information=[typed[cls]],
+                )
+            )
             assert "exclusion_codes" not in v.model_dump()
 
     def test_actor_evidence_not_accepted_in_relevance_verdict(self):
@@ -608,6 +645,7 @@ class TestActorReasonCodes:
         v = InvestorVerdict(
             decision=RelevanceDecision.IN_SCOPE,
             reason_codes=list(InvestorReasonCode),
+            evidence=[{"code": c.value, "quote": "verified"} for c in InvestorReasonCode],
         )
         assert v.decision is RelevanceDecision.IN_SCOPE
 
@@ -624,6 +662,7 @@ class TestActorReasonCodes:
         v = IctVerdict(
             decision=RelevanceDecision.IN_SCOPE,
             reason_codes=list(IctReasonCode),
+            evidence=[{"code": c.value, "quote": "verified"} for c in IctReasonCode],
         )
         assert v.decision is RelevanceDecision.IN_SCOPE
 
@@ -640,6 +679,7 @@ class TestActorReasonCodes:
         v = ProgramVerdict(
             decision=RelevanceDecision.IN_SCOPE,
             reason_codes=list(ProgramReasonCode),
+            evidence=[{"code": c.value, "quote": "verified"} for c in ProgramReasonCode],
         )
         assert v.decision is RelevanceDecision.IN_SCOPE
 
@@ -656,6 +696,7 @@ class TestActorReasonCodes:
         v = AgencyVerdict(
             decision=RelevanceDecision.IN_SCOPE,
             reason_codes=list(AgencyReasonCode),
+            evidence=[{"code": c.value, "quote": "verified"} for c in AgencyReasonCode],
         )
         assert v.decision is RelevanceDecision.IN_SCOPE
 
@@ -689,7 +730,8 @@ class TestActorReasonCodes:
         v = InvestorVerdict(
             decision=RelevanceDecision.NEEDS_REVIEW,
             reason_codes=[InvestorReasonCode.INV_IDENTITY_VERIFIED],
-            missing_information=["INV_TECH_STARTUP_ACTIVITY"],
+            evidence=[{"code": "INV_IDENTITY_VERIFIED", "quote": "verified"}],
+            missing_information=["INV_TECH_STARTUP_ACTIVITY: não verificado"],
         )
         assert v.decision is RelevanceDecision.NEEDS_REVIEW
         assert len(v.reason_codes) == 1

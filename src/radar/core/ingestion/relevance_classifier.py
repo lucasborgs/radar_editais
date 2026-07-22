@@ -13,6 +13,7 @@ import logging
 import os
 import re
 
+from openai import APITimeoutError
 from pydantic import BaseModel, ValidationError
 
 from radar.core.llm.llm_client import make_client
@@ -154,31 +155,43 @@ _INVESTOR_CLASSIFIER_SYSTEM = (
     "\n"
     "Decisões possíveis:\n"
     "  in_scope — o investidor atende todos os critérios abaixo\n"
-    "  out_of_scope — há evidência clara de que não atende\n"
+    "  out_of_scope — a identidade está confirmada e uma fonte confiável "
+    "contradiz ao menos um critério essencial\n"
     "  needs_review — material insuficiente para decisão segura\n"
+    "\n"
+    "Campos da saída:\n"
+    "  reason_codes: critérios comprovadamente satisfeitos\n"
+    "  failed_codes: critérios comprovadamente falsos (apenas para out_of_scope)\n"
+    "  missing_information: critérios ainda ausentes, ambíguos ou conflitantes\n"
     "\n"
     "Critérios (TODOS são necessários para in_scope):\n"
     "  INV_IDENTITY_VERIFIED: identidade e página oficial verificáveis — nome, "
     "site oficial, registro ou referência pública que confirme a existência do investidor\n"
     "  INV_TECH_STARTUP_ACTIVITY: atuação material com startups/empresas de tecnologia — "
-    "tese de investimento, portfólio, setores de atuação ou evidência de que o investidor "
-    "efetivamente investe em empresas de base tecnológica\n"
+    "tese de investimento, portfólio, fundo anunciado ou operações concretas em empresas "
+    "de base tecnológica\n"
     "  INV_BRAZIL_RELEVANCE: relevância para empresas brasileiras ou operação no Brasil — "
     "escritório no Brasil, LPs brasileiros, investimento em startups brasileiras ou "
     "abrangência que inclua o país\n"
     "\n"
     "Regras:\n"
-    "  - Informação ausente produz needs_review, nunca out_of_scope.\n"
+    "  - Informação ausente, página indisponível ou registro incompleto produz "
+    "needs_review, nunca out_of_scope.\n"
+    "  - Ausência de evidência não equivale a evidência de ausência. "
+    "Nunca transforme informação ausente em failed_code.\n"
+    "  - failed_codes só devem conter critérios que uma fonte confiável "
+    "contradiz inequivocamente.\n"
     "  - tese, estágio, setores, geografia e ticket devem ser marcados como ausentes "
     "em missing_information quando não houver evidência — não complete por plausibilidade.\n"
-    "  - Campos não preenchidos no registro (ex.: ticket_min/ticket_max) vão para "
-    "missing_information e não bloqueiam in_scope se os 3 critérios estão satisfeitos.\n"
+    "  - Campos descritivos como ticket, estágio e setores não bloqueiam in_scope "
+    "se os 3 critérios estão satisfeitos.\n"
     "\n"
-    "Responda APENAS JSON válido, sem markdown:\n"
+    "Responda APENAS JSON válido, sem markdown, sem comentários:\n"
     '{\n'
     '  "decision": "in_scope|out_of_scope|needs_review",\n'
     '  "kind": "investor",\n'
     '  "reason_codes": ["INV_IDENTITY_VERIFIED", ...],\n'
+    '  "failed_codes": [],\n'
     '  "evidence": [\n'
     '    {"code": "INV_IDENTITY_VERIFIED", "quote": "texto literal",\n'
     '     "source": "official_page|curated_record",\n'
@@ -201,30 +214,45 @@ _ICT_CLASSIFIER_SYSTEM = (
     "\n"
     "Decisões possíveis:\n"
     "  in_scope — a ICT atende todos os critérios abaixo\n"
-    "  out_of_scope — há evidência clara de que não atende\n"
+    "  out_of_scope — a identidade está confirmada e uma fonte confiável "
+    "contradiz ao menos um critério essencial\n"
     "  needs_review — material insuficiente para decisão segura\n"
     "\n"
+    "Campos da saída:\n"
+    "  reason_codes: critérios comprovadamente satisfeitos\n"
+    "  failed_codes: critérios comprovadamente falsos (apenas para out_of_scope)\n"
+    "  missing_information: critérios ainda ausentes, ambíguos ou conflitantes\n"
+    "\n"
     "Critérios (TODOS são necessários para in_scope):\n"
-    "  ICT_IDENTITY_VERIFIED: identidade e vínculo institucional verificáveis — "
-    "nome oficial, natureza jurídica, instituição de ensino/pesquisa à qual é vinculada\n"
-    "  ICT_INSTITUTIONAL_LINK_VERIFIED: vínculo com EMBRAPII ou programa "
-    "reconhecido de ICT — credenciamento, certificação ou registro em programa oficial\n"
-    "  ICT_ENTERPRISE_TECH_COOP: capacidade de cooperação tecnológica com empresas — "
-    "projetos de P&D com empresas, serviços tecnológicos para o setor produtivo, "
-    "ou programas abertos à participação empresarial\n"
-    "  ICT_CURRENT_STATUS_VERIFIED: competências, localização e status atual "
-    "sustentados por fonte oficial — endereço, contato, situação cadastral, "
-    "data de verificação explícita\n"
+    "  ICT_IDENTITY_VERIFIED: a instituição ou unidade está identificada de forma "
+    "inequívoca — nome oficial, natureza jurídica, instituição de ensino/pesquisa "
+    "à qual é vinculada\n"
+    "  ICT_INSTITUTIONAL_LINK_VERIFIED: o vínculo alegado com EMBRAPII ou outra "
+    "rede/operadora relevante está confirmado — diretório oficial da rede/operadora "
+    "ou página institucional que declare explicitamente credenciamento ou vínculo\n"
+    "  ICT_ENTERPRISE_TECH_COOP: a ICT oferece capacidade concreta de PD&I, "
+    "desenvolvimento, ensaio, validação ou transferência tecnológica em cooperação "
+    "com empresas — descrição oficial de competências e modelo de atendimento, "
+    "projetos empresariais verificáveis ou mecanismo formal de cooperação\n"
+    "  ICT_CURRENT_STATUS_VERIFIED: há evidência de que a unidade, o vínculo e o "
+    "atendimento permanecem ativos na data de referência — listagem oficial atual, "
+    "página operacional com contato vigente, data de atualização ou atividade "
+    "institucional recente\n"
     "\n"
     "Regras:\n"
-    "  - Informação ausente produz needs_review, nunca out_of_scope.\n"
-    "  - Não invente dados de cooperação, projetos ou status.\n"
+    "  - Informação ausente, página indisponível ou registro incompleto produz "
+    "needs_review, nunca out_of_scope.\n"
+    "  - Ausência de evidência não equivale a evidência de ausência. "
+    "Nunca transforme informação ausente em failed_code.\n"
+    "  - Competências e localização devem ser preservadas como unknown quando "
+    "não verificadas — não complete por plausibilidade.\n"
     "\n"
-    "Responda APENAS JSON válido, sem markdown:\n"
+    "Responda APENAS JSON válido, sem markdown, sem comentários:\n"
     '{\n'
     '  "decision": "in_scope|out_of_scope|needs_review",\n'
     '  "kind": "ict",\n'
     '  "reason_codes": ["ICT_IDENTITY_VERIFIED", ...],\n'
+    '  "failed_codes": [],\n'
     '  "evidence": [\n'
     '    {"code": "ICT_IDENTITY_VERIFIED", "quote": "texto literal",\n'
     '     "source": "official_page",\n'
@@ -248,30 +276,39 @@ _PROGRAM_CLASSIFIER_SYSTEM = (
     "\n"
     "Decisões possíveis:\n"
     "  in_scope — o programa atende todos os critérios abaixo\n"
-    "  out_of_scope — há evidência clara de que não atende\n"
+    "  out_of_scope — a identidade está confirmada e uma fonte confiável "
+    "contradiz ao menos um critério essencial\n"
     "  needs_review — material insuficiente para decisão segura\n"
+    "\n"
+    "Campos da saída:\n"
+    "  reason_codes: critérios comprovadamente satisfeitos\n"
+    "  failed_codes: critérios comprovadamente falsos (apenas para out_of_scope)\n"
+    "  missing_information: critérios ainda ausentes, ambíguos ou conflitantes\n"
     "\n"
     "Critérios (TODOS são necessários para in_scope):\n"
     "  PRG_IDENTITY_OPERATOR_VERIFIED: identidade e operador verificáveis — "
     "nome do programa, instituição operadora, página oficial\n"
-    "  PRG_RELEVANT_INNOVATION_MECHANISM: programa/estrutura comprovada de fomento "
-    "à inovação — fluxo contínuo de submissão, chamadas regulares, edital público, "
-    "ou mecanismo estruturado de seleção com critérios de inovação/tecnologia. "
-    "Não basta menção genérica a 'inovação' sem descrever o mecanismo.\n"
-    "  PRG_ENTERPRISE_RELEVANCE: relação demonstrável com uma oportunidade ou "
-    "mecanismo relevante para startups/PMEs de base tecnológica — público-alvo "
-    "empresarial, ou programa cujo beneficiário final é a empresa mesmo quando "
-    "operado por ICT/agência\n"
+    "  PRG_RELEVANT_INNOVATION_MECHANISM: existe mecanismo estruturado de apoio "
+    "à inovação — subvenção, investimento, aceleração, piloto, infraestrutura "
+    "ou cooperação tecnológica. Não basta menção genérica a 'inovação' sem "
+    "descrever o mecanismo.\n"
+    "  PRG_ENTERPRISE_RELEVANCE: startups, PMEs ou empresas de base tecnológica "
+    "são público-alvo ou beneficiárias materiais do programa — público-alvo, "
+    "elegibilidade, portfólio de beneficiários ou modelo de participação "
+    "empresarial declarado. Não depende de uma chamada específica.\n"
     "\n"
     "Regras:\n"
-    "  - Informação ausente produz needs_review, nunca out_of_scope.\n"
-    "  - Não invente mecanismos, prazos ou benefícios.\n"
+    "  - Informação ausente, página indisponível ou registro incompleto produz "
+    "needs_review, nunca out_of_scope.\n"
+    "  - Ausência de evidência não equivale a evidência de ausência. "
+    "Nunca transforme informação ausente em failed_code.\n"
     "\n"
-    "Responda APENAS JSON válido, sem markdown:\n"
+    "Responda APENAS JSON válido, sem markdown, sem comentários:\n"
     '{\n'
     '  "decision": "in_scope|out_of_scope|needs_review",\n'
     '  "kind": "program",\n'
     '  "reason_codes": ["PRG_IDENTITY_OPERATOR_VERIFIED", ...],\n'
+    '  "failed_codes": [],\n'
     '  "evidence": [\n'
     '    {"code": "PRG_IDENTITY_OPERATOR_VERIFIED", "quote": "texto literal",\n'
     '     "source": "official_page",\n'
@@ -293,27 +330,39 @@ _AGENCY_CLASSIFIER_SYSTEM = (
     "\n"
     "Decisões possíveis:\n"
     "  in_scope — a agência atende todos os critérios abaixo\n"
-    "  out_of_scope — há evidência clara de que não atende\n"
+    "  out_of_scope — a identidade está confirmada e uma fonte confiável "
+    "contradiz ao menos um critério essencial\n"
     "  needs_review — material insuficiente para decisão segura\n"
     "\n"
+    "Campos da saída:\n"
+    "  reason_codes: critérios comprovadamente satisfeitos\n"
+    "  failed_codes: critérios comprovadamente falsos (apenas para out_of_scope)\n"
+    "  missing_information: critérios ainda ausentes, ambíguos ou conflitantes\n"
+    "\n"
     "Critérios (TODOS são necessários para in_scope):\n"
-    "  AGY_IDENTITY_VERIFIED: identidade verificável — nome oficial, natureza "
-    "jurídica, página oficial, vinculação institucional\n"
-    "  AGY_RELEVANT_INNOVATION_MANDATE: mandato/missão de fomento à ciência, "
-    "tecnologia e inovação — a agência deve ter como propósito institucional "
-    "o apoio a CT&I, descrito em sua página oficial ou documento de criação\n"
-    "  AGY_BRAZIL_RELEVANCE: atuação no Brasil — sede, abrangência ou "
-    "programas que alcançam empresas/organizações brasileiras\n"
+    "  AGY_IDENTITY_VERIFIED: a entidade e sua natureza institucional estão "
+    "identificadas sem ambiguidade — nome oficial, natureza jurídica, página "
+    "oficial, vinculação institucional\n"
+    "  AGY_RELEVANT_INNOVATION_MANDATE: o mandato inclui financiar, fomentar "
+    "ou operar instrumentos relevantes de ciência, tecnologia, inovação ou "
+    "empreendedorismo tecnológico — missão, competência legal, instrumentos "
+    "ou programas declarados oficialmente\n"
+    "  AGY_BRAZIL_RELEVANCE: a agência atua no Brasil ou oferece mecanismos "
+    "materialmente acessíveis a organizações brasileiras — sede, abrangência "
+    "ou programas que alcançam empresas/organizações brasileiras\n"
     "\n"
     "Regras:\n"
-    "  - Informação ausente produz needs_review, nunca out_of_scope.\n"
-    "  - Não invente mandato, programas ou abrangência.\n"
+    "  - Informação ausente, página indisponível ou registro incompleto produz "
+    "needs_review, nunca out_of_scope.\n"
+    "  - Ausência de evidência não equivale a evidência de ausência. "
+    "Nunca transforme informação ausente em failed_code.\n"
     "\n"
-    "Responda APENAS JSON válido, sem markdown:\n"
+    "Responda APENAS JSON válido, sem markdown, sem comentários:\n"
     '{\n'
     '  "decision": "in_scope|out_of_scope|needs_review",\n'
     '  "kind": "agency",\n'
     '  "reason_codes": ["AGY_IDENTITY_VERIFIED", ...],\n'
+    '  "failed_codes": [],\n'
     '  "evidence": [\n'
     '    {"code": "AGY_IDENTITY_VERIFIED", "quote": "texto literal",\n'
     '     "source": "official_page",\n'
@@ -364,12 +413,13 @@ def _make_classifier_client():
 def _json_from_llm(system: str, user: str, max_tokens: int = 1200) -> dict:
     """Chama o LLM e faz parse estrito do JSON de resposta.
 
-    Returns: dict parsed from JSON.
+    Returns: dict parsed from JSON (strict — no Markdown fence tolerated).
 
     Raises:
       RuntimeError: sem credencial LLM.
       TimeoutError: timeout do provedor.
       json.JSONDecodeError: resposta não é JSON válido.
+      openai.APITimeoutError: timeout real do SDK OpenAI.
       Exception: outras falhas de provedor.
     """
     client, model = _make_classifier_client()
@@ -386,8 +436,6 @@ def _json_from_llm(system: str, user: str, max_tokens: int = 1200) -> dict:
     raw = resp.choices[0].message.content.strip()
     if not raw:
         raise ValueError("resposta vazia do LLM")
-    if "```" in raw:
-        raw = re.sub(r"```(?:json)?", "", raw).strip()
     return json.loads(raw)
 
 
@@ -407,12 +455,46 @@ def _check_quote_grounding(verdict: BaseModel, material: str) -> None:
     for ev in evidence_list:
         q = getattr(ev, "quote", None)
         if not q:
-            continue
+            raise ValueError(
+                f"grounding error: evidence.quote for code '{ev.code}' is empty"
+            )
         quote_norm = re.sub(r"\s+", " ", q).strip()
         if quote_norm and quote_norm not in material_norm:
             raise ValueError(
                 f"grounding error: evidence.quote for code '{ev.code}' "
                 f"not found in input material"
+            )
+
+
+def _check_output_evidence_contract(verdict: BaseModel) -> None:
+    """Require exact code/evidence correspondence in classifier output.
+
+    Actor models enforce this themselves. Keeping the check here as well makes
+    the classifier boundary uniform and closes the same gap for opportunity
+    verdicts, whose domain model deliberately remains compatible with older
+    non-classifier callers.
+    """
+    confirmed = {
+        getattr(code, "value", code)
+        for field in ("reason_codes", "failed_codes")
+        for code in getattr(verdict, field, [])
+    }
+    evidence_codes = {
+        getattr(getattr(ev, "code", None), "value", getattr(ev, "code", None))
+        for ev in getattr(verdict, "evidence", [])
+    }
+    if evidence_codes != confirmed:
+        missing = sorted(confirmed - evidence_codes)
+        extra = sorted(evidence_codes - confirmed)
+        raise ValueError(
+            f"evidence code mismatch: missing={missing}, extra={extra}"
+        )
+
+    for item in getattr(verdict, "missing_information", []):
+        prefix = item.split(":", 1)[0].strip() if ":" in item else ""
+        if prefix and prefix in confirmed:
+            raise ValueError(
+                f"confirmed code '{prefix}' also appears in missing_information"
             )
 
 
@@ -432,7 +514,7 @@ def _validate_actor_verdict(data: dict, kind: str) -> BaseModel:
     """Valida e retorna o veredicto de ator correto conforme o kind.
 
     Usa actor_verdict_adapter (discriminated union) e verifica kind +
-    reason codes. Raises ValidationError ou ValueError.
+    reason_codes + failed_codes. Raises ValidationError ou ValueError.
     """
     verdict = actor_verdict_adapter.validate_python(data)
 
@@ -449,6 +531,11 @@ def _validate_actor_verdict(data: dict, kind: str) -> BaseModel:
             raise ValueError(
                 f"reason code '{rc.value}' is not valid for kind '{kind}'"
             )
+    for fc in getattr(verdict, "failed_codes", []):
+        if fc.value not in valid_codes:
+            raise ValueError(
+                f"failed code '{fc.value}' is not valid for kind '{kind}'"
+            )
 
     return verdict
 
@@ -456,40 +543,41 @@ def _validate_actor_verdict(data: dict, kind: str) -> BaseModel:
 def _classify(system: str, material: str, kind: str) -> dict:
     """Transporte compartilhado: LLM → parse → validação → grounding.
 
-    Returns {"verdict": dict} ou {"error": str}.
+    Returns {"verdict": dict} ou {"error": mensagem_sanitizada}.
     """
     try:
         data = _json_from_llm(
             system,
             f"<dados_externos>\n{material}\n</dados_externos>",
         )
-    except json.JSONDecodeError as e:
-        logger.warning("classify %s: parse failure — %s", kind, e)
-        return {"error": f"parse failure: {e}"}
-    except TimeoutError as e:
-        logger.warning("classify %s: timeout — %s", kind, e)
-        return {"error": f"classifier timeout: {e}"}
-    except Exception as e:
-        logger.warning("classify %s: provider error — %s", kind, e)
-        return {"error": f"provider error: {e}"}
+    except json.JSONDecodeError:
+        logger.warning("classify %s: parse failure", kind)
+        return {"error": "parse_failure: resposta do provedor não é JSON válido"}
+    except (TimeoutError, APITimeoutError):
+        logger.warning("classify %s: timeout", kind)
+        return {"error": "timeout: provedor não respondeu dentro do prazo"}
+    except ValueError:
+        logger.warning("classify %s: empty or invalid provider response", kind)
+        return {"error": "parse_failure: resposta do provedor não é JSON válido"}
+    except Exception as exc:
+        logger.warning("classify %s: provider error (%s)", kind, type(exc).__name__)
+        return {"error": "provider_error: falha na comunicação com o provedor"}
 
     try:
         if kind == "opportunity":
             verdict = RelevanceVerdict.model_validate(data)
         else:
             verdict = _validate_actor_verdict(data, kind)
-    except ValidationError as e:
-        logger.warning("classify %s: contract violation — %s", kind, e)
-        return {"error": f"contract violation: {e}"}
-    except ValueError as e:
-        logger.warning("classify %s: validation error — %s", kind, e)
-        return {"error": str(e)}
+    except (ValidationError, ValueError) as exc:
+        logger.warning("classify %s: contract violation (%s)", kind, type(exc).__name__)
+        return {"error": "contract_violation: saída incompatível com o contrato"}
 
     try:
+        _check_output_evidence_contract(verdict)
         _check_quote_grounding(verdict, material)
-    except ValueError as e:
-        logger.warning("classify %s: %s", kind, e)
-        return {"error": f"grounding error: {e}"}
+    except ValueError:
+        logger.warning("classify %s: evidence or grounding error", kind)
+        return {"error": "grounding_error: evidência incompatível com o material"}
 
     return {"verdict": verdict.model_dump()}
 

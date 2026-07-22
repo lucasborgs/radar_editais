@@ -14,6 +14,7 @@
         "ICT_ENTERPRISE_TECH_COOP",
         "ICT_CURRENT_STATUS_VERIFIED"
       ],
+      "failed_codes": [],
       "evidence": [
         {
           "code": "ICT_IDENTITY_VERIFIED",

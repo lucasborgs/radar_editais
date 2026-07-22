@@ -13,6 +13,7 @@
         "INV_TECH_STARTUP_ACTIVITY",
         "INV_BRAZIL_RELEVANCE"
       ],
+      "failed_codes": [],
       "evidence": [
         {
           "code": "INV_IDENTITY_VERIFIED",
@@ -59,6 +60,7 @@
       "reason_codes": [
         "INV_TECH_STARTUP_ACTIVITY"
       ],
+      "failed_codes": [],
       "evidence": [
         {
           "code": "INV_TECH_STARTUP_ACTIVITY",
