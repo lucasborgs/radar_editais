@@ -2,6 +2,7 @@ from radar.domain.relevance import (
     CLASSIFIER_VERSION,
     ActorEvidence,
     ActorVerdict,
+    ActorVerdictUnion,
     AgencyVerdict,
     ClassificationKind,
     EvidenceLocator,
@@ -14,6 +15,7 @@ from radar.domain.relevance import (
     RelevanceDecision,
     RelevanceEvidence,
     RelevanceVerdict,
+    actor_verdict_adapter,
     is_exclusion_code,
     is_inclusion_code,
 )
@@ -22,6 +24,7 @@ __all__ = [
     "CLASSIFIER_VERSION",
     "ActorEvidence",
     "ActorVerdict",
+    "ActorVerdictUnion",
     "AgencyVerdict",
     "ClassificationKind",
     "EvidenceLocator",
@@ -34,6 +37,7 @@ __all__ = [
     "RelevanceDecision",
     "RelevanceEvidence",
     "RelevanceVerdict",
+    "actor_verdict_adapter",
     "is_exclusion_code",
     "is_inclusion_code",
 ]

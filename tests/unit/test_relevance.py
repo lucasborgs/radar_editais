@@ -15,12 +15,13 @@ from __future__ import annotations
 import json
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from radar.domain.relevance import (
     CLASSIFIER_VERSION,
     ActorEvidence,
     ActorVerdict,
+    ActorVerdictUnion,
     AgencyVerdict,
     ClassificationKind,
     EvidenceLocator,
@@ -33,6 +34,7 @@ from radar.domain.relevance import (
     RelevanceDecision,
     RelevanceEvidence,
     RelevanceVerdict,
+    actor_verdict_adapter,
     is_exclusion_code,
     is_inclusion_code,
 )
@@ -186,6 +188,13 @@ class TestRelevanceVerdictInvariants:
                 exclusion_codes=[ExclusionCode.X1_ACADEMIC_ONLY],
             )
 
+    def test_in_scope_x_in_reason_codes_rejected(self):
+        with pytest.raises(ValidationError, match="must not contain ExclusionCode"):
+            RelevanceVerdict(
+                decision=RelevanceDecision.IN_SCOPE,
+                reason_codes=list(InclusionCode) + [ExclusionCode.X1_ACADEMIC_ONLY],
+            )
+
     def test_out_of_scope_requires_exclusion(self):
         with pytest.raises(ValidationError, match="at least one ExclusionCode"):
             RelevanceVerdict(
@@ -209,6 +218,17 @@ class TestRelevanceVerdictInvariants:
             RelevanceVerdict(
                 decision=RelevanceDecision.OUT_OF_SCOPE,
                 reason_codes=[],
+                exclusion_codes=[ExclusionCode.X1_ACADEMIC_ONLY],
+            )
+
+    def test_out_of_scope_extra_x_in_reason_codes_rejected(self):
+        with pytest.raises(ValidationError, match="not in exclusion_codes"):
+            RelevanceVerdict(
+                decision=RelevanceDecision.OUT_OF_SCOPE,
+                reason_codes=[
+                    ExclusionCode.X1_ACADEMIC_ONLY,
+                    ExclusionCode.X2_CONVENTIONAL_CREDIT,
+                ],
                 exclusion_codes=[ExclusionCode.X1_ACADEMIC_ONLY],
             )
 
@@ -352,6 +372,10 @@ class TestInvestorVerdict:
         v = InvestorVerdict(decision=RelevanceDecision.IN_SCOPE)
         assert v.kind is ClassificationKind.INVESTOR
 
+    def test_wrong_kind_rejected(self):
+        with pytest.raises(ValidationError):
+            InvestorVerdict(decision=RelevanceDecision.IN_SCOPE, kind=ClassificationKind.ICT)
+
     def test_round_trip_preserves_kind(self):
         v = InvestorVerdict(
             decision=RelevanceDecision.NEEDS_REVIEW,
@@ -368,6 +392,10 @@ class TestIctVerdict:
         v = IctVerdict(decision=RelevanceDecision.IN_SCOPE)
         assert v.kind is ClassificationKind.ICT
 
+    def test_wrong_kind_rejected(self):
+        with pytest.raises(ValidationError):
+            IctVerdict(decision=RelevanceDecision.IN_SCOPE, kind=ClassificationKind.INVESTOR)
+
     def test_round_trip_preserves_kind(self):
         v = IctVerdict(decision=RelevanceDecision.IN_SCOPE)
         dumped = json.loads(v.model_dump_json())
@@ -379,16 +407,65 @@ class TestProgramVerdict:
         v = ProgramVerdict(decision=RelevanceDecision.IN_SCOPE)
         assert v.kind is ClassificationKind.PROGRAM
 
+    def test_wrong_kind_rejected(self):
+        with pytest.raises(ValidationError):
+            ProgramVerdict(decision=RelevanceDecision.IN_SCOPE, kind=ClassificationKind.ICT)
+
 
 class TestAgencyVerdict:
     def test_kind_default(self):
         v = AgencyVerdict(decision=RelevanceDecision.IN_SCOPE)
         assert v.kind is ClassificationKind.AGENCY
 
+    def test_wrong_kind_rejected(self):
+        with pytest.raises(ValidationError):
+            AgencyVerdict(decision=RelevanceDecision.IN_SCOPE, kind=ClassificationKind.ICT)
+
     def test_round_trip_preserves_kind(self):
         v = AgencyVerdict(decision=RelevanceDecision.IN_SCOPE)
         dumped = json.loads(v.model_dump_json())
         assert dumped["kind"] == "agency"
+
+
+class TestActorVerdictDiscriminatedUnion:
+    def test_type_adapter_exported(self):
+        assert isinstance(actor_verdict_adapter, TypeAdapter)
+
+    def test_adapter_serializes_investor(self):
+        v = InvestorVerdict(decision=RelevanceDecision.NEEDS_REVIEW)
+        dumped = json.loads(actor_verdict_adapter.dump_json(v))
+        assert dumped["kind"] == "investor"
+        assert dumped["decision"] == "needs_review"
+
+    def test_adapter_deserializes_investor(self):
+        raw = {"decision": "needs_review", "kind": "investor", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
+        restored = actor_verdict_adapter.validate_json(json.dumps(raw))
+        assert isinstance(restored, InvestorVerdict)
+        assert restored.kind is ClassificationKind.INVESTOR
+
+    def test_adapter_deserializes_ict(self):
+        raw = {"decision": "in_scope", "kind": "ict", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
+        restored = actor_verdict_adapter.validate_json(json.dumps(raw))
+        assert isinstance(restored, IctVerdict)
+        assert restored.kind is ClassificationKind.ICT
+
+    def test_adapter_deserializes_program(self):
+        raw = {"decision": "in_scope", "kind": "program", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
+        restored = actor_verdict_adapter.validate_json(json.dumps(raw))
+        assert isinstance(restored, ProgramVerdict)
+
+    def test_adapter_deserializes_agency(self):
+        raw = {"decision": "in_scope", "kind": "agency", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
+        restored = actor_verdict_adapter.validate_json(json.dumps(raw))
+        assert isinstance(restored, AgencyVerdict)
+
+    def test_adapter_rejects_unknown_kind(self):
+        raw = {"decision": "in_scope", "kind": "bogus", "reason_codes": [], "evidence": [], "missing_information": [], "classifier_version": CLASSIFIER_VERSION}
+        with pytest.raises(ValidationError):
+            actor_verdict_adapter.validate_json(json.dumps(raw))
+
+    def test_union_type_importable(self):
+        assert ActorVerdictUnion is not None
 
 
 # ── Separação oportunidade × ator ────────────────────────────────────────

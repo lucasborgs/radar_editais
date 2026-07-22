@@ -9,8 +9,9 @@ Sem lógica de classificação, sem chamadas LLM, sem alteração produtiva.
 from __future__ import annotations
 
 from enum import Enum
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, TypeAdapter, field_validator, model_validator
 
 CLASSIFIER_VERSION = "radar-data-trust-relevance-v1"
 
@@ -107,6 +108,8 @@ class RelevanceVerdict(BaseModel):
     def _check_invariants(self) -> RelevanceVerdict:
         dec = self.decision
         if dec is RelevanceDecision.IN_SCOPE:
+            if self.exclusion_codes:
+                raise ValueError("in_scope must have empty exclusion_codes")
             present_inc = {c for c in self.reason_codes if isinstance(c, InclusionCode)}
             required = set(InclusionCode)
             missing = required - present_inc
@@ -115,18 +118,28 @@ class RelevanceVerdict(BaseModel):
                     f"in_scope requires all InclusionCodes, missing: "
                     f"{[m.value for m in sorted(missing, key=lambda x: x.value)]}"
                 )
-            if self.exclusion_codes:
-                raise ValueError("in_scope must have empty exclusion_codes")
+            x_in_reason = {c for c in self.reason_codes if isinstance(c, ExclusionCode)}
+            if x_in_reason:
+                raise ValueError(
+                    f"in_scope must not contain ExclusionCode in reason_codes, got: "
+                    f"{[m.value for m in sorted(x_in_reason, key=lambda x: x.value)]}"
+                )
         elif dec is RelevanceDecision.OUT_OF_SCOPE:
             if not self.exclusion_codes:
                 raise ValueError("out_of_scope requires at least one ExclusionCode")
-            x_values = set(self.exclusion_codes)
-            r_values = set(self.reason_codes)
-            missing_x = x_values - r_values
+            x_in_reason = {c for c in self.reason_codes if isinstance(c, ExclusionCode)}
+            x_expected = set(self.exclusion_codes)
+            missing_x = x_expected - x_in_reason
             if missing_x:
                 raise ValueError(
                     f"exclusion_codes not found in reason_codes: "
                     f"{[m.value for m in sorted(missing_x, key=lambda x: x.value)]}"
+                )
+            extra_x = x_in_reason - x_expected
+            if extra_x:
+                raise ValueError(
+                    f"reason_codes contain ExclusionCodes not in exclusion_codes: "
+                    f"{[m.value for m in sorted(extra_x, key=lambda x: x.value)]}"
                 )
         return self
 
@@ -147,19 +160,26 @@ class ActorVerdict(BaseModel):
 
 
 class InvestorVerdict(ActorVerdict):
-    kind: ClassificationKind = ClassificationKind.INVESTOR
+    kind: Literal[ClassificationKind.INVESTOR] = ClassificationKind.INVESTOR
 
 
 class IctVerdict(ActorVerdict):
-    kind: ClassificationKind = ClassificationKind.ICT
+    kind: Literal[ClassificationKind.ICT] = ClassificationKind.ICT
 
 
 class ProgramVerdict(ActorVerdict):
-    kind: ClassificationKind = ClassificationKind.PROGRAM
+    kind: Literal[ClassificationKind.PROGRAM] = ClassificationKind.PROGRAM
 
 
 class AgencyVerdict(ActorVerdict):
-    kind: ClassificationKind = ClassificationKind.AGENCY
+    kind: Literal[ClassificationKind.AGENCY] = ClassificationKind.AGENCY
+
+
+ActorVerdictUnion = Annotated[
+    InvestorVerdict | IctVerdict | ProgramVerdict | AgencyVerdict,
+    Field(discriminator="kind"),
+]
+actor_verdict_adapter: TypeAdapter = TypeAdapter(ActorVerdictUnion)
 
 
 def is_inclusion_code(code: str) -> bool:
@@ -186,6 +206,8 @@ __all__ = [
     "IctVerdict",
     "ProgramVerdict",
     "AgencyVerdict",
+    "ActorVerdictUnion",
+    "actor_verdict_adapter",
     "is_inclusion_code",
     "is_exclusion_code",
 ]
