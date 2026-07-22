@@ -524,6 +524,61 @@ class TestNegativeValidation:
         errors = loader.validate_all()
         assert any("not found in" in e and "silver catalog" in e for e in errors), f"expected silver catalog error, got: {errors}"
 
+    def test_reason_code_without_evidence(self, empty_minimal_dataset):
+        manifest = {
+            "dataset_ids": {"opportunities": ["op:no-ev"]},
+            "corpus_stats": {"total_cases": 1, "by_kind": {"opportunities": 1}, "by_decision": {"opportunity:needs_review": 1}},
+            "review_status": "pending_owner",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        item = {
+            "case_id": "op:no-ev", "kind": "opportunity", "source_ref": "legacy_triage_case",
+            "source_record_id": "op:no-ev", "as_of": "2026-07-22", "human_reviewed": False,
+            "verdict": {
+                "decision": "needs_review",
+                "reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION"],
+                "exclusion_codes": [],
+                "evidence": [
+                    {"code": "R1_ENTERPRISE_PATH", "quote": "some quote", "source": "landing_page"},
+                ],
+                "classifier_version": "radar-data-trust-relevance-v1",
+            },
+        }
+        (empty_minimal_dataset / "opportunities.json").write_text(json.dumps([item], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_all()
+        assert any("no matching evidence" in e and "R2_TECH_INNOVATION" in e for e in errors), f"expected missing evidence error, got: {errors}"
+
+    def test_reason_code_also_in_missing_information(self, empty_minimal_dataset):
+        manifest = {
+            "dataset_ids": {"opportunities": ["op:dup-rc"]},
+            "corpus_stats": {"total_cases": 1, "by_kind": {"opportunities": 1}, "by_decision": {"opportunity:needs_review": 1}},
+            "review_status": "pending_owner",
+        }
+        (empty_minimal_dataset / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        item = {
+            "case_id": "op:dup-rc", "kind": "opportunity", "source_ref": "legacy_triage_case",
+            "source_record_id": "op:dup-rc", "as_of": "2026-07-22", "human_reviewed": False,
+            "verdict": {
+                "decision": "needs_review",
+                "reason_codes": ["R1_ENTERPRISE_PATH"],
+                "exclusion_codes": [],
+                "evidence": [
+                    {"code": "R1_ENTERPRISE_PATH", "quote": "some quote", "source": "landing_page"},
+                ],
+                "missing_information": [
+                    "R1_ENTERPRISE_PATH: ambiguous — cannot confirm enterprise path",
+                ],
+                "classifier_version": "radar-data-trust-relevance-v1",
+            },
+        }
+        (empty_minimal_dataset / "opportunities.json").write_text(json.dumps([item], ensure_ascii=False))
+        loader = RelevanceGoldenLoader(golden_dir=empty_minimal_dataset)
+        loader.load_all()
+        errors = loader.validate_all()
+        assert any("also present in missing_information" in e and "R1_ENTERPRISE_PATH" in e for e in errors), f"expected dup rc/MI error, got: {errors}"
+
     def test_source_ref_kind_mismatch(self, empty_minimal_dataset):
         manifest = {
             "dataset_ids": {"programs": ["prg:kind-bad"]},

@@ -8,8 +8,7 @@
     "verdict": {
       "decision": "needs_review",
       "reason_codes": [
-        "R1_ENTERPRISE_PATH",
-        "R4_RELEVANT_BENEFIT"
+        "R1_ENTERPRISE_PATH"
       ],
       "exclusion_codes": [],
       "evidence": [
@@ -132,7 +131,6 @@
     "verdict": {
       "decision": "needs_review",
       "reason_codes": [
-        "R1_ENTERPRISE_PATH",
         "R2_TECH_INNOVATION"
       ],
       "exclusion_codes": [],

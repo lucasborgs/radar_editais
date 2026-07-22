@@ -271,6 +271,26 @@ class RelevanceGoldenLoader:
                 except Exception as e:
                     self._errors.append(f"{cid}: verdict validation failed: {e}")
 
+                # Every reason_code must have evidence with the same code
+                evidence_codes = {ev.get("code") for ev in verdict.get("evidence", []) if ev.get("code")}
+                for rc in verdict.get("reason_codes", []):
+                    if rc not in evidence_codes:
+                        self._errors.append(f"{cid}: reason_code '{rc}' has no matching evidence entry")
+
+                # If missing_information starts with a known reason code,
+                # that code must NOT also appear in reason_codes
+                known_rc_prefixes = set()
+                for rc_list in (verdict.get("reason_codes", []), verdict.get("exclusion_codes", [])):
+                    for rc in rc_list:
+                        known_rc_prefixes.add(rc.split("_")[0] if "_" in rc else rc)
+                for mi in verdict.get("missing_information", []):
+                    mi_code = mi.split(":")[0].strip() if ":" in mi else ""
+                    if mi_code:
+                        if mi_code in verdict.get("reason_codes", []):
+                            self._errors.append(f"{cid}: reason_code '{mi_code}' also present in missing_information")
+                        if mi_code in verdict.get("exclusion_codes", []):
+                            self._errors.append(f"{cid}: exclusion_code '{mi_code}' also present in missing_information")
+
             all_ids[kind] = ids
 
             if expected_ids - ids:
