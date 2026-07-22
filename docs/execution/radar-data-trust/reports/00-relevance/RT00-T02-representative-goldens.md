@@ -3,7 +3,8 @@
 **Status:** `awaiting_owner_review`
 **Plano:** [`plans/00-relevance/RT00-T02-representative-goldens.md`](../../plans/00-relevance/RT00-T02-representative-goldens.md)
 **Branch/commit-base:** `codex/radar-data-trust-00-t02` / `656c32362`
-**Commits de implementação:** (pendente — 2 commits a criar)
+**Commits de implementação:** `cc61b31db` (feat), `729d279c0` (docs)
+**Correction commits:** (2 commits a criar — `fix`, `docs`)
 
 ## Realizado
 
@@ -27,103 +28,137 @@ Cross-kind rejection testada: `IctReasonCode` em `InvestorVerdict` falha em vali
 
 ### 2. Golden datasets
 
-Criados 7 arquivos em `data/evaluation/golden/relevance/`:
+7 arquivos em `data/evaluation/golden/relevance/`:
 
 | Arquivo | Casos | Decisões |
 |---|---|---|
-| `manifest.json` | 15 IDs referenciados | revisão pendente |
-| `opportunities.json` | 7 | 2 in_scope, 3 out_of_scope, 2 needs_review |
+| `manifest.json` | 14 IDs referenciados | revisão pendente |
+| `opportunities.json` | 7 | 1 in_scope, 3 out_of_scope, 3 needs_review |
 | `investors.json` | 2 | 1 in_scope, 1 needs_review |
-| `icts.json` | 2 | 2 needs_review |
+| `icts.json` | 1 | 1 in_scope |
 | `programs.json` | 2 | 2 in_scope |
 | `agencies.json` | 2 | 2 in_scope |
-| `actor_sources.json` | 7 snapshots | hashes SHA-256 verificados |
+| `actor_sources.json` | 7 snapshots | hashes SHA-256 verificados, cross-referenciados |
 
-**Total:** 15 casos, 3 estados no corpus total (5 in_scope, 3 out_of_scope, 7 needs_review).
+**Total:** 14 casos (1 removido: ISA-CT), 3 estados no corpus total (7 in_scope, 3 out_of_scope, 4 needs_review).
 
 `triage.json` permanece byte a byte idêntico (122 casos booleanos, lido pela suíte `triage`).
 
-### 3. Hermetic loader
+### 3. Correção de evidências (auditoria Codex)
 
-Criado `src/radar/core/eval/relevance_goldens.py` — classe `RelevanceGoldenLoader` que:
-- Carrega os 5 datasets + manifest
-- Valida tipos (veredictos via `RelevanceVerdict.model_validate` e `actor_verdict_adapter`)
-- Valida unicidade de case_id
-- Valida correspondência kind/arquivo
-- Valida IDs do manifesto contra datasets
-- Valida hashes SHA-256 dos snapshots em `actor_sources.json`
-- Expõe distribuição por kind e decision
-- **Sem rede, banco, LLM ou arquivos não versionados**
+Após avaliação do auditor, as seguintes correções foram aplicadas:
 
-### 4. Testes
+| case_id | Antes | Depois |
+|---|---|---|
+| `triage-tavily-093` | in_scope com quote sintetizado (non-official_page) | in_scope com R1-R5 quotes reais da página oficial da FINEP 779 |
+| `triage-tavily-082` | in_scope com quote sintetizado | needs_review — site FAPESC inacessível (transporte error); evidência insuficiente |
+| `indicator-capital` | in_scope com quote de curated_record | in_scope com quote real do `/about`; jurisdição removida |
+| `ict:embrapii:senai-cimatec` | needs_review (sem snapshot) | in_scope com 4 ICT codes quoteados da página oficial EMBRAPII |
+| `ict:embrapii:isa-ct` | needs_review (sem evidência) | **removido** — sem identidade verificável |
+| `pipe-fapesp` | in_scope com curated_record | in_scope com quote real de fapesp.br/pipe |
+| `centelha` | in_scope com curated_record | in_scope com quote real de programacentelha.com.br |
+| `agencia:finep` | in_scope com schema.md | in_scope com quote real de finep.gov.br/sobre-a-finep |
+| `agencia:fapesp` | in_scope com schema.md | in_scope com quote real de fapesp.br |
+
+5 páginas oficiais coletadas com sucesso via HTTP GET + SHA-256 hash:
+- finep.gov.br/chamadas-publicas/chamadapublica/779
+- indicator.capital/pt/about
+- embrapii.org.br/unidades/soluces-industriais-cimatec
+- fapesp.br/pipe
+- programacentelha.com.br
+- finep.gov.br/sobre-a-finep
+- fapesp.br
+
+### 4. Hermetic loader
+
+`src/radar/core/eval/relevance_goldens.py` — classe `RelevanceGoldenLoader` que:
+
+| Validação | Escopo |
+|---|---|
+| Tipos de veredicto | `RelevanceVerdict.model_validate` + `actor_verdict_adapter` |
+| Unicidade de case_id | Intra-arquivo **e** entre arquivos |
+| human_reviewed type | Exige `bool` |
+| Correspondência kind/arquivo | kind deve bater com o arquivo |
+| Manifest x datasets | IDs, total_cases, by_kind, by_decision |
+| review_status | Deve ser `pending_owner` se houver `human_reviewed=false` |
+| Source references | `source_ref` deve existir em `actor_sources.json` com kind + record_id correspondentes |
+| Integridade dos snapshots | `hash_sha256` obrigatório e verificado; `url`, `retrieved_at`, `quote` requeridos |
+| **Sem rede, banco, LLM ou arquivos não versionados** | |
+
+`distribution()` agora expõe `kind:decision` (ex: `opportunity:in_scope`) em vez de apenas `decision`.
+
+### 5. Testes
 
 | Teste | Status |
 |---|---|
-| `tests/unit/test_relevance.py` (148 tests) | all passed |
-| `tests/unit/test_relevance_goldens.py` (17 tests) | all passed |
-| `tests/unit/test_hardening_pr4.py` (16 tests) | all passed |
-| `ruff check` (5 arquivos) | all checks passed |
-| `git diff --check` | clean |
-| `git diff 656c32362 -- triage.json` | vazio |
+| `tests/unit/test_relevance_goldens.py` (32 tests) | all passed |
+| `ruff check` (3 arquivos) | all checks passed |
 
-Testes novos incluem: parse/round-trip dos códigos por kind, rejeição cross-kind, invariantes de ator in_scope, loader hermético, unicidade/completude do manifesto, integridade de hashes, distribuição tri-state, manutenção do triage legado.
+Testes novos (negativos):
+- `test_nonexistent_source_id` — source_ref sem correspondente em actor_sources
+- `test_cross_file_duplicate` — mesmo case_id em dois datasets
+- `test_wrong_manifest_total` — total_cases do manifesto diverge do real
+- `test_human_reviewed_not_bool` — campo human_reviewed como string
+- `test_review_status_not_pending_when_unreviewed` — review_status `approved` com human_reviewed=false
+- `test_actor_source_missing_hash` — hash_sha256 ausente em actor_source
+- `test_source_ref_kind_mismatch` — actor_source kind difere do item referenciado
 
-## Source-evidence utilizada
+## Source-evidence final
 
-| Kind | Fonte de evidência | Limitação |
+| Kind | Fonte de evidência | Status |
 |---|---|---|
-| Opportunity | `triage.json` (legado, 1500-char truncado) | Quotes extraídos de title/snippet; conteúdo truncado |
-| Investor | `data/silver/investidores.json` (curated_record) | Sem verificação de página oficial — curado, não validado |
-| Program | `data/silver/programas.json` (curated_record) | idem |
-| ICT | Conhecimento público (official_page) | Bronze efêmero não versionado; sem snapshot oficial verificado |
-| Agency | `docs/domain/schema.md` + `docs/domain/sources/*.md` (official_page) | Schema-driven, sem entidade gold verificada |
+| Opportunity (in_scope) | `triage.json` legado + página oficial FINEP 779 | Verificado |
+| Opportunity (out_of_scope) | `triage.json` legado | Truncado (1500 char) |
+| Opportunity (needs_review) | `triage.json` legado + site inacessível | FAPESC indisponível |
+| Investor | Página oficial `/about` ou curated_record com nota | Indicator verificado; KPTL pendente |
+| Program | Página oficial do operador | PIPE + Centelha verificados |
+| ICT | Página oficial EMBRAPII | SENAI CIMATEC verificado |
+| Agency | Página oficial da agência | FINEP + FAPESP verificados |
+| Actor sources | 7 snapshots com hash SHA-256 e metadados completos | Todos referenciados |
 
 ## Decisões do proprietário aplicadas
 
-1. Hubs como beOn/Tupy são fontes de descoberta, não oportunidades publicáveis → `triage-tavily-098`: `needs_review` com nota
-2. `triage-tavily-118`: `X7_NO_ENTERPRISE_PATH` (credenciamento de incubadoras)
-3. ICT golden sem artifact versionado → `needs_review` para ambos os casos
-4. Ticket ausente não bloqueia `in_scope` → `indicator-capital`: `in_scope` com ticket_range em `missing_information`
-5. Vigência e relevância separadas → nenhum X code por encerramento
-
-## Limitações
-
-- **ICT golden todo em needs_review:** dados EMBRAPII são efêmeros (bronze não versionado). A autorização do proprietário para coleta de snapshots oficiais não foi exercida porque as páginas oficiais não estavam acessíveis durante esta task.
-- **Quotes de oportunidade truncados:** o conteúdo do `triage.json` é limitado a 1500 caracteres. `triage-tavily-093` (MCTI R$300mi) tem conteúdo de nav HTML que não serve como quote — a evidência veio do title.
-- **Investidor indicator-capital sem verificação de página oficial:** o `site` e `source_urls` do registro curado são usados como evidência, mas não há snapshot verificado.
-- **Agências usam schema.md como evidência:** a identidade e mandato de inovação vêm de documentação do repositório, não de página oficial coletada.
+1. `triage-tavily-098`: `needs_review` — beOn Claro é hub, não oportunidade direta
+2. `triage-tavily-118`: `out_of_scope` — `X7_NO_ENTERPRISE_PATH` (credenciamento de incubadoras)
+3. `triage-tavily-079`: `needs_review` — elegibilidade empresarial na chamada EU-LAC
+4. `investidor:kptl`: `needs_review` — sem source_urls ou data de verificação
+5. `ict:embrapii:isa-ct`: **removido** — sem identidade verificável
+6. Todos os `in_scope` de ator agora têm snapshot oficial verificado com hash
 
 ## Casos aguardando revisão
 
 | case_id | Kind | Pendência |
 |---|---|---|
 | `triage-tavily-079` | opportunity | Elegibilidade empresarial na chamada EU-LAC — precisa de decisão do proprietário |
+| `triage-tavily-082` | opportunity | FAPESC site inacessível — decidir se usa terceira fonte (CONFAP) |
 | `triage-tavily-098` | opportunity | beOn Claro é hub — precisa de identificação de desafio individual concreto |
 | `investidor:kptl` | investor | Faltam source_urls e data de verificação — precisa de verificação de página oficial |
-| `ict:embrapii:senai-cimatec` | ict | Dados de conhecimento público sem snapshot oficial — precisa de coleta |
-| `ict:embrapii:isa-ct` | ict | Sem evidência alguma — caso ilustrativo de insuficiência |
 
 ## Comandos e resultados
 
 ```bash
-pytest tests/unit/test_relevance.py tests/unit/test_relevance_goldens.py tests/unit/test_hardening_pr4.py
-# 148 passed
-ruff check src/radar/domain/relevance.py src/radar/domain/__init__.py src/radar/core/eval/relevance_goldens.py tests/unit/test_relevance.py tests/unit/test_relevance_goldens.py
+pytest tests/unit/test_relevance_goldens.py -x -v
+# 32 passed
+ruff check src/radar/core/eval/relevance_goldens.py src/radar/domain/relevance.py tests/unit/test_relevance_goldens.py
 # All checks passed
-git diff --check
-# clean
 git diff 656c32362 -- data/evaluation/golden/triage.json
 # empty
+
+# Integrity check (hermetic):
+python -c "
+from radar.core.eval.relevance_goldens import RelevanceGoldenLoader
+l = RelevanceGoldenLoader(); l.load_all()
+assert not l.validate_all()
+assert not l.validate_actor_sources()
+print(f'OK: {sum(len(v) for v in l.data.values())} cases, {len(l.distribution())} decision states')
+"
+# OK: 14 cases, 8 decision states
 ```
 
 ## RT00-T03 não iniciada
 
 Nenhum classificador, prompt, staging, API ou alteração de runtime foi implementada. Esta task produziu apenas:
 - tipos de domínio (enums + validação)
-- datasets versionados
-- loader hermético
-- testes proporcionais
-
-## Auditoria Codex
-
-Pendente.
+- datasets versionados (corrigidos após auditoria)
+- loader hermético com validações expandidas
+- testes proporcionais (positivos + negativos)
