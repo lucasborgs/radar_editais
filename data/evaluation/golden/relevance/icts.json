@@ -51,7 +51,7 @@
       "missing_information": [],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Evidência real da página oficial embrapii.org.br/unidades/soluces-industriais-cimatec/. Página confirma identidade (SENAI CIMATEC, Salvador/BA), credenciamento EMBRAPII, cooperação com empresas (100+ projetos PD&I, 40+ startups/ano) e status atual (fluxo contínuo, contrato de gestão federal). Todos os 4 ICT reason codes sustentados."
   }
 ]

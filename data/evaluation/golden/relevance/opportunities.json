@@ -29,7 +29,7 @@
       ],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Reclassificado de in_scope para needs_review: site oficial da FAPESC (fapesc.sc.gov.br) retornou erro de transporte — impossível verificar evidência literal do edital 02/2025. Evidência remanescente vem de notícia terceira (CONFAP news), não da fonte oficial. Title e snippet indicam edital de internacionalização com subvenção, mas sem acesso ao regulamento oficial não é possível confirmar R2, R3 e R5."
   },
   {
@@ -59,7 +59,7 @@
       "missing_information": [],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Extraído do golden triage (expected=false, review=false). Compra pública de alimentos para merenda escolar — sem componente de inovação, encomenda tecnológica, sandbox ou desafio de desenvolvimento. X3_GENERIC_PROCUREMENT."
   },
   {
@@ -89,7 +89,7 @@
       "missing_information": [],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Extraído do golden triage (expected=false, review=false). Bolsa de pesquisa — exclusivamente para estudante/pesquisador, sem caminho material de participação empresarial. X1_ACADEMIC_ONLY."
   },
   {
@@ -119,7 +119,7 @@
       "missing_information": [],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Decisão do proprietário: credenciamento de incubadoras é X7_NO_ENTERPRISE_PATH porque o candidato ao instrumento é a incubadora, não a startup/PME tecnológica atendida pelo Radar."
   },
   {
@@ -152,7 +152,7 @@
       ],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Extraído do golden triage (expected=true, review=true). PDF de chamada EU-LAC. Evidência insuficiente para R1 (participação empresarial) e R3 (vigência). Marcar needs_review até decisão do proprietário."
   },
   {
@@ -185,7 +185,7 @@
       ],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Decisão do proprietário: hubs como beOn são fontes de descoberta, não oportunidades publicáveis. needs_review até que um desafio individual concreto seja identificado. O hub inteiro não pode virar oportunidade."
   },
   {
@@ -249,7 +249,7 @@
       "missing_information": [],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Evidência real coletada da Chamada Pública FINEP 779 (Mais Inovação Brasil - Rodada 2 – Tecnologias Digitais). Página oficial finep.gov.br confirma público-alvo empresas, subvenção econômica R$300mi, prazo 2026-09-30, abrangência nacional. Vigência separada de relevância."
   }
 ]

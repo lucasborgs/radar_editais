@@ -42,7 +42,7 @@
       "missing_information": [],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Evidência real da página oficial finep.gov.br/sobre-a-finep. Página confirma identidade (Finep, empresa pública federal), mandato de inovação (fomento à CT&I) e relevância brasileira (sede RJ, vinculada MCTI, atuação nacional)."
   },
   {
@@ -88,7 +88,7 @@
       "missing_information": [],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Evidência real da página centrodememoria.fapesp.br/sobre-a-fapesp. Página confirma identidade (FAPESP, agência pública), mandato de inovação (missão de formar RH para C&T, financiar pesquisas) e relevância brasileira (Estado de SP, empresas sediadas no estado)."
   }
 ]

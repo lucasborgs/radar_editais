@@ -42,7 +42,7 @@
       "missing_information": [],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Evidência real da página oficial fapesp.br/pipe. Página confirma identidade/operador (PIPE-FAPESP), mecanismo de inovação (fluxo contínuo, subvenção para PD) e relevância para empresas (MPMEs paulistas)."
   },
   {
@@ -88,7 +88,7 @@
       "missing_information": [],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Evidência real da página oficial programacentelha.com.br. Página confirma identidade/operador (MCTI/Finep/CNPq), mecanismo (subvenção econômica ~R$50k) e relevância para empresas (criação de MEEPP, todos os estados)."
   }
 ]

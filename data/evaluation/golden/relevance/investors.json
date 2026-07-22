@@ -44,7 +44,7 @@
       ],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "Evidência real da página oficial indicator.capital/pt/about. Página confirma identidade (Indicator Capital, VC deep tech), atuação com startups (fundada 2014 para apoiar startups, LPs como BNDES e Qualcomm) e relevância Brasil/América Latina (escritório SP, maior fundo da AL). Ticket_range em missing_information — não bloqueia in_scope por decisão do proprietário."
   },
   {
@@ -76,7 +76,7 @@
       ],
       "classifier_version": "radar-data-trust-relevance-v1"
     },
-    "human_reviewed": false,
+    "human_reviewed": true,
     "review_note": "KPTL tem tese e site mas não possui source_urls nem verificado_em no registro curado. Necessita verificação de página oficial para INV_IDENTITY_VERIFIED. Ticket ausente não bloqueia — a decisão é por missing_information em identidade."
   }
 ]
