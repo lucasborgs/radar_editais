@@ -1,6 +1,6 @@
 # RT00-T02 — Goldens representativos
 
-**Status:** `awaiting_owner_review`
+**Status:** `approved`
 **Plano:** [`plans/00-relevance/RT00-T02-representative-goldens.md`](../../plans/00-relevance/RT00-T02-representative-goldens.md)
 **Branch/commit-base:** `codex/radar-data-trust-00-t02` / `656c32362`
 
@@ -15,6 +15,9 @@
 | `7b1b8b3d2` | docs: finalize RT00-T02 review report |
 | `286146618` | fix: enforce reason_code/evidence correspondence |
 | `74c35264a` | docs: update RT00-T02 report for final audit findings |
+| `127634d2b` | docs: fill report commit hash for final audit findings |
+| `c098d8a49` | docs: define actor reason code semantics |
+| `6795d5968` | data: approve representative relevance goldens |
 
 ## Realizado
 
@@ -42,7 +45,7 @@ Cross-kind rejection testada: `IctReasonCode` em `InvestorVerdict` falha em vali
 
 | Arquivo | Casos | Decisões |
 |---|---|---|
-| `manifest.json` | 14 IDs referenciados | revisão pendente |
+| `manifest.json` | 14 IDs referenciados | revisão aprovada |
 | `opportunities.json` | 7 | 1 in_scope, 3 out_of_scope, 3 needs_review |
 | `investors.json` | 2 | 1 in_scope, 1 needs_review |
 | `icts.json` | 1 | 1 in_scope |
@@ -54,7 +57,12 @@ Cross-kind rejection testada: `IctReasonCode` em `InvestorVerdict` falha em vali
 
 `triage.json` permanece byte a byte idêntico (122 casos booleanos, lido pela suíte `triage`).
 
-### 3. Correção de evidências (2 ciclos de auditoria)
+Os 14 casos são um golden **representativo para validação e calibração do
+método**, não um inventário completo do catálogo. As 7 oportunidades são uma
+amostra dos 122 casos da triagem legada; os 7 atores cobrem exemplos mínimos dos
+quatro tipos.
+
+### 3. Correção de evidências (3 ciclos de auditoria)
 
 **1º ciclo** (commit 776d4ca6b): substituição de evidências sintetizadas por snapshots reais.
 
@@ -110,6 +118,8 @@ Cross-kind rejection testada: `IctReasonCode` em `InvestorVerdict` falha em vali
 | Evidence quote integrity | Cada `evidence[].quote` é substring do snapshot (`src:*`), do triage entry (`legacy_triage_case`), ou o `source_record_id` existe no catálogo prata (`curated_record`) |
 | Integridade dos snapshots | `hash_sha256` obrigatório e verificado; `url`, `retrieved_at`, `quote` requeridos |
 | Orphaned detection | Actor source sem dataset correspondente é rejeitado (salvo se justificado no manifest) |
+| Correspondência reason/evidence | Todo reason code exige evidence com o mesmo code |
+| Ausência sem contradição | Um código não pode estar simultaneamente confirmado e em missing_information |
 | **Sem rede, banco, LLM ou arquivos não versionados** | |
 
 ### 5. Testes
@@ -117,11 +127,11 @@ Cross-kind rejection testada: `IctReasonCode` em `InvestorVerdict` falha em vali
 | Suite | Testes | Status |
 |---|---|---|
 | `tests/unit/test_relevance.py` | 115 | all passed |
-| `tests/unit/test_relevance_goldens.py` | 37 | all passed |
+| `tests/unit/test_relevance_goldens.py` | 39 | all passed |
 | `tests/unit/test_hardening_pr4.py` | 8 | all passed |
-| **Total** | **160** | **all passed** |
+| **Total** | **162** | **all passed** |
 
-Testes negativos (16 novos nesta task):
+Testes negativos documentados nesta task:
 
 | Teste | Validacão |
 |---|---|
@@ -163,7 +173,10 @@ Testes negativos (16 novos nesta task):
 4. `investidor:kptl`: `needs_review` — sem source_urls ou data de verificação
 5. `ict:embrapii:isa-ct`: **removido** — sem identidade verificável
 
-## Casos aguardando revisão
+## Casos confirmados como `needs_review`
+
+O proprietário confirmou que a incerteza está corretamente representada nestes
+quatro labels; isso não significa que a informação ausente tenha sido resolvida.
 
 | case_id | Kind | Pendência |
 |---|---|---|
@@ -177,7 +190,7 @@ Testes negativos (16 novos nesta task):
 ```bash
 # Testes completos
 PYTHONPATH=src pytest -q tests/unit/test_relevance.py tests/unit/test_relevance_goldens.py tests/unit/test_hardening_pr4.py
-# 160 passed
+# 162 passed
 
 # Ruff
 ruff check src/radar/core/eval/relevance_goldens.py src/radar/domain/relevance.py tests/unit/test_relevance.py tests/unit/test_relevance_goldens.py tests/unit/test_hardening_pr4.py
@@ -202,10 +215,15 @@ print(f'OK: {sum(len(v) for v in l.data.values())} cases, {len(l.distribution())
 
 Nenhum classificador, prompt, staging, API ou alteração de runtime foi implementada. Esta task produziu apenas:
 - tipos de domínio (enums + validação)
-- datasets versionados (corrigidos após 2 ciclos de auditoria)
-- loader hermético com 12 validações
-- 160 testes (115 + 37 + 8)
+- datasets versionados (corrigidos após 3 ciclos de auditoria)
+- loader hermético com 14 validações
+- 162 testes (115 + 39 + 8)
 
 ## Auditoria Codex
 
-**Veredito:** `pendente`
+**Veredito:** `aprovado`
+
+- auditoria técnica Codex: 162 testes, Ruff e integridade do loader verdes;
+- `triage.json` legado: inalterado;
+- revisão do proprietário: 14/14 labels confirmados em 2026-07-22;
+- RT00-T03: não iniciada.
