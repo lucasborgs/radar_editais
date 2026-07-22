@@ -3,7 +3,7 @@
 **Status:** `passed`
 **Plano:** [`plans/00-relevance/RT00-T01-domain-contract.md`](../../plans/00-relevance/RT00-T01-domain-contract.md)
 **Branch/commit-base:** `codex/radar-data-trust-00-t01` / `aa7ac35c3`
-**Commits de implementação:** `8a35e19d3` (contrato inicial), `4c32ef89c` (correções pós-auditoria)
+**Commits de implementação:** `8a35e19d3` (contrato inicial), `4c32ef89c` (correções pós-auditoria), `9d85ab6a7` (fechamento de invariantes)
 **Implementador/modelo:** codex (deepseek-v4-flash-free)
 
 ## Realizado
@@ -46,6 +46,24 @@
 - `ActorVerdict.kind: ClassificationKind` obrigatório
 - Subtipos fixam `kind` como default; round-trip JSON preserva o discriminador
 
+### Commit 3: `9d85ab6a7` — fechamento de invariantes
+
+**Invariantes reforçados:**
+- `in_scope` agora rejeita **ExclusionCode em reason_codes** (não apenas exclusion_codes vazio)
+- `out_of_scope` agora exige que o **conjunto de ExclusionCode em reason_codes seja exatamente igual** a exclusion_codes (nem mais, nem menos)
+
+**Discriminador dos atores com Literal:**
+- `InvestorVerdict.kind: Literal[ClassificationKind.INVESTOR]` — `kind="ict"` falha em validação
+- Mesmo padrão para `IctVerdict`, `ProgramVerdict`, `AgencyVerdict`
+- Criada `ActorVerdictUnion` = união discriminada dos 4 subtipos
+- Exportado `actor_verdict_adapter` (`TypeAdapter`) que serializa/desserializa preservando o subtipo concreto
+
+**Testes (87 no total, +14 em relação ao commit anterior):**
+- `test_in_scope_x_in_reason_codes_rejected` — X em reason_codes de in_scope falha
+- `test_out_of_scope_extra_x_in_reason_codes_rejected` — X extra em reason_codes falha
+- `test_wrong_kind_rejected` para cada subtipo de ator
+- `TestActorVerdictDiscriminatedUnion` com 7 testes de TypeAdapter
+
 ## Divergências e decisões
 
 - **ActorReasonCode A1_A8 e sufixo `.actor-v1` foram decisões indevidas.** O proprietário determinou que a taxonomia de reason codes de atores deve ser derivada dos casos reais em RT00-T02. Ambos foram removidos.
@@ -61,15 +79,17 @@
 
 | Comando/verificação | Resultado |
 |---|---|
-| `pytest tests/unit/test_relevance.py -v` | 73 passed |
-| `pytest tests/unit/test_hardening_pr4.py -v` (triagem) | 16 passed |
+| Comando/verificação | Resultado |
+|---|---|---|
+| `pytest tests/unit/test_relevance.py` | 87 passed |
+| `pytest tests/unit/test_hardening_pr4.py` (triagem) | 16 passed |
 | `ruff check src/radar/domain/relevance.py src/radar/domain/__init__.py tests/unit/test_relevance.py` | All checks passed |
 | Import `radar.domain.relevance` | ok |
 | Import `radar.core.eval.triage` (compatibilidade) | ok |
 
 ## Pendências
 
-- Nenhuma. RT00-T01 concluída conforme escopo e correções da auditoria.
+- Nenhuma.
 
 ## Auditoria Codex
 
