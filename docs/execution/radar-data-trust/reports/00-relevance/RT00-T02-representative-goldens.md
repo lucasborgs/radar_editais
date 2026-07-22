@@ -14,7 +14,7 @@
 | `6c39698a9` | fix: bind golden evidence to versioned sources |
 | `7b1b8b3d2` | docs: finalize RT00-T02 review report |
 | `286146618` | fix: enforce reason_code/evidence correspondence |
-| *hash* | docs: update RT00-T02 report for final audit findings |
+| `74c35264a` | docs: update RT00-T02 report for final audit findings |
 
 ## Realizado
 
