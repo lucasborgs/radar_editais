@@ -6,6 +6,8 @@
 
 - adaptar a triagem de oportunidades para três estados;
 - criar avaliadores separados por `kind` para atores;
+- representar critérios de ator comprovadamente falsos em `failed_codes`,
+  separados de critérios satisfeitos e de informação ausente;
 - proibir prompt genérico único para todos os tipos;
 - falha externa continua erro, nunca `out_of_scope`.
 
@@ -18,6 +20,8 @@
 ## Validação
 
 - testes direcionados de parser/fallback;
+- testes das invariantes `reason_codes` / `failed_codes` /
+  `missing_information` para cada `kind`;
 - run diagnóstica nos casos da T02 quando houver credencial autorizada.
 
 ## Pare

@@ -217,6 +217,43 @@ LLM de páginas oficiais com curadoria básica. Ambos devem permanecer
 - `out_of_scope`: a identidade está suficientemente estabelecida e uma fonte
   confiável contradiz ao menos um critério essencial do `kind`.
 
+Para atores, a saída separa três estados por critério:
+
+- `reason_codes`: critérios comprovadamente satisfeitos;
+- `failed_codes`: critérios comprovadamente falsos; e
+- `missing_information`: critérios ainda ausentes, ambíguos ou conflitantes.
+
+`failed_codes` usa o mesmo enum específico do `kind` que `reason_codes`; não é
+uma segunda taxonomia de exclusão. A polaridade é determinada pelo campo em que
+o código aparece, e os dois conjuntos devem ser disjuntos. Cada código presente
+em qualquer um dos conjuntos exige uma evidência literal com o mesmo `code`.
+
+```json
+{
+  "decision": "out_of_scope",
+  "kind": "investor",
+  "reason_codes": ["INV_IDENTITY_VERIFIED"],
+  "failed_codes": ["INV_TECH_STARTUP_ACTIVITY"],
+  "evidence": [
+    {"code": "INV_IDENTITY_VERIFIED", "quote": "..."},
+    {"code": "INV_TECH_STARTUP_ACTIVITY", "quote": "..."}
+  ],
+  "missing_information": [],
+  "classifier_version": "radar-data-trust-relevance-v1"
+}
+```
+
+Invariantes de decisão para atores:
+
+1. `in_scope` exige todos os códigos obrigatórios em `reason_codes` e
+   `failed_codes` vazio.
+2. `out_of_scope` exige identidade comprovada em `reason_codes` e ao menos um
+   critério essencial não identitário em `failed_codes`.
+3. `needs_review` exige `failed_codes` vazio e ao menos um critério obrigatório
+   ainda não resolvido em `missing_information`.
+4. Um código conhecido não pode aparecer simultaneamente em `reason_codes`,
+   `failed_codes` ou `missing_information`.
+
 Ausência de evidência não equivale a evidência de ausência. Identidade não
 verificável, página indisponível ou registro incompleto levam a `needs_review`,
 não a `out_of_scope`. Campos descritivos como tese, estágio, setores,
@@ -224,6 +261,11 @@ competências, geografia e ticket permanecem `unknown` quando não houver
 evidência; sua ausência só bloqueia `in_scope` quando corresponde diretamente a
 um reason code obrigatório abaixo. Uma mesma passagem pode sustentar mais de um
 código, mas cada código deve possuir sua própria referência de evidência.
+
+Nas tabelas abaixo, a última coluna descreve insuficiência de evidência e,
+portanto, `needs_review`. Quando uma fonte confiável afirmar inequivocamente o
+contrário do critério, o código correspondente entra em `failed_codes` e pode
+sustentar `out_of_scope` pelas invariantes acima.
 
 ##### Critérios mínimos para investidor
 
