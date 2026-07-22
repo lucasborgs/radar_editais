@@ -12,6 +12,7 @@ from radar.core.eval import (
     opportunity_type,
     profile_extractor,
     rag,
+    relevance_shadow,
     reranker,
     structurer,
     triage,
@@ -31,6 +32,7 @@ SUITES: dict[str, Suite] = {
     reranker.SUITE.name: reranker.SUITE,
     structurer.SUITE.name: structurer.SUITE,
     writing.SUITE_WRITING_V2.name: writing.SUITE_WRITING_V2,
+    relevance_shadow.SUITE.name: relevance_shadow.SUITE,
 }
 
 
