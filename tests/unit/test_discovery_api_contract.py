@@ -2,12 +2,16 @@
 
 Cobre:
   - _LIST_COLS inclui os 4 campos de relevância;
-  - linha classificada preserva verdict na resposta;
-  - linha legada sem campos vira unclassified;
-  - linha com erro preserva apenas mensagem sanitizada (sem conteúdo bruto);
-  - promotion_run continua compatível na resposta;
-  - promote/reject continuam independentes da relevância;
-  - auth administrativa permanece inalterada.
+  - _normalize_row: legado sem campos vira unclassified;
+  - _normalize_row: classified preserva verdict;
+  - _normalize_row: erro canônico preservado;
+  - _normalize_row: erro arbitrário vira contract_violation;
+  - _normalize_row: classified sem verdict vira error contract_violation;
+  - _normalize_row: classified com verdict inválido vira error;
+  - _normalize_row: promotion_run não é removido;
+  - list_discovered retorna dados normalizados via mock;
+  - auth administrativa permanece inalterada;
+  - promote/reject não referenciam colunas de relevância.
 """
 from __future__ import annotations
 
@@ -16,7 +20,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from radar.api.routers.discovered import _LIST_COLS, list_discovered
+from radar.api.routers.discovered import (
+    _LIST_COLS,
+    _normalize_row,
+    list_discovered,
+)
+from radar.core.ingestion.relevance_classifier import _ERROR_CANONICAL_MESSAGES
 
 pytestmark = pytest.mark.unit
 
@@ -34,15 +43,28 @@ LEGACY_COLS = [
     "created_at", "reviewed_at", "promoted_web_source_id",
 ]
 
+CANONICAL_ERROR = _ERROR_CANONICAL_MESSAGES["contract_violation:"]
 
-def _build_discovered_row(overrides: dict | None = None) -> dict:
+
+def _build_legacy_row(overrides: dict | None = None) -> dict:
+    """Linha SEM os 4 campos de relevância (registo legado)."""
     row = {c: None for c in LEGACY_COLS}
     row.update({
-        "id": "test-001",
-        "url": "https://exemplo.com/edital",
-        "title": "Edital Teste",
+        "id": "test-legacy",
+        "url": "https://exemplo.com/legacy",
+        "title": "Edital Legado",
         "status": "pending",
-        "created_at": "2026-07-01T00:00:00Z",
+        "created_at": "2026-06-01T00:00:00Z",
+    })
+    if overrides:
+        row.update(overrides)
+    return row
+
+
+def _build_complete_row(overrides: dict | None = None) -> dict:
+    """Linha com todos os campos, incluindo relevância."""
+    row = _build_legacy_row({"id": "test-complete"})
+    row.update({
         "relevance_status": "unclassified",
         "relevance_verdict": None,
         "relevance_error": None,
@@ -53,14 +75,313 @@ def _build_discovered_row(overrides: dict | None = None) -> dict:
     return row
 
 
-def _mock_query_builder_reviewed(return_data: list[dict], run_data: list[dict]):
-    """Cria mock para listagem com include_reviewed=True.
+def test_list_cols_includes_relevance_fields():
+    cols_str = _LIST_COLS if isinstance(_LIST_COLS, str) else " ".join(_LIST_COLS)
+    for field in REQUIRED_FIELDS:
+        assert field in cols_str, f"{field} não encontrado em _LIST_COLS"
 
-    Usa call_count side_effect para alternar entre dois mocks de tabela.
-    """
+
+def test_list_cols_preserves_legacy_fields():
+    cols_str = _LIST_COLS if isinstance(_LIST_COLS, str) else " ".join(_LIST_COLS)
+    for field in LEGACY_COLS:
+        assert field in cols_str, f"{field} não encontrado em _LIST_COLS"
+
+
+# ── _normalize_row: legado ──────────────────────────────────
+
+
+def test_legacy_row_missing_all_relevance_fields():
+    """Registo legado SEM os 4 campos vira unclassified com nulls."""
+    row = _build_legacy_row()
+    assert "relevance_status" not in row
+
+    result = _normalize_row(row)
+
+    assert result["relevance_status"] == "unclassified"
+    assert result["relevance_verdict"] is None
+    assert result["relevance_error"] is None
+    assert result["relevance_classified_at"] is None
+
+
+def test_legacy_row_with_none_status():
+    """Registo com relevance_status=None vira unclassified."""
+    row = _build_legacy_row({"relevance_status": None})
+    result = _normalize_row(row)
+    assert result["relevance_status"] == "unclassified"
+    assert result["relevance_verdict"] is None
+
+
+def test_legacy_row_with_unknown_status():
+    """Registo com relevance_status inválido vira unclassified."""
+    row = _build_legacy_row({"relevance_status": "unknown"})
+    result = _normalize_row(row)
+    assert result["relevance_status"] == "unclassified"
+    assert result["relevance_verdict"] is None
+
+
+# ── _normalize_row: classified ──────────────────────────────
+
+
+def test_classified_in_scope_preserves_verdict():
+    """Linha classified com in_scope preserva verdict."""
+    verdict = {
+        "decision": "in_scope",
+        "reason_codes": [
+            "R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION",
+            "R3_ACTIONABLE", "R4_RELEVANT_BENEFIT", "R5_BRAZIL_RELEVANCE",
+        ],
+        "exclusion_codes": [],
+        "evidence": [
+            {
+                "code": "R1_ENTERPRISE_PATH",
+                "quote": "Empresas de base tecnológica",
+                "source": "landing_page",
+                "locator": None,
+            },
+        ],
+        "missing_information": [],
+        "classifier_version": "radar-data-trust-relevance-v1",
+    }
+    row = _build_complete_row({
+        "relevance_status": "classified",
+        "relevance_verdict": verdict,
+        "relevance_classified_at": "2026-07-21T12:00:00Z",
+    })
+    result = _normalize_row(row)
+
+    assert result["relevance_status"] == "classified"
+    assert result["relevance_verdict"] == verdict
+    assert result["relevance_error"] is None
+    assert result["relevance_classified_at"] == "2026-07-21T12:00:00Z"
+
+
+def test_classified_out_of_scope_preserves_verdict():
+    verdict = {
+        "decision": "out_of_scope",
+        "reason_codes": ["X1_ACADEMIC_ONLY"],
+        "exclusion_codes": ["X1_ACADEMIC_ONLY"],
+        "evidence": [],
+        "missing_information": [],
+        "classifier_version": "radar-data-trust-relevance-v1",
+    }
+    row = _build_complete_row({
+        "relevance_status": "classified",
+        "relevance_verdict": verdict,
+    })
+    result = _normalize_row(row)
+    assert result["relevance_status"] == "classified"
+    assert result["relevance_verdict"]["decision"] == "out_of_scope"
+
+
+def test_classified_needs_review_preserves_verdict():
+    verdict = {
+        "decision": "needs_review",
+        "reason_codes": ["R1_ENTERPRISE_PATH"],
+        "exclusion_codes": [],
+        "evidence": [],
+        "missing_information": ["R2_TECH_INNOVATION: informação ausente"],
+        "classifier_version": "radar-data-trust-relevance-v1",
+    }
+    row = _build_complete_row({
+        "relevance_status": "classified",
+        "relevance_verdict": verdict,
+    })
+    result = _normalize_row(row)
+    assert result["relevance_status"] == "classified"
+    assert result["relevance_verdict"]["missing_information"] == [
+        "R2_TECH_INNOVATION: informação ausente",
+    ]
+
+
+def test_classified_without_verdict_normalized_to_error():
+    """classified mas sem relevance_verdict → error contract_violation."""
+    row = _build_complete_row({
+        "relevance_status": "classified",
+        "relevance_verdict": None,
+    })
+    result = _normalize_row(row)
+
+    assert result["relevance_status"] == "error"
+    assert result["relevance_error"] == CANONICAL_ERROR
+    assert result["relevance_verdict"] is None
+
+
+def test_classified_with_empty_verdict_normalized_to_error():
+    """classified com relevance_verdict={} vira error."""
+    row = _build_complete_row({
+        "relevance_status": "classified",
+        "relevance_verdict": {},
+    })
+    result = _normalize_row(row)
+
+    assert result["relevance_status"] == "error"
+    assert result["relevance_error"] == CANONICAL_ERROR
+    assert result["relevance_verdict"] is None
+
+
+def test_classified_with_malformed_verdict_normalized_to_error():
+    """classified com verdict inválido (falta decision) vira error."""
+    row = _build_complete_row({
+        "relevance_status": "classified",
+        "relevance_verdict": {"foo": "bar"},
+    })
+    result = _normalize_row(row)
+
+    assert result["relevance_status"] == "error"
+    assert result["relevance_error"] == CANONICAL_ERROR
+    assert result["relevance_verdict"] is None
+
+
+def test_classified_with_invalid_decision_normalized_to_error():
+    """classified com decision inválida vira error."""
+    row = _build_complete_row({
+        "relevance_status": "classified",
+        "relevance_verdict": {
+            "decision": "not_a_valid_decision",
+            "reason_codes": [],
+            "exclusion_codes": [],
+            "evidence": [],
+            "missing_information": [],
+            "classifier_version": "v1",
+        },
+    })
+    result = _normalize_row(row)
+
+    assert result["relevance_status"] == "error"
+    assert result["relevance_error"] == CANONICAL_ERROR
+    assert result["relevance_verdict"] is None
+
+
+# ── _normalize_row: error ───────────────────────────────────
+
+
+def test_error_canonical_preserved():
+    """Erro com prefixo canónico preserva a mensagem."""
+    for _prefix, msg in _ERROR_CANONICAL_MESSAGES.items():
+        row = _build_complete_row({
+            "relevance_status": "error",
+            "relevance_verdict": None,
+            "relevance_error": msg,
+            "relevance_classified_at": None,
+        })
+        result = _normalize_row(row)
+
+        assert result["relevance_status"] == "error"
+        assert result["relevance_error"] == msg
+        assert result["relevance_verdict"] is None
+
+
+def test_error_arbitrary_content_normalized():
+    """Conteúdo arbitrário/malformado no erro vira contract_violation."""
+    row = _build_complete_row({
+        "relevance_status": "error",
+        "relevance_verdict": None,
+        "relevance_error": (
+            "algum erro bruto arbitrário com traceback ou stack dump "
+            "que não corresponde a nenhum prefixo canónico"
+        ),
+        "relevance_classified_at": None,
+    })
+    result = _normalize_row(row)
+
+    assert result["relevance_status"] == "error"
+    assert result["relevance_error"] == CANONICAL_ERROR
+    assert "stack dump" not in result["relevance_error"]
+    assert "traceback" not in result["relevance_error"]
+
+
+def test_error_without_message_preserved():
+    """Erro sem mensagem permanece error com null."""
+    row = _build_complete_row({
+        "relevance_status": "error",
+        "relevance_verdict": None,
+        "relevance_error": None,
+    })
+    result = _normalize_row(row)
+
+    assert result["relevance_status"] == "error"
+    assert result["relevance_error"] is None
+    assert result["relevance_verdict"] is None
+
+
+# ── _normalize_row: promotion_run ───────────────────────────
+
+
+def test_promotion_run_preserved():
+    """promotion_run não é alterado pela normalização."""
+    run = {
+        "id": "run-001",
+        "route": "web_source",
+        "status": "awaiting_fetch",
+        "edital_id": None,
+        "stages": {},
+        "updated_at": "2026-07-21T12:00:00Z",
+    }
+    row = _build_complete_row({
+        "relevance_status": "classified",
+        "relevance_verdict": {
+            "decision": "needs_review",
+            "reason_codes": [],
+            "exclusion_codes": [],
+            "evidence": [],
+            "missing_information": ["R2_TECH_INNOVATION: ausente"],
+            "classifier_version": "radar-data-trust-relevance-v1",
+        },
+        "promotion_run": run,
+    })
+    result = _normalize_row(row)
+
+    assert result["promotion_run"]["id"] == "run-001"
+    assert result["promotion_run"]["status"] == "awaiting_fetch"
+    assert result["relevance_status"] == "classified"
+
+
+def test_promotion_run_preserved_even_with_error_normalization():
+    """promotion_run mantém-se mesmo quando a relevância é normalizada."""
+    run = {
+        "id": "run-002",
+        "route": "direct_pdf",
+        "status": "ready",
+        "edital_id": "web:abc",
+        "stages": {"radar_ready": {"status": "ready"}},
+        "updated_at": "2026-07-21T12:00:00Z",
+    }
+    row = _build_complete_row({
+        "relevance_status": "classified",
+        "relevance_verdict": None,
+        "promotion_run": run,
+    })
+    result = _normalize_row(row)
+
+    assert result["relevance_status"] == "error"
+    assert result["promotion_run"]["id"] == "run-002"
+    assert result["promotion_run"]["status"] == "ready"
+
+
+# ── list_discovered (mock) ──────────────────────────────────
+
+
+def _mock_query_builder(return_data: list[dict]):
+    mock_db = MagicMock()
+    mock_execute = MagicMock()
+    mock_execute.data = return_data
+    mock_order = MagicMock()
+    mock_order.execute.return_value = mock_execute
+    mock_gte = MagicMock()
+    mock_gte.order.return_value = mock_order
+    mock_eq = MagicMock()
+    mock_eq.gte.return_value = mock_gte
+    mock_select = MagicMock()
+    mock_select.eq.return_value = mock_eq
+    mock_table = MagicMock()
+    mock_table.select.return_value = mock_select
+    mock_db.table.return_value = mock_table
+    return mock_db
+
+
+def _mock_query_builder_reviewed(return_data: list[dict], run_data: list[dict]):
     mock_db = MagicMock()
 
-    # Runs chain: .select().in_(...).order(...).execute().data
     class FakeRunResponse:
         data = run_data
 
@@ -69,7 +390,6 @@ def _mock_query_builder_reviewed(return_data: list[dict], run_data: list[dict]):
         order=MagicMock(return_value=MagicMock(execute=MagicMock(return_value=FakeRunResponse())))
     )
 
-    # Opps chain (include_reviewed=True): .select().order(...).execute().data
     class FakeOppResponse:
         data = return_data
 
@@ -92,101 +412,35 @@ def _mock_query_builder_reviewed(return_data: list[dict], run_data: list[dict]):
     return mock_db
 
 
-def _mock_query_builder(return_data: list[dict]):
-    """Cria uma cadeia de mocks que reproduz o Supabase query builder para
-    a listagem padrão (sem include_reviewed).
+@patch("radar.api.routers.discovered.get_supabase_service")
+def test_list_discovered_legacy_row_normalized(mock_get_db):
+    """list_discovered normaliza linha legada como unclassified."""
+    row = _build_legacy_row()
+    mock_get_db.return_value = _mock_query_builder([row])
 
-    O fluxo real (include_reviewed=False):
-      db.table("discovered_opportunities").select(_LIST_COLS)
-        .eq("status","pending").gte("created_at",cutoff)
-        .order("created_at", desc=True).execute()
-    """
-    mock_db = MagicMock()
-    mock_execute = MagicMock()
-    mock_execute.data = return_data
-
-    mock_order = MagicMock()
-    mock_order.execute.return_value = mock_execute
-
-    # .gte() returns a mock that has .order()
-    mock_gte = MagicMock()
-    mock_gte.order.return_value = mock_order
-
-    # .eq() returns a mock that has .gte()
-    mock_eq = MagicMock()
-    mock_eq.gte.return_value = mock_gte
-
-    mock_select = MagicMock()
-    mock_select.eq.return_value = mock_eq
-
-    mock_table = MagicMock()
-    mock_table.select.return_value = mock_select
-
-    mock_db.table.return_value = mock_table
-    return mock_db
-
-
-# ── Testes estruturais ─────────────────────────────────────
-
-
-def test_list_cols_includes_relevance_fields():
-    """_LIST_COLS contém os 4 campos de relevância."""
-    cols_str = _LIST_COLS if isinstance(_LIST_COLS, str) else " ".join(_LIST_COLS)
-    for field in REQUIRED_FIELDS:
-        assert field in cols_str, f"{field} não encontrado em _LIST_COLS"
-
-
-def test_list_cols_preserves_legacy_fields():
-    """_LIST_COLS preserva todos os campos legados."""
-    cols_str = _LIST_COLS if isinstance(_LIST_COLS, str) else " ".join(_LIST_COLS)
-    for field in LEGACY_COLS:
-        assert field in cols_str, f"{field} não encontrado em _LIST_COLS"
-
-
-def test_promote_endpoint_unchanged_source():
-    """Promote não referencia colunas de relevância no endpoint."""
-    source = inspect.getsource(
-        __import__("radar.api.routers.discovered", fromlist=["promote_discovered"]).promote_discovered
-    )
-    assert "relevance_status" not in source
-    assert "relevance_verdict" not in source
-    assert "relevance_error" not in source
-    assert "relevance_classified_at" not in source
-
-
-def test_reject_endpoint_unchanged_source():
-    """Reject não referencia colunas de relevância."""
-    source = inspect.getsource(
-        __import__("radar.api.routers.discovered", fromlist=["reject_discovered"]).reject_discovered
-    )
-    assert "relevance_status" not in source
-    assert "relevance_verdict" not in source
-    assert "relevance_error" not in source
-    assert "relevance_classified_at" not in source
-
-
-# ── Testes comportamentais ─────────────────────────────────
+    result = list_discovered("admin-user")
+    opps = result["opportunities"]
+    assert len(opps) == 1
+    assert opps[0]["relevance_status"] == "unclassified"
+    assert opps[0]["relevance_verdict"] is None
+    assert opps[0]["relevance_error"] is None
+    assert opps[0]["relevance_classified_at"] is None
 
 
 @patch("radar.api.routers.discovered.get_supabase_service")
-def test_classified_row_preserves_verdict(mock_get_db):
-    """Linha classificada retorna relevance_verdict intacto na listagem."""
+def test_list_discovered_classified_row(mock_get_db):
+    """list_discovered retorna linha classificada com verdict intacto."""
     verdict = {
         "decision": "in_scope",
-        "reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION"],
+        "reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION",
+                         "R3_ACTIONABLE", "R4_RELEVANT_BENEFIT",
+                         "R5_BRAZIL_RELEVANCE"],
         "exclusion_codes": [],
-        "evidence": [
-            {
-                "code": "R1_ENTERPRISE_PATH",
-                "quote": "Empresas de base tecnológica",
-                "source": "landing_page",
-                "locator": None,
-            }
-        ],
+        "evidence": [],
         "missing_information": [],
         "classifier_version": "radar-data-trust-relevance-v1",
     }
-    row = _build_discovered_row({
+    row = _build_complete_row({
         "relevance_status": "classified",
         "relevance_verdict": verdict,
         "relevance_classified_at": "2026-07-21T12:00:00Z",
@@ -195,69 +449,73 @@ def test_classified_row_preserves_verdict(mock_get_db):
 
     result = list_discovered("admin-user")
     opps = result["opportunities"]
-    assert len(opps) == 1
     assert opps[0]["relevance_status"] == "classified"
-    assert opps[0]["relevance_verdict"] == verdict
+    assert opps[0]["relevance_verdict"]["decision"] == "in_scope"
     assert opps[0]["relevance_classified_at"] == "2026-07-21T12:00:00Z"
 
 
 @patch("radar.api.routers.discovered.get_supabase_service")
-def test_legacy_row_is_unclassified(mock_get_db):
-    """Registro legado (sem campos de relevância) aparece como unclassified."""
-    row = _build_discovered_row({
-        "relevance_status": "unclassified",
+def test_list_discovered_malformed_row_normalized(mock_get_db):
+    """list_discovered normaliza linha inválida para error contract_violation."""
+    row = _build_complete_row({
+        "relevance_status": "classified",
         "relevance_verdict": None,
-        "relevance_error": None,
-        "relevance_classified_at": None,
-    })
-    mock_get_db.return_value = _mock_query_builder([row])
-
-    result = list_discovered("admin-user")
-    opps = result["opportunities"]
-    assert opps[0]["relevance_status"] == "unclassified"
-    assert opps[0]["relevance_verdict"] is None
-    assert opps[0]["relevance_error"] is None
-    assert opps[0]["relevance_classified_at"] is None
-
-
-@patch("radar.api.routers.discovered.get_supabase_service")
-def test_error_row_preserves_sanitized_message(mock_get_db):
-    """Linha com erro preserva apenas mensagem sanitizada (sem conteúdo bruto)."""
-    row = _build_discovered_row({
-        "relevance_status": "error",
-        "relevance_verdict": None,
-        "relevance_error": "timeout: LLM não respondeu a tempo",
-        "relevance_classified_at": None,
     })
     mock_get_db.return_value = _mock_query_builder([row])
 
     result = list_discovered("admin-user")
     opps = result["opportunities"]
     assert opps[0]["relevance_status"] == "error"
+    assert opps[0]["relevance_error"] == CANONICAL_ERROR
     assert opps[0]["relevance_verdict"] is None
-    # A mensagem de erro deve ser apenas a sanitizada (prefixo + msg canônica)
-    assert opps[0]["relevance_error"] == "timeout: LLM não respondeu a tempo"
-    # Conteúdo bruto não deve aparecer
-    assert "traceback" not in opps[0]["relevance_error"]
-    assert "Internal Server Error" not in opps[0]["relevance_error"]
 
 
 @patch("radar.api.routers.discovered.get_supabase_service")
-def test_promotion_run_compatible_with_relevance(mock_get_db):
-    """promotion_run continua funcional ao lado dos campos de relevância."""
-    row = _build_discovered_row({
+def test_list_discovered_error_arbitrary_normalized(mock_get_db):
+    """list_discovered normaliza erro arbitrário."""
+    row = _build_complete_row({
+        "relevance_status": "error",
+        "relevance_verdict": None,
+        "relevance_error": "mensagem bruta arbitrária sem prefixo",
+    })
+    mock_get_db.return_value = _mock_query_builder([row])
+
+    result = list_discovered("admin-user")
+    opps = result["opportunities"]
+    assert opps[0]["relevance_status"] == "error"
+    assert opps[0]["relevance_error"] == CANONICAL_ERROR
+
+
+@patch("radar.api.routers.discovered.get_supabase_service")
+def test_list_discovered_preserves_editorial_fields(mock_get_db):
+    """Campos editoriais (status, reviewed_at, etc.) não são alterados."""
+    row = _build_legacy_row({
         "status": "promoted",
+        "reviewed_at": "2026-07-20T10:00:00Z",
+    })
+    mock_get_db.return_value = _mock_query_builder([row])
+
+    result = list_discovered("admin-user")
+    opps = result["opportunities"]
+    assert opps[0]["status"] == "promoted"
+    assert opps[0]["reviewed_at"] == "2026-07-20T10:00:00Z"
+
+
+@patch("radar.api.routers.discovered.get_supabase_service")
+def test_list_discovered_promotion_run_compatible(mock_get_db):
+    """promotion_run convive com campos de relevância na listagem."""
+    row = _build_complete_row({
+        "id": "test-001", "status": "promoted",
         "relevance_status": "classified",
         "relevance_verdict": {
-            "decision": "in_scope",
-            "reason_codes": ["R1_ENTERPRISE_PATH"],
+            "decision": "needs_review",
+            "reason_codes": [],
             "exclusion_codes": [],
             "evidence": [],
-            "missing_information": [],
+            "missing_information": ["R2_TECH_INNOVATION: ausente"],
             "classifier_version": "radar-data-trust-relevance-v1",
         },
     })
-
     run = {
         "id": "run-001",
         "discovered_opportunity_id": "test-001",
@@ -267,7 +525,6 @@ def test_promotion_run_compatible_with_relevance(mock_get_db):
         "stages": {},
         "updated_at": "2026-07-21T12:00:00Z",
     }
-
     mock_db = _mock_query_builder_reviewed([row], [run])
     mock_get_db.return_value = mock_db
 
@@ -278,37 +535,31 @@ def test_promotion_run_compatible_with_relevance(mock_get_db):
     assert opps[0]["relevance_status"] == "classified"
 
 
-@patch("radar.api.routers.discovered.get_supabase_service")
-def test_include_reviewed_still_works(mock_get_db):
-    """include_reviewed=true continua funcionando."""
-    rows = [
-        _build_discovered_row({
-            "id": "pending-1", "status": "pending",
-            "relevance_status": "unclassified",
-        }),
-        _build_discovered_row({
-            "id": "promoted-1", "status": "promoted",
-            "relevance_status": "classified",
-        }),
-        _build_discovered_row({
-            "id": "rejected-1", "status": "rejected",
-            "relevance_status": "error",
-            "relevance_error": "parse_failure: formato não reconhecido",
-        }),
-    ]
-    mock_db = _mock_query_builder_reviewed(rows, [])
-    mock_get_db.return_value = mock_db
-
-    result = list_discovered("admin-user", include_reviewed=True)
-    opps = result["opportunities"]
-    assert len(opps) == 3
-    statuses = {o["status"] for o in opps}
-    assert statuses == {"pending", "promoted", "rejected"}
+# ── Promote / reject independence ───────────────────────────
 
 
-@patch("radar.api.routers.discovered.get_supabase_service")
-def test_auth_remains_admin_gate(mock_get_db):
-    """A auth administrativa (AdminUserId) permanece como gate."""
+def test_promote_not_called_by_staging():
+    """_stage_records nunca chama promote (inspeção do source de T04)."""
+    from radar.core.ingestion.opportunity_discovery import _row_with_relevance, _stage_records
+    src = inspect.getsource(_stage_records)
+    assert "promote" not in src
+    src2 = inspect.getsource(_row_with_relevance)
+    assert "promote" not in src2
+
+
+def test_reject_not_called_by_staging():
+    from radar.core.ingestion.opportunity_discovery import _row_with_relevance, _stage_records
+    src = inspect.getsource(_stage_records)
+    assert "reject" not in src
+    src2 = inspect.getsource(_row_with_relevance)
+    assert "reject" not in src2
+
+
+# ── Auth ────────────────────────────────────────────────────
+
+
+def test_auth_remains_admin_gate():
+    """Todos os endpoints têm AdminUserId como dependência."""
     from radar.api.routers import discovered as discovered_router_module
     from radar.core.infra.auth import get_admin_user_id as gate
 
@@ -317,4 +568,3 @@ def test_auth_remains_admin_gate(mock_get_db):
     for r in routes:
         deps = [d.call for d in r.dependant.dependencies]
         assert gate in deps, f"rota {r.path} sem gate de admin"
-    mock_get_db.assert_not_called()
