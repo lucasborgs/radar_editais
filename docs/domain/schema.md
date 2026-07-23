@@ -332,9 +332,12 @@ verificacao_values: [verificado, provisorio, promovido]
 
 ### 5.12 Classificação de relevância no staging
 
-A staging `discovered_opportunities` recebe classificação v1 em shadow a cada
-registro extraído, antes do upsert (`_row_with_relevance` em
-`src/radar/core/ingestion/opportunity_discovery.py`). As colunas são aditivas:
+A staging `discovered_opportunities` recebe classificação v1 em shadow durante
+o upsert (`_row_with_relevance` em
+`src/radar/core/ingestion/opportunity_discovery.py`), **apenas para registros
+com material classificável** (`texto_cru` ou `descricao` não vazios). Registro
+sem material permanece `relevance_status = 'unclassified'` pelo default da
+migration 041. As colunas são aditivas:
 
 ```yaml
 relevance_staging:

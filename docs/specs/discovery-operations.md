@@ -30,9 +30,12 @@ independentes da mesma promoção, não sinônimos.
 Hoje `discovered_opportunities` registra a decisão editorial
 `pending | promoted | rejected` e colunas aditivas de classificação de
 relevância (`relevance_status`, `relevance_verdict`, `relevance_error`,
-`relevance_classified_at` — migration 041). A classificação é shadow, nunca
-altera `status` editorial, e erro/abstenção nunca fabrica `out_of_scope`.
-O gate humano permanece obrigatório. A promoção tem duas rotas:
+`relevance_classified_at` — migration 041). A classificação é shadow, executada
+**apenas para registros com material classificável** (`texto_cru`/`descricao`
+não vazios); registro sem material permanece `unclassified` pelo default da
+migration 041. A classificação nunca altera `status` editorial, e erro/abstenção
+nunca fabrica `out_of_scope`. O gate humano permanece obrigatório. A promoção
+tem duas rotas:
 
 - **URL/página:** cria ou reativa `web_sources`; o scraper web a coleta em
   ciclo posterior e o pipeline normal produz bronze, silver, gold e corpus.

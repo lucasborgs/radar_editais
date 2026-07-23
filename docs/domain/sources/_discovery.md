@@ -6,8 +6,10 @@ pelo Brasil. **Regra vive aqui (doc), não no `.py`** — ajuste sem deploy.
 
 Princípio: queries amplas o bastante para recall, específicas o bastante para não
 afogar em ruído. Resultados passam por triagem agêntica + classificação de
-relevância v1 em shadow (`_row_with_relevance`) + entram no staging como
-`provisorio` (§5.11). Erro/abstenção do classificador nunca fabrica
+relevância v1 em shadow (`_row_with_relevance`), **apenas quando há material
+classificável** (`texto_cru`/`descricao` não vazios), e entram no staging como
+`provisorio` (§5.11). Registro sem material permanece `unclassified` pelo
+default da migration 041. Erro/abstenção do classificador nunca fabrica
 `out_of_scope` nem altera o fluxo editorial. O gate humano permanece obrigatório.
 Ver `docs/historical/discovery-opportunities.md` e
 `docs/specs/radar-data-trust-00-relevance-contract.md`.

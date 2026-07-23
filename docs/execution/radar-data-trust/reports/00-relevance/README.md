@@ -43,7 +43,7 @@ Executada em 2026-07-23 com OpenAI `gpt-4o-mini`, suíte `relevance_shadow` v2,
 | Falsos positivos `out_of_scope` | 0 | Nenhum |
 | Taxa `needs_review` | 5/11 (`0.4545`) | Incerteza conservadora elevada |
 | Erros operacionais | 3/14 (`0.2143`) | 1 contract_violation, 2 grounding_error |
-| Grounding médio de evidência | `0.6364` | Razoável para shadow |
+| Grounding médio de evidência | `0.6364` | Diagnóstico sem threshold aceito |
 
 ### Casos auditáveis
 
@@ -89,15 +89,33 @@ Executada em 2026-07-23 com OpenAI `gpt-4o-mini`, suíte `relevance_shadow` v2,
 
 | Suíte | Testes | Status |
 |---|---|---|
-| `test_relevance.py` | 115 | all passed |
+| `test_relevance.py` | 107 | all passed |
 | `test_relevance_goldens.py` | 39 | all passed |
-| `test_relevance_shadow.py` | 35 (T06) + base | all passed |
-| `test_relevance_staging.py` | 29 | all passed |
-| `test_discovery_api_contract.py` | 26 | all passed |
-| `test_hardening_pr4.py` | 8 | all passed |
-| `test_opportunity_discovery_cache.py` | — | all passed |
-| `test_discovery_promotion.py` | — | all passed |
-| **Total** | **342+** | **all passed** |
+| `test_relevance_shadow.py` | 149 | all passed |
+| `test_relevance_staging.py` | 27 | all passed |
+| `test_discovery_api_contract.py` | 29 | all passed |
+| `test_hardening_pr4.py` | 16 | all passed |
+| `test_opportunity_discovery_cache.py` | 4 | all passed |
+| `test_discovery_promotion.py` | 3 | all passed |
+| **Subtotal selecionado** | **374** | **all passed** |
+
+### Validação da RT00-T07
+
+| Gate | Resultado |
+|---|---|
+| `pytest -q` completo | `1143 passed, 64 skipped, 4 warnings` |
+| Ruff sobre Python versionado | `All checks passed` |
+| `npx tsc --noEmit` | sem erros |
+| `npm run lint` | sem erros; 4 warnings preexistentes em `src/lib/auth.tsx` |
+| `git diff --check` | limpo |
+| Migrations | 41 arquivos, sequência linear `001–041`, sem lacuna ou duplicata |
+| Run diagnóstica | reutilizada a run T06; nenhuma nova chamada LLM |
+| `pending → promote/reject` em Supabase local | pendente: portas locais 54321/54322 indisponíveis |
+
+Na primeira execução do `pytest` completo, `test_suites_registered` revelou que
+`relevance_shadow` estava no registry desde T03, mas ausente do conjunto esperado
+pelo teste. A falha também existia na base `f805f4ef8`; a T07 atualizou a
+enumeração e a suíte completa passou.
 
 ### Documentos reconciliados
 
@@ -107,6 +125,8 @@ Executada em 2026-07-23 com OpenAI `gpt-4o-mini`, suíte `relevance_shadow` v2,
 | `docs/architecture.md` | §5: classificação v1 em shadow durante staging. |
 | `docs/domain/sources/_discovery.md` | Menção à classificação v1 em shadow e contrato de relevância. |
 | `docs/specs/discovery-operations.md` | §2: colunas de relevância no staging (migration 041). |
+| `docs/specs/evaluation-operations.md` | Crescimento posterior do registry de 10 para 12 suítes; `explore` e `relevance_shadow` permanecem diagnósticas. |
+| `AGENTS.md` | Lista operacional das 12 suítes reconciliada. |
 | `docs/specs/radar-data-trust-00-relevance-contract.md` | Status: `proposta para aprovação` → `vigente`. |
 | `docs/specs/radar-data-trust.md` | Status: `proposta para aprovação` → `vigente (spec 00 concluída)`. Tabela §9: spec 00 marcada como vigente. |
 | `docs/execution/radar-data-trust/reports/00-relevance/README.md` | Este documento. |
@@ -157,9 +177,10 @@ Executada em 2026-07-23 com OpenAI `gpt-4o-mini`, suíte `relevance_shadow` v2,
 | # | Pendência | Observação |
 |---|---|---|
 | 1 | QA manual da UI de descoberta pendente (5 cenários visuais). | T05 não teve ambiente local disponível. Validado por tipo estático + testes. |
-| 2 | Testes da API usam mock de Supabase (não banco real). | Cobertura contratual; integração com Supabase local seria ideal. |
-| 3 | Progressive disclosure sem animação (CSS). | Coerente com simplicidade da pré-beta. |
-| 4 | `quote` de evidência sem truncamento na UI. | Pode ser longo; aceito como comportamento inicial. |
+| 2 | Fluxo manual `pending → promote/reject` em Supabase local pendente. | T07 confirmou que as portas locais 54321/54322 não estavam disponíveis; nenhum banco remoto foi usado. |
+| 3 | Testes da API usam mock de Supabase (não banco real). | Cobertura contratual; integração com Supabase local seria ideal. |
+| 4 | Progressive disclosure sem animação (CSS). | Coerente com simplicidade da pré-beta. |
+| 5 | `quote` de evidência sem truncamento na UI. | Pode ser longo; aceito como comportamento inicial. |
 
 ## Critérios de conclusão da spec
 
@@ -179,7 +200,10 @@ docs/domain/schema.md
 docs/domain/sources/_discovery.md
 docs/architecture.md
 docs/specs/discovery-operations.md
+docs/specs/evaluation-operations.md
 docs/specs/radar-data-trust.md
 docs/specs/radar-data-trust-00-relevance-contract.md
 docs/execution/radar-data-trust/reports/00-relevance/README.md
+AGENTS.md
+tests/unit/test_eval_harness.py
 ```
