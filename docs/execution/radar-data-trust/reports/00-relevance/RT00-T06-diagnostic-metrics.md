@@ -11,7 +11,7 @@
 | `9122c29f8` | feat: métricas diagnósticas T06 (recall, precisão, taxa, agreement, kind, código, audit) |
 | `1e12e2001` | docs: relatório RT00-T06 corrigido (operational_miss, X em excl_) |
 | `56fccce5a` | docs: atualiza hashes e validação |
-| `b710b85e9` | fix: exp/eval_exp só para códigos esperados em by_code; testes de only-predicted |
+| `181fad1b8` | fix: exp/eval_exp só para códigos esperados em by_code; testes de only-predicted |
 
 ## Resumo
 
@@ -268,9 +268,10 @@ assert not any("conf_X1" in k for k in metrics)  # nunca em conf_
 ## Validação
 
 ```bash
-# 322 passed (149 T06 + 173 legado T03/staging/hardening/cache)
+# 342 passed (149 T06 + 193 legado T03/staging/hardening/cache)
 PYTHONPATH=src pytest -q tests/unit/test_relevance_shadow.py \
   tests/unit/test_relevance_goldens.py tests/unit/test_relevance.py \
+  tests/unit/test_relevance_staging.py \
   tests/unit/test_hardening_pr4.py \
   tests/unit/test_opportunity_discovery_cache.py
 
