@@ -46,7 +46,8 @@ TTL_DAYS = 30
 _LIST_COLS = (
     "id, url, title, agency, fonte, descricao, prazo_envio, publico_alvo, tema, "
     "opportunity_type, status, extraction_quality, edital_link, "
-    "created_at, reviewed_at, promoted_web_source_id"
+    "created_at, reviewed_at, promoted_web_source_id, "
+    "relevance_status, relevance_verdict, relevance_error, relevance_classified_at"
 )
 
 _WEB_RAW_DIR = BRONZE_DIR / "web_raw"

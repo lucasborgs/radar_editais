@@ -836,6 +836,28 @@ export const promoteResearchFinding = (id: string, token: string) =>
     token,
   );
 
+// ── Relevance classification types ─────────────────────────
+
+export type RelevanceStatus = "unclassified" | "classified" | "error";
+
+export type RelevanceDecision = "in_scope" | "out_of_scope" | "needs_review";
+
+export interface RelevanceEvidence {
+  code: string;
+  quote?: string | null;
+  source?: string | null;
+  locator?: { document?: string | null; page?: number | null } | null;
+}
+
+export interface RelevanceVerdict {
+  decision: RelevanceDecision;
+  reason_codes: string[];
+  exclusion_codes: string[];
+  evidence: RelevanceEvidence[];
+  missing_information: string[];
+  classifier_version: string;
+}
+
 // ── Discovered opportunities (torneira web, gate humano) ────
 
 export interface DiscoveredOpportunity {
@@ -855,6 +877,10 @@ export interface DiscoveredOpportunity {
   created_at: string;
   reviewed_at: string | null;
   promoted_web_source_id: string | null;
+  relevance_status: RelevanceStatus;
+  relevance_verdict: RelevanceVerdict | null;
+  relevance_error: string | null;
+  relevance_classified_at: string | null;
   promotion_run?: PromotionRun;
 }
 
