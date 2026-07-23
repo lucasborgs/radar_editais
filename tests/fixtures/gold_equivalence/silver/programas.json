@@ -1,0 +1,31 @@
+{
+  "programas": [
+    {
+      "id": "programa:centelha",
+      "name": "Programa Centelha",
+      "operador": "MCTI / FINEP / FAPs estaduais",
+      "tipo": "subvencao",
+      "descricao": "Programa nacional de estímulo à criação de empreendimentos inovadores: transforma ideias em negócios com capacitação e subvenção. Editais estadualizados pelas FAPs.",
+      "formato": "edital-periodico",
+      "cadencia": "anual",
+      "beneficio": "Subvenção econômica (capital não-reembolsável), bolsas, mentorias e capacitação.",
+      "ticket_range": {
+        "min_brl": 50000,
+        "max_brl": 130000
+      },
+      "tese_themes": [],
+      "setores": [],
+      "estagio_alvo": [
+        "pre-seed"
+      ],
+      "elegibilidade": "Pessoas físicas e empresas com faturamento até R$ 4,8 mi, criadas em até 12 meses do edital estadual.",
+      "site": "https://programacentelha.com.br",
+      "faq_url": "https://programacentelha.com.br/duvidas-frequentes/",
+      "source_urls": [
+        "https://programacentelha.com.br/o-programa/"
+      ],
+      "status": "ativo",
+      "verificado_em": null
+    }
+  ]
+}

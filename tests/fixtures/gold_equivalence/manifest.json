@@ -1,0 +1,115 @@
+{
+  "generated_at": "2026-07-23",
+  "purpose": "Fixtures de teste para RT01-T02 (baseline de equivalência do gold, spec radar-data-trust-01-provenance.md §9.3). NÃO é golden de avaliação (data/evaluation/) — não entra no registry de eval.",
+  "regenerate_baseline_command": "cd <worktree> && PYTHONPATH=src <venv>/bin/python -c \"from tests.helpers.gold_projection import regenerate_baseline; regenerate_baseline()\" — sobrescreve baseline_projection.json recapturando via tests/helpers/gold_projection.py::run_capture (harness que roda radar.core.kg.gold.ingest_all real sobre estas fixtures, com os produtores abaixo stubados). Ver também tests/unit/test_gold_equivalence.py::TestBaselineCapture.",
+  "stubbed_producers": {
+    "tagger": {
+      "target": "radar.core.kg.gold._tag_edital",
+      "behavior": "substituído por stub determinístico (tests/helpers/gold_projection.py); NÃO chama LLM real. Registra sha256(thematic_text) em entities[*].tagger_input_hash no snapshot."
+    },
+    "constraints_producer": {
+      "target": "radar.core.kg.constraints_producer.produce_from_text",
+      "behavior": "substituído por stub determinístico; NÃO chama LLM real. Registra sha256(texto de elegibilidade) em entities[*].constraints_input_hash no snapshot (editais e programas)."
+    },
+    "embeddings": {
+      "targets": [
+        "radar.core.retrieval.embedder.embed_query",
+        "radar.core.kg.gold._embed_match_chunks"
+      ],
+      "behavior": "substituídos por stubs determinísticos; NÃO chamam a API de embeddings real. Retornam vetor sintético fixo (dim=8). Registram sha256(input), modelo=\"stub-embedder-v1\" e dim=8 em entities[*].embedding_input_hash/model/dim e em match_chunks[*][*].embedding_input_hash/model/dim — NUNCA o vetor."
+    }
+  },
+  "explicit_declaration": "O snapshot (baseline_projection.json) NÃO contém saída real de modelo em nenhum campo: setores/tecnologias_tags do tagger, constraints/requisitos_texto/exclusoes/publico_alvo do constraints_producer e os vetores de embedding são todos produtos do stub determinístico acima, não de uma chamada LLM/API real.",
+  "sources": [
+    {
+      "fixture_path": "bronze/finep_raw/finep_chamadas_fixture.json",
+      "origin_path": "/Users/lucasborges/radar_editais/data/bronze/finep_raw/finep_chamadas_20260719_030446.json",
+      "note": "recortado: apenas chamada_id=602 (dos 36 registros do scan mais recente)",
+      "fixture_sha256": "4ffa7dc9849e9c394a4cea3ae05f57dbbac75f9ebeba2513b2e0a9a7e2b78ee9"
+    },
+    {
+      "fixture_path": "bronze/fapesp_raw/fapesp_scan_fixture.json",
+      "origin_path": "/Users/lucasborges/radar_editais/data/bronze/fapesp_raw/fapesp_scan_20260719_030506.json",
+      "note": "recortado: apenas o registro cujo url resolve native_id=16466 (dos 22 registros do scan mais recente)",
+      "fixture_sha256": "34a12b564907dd8611b2783ffd1a9b10d281928bdba0fe29eb43abef472c00af"
+    },
+    {
+      "fixture_path": "bronze/fapesc_raw/fapesc_scan_fixture.json",
+      "origin_path": "/Users/lucasborges/radar_editais/data/bronze/fapesc_raw/fapesc_scan_20260719_030842.json",
+      "note": "recortado: apenas native_id=35-2026 (dos 24 registros do scan mais recente)",
+      "fixture_sha256": "1cdbed763882a79c905b801b514095b9bc9ee30d0db89e62e5112b2d533b14e8"
+    },
+    {
+      "fixture_path": "bronze/web_raw/web_scan_fixture.json",
+      "origin_path": "/Users/lucasborges/radar_editais/data/bronze/web_raw/web_discovery_20260610_154806.json",
+      "note": "recortado: apenas url_hash=ce032edb720c",
+      "fixture_sha256": "be30255282cd69353665a8e0133879f28936b15d2df385ca640b237578192b0f"
+    },
+    {
+      "fixture_path": "bronze/ict_raw/embrapii_fixture.json",
+      "origin_path": "/Users/lucasborges/radar_editais/data/bronze/ict_raw/embrapii_20260603_122233.json",
+      "note": "recortado: apenas slug=inteligencia-artificial-ceia-ufg (1 dos 90 registros do snapshot mais recente). Escolha deliberada: 89/90 registros EMBRAPII carregam contact.responsavel com nome/telefone/email pessoal do ponto focal da unidade; este é o único registro sem identificação pessoal (contact.responsavel=\"\"), evitando commitar dado pessoal num fixture de teste (ver relatório, \"Divergências e decisões\").",
+      "fixture_sha256": "d9c5110089ce6c5a549e2302ba15cb425f8805d79fd270f6b105846dff5fa0bd"
+    },
+    {
+      "fixture_path": "silver/structured_docs/finep/602.jsonl",
+      "origin_path": "/Users/lucasborges/radar_editais/data/silver/structured_docs/finep/602.jsonl",
+      "note": "cópia verbatim (arquivo já é o silver de um único edital)",
+      "fixture_sha256": "91fe4dc3032f8dabbc974c3ec18df44d6c6a18ad3779360e680022190aedb9b8"
+    },
+    {
+      "fixture_path": "silver/structured_docs/finep/602.meta.json",
+      "origin_path": "/Users/lucasborges/radar_editais/data/silver/structured_docs/finep/602.meta.json",
+      "note": "cópia verbatim",
+      "fixture_sha256": "a1277ef615c3b768d463633e62ce6bc574b20a20a4fdd6664a6285cf1b56648d"
+    },
+    {
+      "fixture_path": "silver/structured_docs/fapesp/16466.jsonl",
+      "origin_path": "/Users/lucasborges/radar_editais/data/silver/structured_docs/fapesp/16466.jsonl",
+      "note": "cópia verbatim",
+      "fixture_sha256": "ef8789733d6c340279c9dad2d6578c89a36c7a58080e535aa0e654b9ce89a55e"
+    },
+    {
+      "fixture_path": "silver/structured_docs/fapesp/16466.meta.json",
+      "origin_path": "/Users/lucasborges/radar_editais/data/silver/structured_docs/fapesp/16466.meta.json",
+      "note": "cópia verbatim",
+      "fixture_sha256": "7faa9389fe2041c8484777b029e4b1acfe48b2cc09ca93d60e957e005d9a8588"
+    },
+    {
+      "fixture_path": "silver/structured_docs/fapesc/35-2026.jsonl",
+      "origin_path": "/Users/lucasborges/radar_editais/data/silver/structured_docs/fapesc/35-2026.jsonl",
+      "note": "cópia verbatim",
+      "fixture_sha256": "3ef64c0e9bba1cb2ce2c80770e6f58b57dccba6dbd44b0e5f595181cc202fbab"
+    },
+    {
+      "fixture_path": "silver/structured_docs/fapesc/35-2026.meta.json",
+      "origin_path": "/Users/lucasborges/radar_editais/data/silver/structured_docs/fapesc/35-2026.meta.json",
+      "note": "cópia verbatim",
+      "fixture_sha256": "dc71a178d36298266dd2c6b3f79a7148bebf1765a79292fda0cf97fddfe205df"
+    },
+    {
+      "fixture_path": "silver/structured_docs/web/ce032edb720c.jsonl",
+      "origin_path": "/Users/lucasborges/radar_editais/data/silver/structured_docs/web/ce032edb720c.jsonl",
+      "note": "cópia verbatim",
+      "fixture_sha256": "e26fead9fa6428769e6c452b15b1f954e98459d902ab8e6ecc982f39ffb56b85"
+    },
+    {
+      "fixture_path": "silver/structured_docs/web/ce032edb720c.meta.json",
+      "origin_path": "/Users/lucasborges/radar_editais/data/silver/structured_docs/web/ce032edb720c.meta.json",
+      "note": "cópia verbatim",
+      "fixture_sha256": "222f93537df520a8c06ad27b709c4336ae4944d54bd49b10be0f915727214ead"
+    },
+    {
+      "fixture_path": "silver/investidores.json",
+      "origin_path": "/Users/lucasborges/radar_editais/data/silver/investidores.json",
+      "note": "recortado: apenas investidor:indicator-capital (1 dos 17), forma {\"investidores\": [...]} preservada",
+      "fixture_sha256": "4c718194ac300ffc91413865470adb525d338f6c6f6bf46867860f2240684b27"
+    },
+    {
+      "fixture_path": "silver/programas.json",
+      "origin_path": "/Users/lucasborges/radar_editais/data/silver/programas.json",
+      "note": "recortado: apenas programa:centelha (1 dos 10), forma {\"programas\": [...]} preservada. Escolhido por ter operador multi-agência (\"MCTI / FINEP / FAPs estaduais\") — exercita 3 relações operado_por em vez de 1.",
+      "fixture_sha256": "72d66f57ea4629441b2ef149a69a19abfb2595b81ba3515630ebb4acb6de66f8"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+[
+  {
+    "name": "CEIA-UFG",
+    "slug": "inteligencia-artificial-ceia-ufg",
+    "source": "embrapii",
+    "kind": "embrapii_unit",
+    "url": "https://embrapii.org.br/unidades/inteligencia-artificial-ceia-ufg/",
+    "about": "Apresente sua demanda para o nosso assistente de inteligência artificial: bit.ly/matchias O Centro de Excelência em Inteligência Artificial – CEIA é uma instituição de referência no tema de Inteligência Artificial e Ciência de Dados, com atuação como Unidade Embrapii nas seguintes áreas: – Softwares Inteligentes – Inteligência Artificial para automação industrial – Integração de hardware e software (embarcados ou integrados) O CEIA conta com equipe técnica qualificada composta por pesquisadores, especialistas e discentes com experiência em atividades de PD&I com diferentes níveis de complexidade. A unidade conta com equipamentos modernos, tais como supercomputadores de Inteligência Artificial, laboratório de internet das coisas e de veículo elétrico autônomo, disponíveis para atender demandas tecnológicas. Destacam-se as seguintes soluções desenvolvidas: – Sintetização de voz com expressões emocionais – Desenvolvimento de um Apresentador Virtual em Português Brasileiro – Planejamento inteligente da linha de produção para indústria moveleira (Programa BNDES Embrapii) – Inteligência Artificial no Desenvolvimento de um Robô de monitoramento para condomínios (Programa SEBRAE Embrapii) – Sistema de recomendação para personalização de veiculação de anúncios digitais (Programa SEBRAE Embrapii) – Geração Automática de Textos Jurídicos Utilizando Modelos de Geradores de Linguagem Natural (Programa SEBRAE Embrapii) – Geração de datasets sintéticos com transferência de conhecimento para cenas reais com aplicações para segurança veicular e de pedestres (Programa Rota 2030) – Sensoriamento massivo de dados para navegação autônoma em cenários de mobilidade urbana no contexto Brasileiro (Programa Rota 2030) Sobre o CEIA O CEIA foi criado em parceria com a Fundação de Amparo à Pesquisa do Estado de Goiás – FAPEG e tem por missão disponibilizar e transferir tecnologias baseadas em Inteligência Artificial, promovendo a competitividade de organizações públicas e/ou privadas, através do desenvolvimento de soluções tecnológicas inovadoras com foco principal para o setor de saúde, logística, segurança, energia e cidades inteligentes envolvendo empresas, startups do ecossistema e instituições de ensino e pesquisa.",
+    "institution_type": "Universidade Federal",
+    "address": "Alameda Palmeiras, Quadra D, Câmpus Samambaia, Goiânia, GO",
+    "contact": {
+      "responsavel": "",
+      "email": "ceia@ceia.ufg.br",
+      "telefone": "",
+      "site": "http://www.ceia.ufg.br"
+    },
+    "areas_raw": [
+      "Integração de hardware e software",
+      "Inteligência artificial para automação industrial",
+      "Softwares inteligentes",
+      "Inteligência artificial"
+    ],
+    "data_extracao": "2026-06-03"
+  }
+]

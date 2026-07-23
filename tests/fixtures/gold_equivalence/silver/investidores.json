@@ -1,0 +1,38 @@
+{
+  "investidores": [
+    {
+      "id": "investidor:indicator-capital",
+      "name": "Indicator Capital",
+      "tese": "Venture capital de deep-tech B2B (\"boosting deep-tech heroes\"); aposta em times com risco tecnológico real.",
+      "tese_themes": [
+        "tecnologias digitais e conectividade",
+        "materiais, química e manufatura avançada"
+      ],
+      "tese_keywords": [
+        "deep-tech",
+        "b2b",
+        "hardware",
+        "iot",
+        "ia"
+      ],
+      "setores": [
+        "multissetorial"
+      ],
+      "estagio_alvo": [
+        "seed",
+        "serie-a"
+      ],
+      "ticket_range": null,
+      "lead_follow": "lead",
+      "generalista": false,
+      "fund_status": "ativo",
+      "site": "https://indicator.capital",
+      "source_urls": [
+        "https://indicator.capital/",
+        "https://indicator.capital/building-value-together/",
+        "https://indicator.capital/portfolio/"
+      ],
+      "verificado_em": "2026-06-09"
+    }
+  ]
+}
