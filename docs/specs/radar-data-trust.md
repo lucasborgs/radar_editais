@@ -1,6 +1,6 @@
 # Spec-mãe — Radar Data Trust
 
-**Status:** proposta para aprovação · **Data:** 2026-07-21
+**Status:** vigente (spec 00 concluída) · **Data:** 2026-07-23
 **Documento-pai:** [`system-coherence.md`](system-coherence.md)
 **Família de specs:** `radar-data-trust-NN-<capacidade>.md`
 **Perfis afetados:** usuário de produto, operador e usuário técnico
@@ -277,7 +277,7 @@ afirmar cobertura total do ecossistema.
 
 | Ordem | Spec | Resultado | Dependências | Estado |
 |---:|---|---|---|---|
-| 00 | [`radar-data-trust-00-relevance-contract.md`](radar-data-trust-00-relevance-contract.md) | relevância de oportunidades e atores, com critérios próprios por `kind` | esta spec-mãe | proposta criada |
+| 00 | [`radar-data-trust-00-relevance-contract.md`](radar-data-trust-00-relevance-contract.md) | relevância de oportunidades e atores, com critérios próprios por `kind` | esta spec-mãe | vigente (RT00-T01 a T07 concluídas) |
 | 01 | [`radar-data-trust-01-provenance.md`](radar-data-trust-01-provenance.md) | evidência estruturada do documento ao consumo | 00 | proposta criada |
 | 02 | `radar-data-trust-02-quality-gates.md` | goldens representativos, gates por camada e E2E | 00; contrato de 01 | planejada |
 | 03 | `radar-data-trust-03-source-coverage.md` | registro vivo, saúde, frescor e métricas de cobertura | 00 | planejada |

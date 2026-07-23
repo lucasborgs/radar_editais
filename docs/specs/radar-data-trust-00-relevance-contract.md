@@ -1,6 +1,6 @@
 # Radar Data Trust 00 — Contrato de relevância
 
-**Status:** proposta para aprovação · **Data:** 2026-07-21
+**Status:** vigente · **Data:** 2026-07-23
 **Spec-mãe:** [`radar-data-trust.md`](radar-data-trust.md)
 **Ordem:** 00 · **Bloqueia:** todas as demais specs Radar Data Trust
 **Perfis afetados:** usuário de produto e operador
