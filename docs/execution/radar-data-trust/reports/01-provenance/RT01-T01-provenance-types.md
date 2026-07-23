@@ -211,4 +211,9 @@ módulo.
 
 ## Auditoria Codex
 
-**Veredito:** pendente — não solicitada nesta execução.
+**Veredito:** aprovada em 2026-07-23.
+
+Validação independente confirmou os 65 testes, Ruff e `git diff --check`
+limpos, a rejeição dos casos adversariais corrigidos e o escopo restrito à
+RT01-T01. A interpretação de `quote` como conteúdo permitido sob
+`locator_quality=unresolved` também foi confirmada.
