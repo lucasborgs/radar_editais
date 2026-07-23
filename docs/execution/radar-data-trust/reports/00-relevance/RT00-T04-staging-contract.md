@@ -1,6 +1,6 @@
 # RT00-T04 — Contrato de staging
 
-**Status:** `completed`
+**Status:** `completed` (após correção de auditoria)
 **Plano:** [`RT00-T04-staging-contract.md`](../../plans/00-relevance/RT00-T04-staging-contract.md)
 **Branch/base:** `codex/radar-data-trust-00-t04` / `02e2b393e`
 **Base de referência:** RT00-T03 concluída em `02e2b393e`
@@ -9,8 +9,96 @@
 
 | Commit | Assunto |
 |---|---|
-| `(1º commit a ser criado)` | migration/contrato e implementação |
-| `(2º commit a ser criado)` | testes e relatório |
+| `ba59f569e` | (original) migration/contrato e implementação inicial |
+| `408547e02` | (original) testes e relatório iniciais (continha `assert True`) |
+| `(corretivo 1)` | feat: dual-write real na descoberta + validação de fronteira |
+| `(corretivo 2)` | test: testes comportamentais + relatório corrigido |
+
+## Correções aplicadas após auditoria Codex
+
+### 1. Dual-write real na Descoberta
+
+A classificação v1 roda em shadow dentro de `_row_with_relevance()`, chamada por
+`_stage_records()` a cada registro extraído, antes do upsert em
+`discovered_opportunities`.
+
+Ponto exato do dual-write:
+
+```
+_extract(hit) → record dict
+  ↓
+_row_with_relevance(record)
+  ├─ classify_opportunity(material)           ← LLM v1 shadow
+  ├─ validate_opportunity_result(result)      ← validação de fronteira
+  └─ row["relevance_*"] = ...                ← adiciona ao upsert
+  ↓
+_stage_records → upsert(rows, ...)            ← atômico com status=pending
+```
+
+A classificação usa `classify_opportunity()` de `relevance_classifier.py` —
+exatamente o mesmo registrado no harness. Não há classificador paralelo.
+
+A linha de staging carrega as colunas de relevância **juntas** no upsert,
+dispensando UPDATE posterior por UUID. O upsert usa `ignore_duplicates=True`,
+portanto registros já existentes não são reclassificados (idempotente).
+
+### 2. Validação de fronteira
+
+Nova função `validate_opportunity_result(result)` em `relevance_classifier.py`:
+
+- **Sucesso (`"verdict"`):**
+  - `RelevanceVerdict.model_validate()` — rejeita campos extra (`extra=forbid`),
+    código inválido, `in_scope` sem todos R1-R5, `out_of_scope` sem exclusão.
+  - `_check_output_evidence_contract()` — verifica correspondência exata entre
+    `reason_codes`/`exclusion_codes` e entradas de `evidence`.
+  - `model_dump(mode="json")` — serializa para JSON puro (tipos básicos).
+- **Erro (`"error"`):**
+  - Apenas categorias sanitizadas conhecidas são aceitas:
+    `parse_failure:`, `timeout:`, `provider_error:`, `contract_violation:`,
+    `grounding_error:`.
+  - Mensagem bruta do provedor nunca é persistida.
+- Resultado inválido (sem `verdict` nem `error`) → `ValueError`.
+
+### 3. Preservação de resultado bem-sucedido
+
+- `ignore_duplicates=True` no upsert impede que uma execução posterior com erro
+  sobrescreva um `classified` já persistido.
+- Erro transitório nunca apaga ou rebaixa um veredicto anterior.
+- Nenhuma reclassificação ou backfill é introduzida nesta task.
+
+### 4. Testes comportamentais
+
+Todos os `assert True` foram removidos. 26 testes direcionados agora executam
+caminhos reais com mocks:
+
+| Teste | O que comprova |
+|---|---|
+| `test_valid_in_scope` | in_scope com R1-R5 + evidência é aceito |
+| `test_valid_out_of_scope` | out_of_scope com exclusão + evidência é aceito |
+| `test_valid_needs_review` | needs_review com missing_information é aceito |
+| `test_valid_error_known_category` | 5 categorias sanitizadas conhecidas são aceitas |
+| `test_invalid_result_no_keys_raises` | dict vazio → ValueError |
+| `test_invalid_unknown_error_category_raises` | erro bruto → ValueError |
+| `test_in_scope_incomplete_rejected` | in_scope sem R1-R5 → rejeitado |
+| `test_evidence_code_mismatch_rejected` | evidence sem reason_codes → rejeitado |
+| `test_serialize_mode_json` | model_dump(mode=json) produz tipos básicos |
+| `test_classified_in_scope` | _row_with_relevance → classified + pending |
+| `test_classified_out_of_scope` | _row_with_relevance → classified + out_of_scope |
+| `test_classified_needs_review` | _row_with_relevance → classified + needs_review |
+| `test_error_graceful_pending_preserved` | erro v1 → pending + relevance_status=error |
+| `test_unexpected_exception_never_blocks_staging` | exceção → pending + error sanitizado |
+| `test_no_material_skips_classification` | sem texto → sem classificação |
+| `test_editorial_columns_untouched` | colunas editoriais não são escritas |
+| `test_records_have_relevance_on_upsert` | _stage_records inclui relevance_* no upsert |
+| `test_relevance_error_still_upserts_pending` | erro não impede upsert |
+| `test_ignore_duplicates_preserves_classified` | ignore_duplicates=True protege classified |
+| `test_no_gold_table_written` | apenas discovered_opportunities é escrita |
+| `test_migration_041_default_is_unclassified` | SQL da migration lida e verificada |
+| `test_legacy_records_unclassified_by_default` | contrato: default 'unclassified' |
+| `test_promote_not_called_by_staging` | _stage_records não contém "promote" |
+| `test_reject_not_called_by_staging` | _stage_records não contém "reject" |
+| `test_cache_not_modified_by_relevance` | _row_with_relevance não chama cache |
+| `test_write_false_skips_staging` | write=False → _stage_records não chamado |
 
 ## Schema adicionado
 
@@ -26,27 +114,8 @@ sem alterar RLS, índices, constraints editoriais ou consumidores existentes.
 | `relevance_error` | `text` | — | YES | — |
 | `relevance_classified_at` | `timestamptz` | — | YES | — |
 
-- `unclassified`: registro ainda não processado pelo classificador (default p/ legado).
-- `classified`: classificação concluída com sucesso; `relevance_verdict` preenchido.
-- `error`: falha operacional; `relevance_error` contém mensagem sanitizada,
-  `relevance_verdict` é `null`.
-
 Nenhuma coluna editorial (`status`, `reject_reason`, `reviewed_at`,
-`promoted_web_source_id`) foi alterada. RLS, índices e `url_hash UNIQUE`
-preservados.
-
-## Ponto exato do dual-write
-
-A função `persist_opportunity_verdict(db, opportunity_id, result)` em
-`src/radar/core/ingestion/relevance_classifier.py:660` é o único ponto de
-escrita.
-
-- Aceita o mesmo dicionário retornado por `classify_opportunity()`:
-  `{"verdict": {...}}` ou `{"error": "..."}`.
-- Escreve via `UPDATE discovered_opportunities SET ... WHERE id = opp_id`.
-- Resultado inválido (sem `verdict` nem `error`) levanta `ValueError`.
-- Não está conectada a `discover_opportunities()`, `_stage_records`, ledger,
-  cache negativo, promoção, API ou shadow eval — RT00-T05 fará a fiação.
+`promoted_web_source_id`) foi alterada.
 
 ## Comportamento em falha
 
@@ -60,6 +129,7 @@ escrita.
 | `{"error": "provider_error: ..."}` | `error` | `null` | mensagem sanitizada | Nenhum |
 | `{"error": "contract_violation: ..."}` | `error` | `null` | mensagem sanitizada | Nenhum |
 | `{"error": "grounding_error: ..."}` | `error` | `null` | mensagem sanitizada | Nenhum |
+| exceção inesperada | `error` | `null` | `provider_error: falha inesperada` | Nenhum |
 | nunca processado (legado) | `unclassified` | `null` | `null` | Nenhum |
 
 Falha nunca apaga o candidato, nunca altera `status` editorial e nunca fabrica
@@ -68,28 +138,25 @@ Falha nunca apaga o candidato, nunca altera `status` editorial e nunca fabrica
 ## Compatibilidade com registros legados
 
 - Registros existentes recebem `relevance_status = 'unclassified'` pelo default
-  da coluna — nenhum backfill é executado ou necessário.
-- Nenhuma decisão humana existente (`promoted`/`rejected`) é reclassificada,
-  sobrescrita ou reinterpretada.
-- Cache negativo permanece vinculado ao candidato/URL/documento no
-  `kg_store` (`discovery_ledger`), nunca ao órgão ou domínio.
+  da coluna — nenhum backfill.
+- Nenhuma decisão humana existente é reclassificada ou sobrescrita.
+- Cache negativo permanece no `kg_store` (`discovery_ledger`), nunca no
+  `discovered_opportunities` nem convertido a reason codes v1.
 
 ## Promover/rejeitar e cache — nenhuma alteração
 
 - `POST /discovered-opportunities/{id}/promote` e `reject` ignoram as colunas
-  novas — continuam dependendo exclusivamente de `status` editorial.
-- Nenhuma promotion run event, ledger, `promotion_runs` ou `web_sources` foi
-  alterada.
-- Cache negativo continua por candidato/URL/documento (`discovery_ledger`),
-  nunca por instituição — nenhuma conversão automática de cache para reason
-  codes v1 foi introduzida.
+  novas — dependem exclusivamente de `status` editorial.
+- `_row_with_relevance` não chama `_record_rejection`, não toca o ledger, não
+  altera o cache negativo.
+- Cache negativo continua por candidato/URL/documento, nunca por instituição.
 
 ## Rollback lógico
 
-- Desativar o produtor novo (não conectar na RT00-T05) é suficiente para
-  reverter o comportamento — os dados já gravados permanecem sem efeito.
-- Remover a migration requer apenas `DROP` das 4 colunas, sem afetar consumidores
-  existentes (nenhum consumer lê estas colunas ainda).
+- Desativar a chamada a `_row_with_relevance` em `_stage_records` é suficiente
+  para reverter o comportamento produtivo — dados já gravados permanecem sem
+  efeito.
+- Remover a migration requer apenas `DROP` das 4 colunas.
 
 ## Testes executados
 
@@ -100,73 +167,59 @@ PYTHONPATH=src .venv/bin/pytest -q \
   tests/unit/test_relevance_shadow.py \
   tests/unit/test_relevance_goldens.py \
   tests/unit/test_discovery_promotion.py \
-  tests/unit/test_opportunity_discovery_cache.py
-# 285 passed
+  tests/unit/test_opportunity_discovery_cache.py \
+  tests/unit/test_hardening_pr4.py
+# 309 passed
 ```
-
-### Testes específicos da RT00-T04 (`test_relevance_staging.py`, 18 testes)
-
-| Teste | O que comprova |
-|---|---|
-| `test_persist_in_scope` | `in_scope` → `relevance_status='classified'`, decisão preservada |
-| `test_persist_out_of_scope` | `out_of_scope` → `relevance_status='classified'`, decisão preservada |
-| `test_persist_needs_review` | `needs_review` → `relevance_status='classified'`, decisão preservada |
-| `test_persist_error` | erro → `relevance_status='error'`, `relevance_verdict=null` |
-| `test_error_never_deletes_record` | erro não altera `status`, `reject_reason` ou colunas editoriais |
-| `test_idempotent_write_same_verdict` | mesma escrita duas vezes não falha |
-| `test_idempotent_verdict_then_error` | sobrescrita classified→error é segura |
-| `test_does_not_alter_editorial_status` | nenhuma coluna editorial é tocada |
-| `test_invalid_result_raises_value_error` | dict sem `verdict`/`error` → `ValueError` |
-| `test_empty_dict_raises_value_error` | `{}` → `ValueError` |
-| `test_sets_classified_at_timestamp` | timestamp ISO8601 é gravado |
-| `test_persist_error_sets_null_verdict` | erro → `relevance_verdict=null`, mensagem no `relevance_error` |
-| `test_correct_table_and_filter` | UPDATE na tabela certa com filtro `id = opp_id` |
-| `test_execute_is_called` | `.execute()` é chamado |
-| `test_default_relevance_status_is_unclassified` | default SQL da migration |
-| `test_no_relevance_columns_in_legacy_select` | migration aditiva, colunas antigas intactas |
-| `test_promote_does_not_check_relevance` | promote/reject ignoram colunas novas |
-| `test_reject_does_not_check_relevance` | rejeição humana não afetada |
 
 ### Ruff
 
 ```bash
 .venv/bin/ruff check src/radar/core/ingestion/relevance_classifier.py \
+  src/radar/core/ingestion/opportunity_discovery.py \
   tests/unit/test_relevance_staging.py
 # All checks passed
 ```
 
 ### `git diff --check`
 
-Limpo — sem espaços brancos, tabs ou caracteres não ASCII.
+Limpo.
 
 ## Validação da migration local
 
-Supabase local disponível e executando. Migration `041` aplicada com sucesso via
-`supabase db push --local`. Verificado via `information_schema.columns`:
+Migration `041` reaplicada via `supabase db push --local`. Verificado via
+`information_schema.columns`:
 
-- `relevance_status` presente, `NOT NULL`, default `'unclassified'`, check constraint ativo.
-- `relevance_verdict` presente, nullable, tipo `jsonb`.
-- `relevance_error` presente, nullable, tipo `text`.
-- `relevance_classified_at` presente, nullable, tipo `timestamptz`.
-- Constraints editoriais (`status` check, `extraction_quality` check) preservadas.
+- `relevance_status`: `text`, `NOT NULL`, default `'unclassified'`, check: `('unclassified', 'classified', 'error')`
+- `relevance_verdict`: `jsonb`, nullable
+- `relevance_error`: `text`, nullable
+- `relevance_classified_at`: `timestamptz`, nullable
 
-A migration não altera RLS — as policies existentes continuam vigentes.
+Constraints editoriais e RLS preservados.
 
-## Divergências
+## Divergências encontradas na auditoria
 
-Nenhuma divergência entre spec e runtime foi encontrada. O método da task é
-válido para o estado atual do código.
+1. **Implementação inicial sem dual-write real**: a versão original (`ba59f569e`)
+   adicionava `persist_opportunity_verdict()` como função isolada, sem conectá-la
+   à descoberta. A classificação v1 nunca era chamada no fluxo produtivo.
+   **Corrigido:** `_row_with_relevance()` em `opportunity_discovery.py` chama o
+   classificador a cada registro antes do upsert.
 
-## Pendências
+2. **Ausência de validação de fronteira**: a versão original não validava o
+   resultado contra `RelevanceVerdict` nem verificava categorias de erro
+   conhecidas antes de persistir.
+   **Corrigido:** `validate_opportunity_result()` em `relevance_classifier.py`
+   aplica as 4 validações (model, evidence, in_scope completeness, error prefix).
 
-- Nenhuma. A fiação do produtor (chamar `persist_opportunity_verdict` no pipeline
-  real) pertence à RT00-T05.
+3. **Testes com `assert True`**: 4 testes eram placeholders sem verificação real.
+   **Corrigido:** todos os 26 testes executam asserções comportamentais.
 
-## Confirmação
+## Confirmação final
 
-- [x] RT00-T05 não foi iniciada.
-- [x] Nenhuma alteração em prompts, taxonomias, goldens ou labels da T03.
-- [x] Nenhuma escrita em `entities`, `entity_relationships` ou `match_chunks`.
-- [x] Nenhuma alteração no gate humano, promote/reject ou cache negativo.
-- [x] Shadow eval continua sem conexão com staging.
-- [x] Migration aditiva, default-safe, rollback lógico possível.
+- [x] Falha v1 não bloqueia staging
+- [x] promote/reject continuam humanos
+- [x] cache e gold não mudaram
+- [x] RT00-T05 não foi iniciada
+- [x] Nenhuma alteração em prompts, taxonomias, goldens ou labels da T03
+- [x] Shadow eval continua sem escrita em staging
+- [x] Migration aditiva, default-safe, rollback lógico possível
