@@ -110,12 +110,19 @@ Executada em 2026-07-23 com OpenAI `gpt-4o-mini`, suíte `relevance_shadow` v2,
 | `git diff --check` | limpo |
 | Migrations | 41 arquivos, sequência linear `001–041`, sem lacuna ou duplicata |
 | Run diagnóstica | reutilizada a run T06; nenhuma nova chamada LLM |
-| `pending → promote/reject` em Supabase local | pendente: portas locais 54321/54322 indisponíveis |
+| `pending → promote/reject` em Supabase local | passou com dois registros sintéticos e cleanup confirmado |
 
 Na primeira execução do `pytest` completo, `test_suites_registered` revelou que
 `relevance_shadow` estava no registry desde T03, mas ausente do conjunto esperado
 pelo teste. A falha também existia na base `f805f4ef8`; a T07 atualizou a
 enumeração e a suíte completa passou.
+
+O teste manual local criou dois candidatos `pending/unclassified`: um foi
+rejeitado com motivo e outro promovido pela rota `web_source`. Foram verificados
+`reviewed_at`, `promoted_web_source_id`, a run `awaiting_fetch`, o evento
+`source_ready/ready/operator` e o bloqueio `409` contra segunda revisão. Os
+candidatos, runs/eventos em cascata e `web_sources` sintéticos foram removidos
+ao final. Nenhum banco remoto foi usado.
 
 ### Documentos reconciliados
 
@@ -177,10 +184,9 @@ enumeração e a suíte completa passou.
 | # | Pendência | Observação |
 |---|---|---|
 | 1 | QA manual da UI de descoberta pendente (5 cenários visuais). | T05 não teve ambiente local disponível. Validado por tipo estático + testes. |
-| 2 | Fluxo manual `pending → promote/reject` em Supabase local pendente. | T07 confirmou que as portas locais 54321/54322 não estavam disponíveis; nenhum banco remoto foi usado. |
-| 3 | Testes da API usam mock de Supabase (não banco real). | Cobertura contratual; integração com Supabase local seria ideal. |
-| 4 | Progressive disclosure sem animação (CSS). | Coerente com simplicidade da pré-beta. |
-| 5 | `quote` de evidência sem truncamento na UI. | Pode ser longo; aceito como comportamento inicial. |
+| 2 | Testes automatizados da API usam mock de Supabase. | O fluxo editorial real foi validado manualmente contra Supabase local na T07. |
+| 3 | Progressive disclosure sem animação (CSS). | Coerente com simplicidade da pré-beta. |
+| 4 | `quote` de evidência sem truncamento na UI. | Pode ser longo; aceito como comportamento inicial. |
 
 ## Critérios de conclusão da spec
 
