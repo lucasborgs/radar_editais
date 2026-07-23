@@ -150,13 +150,13 @@ export default function DiscoveredPage() {
       <div className="space-y-2 text-xs font-sans">
         {v.reason_codes.length > 0 && (
           <div>
-            <span className="font-medium text-content-primary">Reason codes: </span>
+            <span className="font-medium text-content-primary">Critérios confirmados: </span>
             <span className="text-content-secondary">{v.reason_codes.join(", ")}</span>
           </div>
         )}
         {v.exclusion_codes.length > 0 && (
           <div>
-            <span className="font-medium text-content-primary">Exclusion codes: </span>
+            <span className="font-medium text-content-primary">Critérios de exclusão: </span>
             <span className="text-content-secondary">{v.exclusion_codes.join(", ")}</span>
           </div>
         )}
@@ -354,27 +354,25 @@ export default function DiscoveredPage() {
               </a>
 
               {/* Relevance details (progressive disclosure) */}
-              {opp.relevance_status && (
-                <div className="border border-border/70 rounded-lg overflow-hidden">
-                  <button
-                    onClick={() =>
-                      setExpandedRelevance((prev) => ({
-                        ...prev,
-                        [opp.id]: !prev[opp.id],
-                      }))
-                    }
-                    className="flex items-center justify-between w-full px-3 py-2 text-xs font-sans text-content-secondary hover:bg-surface/80 transition-colors"
-                  >
-                    <span>Classificação</span>
-                    <span className="text-[10px]">{expandedRelevance[opp.id] ? "▲" : "▼"}</span>
-                  </button>
-                  {expandedRelevance[opp.id] && (
-                    <div className="px-3 pb-2">
-                      {relevanceDetails(opp)}
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="border border-border/70 rounded-lg overflow-hidden">
+                <button
+                  onClick={() =>
+                    setExpandedRelevance((prev) => ({
+                      ...prev,
+                      [opp.id]: !prev[opp.id],
+                    }))
+                  }
+                  className="flex items-center justify-between w-full px-3 py-2 text-xs font-sans text-content-secondary hover:bg-surface/80 transition-colors"
+                >
+                  <span>Classificação</span>
+                  <span className="text-[10px]">{expandedRelevance[opp.id] ? "▲" : "▼"}</span>
+                </button>
+                {expandedRelevance[opp.id] && (
+                  <div className="px-3 pb-2">
+                    {relevanceDetails(opp)}
+                  </div>
+                )}
+              </div>
 
               {/* Campos extras (pending) */}
               {opp.status === "pending" && (

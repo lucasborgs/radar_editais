@@ -9,55 +9,58 @@
 
 | Commit | Assunto |
 |---|---|
-| `34859e351` | API: adiciona relevance_status/verdict/error/classified_at à _LIST_COLS |
-| `34859e351` | Frontend: tipos RelevanceStatus/RelevanceVerdict + badge + progressive disclosure |
-| `34859e351` | Testes: contrato da API (10 testes comportamentais + estruturais) |
+| `543a0f430` | API tipada com Pydantic + normalizador + testes |
+| `2e53aff7c` | Frontend: compatibilidade null + labels PT-BR + relatório |
 
 ## Contrato da API
 
-### Colunas adicionadas a `_LIST_COLS`
+### Response models (Pydantic)
 
-`src/radar/api/routers/discovered.py:46`:
+`src/radar/api/routers/discovered.py`:
 
-```
-relevance_status, relevance_verdict, relevance_error, relevance_classified_at
-```
+```python
+class DiscoveredItem(BaseModel):
+    id: str
+    ...
+    relevance_status: Literal["unclassified", "classified", "error"] = "unclassified"
+    relevance_verdict: RelevanceVerdict | None = None   # reutiliza o domínio
+    relevance_error: str | None = None
+    relevance_classified_at: str | None = None
+    promotion_run: dict[str, Any] | None = None
 
-### Payload de listagem
-
-```json
-{
-  "opportunities": [
-    {
-      "...campos legados...",
-      "relevance_status": "unclassified | classified | error",
-      "relevance_verdict": {
-        "decision": "in_scope | out_of_scope | needs_review",
-        "reason_codes": ["R1_ENTERPRISE_PATH", ...],
-        "exclusion_codes": ["X1_ACADEMIC_ONLY", ...],
-        "evidence": [
-          {
-            "code": "R1_ENTERPRISE_PATH",
-            "quote": "...",
-            "source": "landing_page",
-            "locator": {"document": "...", "page": 3}
-          }
-        ],
-        "missing_information": ["..."],
-        "classifier_version": "radar-data-trust-relevance-v1"
-      } | null,
-      "relevance_error": "timeout: ..." | null,
-      "relevance_classified_at": "2026-07-21T12:00:00Z" | null
-    }
-  ]
-}
+class DiscoveredListResponse(BaseModel):
+    opportunities: list[DiscoveredItem]
 ```
 
-### Compatibilidade
+`response_model=DiscoveredListResponse` no `GET /discovered-opportunities`.
+
+### Normalizador `_normalize_row(row)`
+
+Garantias por estado de entrada:
+
+| Estado de entrada | `relevance_status` saída | `relevance_verdict` | `relevance_error` | Regra |
+|---|---|---|---|---|
+| Sem campos de relevância | `unclassified` | `null` | `null` | legado |
+| `relevance_status` inválido/ausente | `unclassified` | `null` | `null` | segurança |
+| `classified` + verdict válido | `classified` | intacto | `null` | preservado |
+| `classified` + verdict ausente | `error` | `null` | `contract_violation:` | segurança |
+| `classified` + verdict malformado | `error` | `null` | `contract_violation:` | segurança |
+| `error` + erro canônico | `error` | `null` | intacto | preservado |
+| `error` + erro arbitrário | `error` | `null` | `contract_violation:` | sanitização |
+| `error` + sem mensagem | `error` | `null` | `null` | preservado |
+
+A mensagem canônica de `contract_violation` reutiliza `_ERROR_CANONICAL_MESSAGES` do
+`relevance_classifier.py` (contrato T04). Conteúdo arbitrário, traceback ou stack
+dump nunca são expostos.
+
+`promotion_run` e campos editoriais não são afetados pela normalização.
+
+## Compatibilidade
 
 - Registro legado sem campos novos → `relevance_status=unclassified`, demais `null`
 - Linha classificada → `relevance_status=classified`, `relevance_verdict` preservado
 - Linha com erro → `relevance_status=error`, apenas a mensagem sanitizada (nunca conteúdo bruto)
+- Linha malformada → normalizada para `error` com `contract_violation`
 - `promotion_run` e campos editoriais (`status`, `reviewed_at`, etc.) permanecem no payload
 - Promote/reject ignoram colunas de relevância
 - Auth administrativa (`AdminUserId`) permanece como gate em todos os endpoints
@@ -72,15 +75,17 @@ relevance_status, relevance_verdict, relevance_error, relevance_classified_at
 | `unclassified` | `null` | "não classificado" | cinza (`bg-gray-100 text-gray-500`) |
 | `error` | `null` | "erro de classificação" | vermelho (`bg-red-100 text-red-700`) |
 
-Nenhum desses estados oculta, reordena ou filtra candidatos. A classificação é informação auxiliar independente do status editorial.
+Nenhum desses estados oculta, reordena ou filtra candidatos. A classificação é
+informação auxiliar independente do status editorial.
 
 ## Progressive disclosure
 
-A seção de classificação fica recolhida por padrão. Ao expandir, mostra:
+A seção de classificação fica sempre visível (recolhida por padrão). O badge
+aparece no header do card. Ao expandir:
 
-- **`in_scope`** → `reason_codes` + evidências
-- **`out_of_scope`** → `exclusion_codes` + evidências
-- **`needs_review`** → `missing_information` explicitamente + demais códigos
+- **`in_scope`** → Critérios confirmados (`reason_codes`) + evidências
+- **`out_of_scope`** → Critérios de exclusão (`exclusion_codes`) + evidências
+- **`needs_review`** → Informação faltante (`missing_information`) explicitamente + demais códigos
 - **`error`** → apenas a mensagem sanitizada (`relevance_error`)
 - **`unclassified`** → explicação: "Registro legado ou ainda não processado pelo classificador de relevância."
 
@@ -101,14 +106,14 @@ Nenhuma ação editorial foi criada, alterada ou bloqueada pelo classificador.
 
 | Arquivo | Tipo | Alteração |
 |---|---|---|
-| `src/radar/api/routers/discovered.py` | Python | Adiciona 4 colunas de relevância a `_LIST_COLS` (1 linha alterada) |
-| `frontend/src/lib/api.ts` | TypeScript | Adiciona tipos `RelevanceStatus`, `RelevanceDecision`, `RelevanceEvidence`, `RelevanceVerdict`; adiciona 4 campos a `DiscoveredOpportunity` |
-| `frontend/src/app/discovered/page.tsx` | TypeScript React | Adiciona `relevanceBadge()`, `relevanceDetails()`, estado `expandedRelevance`, rendering do badge no header, seção expansível de classificação |
-| `tests/unit/test_discovery_api_contract.py` | Python (novo) | 10 testes do contrato da API: estruturais (colunas, promote/reject independence) + comportamentais (veredicto, legado, erro, promotion_run) |
+| `src/radar/api/routers/discovered.py` | Python | Modelos Pydantic (`DiscoveredItem`, `DiscoveredListResponse`), normalizador `_normalize_row`, `response_model` no endpoint, importa `RelevanceVerdict` do domínio e `_ERROR_CANONICAL_MESSAGES` do relevance_classifier |
+| `frontend/src/lib/api.ts` | TypeScript | Tipos `RelevanceStatus`, `RelevanceDecision`, `RelevanceEvidence`, `RelevanceVerdict`; 4 campos novos em `DiscoveredOpportunity` |
+| `frontend/src/app/discovered/page.tsx` | TypeScript React | Badge + progressive disclosure (sempre renderizado), labels em PT-BR ("Critérios confirmados", "Critérios de exclusão") |
+| `tests/unit/test_discovery_api_contract.py` | Python (novo) | 26 testes: `_normalize_row` (legado, classified, error, promotion_run), `list_discovered` (mock), promote/reject independence, auth gate |
 
 ## Testes e checks executados
 
-### Testes Python (46 passed)
+### Testes Python (62 passed)
 
 ```bash
 PYTHONPATH=src .venv/bin/pytest -q \
@@ -116,23 +121,71 @@ PYTHONPATH=src .venv/bin/pytest -q \
   tests/unit/test_relevance_staging.py \
   tests/unit/test_discovery_promotion.py \
   tests/unit/test_admin_gate.py
-# 46 passed
+# 62 passed
 ```
 
-### Testes novos (`test_discovery_api_contract.py` — 10 testes)
+### Testes novos (`test_discovery_api_contract.py` — 26 testes)
 
-| Teste | Tipo | O que comprova |
-|---|---|---|
-| `test_list_cols_includes_relevance_fields` | estrutural | `_LIST_COLS` contém os 4 campos novos |
-| `test_list_cols_preserves_legacy_fields` | estrutural | `_LIST_COLS` preserva todos os campos legados |
-| `test_promote_endpoint_unchanged_source` | estrutural | promote não referencia colunas de relevância |
-| `test_reject_endpoint_unchanged_source` | estrutural | reject não referencia colunas de relevância |
-| `test_classified_row_preserves_verdict` | comportamental | verdict intacto na resposta da listagem |
-| `test_legacy_row_is_unclassified` | comportamental | registro legado → `unclassified` |
-| `test_error_row_preserves_sanitized_message` | comportamental | erro sem conteúdo bruto |
-| `test_promotion_run_compatible_with_relevance` | comportamental | `promotion_run` convive com campos novos |
-| `test_include_reviewed_still_works` | comportamental | filtro `include_reviewed` compatível |
-| `test_auth_remains_admin_gate` | estrutural | todos os endpoints têm `AdminUserId` |
+#### Estruturais (4)
+
+| Teste | O que comprova |
+|---|---|
+| `test_list_cols_includes_relevance_fields` | `_LIST_COLS` contém os 4 campos novos |
+| `test_list_cols_preserves_legacy_fields` | `_LIST_COLS` preserva todos os campos legados |
+| `test_promote_not_called_by_staging` | promote não referenciado no staging T04 |
+| `test_reject_not_called_by_staging` | reject não referenciado no staging T04 |
+
+#### `_normalize_row` — legado (3)
+
+| Teste | O que comprova |
+|---|---|
+| `test_legacy_row_missing_all_relevance_fields` | Linha SEM os 4 campos → unclassified |
+| `test_legacy_row_with_none_status` | relevance_status=None → unclassified |
+| `test_legacy_row_with_unknown_status` | relevance_status inválido → unclassified |
+
+#### `_normalize_row` — classified (6)
+
+| Teste | O que comprova |
+|---|---|
+| `test_classified_in_scope_preserves_verdict` | in_scope completo preservado |
+| `test_classified_out_of_scope_preserves_verdict` | out_of_scope preservado |
+| `test_classified_needs_review_preserves_verdict` | needs_review preservado |
+| `test_classified_without_verdict_normalized_to_error` | classified sem verdict → error contract_violation |
+| `test_classified_with_empty_verdict_normalized_to_error` | verdict vazio → error |
+| `test_classified_with_malformed_verdict_normalized_to_error` | verdict sem "decision" → error |
+| `test_classified_with_invalid_decision_normalized_to_error` | decision inválida → error |
+
+#### `_normalize_row` — error (3)
+
+| Teste | O que comprova |
+|---|---|
+| `test_error_canonical_preserved` | Mensagem canônica (5 prefixos) preservada |
+| `test_error_arbitrary_content_normalized` | Conteúdo arbitrário → contract_violation |
+| `test_error_without_message_preserved` | Erro sem mensagem → permanece error/null |
+
+#### `_normalize_row` — promotion_run (2)
+
+| Teste | O que comprova |
+|---|---|
+| `test_promotion_run_preserved` | promotion_run não é removido pela normalização |
+| `test_promotion_run_preserved_even_with_error_normalization` | promotion_run sobrevive mesmo quando relevância vira error |
+
+#### `list_discovered` mock (6)
+
+| Teste | O que comprova |
+|---|---|
+| `test_list_discovered_legacy_row_normalized` | Endpoint retorna legado como unclassified |
+| `test_list_discovered_classified_row` | Endpoint retorna classified com verdict intacto |
+| `test_list_discovered_malformed_row_normalized` | Endpoint normaliza linha inválida |
+| `test_list_discovered_error_arbitrary_normalized` | Endpoint normaliza erro arbitrário |
+| `test_list_discovered_preserves_editorial_fields` | Campos editoriais não alterados |
+| `test_list_discovered_promotion_run_compatible` | promotion_run convive com relevância |
+
+#### Auth (1)
+
+| Teste | O que comprova |
+|---|---|
+| `test_auth_remains_admin_gate` | Todos os endpoints têm `AdminUserId` como dependência |
 
 ### Ruff
 
@@ -158,28 +211,54 @@ Limpo (sem whitespace errors).
 
 ## QA manual direcionado
 
-Testes de UI (6 cenários):
+**Pendente.** A página não foi aberta em navegador porque o ambiente local
+(frontend dev server + backend) não estava disponível durante a execução.
+Validou-se apenas:
 
-1. **classified/in_scope** — badge verde "no escopo" visível; ao expandir, mostra reason_codes + evidências
-2. **classified/out_of_scope** — badge laranja "fora do escopo"; ao expandir, exclusion_codes + evidências
-3. **classified/needs_review** — badge âmbar "revisar"; ao expandir, missing_information + reason_codes
-4. **error** — badge vermelho "erro de classificação"; ao expandir, mensagem sanitizada
-5. **unclassified** — badge cinza "não classificado"; ao expandir, mensagem de registro legado
-6. **botões Promover/Rejeitar** — inalterados, independentes da classificação
+- TypeScript: `tsc --noEmit` — sem erros
+- ESLint: `npm run lint` — sem warnings novos
+- Python API: 62 testes passam, cobrindo todos os estados de relevância
+
+Cenários pendentes de validação visual:
+
+1. **classified/in_scope** — badge verde "no escopo" visível; ao expandir,
+   mostra "Critérios confirmados" + evidências
+2. **classified/out_of_scope** — badge laranja "fora do escopo"; ao expandir,
+   mostra "Critérios de exclusão" + evidências
+3. **classified/needs_review** — badge âmbar "revisar"; ao expandir, mostra
+   "Informação faltante" + demais códigos
+4. **error** — badge vermelho "erro de classificação"; ao expandir, mensagem
+   sanitizada
+5. **unclassified** — badge cinza "não classificado"; ao expandir, explicação
+   de registro legado
+6. **botões Promover/Rejeitar** — inalterados
 
 Não foi executado LLM real (T05 não muda prompt nem modelo).
 
 ## Divergências e limitações
 
-1. **Frontend sem harness unitário:** validação TypeScript via `tsc --noEmit` e `npm run lint` apenas; sem testes de componente.
-2. **Testes da API usam mock de Supabase:** validam o contrato do endpoint Python, mas não testam contra banco real.
-3. **Progressive disclosure sem animação:** expansão/recolhimento é instantânea, sem transição CSS — coerente com a simplicidade exigida.
-4. **Detalhes de evidência sem truncamento:** `quote` pode ser longo, mas não há limite de caracteres no display.
+1. **Frontend sem harness unitário:** validação TypeScript via `tsc --noEmit` e
+   `npm run lint` apenas; sem testes de componente.
+2. **Testes da API usam mock de Supabase:** validam o contrato do endpoint
+   Python, mas não testam contra banco real.
+3. **QA manual da UI pendente:** não foi possível abrir a página no navegador
+   para validação visual dos 6 cenários.
+4. **Progressive disclosure sem animação:** expansão/recolhimento é instantânea,
+   sem transição CSS — coerente com a simplicidade exigida.
+5. **Detalhes de evidência sem truncamento:** `quote` pode ser longo, mas não
+   há limite de caracteres no display.
+6. **Import de `_ERROR_CANONICAL_MESSAGES` (símbolo privado):** o normalizador
+   importa o dict privado de `relevance_classifier.py`. É o repositório
+   autoritativo das mensagens canônicas (T04); não foi criada lista paralela.
 
 ## Confirmação final
 
-- [x] API: 4 campos novos em `_LIST_COLS`, payload tipado, compatibilidade com legados
-- [x] UI: badge + progressive disclosure, 5 estados visuais, sem ocultar/reordenar/filtrar
+- [x] API: modelos Pydantic `DiscoveredItem`+`DiscoveredListResponse`,
+      `response_model` no endpoint, `RelevanceVerdict` reutilizado do domínio
+- [x] `_normalize_row` sanitiza: legado→unclassified, erro arbitrário→contract_violation,
+      classified sem verdict→error, combinação inválida→error
+- [x] Conteúdo bruto nunca exposto (erro arbitrário vira mensagem canônica)
+- [x] UI: badge + progressive disclosure sempre visível, 5 estados, labels PT-BR
 - [x] promote/reject continuam sem referência a relevância
 - [x] auth administrativa (`AdminUserId`) inalterada
 - [x] Nenhuma ação editorial nova, nenhum bloqueio por classificador
