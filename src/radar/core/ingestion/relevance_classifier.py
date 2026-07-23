@@ -662,6 +662,41 @@ def classify(kind: str, material: str) -> dict:
 # Staging persistence (RT00-T04)
 # =============================================================================
 
+_VALID_ERROR_PREFIXES = (
+    "parse_failure:", "timeout:", "provider_error:",
+    "contract_violation:", "grounding_error:",
+)
+
+
+def validate_opportunity_result(result: dict) -> dict:
+    """Valida e normaliza o resultado do classificador para staging.
+
+    Para sucesso: re-valida com RelevanceVerdict (JSON mode),
+    verifica evidence/reason_codes, serializa.
+    Para erro: confirma prefixo sanitizado conhecido.
+
+    Args:
+        result: dict retornado por classify_opportunity()
+                — {"verdict": {...}} ou {"error": "..."}.
+
+    Returns:
+        dict com 'verdict' ou 'error' key, normalizado.
+
+    Raises:
+        ValueError: se result não contém 'verdict'/'error' ou categoria
+                    de erro desconhecida.
+    """
+    if "verdict" in result:
+        verdict = RelevanceVerdict.model_validate(result["verdict"])
+        _check_output_evidence_contract(verdict)
+        return {"verdict": verdict.model_dump(mode="json")}
+    if "error" in result:
+        err = result["error"]
+        if not isinstance(err, str) or not err.startswith(_VALID_ERROR_PREFIXES):
+            raise ValueError(f"unknown error category: {err}")
+        return {"error": err}
+    raise ValueError("result must contain 'verdict' or 'error' key")
+
 
 def persist_opportunity_verdict(db, opportunity_id: str, result: dict) -> dict:
     """Persiste a classificação de relevância no staging.
@@ -715,5 +750,6 @@ __all__ = [
     "classify_program",
     "classify_agency",
     "classify",
+    "validate_opportunity_result",
     "persist_opportunity_verdict",
 ]
