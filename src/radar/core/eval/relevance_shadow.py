@@ -539,6 +539,700 @@ def _expected_case_ids() -> list[str]:
 
 
 # =============================================================================
+# T06 — In-scope recall
+# =============================================================================
+
+
+def _is_error_output(output: dict) -> bool:
+    return isinstance(output, dict) and "error" in output
+
+
+def _pred_decision(output: dict) -> str | None:
+    if isinstance(output, dict) and "verdict" in output:
+        return output["verdict"].get("decision")
+    return None
+
+
+def _expected_decision_from(expected: dict) -> str | None:
+    if isinstance(expected, dict):
+        return expected.get("decision")
+    return None
+
+
+def _case_id(metadata: dict) -> str:
+    return (metadata or {}).get("case_id", "?")
+
+
+def _kind_from_meta(metadata: dict) -> str:
+    return (metadata or {}).get("kind", "unknown")
+
+
+def run_eval_in_scope_recall(item_results: list[dict]) -> list[Evaluation]:
+    """Métricas de recall para in_scope.
+
+    - total_in_scope_goldens: denominador absoluto
+    - true_positives: in_scope que permaneceram in_scope
+    - semantic_false_negatives: in_scope perdidos sem erro operacional
+    - operational_errors_in_scope: in_scope com erro operacional
+    - semantic_recall: TP / (TP + FN) — apenas casos avaliáveis
+    - end_to_end_recall: TP / total — erro operacional conta como não recuperado
+    """
+    total_in_scope = 0
+    tp = 0
+    fn_semantic = 0
+    op_errors_in_scope = []
+
+    for ir in item_results:
+        output = ir.get("output") or {}
+        expected = ir.get("expected_output") or {}
+        meta = ir.get("metadata") or {}
+        exp = _expected_decision_from(expected)
+
+        if exp != "in_scope":
+            continue
+        total_in_scope += 1
+
+        if _is_error_output(output):
+            op_errors_in_scope.append(_case_id(meta))
+            continue
+
+        pred = _pred_decision(output)
+        if pred == "in_scope":
+            tp += 1
+        else:
+            fn_semantic += 1
+
+    evals: list[Evaluation] = []
+    evals.append({"name": "total_in_scope_goldens", "value": total_in_scope,
+                   "comment": f"{total_in_scope} goldens in_scope"})
+    evals.append({"name": "in_scope_true_positives", "value": tp,
+                   "comment": f"{tp} in_scope preserved"})
+    evals.append({"name": "in_scope_semantic_false_negatives", "value": fn_semantic,
+                   "comment": f"{fn_semantic} semantic FN(s)"})
+    evals.append({"name": "in_scope_operational_errors", "value": len(op_errors_in_scope),
+                   "comment": f"{len(op_errors_in_scope)} error(s) in in_scope goldens"})
+
+    evaluable = tp + fn_semantic
+    if evaluable > 0:
+        sr = tp / evaluable
+        evals.append({"name": "in_scope_semantic_recall", "value": round(sr, 4),
+                       "comment": f"recall among evaluable: {tp}/{evaluable}"})
+    else:
+        evals.append({"name": "in_scope_semantic_recall", "value": None,
+                       "comment": "no evaluable in_scope goldens"})
+
+    if total_in_scope > 0:
+        e2e = tp / total_in_scope
+        evals.append({"name": "in_scope_end_to_end_recall", "value": round(e2e, 4),
+                       "comment": f"end-to-end recall: {tp}/{total_in_scope}"})
+    else:
+        evals.append({"name": "in_scope_end_to_end_recall", "value": None,
+                       "comment": "no in_scope goldens"})
+
+    return evals
+
+
+# =============================================================================
+# T06 — Out-of-scope precision
+# =============================================================================
+
+
+def run_eval_out_of_scope_precision(item_results: list[dict]) -> list[Evaluation]:
+    """Precisão de out_of_scope.
+
+    - total_pred_out_of_scope: total de predições out_of_scope
+    - true_positives_out_of_scope: golden out_of_scope e pred out_of_scope
+    - false_positives_out_of_scope: golden != out_of_scope, pred out_of_scope
+    - out_of_scope_precision: TP / (TP + FP)
+    - out_of_scope_support: casos avaliáveis (sem erro) para esta métrica
+    """
+    tp = 0
+    fp = 0
+    pred_oos = 0
+    support = 0
+    fp_ids: list[str] = []
+
+    for ir in item_results:
+        output = ir.get("output") or {}
+        expected = ir.get("expected_output") or {}
+        meta = ir.get("metadata") or {}
+
+        if _is_error_output(output):
+            continue
+        pred = _pred_decision(output)
+        exp = _expected_decision_from(expected)
+        if pred is None or exp is None:
+            continue
+
+        support += 1
+        if pred == "out_of_scope":
+            pred_oos += 1
+            if exp == "out_of_scope":
+                tp += 1
+            else:
+                fp += 1
+                fp_ids.append(_case_id(meta))
+
+    evals: list[Evaluation] = []
+    evals.append({"name": "out_of_scope_total_predictions", "value": pred_oos,
+                   "comment": f"{pred_oos} predictions out_of_scope"})
+    evals.append({"name": "out_of_scope_true_positives", "value": tp,
+                   "comment": f"{tp} correct out_of_scope"})
+    evals.append({"name": "out_of_scope_false_positives", "value": fp,
+                   "comment": f"{fp} false positives"})
+    evals.append({"name": "out_of_scope_support", "value": support,
+                   "comment": f"{support} evaluable cases"})
+
+    if tp + fp > 0:
+        prec = tp / (tp + fp)
+        evals.append({"name": "out_of_scope_precision", "value": round(prec, 4),
+                       "comment": f"precision: {tp}/{tp+fp}"})
+    else:
+        evals.append({"name": "out_of_scope_precision", "value": None,
+                       "comment": "no predictions or evaluable cases"})
+
+    return evals
+
+
+# =============================================================================
+# T06 — Needs review rate
+# =============================================================================
+
+
+def run_eval_needs_review_rate(item_results: list[dict]) -> list[Evaluation]:
+    """Taxa de needs_review.
+
+    - total_needs_review_predictions
+    - needs_review_support: casos avaliáveis
+    - needs_review_operational_errors
+    - needs_review_rate: predições needs_review / suporte avaliável
+    - needs_review_by_kind: distribuição por kind
+    """
+    nr_preds = 0
+    evaluable = 0
+    op_errors = 0
+    by_kind: dict[str, int] = {}
+
+    for ir in item_results:
+        output = ir.get("output") or {}
+        meta = ir.get("metadata") or {}
+        kind = _kind_from_meta(meta)
+
+        if _is_error_output(output):
+            op_errors += 1
+            continue
+        pred = _pred_decision(output)
+        if pred is None:
+            continue
+        evaluable += 1
+        if pred == "needs_review":
+            nr_preds += 1
+            by_kind[kind] = by_kind.get(kind, 0) + 1
+
+    evals: list[Evaluation] = []
+    evals.append({"name": "needs_review_total_predictions", "value": nr_preds,
+                   "comment": f"{nr_preds} needs_review predictions"})
+    evals.append({"name": "needs_review_support", "value": evaluable,
+                   "comment": f"{evaluable} evaluable cases"})
+    evals.append({"name": "needs_review_operational_errors", "value": op_errors,
+                   "comment": f"{op_errors} operational errors"})
+
+    if evaluable > 0:
+        rate = nr_preds / evaluable
+        evals.append({"name": "needs_review_rate", "value": round(rate, 4),
+                       "comment": f"rate: {nr_preds}/{evaluable}"})
+    else:
+        evals.append({"name": "needs_review_rate", "value": None,
+                       "comment": "no evaluable cases"})
+
+    has_kind_dist = False
+    for kind in sorted(by_kind):
+        count = by_kind[kind]
+        evals.append({"name": f"needs_review_{kind}", "value": count,
+                       "comment": f"{count} needs_review in {kind}"})
+        has_kind_dist = True
+    if not has_kind_dist:
+        evals.append({"name": "needs_review_kind_distribution", "value": None,
+                       "comment": "no needs_review to distribute"})
+
+    return evals
+
+
+# =============================================================================
+# T06 — Decision agreement
+# =============================================================================
+
+
+def run_eval_decision_agreement(item_results: list[dict]) -> list[Evaluation]:
+    """Concordância de decisão com contagens explícitas.
+
+    - decision_correct: pred == expected (sem erro)
+    - decision_divergent: pred != expected (sem erro)
+    - decision_operational_errors: erros operacionais
+    - decision_support: total de casos avaliáveis
+    """
+    correct = 0
+    divergent = 0
+    op_errors = 0
+    support = 0
+
+    for ir in item_results:
+        output = ir.get("output") or {}
+        expected = ir.get("expected_output") or {}
+
+        if _is_error_output(output):
+            op_errors += 1
+            continue
+        pred = _pred_decision(output)
+        exp = _expected_decision_from(expected)
+        if pred is None or exp is None:
+            continue
+        support += 1
+        if pred == exp:
+            correct += 1
+        else:
+            divergent += 1
+
+    evals: list[Evaluation] = []
+    evals.append({"name": "decision_correct", "value": correct,
+                   "comment": f"{correct} correct decisions"})
+    evals.append({"name": "decision_divergent", "value": divergent,
+                   "comment": f"{divergent} divergent decisions"})
+    evals.append({"name": "decision_operational_errors", "value": op_errors,
+                   "comment": f"{op_errors} operational errors"})
+    evals.append({"name": "decision_support", "value": support,
+                   "comment": f"{support} evaluable cases"})
+    if support > 0:
+        acc = correct / support
+        evals.append({"name": "decision_accuracy_rate", "value": round(acc, 4),
+                       "comment": f"accuracy: {correct}/{support}"})
+    else:
+        evals.append({"name": "decision_accuracy_rate", "value": None,
+                       "comment": "no evaluable cases"})
+
+    return evals
+
+
+# =============================================================================
+# T06 — Metrics by kind (complementar)
+# =============================================================================
+
+
+def _by_kind(item_results: list[dict]) -> dict[str, list[dict]]:
+    from collections import defaultdict
+    by_kind: dict[str, list[dict]] = defaultdict(list)
+    for ir in item_results:
+        k = _kind_from_meta(ir.get("metadata") or {})
+        by_kind[k].append(ir)
+    return by_kind
+
+
+def run_eval_metrics_by_kind_t06(item_results: list[dict]) -> list[Evaluation]:
+    """Métricas por kind — recall, precisão, needs_review rate e concordância.
+
+    Produz para cada kind com suporte avaliável:
+    - in_scope_semantic_recall, in_scope_e2e_recall
+    - out_of_scope_precision
+    - needs_review_rate
+    - decision_agreement
+    - fn_count, operational_errors
+
+    Uma média global não esconde perda de um kind.
+    """
+    evals: list[Evaluation] = []
+    by_kind = _by_kind(item_results)
+
+    for kind in sorted(by_kind):
+        items = by_kind[kind]
+
+        # in_scope recall
+        total_is = 0
+        tp_is = 0
+        fn_is = 0
+        op_is = []
+
+        # out_of_scope precision
+        tp_oos = 0
+        fp_oos = 0
+        pred_oos = 0
+
+        # needs_review
+        nr_preds = 0
+
+        # agreement
+        correct = 0
+        divergent = 0
+        evaluable = 0
+        op_total = 0
+
+        for ir in items:
+            output = ir.get("output") or {}
+            expected = ir.get("expected_output") or {}
+            meta = ir.get("metadata") or {}
+
+            exp = _expected_decision_from(expected)
+            is_err = _is_error_output(output)
+
+            # Count total in_scope goldens BEFORE error continue (for e2e recall)
+            if exp == "in_scope":
+                total_is += 1
+
+            if is_err:
+                op_total += 1
+                if exp == "in_scope":
+                    op_is.append(_case_id(meta))
+                continue
+
+            pred = _pred_decision(output)
+            if pred is None or exp is None:
+                continue
+            evaluable += 1
+
+            # in_scope recall (only non-error items)
+            if exp == "in_scope":
+                if pred == "in_scope":
+                    tp_is += 1
+                else:
+                    fn_is += 1
+
+            # out_of_scope precision
+            if pred == "out_of_scope":
+                pred_oos += 1
+                if exp == "out_of_scope":
+                    tp_oos += 1
+                else:
+                    fp_oos += 1
+
+            # needs_review
+            if pred == "needs_review":
+                nr_preds += 1
+
+            # agreement
+            if pred == exp:
+                correct += 1
+            else:
+                divergent += 1
+
+        # Emit metrics with kind prefix
+        kp = f"kind_{kind}"
+
+        # in_scope recall for this kind
+        evaluable_is = tp_is + fn_is
+        if evaluable_is > 0:
+            sr = tp_is / evaluable_is
+            evals.append({"name": f"{kp}_in_scope_recall", "value": round(sr, 4),
+                           "comment": f"recall: {tp_is}/{evaluable_is}"})
+        elif total_is > 0:
+            # All errors
+            evals.append({"name": f"{kp}_in_scope_recall", "value": None,
+                           "comment": "no evaluable in_scope cases"})
+        else:
+            evals.append({"name": f"{kp}_in_scope_recall", "value": None,
+                           "comment": "no in_scope goldens"})
+
+        if total_is > 0:
+            e2e = tp_is / total_is
+            evals.append({"name": f"{kp}_in_scope_e2e_recall", "value": round(e2e, 4),
+                           "comment": f"e2e recall: {tp_is}/{total_is}"})
+        else:
+            evals.append({"name": f"{kp}_in_scope_e2e_recall", "value": None,
+                           "comment": "no in_scope goldens"})
+
+        evals.append({"name": f"{kp}_fn_count", "value": fn_is,
+                       "comment": f"{fn_is} FN(s)"})
+        evals.append({"name": f"{kp}_in_scope_operational_errors", "value": len(op_is),
+                       "comment": f"{len(op_is)} error(s) in in_scope"})
+
+        # out_of_scope precision
+        if tp_oos + fp_oos > 0:
+            prec = tp_oos / (tp_oos + fp_oos)
+            evals.append({"name": f"{kp}_out_of_scope_precision", "value": round(prec, 4),
+                           "comment": f"precision: {tp_oos}/{tp_oos+fp_oos}"})
+        else:
+            evals.append({"name": f"{kp}_out_of_scope_precision", "value": None,
+                           "comment": "no out_of_scope predictions"})
+
+        # needs_review rate
+        if evaluable > 0:
+            nr_rate = nr_preds / evaluable
+            evals.append({"name": f"{kp}_needs_review_rate", "value": round(nr_rate, 4),
+                           "comment": f"nr rate: {nr_preds}/{evaluable}"})
+        else:
+            evals.append({"name": f"{kp}_needs_review_rate", "value": None,
+                           "comment": "no evaluable cases"})
+
+        # agreement
+        if evaluable > 0:
+            acc = correct / evaluable
+            evals.append({"name": f"{kp}_decision_agreement", "value": round(acc, 4),
+                           "comment": f"agreement: {correct}/{evaluable}"})
+        else:
+            evals.append({"name": f"{kp}_decision_agreement", "value": None,
+                           "comment": "no evaluable cases"})
+
+        evals.append({"name": f"{kp}_operational_errors", "value": op_total,
+                       "comment": f"{op_total} error(s)"})
+
+    return evals
+
+
+# =============================================================================
+# T06 — Metrics by code
+# =============================================================================
+
+
+def _all_codes_from_expected(expected: dict, field: str) -> set[str]:
+    """Get codes from a specific field of expected_output."""
+    vals = expected.get(field, []) if isinstance(expected, dict) else []
+    return {v.value if hasattr(v, 'value') else str(v) for v in vals}
+
+
+def _all_codes_from_pred(output: dict, field: str) -> set[str]:
+    """Get codes from a specific field of predicted verdict."""
+    verdict = output.get("verdict") if isinstance(output, dict) else {}
+    if not isinstance(verdict, dict):
+        return set()
+    vals = verdict.get(field, [])
+    return {v.value if hasattr(v, 'value') else str(v) for v in vals}
+
+
+def run_eval_metrics_by_code(item_results: list[dict]) -> list[Evaluation]:
+    """Métricas por código — precision/recall por code namespace.
+
+    Namespaces:
+      conf_ — reason_codes de confirmação (R1-R5, actor codes), exclui
+              códigos que também aparecem em exclusion_codes (X1-X8).
+      excl_ — exclusion_codes (X1-X8) de oportunidades.
+      fail_ — failed_codes de atores (falha comprovada).
+
+    Erro operacional não descarta o caso: support_expected inclui todas
+    as ocorrências esperadas mesmo com erro; operational_miss contabiliza
+    códigos esperados em casos com erro.
+    """
+    from collections import defaultdict
+
+    code_stats: dict[str, dict] = defaultdict(lambda: {
+        "exp": 0, "eval_exp": 0, "pred": 0,
+        "tp": 0, "fp": 0, "semantic_fn": 0, "operational_miss": 0,
+    })
+
+    for ir in item_results:
+        output = ir.get("output") or {}
+        expected = ir.get("expected_output") or {}
+
+        exp_rc = _all_codes_from_expected(expected, "reason_codes")
+        exp_ec = _all_codes_from_expected(expected, "exclusion_codes")
+        exp_fc = _all_codes_from_expected(expected, "failed_codes")
+
+        is_err = _is_error_output(output)
+        pred_rc = set()
+        pred_ec = set()
+        pred_fc = set()
+        if not is_err:
+            verdict = output.get("verdict") if isinstance(output, dict) else {}
+            if isinstance(verdict, dict):
+                pred_rc = {v.value if hasattr(v, 'value') else str(v)
+                           for v in verdict.get("reason_codes", [])}
+                pred_ec = {v.value if hasattr(v, 'value') else str(v)
+                           for v in verdict.get("exclusion_codes", [])}
+                pred_fc = {v.value if hasattr(v, 'value') else str(v)
+                           for v in verdict.get("failed_codes", [])}
+
+        # Strip codes from conf_ that end up in excl_ to avoid duplicating X1-X8
+        # (opportunity out_of_scope puts X* in both reason_codes and exclusion_codes)
+        excl_from_exp = exp_ec & exp_rc
+        excl_from_pred = pred_ec & pred_rc
+        conf_exp_rc = exp_rc - excl_from_exp
+        conf_pred_rc = pred_rc - excl_from_pred
+
+        # ---- conf_ namespace: confirmed reason_codes (no X* duplication) ----
+        for code in conf_exp_rc | conf_pred_rc:
+            ns = f"conf_{code}"
+            stats = code_stats[ns]
+            stats["exp"] += 1
+            if not is_err:
+                stats["eval_exp"] += 1
+                stats["pred"] += 1 if code in conf_pred_rc else 0
+                if code in conf_pred_rc and code in conf_exp_rc:
+                    stats["tp"] += 1
+                elif code in conf_pred_rc and code not in conf_exp_rc:
+                    stats["fp"] += 1
+                elif code not in conf_pred_rc and code in conf_exp_rc:
+                    stats["semantic_fn"] += 1
+            else:
+                stats["operational_miss"] += 1
+
+        # ---- excl_ namespace: exclusion_codes ----
+        for code in exp_ec | pred_ec:
+            ns = f"excl_{code}"
+            stats = code_stats[ns]
+            stats["exp"] += 1
+            if not is_err:
+                stats["eval_exp"] += 1
+                stats["pred"] += 1 if code in pred_ec else 0
+                if code in pred_ec and code in exp_ec:
+                    stats["tp"] += 1
+                elif code in pred_ec and code not in exp_ec:
+                    stats["fp"] += 1
+                elif code not in pred_ec and code in exp_ec:
+                    stats["semantic_fn"] += 1
+            else:
+                stats["operational_miss"] += 1
+
+        # ---- fail_ namespace: failed_codes ----
+        for code in exp_fc | pred_fc:
+            ns = f"fail_{code}"
+            stats = code_stats[ns]
+            stats["exp"] += 1
+            if not is_err:
+                stats["eval_exp"] += 1
+                stats["pred"] += 1 if code in pred_fc else 0
+                if code in pred_fc and code in exp_fc:
+                    stats["tp"] += 1
+                elif code in pred_fc and code not in exp_fc:
+                    stats["fp"] += 1
+                elif code not in pred_fc and code in exp_fc:
+                    stats["semantic_fn"] += 1
+            else:
+                stats["operational_miss"] += 1
+
+    evals: list[Evaluation] = []
+    for ns in sorted(code_stats):
+        s = code_stats[ns]
+        evals.append({"name": f"code_{ns}_support_expected", "value": s["exp"],
+                       "comment": f"total expected: {s['exp']}"})
+        evals.append({"name": f"code_{ns}_support_evaluable_expected",
+                       "value": s["eval_exp"],
+                       "comment": f"evaluable expected: {s['eval_exp']}"})
+        evals.append({"name": f"code_{ns}_support_predicted", "value": s["pred"],
+                       "comment": f"predicted: {s['pred']}"})
+        evals.append({"name": f"code_{ns}_tp", "value": s["tp"],
+                       "comment": f"TP: {s['tp']}"})
+        evals.append({"name": f"code_{ns}_fp", "value": s["fp"],
+                       "comment": f"FP: {s['fp']}"})
+        evals.append({"name": f"code_{ns}_semantic_fn", "value": s["semantic_fn"],
+                       "comment": f"FN (evaluable): {s['semantic_fn']}"})
+        evals.append({"name": f"code_{ns}_operational_miss", "value": s["operational_miss"],
+                       "comment": f"missed by error: {s['operational_miss']}"})
+
+        # Precision: TP / (TP + FP)
+        if s["tp"] + s["fp"] > 0:
+            prec = s["tp"] / (s["tp"] + s["fp"])
+            evals.append({"name": f"code_{ns}_precision", "value": round(prec, 4),
+                           "comment": f"{s['tp']}/{s['tp']+s['fp']}"})
+        else:
+            evals.append({"name": f"code_{ns}_precision", "value": None,
+                           "comment": "no predicted codes"})
+
+        # Semantic recall: TP / (TP + semantic_fn)
+        if s["tp"] + s["semantic_fn"] > 0:
+            srec = s["tp"] / (s["tp"] + s["semantic_fn"])
+            evals.append({"name": f"code_{ns}_semantic_recall",
+                           "value": round(srec, 4),
+                           "comment": f"semantic: {s['tp']}/{s['tp']+s['semantic_fn']}"})
+        else:
+            evals.append({"name": f"code_{ns}_semantic_recall", "value": None,
+                           "comment": "no evaluable expected codes"})
+
+        # End-to-end recall: TP / support_expected
+        if s["exp"] > 0:
+            e2e = s["tp"] / s["exp"]
+            evals.append({"name": f"code_{ns}_end_to_end_recall",
+                           "value": round(e2e, 4),
+                           "comment": f"e2e: {s['tp']}/{s['exp']}"})
+        else:
+            evals.append({"name": f"code_{ns}_end_to_end_recall", "value": None,
+                           "comment": "no expected codes"})
+
+    return evals
+
+
+# =============================================================================
+# T06 — Audit IDs
+# =============================================================================
+
+
+def run_eval_audit_ids(item_results: list[dict]) -> list[Evaluation]:
+    """Lista de IDs auditáveis — divergências, FN, FP, erros e código.
+
+    Inclui case_ids de:
+    - divergências de decisão
+    - falsos negativos
+    - false positives de out_of_scope
+    - erros operacionais
+    - divergências de reason/failed codes
+    """
+    div_ids: list[str] = []
+    fn_ids: list[str] = []
+    fp_oos_ids: list[str] = []
+    error_ids: list[str] = []
+    code_div_ids: list[str] = []
+    code_op_miss_ids: list[str] = []
+
+    for ir in item_results:
+        output = ir.get("output") or {}
+        expected = ir.get("expected_output") or {}
+        meta = ir.get("metadata") or {}
+        cid = _case_id(meta)
+
+        is_err = _is_error_output(output)
+
+        # Track operational misses: any expected code in an error case
+        if is_err:
+            error_ids.append(cid)
+            exp_any = _all_codes_from_expected(expected, "reason_codes")
+            exp_any |= _all_codes_from_expected(expected, "exclusion_codes")
+            exp_any |= _all_codes_from_expected(expected, "failed_codes")
+            if exp_any:
+                code_op_miss_ids.append(cid)
+            continue
+
+        pred = _pred_decision(output)
+        exp = _expected_decision_from(expected)
+        if pred is None or exp is None:
+            continue
+
+        # Decision divergences
+        if pred != exp:
+            div_ids.append(cid)
+
+        # False negatives
+        if exp == "in_scope" and pred != "in_scope":
+            fn_ids.append(cid)
+
+        # FP out_of_scope
+        if pred == "out_of_scope" and exp != "out_of_scope":
+            fp_oos_ids.append(cid)
+
+        # Code divergences (only evaluable cases)
+        pred_rc = _all_codes_from_pred(output, "reason_codes")
+        exp_rc = _all_codes_from_expected(expected, "reason_codes")
+        pred_ec = _all_codes_from_pred(output, "exclusion_codes")
+        exp_ec = _all_codes_from_expected(expected, "exclusion_codes")
+        pred_fc = _all_codes_from_pred(output, "failed_codes")
+        exp_fc = _all_codes_from_expected(expected, "failed_codes")
+
+        if pred_rc != exp_rc or pred_ec != exp_ec or pred_fc != exp_fc:
+            code_div_ids.append(cid)
+
+    evals: list[Evaluation] = []
+    evals.append({"name": "audit_divergences", "value": len(div_ids),
+                   "comment": f"case_ids: {', '.join(div_ids)}" if div_ids else "nenhuma divergência"})
+    evals.append({"name": "audit_false_negatives", "value": len(fn_ids),
+                   "comment": f"case_ids: {', '.join(fn_ids)}" if fn_ids else "nenhum FN"})
+    evals.append({"name": "audit_false_positives_oos", "value": len(fp_oos_ids),
+                   "comment": f"case_ids: {', '.join(fp_oos_ids)}" if fp_oos_ids else "nenhum FP out_of_scope"})
+    evals.append({"name": "audit_operational_errors", "value": len(error_ids),
+                   "comment": f"case_ids: {', '.join(error_ids)}" if error_ids else "nenhum erro"})
+    evals.append({"name": "audit_code_divergences", "value": len(code_div_ids),
+                   "comment": f"case_ids: {', '.join(code_div_ids)}" if code_div_ids else "nenhuma divergência de código"})
+    evals.append({"name": "audit_code_operational_misses", "value": len(code_op_miss_ids),
+                   "comment": f"case_ids: {', '.join(code_op_miss_ids)}" if code_op_miss_ids else "nenhum operational miss"})
+
+    return evals
+
+
+# =============================================================================
 # Suite definition
 # =============================================================================
 
@@ -563,10 +1257,17 @@ SUITE = Suite(
     run_evaluators=[
         run_eval_metrics_by_kind,
         run_eval_divergences,
+        run_eval_in_scope_recall,
+        run_eval_out_of_scope_precision,
+        run_eval_needs_review_rate,
+        run_eval_decision_agreement,
+        run_eval_metrics_by_kind_t06,
+        run_eval_metrics_by_code,
+        run_eval_audit_ids,
     ],
     prereqs=_prereqs,
     classification="diagnostic",
-    version="1",
+    version="2",
     dataset_paths=[
         GOLDEN_DIR / "manifest.json",
         GOLDEN_DIR / "opportunities.json",

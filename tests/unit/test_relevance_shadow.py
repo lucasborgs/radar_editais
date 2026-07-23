@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import sys
 from pathlib import Path
@@ -21,8 +22,15 @@ from radar.core.eval.relevance_shadow import (  # noqa: E402
     eval_operational_error,
     eval_reason_code_coverage,
     eval_reason_code_precision,
+    run_eval_audit_ids,
+    run_eval_decision_agreement,
     run_eval_divergences,
+    run_eval_in_scope_recall,
+    run_eval_metrics_by_code,
     run_eval_metrics_by_kind,
+    run_eval_metrics_by_kind_t06,
+    run_eval_needs_review_rate,
+    run_eval_out_of_scope_precision,
 )
 from radar.core.ingestion.relevance_classifier import (  # noqa: E402
     _check_quote_grounding,
@@ -847,4 +855,555 @@ class TestNoWiring:
                     f"{item['case_id']} human_reviewed is not True"
 
 
-import inspect
+# =============================================================================
+# 12. T06 — In-scope recall
+# =============================================================================
+
+
+class TestT06InScopeRecall:
+    def test_perfect_recall(self):
+        results = [
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "b"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_in_scope_recall(results)}
+        assert metrics["total_in_scope_goldens"]["value"] == 2
+        assert metrics["in_scope_true_positives"]["value"] == 2
+        assert metrics["in_scope_semantic_false_negatives"]["value"] == 0
+        assert metrics["in_scope_operational_errors"]["value"] == 0
+        assert metrics["in_scope_semantic_recall"]["value"] == 1.0
+        assert metrics["in_scope_end_to_end_recall"]["value"] == 1.0
+
+    def test_semantic_false_negative(self):
+        results = [
+            {"output": {"verdict": {"decision": "needs_review"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "fn-1"}},
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "tp-1"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_in_scope_recall(results)}
+        assert metrics["total_in_scope_goldens"]["value"] == 2
+        assert metrics["in_scope_true_positives"]["value"] == 1
+        assert metrics["in_scope_semantic_false_negatives"]["value"] == 1
+        assert metrics["in_scope_semantic_recall"]["value"] == 0.5
+        assert metrics["in_scope_end_to_end_recall"]["value"] == 0.5
+
+    def test_operational_error_in_scope_golden(self):
+        results = [
+            {"output": {"error": "timeout"},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "err-1"}},
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "tp-1"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_in_scope_recall(results)}
+        assert metrics["total_in_scope_goldens"]["value"] == 2
+        assert metrics["in_scope_true_positives"]["value"] == 1
+        assert metrics["in_scope_semantic_false_negatives"]["value"] == 0
+        assert metrics["in_scope_operational_errors"]["value"] == 1
+        # semantic recall: only evaluable (FN is 0, so 1/1 = 1.0)
+        assert metrics["in_scope_semantic_recall"]["value"] == 1.0
+        # end-to-end: 1/2 = 0.5
+        assert metrics["in_scope_end_to_end_recall"]["value"] == 0.5
+
+    def test_semantic_vs_end_to_end_recall(self):
+        """Diferença entre semântico (exclui erro) e end-to-end (inclui erro)."""
+        results = [
+            {"output": {"error": "parse_failure"},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "err-1"}},
+            {"output": {"verdict": {"decision": "needs_review"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "fn-1"}},
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "tp-1"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_in_scope_recall(results)}
+        # semantic: TP=1, FN=1 → 0.5
+        assert metrics["in_scope_semantic_recall"]["value"] == 0.5
+        # e2e: TP=1, total=3 → 0.333...
+        assert round(metrics["in_scope_end_to_end_recall"]["value"], 4) == round(1.0 / 3.0, 4)
+
+    def test_no_in_scope_goldens(self):
+        results = [
+            {"output": {"verdict": {"decision": "out_of_scope"}},
+             "expected_output": {"decision": "out_of_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_in_scope_recall(results)}
+        assert metrics["total_in_scope_goldens"]["value"] == 0
+        assert metrics["in_scope_semantic_recall"]["value"] is None
+        assert metrics["in_scope_end_to_end_recall"]["value"] is None
+
+
+# =============================================================================
+# 13. T06 — Out-of-scope precision
+# =============================================================================
+
+
+class TestT06OutOfScopePrecision:
+    def test_perfect_precision(self):
+        results = [
+            {"output": {"verdict": {"decision": "out_of_scope"}},
+             "expected_output": {"decision": "out_of_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "b"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_out_of_scope_precision(results)}
+        assert metrics["out_of_scope_true_positives"]["value"] == 1
+        assert metrics["out_of_scope_false_positives"]["value"] == 0
+        assert metrics["out_of_scope_precision"]["value"] == 1.0
+
+    def test_false_positive_out_of_scope(self):
+        results = [
+            {"output": {"verdict": {"decision": "out_of_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "fp-1"}},
+            {"output": {"verdict": {"decision": "out_of_scope"}},
+             "expected_output": {"decision": "out_of_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "tp-1"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_out_of_scope_precision(results)}
+        assert metrics["out_of_scope_true_positives"]["value"] == 1
+        assert metrics["out_of_scope_false_positives"]["value"] == 1
+        assert metrics["out_of_scope_precision"]["value"] == 0.5
+
+    def test_precision_undefined_no_predictions(self):
+        results = [
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_out_of_scope_precision(results)}
+        assert metrics["out_of_scope_total_predictions"]["value"] == 0
+        assert metrics["out_of_scope_precision"]["value"] is None
+
+    def test_precision_undefined_no_support(self):
+        """Sem predição nem golden out_of_scope, precision fica None."""
+        results = [
+            {"output": {"error": "timeout"},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_out_of_scope_precision(results)}
+        assert metrics["out_of_scope_precision"]["value"] is None
+
+
+# =============================================================================
+# 14. T06 — Needs review rate
+# =============================================================================
+
+
+class TestT06NeedsReviewRate:
+    def test_needs_review_rate_calculation(self):
+        results = [
+            {"output": {"verdict": {"decision": "needs_review"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "b"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_needs_review_rate(results)}
+        assert metrics["needs_review_total_predictions"]["value"] == 1
+        assert metrics["needs_review_support"]["value"] == 2
+        assert metrics["needs_review_rate"]["value"] == 0.5
+
+    def test_needs_review_operational_errors_separated(self):
+        results = [
+            {"output": {"error": "timeout"},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "err-1"}},
+            {"output": {"verdict": {"decision": "needs_review"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "nr-1"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_needs_review_rate(results)}
+        assert metrics["needs_review_operational_errors"]["value"] == 1
+        assert metrics["needs_review_support"]["value"] == 1
+        assert metrics["needs_review_total_predictions"]["value"] == 1
+        assert metrics["needs_review_rate"]["value"] == 1.0
+
+    def test_needs_review_distribution_by_kind(self):
+        results = [
+            {"output": {"verdict": {"decision": "needs_review"}},
+             "expected_output": {"decision": "needs_review"},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+            {"output": {"verdict": {"decision": "needs_review"}},
+             "expected_output": {"decision": "needs_review"},
+             "metadata": {"kind": "investor", "case_id": "b"}},
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "c"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_needs_review_rate(results)}
+        assert metrics["needs_review_opportunity"]["value"] == 1
+        assert metrics["needs_review_investor"]["value"] == 1
+
+    def test_needs_review_zero_evaluable(self):
+        results = [
+            {"output": {"error": "timeout"},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_needs_review_rate(results)}
+        assert metrics["needs_review_rate"]["value"] is None
+        assert metrics["needs_review_operational_errors"]["value"] == 1
+
+
+# =============================================================================
+# 15. T06 — Decision agreement
+# =============================================================================
+
+
+class TestT06DecisionAgreement:
+    def test_correct_divergent_error(self):
+        results = [
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "correct"}},
+            {"output": {"verdict": {"decision": "out_of_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "divergent"}},
+            {"output": {"error": "timeout"},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "error"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_decision_agreement(results)}
+        assert metrics["decision_correct"]["value"] == 1
+        assert metrics["decision_divergent"]["value"] == 1
+        assert metrics["decision_operational_errors"]["value"] == 1
+        assert metrics["decision_support"]["value"] == 2
+        assert metrics["decision_accuracy_rate"]["value"] == 0.5
+
+
+# =============================================================================
+# 16. T06 — Metrics by kind
+# =============================================================================
+
+
+class TestT06MetricsByKind:
+    def test_kind_without_support(self):
+        """Kind sem nenhum caso avaliável (todos erro) ou sem casos."""
+        results = [
+            {"output": {"error": "timeout"},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_kind_t06(results)}
+        kind_keys = {k for k in metrics if k.startswith("kind_opportunity")}
+        assert kind_keys  # at least some metrics emitted
+        assert metrics["kind_opportunity_in_scope_recall"]["value"] is None
+        assert metrics["kind_opportunity_in_scope_e2e_recall"]["value"] == 0.0  # TP=0, total=1
+
+    def test_kind_missing_entirely(self):
+        """No items for a given kind produces no metrics for that kind."""
+        results = [
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "investor", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_kind_t06(results)}
+        assert "kind_investor_in_scope_recall" in metrics
+        assert "kind_opportunity_in_scope_recall" not in metrics
+
+    def test_global_average_does_not_hide_kind_loss(self):
+        """Um kind com recall baixo não é mascarado por outros."""
+        results = [
+            # kind A: perfect recall in 2 cases
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "investor", "case_id": "a1"}},
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "investor", "case_id": "a2"}},
+            # kind B: zero recall in 1 case
+            {"output": {"verdict": {"decision": "out_of_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "b1"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_kind_t06(results)}
+        assert metrics["kind_investor_in_scope_recall"]["value"] == 1.0
+        assert metrics["kind_opportunity_in_scope_recall"]["value"] == 0.0
+
+
+# =============================================================================
+# 17. T06 — Metrics by code
+# =============================================================================
+
+
+class TestT06MetricsByCode:
+    def test_code_tp_fp_semantic_fn(self):
+        results = [
+            {"output": {"verdict": {"reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION"],
+                                    "exclusion_codes": [], "failed_codes": []}},
+             "expected_output": {"reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION"],
+                                 "exclusion_codes": [], "failed_codes": []},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_code(results)}
+        r1 = "code_conf_R1_ENTERPRISE_PATH"
+        assert metrics[f"{r1}_tp"]["value"] == 1
+        assert metrics[f"{r1}_fp"]["value"] == 0
+        assert metrics[f"{r1}_semantic_fn"]["value"] == 0
+        assert metrics[f"{r1}_operational_miss"]["value"] == 0
+        assert metrics[f"{r1}_precision"]["value"] == 1.0
+        assert metrics[f"{r1}_semantic_recall"]["value"] == 1.0
+        assert metrics[f"{r1}_end_to_end_recall"]["value"] == 1.0
+
+    def test_code_fp_and_semantic_fn(self):
+        results = [
+            {"output": {"verdict": {"reason_codes": ["R1_ENTERPRISE_PATH", "R3_ACTIONABLE"],
+                                    "exclusion_codes": [], "failed_codes": []}},
+             "expected_output": {"reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION"],
+                                 "exclusion_codes": [], "failed_codes": []},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_code(results)}
+        r1 = "code_conf_R1_ENTERPRISE_PATH"
+        r2 = "code_conf_R2_TECH_INNOVATION"
+        r3 = "code_conf_R3_ACTIONABLE"
+        assert metrics[f"{r1}_tp"]["value"] == 1
+        assert metrics[f"{r2}_tp"]["value"] == 0  # R2 expected but not predicted → FN
+        assert metrics[f"{r2}_semantic_fn"]["value"] == 1
+        assert metrics[f"{r2}_semantic_recall"]["value"] == 0.0
+        assert metrics[f"{r3}_fp"]["value"] == 1  # R3 predicted but not expected → FP
+
+    def test_operational_miss(self):
+        """R1 esperado em erro operacional → operational_miss=1, e2e recall penalizado."""
+        results = [
+            {"output": {"verdict": {"reason_codes": ["R1_ENTERPRISE_PATH"],
+                                    "exclusion_codes": [], "failed_codes": []}},
+             "expected_output": {"reason_codes": ["R1_ENTERPRISE_PATH"],
+                                 "exclusion_codes": [], "failed_codes": []},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+            {"output": {"error": "timeout"},
+             "expected_output": {"reason_codes": ["R1_ENTERPRISE_PATH"],
+                                 "exclusion_codes": [], "failed_codes": []},
+             "metadata": {"kind": "opportunity", "case_id": "b"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_code(results)}
+        r1 = "code_conf_R1_ENTERPRISE_PATH"
+        assert metrics[f"{r1}_support_expected"]["value"] == 2
+        assert metrics[f"{r1}_support_evaluable_expected"]["value"] == 1
+        assert metrics[f"{r1}_tp"]["value"] == 1
+        assert metrics[f"{r1}_semantic_fn"]["value"] == 0
+        assert metrics[f"{r1}_operational_miss"]["value"] == 1
+        # semantic: 1/1 = 1.0
+        assert metrics[f"{r1}_semantic_recall"]["value"] == 1.0
+        # e2e: 1/2 = 0.5
+        assert metrics[f"{r1}_end_to_end_recall"]["value"] == 0.5
+
+    def test_failed_codes_separate(self):
+        """failed_codes use distinct namespace 'fail_' prefix."""
+        results = [
+            {"output": {"verdict": {"reason_codes": ["INV_IDENTITY_VERIFIED"],
+                                    "failed_codes": ["INV_TECH_STARTUP_ACTIVITY"]}},
+             "expected_output": {"reason_codes": ["INV_IDENTITY_VERIFIED"],
+                                 "failed_codes": ["INV_TECH_STARTUP_ACTIVITY"]},
+             "metadata": {"kind": "investor", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_code(results)}
+        # Confirmed code (reason_codes)
+        assert "code_conf_INV_IDENTITY_VERIFIED_tp" in metrics
+        # Failed code (separate namespace)
+        assert "code_fail_INV_TECH_STARTUP_ACTIVITY_tp" in metrics
+        assert metrics["code_fail_INV_TECH_STARTUP_ACTIVITY_tp"]["value"] == 1
+
+    def test_code_no_support_returns_no_metrics(self):
+        results = [
+            {"output": {"verdict": {"reason_codes": [], "failed_codes": []}},
+             "expected_output": {"reason_codes": [], "failed_codes": []},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_code(results)}
+        code_metrics = {k: v for k, v in metrics.items() if k.startswith("code_")}
+        assert len(code_metrics) == 0
+
+    def test_x_only_in_excl_not_conf(self):
+        """X1-X8 aparecem apenas no namespace excl_, nunca em conf_."""
+        results = [
+            {"output": {"verdict": {"reason_codes": ["X1_ACADEMIC_ONLY"],
+                                    "exclusion_codes": ["X1_ACADEMIC_ONLY"]}},
+             "expected_output": {"reason_codes": ["X1_ACADEMIC_ONLY"],
+                                 "exclusion_codes": ["X1_ACADEMIC_ONLY"]},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_code(results)}
+        # Exclusion code X1 em excl_ namespace
+        excl_key = "code_excl_X1_ACADEMIC_ONLY"
+        assert f"{excl_key}_tp" in metrics
+        assert metrics[f"{excl_key}_tp"]["value"] == 1
+        # conf_ namespace não deve conter X1
+        conf_x1_keys = {k for k in metrics if "conf_X1" in k}
+        assert len(conf_x1_keys) == 0, f"X1 encontrado em conf_: {conf_x1_keys}"
+
+
+# =============================================================================
+# 18. T06 — Audit IDs
+# =============================================================================
+
+
+class TestT06AuditIDs:
+    def test_divergences_ids(self):
+        results = [
+            {"output": {"verdict": {"decision": "out_of_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "div-1"}},
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "ok-1"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_audit_ids(results)}
+        assert metrics["audit_divergences"]["value"] == 1
+        assert "div-1" in metrics["audit_divergences"]["comment"]
+
+    def test_false_negative_ids(self):
+        results = [
+            {"output": {"verdict": {"decision": "needs_review"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "fn-1"}},
+            {"output": {"verdict": {"decision": "in_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "tp-1"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_audit_ids(results)}
+        assert metrics["audit_false_negatives"]["value"] == 1
+        assert "fn-1" in metrics["audit_false_negatives"]["comment"]
+
+    def test_false_positive_oos_ids(self):
+        results = [
+            {"output": {"verdict": {"decision": "out_of_scope"}},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "fp-1"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_audit_ids(results)}
+        assert metrics["audit_false_positives_oos"]["value"] == 1
+        assert "fp-1" in metrics["audit_false_positives_oos"]["comment"]
+
+    def test_operational_error_ids(self):
+        results = [
+            {"output": {"error": "timeout"},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "err-1"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_audit_ids(results)}
+        assert metrics["audit_operational_errors"]["value"] == 1
+        assert "err-1" in metrics["audit_operational_errors"]["comment"]
+
+    def test_code_divergence_ids(self):
+        results = [
+            {"output": {"verdict": {"decision": "in_scope",
+                                    "reason_codes": ["R1_ENTERPRISE_PATH"],
+                                    "failed_codes": []}},
+             "expected_output": {"decision": "in_scope",
+                                 "reason_codes": ["R1_ENTERPRISE_PATH", "R2_TECH_INNOVATION"],
+                                 "failed_codes": []},
+             "metadata": {"kind": "opportunity", "case_id": "code-div-1"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_audit_ids(results)}
+        assert metrics["audit_code_divergences"]["value"] == 1
+        assert "code-div-1" in metrics["audit_code_divergences"]["comment"]
+
+    def test_code_operational_miss_ids(self):
+        results = [
+            {"output": {"error": "timeout"},
+             "expected_output": {"decision": "in_scope",
+                                 "reason_codes": ["R1_ENTERPRISE_PATH"]},
+             "metadata": {"kind": "opportunity", "case_id": "err-1"}},
+            {"output": {"error": "timeout"},
+             "expected_output": {"decision": "in_scope",
+                                 "reason_codes": []},
+             "metadata": {"kind": "opportunity", "case_id": "err-2"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_audit_ids(results)}
+        assert metrics["audit_code_operational_misses"]["value"] == 1
+        assert "err-1" in metrics["audit_code_operational_misses"]["comment"]
+
+
+# =============================================================================
+# 19. T06 — Edge cases
+# =============================================================================
+
+
+class TestT06EdgeCases:
+    def test_zero_cases(self):
+        metrics = {ev["name"]: ev for ev in run_eval_in_scope_recall([])}
+        assert metrics["total_in_scope_goldens"]["value"] == 0
+        assert metrics["in_scope_semantic_recall"]["value"] is None
+        assert metrics["in_scope_end_to_end_recall"]["value"] is None
+
+        metrics2 = {ev["name"]: ev for ev in run_eval_out_of_scope_precision([])}
+        assert metrics2["out_of_scope_precision"]["value"] is None
+
+        metrics3 = {ev["name"]: ev for ev in run_eval_needs_review_rate([])}
+        assert metrics3["needs_review_rate"]["value"] is None
+
+        metrics4 = {ev["name"]: ev for ev in run_eval_decision_agreement([])}
+        assert metrics4["decision_support"]["value"] == 0
+
+        metrics5 = {ev["name"]: ev for ev in run_eval_metrics_by_kind_t06([])}
+        assert len(metrics5) == 0  # no kinds → no metrics
+
+        metrics6 = {ev["name"]: ev for ev in run_eval_metrics_by_code([])}
+        assert len(metrics6) == 0
+
+        metrics7 = {ev["name"]: ev for ev in run_eval_audit_ids([])}
+        assert metrics7["audit_divergences"]["value"] == 0
+        assert metrics7["audit_false_negatives"]["value"] == 0
+
+    def test_error_never_inflates_precision_or_recall(self):
+        """Error cases are excluded from numerator AND denominator of precision/recall."""
+        results = [
+            {"output": {"error": "timeout"},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "err-1"}},
+            {"output": {"error": "parse_failure"},
+             "expected_output": {"decision": "in_scope"},
+             "metadata": {"kind": "opportunity", "case_id": "err-2"}},
+        ]
+
+        # In-scope recall — semantic = None (no evaluable), e2e = 0/2
+        rec = {ev["name"]: ev for ev in run_eval_in_scope_recall(results)}
+        assert rec["in_scope_semantic_recall"]["value"] is None
+        assert rec["in_scope_end_to_end_recall"]["value"] == 0.0
+
+        # Out-of-scope precision — errors not included, so no predictions
+        prec = {ev["name"]: ev for ev in run_eval_out_of_scope_precision(results)}
+        assert prec["out_of_scope_precision"]["value"] is None
+
+        # Needs review rate — errors excluded from support
+        nr = {ev["name"]: ev for ev in run_eval_needs_review_rate(results)}
+        assert nr["needs_review_rate"]["value"] is None
+
+        # Decision agreement — errors not evaluable
+        agree = {ev["name"]: ev for ev in run_eval_decision_agreement(results)}
+        assert agree["decision_accuracy_rate"]["value"] is None
+        assert agree["decision_support"]["value"] == 0
+
+        # By-code: expected codes registered, but semantic_recall = None
+        code_results = [
+            {"output": {"error": "timeout"},
+             "expected_output": {"reason_codes": ["R1_ENTERPRISE_PATH"]},
+             "metadata": {"kind": "opportunity", "case_id": "err-1"}},
+        ]
+        code_metrics = {ev["name"]: ev for ev in run_eval_metrics_by_code(code_results)}
+        r1 = "code_conf_R1_ENTERPRISE_PATH"
+        assert code_metrics[f"{r1}_support_expected"]["value"] == 1
+        assert code_metrics[f"{r1}_support_evaluable_expected"]["value"] == 0
+        assert code_metrics[f"{r1}_tp"]["value"] == 0
+        assert code_metrics[f"{r1}_operational_miss"]["value"] == 1
+        # semantic_recall = None (no evaluable expected)
+        assert code_metrics[f"{r1}_semantic_recall"]["value"] is None
+        # end_to_end_recall = 0/1 = 0.0
+        assert code_metrics[f"{r1}_end_to_end_recall"]["value"] == 0.0
