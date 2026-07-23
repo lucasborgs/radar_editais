@@ -5,8 +5,12 @@ Queries que varrem a web atrás de editais/chamadas/desafios de fomento espalhad
 pelo Brasil. **Regra vive aqui (doc), não no `.py`** — ajuste sem deploy.
 
 Princípio: queries amplas o bastante para recall, específicas o bastante para não
-afogar em ruído. Resultados passam por triagem agêntica + entram no KG como
-`provisorio` (§5.11). Ver `docs/historical/discovery-opportunities.md`.
+afogar em ruído. Resultados passam por triagem agêntica + classificação de
+relevância v1 em shadow (`_row_with_relevance`) + entram no staging como
+`provisorio` (§5.11). Erro/abstenção do classificador nunca fabrica
+`out_of_scope` nem altera o fluxo editorial. O gate humano permanece obrigatório.
+Ver `docs/historical/discovery-opportunities.md` e
+`docs/specs/radar-data-trust-00-relevance-contract.md`.
 
 **Divisão de trabalho com o feeder DOU (spec_dou_feeder.md §6.1):** com
 `DISCOVERY_DOU_ENABLED=1`, o DOU é a *espinha de alta precisão* do fomento

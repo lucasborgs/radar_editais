@@ -27,8 +27,12 @@ independentes da mesma promoção, não sinônimos.
 
 ## 2. Situação atual e problema
 
-Hoje `discovered_opportunities` registra apenas a decisão editorial
-`pending | promoted | rejected`. A promoção tem duas rotas:
+Hoje `discovered_opportunities` registra a decisão editorial
+`pending | promoted | rejected` e colunas aditivas de classificação de
+relevância (`relevance_status`, `relevance_verdict`, `relevance_error`,
+`relevance_classified_at` — migration 041). A classificação é shadow, nunca
+altera `status` editorial, e erro/abstenção nunca fabrica `out_of_scope`.
+O gate humano permanece obrigatório. A promoção tem duas rotas:
 
 - **URL/página:** cria ou reativa `web_sources`; o scraper web a coleta em
   ciclo posterior e o pipeline normal produz bronze, silver, gold e corpus.
