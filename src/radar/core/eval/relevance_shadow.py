@@ -1049,51 +1049,63 @@ def run_eval_metrics_by_code(item_results: list[dict]) -> list[Evaluation]:
         for code in conf_exp_rc | conf_pred_rc:
             ns = f"conf_{code}"
             stats = code_stats[ns]
-            stats["exp"] += 1
-            if not is_err:
+            expected_here = code in conf_exp_rc
+            predicted_here = code in conf_pred_rc
+            if expected_here:
+                stats["exp"] += 1
+            if expected_here and not is_err:
                 stats["eval_exp"] += 1
-                stats["pred"] += 1 if code in conf_pred_rc else 0
-                if code in conf_pred_rc and code in conf_exp_rc:
-                    stats["tp"] += 1
-                elif code in conf_pred_rc and code not in conf_exp_rc:
-                    stats["fp"] += 1
-                elif code not in conf_pred_rc and code in conf_exp_rc:
-                    stats["semantic_fn"] += 1
-            else:
+            if predicted_here and not is_err:
+                stats["pred"] += 1
+            if expected_here and predicted_here:
+                stats["tp"] += 1
+            elif predicted_here and not expected_here:
+                stats["fp"] += 1
+            elif expected_here and not predicted_here and not is_err:
+                stats["semantic_fn"] += 1
+            if expected_here and is_err:
                 stats["operational_miss"] += 1
 
         # ---- excl_ namespace: exclusion_codes ----
         for code in exp_ec | pred_ec:
             ns = f"excl_{code}"
             stats = code_stats[ns]
-            stats["exp"] += 1
-            if not is_err:
+            expected_here = code in exp_ec
+            predicted_here = code in pred_ec
+            if expected_here:
+                stats["exp"] += 1
+            if expected_here and not is_err:
                 stats["eval_exp"] += 1
-                stats["pred"] += 1 if code in pred_ec else 0
-                if code in pred_ec and code in exp_ec:
-                    stats["tp"] += 1
-                elif code in pred_ec and code not in exp_ec:
-                    stats["fp"] += 1
-                elif code not in pred_ec and code in exp_ec:
-                    stats["semantic_fn"] += 1
-            else:
+            if predicted_here and not is_err:
+                stats["pred"] += 1
+            if expected_here and predicted_here:
+                stats["tp"] += 1
+            elif predicted_here and not expected_here:
+                stats["fp"] += 1
+            elif expected_here and not predicted_here and not is_err:
+                stats["semantic_fn"] += 1
+            if expected_here and is_err:
                 stats["operational_miss"] += 1
 
         # ---- fail_ namespace: failed_codes ----
         for code in exp_fc | pred_fc:
             ns = f"fail_{code}"
             stats = code_stats[ns]
-            stats["exp"] += 1
-            if not is_err:
+            expected_here = code in exp_fc
+            predicted_here = code in pred_fc
+            if expected_here:
+                stats["exp"] += 1
+            if expected_here and not is_err:
                 stats["eval_exp"] += 1
-                stats["pred"] += 1 if code in pred_fc else 0
-                if code in pred_fc and code in exp_fc:
-                    stats["tp"] += 1
-                elif code in pred_fc and code not in exp_fc:
-                    stats["fp"] += 1
-                elif code not in pred_fc and code in exp_fc:
-                    stats["semantic_fn"] += 1
-            else:
+            if predicted_here and not is_err:
+                stats["pred"] += 1
+            if expected_here and predicted_here:
+                stats["tp"] += 1
+            elif predicted_here and not expected_here:
+                stats["fp"] += 1
+            elif expected_here and not predicted_here and not is_err:
+                stats["semantic_fn"] += 1
+            if expected_here and is_err:
                 stats["operational_miss"] += 1
 
     evals: list[Evaluation] = []

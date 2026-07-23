@@ -1248,6 +1248,81 @@ class TestT06MetricsByCode:
         conf_x1_keys = {k for k in metrics if "conf_X1" in k}
         assert len(conf_x1_keys) == 0, f"X1 encontrado em conf_: {conf_x1_keys}"
 
+    def test_conf_code_only_predicted(self):
+        """Código conf_ somente predito (não esperado) → fp, precision=0.0,
+        support_expected=0, semantic_recall=None, end_to_end_recall=None."""
+        results = [
+            {"output": {"verdict": {"reason_codes": ["R3_ACTIONABLE"],
+                                    "exclusion_codes": [], "failed_codes": []}},
+             "expected_output": {"reason_codes": [], "exclusion_codes": [],
+                                 "failed_codes": []},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_code(results)}
+        r3 = "code_conf_R3_ACTIONABLE"
+        assert metrics[f"{r3}_support_expected"]["value"] == 0
+        assert metrics[f"{r3}_support_evaluable_expected"]["value"] == 0
+        assert metrics[f"{r3}_support_predicted"]["value"] == 1
+        assert metrics[f"{r3}_fp"]["value"] == 1
+        assert metrics[f"{r3}_precision"]["value"] == 0.0
+        assert metrics[f"{r3}_semantic_recall"]["value"] is None
+        assert metrics[f"{r3}_end_to_end_recall"]["value"] is None
+
+    def test_excl_code_only_predicted(self):
+        """Código excl_ somente predito → fp, precision=0.0,
+        support_expected=0, semantic_recall=None."""
+        results = [
+            {"output": {"verdict": {"reason_codes": ["X1_ACADEMIC_ONLY"],
+                                    "exclusion_codes": ["X1_ACADEMIC_ONLY"]}},
+             "expected_output": {"reason_codes": [], "exclusion_codes": [],
+                                 "failed_codes": []},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_code(results)}
+        x1 = "code_excl_X1_ACADEMIC_ONLY"
+        assert metrics[f"{x1}_support_expected"]["value"] == 0
+        assert metrics[f"{x1}_support_predicted"]["value"] == 1
+        assert metrics[f"{x1}_fp"]["value"] == 1
+        assert metrics[f"{x1}_precision"]["value"] == 0.0
+        assert metrics[f"{x1}_semantic_recall"]["value"] is None
+        assert metrics[f"{x1}_end_to_end_recall"]["value"] is None
+
+    def test_fail_code_only_predicted(self):
+        """Código fail_ somente predito → fp, precision=0.0,
+        support_expected=0."""
+        results = [
+            {"output": {"verdict": {"reason_codes": [],
+                                    "failed_codes": ["INV_TECH_STARTUP_ACTIVITY"]}},
+             "expected_output": {"reason_codes": [], "failed_codes": []},
+             "metadata": {"kind": "investor", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_code(results)}
+        fc = "code_fail_INV_TECH_STARTUP_ACTIVITY"
+        assert metrics[f"{fc}_support_expected"]["value"] == 0
+        assert metrics[f"{fc}_support_predicted"]["value"] == 1
+        assert metrics[f"{fc}_fp"]["value"] == 1
+        assert metrics[f"{fc}_precision"]["value"] == 0.0
+        assert metrics[f"{fc}_semantic_recall"]["value"] is None
+        assert metrics[f"{fc}_end_to_end_recall"]["value"] is None
+
+    def test_code_only_expected(self):
+        """Código somente esperado (não predito) → semantic_fn=1, support_expected=1,
+        semantic_recall=0.0."""
+        results = [
+            {"output": {"verdict": {"reason_codes": [],
+                                    "exclusion_codes": [], "failed_codes": []}},
+             "expected_output": {"reason_codes": ["R1_ENTERPRISE_PATH"],
+                                 "exclusion_codes": [], "failed_codes": []},
+             "metadata": {"kind": "opportunity", "case_id": "a"}},
+        ]
+        metrics = {ev["name"]: ev for ev in run_eval_metrics_by_code(results)}
+        r1 = "code_conf_R1_ENTERPRISE_PATH"
+        assert metrics[f"{r1}_support_expected"]["value"] == 1
+        assert metrics[f"{r1}_support_predicted"]["value"] == 0
+        assert metrics[f"{r1}_semantic_fn"]["value"] == 1
+        assert metrics[f"{r1}_semantic_recall"]["value"] == 0.0
+        assert metrics[f"{r1}_end_to_end_recall"]["value"] == 0.0
+
 
 # =============================================================================
 # 18. T06 — Audit IDs

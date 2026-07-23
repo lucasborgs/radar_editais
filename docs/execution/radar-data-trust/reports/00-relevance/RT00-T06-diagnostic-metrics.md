@@ -8,8 +8,10 @@
 
 | Commit | Assunto |
 |---|---|
-| `9122c29f8` | feat: métricas diagnósticas T06 — recall, precisão, taxa, agreement, por kind, por código, audit IDs |
-| `1e12e2001` | docs: relatório RT00-T06 com correções de operational_miss, X em excl_, testes |
+| `9122c29f8` | feat: métricas diagnósticas T06 (recall, precisão, taxa, agreement, kind, código, audit) |
+| `1e12e2001` | docs: relatório RT00-T06 corrigido (operational_miss, X em excl_) |
+| `56fccce5a` | docs: atualiza hashes e validação |
+| `b710b85e9` | fix: exp/eval_exp só para códigos esperados em by_code; testes de only-predicted |
 
 ## Resumo
 
@@ -19,7 +21,7 @@ produtiva foi introduzida. A suíte permanece `diagnostic`, versão `"2"`.
 
 ## Correções aplicadas
 
-Após auditoria, foram aplicadas 3 correções estruturais:
+Após auditoria, foram aplicadas 4 correções estruturais:
 
 ### 1. Erros operacionais nas métricas por código
 
@@ -56,6 +58,30 @@ Um X1 gera apenas `code_excl_X1_ACADEMIC_ONLY_*`, nunca `code_conf_X1_*`.
 
 Adicionado `audit_code_operational_misses` com case_ids de casos com erro
 que possuíam códigos esperados. Nenhum conteúdo documental é incluído.
+
+### 4. `exp`/`eval_exp` só para códigos esperados em by_code
+
+A auditoria identificou que os três loops (`conf_`, `excl_`, `fail_`) em
+`run_eval_metrics_by_code` usavam a união das chaves esperadas e preditas como
+iteração, mas incrementavam `exp` e `eval_exp` **incondicionalmente** para todo
+código no loop — inclusive códigos que estavam apenas na predição, não no golden.
+
+**Impacto:** um código previsto mas não esperado (ex.: `R3_ACTIONABLE` predito
+em um golden que não lista R3) gerava `support_expected=1` e
+`support_evaluable_expected=1`, contaminando o denominador do recall.
+
+**Correção:** os incrementos de `exp` e `eval_exp` agora só ocorrem quando
+`expected_here` é verdadeiro. Códigos apenas preditos produzem:
+- `support_expected = 0`
+- `support_predicted = 1`
+- `fp = 1`
+- `precision = 0.0`
+- `semantic_recall = None`
+- `end_to_end_recall = None`
+
+**testado em:** `test_conf_code_only_predicted`,
+`test_excl_code_only_predicted`, `test_fail_code_only_predicted`,
+`test_code_only_expected`.
 
 ## Métricas adicionadas
 
@@ -173,8 +199,8 @@ timeout:
 
 | Arquivo | Alteração |
 |---|---|
-| `src/radar/core/eval/relevance_shadow.py` | 7 novos `run_evaluators`; versão `"2"` |
-| `tests/unit/test_relevance_shadow.py` | 31 novos testes em 8 classes T06 |
+| `src/radar/core/eval/relevance_shadow.py` | 7 novos `run_evaluators`; versão `"2"`; correção exp/eval_exp em by_code |
+| `tests/unit/test_relevance_shadow.py` | 35 novos testes em 8 classes T06 (4 correção) |
 | `docs/execution/radar-data-trust/reports/00-relevance/RT00-T06-diagnostic-metrics.md` | este relatório |
 
 ## Evaluators adicionados
@@ -194,7 +220,7 @@ Evaluators T03 mantidos inalterados: `run_eval_metrics_by_kind`,
 
 ## Testes
 
-31 novos testes em 8 classes:
+35 novos testes em 8 classes:
 
 | Classe | Testes | Cobre |
 |---|---|---|
@@ -203,7 +229,7 @@ Evaluators T03 mantidos inalterados: `run_eval_metrics_by_kind`,
 | `TestT06NeedsReviewRate` | 4 | taxa, erros separados, distribuição, zero avaliável |
 | `TestT06DecisionAgreement` | 1 | correct, divergent, error, support |
 | `TestT06MetricsByKind` | 3 | kind sem suporte, kind ausente, média não esconde perda |
-| `TestT06MetricsByCode` | 6 | TP/FP/FN, FP+semantic_fn, operational_miss, failed_codes, sem suporte, X só excl_ |
+| `TestT06MetricsByCode` | 10 | TP/FP/FN, FP+semantic_fn, operational_miss, failed_codes, sem suporte, X só excl_, conf_only_predicted, excl_only_predicted, fail_only_predicted, code_only_expected |
 | `TestT06AuditIDs` | 6 | divergências, FN, FP, erro, codeset, operational miss |
 | `TestT06EdgeCases` | 2 | zero casos, erro nunca infla |
 
@@ -242,19 +268,17 @@ assert not any("conf_X1" in k for k in metrics)  # nunca em conf_
 ## Validação
 
 ```bash
+# 322 passed (149 T06 + 173 legado T03/staging/hardening/cache)
 PYTHONPATH=src pytest -q tests/unit/test_relevance_shadow.py \
   tests/unit/test_relevance_goldens.py tests/unit/test_relevance.py \
   tests/unit/test_hardening_pr4.py \
   tests/unit/test_opportunity_discovery_cache.py
-# 311 passed
 
 ruff check src/radar/core/eval/relevance_shadow.py \
   tests/unit/test_relevance_shadow.py
 # All checks passed
 
 git diff --check  # limpo
-git status --short
-# 2 clean commits, sem untracked files
 ```
 
 ## Limitações
@@ -295,6 +319,7 @@ label.
 - [x] Correção 1: operational_miss contabilizado sem descartar erro.
 - [x] Correção 2: X1–X8 exclusivos em `excl_`, sem leak para `conf_`.
 - [x] Correção 3: `audit_code_operational_misses` adicionado.
+- [x] Correção 4: `exp`/`eval_exp` só para códigos esperados em by_code; testes de only-predicted.
 - [x] RT00-T07 não iniciada.
 - [x] Run externa não executada.
 - [x] Merge/push não realizado.
