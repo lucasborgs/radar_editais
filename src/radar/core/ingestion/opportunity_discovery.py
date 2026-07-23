@@ -440,21 +440,7 @@ def _stage_records(records: list[dict]) -> int:
     except Exception as e:
         logger.warning("staging: sem cliente Supabase (%s) — achados NÃO persistidos", e)
         return 0
-    rows = [{
-        "url": r["url"],
-        "url_hash": r["url_hash"],
-        "title": r.get("title"),
-        "agency": r.get("agency"),
-        "fonte": r.get("fonte"),
-        "descricao": r.get("descricao"),
-        "prazo_envio": r.get("prazo_envio"),
-        "publico_alvo": r.get("publico_alvo"),
-        "tema": r.get("tema"),
-        "opportunity_type": r.get("opportunity_type"),
-        "raw": r,
-        "status": "pending",
-        "extraction_quality": "high" if len(r.get("texto_cru") or "") >= 500 else "low",
-    } for r in records]
+    rows = [_row_with_relevance(r) for r in records]
     try:
         (db.table("discovered_opportunities")
            .upsert(rows, on_conflict="url_hash", ignore_duplicates=True)
@@ -463,6 +449,62 @@ def _stage_records(records: list[dict]) -> int:
     except Exception as e:
         logger.error("staging: falha ao inserir %d achados: %s", len(rows), e)
         return 0
+
+
+def _row_with_relevance(record: dict) -> dict:
+    """Monta a linha de staging incluindo classificação de relevância v1.
+
+    A classificação roda em shadow: nunca altera status editorial, nunca
+    bloqueia o staging e nunca promove/rejeita o candidato.
+
+    import local para permitir teste sem LLM real."""
+    from radar.core.ingestion.relevance_classifier import (  # noqa: PLC0415
+        classify_opportunity,
+        validate_opportunity_result,
+    )
+
+    row = {
+        "url": record["url"],
+        "url_hash": record["url_hash"],
+        "title": record.get("title"),
+        "agency": record.get("agency"),
+        "fonte": record.get("fonte"),
+        "descricao": record.get("descricao"),
+        "prazo_envio": record.get("prazo_envio"),
+        "publico_alvo": record.get("publico_alvo"),
+        "tema": record.get("tema"),
+        "opportunity_type": record.get("opportunity_type"),
+        "raw": record,
+        "status": "pending",
+        "extraction_quality": "high" if len(record.get("texto_cru") or "") >= 500 else "low",
+    }
+
+    material = (record.get("texto_cru") or record.get("descricao") or "")
+    if not material:
+        return row
+
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        result = classify_opportunity(material)
+        validated = validate_opportunity_result(result)
+    except Exception:
+        logger.warning(
+            "relevance v1: falha inesperada para %s", record.get("url", ""),
+        )
+        row["relevance_status"] = "error"
+        row["relevance_error"] = "provider_error: falha inesperada do classificador"
+        row["relevance_classified_at"] = now
+        return row
+
+    if "verdict" in validated:
+        row["relevance_status"] = "classified"
+        row["relevance_verdict"] = validated["verdict"]
+        row["relevance_error"] = None
+    else:
+        row["relevance_status"] = "error"
+        row["relevance_error"] = validated["error"]
+    row["relevance_classified_at"] = now
+    return row
 
 
 # =============================================================================

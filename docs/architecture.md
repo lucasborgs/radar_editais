@@ -137,6 +137,16 @@ Duas superfícies sobre o mesmo catálogo:
 
 Torneira de novas oportunidades da web (DOU e afins) → triagem → pacote
 canônico de evidências → **staging com gate humano** (admin promove ou rejeita).
+
+A staging recebe classificação de relevância v1 em shadow durante o upsert,
+**apenas para registros com material classificável** (`texto_cru`/`descricao`
+não vazios). Registro sem material permanece `unclassified` pelo default da
+migration 041. As colunas `relevance_*` são aditivas, nunca alteram `status`
+editorial, e erro/abstenção nunca fabrica `out_of_scope`. O gate humano
+permanece obrigatório; `in_scope` não promove automaticamente. A classificação
+é exposta na UI administrativa como badge + progressive disclosure, sem filtrar
+ou reordenar candidatos.
+
 O pacote preserva a proveniência da página, de documentos oficiais e de adapters;
 o Crawl4AI é um enriquecimento opcional, executado apenas no worker, para cobrir
 conteúdo dinâmico, links e lacunas de evidência. Ele não substitui scrapers ou

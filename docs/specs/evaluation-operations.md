@@ -9,8 +9,11 @@ alteração dos pipelines avaliados
 
 ## 1. Problema comprovado
 
-O repositório possui um harness unificado funcional, dez suítes registradas,
-goldens versionados, fallback local e integração com Langfuse. A suíte hermética
+O repositório possui um harness unificado funcional. O estado inicialmente
+aprovado tinha dez suítes registradas. O registry atual, após a adição de
+`explore` e `relevance_shadow` (ambas diagnósticas e não bloqueantes), possui
+doze suítes registradas, goldens versionados, fallback local e integração com
+Langfuse. A suíte hermética
 do harness passa com nove testes. A divergência está na semântica operacional:
 
 - `python -m radar.core.eval` sempre termina com sucesso quando ao menos uma suíte
@@ -94,6 +97,8 @@ Uma pessoa técnica deve conseguir responder, a partir de um resultado oficial:
 | `profile_extractor` | diagnóstica | não | sem threshold aceito |
 | `reranker` | diagnóstica/opcional | não | backend produtivo pode estar desligado e extra local é opcional |
 | `structurer` | diagnóstica | não | sem threshold aceito e provider configurável |
+| `explore` | diagnóstica (adicionada posteriormente) | não | sem threshold aceito |
+| `relevance_shadow` | diagnóstica (adicionada posteriormente) | não | sem threshold aceito; suíte shadow de classificação de relevância |
 
 “Obrigatória” para uma suíte diagnóstica significa anexar evidência à mudança;
 não permite ao CLI inventar aprovação ou reprovação.
@@ -305,7 +310,9 @@ simultaneamente o novo critério e a aprovação do pipeline sem revisão explí
 
 - mudar prompts, modelos, ranking, retrieval, agentes ou dados de produto;
 - criar novos evaluators para aumentar cobertura;
-- inventar thresholds para as oito suítes diagnósticas;
+- inventar thresholds para as suítes diagnósticas (atualmente dez: `rag`,
+  `writing`, `writing_v2`, `triage`, `opportunity_type`, `profile_extractor`,
+  `reranker`, `structurer`, `explore` e `relevance_shadow`);
 - versionar os 14 MB de resultados locais existentes;
 - publicar automaticamente todos os experimentos;
 - configurar secrets ou projetos Langfuse/GitHub externos;

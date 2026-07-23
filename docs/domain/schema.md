@@ -50,7 +50,7 @@ no silver reconstruível; a vigência é aplicada no Stage 0 do match, não por 
 | Doc estruturado (silver) | `data/silver/structured_docs/{source}/{id}.jsonl` | Blocos estruturais usados pelo gold e pelo RAG de escrita. Ver §11 |
 | Catálogo gold | Postgres: `entities`, `entity_relationships`, `match_chunks` | Catálogo, relações e trechos do match v3 |
 | Chunks de escrita | Postgres: `edital_chunks` | Contexto da WritingSession, aquecido diariamente e garantido sob demanda |
-| Estado da descoberta | Postgres: `discovered_opportunities`, `discovery_promotion_runs` | Staging e execução do gate humano |
+| Estado da descoberta | Postgres: `discovered_opportunities`, `discovery_promotion_runs` | Staging e execução do gate humano; inclui `relevance_*` (status, verdict, error, classified_at) da classificação v1 |
 | Vault Obsidian | `data/hyper_extract_output_v2/vault/` | Espelho Markdown do gold, regenerado pelo ETL diário ou via `scripts/export_to_obsidian.py` |
 
 ---
@@ -329,6 +329,31 @@ verificacao_values: [verificado, provisorio, promovido]
 
 É metadado de proveniência, não entidade (§6.1). Fontes fixas usam
 `verificado`; itens provisórios permanecem fora das superfícies de produto.
+
+### 5.12 Classificação de relevância no staging
+
+A staging `discovered_opportunities` recebe classificação v1 em shadow durante
+o upsert (`_row_with_relevance` em
+`src/radar/core/ingestion/opportunity_discovery.py`), **apenas para registros
+com material classificável** (`texto_cru` ou `descricao` não vazios). Registro
+sem material permanece `relevance_status = 'unclassified'` pelo default da
+migration 041. As colunas são aditivas:
+
+```yaml
+relevance_staging:
+  relevance_status:   "text — 'unclassified' | 'classified' | 'error'"
+  relevance_verdict:  "jsonb — RelevanceVerdict serializado quando classificado"
+  relevance_error:    "text — mensagem sanitizada (nunca conteúdo bruto)"
+  relevance_classified_at: "timestamptz — timestamp da classificação"
+```
+
+A classificação nunca altera `status` editorial (`pending`/`promoted`/`rejected`),
+nunca é condição para promote/reject, e nunca fabrica `out_of_scope` a partir de
+erro ou abstenção. O gate humano permanece obrigatório. Cache negativo legado
+(`discovery_ledger`) não é convertido para reason codes v1.
+
+Ver RT00-T04 (staging), RT00-T05 (API/UI), RT00-T06 (métricas diagnósticas) e
+a spec `radar-data-trust-00-relevance-contract.md`.
 
 ---
 

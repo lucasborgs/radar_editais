@@ -1,0 +1,84 @@
+[
+  {
+    "case_id": "investidor:indicator-capital",
+    "kind": "investor",
+    "source_record_id": "investidor:indicator-capital",
+    "source_ref": "src:indicator-capital-about",
+    "as_of": "2026-07-22",
+    "verdict": {
+      "decision": "in_scope",
+      "kind": "investor",
+      "reason_codes": [
+        "INV_IDENTITY_VERIFIED",
+        "INV_TECH_STARTUP_ACTIVITY",
+        "INV_BRAZIL_RELEVANCE"
+      ],
+      "failed_codes": [],
+      "evidence": [
+        {
+          "code": "INV_IDENTITY_VERIFIED",
+          "quote": "A Indicator Capital é uma das principais firmas de venture capital em deep tech",
+          "source": "official_page",
+          "locator": {
+            "document": "indicator.capital/pt/about"
+          }
+        },
+        {
+          "code": "INV_TECH_STARTUP_ACTIVITY",
+          "quote": "A Indicator Capital é uma das principais firmas de venture capital em deep tech, investindo no futuro das tecnologias inteligentes e conectadas. Com escritórios em São Paulo e na Califórnia, a Indicator foi fundada em 2014 para apoiar startups em estágio inicial.",
+          "source": "official_page",
+          "locator": {
+            "document": "indicator.capital/pt/about"
+          }
+        },
+        {
+          "code": "INV_BRAZIL_RELEVANCE",
+          "quote": "Com escritórios em São Paulo e na Califórnia, a Indicator foi fundada em 2014 para apoiar startups em estágio inicial. Somos confiáveis para investidores globais (LPs) como BNDES, Qualcomm Ventures, Lenovo, Motorola, Grupo Multi e Banco do Brasil, e gerimos o maior fundo desse tipo na América Latina.",
+          "source": "official_page",
+          "locator": {
+            "document": "indicator.capital/pt/about"
+          }
+        }
+      ],
+      "missing_information": [
+        "ticket_range não preenchido (ticket_min/ticket_max ausentes no registro curado)"
+      ],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": true,
+    "review_note": "Evidência real da página oficial indicator.capital/pt/about. Página confirma identidade (Indicator Capital, VC deep tech), atuação com startups (fundada 2014 para apoiar startups, LPs como BNDES e Qualcomm) e relevância Brasil/América Latina (escritório SP, maior fundo da AL). Ticket_range em missing_information — não bloqueia in_scope por decisão do proprietário."
+  },
+  {
+    "case_id": "investidor:kptl",
+    "kind": "investor",
+    "source_record_id": "investidor:kptl",
+    "source_ref": "curated_record",
+    "as_of": "2026-07-22",
+    "verdict": {
+      "decision": "needs_review",
+      "kind": "investor",
+      "reason_codes": [
+        "INV_TECH_STARTUP_ACTIVITY"
+      ],
+      "failed_codes": [],
+      "evidence": [
+        {
+          "code": "INV_TECH_STARTUP_ACTIVITY",
+          "quote": "Venture capital de deep-tech early-stage (ex-Inseed); aposta em startups com risco tecnológico/científico real. Site: https://kptl.com.br",
+          "source": "curated_record",
+          "locator": {
+            "document": "data/silver/investidores.json"
+          }
+        }
+      ],
+      "missing_information": [
+        "INV_IDENTITY_VERIFIED: registro não possui source_urls nem verificado_em — não é possível verificar identidade contra página oficial",
+        "INV_BRAZIL_RELEVANCE: site .com.br sugere Brasil mas sem verificação de página oficial",
+        "ticket_range não preenchido; verificado_em nulo"
+      ],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": true,
+    "review_note": "KPTL tem tese e site mas não possui source_urls nem verificado_em no registro curado. Necessita verificação de página oficial para INV_IDENTITY_VERIFIED. Ticket ausente não bloqueia — a decisão é por missing_information em identidade."
+  }
+]

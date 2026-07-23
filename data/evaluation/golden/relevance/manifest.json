@@ -1,0 +1,61 @@
+{
+  "classifier_version": "radar-data-trust-relevance-v1",
+  "created_at": "2026-07-22",
+  "review_status": "approved",
+  "description": "RT00-T02 representative relevance goldens — pre-beta, owner-reviewed",
+  "dataset_ids": {
+    "opportunities": [
+      "triage-tavily-082",
+      "triage-tavily-093",
+      "triage-dou-000",
+      "triage-tavily-084",
+      "triage-tavily-118",
+      "triage-tavily-079",
+      "triage-tavily-098"
+    ],
+    "investors": [
+      "investidor:indicator-capital",
+      "investidor:kptl"
+    ],
+    "icts": [
+      "ict:embrapii:senai-cimatec"
+    ],
+    "programs": [
+      "programa:pipe-fapesp",
+      "programa:centelha"
+    ],
+    "agencies": [
+      "agencia:finep",
+      "agencia:fapesp"
+    ]
+  },
+  "corpus_stats": {
+    "total_cases": 14,
+    "by_kind": {
+      "opportunities": 7,
+      "investors": 2,
+      "icts": 1,
+      "programs": 2,
+      "agencies": 2
+    },
+    "by_decision": {
+      "opportunity:needs_review": 3,
+      "opportunity:out_of_scope": 3,
+      "opportunity:in_scope": 1,
+      "investor:in_scope": 1,
+      "investor:needs_review": 1,
+      "ict:in_scope": 1,
+      "program:in_scope": 2,
+      "agency:in_scope": 2
+    },
+    "triage_legacy_preserved": 122
+  },
+  "notes": [
+    "triage.json remains byte-identical (122 cases, boolean contract)",
+    "All 14 labels were approved by the product owner on 2026-07-22 — human_reviewed: true",
+    "ISA-CT removed (no verifiable evidence)",
+    "triage-tavily-082 changed to needs_review (FAPESC site inaccessible)",
+    "triage-tavily-093, SENAI CIMATEC, PIPE, Centelha, FINEP, FAPESP use real official page snapshots",
+    "actor_sources.json rebuilt with cross-references, mandatory hashes, required fields"
+  ]
+}

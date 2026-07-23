@@ -1,0 +1,65 @@
+[
+  {
+    "source_id": "src:finep-chamada-779",
+    "url": "https://www.finep.gov.br/chamadas-publicas/chamadapublica/779",
+    "retrieved_at": "2026-07-22",
+    "quote": "Finep Mais Inovação Brasil - Rodada 2 – Tecnologias Digitais. Esta Seleção Pública objetiva conceder recursos de subvenção econômica para o desenvolvimento de produtos ou processos inovadores. Orçamento da chamada: R$ 300.000.000,00. Público-alvo: Empresas. Todo Brasil. Inscrição: Aberta.",
+    "kind": "opportunity",
+    "source_record_id": "triage-tavily-093",
+    "hash_sha256": "6624a764967949eaade392ecfa4d0ac99bfd047df75e904639c557605b19e2eb"
+  },
+  {
+    "source_id": "src:indicator-capital-about",
+    "url": "https://indicator.capital/pt/about",
+    "retrieved_at": "2026-07-22",
+    "quote": "A Indicator Capital é uma das principais firmas de venture capital em deep tech, investindo no futuro das tecnologias inteligentes e conectadas. Com escritórios em São Paulo e na Califórnia, a Indicator foi fundada em 2014 para apoiar startups em estágio inicial. Somos confiáveis para investidores globais (LPs) como BNDES, Qualcomm Ventures, Lenovo, Motorola, Grupo Multi e Banco do Brasil, e gerimos o maior fundo desse tipo na América Latina.",
+    "kind": "investor",
+    "source_record_id": "investidor:indicator-capital",
+    "hash_sha256": "5d1e3c354daee08bf358748e1847e89fceccc93f1bc426f8bbe5f3cff12add15"
+  },
+  {
+    "source_id": "src:embrapii-cimatec",
+    "url": "https://embrapii.org.br/unidades/soluces-industriais-cimatec/",
+    "retrieved_at": "2026-07-22",
+    "quote": "UNIDADE EMBRAPII CIMATEC. O SENAI CIMATEC é credenciado pela EMBRAPII para atendimento na área de Soluções Industriais com um programa avançado de suporte tecnológico para promover a pesquisa aplicada nas tecnologias integradas da manufatura para atender a indústria brasileira. Mais de 100 projetos de PD&I com empresas. Contato: Silmar Baptista Nunes, Av. Orlando Gomes 1845 - Piatã, Salvador/BA, CEP 41650-010.",
+    "kind": "ict",
+    "source_record_id": "ict:embrapii:senai-cimatec",
+    "hash_sha256": "6897b06236ea56156f52d10f29eaeaf3409e839d1892f95de7186467ce928137"
+  },
+  {
+    "source_id": "src:fapesp-pipe",
+    "url": "https://fapesp.br/pipe",
+    "retrieved_at": "2026-07-22",
+    "quote": "O PIPE-FAPESP apoia a execução de pesquisa científica e/ou tecnológica em micro, pequenas e médias empresas no Estado de São Paulo. Objetivos: apoiar a pesquisa em CT como instrumento para promover inovação tecnológica e desenvolvimento empresarial. Fluxo Contínuo: submissão de propostas a qualquer momento do ano pelo SAGe.",
+    "kind": "program",
+    "source_record_id": "programa:pipe-fapesp",
+    "hash_sha256": "155f38fb9aac2d6a1dd2bfdc02bd5addb40fe8425f8ce0f233b51d183ed96655"
+  },
+  {
+    "source_id": "src:programa-centelha",
+    "url": "https://programacentelha.com.br",
+    "retrieved_at": "2026-07-22",
+    "quote": "O Programa Centelha é uma iniciativa de empreendedorismo inovador que oferece recursos financeiros, capacitação e suporte para transformar ideias inovadoras em negócios. Promovido pelo MCTI, Finep e CNPq. Recursos financeiros via subvenção econômica. Empreendedores receberão cerca de R$ 50 mil na forma de subvenção econômica.",
+    "kind": "program",
+    "source_record_id": "programa:centelha",
+    "hash_sha256": "34918f09069811532a2b2d4cca8079914e8fb22854713f3d30efb5883a46f384"
+  },
+  {
+    "source_id": "src:finep-institucional",
+    "url": "https://finep.gov.br/sobre-a-finep",
+    "retrieved_at": "2026-07-22",
+    "quote": "Finep — Financiadora de Estudos e Projetos. Empresa pública federal, vinculada ao Ministério da Ciência, Tecnologia e Inovação (MCTI). Há quase 60 anos, a Finep promove o desenvolvimento econômico e social do país por meio do fomento à ciência, tecnologia e inovação.",
+    "kind": "agency",
+    "source_record_id": "agencia:finep",
+    "hash_sha256": "0839d828493b73a04d758e8e471f9a7ce1695c00037d56682cc114dce9d94330"
+  },
+  {
+    "source_id": "src:fapesp-institucional",
+    "url": "https://centrodememoria.fapesp.br/sobre-a-fapesp/",
+    "retrieved_at": "2026-07-22",
+    "quote": "A Fundação de Amparo à Pesquisa do Estado de São Paulo (FAPESP) é uma das principais agências públicas brasileiras de fomento à pesquisa científica e tecnológica do país. A FAPESP tem como missão formar recursos humanos para C&T, financiar iniciativas de pesquisas movidas pela curiosidade do pesquisador ou orientadas por missões específicas, e contribuir para a modernização da infraestrutura de pesquisa em São Paulo. Esse apoio se dá por meio da concessão de bolsas e auxílios a projetos de pesquisa em todas as áreas do conhecimento, submetidos por pesquisadores vinculados a instituições de ensino superior e de pesquisa, públicas ou particulares, e de empresas sediadas no Estado de São Paulo.",
+    "kind": "agency",
+    "source_record_id": "agencia:fapesp",
+    "hash_sha256": "43bb21359cec2506930b8a98f3ad855a0c3a705974c0d70383f0f8ff288169ec"
+  }
+]

@@ -1,0 +1,58 @@
+[
+  {
+    "case_id": "ict:embrapii:senai-cimatec",
+    "kind": "ict",
+    "source_record_id": "ict:embrapii:senai-cimatec",
+    "source_ref": "src:embrapii-cimatec",
+    "as_of": "2026-07-22",
+    "verdict": {
+      "decision": "in_scope",
+      "kind": "ict",
+      "reason_codes": [
+        "ICT_IDENTITY_VERIFIED",
+        "ICT_INSTITUTIONAL_LINK_VERIFIED",
+        "ICT_ENTERPRISE_TECH_COOP",
+        "ICT_CURRENT_STATUS_VERIFIED"
+      ],
+      "failed_codes": [],
+      "evidence": [
+        {
+          "code": "ICT_IDENTITY_VERIFIED",
+          "quote": "UNIDADE EMBRAPII CIMATEC. O SENAI CIMATEC é credenciado pela EMBRAPII para atendimento na área de Soluções Industriais",
+          "source": "official_page",
+          "locator": {
+            "document": "embrapii.org.br/unidades/soluces-industriais-cimatec/"
+          }
+        },
+        {
+          "code": "ICT_INSTITUTIONAL_LINK_VERIFIED",
+          "quote": "O SENAI CIMATEC é credenciado pela EMBRAPII para atendimento na área de Soluções Industriais",
+          "source": "official_page",
+          "locator": {
+            "document": "embrapii.org.br/unidades/soluces-industriais-cimatec/"
+          }
+        },
+        {
+          "code": "ICT_ENTERPRISE_TECH_COOP",
+          "quote": "Mais de 100 projetos de PD&I com empresas",
+          "source": "official_page",
+          "locator": {
+            "document": "embrapii.org.br/unidades/soluces-industriais-cimatec/"
+          }
+        },
+        {
+          "code": "ICT_CURRENT_STATUS_VERIFIED",
+          "quote": "UNIDADE EMBRAPII CIMATEC. O SENAI CIMATEC é credenciado pela EMBRAPII",
+          "source": "official_page",
+          "locator": {
+            "document": "embrapii.org.br/unidades/soluces-industriais-cimatec/"
+          }
+        }
+      ],
+      "missing_information": [],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": true,
+    "review_note": "Evidência real da página oficial embrapii.org.br/unidades/soluces-industriais-cimatec/. Página confirma identidade (SENAI CIMATEC, Salvador/BA), credenciamento EMBRAPII, cooperação com empresas (100+ projetos PD&I, 40+ startups/ano) e status atual (fluxo contínuo, contrato de gestão federal). Todos os 4 ICT reason codes sustentados."
+  }
+]

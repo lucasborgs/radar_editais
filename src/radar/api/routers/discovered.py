@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -33,9 +34,11 @@ from radar.core.config import BRONZE_DIR
 from radar.core.infra.auth import AdminUserId
 from radar.core.infra.db import get_supabase_service
 from radar.core.infra.net_guard import safe_get, safe_head
+from radar.core.ingestion.relevance_classifier import validate_opportunity_result
 from radar.core.services import discovery_promotion
 from radar.core.services.discovery_materializer import materialize_approved_evidence
 from radar.core.web_identity import normalize_web_url, web_url_hash
+from radar.domain.relevance import RelevanceVerdict
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +49,113 @@ TTL_DAYS = 30
 _LIST_COLS = (
     "id, url, title, agency, fonte, descricao, prazo_envio, publico_alvo, tema, "
     "opportunity_type, status, extraction_quality, edital_link, "
-    "created_at, reviewed_at, promoted_web_source_id"
+    "created_at, reviewed_at, promoted_web_source_id, "
+    "relevance_status, relevance_verdict, relevance_error, relevance_classified_at"
 )
 
 _WEB_RAW_DIR = BRONZE_DIR / "web_raw"
 _PDF_TIMEOUT = 30
+
+
+# ── Response models ──────────────────────────────────────────────────────
+
+
+_RELEVANCE_STATUSES: set[str] = {"unclassified", "classified", "error"}
+
+# Mensagem canônica de fallback para erro sem prefixo conhecido.
+# Derivada de validate_opportunity_result (T04) para evitar lista paralela.
+_CONTRACT_VIOLATION_MSG: str = "contract_violation: saída incompatível com o contrato"
+
+
+def _canonicalize_error(error: str | None) -> str | None:
+    """Retorna apenas a mensagem canônica para um erro.
+
+    Usa validate_opportunity_result (público) para canonicalizar:
+    - prefixo conhecido → mensagem canônica (sufixo bruto descartado)
+    - prefixo desconhecido, string vazia, só espaços ou None → contract_violation
+    - None → None (preservado para sinalizar ausência de erro)
+    """
+    if error is None:
+        return None
+    if not error.strip():
+        return _CONTRACT_VIOLATION_MSG
+    try:
+        result = validate_opportunity_result({"error": error})
+        return result["error"]
+    except (ValueError, TypeError):
+        return _CONTRACT_VIOLATION_MSG
+
+
+class DiscoveredItem(BaseModel):
+    """Item da fila de descoberta com campos de relevância normalizados."""
+    id: str
+    url: str
+    title: str | None = None
+    agency: str | None = None
+    fonte: str | None = None
+    descricao: str | None = None
+    prazo_envio: str | None = None
+    publico_alvo: str | None = None
+    tema: str | None = None
+    opportunity_type: str | None = None
+    status: str
+    extraction_quality: str | None = None
+    edital_link: str | None = None
+    created_at: str
+    reviewed_at: str | None = None
+    promoted_web_source_id: str | None = None
+    relevance_status: Literal["unclassified", "classified", "error"] = "unclassified"
+    relevance_verdict: RelevanceVerdict | None = None
+    relevance_error: str | None = None
+    relevance_classified_at: str | None = None
+    promotion_run: dict[str, Any] | None = None
+
+
+class DiscoveredListResponse(BaseModel):
+    opportunities: list[DiscoveredItem]
+
+
+def _normalize_row(row: dict) -> dict:
+    """Normaliza uma linha bruta do banco para o payload da API.
+
+    - Linha legada (sem campos de relevância) → unclassified
+    - Combinação inválida de status/verdict/error → error sanitizado
+    - Erro arbitrário → preserva apenas mensagem canônica
+    """
+    status = row.get("relevance_status")
+
+    if not status or status not in _RELEVANCE_STATUSES:
+        row["relevance_status"] = "unclassified"
+        row["relevance_verdict"] = None
+        row["relevance_error"] = None
+        row["relevance_classified_at"] = None
+        return row
+
+    if status == "error":
+        row["relevance_error"] = _canonicalize_error(row.get("relevance_error"))
+        row["relevance_verdict"] = None
+        row["relevance_classified_at"] = None
+        return row
+
+    if status == "classified":
+        verdict = row.get("relevance_verdict")
+        if not verdict or not isinstance(verdict, dict) or "decision" not in verdict:
+            row["relevance_status"] = "error"
+            row["relevance_error"] = _CONTRACT_VIOLATION_MSG
+            row["relevance_verdict"] = None
+            row["relevance_classified_at"] = None
+            return row
+        try:
+            RelevanceVerdict.model_validate(verdict)
+        except Exception:
+            row["relevance_status"] = "error"
+            row["relevance_error"] = _CONTRACT_VIOLATION_MSG
+            row["relevance_verdict"] = None
+            row["relevance_classified_at"] = None
+            return row
+        row["relevance_error"] = None
+
+    return row
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
@@ -173,18 +278,19 @@ def _process_approved_evidence(opp: dict) -> dict | None:
 # ── Endpoints ────────────────────────────────────────────────────────────
 
 
-@router.get("", summary="Fila de oportunidades descobertas")
+@router.get("", response_model=DiscoveredListResponse,
+            summary="Fila de oportunidades descobertas")
 def list_discovered(user_id: AdminUserId, include_reviewed: bool = False):
     """Lista a fila. Default: só `pending` e dentro do TTL de 30 dias.
     `include_reviewed=true` traz também promovidos/rejeitados (sem filtro de TTL),
-    mais recentes primeiro."""
+    mais recentes primeiros."""
     db = get_supabase_service()
     q = db.table("discovered_opportunities").select(_LIST_COLS)
     if not include_reviewed:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=TTL_DAYS)).isoformat()
         q = q.eq("status", "pending").gte("created_at", cutoff)
     res = q.order("created_at", desc=True).execute()
-    opportunities = res.data or []
+    opportunities = [_normalize_row(row) for row in (res.data or [])]
     if include_reviewed and opportunities:
         ids = [row["id"] for row in opportunities]
         runs = (db.table("discovery_promotion_runs")

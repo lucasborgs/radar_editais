@@ -11,6 +11,8 @@ import {
   retryDiscoveredPromotion,
   updateDiscoveredEditalLink,
   type DiscoveredOpportunity,
+  type RelevanceStatus,
+  type RelevanceVerdict,
   ApiError,
 } from "@/lib/api";
 
@@ -23,6 +25,7 @@ export default function DiscoveredPage() {
   const [actingOn, setActingOn] = useState<string | null>(null);
   const [editalInputs, setEditalInputs] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<"pending" | "all">("pending");
+  const [expandedRelevance, setExpandedRelevance] = useState<Record<string, boolean>>({});
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
@@ -88,6 +91,93 @@ export default function DiscoveredPage() {
       )}>
         {status === "pending" ? "pendente" : status}
       </span>
+    );
+  }
+
+  function relevanceBadge(status: RelevanceStatus | undefined | null, verdict: RelevanceVerdict | undefined | null) {
+    const label = (() => {
+      if (!status || status === "unclassified") return "não classificado";
+      if (status === "error") return "erro de classificação";
+      if (!verdict) return "classificado";
+      if (verdict.decision === "in_scope") return "no escopo";
+      if (verdict.decision === "out_of_scope") return "fora do escopo";
+      if (verdict.decision === "needs_review") return "revisar";
+      return "classificado";
+    })();
+    const color = (() => {
+      if (!status || status === "unclassified") return "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400";
+      if (status === "error") return "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300";
+      if (!verdict) return "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300";
+      if (verdict.decision === "in_scope") return "bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300";
+      if (verdict.decision === "out_of_scope") return "bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300";
+      if (verdict.decision === "needs_review") return "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300";
+      return "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400";
+    })();
+    return (
+      <span className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium font-sans",
+        color,
+      )}>
+        {label}
+      </span>
+    );
+  }
+
+  function relevanceDetails(opp: DiscoveredOpportunity) {
+    if (!opp.relevance_status || opp.relevance_status === "unclassified") {
+      return (
+        <p className="text-xs text-content-secondary font-sans">
+          Registro legado ou ainda não processado pelo classificador de relevância.
+        </p>
+      );
+    }
+    if (opp.relevance_status === "error") {
+      return (
+        <p className="text-xs text-red-600 dark:text-red-400 font-sans">
+          {opp.relevance_error || "Erro de classificação"}
+        </p>
+      );
+    }
+    if (!opp.relevance_verdict) {
+      return (
+        <p className="text-xs text-content-secondary font-sans">
+          Classificado, mas sem detalhes disponíveis.
+        </p>
+      );
+    }
+    const v = opp.relevance_verdict;
+    return (
+      <div className="space-y-2 text-xs font-sans">
+        {v.reason_codes.length > 0 && (
+          <div>
+            <span className="font-medium text-content-primary">Critérios confirmados: </span>
+            <span className="text-content-secondary">{v.reason_codes.join(", ")}</span>
+          </div>
+        )}
+        {v.exclusion_codes.length > 0 && (
+          <div>
+            <span className="font-medium text-content-primary">Critérios de exclusão: </span>
+            <span className="text-content-secondary">{v.exclusion_codes.join(", ")}</span>
+          </div>
+        )}
+        {v.missing_information.length > 0 && (
+          <div>
+            <span className="font-medium text-content-primary">Informação faltante: </span>
+            <span className="text-content-secondary">{v.missing_information.join("; ")}</span>
+          </div>
+        )}
+        {v.evidence.length > 0 && (
+          <div className="space-y-1">
+            <span className="font-medium text-content-primary">Evidências:</span>
+            {v.evidence.map((ev, i) => (
+              <div key={i} className="pl-2 border-l-2 border-border text-content-secondary">
+                <p><span className="font-medium">{ev.code}</span>{ev.quote ? `: "${ev.quote}"` : ""}</p>
+                <p>{ev.source && `Fonte: ${ev.source}`}{ev.locator?.document ? ` · ${ev.locator.document}` : ""}{ev.locator?.page ? ` · p. ${ev.locator.page}` : ""}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -232,6 +322,7 @@ export default function DiscoveredPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     {badge(opp.extraction_quality)}
                     {statusBadge(opp.status)}
+                    {relevanceBadge(opp.relevance_status, opp.relevance_verdict)}
                     {opp.opportunity_type && (
                       <span className="text-[10px] text-content-secondary font-sans uppercase">
                         {opp.opportunity_type}
@@ -261,6 +352,27 @@ export default function DiscoveredPage() {
               >
                 {opp.url}
               </a>
+
+              {/* Relevance details (progressive disclosure) */}
+              <div className="border border-border/70 rounded-lg overflow-hidden">
+                <button
+                  onClick={() =>
+                    setExpandedRelevance((prev) => ({
+                      ...prev,
+                      [opp.id]: !prev[opp.id],
+                    }))
+                  }
+                  className="flex items-center justify-between w-full px-3 py-2 text-xs font-sans text-content-secondary hover:bg-surface/80 transition-colors"
+                >
+                  <span>Classificação</span>
+                  <span className="text-[10px]">{expandedRelevance[opp.id] ? "▲" : "▼"}</span>
+                </button>
+                {expandedRelevance[opp.id] && (
+                  <div className="px-3 pb-2">
+                    {relevanceDetails(opp)}
+                  </div>
+                )}
+              </div>
 
               {/* Campos extras (pending) */}
               {opp.status === "pending" && (

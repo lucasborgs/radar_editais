@@ -1,0 +1,96 @@
+[
+  {
+    "case_id": "programa:pipe-fapesp",
+    "kind": "program",
+    "source_record_id": "programa:pipe-fapesp",
+    "source_ref": "src:fapesp-pipe",
+    "as_of": "2026-07-22",
+    "verdict": {
+      "decision": "in_scope",
+      "kind": "program",
+      "reason_codes": [
+        "PRG_IDENTITY_OPERATOR_VERIFIED",
+        "PRG_RELEVANT_INNOVATION_MECHANISM",
+        "PRG_ENTERPRISE_RELEVANCE"
+      ],
+      "failed_codes": [],
+      "evidence": [
+        {
+          "code": "PRG_IDENTITY_OPERATOR_VERIFIED",
+          "quote": "O PIPE-FAPESP apoia a execução de pesquisa científica e/ou tecnológica em micro, pequenas e médias empresas no Estado de São Paulo.",
+          "source": "official_page",
+          "locator": {
+            "document": "fapesp.br/pipe"
+          }
+        },
+        {
+          "code": "PRG_RELEVANT_INNOVATION_MECHANISM",
+          "quote": "Objetivos: apoiar a pesquisa em CT como instrumento para promover inovação tecnológica e desenvolvimento empresarial. Fluxo Contínuo: submissão de propostas a qualquer momento do ano pelo SAGe.",
+          "source": "official_page",
+          "locator": {
+            "document": "fapesp.br/pipe"
+          }
+        },
+        {
+          "code": "PRG_ENTERPRISE_RELEVANCE",
+          "quote": "O PIPE-FAPESP apoia a execução de pesquisa científica e/ou tecnológica em micro, pequenas e médias empresas no Estado de São Paulo.",
+          "source": "official_page",
+          "locator": {
+            "document": "fapesp.br/pipe"
+          }
+        }
+      ],
+      "missing_information": [],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": true,
+    "review_note": "Evidência real da página oficial fapesp.br/pipe. Página confirma identidade/operador (PIPE-FAPESP), mecanismo de inovação (fluxo contínuo, subvenção para PD) e relevância para empresas (MPMEs paulistas)."
+  },
+  {
+    "case_id": "programa:centelha",
+    "kind": "program",
+    "source_record_id": "programa:centelha",
+    "source_ref": "src:programa-centelha",
+    "as_of": "2026-07-22",
+    "verdict": {
+      "decision": "in_scope",
+      "kind": "program",
+      "reason_codes": [
+        "PRG_IDENTITY_OPERATOR_VERIFIED",
+        "PRG_RELEVANT_INNOVATION_MECHANISM",
+        "PRG_ENTERPRISE_RELEVANCE"
+      ],
+      "failed_codes": [],
+      "evidence": [
+        {
+          "code": "PRG_IDENTITY_OPERATOR_VERIFIED",
+          "quote": "O Programa Centelha é uma iniciativa de empreendedorismo inovador que oferece recursos financeiros, capacitação e suporte para transformar ideias inovadoras em negócios. Promovido pelo MCTI, Finep e CNPq.",
+          "source": "official_page",
+          "locator": {
+            "document": "programacentelha.com.br"
+          }
+        },
+        {
+          "code": "PRG_RELEVANT_INNOVATION_MECHANISM",
+          "quote": "Recursos financeiros via subvenção econômica. Empreendedores receberão cerca de R$ 50 mil na forma de subvenção econômica.",
+          "source": "official_page",
+          "locator": {
+            "document": "programacentelha.com.br"
+          }
+        },
+        {
+          "code": "PRG_ENTERPRISE_RELEVANCE",
+          "quote": "O Programa Centelha é uma iniciativa de empreendedorismo inovador que oferece recursos financeiros, capacitação e suporte para transformar ideias inovadoras em negócios.",
+          "source": "official_page",
+          "locator": {
+            "document": "programacentelha.com.br"
+          }
+        }
+      ],
+      "missing_information": [],
+      "classifier_version": "radar-data-trust-relevance-v1"
+    },
+    "human_reviewed": true,
+    "review_note": "Evidência real da página oficial programacentelha.com.br. Página confirma identidade/operador (MCTI/Finep/CNPq), mecanismo (subvenção econômica ~R$50k) e relevância para empresas (criação de MEEPP, todos os estados)."
+  }
+]
