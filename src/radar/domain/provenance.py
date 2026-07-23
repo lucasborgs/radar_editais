@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from radar.domain.edital_extraction import Extracted
 
-PROVENANCE_SCHEMA_VERSION = 1
+PROVENANCE_SCHEMA_VERSION: Literal[1] = 1
 
 
 class FactState(str, Enum):
@@ -66,19 +66,20 @@ class EvidenceRef(BaseModel):
     """Referência estruturada a um trecho verificável (spec §4.2).
 
     Requisitos estruturais mínimos:
-      - `page`, quando presente, é 1-based;
+      - `schema_version` é fixo em `1` — qualquer outro valor é rejeitado;
+      - `source` é obrigatório e não vazio;
+      - `page`, quando presente, é 1-based; `block_idx`, quando presente,
+        é `>= 0`;
       - ao menos um de `canonical_content_hash`/`silver_source_hash`
         identifica a versão recuperável;
-      - `locator_quality=unresolved` registra falha sem fabricar
-        coordenadas exatas (page/block_idx/section_path ficam vazios; o
-        texto de `quote`, quando existir, não é uma coordenada — é o
-        conteúdo capturado sem posição confirmada).
+      - `locator_quality` é semanticamente consistente com as coordenadas
+        declaradas (ver `_check_invariants`).
     """
 
     model_config = {"extra": "forbid"}
 
-    schema_version: int = PROVENANCE_SCHEMA_VERSION
-    source: str | None = None
+    schema_version: Literal[1] = PROVENANCE_SCHEMA_VERSION
+    source: str
     native_id: str | None = None
     edital_id: str | None = None
     source_url: str | None = None
@@ -92,11 +93,25 @@ class EvidenceRef(BaseModel):
     collected_at: datetime | None = None
     locator_quality: LocatorQuality = LocatorQuality.UNRESOLVED
 
+    @field_validator("source")
+    @classmethod
+    def _source_must_be_non_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("source must be non-empty")
+        return v
+
     @field_validator("page")
     @classmethod
     def _page_must_be_positive(cls, v: int | None) -> int | None:
         if v is not None and v < 1:
             raise ValueError("page must be >= 1 (1-based)")
+        return v
+
+    @field_validator("block_idx")
+    @classmethod
+    def _block_idx_must_be_non_negative(cls, v: int | None) -> int | None:
+        if v is not None and v < 0:
+            raise ValueError("block_idx must be >= 0")
         return v
 
     @model_validator(mode="after")
@@ -106,16 +121,35 @@ class EvidenceRef(BaseModel):
                 "EvidenceRef requires canonical_content_hash or silver_source_hash "
                 "to identify a recoverable version"
             )
-        if self.locator_quality is LocatorQuality.UNRESOLVED and (
-            self.page is not None
-            or self.block_idx is not None
-            or self.section_path
-        ):
-            raise ValueError(
-                "locator_quality=unresolved must not carry fabricated positional "
-                "coordinates (page/block_idx/section_path); quote text alone is "
-                "allowed (content without confirmed position)"
-            )
+        has_exact_coordinate = (
+            self.page is not None or self.block_idx is not None or bool(self.section_path)
+        )
+        if self.locator_quality is LocatorQuality.UNRESOLVED:
+            # unresolved: quote (content) is allowed, but no fabricated
+            # positional coordinate — resolution failed, position unknown.
+            if has_exact_coordinate:
+                raise ValueError(
+                    "locator_quality=unresolved must not carry fabricated positional "
+                    "coordinates (page/block_idx/section_path); quote text alone is "
+                    "allowed (content without confirmed position)"
+                )
+        elif self.locator_quality is LocatorQuality.DOCUMENT_ONLY:
+            # document_only: document identified, but resolution stopped at
+            # document granularity — no exact position within it.
+            if not self.document or not self.document.strip():
+                raise ValueError("locator_quality=document_only requires a non-empty document")
+            if has_exact_coordinate:
+                raise ValueError(
+                    "locator_quality=document_only must not declare exact coordinates "
+                    "(page/block_idx/section_path)"
+                )
+        elif self.locator_quality is LocatorQuality.EXACT:
+            # exact: at least one resolved coordinate must back the claim.
+            if not has_exact_coordinate:
+                raise ValueError(
+                    "locator_quality=exact requires at least one resolved coordinate "
+                    "(page/block_idx/section_path)"
+                )
         return self
 
 
@@ -154,19 +188,35 @@ class ValidationResult(BaseModel):
 
 
 class ReviewInfo(BaseModel):
-    """Revisão humana ou override append-only (spec §5.3: "ator e data").
+    """Referência a uma revisão humana ou override, append-only (spec §5.3:
+    "ator e data").
 
-    Sem score, sem julgamento livre-form além de uma nota curta — o
-    histórico operacional completo não é modelado aqui (fora de escopo do
-    T01).
+    Este tipo é apenas a *referência* — quem revisou, quando e se houve
+    override — não o histórico ou o registro operacional completo, que não
+    são modelados aqui (fora de escopo do T01). Sem armazenamento, migration
+    ou exposição em API.
     """
 
     model_config = {"extra": "forbid"}
 
-    reviewer: str | None = None
-    note: str | None = None
-    reviewed_at: datetime | None = None
+    review_id: str
+    actor_id: str
+    reviewed_at: datetime
     overridden: bool = False
+
+    @field_validator("review_id")
+    @classmethod
+    def _review_id_must_be_non_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("review_id must be non-empty")
+        return v
+
+    @field_validator("actor_id")
+    @classmethod
+    def _actor_id_must_be_non_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("actor_id must be non-empty")
+        return v
 
 
 class FactProvenance(BaseModel):
@@ -193,6 +243,11 @@ class FactProvenance(BaseModel):
             raise ValueError(
                 "producer.kind=default cannot declare state=stated "
                 "(spec radar-data-trust-01-provenance.md §4.1)"
+            )
+        if self.state is FactState.STATED and not self.evidence_refs:
+            raise ValueError(
+                "state=stated requires at least one EvidenceRef "
+                "(spec radar-data-trust-01-provenance.md §8.1 state_consistent)"
             )
         return self
 
@@ -229,9 +284,9 @@ def evidence_ref_from_extracted(
         return None
     quality = locator_quality
     if quality is None:
-        if page is not None or block_idx is not None:
+        if page is not None or block_idx is not None or section_path:
             quality = LocatorQuality.EXACT
-        elif document is not None:
+        elif document:
             quality = LocatorQuality.DOCUMENT_ONLY
         else:
             quality = LocatorQuality.UNRESOLVED
