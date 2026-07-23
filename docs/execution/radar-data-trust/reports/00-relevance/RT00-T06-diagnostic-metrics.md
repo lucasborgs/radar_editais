@@ -8,8 +8,8 @@
 
 | Commit | Assunto |
 |---|---|
-| `(hash_t06_1)` | feat: métricas diagnósticas T06 — recall, precisão, taxa, agreement, por kind, por código, audit IDs |
-| `(hash_t06_2)` | docs: relatório RT00-T06 com correções de operational_miss, X em excl_, testes |
+| `9122c29f8` | feat: métricas diagnósticas T06 — recall, precisão, taxa, agreement, por kind, por código, audit IDs |
+| `1e12e2001` | docs: relatório RT00-T06 com correções de operational_miss, X em excl_, testes |
 
 ## Resumo
 
@@ -241,10 +241,20 @@ assert not any("conf_X1" in k for k in metrics)  # nunca em conf_
 
 ## Validação
 
-```text
-311 passed (5 files)
-All checks passed (ruff)
+```bash
+PYTHONPATH=src pytest -q tests/unit/test_relevance_shadow.py \
+  tests/unit/test_relevance_goldens.py tests/unit/test_relevance.py \
+  tests/unit/test_hardening_pr4.py \
+  tests/unit/test_opportunity_discovery_cache.py
+# 311 passed
+
+ruff check src/radar/core/eval/relevance_shadow.py \
+  tests/unit/test_relevance_shadow.py
+# All checks passed
+
 git diff --check  # limpo
+git status --short
+# 2 clean commits, sem untracked files
 ```
 
 ## Limitações
