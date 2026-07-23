@@ -21,7 +21,7 @@ import pytest
 
 from radar.core.ingestion.opportunity_discovery import _row_with_relevance
 from radar.core.ingestion.relevance_classifier import (
-    _VALID_ERROR_PREFIXES,
+    _ERROR_CANONICAL_MESSAGES,
     validate_opportunity_result,
 )
 
@@ -164,9 +164,26 @@ class TestValidateOpportunityResult:
         assert result["verdict"]["decision"] == "needs_review"
 
     def test_valid_error_known_category(self):
-        for prefix in _VALID_ERROR_PREFIXES:
-            result = validate_opportunity_result({"error": f"{prefix} test"})
-            assert result["error"].startswith(prefix)
+        """Erro com prefixo conhecido retorna mensagem canônica fixa."""
+        for prefix, msg in _ERROR_CANONICAL_MESSAGES.items():
+            result = validate_opportunity_result({"error": f"{prefix} conteúdo arbitrário"})
+            assert result["error"] == msg
+
+    def test_error_content_after_prefix_discarded(self):
+        """Conteúdo arbitrário após prefixo não é persistido."""
+        result = validate_opportunity_result(
+            {"error": "provider_error: segredo-ou-resposta-bruta"}
+        )
+        assert result["error"] == _ERROR_CANONICAL_MESSAGES["provider_error:"]
+        assert "segredo" not in result["error"]
+
+    def test_dual_keys_rejected(self):
+        """Resultado com verdict e error simultâneos é rejeitado."""
+        with pytest.raises(ValueError, match="must not contain both"):
+            validate_opportunity_result({
+                "verdict": {"decision": "in_scope"},
+                "error": "timeout: erro",
+            })
 
     def test_invalid_result_no_keys_raises(self):
         with pytest.raises(ValueError, match="must contain 'verdict' or 'error'"):
@@ -439,13 +456,13 @@ class TestStageRecordsRelevance:
 
 class TestLegacyContract:
     def test_migration_041_default_is_unclassified(self):
-        """A migration SQL define default 'unclassified'."""
+        """A migration SQL define default 'unclassified' + NOT NULL + 4 colunas."""
         import importlib.util
 
         migration_path = "supabase/migrations/041_discovered_opportunities_relevance.sql"
         try:
             spec = importlib.util.find_spec("radar")
-            pkg_path = spec.origin  # src/radar/__init__.py
+            pkg_path = spec.origin
             root = pkg_path.rsplit("/src/radar", 1)[0]
         except Exception:
             root = "."
@@ -454,15 +471,17 @@ class TestLegacyContract:
         import os.path
         if os.path.exists(path):
             sql = open(path, encoding="utf-8").read()
-            assert "default 'unclassified'" in sql
-            assert "relevance_status" in sql
-            assert "relevance_verdict" in sql
-            assert "relevance_error" in sql
-            assert "relevance_classified_at" in sql
+        else:
+            raise FileNotFoundError(f"migration not found at {path}")
 
-    def test_legacy_records_unclassified_by_default(self):
-        """Colunas novas são nullable/default-safe; registros antigos viram unclassified."""
-        assert True  # Contrato verificado pela migration SQL acima
+        assert "default 'unclassified'" in sql, "default must be 'unclassified'"
+        assert "not null" in sql.lower(), "relevance_status must be NOT NULL"
+        assert "relevance_status" in sql, "relevance_status column missing"
+        assert "relevance_verdict" in sql, "relevance_verdict column missing"
+        assert "relevance_error" in sql, "relevance_error column missing"
+        assert "relevance_classified_at" in sql, "relevance_classified_at column missing"
+
+
 
 
 # ══════════════════════════════════════════════════════════════════════════

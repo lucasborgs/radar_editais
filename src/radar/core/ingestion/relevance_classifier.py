@@ -14,7 +14,6 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
 
 from openai import APITimeoutError
 from pydantic import BaseModel, ValidationError
@@ -667,13 +666,21 @@ _VALID_ERROR_PREFIXES = (
     "contract_violation:", "grounding_error:",
 )
 
+_ERROR_CANONICAL_MESSAGES = {
+    "parse_failure:": "parse_failure: resposta do provedor não é JSON válido",
+    "timeout:": "timeout: provedor não respondeu dentro do prazo",
+    "provider_error:": "provider_error: falha na comunicação com o provedor",
+    "contract_violation:": "contract_violation: saída incompatível com o contrato",
+    "grounding_error:": "grounding_error: evidência incompatível com o material",
+}
+
 
 def validate_opportunity_result(result: dict) -> dict:
     """Valida e normaliza o resultado do classificador para staging.
 
     Para sucesso: re-valida com RelevanceVerdict (JSON mode),
     verifica evidence/reason_codes, serializa.
-    Para erro: confirma prefixo sanitizado conhecido.
+    Para erro: retorna mensagem canônica fixa (descarta conteúdo arbitrário).
 
     Args:
         result: dict retornado por classify_opportunity()
@@ -683,9 +690,11 @@ def validate_opportunity_result(result: dict) -> dict:
         dict com 'verdict' ou 'error' key, normalizado.
 
     Raises:
-        ValueError: se result não contém 'verdict'/'error' ou categoria
-                    de erro desconhecida.
+        ValueError: se result contém ambas as chaves, não contém
+                    'verdict'/'error', ou categoria de erro desconhecida.
     """
+    if "verdict" in result and "error" in result:
+        raise ValueError("result must not contain both 'verdict' and 'error'")
     if "verdict" in result:
         verdict = RelevanceVerdict.model_validate(result["verdict"])
         _check_output_evidence_contract(verdict)
@@ -694,53 +703,10 @@ def validate_opportunity_result(result: dict) -> dict:
         err = result["error"]
         if not isinstance(err, str) or not err.startswith(_VALID_ERROR_PREFIXES):
             raise ValueError(f"unknown error category: {err}")
-        return {"error": err}
+        for prefix, msg in _ERROR_CANONICAL_MESSAGES.items():
+            if err.startswith(prefix):
+                return {"error": msg}
     raise ValueError("result must contain 'verdict' or 'error' key")
-
-
-def persist_opportunity_verdict(db, opportunity_id: str, result: dict) -> dict:
-    """Persiste a classificação de relevância no staging.
-
-    Idempotente: escrever o mesmo resultado novamente é seguro.
-    Não altera status editorial nem outras colunas existentes.
-
-    Args:
-        db: cliente Supabase duck-typed (.table().update().eq().execute()).
-        opportunity_id: UUID da linha em discovered_opportunities.
-        result: dicionário retornado por classify_opportunity()
-                — {"verdict": {...}} em sucesso ou {"error": "..."} em falha.
-
-    Returns:
-        {"written": True}
-
-    Raises:
-        ValueError: se result não contém 'verdict' nem 'error'.
-    """
-    now = datetime.now(timezone.utc).isoformat()
-
-    if "verdict" in result:
-        update = {
-            "relevance_status": "classified",
-            "relevance_verdict": result["verdict"],
-            "relevance_error": None,
-            "relevance_classified_at": now,
-        }
-    elif "error" in result:
-        update = {
-            "relevance_status": "error",
-            "relevance_verdict": None,
-            "relevance_error": result["error"],
-            "relevance_classified_at": now,
-        }
-    else:
-        raise ValueError("result must contain 'verdict' or 'error' key")
-
-    (db.table("discovered_opportunities")
-     .update(update)
-     .eq("id", opportunity_id)
-     .execute())
-
-    return {"written": True}
 
 
 __all__ = [
@@ -751,5 +717,4 @@ __all__ = [
     "classify_agency",
     "classify",
     "validate_opportunity_result",
-    "persist_opportunity_verdict",
 ]
