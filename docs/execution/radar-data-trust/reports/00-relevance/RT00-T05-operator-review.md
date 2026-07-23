@@ -8,9 +8,10 @@
 ## Commits
 
 | Commit | Assunto |
-|---|---|
+|---|---|---|
 | `543a0f430` | API tipada com Pydantic + normalizador + testes |
 | `2e53aff7c` | Frontend: compatibilidade null + labels PT-BR + relatório |
+| `50de3e8da` | Remoção de `_ERROR_CANONICAL_MESSAGES` (privado) — uso de `validate_opportunity_result` (público) + 5 novos testes de sanitização |
 
 ## Contrato da API
 
@@ -45,13 +46,13 @@ Garantias por estado de entrada:
 | `classified` + verdict válido | `classified` | intacto | `null` | preservado |
 | `classified` + verdict ausente | `error` | `null` | `contract_violation:` | segurança |
 | `classified` + verdict malformado | `error` | `null` | `contract_violation:` | segurança |
-| `error` + erro canônico | `error` | `null` | intacto | preservado |
-| `error` + erro arbitrário | `error` | `null` | `contract_violation:` | sanitização |
-| `error` + sem mensagem | `error` | `null` | `null` | preservado |
+| `error` + erro com prefixo conhecido | `error` | `null` | mensagem canônica (sufixo bruto descartado) | sanitização |
+| `error` + erro sem prefixo conhecido | `error` | `null` | `contract_violation:` | sanitização |
+| `error` + string vazia | `error` | `null` | `contract_violation:` | sanitização |
+| `error` + `error=None` | `error` | `null` | `null` | preservado |
 
-A mensagem canônica de `contract_violation` reutiliza `_ERROR_CANONICAL_MESSAGES` do
-`relevance_classifier.py` (contrato T04). Conteúdo arbitrário, traceback ou stack
-dump nunca são expostos.
+A canonicalização usa `validate_opportunity_result` do `relevance_classifier.py` (contrato T04,
+API pública). Conteúdo arbitrário, traceback ou stack dump nunca são expostos.
 
 `promotion_run` e campos editoriais não são afetados pela normalização.
 
@@ -106,14 +107,14 @@ Nenhuma ação editorial foi criada, alterada ou bloqueada pelo classificador.
 
 | Arquivo | Tipo | Alteração |
 |---|---|---|
-| `src/radar/api/routers/discovered.py` | Python | Modelos Pydantic (`DiscoveredItem`, `DiscoveredListResponse`), normalizador `_normalize_row`, `response_model` no endpoint, importa `RelevanceVerdict` do domínio e `_ERROR_CANONICAL_MESSAGES` do relevance_classifier |
+| `src/radar/api/routers/discovered.py` | Python | Modelos Pydantic (`DiscoveredItem`, `DiscoveredListResponse`), normalizador `_normalize_row`, `response_model` no endpoint, importa `RelevanceVerdict` do domínio e `validate_opportunity_result` do relevance_classifier; `_canonicalize_error` derivada da API pública |
 | `frontend/src/lib/api.ts` | TypeScript | Tipos `RelevanceStatus`, `RelevanceDecision`, `RelevanceEvidence`, `RelevanceVerdict`; 4 campos novos em `DiscoveredOpportunity` |
 | `frontend/src/app/discovered/page.tsx` | TypeScript React | Badge + progressive disclosure (sempre renderizado), labels em PT-BR ("Critérios confirmados", "Critérios de exclusão") |
 | `tests/unit/test_discovery_api_contract.py` | Python (novo) | 26 testes: `_normalize_row` (legado, classified, error, promotion_run), `list_discovered` (mock), promote/reject independence, auth gate |
 
 ## Testes e checks executados
 
-### Testes Python (62 passed)
+### Testes Python (65 passed)
 
 ```bash
 PYTHONPATH=src .venv/bin/pytest -q \
@@ -121,10 +122,10 @@ PYTHONPATH=src .venv/bin/pytest -q \
   tests/unit/test_relevance_staging.py \
   tests/unit/test_discovery_promotion.py \
   tests/unit/test_admin_gate.py
-# 62 passed
+# 65 passed
 ```
 
-### Testes novos (`test_discovery_api_contract.py` — 26 testes)
+### Testes novos (`test_discovery_api_contract.py` — 29 testes)
 
 #### Estruturais (4)
 
@@ -155,13 +156,16 @@ PYTHONPATH=src .venv/bin/pytest -q \
 | `test_classified_with_malformed_verdict_normalized_to_error` | verdict sem "decision" → error |
 | `test_classified_with_invalid_decision_normalized_to_error` | decision inválida → error |
 
-#### `_normalize_row` — error (3)
+#### `_normalize_row` — error (6)
 
 | Teste | O que comprova |
 |---|---|
-| `test_error_canonical_preserved` | Mensagem canônica (5 prefixos) preservada |
-| `test_error_arbitrary_content_normalized` | Conteúdo arbitrário → contract_violation |
-| `test_error_without_message_preserved` | Erro sem mensagem → permanece error/null |
+| `test_error_with_raw_suffix_returns_only_canonical` | 5 prefixos conhecidos + sufixo bruto → só mensagem canônica |
+| `test_provider_error_raw_suffix_stripped` | `provider_error: SEGREDO_BRUTO` → canônico, sem o segredo |
+| `test_timeout_with_traceback_returns_only_canonical` | `timeout: traceback...` → canônico, sem traceback |
+| `test_error_without_prefix_returns_contract_violation` | Erro sem prefixo → contract_violation |
+| `test_error_empty_string_returns_contract_violation` | String vazia → contract_violation |
+| `test_error_none_preserved` | error=None → permanece None |
 
 #### `_normalize_row` — promotion_run (2)
 
@@ -247,17 +251,20 @@ Não foi executado LLM real (T05 não muda prompt nem modelo).
    sem transição CSS — coerente com a simplicidade exigida.
 5. **Detalhes de evidência sem truncamento:** `quote` pode ser longo, mas não
    há limite de caracteres no display.
-6. **Import de `_ERROR_CANONICAL_MESSAGES` (símbolo privado):** o normalizador
-   importa o dict privado de `relevance_classifier.py`. É o repositório
-   autoritativo das mensagens canônicas (T04); não foi criada lista paralela.
+6. *(Resolvido)* O import privado `_ERROR_CANONICAL_MESSAGES` foi substituído
+   por `validate_opportunity_result` (API pública) na correção do commit
+   `50de3e8da`. Não há mais dependência de símbolo privado.
 
 ## Confirmação final
 
 - [x] API: modelos Pydantic `DiscoveredItem`+`DiscoveredListResponse`,
       `response_model` no endpoint, `RelevanceVerdict` reutilizado do domínio
-- [x] `_normalize_row` sanitiza: legado→unclassified, erro arbitrário→contract_violation,
+- [x] `_normalize_row` sanitiza: legado→unclassified, erro com/sem prefixo→canônico,
       classified sem verdict→error, combinação inválida→error
-- [x] Conteúdo bruto nunca exposto (erro arbitrário vira mensagem canônica)
+- [x] Conteúdo bruto nunca exposto (erro com prefixo conhecido → só mensagem canônica,
+      sem o sufixo arbitrário)
+- [x] Import privado removido — `validate_opportunity_result` (público) rege a
+      canonicalização; testes derivam expectativas da mesma API pública
 - [x] UI: badge + progressive disclosure sempre visível, 5 estados, labels PT-BR
 - [x] promote/reject continuam sem referência a relevância
 - [x] auth administrativa (`AdminUserId`) inalterada
