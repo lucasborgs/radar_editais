@@ -299,14 +299,41 @@ git diff --check  # limpo
 
 ## Run externa
 
-**Pendente.** Será executada pelo Codex após auditoria e autorização explícita:
+Executada pelo Codex em 2026-07-23, após autorização explícita do proprietário,
+com OpenAI `gpt-4o-mini` e os 14 casos do manifesto versionado:
 
 ```bash
 PYTHONPATH=src python -m radar.core.eval run relevance_shadow
 ```
 
-Mesmos evaluators de T03 e T06. Nenhuma alteração de prompt, modelo, golden ou
-label.
+Manifesto: `relevance_shadow-20260723_031659`, suíte versão `"2"`, estado
+`diagnostic`, commit `d473db2b5`, árvore limpa e 14/14 casos carregados.
+
+| Métrica | Resultado |
+|---|---:|
+| decisões avaliáveis | 11/14 |
+| concordância de decisão | 9/11 (`0.8182`) |
+| recall `in_scope` semântico e end-to-end | 5/7 (`0.7143`) |
+| precisão `out_of_scope` | 1/1 (`1.0000`) |
+| falsos positivos `out_of_scope` | 0 |
+| taxa `needs_review` | 5/11 (`0.4545`) |
+| erros operacionais | 3/14 (`0.2143`) |
+| grounding médio de evidência | `0.6364` |
+
+Casos auditáveis:
+
+- divergências/falsos negativos: `programa:pipe-fapesp` e `agencia:fapesp`
+  (`in_scope` no golden, `needs_review` na predição);
+- erros operacionais: `triage-dou-000` (`contract_violation`),
+  `triage-tavily-118` e `triage-tavily-098` (`grounding_error`);
+- divergência de códigos: `triage-tavily-082`, `triage-tavily-079`,
+  `investidor:kptl`, `programa:pipe-fapesp` e `agencia:fapesp`;
+- nenhum erro operacional foi convertido em `out_of_scope`.
+
+O resultado confirma sinal diagnóstico, não qualidade suficiente para promoção:
+o corpus é pequeno, há apenas uma predição `out_of_scope` avaliável e programas/
+agências têm somente dois casos por kind. Nenhum prompt, modelo, golden, label,
+threshold ou runtime produtivo foi alterado em resposta à run.
 
 ## Confirmações
 
@@ -322,5 +349,5 @@ label.
 - [x] Correção 3: `audit_code_operational_misses` adicionado.
 - [x] Correção 4: `exp`/`eval_exp` só para códigos esperados em by_code; testes de only-predicted.
 - [x] RT00-T07 não iniciada.
-- [x] Run externa não executada.
+- [x] Run externa executada e registrada como diagnóstico.
 - [x] Merge/push não realizado.
