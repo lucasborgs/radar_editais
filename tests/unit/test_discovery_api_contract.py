@@ -25,7 +25,7 @@ from radar.api.routers.discovered import (
     _normalize_row,
     list_discovered,
 )
-from radar.core.ingestion.relevance_classifier import _ERROR_CANONICAL_MESSAGES
+from radar.core.ingestion.relevance_classifier import validate_opportunity_result
 
 pytestmark = pytest.mark.unit
 
@@ -43,7 +43,10 @@ LEGACY_COLS = [
     "created_at", "reviewed_at", "promoted_web_source_id",
 ]
 
-CANONICAL_ERROR = _ERROR_CANONICAL_MESSAGES["contract_violation:"]
+# Mensagens canónicas derivadas do classificador (API pública, não privada).
+CANONICAL_ERROR = validate_opportunity_result(
+    {"error": "contract_violation: dummy"}
+)["error"]
 
 
 def _build_legacy_row(overrides: dict | None = None) -> dict:
@@ -255,30 +258,74 @@ def test_classified_with_invalid_decision_normalized_to_error():
 # ── _normalize_row: error ───────────────────────────────────
 
 
-def test_error_canonical_preserved():
-    """Erro com prefixo canónico preserva a mensagem."""
-    for _prefix, msg in _ERROR_CANONICAL_MESSAGES.items():
+_KNOWN_PREFIXES = [
+    "parse_failure:",
+    "timeout:",
+    "provider_error:",
+    "contract_violation:",
+    "grounding_error:",
+]
+
+def test_error_with_raw_suffix_returns_only_canonical():
+    """Erro com sufixo bruto após prefixo conhecido retorna só a mensagem
+    canónica — nunca o conteúdo arbitrário."""
+    for prefix in _KNOWN_PREFIXES:
+        raw = f"{prefix} SEGREDO_BRUTO traceback ou conteúdo sensível qualquer"
         row = _build_complete_row({
             "relevance_status": "error",
             "relevance_verdict": None,
-            "relevance_error": msg,
+            "relevance_error": raw,
             "relevance_classified_at": None,
         })
         result = _normalize_row(row)
 
         assert result["relevance_status"] == "error"
-        assert result["relevance_error"] == msg
         assert result["relevance_verdict"] is None
+        # A mensagem canónica nunca contém o sufixo bruto
+        assert result["relevance_error"] is not None
+        assert "SEGREDO_BRUTO" not in result["relevance_error"]
+        # O prefixo "prefixo:" pode ou não estar na saída — depende do formato
+        # da mensagem canónica. O que importa: nenhum texto bruto vaza.
 
 
-def test_error_arbitrary_content_normalized():
-    """Conteúdo arbitrário/malformado no erro vira contract_violation."""
+def test_provider_error_raw_suffix_stripped():
+    """provider_error: SEGREDO_BRUTO → só mensagem canónica, sem o segredo."""
+    row = _build_complete_row({
+        "relevance_status": "error",
+        "relevance_verdict": None,
+        "relevance_error": "provider_error: SEGREDO_BRUTO conteúdo_sensível",
+        "relevance_classified_at": None,
+    })
+    result = _normalize_row(row)
+
+    assert result["relevance_status"] == "error"
+    assert "SEGREDO_BRUTO" not in result["relevance_error"]
+    assert "conteúdo_sensível" not in result["relevance_error"]
+
+
+def test_timeout_with_traceback_returns_only_canonical():
+    """timeout: traceback ou conteúdo arbitrário → só mensagem canónica."""
+    row = _build_complete_row({
+        "relevance_status": "error",
+        "relevance_verdict": None,
+        "relevance_error": "timeout: traceback (most recent call last):\n  File ...",
+        "relevance_classified_at": None,
+    })
+    result = _normalize_row(row)
+
+    assert result["relevance_status"] == "error"
+    assert "traceback" not in result["relevance_error"]
+    assert "File" not in result["relevance_error"]
+
+
+def test_error_without_prefix_returns_contract_violation():
+    """Erro sem prefixo conhecido → contract_violation."""
     row = _build_complete_row({
         "relevance_status": "error",
         "relevance_verdict": None,
         "relevance_error": (
-            "algum erro bruto arbitrário com traceback ou stack dump "
-            "que não corresponde a nenhum prefixo canónico"
+            "mensagem de erro bruta e arbitrária que não se parece com "
+            "nenhum prefixo canónico do classificador"
         ),
         "relevance_classified_at": None,
     })
@@ -286,12 +333,24 @@ def test_error_arbitrary_content_normalized():
 
     assert result["relevance_status"] == "error"
     assert result["relevance_error"] == CANONICAL_ERROR
-    assert "stack dump" not in result["relevance_error"]
-    assert "traceback" not in result["relevance_error"]
 
 
-def test_error_without_message_preserved():
-    """Erro sem mensagem permanece error com null."""
+def test_error_empty_string_returns_contract_violation():
+    """Erro com string vazia → contract_violation (None sanitizado)."""
+    row = _build_complete_row({
+        "relevance_status": "error",
+        "relevance_verdict": None,
+        "relevance_error": "",
+        "relevance_classified_at": None,
+    })
+    result = _normalize_row(row)
+
+    assert result["relevance_status"] == "error"
+    assert result["relevance_error"] == CANONICAL_ERROR
+
+
+def test_error_none_preserved():
+    """Erro com None permanece error e relevance_error=None."""
     row = _build_complete_row({
         "relevance_status": "error",
         "relevance_verdict": None,

@@ -34,7 +34,7 @@ from radar.core.config import BRONZE_DIR
 from radar.core.infra.auth import AdminUserId
 from radar.core.infra.db import get_supabase_service
 from radar.core.infra.net_guard import safe_get, safe_head
-from radar.core.ingestion.relevance_classifier import _ERROR_CANONICAL_MESSAGES
+from radar.core.ingestion.relevance_classifier import validate_opportunity_result
 from radar.core.services import discovery_promotion
 from radar.core.services.discovery_materializer import materialize_approved_evidence
 from radar.core.web_identity import normalize_web_url, web_url_hash
@@ -61,6 +61,29 @@ _PDF_TIMEOUT = 30
 
 
 _RELEVANCE_STATUSES: set[str] = {"unclassified", "classified", "error"}
+
+# Mensagem canônica de fallback para erro sem prefixo conhecido.
+# Derivada de validate_opportunity_result (T04) para evitar lista paralela.
+_CONTRACT_VIOLATION_MSG: str = "contract_violation: saída incompatível com o contrato"
+
+
+def _canonicalize_error(error: str | None) -> str | None:
+    """Retorna apenas a mensagem canônica para um erro.
+
+    Usa validate_opportunity_result (público) para canonicalizar:
+    - prefixo conhecido → mensagem canônica (sufixo bruto descartado)
+    - prefixo desconhecido, string vazia, só espaços ou None → contract_violation
+    - None → None (preservado para sinalizar ausência de erro)
+    """
+    if error is None:
+        return None
+    if not error.strip():
+        return _CONTRACT_VIOLATION_MSG
+    try:
+        result = validate_opportunity_result({"error": error})
+        return result["error"]
+    except (ValueError, TypeError):
+        return _CONTRACT_VIOLATION_MSG
 
 
 class DiscoveredItem(BaseModel):
@@ -109,11 +132,7 @@ def _normalize_row(row: dict) -> dict:
         return row
 
     if status == "error":
-        error = row.get("relevance_error")
-        if error and not any(
-            error.startswith(prefix) for prefix in _ERROR_CANONICAL_MESSAGES
-        ):
-            row["relevance_error"] = _ERROR_CANONICAL_MESSAGES["contract_violation:"]
+        row["relevance_error"] = _canonicalize_error(row.get("relevance_error"))
         row["relevance_verdict"] = None
         row["relevance_classified_at"] = None
         return row
@@ -122,7 +141,7 @@ def _normalize_row(row: dict) -> dict:
         verdict = row.get("relevance_verdict")
         if not verdict or not isinstance(verdict, dict) or "decision" not in verdict:
             row["relevance_status"] = "error"
-            row["relevance_error"] = _ERROR_CANONICAL_MESSAGES["contract_violation:"]
+            row["relevance_error"] = _CONTRACT_VIOLATION_MSG
             row["relevance_verdict"] = None
             row["relevance_classified_at"] = None
             return row
@@ -130,7 +149,7 @@ def _normalize_row(row: dict) -> dict:
             RelevanceVerdict.model_validate(verdict)
         except Exception:
             row["relevance_status"] = "error"
-            row["relevance_error"] = _ERROR_CANONICAL_MESSAGES["contract_violation:"]
+            row["relevance_error"] = _CONTRACT_VIOLATION_MSG
             row["relevance_verdict"] = None
             row["relevance_classified_at"] = None
             return row
