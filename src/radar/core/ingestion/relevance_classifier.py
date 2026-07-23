@@ -4,7 +4,9 @@ Radar Data Trust 00 — Classificadores de relevância em shadow.
 Cinco funções públicas separadas (uma por kind), cada uma com prompt
 próprio e parsing estrito. Transporte e validação compartilhados.
 
-Nenhuma função altera staging, ledger, cache, gold, API ou frontend.
+Nenhuma função altera staging, ledger, cache, gold, API ou frontend
+diretamente. Funções de persistência (persist_*) escrevem staging
+quando chamadas explicitamente, sem alterar o fluxo de classificação.
 """
 from __future__ import annotations
 
@@ -12,6 +14,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime, timezone
 
 from openai import APITimeoutError
 from pydantic import BaseModel, ValidationError
@@ -655,6 +658,56 @@ def classify(kind: str, material: str) -> dict:
     return fn(material)
 
 
+# =============================================================================
+# Staging persistence (RT00-T04)
+# =============================================================================
+
+
+def persist_opportunity_verdict(db, opportunity_id: str, result: dict) -> dict:
+    """Persiste a classificação de relevância no staging.
+
+    Idempotente: escrever o mesmo resultado novamente é seguro.
+    Não altera status editorial nem outras colunas existentes.
+
+    Args:
+        db: cliente Supabase duck-typed (.table().update().eq().execute()).
+        opportunity_id: UUID da linha em discovered_opportunities.
+        result: dicionário retornado por classify_opportunity()
+                — {"verdict": {...}} em sucesso ou {"error": "..."} em falha.
+
+    Returns:
+        {"written": True}
+
+    Raises:
+        ValueError: se result não contém 'verdict' nem 'error'.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+
+    if "verdict" in result:
+        update = {
+            "relevance_status": "classified",
+            "relevance_verdict": result["verdict"],
+            "relevance_error": None,
+            "relevance_classified_at": now,
+        }
+    elif "error" in result:
+        update = {
+            "relevance_status": "error",
+            "relevance_verdict": None,
+            "relevance_error": result["error"],
+            "relevance_classified_at": now,
+        }
+    else:
+        raise ValueError("result must contain 'verdict' or 'error' key")
+
+    (db.table("discovered_opportunities")
+     .update(update)
+     .eq("id", opportunity_id)
+     .execute())
+
+    return {"written": True}
+
+
 __all__ = [
     "classify_opportunity",
     "classify_investor",
@@ -662,4 +715,5 @@ __all__ = [
     "classify_program",
     "classify_agency",
     "classify",
+    "persist_opportunity_verdict",
 ]
