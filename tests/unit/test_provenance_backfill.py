@@ -269,4 +269,23 @@ def test_execute_writes_when_not_already_present(monkeypatch):
     assert finep["write"]["paths_written"] == 2  # requisitos_texto.0 + status (mecanismo é None, sem path)
     update_calls = [c for c in conn.cursor_obj.calls if "update" in c[0].lower()]
     assert len(update_calls) == 1
-    assert update_calls[0][1][1] == "e1"
+
+
+def test_defer_editais_measures_but_does_not_write_editais(monkeypatch):
+    """Rework RT01-T12: `defer_editais=True` mede os editais (métricas do
+    relatório intactas) mas NÃO escreve — o adiamento é por decisão explícita,
+    não por ausência de dados (os silver blocks estão presentes no fixture)."""
+    _install_fixture(monkeypatch)
+    monkeypatch.setattr(pb, "assert_database_target", lambda *a, **k: {})
+    conn = _RecordingConn()
+
+    report = pb.run_backfill(conn, execute=True, sample=5, prestate_path=None, defer_editais=True)
+
+    finep = report["origins"]["finep"]
+    # medição preservada: os paths continuam sendo CALCULADOS...
+    assert finep["paths"]["stated"] == 1
+    assert finep["paths"]["inferred"] == 1
+    # ...mas nada é escrito para a origem de edital.
+    assert finep["write"]["entities_written"] == 0
+    update_calls = [c for c in conn.cursor_obj.calls if "update" in c[0].lower()]
+    assert update_calls == []

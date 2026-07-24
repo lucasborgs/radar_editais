@@ -406,3 +406,60 @@ diagnosticar; não escreveu no banco nem alterou o código do implementador.
 Os symlinks de `data/` usados no diagnóstico foram removidos — worktree
 restaurado ao estado entregue (só o `backfill_prestate_*.json` untracked).
 
+---
+
+## Rework aplicado (governança — Fable, 2026-07-24)
+
+**Perda de independência declarada:** a governança implementou este rework
+diretamente (não um subagente), por economia de tokens e a pedido do
+proprietário. Compensação: passagem adversarial separada abaixo, em vez de
+autoconfiança.
+
+### Decisões do proprietário incorporadas
+1. Backfill é tarefa de **operação** — roda onde o `data/` vivo existe (não
+   num worktree isolado, que não tem os untracked `silver/structured_docs`
+   e `bronze/*_raw`; ver memória `data-lives-in-main-checkout`).
+2. **Medir agora; carimbar editais só quando houver ganho real de citação.**
+   Editais são medidos mas NÃO escritos; investidores (âncora de catálogo,
+   100% determinística) são carimbados. Dívida explícita: backfill de edital
+   fica para quando o programa produzir citação de página (spec 04 —
+   documentos-fonte versionados). Motivo medido: `stated=0` nos editais (os
+   requisitos normalizados por LLM não batem verbatim no silver).
+
+### Mudança de código
+`provenance_backfill.py` ganhou a flag `--defer-editais` (`run_backfill(...,
+defer_editais=False)`): as origens de edital continuam MEDIDAS no relatório
+shadow, mas suas escritas (entidade e chunk) são suprimidas. O adiamento é
+**explícito por flag**, não por ausência de dados — evita a armadilha que
+reprovou a 1ª entrega. Teste hermético novo
+`test_defer_editais_measures_but_does_not_write_editais` cobre o caminho.
+
+### Medição honesta (dry-run com o `data/` real)
+| origem | entidades | inferred | document_only | unresolved | chunks backfilláveis | stated |
+|---|---|---|---|---|---|---|
+| curadoria (17 investidores) | 17 (12 legadas) | 0 | 36 | 0 | — | 0 |
+| finep (3 editais) | 3 | 6 | 0 | 12 | 25/25 | **0** |
+| fapesc (1 edital) | 1 | 1 | 0 | 28 | 20/42 | **0** |
+
+### Execução real (banco local :54322, `ENVIRONMENT=test`)
+`--execute --defer-editais --sample 17`:
+- **17 investidores carimbados** (12 novos + 5 anteriores), 36 paths
+  `unknown`/`document_only` com âncora de catálogo;
+- **editais: 0 escritas** — apesar do silver estar presente (prova do guard
+  por decisão, não por ausência);
+- pré-estado salvo (`backfill_prestate_20260724T180823Z.json`, fora do
+  commit);
+- re-execução → 0 escritas (idempotente).
+
+### Passagem adversarial da governança
+- digest SHA-256 das colunas não-provenance de `entities` antes×depois:
+  **idêntico** (`62f9e018446ea8e2`) — só `provenance` mudou;
+- `match_chunks` com coords: **0** antes e depois — editais não tocados
+  mesmo com dados presentes;
+- `edital c/ provenance`: **0** — adiamento efetivo;
+- suíte `tests/unit` completa: **1321 passed**; gate `test_gold_equivalence`
+  16/16; ruff limpo.
+
+**Veredito:** aprovada em 2026-07-24 (com dívida registrada: backfill de
+editais adiado até haver ganho real de citação).
+

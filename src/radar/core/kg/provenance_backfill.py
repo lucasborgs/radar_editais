@@ -381,14 +381,24 @@ def _repack_chunks_for_entity(
 # ===========================================================================
 
 
-def run_backfill(conn, *, execute: bool, sample: int, prestate_path: str | None = None) -> dict:
+def run_backfill(
+    conn, *, execute: bool, sample: int, prestate_path: str | None = None,
+    defer_editais: bool = False,
+) -> dict:
     """Orquestra o backfill sobre `conn` (psycopg connection ou fake com a
     mesma interface `cursor()/execute()/fetchall()/description`).
     `execute=False`: calcula tudo, não escreve — relatório shadow completo
     (população inteira, não limitada por `sample`). `execute=True`: escreve
     só os `sample` primeiros registros (ordem determinística por
     `native_id`) de cada (origem, kind), precedido do despejo de pré-estado
-    em `prestate_path`."""
+    em `prestate_path`.
+
+    `defer_editais=True` (decisão do proprietário, RT01-T12 rework
+    2026-07-24): as origens de edital (`gold.EDITAL_SOURCES`) ainda são
+    MEDIDAS no relatório shadow, mas NÃO são escritas — o backfill de edital
+    fica adiado até haver ganho real de citação (o backfill atual produz
+    `stated=0`, sem citação de página). O adiamento é explícito por esta
+    flag, não por ausência de dados no ambiente."""
     if execute:
         assert_database_target("provenance backfill (execute)")
 
@@ -478,7 +488,9 @@ def run_backfill(conn, *, execute: bool, sample: int, prestate_path: str | None 
                     if fp_mecanismo is not None:
                         new_paths["mecanismo"] = fp_mecanismo
 
-            if new_paths and row["id"] in sampled_ids:
+            # `defer_editais`: métricas acima já foram registradas (medição
+            # honesta); só a ESCRITA é adiada para as origens de edital.
+            if new_paths and row["id"] in sampled_ids and not defer_editais:
                 pending_entity_writes.append((source, row["id"], new_paths))
                 prestate.append({"table": "entities", "id": row["id"], "provenance": provenance})
 
@@ -554,7 +566,7 @@ def run_backfill(conn, *, execute: bool, sample: int, prestate_path: str | None 
                 report.unresolved += 1
                 continue
             report.chunks_backfillable += 1
-            if in_sample:
+            if in_sample and not (defer_editais and origin in gold.EDITAL_SOURCES):
                 pending_chunk_writes.append((origin, chunk_row["id"], coords))
                 prestate.append({
                     "table": "match_chunks", "id": chunk_row["id"],
@@ -607,6 +619,11 @@ def main() -> None:
         "--sample", type=int, default=DEFAULT_SAMPLE,
         help="entidades por (origem, kind) escritas em --execute (default: 5)",
     )
+    ap.add_argument(
+        "--defer-editais", action="store_true",
+        help="mede mas NÃO escreve as origens de edital (decisão RT01-T12: "
+             "backfill de edital adiado até haver ganho real de citação)",
+    )
     args = ap.parse_args()
 
     prestate_path = None
@@ -618,7 +635,10 @@ def main() -> None:
         )
 
     with psycopg.connect(gold._dsn(), autocommit=True) as conn:  # noqa: SLF001
-        report = run_backfill(conn, execute=args.execute, sample=args.sample, prestate_path=prestate_path)
+        report = run_backfill(
+            conn, execute=args.execute, sample=args.sample, prestate_path=prestate_path,
+            defer_editais=args.defer_editais,
+        )
 
     if prestate_path and os.path.exists(prestate_path):
         report["prestate_file"] = prestate_path
