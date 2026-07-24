@@ -210,3 +210,26 @@ FINEP/T05.
 - **Worktree limpo**: sem untracked além dos arquivos desta task
 
 **Veredito:** pendente
+
+## Auditoria (governança — Fable)
+
+**Veredito:** aprovada em 2026-07-24.
+
+- Diff inspecionado integralmente: só `_ingest_icts` tocado no gold (T08
+  intocada), builders em seção delimitada, gate T02 byte-idêntico (0 linhas
+  de diff em harness/teste/baseline/fixtures);
+- suítes reexecutadas: 169 passed; Ruff e `git diff --check` limpos;
+- adversarial independente (captura própria): baseline com 0 divergências;
+  âncora do registro recomputada de forma independente a partir da fixture
+  e IDÊNTICA à gravada (`md5:` do JSON canônico do registro individual);
+  `document_only` sem quote e sem coordenadas fabricadas; edge
+  `credenciada_por` stated com a MESMA âncora; investidor/programa/agencia
+  seguem com provenance vazia (escopo T08 preservado);
+- a atualização do teste `test_actor_edges_have_empty_provenance_until_t07_t08`
+  (restrito a `programa|*`) foi além da lista explícita de arquivos, mas é
+  consequência direta e inevitável do contrato da task — aceita, espelha o
+  precedente da T06; o conflito esperado com a T08 nesse arquivo será
+  resolvido pela governança no pouso;
+- decisões do implementador aceitas: hash por registro individual (não do
+  arquivo inteiro — testado), âncora construída uma vez e reusada na edge.
+
