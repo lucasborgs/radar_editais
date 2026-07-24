@@ -896,38 +896,30 @@ def _ingest_editais(
             meta["exclusoes"] = exclusoes
             meta["publico_alvo"] = publico_alvo or ([str(bronze_pa)] if bronze_pa else [])
 
-            # RT01-T05 (spec docs/specs/radar-data-trust-01-provenance.md
-            # §4/§6): dual-write de proveniência SOMENTE para `source ==
-            # "finep"` — outras fontes ficam byte-idênticas ao path antigo
-            # (`entity_provenance = {}`, chunks sem coordenadas novas).
+            # RT01-T05+/T06 (spec docs/specs/radar-data-trust-01-provenance.md
+            # §4/§6): dual-write de proveniência para TODAS as fontes de
+            # edital (finep, fapesp, fapesc, web).
             entity_provenance: dict = {}
             operado_por_provenance: dict | None = None
             subordinado_a_provenance: dict | None = None
             silver_hash_ref = f"md5:{src_hash}" if src_hash else None
-            if src == "finep":
-                entity_provenance = provenance_writer.build_edital_fact_provenance(
-                    status=md["status"], mecanismo=mecanismo_value,
-                    constraints=constraints, requisitos_texto=requisitos, blocks=blocks,
-                    source=src, native_id=stem, edital_id=native_id,
-                    silver_source_hash=silver_hash_ref, source_url=md["metadata"].get("url"),
-                    tagger_model=model, constraints_model=CONSTRAINTS_MODEL,
-                )
-                for c in chunks:
-                    coords = provenance_writer.chunk_storage_coords(c, silver_hash_ref)
-                    if coords:
-                        c.update(coords)
-                # RT01-T05 — emenda autorizada pela governança (2026-07-24):
-                # o harness T02 aceita e ignora `provenance` em
-                # `_upsert_rel` (stub_upsert_rel), então esta chamada não
-                # arrisca mais o gate. SOMENTE finep grava; outras fontes
-                # chamam `_upsert_rel` sem o kwarg, byte-idêntico ao path
-                # antigo.
-                operado_por_provenance = provenance_writer.build_operado_por_provenance().model_dump(
-                    mode="json"
-                )
-                subordinado_a_provenance = provenance_writer.build_subordinado_a_provenance().model_dump(
-                    mode="json"
-                )
+            entity_provenance = provenance_writer.build_edital_fact_provenance(
+                status=md["status"], mecanismo=mecanismo_value,
+                constraints=constraints, requisitos_texto=requisitos, blocks=blocks,
+                source=src, native_id=stem, edital_id=native_id,
+                silver_source_hash=silver_hash_ref, source_url=md["metadata"].get("url"),
+                tagger_model=model, constraints_model=CONSTRAINTS_MODEL,
+            )
+            for c in chunks:
+                coords = provenance_writer.chunk_storage_coords(c, silver_hash_ref)
+                if coords:
+                    c.update(coords)
+            operado_por_provenance = provenance_writer.build_operado_por_provenance().model_dump(
+                mode="json"
+            )
+            subordinado_a_provenance = provenance_writer.build_subordinado_a_provenance().model_dump(
+                mode="json"
+            )
 
             with conn.transaction(), conn.cursor() as cur:
                 eid = _upsert_entity(
