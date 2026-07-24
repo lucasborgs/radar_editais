@@ -200,4 +200,26 @@ no checkout principal.
 
 **Implementador/modelo: claude-sonnet (subagente), worktree isolado**
 
-**Veredito:** pendente
+**Veredito:** aprovada em 2026-07-24 (auditoria da governança — Fable).
+
+Melhor entrega do bloco em honestidade. Verificação independente:
+
+- diff 100% docs (nenhum código/migration/prompt/fixture); spec 01 header
+  NÃO virou vigente (correto — promoção é ato de governança/proprietário);
+- afirmações factuais centrais reconferidas pela governança, não confiando
+  no resumo: `git diff` da base do programa em `src/radar/core/eval/` é
+  **vazio** (confirma "evals §10 não construídas"); banco local vivo tem
+  provenance só nos 17 investidores, editais/agências em `{}` (confirma a
+  nota honesta §2 — dual-write é código provado por teste, materializa no
+  próximo re-ingest, não é falha); correção cosmética T01 aplicada (57+8);
+- auditoria §16 é honesta: 8 cumpridos, 1 parcial (deadline/name→spec 04),
+  1 NÃO cumprido como gate formal (evals §10→spec 02, com a evidência do
+  diff vazio), 1 em execução — nenhum critério marcado cumprido sem
+  evidência, nenhuma pendência escondida;
+- matriz de fontes e destinos das dívidas conferem com os relatórios das
+  tasks; architecture.md descreve só o runtime implementado.
+
+Nuance registrada (não bloqueia): a spec menciona um estado agregado
+`legacy` (§9.1) que o domínio não materializa como valor de `FactState` — a
+implementação usa ausência/`{}`. Leitura operacional correta; vale nota na
+eventual revisão da spec.
