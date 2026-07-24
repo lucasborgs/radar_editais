@@ -261,7 +261,7 @@ def test_suites_registered():
     from radar.core.eval.registry import SUITES
     assert set(SUITES) == {
         "matching", "rag", "writing", "extraction",
-        "opportunity_type", "triage", "writing_v2",
+        "opportunity_type", "provenance", "triage", "writing_v2",
         "profile_extractor", "reranker", "structurer",
         "explore", "relevance_shadow", "e2e_health",
     }
