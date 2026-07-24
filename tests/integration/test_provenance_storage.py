@@ -240,10 +240,16 @@ class TestMatchChunksNewColumns:
 
 class TestGoldEntityUpsertCompatibility:
     def test_entity_upsert_sql_literal_runs_twice_after_migration(self, pg_conn):
-        """O SQL literal de `gold._ENTITY_UPSERT` (colunas nomeadas, sem
-        `provenance`) continua funcionando após a migration aditiva — upsert
-        idempotente por (source, native_id), mesmo com a coluna nova presente
-        na tabela mas ausente da lista de colunas do INSERT."""
+        """O SQL literal de `gold._ENTITY_UPSERT` continua funcionando após a
+        migration aditiva — upsert idempotente por (source, native_id).
+
+        NOTA (RT01-T05): `_ENTITY_UPSERT` passou a nomear a coluna
+        `provenance` no INSERT (dual-write, spec §6.1); os `params` abaixo
+        foram atualizados de `'{}'` explícito para acompanhar essa mudança —
+        é a atualização mínima necessária para este teste do T04 continuar
+        válido, não uma mudança de escopo do T04. O comportamento provado
+        (upsert idempotente; `provenance='{}'` quando o caller não passa
+        nada de fato) permanece o mesmo."""
         cur = pg_conn.cursor()
         params = {
             "kind": "edital",
@@ -265,6 +271,7 @@ class TestGoldEntityUpsertCompatibility:
             "curated": False,
             "verificado": None,
             "metadata": json.dumps({}),
+            "provenance": json.dumps({}),
             "embedding": gold._vec(_DUMMY_EMB),
         }
 
@@ -276,7 +283,8 @@ class TestGoldEntityUpsertCompatibility:
 
         assert id_first == id_second, "upsert por (source, native_id) deve resolver para a mesma linha"
 
-        # a linha existe, provenance permanece no default '{}' (o upsert não
-        # menciona a coluna nova — comportamento aditivo intocado)
+        # a linha existe, provenance permanece no default '{}' (o caller
+        # passou '{}' explicitamente — guard anti-clobber não tem nada a
+        # preservar aqui, e o resultado é o mesmo '{}' de antes do T05)
         cur.execute("select provenance from public.entities where id = %s", (id_first,))
         assert cur.fetchone()[0] == {}

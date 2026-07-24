@@ -203,8 +203,18 @@ class GoldCaptureHarness:
         return synthetic_id
 
     def stub_upsert_rel(
-        self, cur: Any, source_id: str, target_id: str, rtype: str, properties: dict | None = None
+        self, cur: Any, source_id: str, target_id: str, rtype: str,
+        properties: dict | None = None, provenance: dict | None = None,
     ) -> None:
+        # `provenance` (RT01-T05, emenda autorizada pela governança em
+        # 2026-07-24): aceito para que a assinatura acompanhe
+        # `gold._upsert_rel`, mas deliberadamente IGNORADO — não entra em
+        # `make_relation_record`, não é capturado na projeção. A projeção
+        # capturada permanece byte-idêntica ao baseline congelado
+        # independente do que este parâmetro receber; a captura real do
+        # valor (para os testes específicos de T05) é feita por um wrapper
+        # LOCAL em tests/unit/test_gold_provenance_dualwrite.py, não aqui.
+        del provenance
         record = equivalence.make_relation_record(
             source_entity_key=self._id_to_key.get(source_id, source_id),
             target_entity_key=self._id_to_key.get(target_id, target_id),
