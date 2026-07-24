@@ -30,6 +30,27 @@ from radar.core.kg import entity_catalog
 logger = logging.getLogger(__name__)
 
 
+def _format_provenance(provenance: dict) -> str:
+    """Formata o dict público de proveniência para o payload textual do agente."""
+    lines: list[str] = []
+    for path, info in provenance.items():
+        state = info.get("state", "unknown")
+        citations = info.get("citations", [])
+        if citations:
+            for c in citations:
+                doc = c.get("document") or "?"
+                page = c.get("page")
+                quote = (c.get("quote") or "")[:80]
+                page_str = f", p. {page}" if page is not None else ""
+                lines.append(
+                    f"[PROVENANCE:{path}] state={state} | {doc}{page_str} — "
+                    f"\"{quote}\""
+                )
+        else:
+            lines.append(f"[PROVENANCE:{path}] state={state} (sem citação verificável)")
+    return "\n".join(lines)
+
+
 def build_explore_tools() -> list[BaseTool]:
     """Constrói as tools de leitura do agente de explore (lêem entity_catalog/SQL,
     stateless, reusáveis entre turns/usuários)."""
@@ -106,6 +127,9 @@ def build_explore_tools() -> list[BaseTool]:
             parts.append(f"Temas: {', '.join(card['themes'][:6])}")
         for req in (card.get("key_requirements") or [])[:5]:
             parts.append(f"  • {req}")
+        pv = card.get("provenance")
+        if pv:
+            parts.append(_format_provenance(pv))
         return "\n".join(parts)
 
     @tool
@@ -200,6 +224,9 @@ def build_explore_tools() -> list[BaseTool]:
             parts.append(f"Fonte oficial: {card['site']}")
         if card.get("verificado_em"):
             parts.append(f"Verificado em: {card['verificado_em']}")
+        pv = card.get("provenance")
+        if pv:
+            parts.append(_format_provenance(pv))
         return "\n".join(parts)
 
     @tool
