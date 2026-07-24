@@ -15,7 +15,12 @@ export function ProvenanceHint({ provenance, curationLabel }: ProvenanceHintProp
 
   const { state, citations } = provenance;
 
-  if (state === "unknown" || state === "legacy") return null;
+  // `legacy` nunca tem um rótulo de origem — permanece o fallback limpo.
+  // `unknown` é o estado de contrato dos campos de catálogo (curado != validado):
+  // quando o chamador passa `curationLabel`, o rótulo de origem tem precedência
+  // sobre a regra "unknown → null" (decisão do proprietário, RT01-T11 correção).
+  if (state === "legacy") return null;
+  if (state === "unknown" && !curationLabel) return null;
 
   let tooltipText: string;
 

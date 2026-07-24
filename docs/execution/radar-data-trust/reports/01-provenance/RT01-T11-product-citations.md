@@ -81,3 +81,83 @@ remover hints de paths inexistentes e de listas de relações, dar precedência
 a curationLabel sobre a regra unknown→null, e um hint de origem por ficha de
 ator. Aprovação após reauditoria + QA manual do proprietário.
 
+## Correção aplicada
+
+**Implementador da correção:** claude-sonnet (subagente), worktree existente.
+
+Somente os dois arquivos autorizados foram tocados. `frontend/src/types/edital.ts`
+não precisou de alteração: `provenance` já era tipado como
+`Record<string, FieldProvenance>`, então o acesso por bracket notation
+(`detail.provenance?.["mecanismo"]`, `` detail.provenance?.[`requisitos_texto.${i}`] ``)
+compila sem mudança de tipo.
+
+### `frontend/src/app/oportunidades/[id]/page.tsx`
+
+1. **Removidos** os hints de `deadline`, `mechanism` (InfoRow "Valor"/"Ticket"
+   continuam usando as props `value`/`ticket`, não confundir com o path
+   inexistente `mechanism`), `value`, `ticket_range`, `estagio_alvo`,
+   `lead_follow`, e das TagCards "Programas", "ICTs relacionadas" e
+   "Investidores" (listas de relações — hint conceitualmente errado ali, path
+   também não existe no backend).
+2. **Religados** aos paths reais do `provenance_writer.py`:
+   - InfoRow "Mecanismo" → `detail.provenance?.["mecanismo"]`.
+   - TagCard "Temas" → `detail.provenance?.["setores"]` (sem `curationLabel`).
+   - TagCard "Tecnologias" → `detail.provenance?.["tecnologias_tags"]` (sem
+     `curationLabel`).
+   - Seção "Requisitos": hint POR ITEM, um `<ProvenanceHint>` por `<li>` usando
+     `` detail.provenance?.[`requisitos_texto.${i}`] `` (índice 0-based, mesma
+     ordem do array persistido) — o coração da correção: quando o item tem
+     `state="stated"` com `citations`, o tooltip (comportamento já existente do
+     componente) mostra "Fonte: <documento>, p. <página>", a única citação
+     documental real da ficha.
+3. **Fichas de ator** (`kind === "investimento" | "programa"`): um hint de
+   origem por ficha, colocado no `<h1>` do título (não existe uma linha
+   literal "Fonte oficial" na página — o link condicional mais próximo é "Ver
+   página oficial ↗", presente só quando `official_url` existe; o título é o
+   único elemento sempre presente em toda ficha de ator, por isso foi o
+   ancoradouro escolhido, conforme a alternativa prevista na correção), usando
+   `curationLabel="catalogo"` e `detail.provenance?.["name"]`.
+
+### `frontend/src/components/ProvenanceHint.tsx`
+
+4. `curationLabel` agora tem precedência sobre a regra `unknown → null`:
+   ```
+   if (state === "legacy") return null;
+   if (state === "unknown" && !curationLabel) return null;
+   ```
+   `legacy` continua retornando `null` incondicionalmente (não é um
+   `FactState` real do backend — nenhum call site desta task o produz com
+   `curationLabel`, então não havia motivo para abrir exceção ali). `unknown`
+   só é liberado quando o chamador passa `curationLabel` — é exatamente o
+   estado contratual de `build_catalog_copied_provenance` (curado ≠ validado)
+   usado pelo path `name` de investidor/programa. Sem `curationLabel`,
+   `unknown`/`legacy` continuam retornando `null` — fallback limpo de legado
+   inalterado.
+
+   **Consistência componente ↔ call site (ponto de atenção da correção):**
+   optou-se pela via mais simples — **passar o objeto de provenance e deixar
+   o componente decidir**, mantendo o padrão já usado em todos os outros call
+   sites (`{cond && <ProvenanceHint provenance={...} .../>}`). O call site do
+   hint de ator segue esse mesmo padrão
+   (`detail.provenance?.["name"] && <ProvenanceHint provenance={detail.provenance["name"]} curationLabel="catalogo" />`).
+   Não foi necessário tornar a prop `provenance` opcional no componente: como
+   `name` é incluído no dict de saída sempre que `record.get("name")` é
+   truthy (`build_investidor_fact_provenance`/`build_programa_fact_provenance`),
+   na prática o campo estará presente para todo investidor/programa
+   curado; se um dia faltar, o guard `&&` no call site já cobre a ausência
+   sem renderizar nada — comportamento equivalente e mais simples do que
+   aceitar `provenance: undefined` dentro do componente.
+
+### Validação
+
+| Comando/verificação | Resultado |
+|---|---|
+| `cd frontend && npm run lint` | Limpo — só os 4 warnings preexistentes em `src/lib/auth.tsx` (`react-hooks/exhaustive-deps`, não relacionados a esta task) |
+| `cd frontend && npx tsc --noEmit` | Limpo (0 erros, sem output) |
+| `git diff --check` | Limpo (exit 0, sem whitespace errors) |
+| `git diff 89ff58e7d --stat` | `frontend/src/app/oportunidades/[id]/page.tsx` \| 30 +++++++++++++++++----------- ; `frontend/src/components/ProvenanceHint.tsx` \| 7 ++++++- ; 2 arquivos, ambos autorizados |
+
+O veredito condicionado da auditoria acima permanece intacto (nada foi
+reescrito ou apagado). Nenhum arquivo de backend, dependência ou rota foi
+tocado. Commit único, nada pushed.
+

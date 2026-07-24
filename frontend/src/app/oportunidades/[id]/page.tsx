@@ -207,8 +207,11 @@ export default function OportunidadeDetailPage() {
       {/* Header card */}
       <div className="bg-surface rounded-xl border border-border p-5 mb-4">
         <div className="flex items-start justify-between gap-4 mb-3">
-          <h1 className="font-heading text-lg font-bold text-content-primary leading-snug flex-1">
+          <h1 className="font-heading text-lg font-bold text-content-primary leading-snug flex-1 flex items-center gap-1.5">
             {detail.title}
+            {(detail.kind === "investimento" || detail.kind === "programa") && detail.provenance?.["name"] && (
+              <ProvenanceHint provenance={detail.provenance["name"]} curationLabel="catalogo" />
+            )}
           </h1>
           {isEdital && <StatusBadge status={detail.status as EditalStatus} />}
         </div>
@@ -233,15 +236,15 @@ export default function OportunidadeDetailPage() {
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 mb-4">
           {detail.deadline && (() => {
             const parsed = parseDeadline(detail.deadline);
-            return <InfoRow label="Prazo" value={parsed ?? detail.deadline} provenance={detail.provenance?.deadline} />;
+            return <InfoRow label="Prazo" value={parsed ?? detail.deadline} />;
           })()}
-          {detail.mechanism && <InfoRow label="Mecanismo" value={detail.mechanism} provenance={detail.provenance?.mechanism} />}
-          {value && <InfoRow label="Valor" value={value} provenance={detail.provenance?.value} />}
-          {ticket && !value && <InfoRow label="Ticket" value={ticket} provenance={detail.provenance?.ticket_range} />}
+          {detail.mechanism && <InfoRow label="Mecanismo" value={detail.mechanism} provenance={detail.provenance?.["mecanismo"]} />}
+          {value && <InfoRow label="Valor" value={value} />}
+          {ticket && !value && <InfoRow label="Ticket" value={ticket} />}
           {detail.estagio_alvo && detail.estagio_alvo.length > 0 && (
-            <InfoRow label="Estágio-alvo" value={detail.estagio_alvo.join(", ")} provenance={detail.provenance?.estagio_alvo} />
+            <InfoRow label="Estágio-alvo" value={detail.estagio_alvo.join(", ")} />
           )}
-          {detail.lead_follow && <InfoRow label="Lead/follow" value={detail.lead_follow} provenance={detail.provenance?.lead_follow} />}
+          {detail.lead_follow && <InfoRow label="Lead/follow" value={detail.lead_follow} />}
         </div>
 
         {detail.official_url && (
@@ -309,12 +312,12 @@ export default function OportunidadeDetailPage() {
 
       {/* Conceitos cobertos + atores relacionados */}
       <div className="flex flex-wrap gap-4 mb-4">
-        <TagCard title="Temas" tags={detail.themes} />
-        <TagCard title="Tecnologias" tags={detail.technologies} />
-        <TagCard title="Programas" tags={detail.programs} provenance={detail.provenance?.programs} curationLabel="catalogo" />
+        <TagCard title="Temas" tags={detail.themes} provenance={detail.provenance?.["setores"]} />
+        <TagCard title="Tecnologias" tags={detail.technologies} provenance={detail.provenance?.["tecnologias_tags"]} />
+        <TagCard title="Programas" tags={detail.programs} />
         <TagCard title="Público-alvo" tags={detail.eligible_entities.length ? detail.eligible_entities : detail.publico_alvo} />
-        <TagCard title="ICTs relacionadas" tags={detail.icts} provenance={detail.provenance?.icts} curationLabel="embrapii" />
-        <TagCard title="Investidores" tags={detail.investidores} provenance={detail.provenance?.investidores} curationLabel="catalogo" />
+        <TagCard title="ICTs relacionadas" tags={detail.icts} />
+        <TagCard title="Investidores" tags={detail.investidores} />
       </div>
 
       {/* Requisitos */}
@@ -325,6 +328,9 @@ export default function OportunidadeDetailPage() {
               <li key={i} className="text-sm font-sans text-content-primary flex gap-2">
                 <span className="text-primary shrink-0 mt-0.5">·</span>
                 {r}
+                {detail.provenance?.[`requisitos_texto.${i}`] && (
+                  <ProvenanceHint provenance={detail.provenance[`requisitos_texto.${i}`]} />
+                )}
               </li>
             ))}
           </ul>
