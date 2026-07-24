@@ -29,11 +29,10 @@ import hashlib
 import json
 from typing import Any
 
-from helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
-
 from radar.core.kg import provenance_writer
 from radar.core.kg.equivalence import relation_key
 from radar.domain.provenance import FactProvenance
+from tests.helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
 
 ICT_FIXTURE = DEFAULT_FIXTURES_DIR / "bronze" / "ict_raw" / "embrapii_fixture.json"
 

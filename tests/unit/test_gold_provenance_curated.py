@@ -29,11 +29,10 @@ import hashlib
 import json
 from typing import Any
 
-from helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
-
 from radar.core.kg import provenance_writer
 from radar.core.kg.equivalence import relation_key
 from radar.domain.provenance import EvidenceRef, FactProvenance
+from tests.helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
 
 INVESTIDOR_KEY = "investidor|curadoria|investidor:indicator-capital"
 PROGRAMA_KEY = "programa|curadoria|programa:centelha"

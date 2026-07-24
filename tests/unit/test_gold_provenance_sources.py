@@ -12,10 +12,9 @@ da T05). Prova:
 """
 from __future__ import annotations
 
-from helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
-
 from radar.core.kg.equivalence import relation_key
 from radar.domain.provenance import FactProvenance
+from tests.helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
 
 FAPESP_HASH = "md5:329072644fcefa5cf130b051bce0365c"
 FAPESC_HASH = "md5:5b1b0fbb4f62fa8d7e70ac083360aa16"

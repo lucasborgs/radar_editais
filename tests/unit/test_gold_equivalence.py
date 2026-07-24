@@ -15,9 +15,8 @@ from __future__ import annotations
 import copy
 import json
 
-from helpers.gold_projection import DEFAULT_FIXTURES_DIR, run_capture
-
 from radar.core.kg import equivalence
+from tests.helpers.gold_projection import DEFAULT_FIXTURES_DIR, run_capture
 
 # ---------------------------------------------------------------------------
 # Projeção sintética mínima para os testes do comparador (não usa o harness —

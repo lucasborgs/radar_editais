@@ -27,11 +27,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
-
 from radar.core.kg import provenance_writer
 from radar.core.kg.equivalence import relation_key
 from radar.domain.provenance import FactProvenance
+from tests.helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
 
 FINEP_SILVER = DEFAULT_FIXTURES_DIR / "silver" / "structured_docs" / "finep" / "602.jsonl"
 FINEP_HASH = "md5:e0c8a6f538aa9ab9b30f7ced0ad5edc5"  # tests/fixtures/.../finep/602.meta.json::source_hash
