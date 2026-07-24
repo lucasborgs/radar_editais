@@ -277,8 +277,8 @@ def _pack_chunks(blocks: list[dict]) -> list[dict]:
     coordenadas do PRIMEIRO bloco constituinte do chunk — semântica de âncora
     "o chunk começa aqui", não um range. Presentes para TODA fonte (o dict do
     bloco silver já as carrega quando existem); só `_ingest_editais` decide
-    se persiste (`gold._replace_match_chunks`), e só faz isso para
-    `source == "finep"` nesta task."""
+    se persiste (`gold._replace_match_chunks`) — desde a RT01-T06, para
+    todas as fontes de EDITAL_SOURCES."""
     chunks: list[dict] = []
     buf: list[str] = []
     head: dict | None = None
@@ -575,9 +575,10 @@ def _upsert_rel(
     """`provenance` (RT01-T05, spec §6.1) é opcional e gravada só no INSERT:
     `on conflict do nothing` preserva a semântica atual — uma aresta
     pré-existente NÃO é atualizada (nem `properties` nem `provenance`) por
-    uma chamada repetida. Nesta task, só `_ingest_editais` passa `provenance`
-    (edges `operado_por`/`subordinado_a`, somente `source == "finep"`);
-    `_ingest_programas`/`_ingest_icts` chamam sem o kwarg (equivale a `{}`).
+    uma chamada repetida. Só `_ingest_editais` passa `provenance` (edges
+    `operado_por`/`subordinado_a`, todas as fontes de edital desde a
+    RT01-T06); `_ingest_programas`/`_ingest_icts` chamam sem o kwarg
+    (equivale a `{}`) até T07/T08.
     O stub do harness T02 (`tests/helpers/gold_projection.py::stub_upsert_rel`)
     aceita e ignora o kwarg (emenda autorizada pela governança, 2026-07-24);
     a persistência real é validada por

@@ -274,24 +274,15 @@ class TestHarnessCapturedProvenance:
         for _path, payload in prov.items():
             FactProvenance.model_validate(payload)
 
-    def test_non_finep_entities_have_empty_provenance(self, monkeypatch):
-        harness, _stats = _run_provenance_capture(monkeypatch)
-        non_finep_keys = [
-            k for k, rec in harness.projection.entities.items()
-            if not (rec["kind"] == "edital" and rec["source"] == "finep")
-        ]
-        assert non_finep_keys, "fixture deveria ter entidades além do edital finep"
-        for k in non_finep_keys:
-            assert harness.entity_provenance.get(k, {}) == {}, f"{k} deveria ter provenance vazia"
-        # Confere explicitamente as fontes citadas no enunciado (dado que estejam na fixture).
-        sources_present = {rec["source"] for rec in harness.projection.entities.values()}
-        for src in ("fapesp", "fapesc", "web", "embrapii", "curadoria"):
-            if src in sources_present:
-                keys = [k for k, rec in harness.projection.entities.items() if rec["source"] == src]
-                for k in keys:
-                    assert harness.entity_provenance.get(k, {}) == {}
+    # NOTA (RT01-T06, governança): os testes `test_non_finep_entities_have_
+    # empty_provenance`, `test_chunk_coords_only_present_for_finep` e
+    # `test_non_finep_edges_have_empty_provenance` (escopo era-T05: "só finep
+    # grava") foram REMOVIDOS ao pousar a T06, que estendeu o dual-write a
+    # todas as fontes de edital. O contrato vigente é afirmado em
+    # tests/unit/test_gold_provenance_sources.py (fontes de edital com
+    # provenance/coords; não-edital ainda vazio até T07/T08).
 
-    def test_chunk_coords_only_present_for_finep(self, monkeypatch):
+    def test_finep_chunk_coords_are_anchored(self, monkeypatch):
         harness, _stats = _run_provenance_capture(monkeypatch)
         finep_key = "edital|finep|finep:602"
         assert finep_key in harness.chunk_coords
@@ -300,12 +291,6 @@ class TestHarnessCapturedProvenance:
         assert all(c["document"] == "Edital.pdf" for c in finep_coords)
         assert all(c["source_hash"] == FINEP_HASH for c in finep_coords)
         assert all(c["silver_block_idx"] is not None for c in finep_coords)
-
-        for key, coords in harness.chunk_coords.items():
-            if key == finep_key:
-                continue
-            for c in coords:
-                assert c == {"document": None, "page": None, "silver_block_idx": None, "source_hash": None}
 
     def test_two_consecutive_captures_agree_on_provenance(self, monkeypatch):
         """Determinismo (espelha `TestBaselineCapture` do T02): a captura de
@@ -331,16 +316,16 @@ class TestHarnessCapturedProvenance:
         assert fp.producer.kind == "deterministic"
         assert fp.derivation.rule == "_SOURCE_AGENCY:v1"
 
-    def test_non_finep_edges_have_empty_provenance(self, monkeypatch):
-        """Todas as demais arestas da fixture (fapesp/fapesc operado_por,
-        EMBRAPII credenciada_por, programa operado_por x3) ficam com
-        provenance vazia — só o edital finep grava."""
+    def test_actor_edges_have_empty_provenance_until_t07_t08(self, monkeypatch):
+        """Arestas de atores (EMBRAPII `credenciada_por`, programa
+        `operado_por`) seguem sem provenance até T07/T08 — as fontes de
+        EDITAL passaram a gravar na T06 e são afirmadas em
+        test_gold_provenance_sources.py."""
         harness, _stats = _run_provenance_capture(monkeypatch)
-        finep_rk = "edital|finep|finep:602->agencia|curadoria|agencia:finep|operado_por"
-        assert set(harness.projection.relations) - {finep_rk}, (
-            "fixture deveria ter arestas além da operado_por do edital finep"
-        )
-        for rk in harness.projection.relations:
-            if rk == finep_rk:
-                continue
+        actor_rks = [
+            rk for rk in harness.projection.relations
+            if rk.startswith(("ict|", "programa|"))
+        ]
+        assert actor_rks, "fixture deveria ter arestas de atores"
+        for rk in actor_rks:
             assert harness.relation_provenance.get(rk, {}) == {}, f"{rk} deveria ter provenance vazia"

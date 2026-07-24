@@ -3,7 +3,7 @@
 **Status:** `passed`
 **Plano:** [`plans/01-provenance/RT01-T06-other-opportunity-sources.md`](../../plans/01-provenance/RT01-T06-other-opportunity-sources.md)
 **Branch/commit-base:** `codex/radar-data-trust-01-t06` / base `a1d16a4a2`
-**Implementador/modelo:** claude-sonnet (subagente), worktree isolado
+**Implementador/modelo:** deepseek-v4 (subagente via opencode, orquestrado externamente), worktree isolado
 
 ## Realizado
 
@@ -45,7 +45,7 @@ herméticos (sem rede/banco, stubs do harness T02) provando:
 - **Web page=1**: o structurer emite page=1 para blocos web; `chunk_storage_coords`
   lê `src_page` do chunk e persiste como está — sem fabricação
 - **Proveniência não usada por consumidor novo**: estritamente aditiva
-  (colunas `provenance::jsonb` já existiam na migration 036)
+  (colunas `provenance::jsonb` já existiam na migration 042 (RT01-T04))
 
 ## Divergências e decisões
 
@@ -151,4 +151,34 @@ Nenhuma. Implementação mínima completa.
 - **Proibições respeitadas**: sem fabricação de coordenada/página/hash;
   sem `stated` sem EvidenceRef; sem overengineering
 
-**Veredito:** pendente
+**Veredito:** aprovada em 2026-07-24 (ver seção de auditoria ao final).
+
+## Auditoria (governança — Fable)
+
+**Veredito:** aprovada em 2026-07-24, com correções da governança aplicadas
+em commit próprio na branch (sequência achado → correção → validação):
+
+- diff do commit `cc18a3d5b` inspecionado integralmente: mudança mínima e
+  correta (remoção do gate `src == "finep"`), nenhum builder novo, gate T02
+  byte-idêntico; teste novo substantivo (verificado que FactState/
+  LocatorQuality são str-enums — as comparações com string não são vazias);
+- **achado 1 (material):** a entrega deixou a suíte vermelha — 3 asserções
+  era-T05 em `test_gold_provenance_dualwrite.py` invalidadas pela mudança
+  de contrato aprovada. Correção da governança: os 3 testes supersedidos
+  foram removidos/reescritos para o contrato vigente (cobertura da forma
+  T06 vive em `test_gold_provenance_sources.py`; âncora de chunks finep e
+  edges de atores continuam afirmadas aqui);
+- **achado 2:** docstrings obsoletas ("somente finep") em `_pack_chunks`,
+  `_upsert_rel` e no módulo `provenance_writer` — atualizadas;
+- **achado 3:** relatório com migration errada (036 → 042) e implementador
+  mal atribuído (claude-sonnet → deepseek-v4/opencode) — corrigidos;
+- as correções da governança são declaradas como perda pontual de
+  independência (escopo: testes supersedidos + docstrings + relatório;
+  nenhuma mudança de comportamento produtivo);
+- validação pós-correção e auditoria adversarial independente registradas
+  na conversa de governança: suíte completa verde, baseline T02 com 0
+  divergências sob o código novo, provenance presente nas 4 fontes de
+  edital e ausente em atores, nenhum `stated` sem ref resolvida, contagens
+  do banco local intactas;
+- nota operacional: o stash `wip/docs-architecture-...` visível no worktree
+  pertence ao proprietário (compartilhado via git dir comum) — não tocado.

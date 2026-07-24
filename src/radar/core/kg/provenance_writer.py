@@ -10,8 +10,9 @@ requisitos/blocks/silver_hash/model/...) por parâmetro e devolve um
 o dict `path -> FactProvenance.model_dump(mode="json")` pronto para
 `entities.provenance`.
 
-Chamado SOMENTE quando `source == "finep"` — o gate por fonte fica em
-`gold._ingest_editais`, não aqui. Nenhum consumidor lê o resultado ainda
+Chamado por `gold._ingest_editais` para todas as fontes de edital (finep na
+RT01-T05; fapesp/fapesc/web desde a RT01-T06) — a decisão de quem chama fica
+em `gold`, não aqui. Nenhum consumidor lê o resultado ainda
 (spec §9.2 passo 1: "produtores começam a gravar... sem exigir cobertura
 total do legado").
 
