@@ -284,20 +284,12 @@ class TestHarnessCapturedICTProvenance:
             if rec["kind"] == "edital":
                 assert harness.entity_provenance.get(key), f"{key} deveria ter provenance não vazia"
 
-    def test_investor_programa_agencia_still_empty(self, monkeypatch):
-        """investidor/programa/agência seguem sem provenance até T08."""
-        harness, _stats = _run_capture(monkeypatch)
-        checked = 0
-        for key, rec in harness.projection.entities.items():
-            if rec["kind"] in ("investidor", "programa", "agencia"):
-                checked += 1
-                assert harness.entity_provenance.get(key, {}) == {}, f"{key} deveria ter provenance vazia"
-        assert checked, "fixture deveria ter investidor/programa/agência"
+    # NOTA (pouso T07+T08, governança): a asserção de escopo-irmão que vivia
+    # aqui ("test_investor_programa_agencia_still_empty") afirmava que os kinds da task PARALELA ainda não gravavam
+    # provenance — supersedida quando as duas pousaram juntas. O contrato
+    # positivo pós-pouso vive em test_gold_provenance_sources.py
+    # (test_all_entities_have_provenance) e nos arquivos por kind.
 
-
-# ---------------------------------------------------------------------------
-# (c) Adversarial + determinismo
-# ---------------------------------------------------------------------------
 
 
 class TestAdversarialAndDeterminism:

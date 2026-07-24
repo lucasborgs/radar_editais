@@ -318,15 +318,8 @@ class TestHarnessCapturedProvenance:
         assert fp.producer.kind == "deterministic"
         assert fp.derivation.rule == "_SOURCE_AGENCY:v1"
 
-    def test_programa_edges_have_empty_provenance_until_t08(self, monkeypatch):
-        """Arestas de programa (`operado_por`) seguem sem provenance até
-        T08. RT01-T07: a aresta `credenciada_por` de ICT (EMBRAPII) passou a
-        gravar provenance (âncora document_only do registro, spec §6.4) —
-        removida deste teste "ainda vazio" e afirmada em
-        test_gold_provenance_icts.py; as fontes de EDITAL passaram a gravar
-        na T06 e são afirmadas em test_gold_provenance_sources.py."""
-        harness, _stats = _run_provenance_capture(monkeypatch)
-        programa_rks = [rk for rk in harness.projection.relations if rk.startswith("programa|")]
-        assert programa_rks, "fixture deveria ter arestas de programa"
-        for rk in programa_rks:
-            assert harness.relation_provenance.get(rk, {}) == {}, f"{rk} deveria ter provenance vazia"
+    # NOTA (pouso T07+T08, governança): a asserção de escopo-irmão que vivia
+    # aqui ("test_programa_edges_have_empty_provenance_until_t08") afirmava que os kinds da task PARALELA ainda não gravavam
+    # provenance — supersedida quando as duas pousaram juntas. O contrato
+    # positivo pós-pouso vive em test_gold_provenance_sources.py
+    # (test_all_entities_have_provenance) e nos arquivos por kind.

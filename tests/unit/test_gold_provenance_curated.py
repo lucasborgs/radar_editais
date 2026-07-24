@@ -378,14 +378,12 @@ class TestCuratedCapturedProvenance:
             expected_min = {"status", "setores", "tecnologias_tags"}
             assert expected_min <= set(prov)
 
-    def test_ict_still_has_no_provenance(self, monkeypatch):
-        """`ict` é escopo da task irmã T07 (paralela) — nesta branch continua
-        vazio, entidade e aresta `credenciada_por`."""
-        harness, _ = _run_capture(monkeypatch)
-        assert ICT_KEY in harness.entity_provenance
-        assert harness.entity_provenance[ICT_KEY] == {}
-        assert ICT_CREDENCIADA_POR in harness.relation_provenance
-        assert harness.relation_provenance[ICT_CREDENCIADA_POR] == {}
+    # NOTA (pouso T07+T08, governança): a asserção de escopo-irmão que vivia
+    # aqui ("test_ict_still_has_no_provenance") afirmava que os kinds da task PARALELA ainda não gravavam
+    # provenance — supersedida quando as duas pousaram juntas. O contrato
+    # positivo pós-pouso vive em test_gold_provenance_sources.py
+    # (test_all_entities_have_provenance) e nos arquivos por kind.
+
 
     def test_no_catalog_field_is_stated(self, monkeypatch):
         """Adversarial: nenhum path de investidor/programa/agencia é
