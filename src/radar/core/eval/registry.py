@@ -6,6 +6,7 @@ suítes especializadas registradas abaixo. Todas exercitam o pipeline real.
 from __future__ import annotations
 
 from radar.core.eval import (
+    e2e_health,
     explore,
     extraction,
     matching,
@@ -33,6 +34,7 @@ SUITES: dict[str, Suite] = {
     structurer.SUITE.name: structurer.SUITE,
     writing.SUITE_WRITING_V2.name: writing.SUITE_WRITING_V2,
     relevance_shadow.SUITE.name: relevance_shadow.SUITE,
+    e2e_health.SUITE.name: e2e_health.SUITE,
 }
 
 
