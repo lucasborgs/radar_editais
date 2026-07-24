@@ -1,0 +1,937 @@
+[
+  {
+    "case_id": "provenance-01-unique-exact",
+    "case_type": "unique_exact_quote",
+    "description": "Trecho único, presente em um só bloco/página do Documento Canônico silver real (FINEP 602). resolve_quote deve produzir locator_quality=exact com page e block_idx resolvidos.",
+    "input": {
+      "quote": "A concessão de recursos não reembolsáveis pela Finep implica, obrigatoriamente, que a Interveniente Cofinanciadora aporte no projeto recursos de contrapartida financeira.",
+      "source": "finep",
+      "native_id": "602",
+      "edital_id": "finep:602",
+      "silver_source_hash": "md5:e0c8a6f538aa9ab9b30f7ced0ad5edc5",
+      "canonical_content_hash": null,
+      "blocks": [
+        {
+          "idx": 61,
+          "doc": "Edital.pdf",
+          "page": 6,
+          "section_path": [
+            "6. FINANCIAMENTO DE PROJETOS",
+            "6.5 Valores mínimos de contrapartida"
+          ],
+          "kind": "paragraph",
+          "text": "6.5.1. A concessão de recursos não reembolsáveis pela Finep implica, obrigatoriamente, que a Interveniente Cofinanciadora aporte no projeto recursos de contrapartida financeira. O valor do aporte dependerá do faturamento bruto de 2016 da Interveniente Cofinanciadora, conforme quadro abaixo. Caso a Interveniente Cofinanciadora pertença a um Grupo Econômico, será utilizada a composição do faturamento deste para apuração do percentual de contrapartida."
+        }
+      ]
+    },
+    "expected_output": {
+      "candidates": [
+        {
+          "doc": "Edital.pdf",
+          "page": 6,
+          "block_idx": 61,
+          "section_path": [
+            "6. FINANCIAMENTO DE PROJETOS",
+            "6.5 Valores mínimos de contrapartida"
+          ]
+        }
+      ],
+      "ambiguous": false,
+      "missing_hash": false,
+      "locator_quality": "exact",
+      "evidence_ref": {
+        "source": "finep",
+        "native_id": "602",
+        "edital_id": "finep:602",
+        "document": "Edital.pdf",
+        "page": 6,
+        "block_idx": 61,
+        "section_path": [
+          "6. FINANCIAMENTO DE PROJETOS",
+          "6.5 Valores mínimos de contrapartida"
+        ],
+        "quote": "A concessão de recursos não reembolsáveis pela Finep implica, obrigatoriamente, que a Interveniente Cofinanciadora aporte no projeto recursos de contrapartida financeira.",
+        "canonical_content_hash": null,
+        "silver_source_hash": "md5:e0c8a6f538aa9ab9b30f7ced0ad5edc5",
+        "locator_quality": "exact"
+      },
+      "fact_state": "stated",
+      "critical_field": "counterpart",
+      "critical_field_group": "mecanismo (spec 01 §3.1)"
+    },
+    "metadata": {
+      "spec_ref": "docs/specs/radar-data-trust-02-quality-gates.md §7.1",
+      "case_ref": "spec §7.1 caso 1 — trecho único e exato",
+      "silver_fixture_source": "tests/fixtures/gold_equivalence/silver/structured_docs/finep/602.jsonl (idx 61)",
+      "synthetic": false,
+      "uniqueness_verified": "confirmado via script ad-hoc que este quote ocorre exatamente 1x nos 121 blocos do fixture real (ver relatório da task)"
+    }
+  },
+  {
+    "case_id": "provenance-02-repeated-two-pages",
+    "case_type": "repeated_two_pages",
+    "description": "Trecho verbatim ('http://www.finep.gov.br/') ocorre em dois blocos do mesmo documento (FINEP 602), em páginas diferentes (6 e 10). resolve_quote não pode escolher silenciosamente uma página: cai para locator_quality=document_only.",
+    "input": {
+      "quote": "http://www.finep.gov.br/",
+      "source": "finep",
+      "native_id": "602",
+      "edital_id": "finep:602",
+      "silver_source_hash": "md5:e0c8a6f538aa9ab9b30f7ced0ad5edc5",
+      "canonical_content_hash": null,
+      "blocks": [
+        {
+          "idx": 56,
+          "doc": "Edital.pdf",
+          "page": 6,
+          "section_path": [
+            "6. FINANCIAMENTO DE PROJETOS",
+            "6.3 Empresas e ICTs Brasileiras"
+          ],
+          "kind": "paragraph",
+          "text": "6.3.3. A Finep poderá financiar os recursos financeiros alocados pelas Intervenientes Cofinanciadoras ao projeto como aporte obrigatório, assim como as atividades relacionadas ao projeto e que serão desenvolvidas internamente, por meio de financiamento reembolsável nas condições da Política Operacional: http://www.finep.gov.br/a-finep-externo/politica-operacional."
+        },
+        {
+          "idx": 88,
+          "doc": "Edital.pdf",
+          "page": 10,
+          "section_path": [
+            "8. Deliberação e Divulgação dos Resultados"
+          ],
+          "kind": "paragraph",
+          "text": "8.3. As decisões finais serão tomadas com base nos critérios de seleção descritos no item 7.1.2. A lista dos projetos selecionados será publicada pela Finep e pelo CDTI em suas páginas web: http://www.finep.gov.br/ e https://www.cdti.es/."
+        }
+      ]
+    },
+    "expected_output": {
+      "candidates": [
+        {
+          "doc": "Edital.pdf",
+          "page": 6,
+          "block_idx": 56,
+          "section_path": [
+            "6. FINANCIAMENTO DE PROJETOS",
+            "6.3 Empresas e ICTs Brasileiras"
+          ]
+        },
+        {
+          "doc": "Edital.pdf",
+          "page": 10,
+          "block_idx": 88,
+          "section_path": [
+            "8. Deliberação e Divulgação dos Resultados"
+          ]
+        }
+      ],
+      "ambiguous": true,
+      "missing_hash": false,
+      "locator_quality": "document_only",
+      "evidence_ref": {
+        "source": "finep",
+        "native_id": "602",
+        "edital_id": "finep:602",
+        "document": "Edital.pdf",
+        "page": null,
+        "block_idx": null,
+        "section_path": [],
+        "quote": "http://www.finep.gov.br/",
+        "canonical_content_hash": null,
+        "silver_source_hash": "md5:e0c8a6f538aa9ab9b30f7ced0ad5edc5",
+        "locator_quality": "document_only"
+      },
+      "fact_state": "stated",
+      "critical_field": null,
+      "critical_field_group": null
+    },
+    "metadata": {
+      "spec_ref": "docs/specs/radar-data-trust-02-quality-gates.md §7.1",
+      "case_ref": "spec §7.1 caso 2 — trecho repetido em duas páginas",
+      "silver_fixture_source": "tests/fixtures/gold_equivalence/silver/structured_docs/finep/602.jsonl (idx 56, idx 88)",
+      "synthetic": false,
+      "uniqueness_verified": "confirmado via script ad-hoc que este quote ocorre exatamente 2x nos 121 blocos do fixture real, nas páginas 6 e 10 — nenhuma terceira ocorrência",
+      "critical_field_note": "caso mecânico do locator (ambiguidade de página); não ancorado a um campo crítico específico do §3.1/§3.2"
+    }
+  },
+  {
+    "case_id": "provenance-03-html-no-page",
+    "case_type": "html_no_page",
+    "description": "Blocos sintéticos mínimos de uma página HTML (adapter web html_clean, sem unidade paginada — page=None em ambos). O trecho ocorre em dois blocos diferentes do mesmo doc; como a 'mesma página' aqui é apenas ausência uniforme de paginação (não uma coordenada real), resolve_quote NÃO deve produzir locator_quality=exact sem coordenada — cai para document_only (regra documentada em evidence_resolver._classify).",
+    "input": {
+      "quote": "Inscrições devem ser enviadas até o encerramento do prazo definido no regulamento.",
+      "source": "web",
+      "native_id": "web-synthetic-case3",
+      "edital_id": "web:web-synthetic-case3",
+      "silver_source_hash": "md5:9be28231717235955e3a02f91fda839e",
+      "canonical_content_hash": null,
+      "blocks": [
+        {
+          "idx": 0,
+          "doc": "oportunidade-web.html",
+          "page": null,
+          "section_path": [],
+          "kind": "paragraph",
+          "text": "Inscrições devem ser enviadas até o encerramento do prazo definido no regulamento."
+        },
+        {
+          "idx": 1,
+          "doc": "oportunidade-web.html",
+          "page": null,
+          "section_path": [
+            "Regulamento"
+          ],
+          "kind": "paragraph",
+          "text": "Consulte o regulamento completo antes de enviar. Inscrições devem ser enviadas até o encerramento do prazo definido no regulamento."
+        }
+      ]
+    },
+    "expected_output": {
+      "candidates": [
+        {
+          "doc": "oportunidade-web.html",
+          "page": null,
+          "block_idx": 0,
+          "section_path": []
+        },
+        {
+          "doc": "oportunidade-web.html",
+          "page": null,
+          "block_idx": 1,
+          "section_path": [
+            "Regulamento"
+          ]
+        }
+      ],
+      "ambiguous": true,
+      "missing_hash": false,
+      "locator_quality": "document_only",
+      "evidence_ref": {
+        "source": "web",
+        "native_id": "web-synthetic-case3",
+        "edital_id": "web:web-synthetic-case3",
+        "document": "oportunidade-web.html",
+        "page": null,
+        "block_idx": null,
+        "section_path": [],
+        "quote": "Inscrições devem ser enviadas até o encerramento do prazo definido no regulamento.",
+        "canonical_content_hash": null,
+        "silver_source_hash": "md5:9be28231717235955e3a02f91fda839e",
+        "locator_quality": "document_only"
+      },
+      "fact_state": "stated",
+      "critical_field": "deadline",
+      "critical_field_group": "temporal (spec 01 §3.1)"
+    },
+    "metadata": {
+      "spec_ref": "docs/specs/radar-data-trust-02-quality-gates.md §7.1",
+      "case_ref": "spec §7.1 caso 3 — HTML sem página",
+      "silver_fixture_source": "sintético (nenhum fixture real de silver tem page=None hoje)",
+      "synthetic": true,
+      "synthetic_hash_derivation": "md5(block[0].text + '\\n' + block[1].text), hex prefixado 'md5:'"
+    }
+  },
+  {
+    "case_id": "provenance-04-normalized-value",
+    "case_type": "normalized_value",
+    "description": "Campo crítico financeiro (funding_amount.max) cujo valor normalizado (600000.00) difere do texto verbatim do bloco ('R$600.000,00 (seiscentos mil reais)'). O locator resolve exact; a faithfulness do quote deve ser checada contra o TEXTO REAL do bloco, não contra o valor normalizado.",
+    "input": {
+      "quote": "O montante máximo do apoio não reembolsável da Finep por projeto é de R$600.000,00 (seiscentos mil reais).",
+      "source": "finep",
+      "native_id": "602",
+      "edital_id": "finep:602",
+      "silver_source_hash": "md5:e0c8a6f538aa9ab9b30f7ced0ad5edc5",
+      "canonical_content_hash": null,
+      "blocks": [
+        {
+          "idx": 49,
+          "doc": "Edital.pdf",
+          "page": 5,
+          "section_path": [
+            "6. FINANCIAMENTO DE PROJETOS",
+            "6.2 Orçamento",
+            "6.2.2"
+          ],
+          "kind": "paragraph",
+          "text": "O montante máximo do apoio não reembolsável da Finep por projeto é de R$600.000,00 (seiscentos mil reais)."
+        }
+      ]
+    },
+    "expected_output": {
+      "candidates": [
+        {
+          "doc": "Edital.pdf",
+          "page": 5,
+          "block_idx": 49,
+          "section_path": [
+            "6. FINANCIAMENTO DE PROJETOS",
+            "6.2 Orçamento",
+            "6.2.2"
+          ]
+        }
+      ],
+      "ambiguous": false,
+      "missing_hash": false,
+      "locator_quality": "exact",
+      "evidence_ref": {
+        "source": "finep",
+        "native_id": "602",
+        "edital_id": "finep:602",
+        "document": "Edital.pdf",
+        "page": 5,
+        "block_idx": 49,
+        "section_path": [
+          "6. FINANCIAMENTO DE PROJETOS",
+          "6.2 Orçamento",
+          "6.2.2"
+        ],
+        "quote": "O montante máximo do apoio não reembolsável da Finep por projeto é de R$600.000,00 (seiscentos mil reais).",
+        "canonical_content_hash": null,
+        "silver_source_hash": "md5:e0c8a6f538aa9ab9b30f7ced0ad5edc5",
+        "locator_quality": "exact"
+      },
+      "fact_state": "stated",
+      "critical_field": "funding_amount",
+      "critical_field_group": "financeiro (spec 01 §3.1)"
+    },
+    "metadata": {
+      "spec_ref": "docs/specs/radar-data-trust-02-quality-gates.md §7.1",
+      "case_ref": "spec §7.1 caso 4 — valor normalizado",
+      "silver_fixture_source": "tests/fixtures/gold_equivalence/silver/structured_docs/finep/602.jsonl (idx 49)",
+      "synthetic": false,
+      "uniqueness_verified": "confirmado via script ad-hoc que este quote ocorre exatamente 1x nos 121 blocos do fixture real",
+      "normalized_value": {
+        "field": "funding_amount.max",
+        "value": 600000.0,
+        "currency": "BRL",
+        "note": "600000.00 é o valor normalizado esperado por um produtor determinístico/LLM a partir de 'R$600.000,00'; o quote verbatim esperado é o texto do bloco, NUNCA o número normalizado"
+      }
+    }
+  },
+  {
+    "case_id": "provenance-05-absent-field",
+    "case_type": "absent_field",
+    "description": "Campo crítico do escopo spec 01 §3.1 (trl_range, grupo aderência) genuinamente ausente: buscado ('TRL') no escopo temático/de elegibilidade real do FINEP 602 (idx 0-30 — introdução, objetivo, áreas temáticas, arranjo institucional) e não encontrado em nenhum dos 121 blocos do documento completo. resolve_quote retorna 0 candidatos -> locator_quality=unresolved; evidence_ref preserva o quote buscado (conteúdo), sem coordenada fabricada. fact_state=absent (buscado e não encontrado), distinto de unknown (caso 6, material insuficiente).",
+    "input": {
+      "quote": "TRL",
+      "source": "finep",
+      "native_id": "602",
+      "edital_id": "finep:602",
+      "silver_source_hash": "md5:e0c8a6f538aa9ab9b30f7ced0ad5edc5",
+      "canonical_content_hash": null,
+      "blocks": [
+        {
+          "idx": 0,
+          "doc": "Edital.pdf",
+          "page": 1,
+          "section_path": [],
+          "kind": "heading",
+          "text": "CHAMADA PÚBLICA CONJUNTA ENTRE A FINANCIADORA DE ESTUDOS E PROJETOS (FINEP) E O CENTRO PARA EL DESARROLLO TECNOLÓGICO INDUSTRIAL (CDTI) COOPERAÇÃO ICT-EMPRESA – 01/2017",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 1,
+          "doc": "Edital.pdf",
+          "page": 1,
+          "section_path": [
+            "CHAMADA PÚBLICA CONJUNTA ENTRE A FINANCIADORA DE ESTUDOS E PROJETOS (FINEP) E O CENTRO PARA EL DESARROLLO TECNOLÓGICO INDUSTRIAL (CDTI) COOPERAÇÃO ICT-EMPRESA – 01/2017"
+          ],
+          "kind": "heading",
+          "text": "SELEÇÃO PÚBLICA DE PROJETOS COOPERATIVOS ENTRE INSTITUIÇÕES CIENTÍFICAS, TECNOLÓGICAS E DE INOVAÇÃO (ICTs) E EMPRESAS PARA O DESENVOLVIMENTO SUSTENTÁVEL E O CRESCIMENTO ECONÔMICO DO BRASIL E DA ESPANHA",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 2,
+          "doc": "Edital.pdf",
+          "page": 1,
+          "section_path": [
+            "SELEÇÃO PÚBLICA DE PROJETOS COOPERATIVOS ENTRE INSTITUIÇÕES CIENTÍFICAS, TECNOLÓGICAS E DE INOVAÇÃO (ICTs) E EMPRESAS PARA O DESENVOLVIMENTO SUSTENTÁVEL E O CRESCIMENTO ECONÔMICO DO BRASIL E DA ESPANHA"
+          ],
+          "kind": "heading",
+          "text": "1. INTRODUÇÃO",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 3,
+          "doc": "Edital.pdf",
+          "page": 1,
+          "section_path": [
+            "1. INTRODUÇÃO"
+          ],
+          "kind": "paragraph",
+          "text": "1.1. A Financiadora de Estudos e Projetos – FINEP e o Centro para el Desarrollo Tecnológico Industrial (CDTI), doravante denominados “Partes”, tornam pública a seleção conjunta de projetos cooperativos entre Instituições Científicas, Tecnológicas e de Inovação (ICTs) e empresas, no âmbito do Acordo de Cooperação entre as Partes, assinado em Madri em 27 de outubro de 2006 e renovado em São Paulo em 12 de dezembro de 2013.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 4,
+          "doc": "Edital.pdf",
+          "page": 1,
+          "section_path": [
+            "SELEÇÃO PÚBLICA DE PROJETOS COOPERATIVOS ENTRE INSTITUIÇÕES CIENTÍFICAS, TECNOLÓGICAS E DE INOVAÇÃO (ICTs) E EMPRESAS PARA O DESENVOLVIMENTO SUSTENTÁVEL E O CRESCIMENTO ECONÔMICO DO BRASIL E DA ESPANHA"
+          ],
+          "kind": "heading",
+          "text": "2. OBJETIVO",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 5,
+          "doc": "Edital.pdf",
+          "page": 1,
+          "section_path": [
+            "2. OBJETIVO"
+          ],
+          "kind": "paragraph",
+          "text": "2.1. Esta seleção tem como objetivo apoiar, por meio de financiamento não reembolsável às ICTs brasileiras pela FINEP e financiamento a empresas espanholas pelo CDTI, projetos elaborados em cooperação entre ICTs, empresas brasileiras e empresas espanholas, cujos objetivos estejam em consonância com as linhas temáticas apresentadas no item 3 desta Chamada Pública Conjunta.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 6,
+          "doc": "Edital.pdf",
+          "page": 1,
+          "section_path": [
+            "SELEÇÃO PÚBLICA DE PROJETOS COOPERATIVOS ENTRE INSTITUIÇÕES CIENTÍFICAS, TECNOLÓGICAS E DE INOVAÇÃO (ICTs) E EMPRESAS PARA O DESENVOLVIMENTO SUSTENTÁVEL E O CRESCIMENTO ECONÔMICO DO BRASIL E DA ESPANHA"
+          ],
+          "kind": "heading",
+          "text": "3. PROJETOS DE INOVAÇÃO E ÁREAS TEMÁTICAS",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 7,
+          "doc": "Edital.pdf",
+          "page": 1,
+          "section_path": [
+            "3. PROJETOS DE INOVAÇÃO E ÁREAS TEMÁTICAS"
+          ],
+          "kind": "paragraph",
+          "text": "3.1. Em reposta à presente Chamada Pública, devem ser apresentadas propostas de projetos coordenados bilaterais, doravante denominados “Consórcios Internacionais”, que estimulem a pesquisa estratégica e o desenvolvimento de parcerias para inovação por meio de projetos selecionados nas seguintes áreas de conhecimento:",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 8,
+          "doc": "Edital.pdf",
+          "page": 1,
+          "section_path": [
+            "3. PROJETOS DE INOVAÇÃO E ÁREAS TEMÁTICAS"
+          ],
+          "kind": "list",
+          "text": "3.1.1. Tecnologias da Informação e Comunicação.\n3.1.2. Meio Ambiente e Eficiência Energética.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 9,
+          "doc": "Edital.pdf",
+          "page": 1,
+          "section_path": [
+            "SELEÇÃO PÚBLICA DE PROJETOS COOPERATIVOS ENTRE INSTITUIÇÕES CIENTÍFICAS, TECNOLÓGICAS E DE INOVAÇÃO (ICTs) E EMPRESAS PARA O DESENVOLVIMENTO SUSTENTÁVEL E O CRESCIMENTO ECONÔMICO DO BRASIL E DA ESPANHA"
+          ],
+          "kind": "heading",
+          "text": "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 10,
+          "doc": "Edital.pdf",
+          "page": 1,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE"
+          ],
+          "kind": "paragraph",
+          "text": "4.1. Cada Consórcio Internacional deverá ser composto por:",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 11,
+          "doc": "Edital.pdf",
+          "page": 2,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.1"
+          ],
+          "kind": "heading",
+          "text": "4.1.1. Uma única Instituição Proponente, que será responsável pela execução gerencial e financeira do projeto realizado no Brasil, e deverá ser:",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 12,
+          "doc": "Edital.pdf",
+          "page": 2,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.1"
+          ],
+          "kind": "list",
+          "text": "• Instituição Científica, Tecnológica e de Inovação (ICT), conforme definição da Lei 10.973, de 02 de Dezembro de 2004; ou\n• Fundação de Apoio a uma ICT.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 13,
+          "doc": "Edital.pdf",
+          "page": 2,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.1",
+            "a"
+          ],
+          "kind": "heading",
+          "text": "(a) Instituição Científica, Tecnológica e de Inovação (ICT): órgão ou entidade da administração pública direta ou indireta ou pessoa jurídica de direito privado sem fins lucrativos legalmente constituída sob as leis brasileiras, com sede e foro no País, que inclua em sua missão institucional ou em seu objetivo social ou estatutário a pesquisa básica ou aplicada de caráter científico ou tecnológico ou o desenvolvimento de novos produtos, serviços ou processos.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 14,
+          "doc": "Edital.pdf",
+          "page": 2,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.1",
+            "b"
+          ],
+          "kind": "heading",
+          "text": "(b) As Instituições Proponentes privadas sem fins lucrativos somente poderão participar da presente Chamada Pública mediante apresentação de declaração de funcionamento regular nos últimos três anos emitida no exercício de 2017, em observância ao disposto no art. 77, inciso VII, da Lei 13.408/16, de 26/12/2016 – LDO 2017, tomando como referência a data prevista para divulgação final dos resultados desta Chamada Pública Conjunta.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 15,
+          "doc": "Edital.pdf",
+          "page": 2,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.1",
+            "c"
+          ],
+          "kind": "heading",
+          "text": "(c) As Instituições Federais devem ser integrantes do Sistema Integrado de Administração Financeira do Governo Federal (SIAFI).",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 16,
+          "doc": "Edital.pdf",
+          "page": 2,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.2"
+          ],
+          "kind": "heading",
+          "text": "4.1.2. No mínimo uma Instituição Executora, necessariamente uma ICT, que será responsável pela coordenação e execução técnica do projeto realizado no Brasil.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 17,
+          "doc": "Edital.pdf",
+          "page": 2,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.2",
+            "a"
+          ],
+          "kind": "heading",
+          "text": "(a) Caso haja mais de uma Instituição Executora, na proposta deverá ser indicada a Instituição Executora Principal, que será a responsável pela coordenação técnica do projeto.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 18,
+          "doc": "Edital.pdf",
+          "page": 2,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.2",
+            "b"
+          ],
+          "kind": "heading",
+          "text": "(b) O coordenador geral do projeto deverá pertencer ao quadro permanente da Instituição Executora Principal.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 19,
+          "doc": "Edital.pdf",
+          "page": 2,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.3"
+          ],
+          "kind": "heading",
+          "text": "4.1.3. No mínimo, uma Interveniente Cofinanciadora, necessariamente uma empresa brasileira.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 20,
+          "doc": "Edital.pdf",
+          "page": 2,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.3",
+            "a"
+          ],
+          "kind": "heading",
+          "text": "(a) A Interveniente Cofinanciadora deverá:",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 21,
+          "doc": "Edital.pdf",
+          "page": 2,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.3",
+            "a"
+          ],
+          "kind": "list",
+          "text": "• Estar interessada em produzir e comercializar o(s) produto(s) ou a(s) solução(ões) desenvolvido(s)/a(s) no projeto;\n• Participar do projeto com aporte de recursos financeiros, os quais estão sujeitos à análise e aprovação da Finep, conforme seus critérios;\n• Ter efetuado alguma atividade operacional no ano de 2015 (a análise será realizada com base na Demonstração do Resultado do exercício de 2015);",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 22,
+          "doc": "Edital.pdf",
+          "page": 3,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.3",
+            "a"
+          ],
+          "kind": "paragraph",
+          "text": "Apresentar situação econômico-financeira satisfatória (a análise será realizada com base nos Demonstrativos Contábeis dos três últimos exercícios financeiros, contemplando no mínimo Balanço Patrimonial e Demonstração do Resultado de Exercício).",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 23,
+          "doc": "Edital.pdf",
+          "page": 3,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.3",
+            "b"
+          ],
+          "kind": "paragraph",
+          "text": "(b) Para os fins aqui tratados, entende-se como empresa brasileira toda sociedade empresária constituída sob as leis brasileiras para a produção ou comercialização de bens ou serviços, com finalidade lucrativa, cujos atos societários se encontrem devidamente arquivados em registro público competente e que tenha a sede da sua administração no País.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 24,
+          "doc": "Edital.pdf",
+          "page": 3,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.4"
+          ],
+          "kind": "heading",
+          "text": "4.1.4. No mínimo, uma Empresa Espanhola.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 25,
+          "doc": "Edital.pdf",
+          "page": 3,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.1.4",
+            "a"
+          ],
+          "kind": "paragraph",
+          "text": "(a) O CDTI será o responsável por atestar a elegibilidade das empresas espanholas.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 26,
+          "doc": "Edital.pdf",
+          "page": 3,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.2"
+          ],
+          "kind": "heading",
+          "text": "4.2. As empresas brasileira e espanhola, dentro de um mesmo Consórcio Internacional, não poderão pertencer ao mesmo Grupo Econômico.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 27,
+          "doc": "Edital.pdf",
+          "page": 3,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.2.1"
+          ],
+          "kind": "heading",
+          "text": "4.2.1. Para os fins aqui tratados, entende-se Grupo Econômico como conjunto de empresas cujo controle majoritário ou efetivo seja exercido pelas mesmas pessoas físicas e/ou jurídicas.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 28,
+          "doc": "Edital.pdf",
+          "page": 3,
+          "section_path": [
+            "4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE",
+            "4.3"
+          ],
+          "kind": "heading",
+          "text": "4.3. A participação de outras empresas e ICTs no projeto será também objeto de avaliação, não sendo, porém, um requisito obrigatório para a concessão do financiamento.",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 29,
+          "doc": "Edital.pdf",
+          "page": 3,
+          "section_path": [
+            "5. CARACTERÍSTICAS DE APRESENTAÇÃO DA PROPOSTA"
+          ],
+          "kind": "heading",
+          "text": "5. CARACTERÍSTICAS DE APRESENTAÇÃO DA PROPOSTA",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        },
+        {
+          "idx": 30,
+          "doc": "Edital.pdf",
+          "page": 3,
+          "section_path": [
+            "5. CARACTERÍSTICAS DE APRESENTAÇÃO DA PROPOSTA",
+            "5.1 Requisitos Gerais"
+          ],
+          "kind": "heading",
+          "text": "5.1 Requisitos Gerais",
+          "document_metadata": {
+            "family": "edital",
+            "revision": 0,
+            "published_at": null,
+            "authority_state": "vigente",
+            "version_score": 0
+          }
+        }
+      ]
+    },
+    "expected_output": {
+      "candidates": [],
+      "ambiguous": false,
+      "missing_hash": false,
+      "locator_quality": "unresolved",
+      "evidence_ref": {
+        "source": "finep",
+        "native_id": "602",
+        "edital_id": "finep:602",
+        "document": null,
+        "page": null,
+        "block_idx": null,
+        "section_path": [],
+        "quote": "TRL",
+        "canonical_content_hash": null,
+        "silver_source_hash": "md5:e0c8a6f538aa9ab9b30f7ced0ad5edc5",
+        "locator_quality": "unresolved"
+      },
+      "fact_state": "absent",
+      "critical_field": "trl_range",
+      "critical_field_group": "aderência (spec 01 §3.1)"
+    },
+    "metadata": {
+      "spec_ref": "docs/specs/radar-data-trust-02-quality-gates.md §7.1",
+      "case_ref": "spec §7.1 caso 5 — campo ausente",
+      "silver_fixture_source": "tests/fixtures/gold_equivalence/silver/structured_docs/finep/602.jsonl (idx 0-30, escopo temático/elegibilidade)",
+      "synthetic": false,
+      "absence_verified": "confirmado via grep (case-insensitive) que 'TRL' e 'maturidade tecnol' não ocorrem em nenhum dos 121 blocos do documento completo, não só no subconjunto incluído aqui"
+    }
+  },
+  {
+    "case_id": "provenance-06-legacy-no-silver",
+    "case_type": "legacy_no_silver",
+    "description": "Registro legado (pré-migração, categoria representativa — ver 'source_id_is_illustrative' nos metadados) sem nenhum bloco silver recuperável e sem hash de origem. resolve_quote recebe blocks=[] e nenhum hash: 0 candidatos -> unresolved, e missing_hash=True força evidence_ref=None mesmo sem tentar fabricar coordenada. A AUSÊNCIA total (nem quote citável) é o resultado correto — distinto do caso 5, que tem hash+blocos e preserva o quote buscado.",
+    "input": {
+      "quote": "Prazo de submissão prorrogado conforme comunicado interno do sistema legado.",
+      "source": "finep",
+      "native_id": "finep-legacy-illustrative",
+      "edital_id": "finep:finep-legacy-illustrative",
+      "silver_source_hash": null,
+      "canonical_content_hash": null,
+      "blocks": []
+    },
+    "expected_output": {
+      "candidates": [],
+      "ambiguous": false,
+      "missing_hash": true,
+      "locator_quality": "unresolved",
+      "evidence_ref": null,
+      "fact_state": "unknown",
+      "critical_field": null,
+      "critical_field_group": null
+    },
+    "metadata": {
+      "spec_ref": "docs/specs/radar-data-trust-02-quality-gates.md §7.1",
+      "case_ref": "spec §7.1 caso 6 — registro legado sem silver recuperável",
+      "silver_fixture_source": "nenhum — não há bloco silver para este registro (o ponto do caso)",
+      "synthetic": true,
+      "source_id_is_illustrative": "native_id='finep-legacy-illustrative' é um rótulo representativo, não um ID real do sistema legado FINEP/Liferay; o 'quote' de entrada também é ilustrativo (o texto de um campo legado sem bloco silver correspondente) — nada aqui é uma citação real de um edital específico. Nada foi fabricado no RESULTADO (page/hash/citação): a ausência é o gabarito."
+    }
+  }
+]
