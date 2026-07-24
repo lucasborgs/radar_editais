@@ -331,4 +331,78 @@ conforme a regra da task.)
 
 ## Auditoria Codex
 
-**Veredito:** pendente
+**Veredito:** REPROVADO para rework em 2026-07-24 (auditoria da governança — Fable). Ver seção abaixo.
+
+## Auditoria (governança — Fable)
+
+**Veredito:** reprovado para rework — achado material (o item, não o método).
+
+### Achado material: shadow metrics dos editais são artefato do worktree
+
+O relatório conclui que os 4 editais são "100% legacy, 0 backfilláveis, sem
+silver/bronze contra o quê resolver". Isso é FALSO — é artefato de isolamento
+de worktree, não a realidade:
+
+- `data/silver/investidores.json` e `programas.json` são **versionados no
+  git** → presentes em qualquer worktree → o backfill de investidor
+  funcionou de verdade;
+- `data/silver/structured_docs/` e `data/bronze/*_raw/` são **git-ignored
+  (untracked)** → ausentes num worktree novo → o script mediu diretórios
+  VAZIOS, não a realidade. `SILVER_DIR = ROOT/data/silver` resolve para a
+  raiz do worktree.
+
+Reexecução da governança (dry-run com o `data/` real do checkout principal
+linkado ao worktree) prova que os editais SÃO backfilláveis:
+
+| origem | inferred paths | chunks backfilláveis | stated (citações) |
+|---|---|---|---|
+| finep (3 editais) | 6 | 25 / 25 | **0** |
+| fapesc (1 edital) | 1 | 20 / 42 | **0** |
+
+Logo, o `--execute --sample 5` do implementador só escreveu 5 investidores
+(15 paths) porque os editais falsamente pareciam vazios. Estado atual do
+banco local: 5 investidores com provenance backfill; **editais e
+match_chunks intocados**. A afirmação de cobertura do relatório precisa ser
+refeita com dados presentes.
+
+### Observação secundária (a explicar): stated = 0 nos editais
+
+Com dados presentes, `requisitos_texto` não resolveu para NENHUMA citação
+documental (`exact`/`document_only`) — justamente o único ponto onde o
+backfill produziria evidência de página. Pode ser legítimo (requisitos
+armazenados são normalizados por LLM e não aparecem verbatim no silver) ou
+indicar descasamento no caminho de resolução. Não verificado — deve ser
+explicado no rework, não abençoado.
+
+### O que está sólido (não é defeito de código)
+
+Funções de decisão, `producer.kind=backfill`, idempotência (reexecução =
+0 escritas), captura de pré-estado, guard `document is null` nos chunks,
+merge `provenance || jsonb`, preservação por digest das colunas
+não-provenance, 31 testes herméticos verdes, gate T02 intacto. O código
+resolve editais corretamente quando o `data/` está presente.
+
+### Escopo do impacto
+
+Divergência do ITEM (T12), não do método: T02–T11 usaram fixtures/harness
+**versionados** (`tests/fixtures/gold_equivalence/`), então o isolamento de
+worktree nunca os afetou — aquelas auditorias permanecem válidas. Só a T12
+lê o `data/` vivo e o banco vivo, e é a única afetada.
+
+### Correções exigidas para reaprovação
+
+1. Rodar dry-run e `--execute` num ambiente onde `data/silver/structured_docs`
+   e `data/bronze/*_raw` estejam presentes (decisão de ambiente é do
+   proprietário — ver nota da governança ao proprietário);
+2. refazer as shadow metrics e as conclusões do relatório com os números
+   reais (a tabela acima é o ponto de partida);
+3. explicar o `stated=0` dos editais (legítimo vs. bug de resolução);
+4. decisão do proprietário sobre executar de fato o backfill dos editais no
+   banco local (muda estado de linhas reais de edital) ou manter T12 como
+   medição + amostra de investidor.
+
+Independência: a governança executou apenas leitura (dry-run) para
+diagnosticar; não escreveu no banco nem alterou o código do implementador.
+Os symlinks de `data/` usados no diagnóstico foram removidos — worktree
+restaurado ao estado entregue (só o `backfill_prestate_*.json` untracked).
+
