@@ -3,15 +3,13 @@
 Cobre contratos e fronteiras: carregamento do golden, classificação,
 cálculo dos três sinais, critical_field=null, determinismo, registro.
 """
-from __future__ import annotations
 
-import json
+from __future__ import annotations
 
 import pytest
 
 from radar.core.eval.harness import run_suite
 from radar.core.eval.provenance import SUITE, load_data
-
 
 pytestmark = pytest.mark.unit
 
@@ -46,13 +44,13 @@ def test_suite_name():
 
 def test_registry_has_provenance():
     from radar.core.eval.registry import get_suite
+
     suite = get_suite("provenance")
     assert suite is not None
     assert suite.name == "provenance"
 
 
 def test_run_produces_locator_signals(tmp_path):
-    items = load_data()
     result = run_suite(SUITE, out_dir=tmp_path)
     assert result["status"] == "diagnostic"
     agg = result.get("aggregate", {})

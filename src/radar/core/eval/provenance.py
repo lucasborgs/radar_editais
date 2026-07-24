@@ -11,10 +11,10 @@ da spec radar-data-trust-02-quality-gates.md §7.1:
 Hermética: sem LLM, sem DB, sem rede, sem credenciais.
 classification="diagnostic", criteria=() — nenhum threshold, nenhum gate.
 """
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
 from radar.core.config import ROOT
@@ -43,11 +43,13 @@ def _load_golden() -> list[dict]:
             "critical_field_group": expected.get("critical_field_group"),
             "metadata": case.get("metadata", {}),
         }
-        out.append({
-            "input": inp,
-            "expected_output": expected,
-            "metadata": meta,
-        })
+        out.append(
+            {
+                "input": inp,
+                "expected_output": expected,
+                "metadata": meta,
+            }
+        )
     return out
 
 
@@ -79,9 +81,7 @@ def _provenance_task(*, item: dict) -> dict:
     )
     return {
         "locator_quality": (
-            result.evidence_ref.locator_quality.value
-            if result.evidence_ref
-            else "unresolved"
+            result.evidence_ref.locator_quality.value if result.evidence_ref else "unresolved"
         ),
         "evidence_ref": (
             result.evidence_ref.model_dump(mode="json") if result.evidence_ref else None
@@ -165,13 +165,16 @@ def eval_faithfulness_verbatim(*, output: dict, **_: Any) -> Evaluation:
     return {"name": "faithfulness_verbatim", "value": 1.0, "comment": "quote preserved"}
 
 
-def eval_critical_field_completeness(*, metadata: dict, output: dict,
-                                      expected_output: dict,
-                                      **_: Any) -> Evaluation:
+def eval_critical_field_completeness(
+    *, metadata: dict, output: dict, expected_output: dict, **_: Any
+) -> Evaluation:
     critical = metadata.get("critical_field")
     if critical is None:
-        return {"name": "critical_field_completeness", "value": None,
-                "comment": "critical_field=null: excluded from denominator"}
+        return {
+            "name": "critical_field_completeness",
+            "value": None,
+            "comment": "critical_field=null: excluded from denominator",
+        }
     has_state = expected_output.get("fact_state") is not None
     lq = output.get("locator_quality")
     return {
