@@ -78,7 +78,6 @@ eval_matching_results.json
 .DS_Store
 
 # Python virtualenv
-.venv
 .venv/
 
 # Supabase CLI internal state
