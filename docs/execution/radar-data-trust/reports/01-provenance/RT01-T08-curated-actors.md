@@ -157,27 +157,25 @@ FAILED tests/unit/test_gold_provenance_dualwrite.py::TestHarnessCapturedProvenan
   branches precisa reconciliar essa mesma linha (a task já avisou que isso é
   "conflito de pouso da governança").
 
-## Auditoria Codex
+## Auditoria Codex**Veredito:** aprovada em 2026-07-24 (auditoria da governança — Fable).
 
-**Veredito:** pendente
+- Diff pré-pouso inspecionado: só as 3 funções da task no gold
+  (`_ingest_investidores`/`_ingest_programas`/`_get_agency`), builders em
+  seção delimitada, gate T02 com 0 linhas de diff; ordem dos seams de
+  embedding preservada (FIFO do harness intacto);
+- POUSO (governança, declarado): rebase sobre o HEAD aprovado da T07
+  (`da1206776`); conflitos resolvidos — `provenance_writer.py` com as duas
+  seções (ICT + curated) e `__all__` merged (31 símbolos);
+  `test_non_edital_entities_still_empty` substituído pelo contrato positivo
+  pós-pouso (`test_all_entities_have_provenance`); 3 asserções de
+  escopo-irmão supersedidas (ict-vazio na curated, curadoria-vazia na icts,
+  edges-de-programa-vazias na dualwrite) removidas com nota — cobertura
+  positiva vive nos arquivos por kind;
+- validação pós-pouso: 189 passed nas suítes de proveniência+gate+vizinhas;
+  Ruff e `git diff --check` limpos;
+- adversarial independente: baseline T02 com 0 divergências; TODAS as 13
+  entidades da fixture com provenance não vazia e válida; NENHUM campo de
+  catálogo `stated` (invariante curado≠validado); campos copiados `unknown`
+  com âncora do catálogo; edges `operado_por` de programa com provenance
+  deterministic válida.
 
-- **Arquivos tocados**: `src/radar/core/kg/gold.py` (modificado, só
-  `_ingest_investidores`/`_ingest_programas`/`_get_agency`),
-  `src/radar/core/kg/provenance_writer.py` (modificado, nova seção ao final),
-  `tests/unit/test_gold_provenance_sources.py` (modificado, 1 asserção),
-  `tests/unit/test_gold_provenance_curated.py` (novo);
-- **Gates intocáveis**: `tests/helpers/gold_projection.py`,
-  `tests/unit/test_gold_equivalence.py`, `src/radar/core/kg/equivalence.py`,
-  `tests/fixtures/gold_equivalence/**` — nenhum modificado; baseline não
-  regenerado; 16/16 passam;
-- **`_ingest_icts` (T07)**: não tocada — confirmado por `grep` no diff;
-- **Sem alteração de**: prompts LLM, migrations, RLS, score de confiança,
-  estado factual novo além do previsto na tabela de fatos, consumidor lendo
-  provenance, banco remoto/rede/LLM real;
-- **Hashes**: prefixo `md5:` real (`hashlib.md5` sobre JSON canônico
-  `sort_keys=True, ensure_ascii=False`), nunca re-hasheado para simular
-  outro algoritmo, nunca fabricado;
-- **Proibições respeitadas**: sem fabricação de coordenada/página/hash; sem
-  `stated` em campo de catálogo (adversarial testado); nenhum builder além
-  dos previstos na tabela de fatos da task; `constraints` reusa o builder
-  existente sem modificá-lo, como instruído.
