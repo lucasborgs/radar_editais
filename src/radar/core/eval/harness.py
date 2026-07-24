@@ -490,6 +490,45 @@ def _normalize_lf_result(result: Any) -> tuple[list[dict], list[Evaluation], str
 # Orquestração
 # ---------------------------------------------------------------------------
 
+
+def _refuse_hostile_environment() -> str | None:
+    """Fail-closed antes de qualquer task/load_data/prereqs.
+
+    Recusa:
+      - ENVIRONMENT=production ou staging;
+      - ENVIRONMENT ausente/desconhecido/local/test com DATABASE_URL ou
+        SUPABASE_URL apontando para alvo remoto.
+
+    Mensagens sanitizadas: nunca incluem DSN, chave ou URL completa.
+    Publicação opt-in no Langfuse a partir de ambiente local permanece
+    possível (não configura um "alvo remoto" — Langfuse é telemetria de
+    eval, não banco de dados do produto).
+    """
+    from radar.core.environment import Environment, _host, _is_local_host, resolve_environment
+
+    env = resolve_environment()
+    if env is Environment.PRODUCTION:
+        return "ambiente de produção não permitido para avaliação"
+    if env is Environment.STAGING:
+        return "ambiente de staging não permitido para avaliação"
+
+    if env in (Environment.LOCAL, Environment.TEST, Environment.UNKNOWN):
+        import os
+
+        remote = []
+        for var in ("DATABASE_URL", "SUPABASE_URL"):
+            host = _host(os.getenv(var))
+            if host and not _is_local_host(host):
+                remote.append(var)
+        if remote:
+            return (
+                f"ambiente {env.value} com alvo remoto em "
+                f"{' e '.join(remote)} recusado"
+            )
+
+    return None
+
+
 def run_suite(
     suite: Suite,
     *,
@@ -509,6 +548,15 @@ def run_suite(
     started_at = datetime.now(timezone.utc)
     expected = _expected_cases(suite)
     expected_ids = _expected_case_ids(suite)
+
+    hostile = _refuse_hostile_environment()
+    if hostile is not None:
+        print(f"[block] {suite.name}: {hostile}")
+        return _terminal_payload(
+            suite, intent=intent, status="error", reason=hostile,
+            items=[], expected=expected, expected_ids=expected_ids, started_at=started_at,
+            publish=publish,
+        )
 
     if intent == "gate" and limit is not None:
         return _terminal_payload(
