@@ -146,4 +146,24 @@ ou frontend foi alterado.
 
 ## Veredito
 
-**pendente**
+**pendente****Veredito:** aprovada em 2026-07-24 (auditoria da governança — Fable).
+
+- Diff inspecionado integralmente; escopo aditivo, zero mudança em chave
+  pré-existente de ficha/card; gate T02, gold e migrations intocados;
+- `public_provenance` cumpre o contrato à risca: fail-safe (malformado →
+  {}/pulado), `unresolved` nunca vira citação pública, e a sonda
+  adversarial da governança confirmou que NENHUM campo operacional vaza
+  (producer/derivation/validations/review/hashes/coordenadas internas
+  ausentes do output por construção — whitelist de 5 campos);
+- tools do Explorar: bloco textual [PROVENANCE:path] só com estado +
+  documento/página + quote truncado; nenhum prompt/instrução de agente
+  alterado — verbalização na superfície permanece na T11;
+- **desvio aceito com registro:** a chave `provenance` foi anexada no
+  builder compartilhado `_row_to_card`, então as LISTAGENS também a
+  carregam (a instrução era só fichas). Aceito pela governança: é a rota de
+  menor código, expõe o mesmo subconjunto público sob as mesmas policies, e
+  o catálogo pré-beta é pequeno; se o payload de listagem pesar, otimizar
+  vira item da T13/backlog — não é bloqueio;
+- validação independente: 20/20 no teste novo, suíte tests/unit COMPLETA
+  1305 passed/2 skipped, gate 16/16, Ruff e `git diff --check` limpos.
+
