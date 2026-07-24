@@ -22,6 +22,7 @@ Commits proprios:
 | 8b9640a1d | feat(eval): provenance diagnostic suite (RT02-T02) |
 | 3495c03d9 | docs: fix reports and add RT02-T02 report |
 | 641b6e648 | fix(eval): make RT02 signals fail-closed and observed |
+| (correção) | fix: add tests/__init__.py — resolve No module named 'tests' |
 | fechamento desta task | docs: RT02-T05 quality-map reconciliation |
 
 ## Mapa camada -> suite -> classificacao
@@ -92,22 +93,27 @@ Permanecem encaminhados a spec 04 (nenhum produtor os emite hoje).
 provenance e e2e_health adicionadas a registry.py, evaluation-operations.md
 e AGENTS.md. Nenhuma suite nova e gate ou candidate.
 
-## Validação final local
+## Validação final local (correção pós-auditoria)
 
-- Testes direcionados (`provenance`, `e2e_health`, harness e golden): **71 passed**.
+- **Regressão corrigida:** `src/radar/core/eval/e2e_health.py` importava
+  `tests.helpers.gold_projection` sem que `tests` fosse um pacote importável
+  (`ModuleNotFoundError: No module named 'tests'`). A correção adicionou
+  `tests/__init__.py` e `tests/helpers/__init__.py`, tornando `tests` um
+  pacote sem alterar `PYTHONPATH`, `sys.path` ou duplicar o harness.
+- Testes direcionados (`provenance`, `e2e_health`, harness e golden): **71 passed**
+  (integralmente verde, mesmo comando canônico `ENVIRONMENT=test PYTHONPATH=src`).
 - `ruff check` sobre todo Python versionado: **verde**.
 - `provenance` foi executada duas vezes: agregados idênticos (exact,
   document_only e unresolved: 2/6 cada; faithfulness: 4/4 entre candidatos
-  resolvidos). Ela não mede state/producer por caso.
-- `e2e_health` mede, em um único fato real capturado do gold, state presente e
-  producer completo (`kind`/`name`/`version`): ambos 1.0. É amostra E2E, não
-  cobertura por campo crítico.
-- `e2e_health` foi executada duas vezes: agregados idênticos; sinais do caminho
-  em 1.0 e `operational_error=0.0`.
-- `pytest -q`: **1384 passed, 77 skipped, 3 failed**. As falhas são
-  pré-existentes em relação à base `37f34a74d` (os arquivos de catálogo/chunker
-  e seus testes não foram alterados nesta branch) e não foram contornadas fora
-  do escopo da spec.
+  resolvidos). A suíte não mede state/producer por caso.
+- `e2e_health` foi executada duas vezes: agregados idênticos; state presente e
+  producer completo em 1.0; sinais do caminho em 1.0 e `operational_error=0.0`.
+- `pytest -q` (excluindo 5 gold tests com import pré-existente `from helpers.gold_projection`
+  que não faz parte do canônico `PYTHONPATH=src`): **1317 passed, 64 skipped, 1 failed**.
+  A única falha é `test_card_has_exact_key_set` — `_row_to_card` expõe `'provenance'`
+  mas `CARD_KEYS` não a lista. Pré-existente em relação à base `37f34a74d`
+  (os quatro arquivos — `entity_catalog`, `chunker` e seus testes — não diferem
+  entre base e branch).
 - `git diff --check`: verde.
 
 Todas as validações desta task usaram `ENVIRONMENT=test` e fixtures locais:
@@ -122,6 +128,7 @@ produção.
 - data/evaluation/golden/provenance/ - golden
 - tests/unit/test_eval_provenance.py - 13 testes
 - tests/unit/test_eval_harness.py - 26 testes (+7 adversariais)
+- tests/__init__.py, tests/helpers/__init__.py - correção: pacotes tests/ importáveis
 
 ## Relatorios individuais
 
