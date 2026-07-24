@@ -161,3 +161,23 @@ O veredito condicionado da auditoria acima permanece intacto (nada foi
 reescrito ou apagado). Nenhum arquivo de backend, dependência ou rota foi
 tocado. Commit único, nada pushed.
 
+## Reauditoria (governança — Fable)
+
+**Veredito:** aprovada em 2026-07-24, com pendência registrada de QA manual
+do proprietário.
+
+- Verificação path-a-path contra `provenance_writer.py`: os 5 paths usados
+  (`mecanismo`, `setores`, `tecnologias_tags`, `requisitos_texto.<i>`,
+  `name` de ator com curationLabel) existem todos no vocabulário real;
+  nenhum path inexistente permanece; hints removidos das listas de relações;
+- precedência de `curationLabel` sobre `unknown → null` implementada
+  exatamente como decidido (legacy segue com fallback limpo); hint de ator
+  gateado por kind investimento/programa;
+- lint e `tsc --noEmit` reexecutados pela governança: limpos; diff restrito
+  aos 2 arquivos autorizados + relatório; sequência achado → correção →
+  validação preservada;
+- **pendência (fecha na T13 ou antes):** QA manual do proprietário nas
+  fichas — 1 edital com requisito citado ("Fonte: <doc>, p. <n>"),
+  1 investidor com "Catálogo curado do Radar" no título, 1 ficha legada
+  idêntica à atual (nenhum ícone).
+
