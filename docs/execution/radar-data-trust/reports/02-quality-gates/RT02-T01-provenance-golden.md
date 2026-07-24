@@ -2,9 +2,10 @@
 
 **Status:** `passed`
 **Plano:** [`plans/02-quality-gates/RT02-T01-provenance-golden.md`](../../plans/02-quality-gates/RT02-T01-provenance-golden.md)
-**Branch/commit-base:** `codex/radar-data-trust-02-t01` / base `37f34a74d`
-**Commits:** nenhum — mudanças em staging (`git add`), commit fica para depois da auditoria da governança
+**Branch/commit-base:** `codex/radar-data-trust-02-completion` / base `37f34a74d`
+**Commits:** `d3cbed372bc8691149e09650f5c83a5f931ebbc5`
 **Implementador/modelo:** claude-sonnet, worktree isolado
+**Auditoria Codex:** pendente
 
 ## Realizado
 

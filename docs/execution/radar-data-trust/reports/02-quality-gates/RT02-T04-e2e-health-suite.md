@@ -5,6 +5,7 @@
 **Branch/commit-base:** `codex/radar-data-trust-02-t04` / `37f34a74d`
 **Commits:** `feat(data-trust): e2e_health diagnostic eval signal (RT02-T04)`
 **Implementador/modelo:** claude-sonnet, worktree isolado
+**Auditoria Codex:** pendente
 
 ## Realizado
 
