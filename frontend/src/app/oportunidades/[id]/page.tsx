@@ -13,7 +13,9 @@ import type {
   EligibilityConstraint,
   TicketRange,
   EditalStatus,
+  FieldProvenance,
 } from "@/types/edital";
+import { ProvenanceHint } from "@/components/ProvenanceHint";
 
 // ── Rótulos v2 ───────────────────────────────────────────────────────────────
 
@@ -80,11 +82,14 @@ function verdictKeyFor(detail: OportunidadeDetail): string {
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+function InfoRow({ label, value, provenance }: { label: string; value: React.ReactNode; provenance?: FieldProvenance }) {
   return (
     <div className="flex gap-3">
       <span className="text-xs font-sans text-content-secondary w-36 shrink-0">{label}</span>
-      <span className="text-xs font-sans text-content-primary">{value}</span>
+      <span className="text-xs font-sans text-content-primary">
+        {value}
+        {provenance && <ProvenanceHint provenance={provenance} />}
+      </span>
     </div>
   );
 }
@@ -100,12 +105,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function TagCard({ title, tags }: { title: string; tags: string[] }) {
+function TagCard({ title, tags, provenance, curationLabel }: { title: string; tags: string[]; provenance?: FieldProvenance; curationLabel?: "embrapii" | "catalogo" }) {
   if (!tags.length) return null;
   return (
     <div className="min-w-[250px] flex-1 bg-surface rounded-xl border border-border p-5">
-      <h2 className="font-heading text-sm font-bold text-content-primary mb-3 pb-2 border-b border-border">
+      <h2 className="font-heading text-sm font-bold text-content-primary mb-3 pb-2 border-b border-border flex items-center gap-1.5">
         {title}
+        {provenance && <ProvenanceHint provenance={provenance} curationLabel={curationLabel} />}
       </h2>
       <div className="flex flex-wrap gap-1.5">
         {tags.map((t) => (
@@ -227,15 +233,15 @@ export default function OportunidadeDetailPage() {
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 mb-4">
           {detail.deadline && (() => {
             const parsed = parseDeadline(detail.deadline);
-            return <InfoRow label="Prazo" value={parsed ?? detail.deadline} />;
+            return <InfoRow label="Prazo" value={parsed ?? detail.deadline} provenance={detail.provenance?.deadline} />;
           })()}
-          {detail.mechanism && <InfoRow label="Mecanismo" value={detail.mechanism} />}
-          {value && <InfoRow label="Valor" value={value} />}
-          {ticket && !value && <InfoRow label="Ticket" value={ticket} />}
+          {detail.mechanism && <InfoRow label="Mecanismo" value={detail.mechanism} provenance={detail.provenance?.mechanism} />}
+          {value && <InfoRow label="Valor" value={value} provenance={detail.provenance?.value} />}
+          {ticket && !value && <InfoRow label="Ticket" value={ticket} provenance={detail.provenance?.ticket_range} />}
           {detail.estagio_alvo && detail.estagio_alvo.length > 0 && (
-            <InfoRow label="Estágio-alvo" value={detail.estagio_alvo.join(", ")} />
+            <InfoRow label="Estágio-alvo" value={detail.estagio_alvo.join(", ")} provenance={detail.provenance?.estagio_alvo} />
           )}
-          {detail.lead_follow && <InfoRow label="Lead/follow" value={detail.lead_follow} />}
+          {detail.lead_follow && <InfoRow label="Lead/follow" value={detail.lead_follow} provenance={detail.provenance?.lead_follow} />}
         </div>
 
         {detail.official_url && (
@@ -305,10 +311,10 @@ export default function OportunidadeDetailPage() {
       <div className="flex flex-wrap gap-4 mb-4">
         <TagCard title="Temas" tags={detail.themes} />
         <TagCard title="Tecnologias" tags={detail.technologies} />
-        <TagCard title="Programas" tags={detail.programs} />
+        <TagCard title="Programas" tags={detail.programs} provenance={detail.provenance?.programs} curationLabel="catalogo" />
         <TagCard title="Público-alvo" tags={detail.eligible_entities.length ? detail.eligible_entities : detail.publico_alvo} />
-        <TagCard title="ICTs relacionadas" tags={detail.icts} />
-        <TagCard title="Investidores" tags={detail.investidores} />
+        <TagCard title="ICTs relacionadas" tags={detail.icts} provenance={detail.provenance?.icts} curationLabel="embrapii" />
+        <TagCard title="Investidores" tags={detail.investidores} provenance={detail.provenance?.investidores} curationLabel="catalogo" />
       </div>
 
       {/* Requisitos */}

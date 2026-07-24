@@ -99,6 +99,23 @@ export interface OportunidadeDetail {
   estagio_alvo?: string[];
   ticket_range?: TicketRange | "";
   lead_follow?: string;
+  // Provenance per field path (RT01-T11):
+  provenance?: Record<string, FieldProvenance>;
+}
+
+// ── Provenance (RT01-T11) ──────────────────────────────────
+
+export interface Citation {
+  document: string;
+  page?: number | null;
+  quote?: string;
+  source_url?: string;
+  collected_at?: string;
+}
+
+export interface FieldProvenance {
+  state: string;
+  citations?: Citation[];
 }
 
 // Resultado do matching híbrido
