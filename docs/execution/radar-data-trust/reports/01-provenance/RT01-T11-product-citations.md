@@ -61,6 +61,23 @@ Executar com o servidor local rodando (`npm run dev` no frontend + backend em `l
 
 5. **Programa** — Abrir `/oportunidades/programa:centelha` (entidade programa). Card "Programas" deve exibir `?` com "Catálogo curado do Radar" no hover.
 
-## Auditoria Codex
+## Auditoria Codex**Veredito:** condicionado em 2026-07-24 (auditoria da governança — Fable).
 
-**Veredito:** pendente
+Lint/tsc limpos e componente bem construído (acessível, fallback de legado
+limpo), porém a integração está ligada a paths que o backend nunca produz
+(`deadline`, `mechanism`, `value`, `ticket_range`, `estagio_alvo`,
+`lead_follow`, `programs`, `icts`, `investidores`), enquanto os paths reais
+(`mecanismo`, `setores`, `tecnologias_tags`, `requisitos_texto.<i>`,
+`status`) ficaram sem hint — a feature não renderia nenhum disclosure em
+produção. Defeito derivado: o componente retorna null para `unknown` antes
+de checar `curationLabel`, então o rótulo de curadoria (decisão 3 do
+proprietário) nunca apareceria para campos de catálogo (unknown por
+contrato). Co-responsabilidade registrada: o prompt da task descreveu a
+forma do dado, não o vocabulário de paths.
+
+Correções exigidas (entregues ao implementador): religar os hints aos paths
+reais (incluindo requisitos por item — a única citação documental real),
+remover hints de paths inexistentes e de listas de relações, dar precedência
+a curationLabel sobre a regra unknown→null, e um hint de origem por ficha de
+ator. Aprovação após reauditoria + QA manual do proprietário.
+
