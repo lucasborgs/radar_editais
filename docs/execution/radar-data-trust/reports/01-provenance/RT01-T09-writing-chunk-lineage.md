@@ -204,34 +204,24 @@ acima; incluído no commit único da task).
   reindex/backfill", e não objetivo #2 da spec-mãe: "não exigir provenance
   retroativa perfeita para todo o catálogo").
 
-## Auditoria Codex
+## Auditoria Codex**Veredito:** aprovada em 2026-07-24 (auditoria da governança — Fable).
 
-**Veredito:** pendente
-
-- **Arquivos tocados**: `src/radar/core/tasks.py` (só
-  `_build_chunks_for_edital` + `chunk_edital_task`), `src/radar/core/retrieval/chunker.py`
-  (só a constante `CHUNKER_VERSION`), `src/radar/core/contextual_retrieval.py`
-  (só o accessor `effective_model`), `tests/unit/test_chunk_lineage.py` (novo)
-- **Gates intocáveis**: `retriever.py`, `embedder.py`, `hyde.py`, reranker,
-  `gold.py`, `provenance_writer.py`, `equivalence.py`, `evidence_resolver.py`,
-  `tests/helpers/gold_projection.py`, `tests/unit/test_gold_equivalence.py`,
-  `tests/fixtures/gold_equivalence/**`, migrations, RLS, prompts LLM — nenhum
-  tocado (confirmado por `git diff --stat` acima, só 3 arquivos de produção)
-- **Sem alteração de**: política de chunking (`TARGET_TOKENS`/`OVERLAP_TOKENS`/
-  `MIN_TOKENS`/`MAX_TOKENS`/algoritmo de `chunk_from_blocks` intocados),
-  modelo de embedding, ranking, texto armazenado (`text` continua o corpo
-  original, nunca o contextualizado — provado pelo teste (c))
-- **Idempotência preservada**: marcador `{content_hash, n_chunks}` do
-  `chunk_index=0` continua sendo a chave do gate `_index_is_current`
-  (inalterado); teste (d) prova reindex do mesmo conteúdo pula o re-embed
-- **Hash**: prefixo `md5:` real (reusa `source_docs.canonical_hash`, mesma
-  função pura já usada por `source_docs.save`/T07/T08 — não reimplementada);
-  hash muda quando o CanonicalDoc muda (teste (e)); nunca fabricado quando o
-  CanonicalDoc não está disponível (nesse caminho de código ele sempre está,
-  por causa do early-return anterior — ver "Realizado")
-- **Banco/rede/LLM real em teste**: nenhum — `get_supabase_service` real
-  (singleton `lru_cache`) stubado para lançar se chamado; `contextualize_chunks`
-  stubada no caso "on"; env sem `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`/chaves
-  de LLM
-- **Worktree limpo**: sem untracked além dos arquivos desta task
+- Diff inspecionado integralmente: escopo exato (3 arquivos produtivos +
+  teste + relatório); gate T02, gold/provenance, retriever/embedder/rankings
+  e migrations com 0 linhas de diff;
+- o hash de linhagem cobre o Documento Canônico ATIVO realmente usado no
+  chunking (`active_documents` → structurer → chunks) — âncora honesta, não
+  fabricada; `_build_chunks_for_edital` tem um único chamador
+  (`chunk_edital_task`), então warm/ensure herdam a linhagem;
+- marcador de idempotência preservado: `content_hash`/`n_chunks` continuam
+  autoritativos em `_index_is_current`; derivar o marcador de
+  `rows[0]["metadata"]` só agrega a linhagem ao chunk 0, sem mudar a
+  semântica de skip;
+- `context_version` gravado apenas quando a contextualização está ativa na
+  run (decisão lida uma vez), ausente quando off — sem fabricação;
+- validação independente da governança: 5/5 no teste novo, suíte
+  tests/unit COMPLETA 1285 passed/2 skipped, gate 16/16 (transitivo),
+  Ruff e `git diff --check` limpos — a exigência de suíte 100% verde
+  (lição da T06) foi cumprida pelo implementador desta vez;
+- atribuição correta do implementador (deepseek/opencode) verificada.
 
