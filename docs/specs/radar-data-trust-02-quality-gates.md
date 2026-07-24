@@ -136,10 +136,14 @@ projeção de proveniência do gold) sobre um golden representativo e agrega:
 - **faithfulness do trecho:** o `quote` resolvido é substring verbatim do
   bloco silver correspondente (reusa a checagem já existente).
 
-Golden: um caso por tipo obrigatório da spec 01 §10.2 (trecho único/exato;
-repetido em duas páginas; HTML sem página; valor normalizado; campo ausente;
-registro legado sem silver). Fixture representativa, não exaustiva. Sem
-threshold — `classification="diagnostic"`, `criteria=()`.
+Golden: um caso por tipo do subconjunto representativo abaixo (derivado da spec
+01 §10.2, curado para esta passada diagnóstica) — trecho único/exato; repetido
+em duas páginas; HTML sem página; valor normalizado; campo ausente; registro
+legado sem silver. Os casos `conflicting` e retificação da §10.2 ficam **fora**:
+a própria spec 01 os encaminhou à spec 04, que define precedência, e nenhum
+produtor os emite hoje. Esta enumeração é a autoritativa da spec para o golden.
+Fixture representativa, não exaustiva. Sem threshold —
+`classification="diagnostic"`, `criteria=()`.
 
 ### 7.2 Sinal E2E `e2e_health` — NOVO, diagnóstico
 
@@ -208,7 +212,7 @@ sobre arquivos e ordem. Ordem lógica proposta:
 
 | Task | Resultado |
 |---|---|
-| `RT02-T01` | golden representativo de proveniência (§10.2) — fixtures, sem código de suíte |
+| `RT02-T01` | golden representativo de proveniência (§7.1) — fixtures, sem código de suíte |
 | `RT02-T02` | suíte `provenance` diagnóstica registrada (§7.1) |
 | `RT02-T03` | revisão leve das suítes existentes: classificação, execução, tamanho de golden (§7.3) |
 | `RT02-T04` | sinal E2E `e2e_health` diagnóstico (§7.2) |
@@ -223,8 +227,8 @@ A spec pode ser marcada vigente quando:
 
 1. `provenance` e `e2e_health` registradas, diagnósticas, rodando local com
    métrica agregada estável;
-2. golden de proveniência cobrindo os casos obrigatórios da spec 01 §10.2, um
-   por tipo;
+2. golden de proveniência cobrindo os casos enumerados em §7.1 (subconjunto
+   representativo derivado da spec 01 §10.2), um por tipo;
 3. revisão leve concluída (classificação/execução/tamanho registrados);
 4. mapa por camada preenchido e recomendação de maturidade entregue como
    recomendação, sem promover gate;
