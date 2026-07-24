@@ -35,6 +35,9 @@ slice. Ver relatório da task, seção "Pendências".
 """
 from __future__ import annotations
 
+import hashlib
+import json
+
 from radar.core.kg.evidence_resolver import resolve_quote
 from radar.domain.provenance import (
     DerivationInfo,
@@ -282,6 +285,127 @@ def chunk_storage_coords(chunk: dict, silver_source_hash: str | None) -> dict:
     }
 
 
+# ===========================================================================
+# RT01-T07 — ICTs EMBRAPII (spec §3.2/§3.3/§6.4)
+# ===========================================================================
+#
+# A evidência legítima desta origem (spec §6.4, linha EMBRAPII) é o REGISTRO
+# versionado do scraper — não um documento paginado. Cada ICT ancora em UM
+# `EvidenceRef` `document_only`: `document` é o nome do arquivo
+# `embrapii_*.json` usado pelo ingest (`gold._ingest_icts` já o conhece via
+# `files[-1]`); `canonical_content_hash` é o md5 do JSON canônico do
+# REGISTRO INDIVIDUAL (`json.dumps(record, sort_keys=True,
+# ensure_ascii=False)`), não do arquivo inteiro — cada ICT do mesmo arquivo
+# versionado tem hash próprio; `source_url` é a URL oficial da própria
+# unidade (`record["url"]`); sem `quote` — não é uma citação textual, é a
+# identidade do registro estruturado.
+#
+# Tabela de fatos (contrato aprovado da task RT01-T07):
+#
+# | Path                         | state    | producer.kind             |
+# |-------------------------------|----------|----------------------------|
+# | `name`, `metadata.url`        | stated   | adapter (embrapii_scraper) |
+# | `uf` (só quando derivada)      | inferred | deterministic              |
+# | `setores`/`tecnologias_tags`   | inferred | deterministic              |
+# | aresta `credenciada_por`       | stated   | adapter (embrapii_scraper) |
+#
+# Campo sem valor no registro não recebe entrada no dict de saída — nada de
+# `unknown` artificial (tabela de fatos da task). Sem chunks/RAG para ICTs
+# (spec §3.4): esta seção não produz nenhuma coordenada de chunk.
+# ===========================================================================
+
+ICT_SCRAPER_PRODUCER_NAME = "embrapii_scraper"
+
+
+def build_ict_record_anchor(
+    *, record: dict, document: str, source_url: str | None, native_id: str | None = None,
+) -> EvidenceRef:
+    """Âncora `document_only` de UM registro EMBRAPII (spec §6.4).
+
+    O hash cobre só o JSON do `record` recebido, não o arquivo inteiro —
+    cada ICT do mesmo `embrapii_*.json` versionado tem hash próprio. Sem
+    `quote`: identidade de um registro estruturado, não citação verbatim."""
+    canonical = json.dumps(record, sort_keys=True, ensure_ascii=False)
+    digest = hashlib.md5(canonical.encode("utf-8")).hexdigest()
+    return EvidenceRef(
+        source="embrapii",
+        native_id=native_id,
+        source_url=source_url,
+        document=document,
+        canonical_content_hash=f"md5:{digest}",
+        locator_quality=LocatorQuality.DOCUMENT_ONLY,
+    )
+
+
+def build_ict_identity_provenance(anchor: EvidenceRef) -> FactProvenance:
+    """`name`/`metadata.url` — `stated/adapter`: o scraper declara os dois
+    diretamente do registro coletado (spec §3.2), não infere nenhum deles.
+    Mesma âncora do registro para ambos — não são citações distintas, é o
+    mesmo registro estruturado declarando os dois campos."""
+    return FactProvenance(
+        state=FactState.STATED,
+        evidence_refs=[anchor],
+        producer=ProducerInfo(kind=ProducerKind.ADAPTER, name=ICT_SCRAPER_PRODUCER_NAME),
+    )
+
+
+def build_ict_uf_provenance() -> FactProvenance:
+    """`uf` — `inferred/deterministic` (regra `gold._uf_from_address`). Sem
+    `EvidenceRef`: extração de padrão sobre `address`, não citação verbatim.
+    O chamador só inclui esta entrada quando a derivação teve êxito (tabela
+    de fatos: "só quando derivada")."""
+    return FactProvenance(
+        state=FactState.INFERRED,
+        producer=ProducerInfo(kind=ProducerKind.DETERMINISTIC, name="_uf_from_address"),
+        derivation=DerivationInfo(rule="_uf_from_address:v1", inputs=["record.address"]),
+    )
+
+
+def build_ict_tags_provenance() -> FactProvenance:
+    """`setores`/`tecnologias_tags` — `inferred/deterministic` (regras
+    `normalize_setores`/`normalize_tags` sobre `areas_raw`; a tabela de
+    fatos da task unifica as duas sob a regra `normalize_tags:v1`). Sem
+    `EvidenceRef`: normalização determinística de vocabulário, não citação."""
+    return FactProvenance(
+        state=FactState.INFERRED,
+        producer=ProducerInfo(kind=ProducerKind.DETERMINISTIC, name="normalize_tags"),
+        derivation=DerivationInfo(rule="normalize_tags:v1", inputs=["record.areas_raw"]),
+    )
+
+
+def build_ict_credenciada_por_provenance(anchor: EvidenceRef) -> FactProvenance:
+    """Aresta `credenciada_por` — `stated/adapter`: a listagem EMBRAPII É a
+    declaração oficial do vínculo (spec §3.3), não uma inferência sobre ele.
+    Mesma âncora do registro do lado ICT da aresta — reusada pelo chamador,
+    não recomputada, para não hashear o mesmo registro duas vezes."""
+    return FactProvenance(
+        state=FactState.STATED,
+        evidence_refs=[anchor],
+        producer=ProducerInfo(kind=ProducerKind.ADAPTER, name=ICT_SCRAPER_PRODUCER_NAME),
+    )
+
+
+def build_ict_fact_provenance(*, record: dict, anchor: EvidenceRef, uf: str | None) -> dict[str, dict]:
+    """Compõe o dict `path -> FactProvenance.model_dump(mode="json")` de UM
+    registro ICT, pronto para `entities.provenance`.
+
+    Recebe `anchor` já construído (não o reconstrói) para que o chamador
+    reuse a mesma âncora na aresta `credenciada_por` sem hashear o registro
+    duas vezes. Campo sem valor no registro não recebe entrada — nada de
+    `unknown` artificial (tabela de fatos da task)."""
+    out: dict[str, dict] = {}
+    if record.get("name"):
+        out["name"] = build_ict_identity_provenance(anchor).model_dump(mode="json")
+    if record.get("url"):
+        out["metadata.url"] = build_ict_identity_provenance(anchor).model_dump(mode="json")
+    if uf is not None:
+        out["uf"] = build_ict_uf_provenance().model_dump(mode="json")
+    if record.get("areas_raw"):
+        out["setores"] = build_ict_tags_provenance().model_dump(mode="json")
+        out["tecnologias_tags"] = build_ict_tags_provenance().model_dump(mode="json")
+    return out
+
+
 __all__ = [
     "GOLD_TAGGER_PRODUCER_NAME",
     "GOLD_TAGGER_PROMPT_VERSION",
@@ -297,4 +421,11 @@ __all__ = [
     "build_subordinado_a_provenance",
     "build_edital_fact_provenance",
     "chunk_storage_coords",
+    "ICT_SCRAPER_PRODUCER_NAME",
+    "build_ict_record_anchor",
+    "build_ict_identity_provenance",
+    "build_ict_uf_provenance",
+    "build_ict_tags_provenance",
+    "build_ict_credenciada_por_provenance",
+    "build_ict_fact_provenance",
 ]

@@ -112,9 +112,12 @@ class TestSourceProvenance:
             FactProvenance.model_validate(payload)
 
     def test_non_edital_entities_still_empty(self, monkeypatch):
+        """`ict` passou a gravar provenance na RT01-T07 (spec §6.4) — excluído
+        aqui e afirmado não-vazio em `test_gold_provenance_icts.py`.
+        investidor/programa/agencia seguem vazios até a T08."""
         harness, _ = _run_capture(monkeypatch)
         for key, rec in harness.projection.entities.items():
-            if rec["kind"] != "edital":
+            if rec["kind"] not in ("edital", "ict"):
                 assert harness.entity_provenance.get(key, {}) == {}, f"{key} deveria ter provenance vazia"
 
     def test_web_has_no_operado_por_edge(self, monkeypatch):

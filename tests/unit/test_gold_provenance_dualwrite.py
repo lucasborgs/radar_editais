@@ -13,9 +13,11 @@ Dois blocos:
     modificá-lo — uma subclasse local de `GoldCaptureHarness` que também
     captura `f.get("provenance")` (entidades) e as 4 coordenadas novas de
     `match_chunks`, delegando toda a lógica de correlação/projeção à classe
-    base. Prova: finep tem proveniência nos paths esperados; as demais
-    origens (fapesp/fapesc/web/ict/investidor/programa/agência) ficam com
-    proveniência vazia; coordenadas de chunk só existem nos chunks finep.
+    base. Prova: finep tem proveniência nos paths esperados; coordenadas de
+    chunk só existem nos chunks finep. NOTA: fapesp/fapesc/web (T06) e ict
+    (T07) também passaram a gravar provenance não vazia — afirmado em
+    test_gold_provenance_sources.py e test_gold_provenance_icts.py,
+    respectivamente; investidor/programa/agência seguem vazios até T08.
 
 Hermético: sem rede, sem banco (mesmos stubs do harness T02).
 """
@@ -316,16 +318,15 @@ class TestHarnessCapturedProvenance:
         assert fp.producer.kind == "deterministic"
         assert fp.derivation.rule == "_SOURCE_AGENCY:v1"
 
-    def test_actor_edges_have_empty_provenance_until_t07_t08(self, monkeypatch):
-        """Arestas de atores (EMBRAPII `credenciada_por`, programa
-        `operado_por`) seguem sem provenance até T07/T08 — as fontes de
-        EDITAL passaram a gravar na T06 e são afirmadas em
-        test_gold_provenance_sources.py."""
+    def test_programa_edges_have_empty_provenance_until_t08(self, monkeypatch):
+        """Arestas de programa (`operado_por`) seguem sem provenance até
+        T08. RT01-T07: a aresta `credenciada_por` de ICT (EMBRAPII) passou a
+        gravar provenance (âncora document_only do registro, spec §6.4) —
+        removida deste teste "ainda vazio" e afirmada em
+        test_gold_provenance_icts.py; as fontes de EDITAL passaram a gravar
+        na T06 e são afirmadas em test_gold_provenance_sources.py."""
         harness, _stats = _run_provenance_capture(monkeypatch)
-        actor_rks = [
-            rk for rk in harness.projection.relations
-            if rk.startswith(("ict|", "programa|"))
-        ]
-        assert actor_rks, "fixture deveria ter arestas de atores"
-        for rk in actor_rks:
+        programa_rks = [rk for rk in harness.projection.relations if rk.startswith("programa|")]
+        assert programa_rks, "fixture deveria ter arestas de programa"
+        for rk in programa_rks:
             assert harness.relation_provenance.get(rk, {}) == {}, f"{rk} deveria ter provenance vazia"

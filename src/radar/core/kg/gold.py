@@ -575,10 +575,11 @@ def _upsert_rel(
     """`provenance` (RT01-T05, spec §6.1) é opcional e gravada só no INSERT:
     `on conflict do nothing` preserva a semântica atual — uma aresta
     pré-existente NÃO é atualizada (nem `properties` nem `provenance`) por
-    uma chamada repetida. Só `_ingest_editais` passa `provenance` (edges
+    uma chamada repetida. `_ingest_editais` passa `provenance` (edges
     `operado_por`/`subordinado_a`, todas as fontes de edital desde a
-    RT01-T06); `_ingest_programas`/`_ingest_icts` chamam sem o kwarg
-    (equivale a `{}`) até T07/T08.
+    RT01-T06); `_ingest_icts` passa `provenance` na aresta `credenciada_por`
+    desde a RT01-T07 (âncora document_only do registro EMBRAPII, spec §6.4);
+    `_ingest_programas` chama sem o kwarg (equivale a `{}`) até T08.
     O stub do harness T02 (`tests/helpers/gold_projection.py::stub_upsert_rel`)
     aceita e ignora o kwarg (emenda autorizada pela governança, 2026-07-24);
     a persistência real é validada por
@@ -748,31 +749,47 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
 
 
 def _ingest_icts(conn, agency_cache: dict, stats: dict) -> None:
+    from radar.core.kg import provenance_writer
     from radar.core.retrieval.embedder import embed_query
 
     files = sorted((BRONZE_DIR / "ict_raw").glob("embrapii_*.json"))
+    document = files[-1].name if files else None
     recs = json.loads(files[-1].read_text(encoding="utf-8")) if files else []
     for r in recs:
         try:
             slug = r.get("slug") or schema.slugify(r.get("name") or "")
+            native_id = f"embrapii:{slug}"
             desc = _ws(r.get("about") or "")
             areas = list(r.get("areas_raw") or [])
+            uf = _uf_from_address(r.get("address"))
+            # RT01-T07 (spec §6.4): âncora `document_only` do registro
+            # versionado do scraper — reusada em `name`/`metadata.url`/`uf`/
+            # tags e na aresta `credenciada_por`, sem recomputar o hash.
+            anchor = provenance_writer.build_ict_record_anchor(
+                record=r, document=document, source_url=r.get("url"), native_id=native_id,
+            )
+            provenance = provenance_writer.build_ict_fact_provenance(record=r, anchor=anchor, uf=uf)
             with conn.transaction(), conn.cursor() as cur:
                 eid = _upsert_entity(
-                    cur, kind="ict", source="embrapii", native_id=f"embrapii:{slug}",
+                    cur, kind="ict", source="embrapii", native_id=native_id,
                     name=r.get("name") or slug, description=desc[:_DESC_CHARS],
                     setores=normalize_setores(areas),
                     tecnologias_tags=normalize_tags(areas),
-                    uf=_uf_from_address(r.get("address")), curated=True,
+                    uf=uf, curated=True,
                     metadata={
                         "institution_type": r.get("institution_type"), "contact": r.get("contact") or {},
                         "url": r.get("url"), "address": r.get("address"), "embrapii_kind": r.get("kind"),
                     },
                     embedding=embed_query(desc or r.get("name") or slug),
+                    provenance=provenance,
                 )
                 aid = _get_agency(cur, agency_cache, "EMBRAPII")
                 if aid:
-                    _upsert_rel(cur, eid, aid, "credenciada_por")
+                    edge_provenance = provenance_writer.build_ict_credenciada_por_provenance(anchor)
+                    _upsert_rel(
+                        cur, eid, aid, "credenciada_por",
+                        provenance=edge_provenance.model_dump(mode="json"),
+                    )
                     stats["credenciada_por"] += 1
             stats["ict"] += 1
         except Exception as e:  # noqa: BLE001
