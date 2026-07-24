@@ -21,6 +21,7 @@ Commits proprios:
 | e0a2c885d | fix(eval): refuse production and remote targets (hardening) |
 | 8b9640a1d | feat(eval): provenance diagnostic suite (RT02-T02) |
 | 3495c03d9 | docs: fix reports and add RT02-T02 report |
+| 641b6e648 | fix(eval): make RT02 signals fail-closed and observed |
 | fechamento desta task | docs: RT02-T05 quality-map reconciliation |
 
 ## Mapa camada -> suite -> classificacao
@@ -63,8 +64,8 @@ Nenhuma suite teve classificacao promovida. Nenhum threshold foi criado.
 - extraction: gate ativo (baseline 0.95 aceito) - manter.
 - matching: candidata com criterios aceitos - requer finalizacao dos
   julgamentos do top-8.
-- provenance: baseline comportamental coletado; golden pequeno (6); nao
-  sustenta gate sem ampliacao do corpus e aceite de baseline.
+- provenance: baseline comportamental de locator+faithfulness; golden pequeno
+  (6), sem state/producer observado por caso; nao sustenta gate.
 - e2e_health: sinal minimo; util como smoke test, nao como gate sem
   expansao para multiplos caminhos.
 - Demais suites: diagnosticas, sem baseline aceito para promocao.
@@ -93,13 +94,16 @@ e AGENTS.md. Nenhuma suite nova e gate ou candidate.
 
 ## Validação final local
 
-- Testes direcionados (`provenance`, `e2e_health`, harness): **48 passed**.
+- Testes direcionados (`provenance`, `e2e_health`, harness e golden): **71 passed**.
 - `ruff check` sobre todo Python versionado: **verde**.
 - `provenance` foi executada duas vezes: agregados idênticos (exact,
-  document_only e unresolved: 2/6 cada; faithfulness: 5/6; completude crítica:
-  1.0).
-- `e2e_health` foi executada duas vezes: agregados idênticos; sete sinais de
-  conectividade em 1.0 e `operational_error=0.0`.
+  document_only e unresolved: 2/6 cada; faithfulness: 4/4 entre candidatos
+  resolvidos). Ela não mede state/producer por caso.
+- `e2e_health` mede, em um único fato real capturado do gold, state presente e
+  producer completo (`kind`/`name`/`version`): ambos 1.0. É amostra E2E, não
+  cobertura por campo crítico.
+- `e2e_health` foi executada duas vezes: agregados idênticos; sinais do caminho
+  em 1.0 e `operational_error=0.0`.
 - `pytest -q`: **1384 passed, 77 skipped, 3 failed**. As falhas são
   pré-existentes em relação à base `37f34a74d` (os arquivos de catálogo/chunker
   e seus testes não foram alterados nesta branch) e não foram contornadas fora

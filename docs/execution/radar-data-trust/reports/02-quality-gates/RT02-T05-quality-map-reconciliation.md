@@ -3,6 +3,7 @@
 **Status:** implementação concluída; auditoria Codex pendente
 **Plano:** [`RT02-T05-quality-map-reconciliation.md`](../../plans/02-quality-gates/RT02-T05-quality-map-reconciliation.md)
 **Branch/base:** `codex/radar-data-trust-02-completion` / `37f34a74d112b441b91279d058209f127ce1e1d9`
+**Correção auditada:** `641b6e648` (sinais observados e fail-closed antes de callbacks)
 **Auditoria Codex:** pendente
 
 ## Realizado
@@ -18,12 +19,17 @@
 
 ## Validação local hermética
 
-- Testes direcionados de provenance, e2e_health e harness: **48 passed**.
+- Testes direcionados de provenance, e2e_health, harness e golden: **71 passed**.
 - `ruff check` sobre todo Python versionado: **verde**.
 - `provenance` executada duas vezes com agregados idênticos: exact 2/6,
-  document_only 2/6, unresolved 2/6, faithfulness 5/6, completude crítica 1.0.
-- `e2e_health` executada duas vezes com agregados idênticos: os sete sinais de
-  conectividade em 1.0 e `operational_error=0.0`.
+  document_only 2/6, unresolved 2/6 e faithfulness 4/4 entre candidatos
+  resolvidos. O golden não observa state/producer, portanto não fabrica
+  completude por campo.
+- `e2e_health` observa um único fato real capturado do gold: state presente e
+  producer completo (`kind`/`name`/`version`) em 1.0. É amostra E2E, não
+  cobertura dos campos críticos.
+- `e2e_health` executada duas vezes com agregados idênticos: os sinais do
+  caminho em 1.0 e `operational_error=0.0`.
 - `pytest -q` completo: **1384 passed, 77 skipped, 3 failed**. As três falhas
   não são regressões desta spec: os quatro arquivos envolvidos
   (`entity_catalog`, `chunker` e seus testes) não diferem da base

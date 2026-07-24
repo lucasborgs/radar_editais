@@ -137,6 +137,12 @@ projeção de proveniência do gold) sobre um golden representativo e agrega:
 - **faithfulness do trecho:** o `quote` resolvido é substring verbatim do
   bloco silver correspondente (reusa a checagem já existente).
 
+**Limite da implementação RT02:** o golden do resolvedor observa locator e
+faithfulness, não um `FactProvenance` produzido pelo gold; portanto não mede
+completude de `state`/`producer` pelos seis casos. Essa completude é observada
+no único fato real do sinal `e2e_health` (§7.2), como amostra E2E diagnóstica,
+e não como cobertura por campo crítico.
+
 Golden: um caso por tipo do subconjunto representativo abaixo (derivado da spec
 01 §10.2, curado para esta passada diagnóstica) — trecho único/exato; repetido
 em duas páginas; HTML sem página; valor normalizado; campo ausente; registro

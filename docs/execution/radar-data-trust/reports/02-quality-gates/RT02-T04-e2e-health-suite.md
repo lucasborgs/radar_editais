@@ -3,7 +3,8 @@
 **Status:** `passed` (implementação; auditoria da governança pendente)
 **Plano:** [`plans/02-quality-gates/RT02-T04-e2e-health-suite.md`](../../plans/02-quality-gates/RT02-T04-e2e-health-suite.md)
 **Branch/commit-base:** `codex/radar-data-trust-02-t04` / `37f34a74d`
-**Commits:** `feat(data-trust): e2e_health diagnostic eval signal (RT02-T04)`
+**Commits:** `ba136c695` (`feat(data-trust): e2e_health diagnostic eval signal`),
+`641b6e648` (sinais E2E de state/producer observados)
 **Implementador/modelo:** claude-sonnet, worktree isolado
 **Auditoria Codex:** pendente
 
@@ -42,7 +43,8 @@
      pelo gold.
 - Sinais diagnósticos agregados (booleans/contagens, `mean_*` — 1 caso, então
   `mean` = o próprio valor 0/1): `gold_ran`, `known_fact_stated`,
-  `consumption_present`, `quote_survives`, `coordinates_match`,
+  `fact_state_present`, `producer_complete`, `consumption_present`,
+  `quote_survives`, `coordinates_match`,
   `citation_count`, `layers_connected` (AND de todos os anteriores),
   `operational_error`. Nenhum threshold: `classification="diagnostic"`,
   `criteria=()`, `version="1"`.
@@ -126,8 +128,8 @@
 
 | Comando/verificação | Resultado |
 |---|---|
-| `PYTHONPATH=src .venv/bin/python -m radar.core.eval run e2e_health` (1ª rodada) | `status=diagnostic`, `n_cases=1`, todos os 7 sinais booleanos em `1.0`, `mean_operational_error=0.0`; grava `eval_results/20260724_203219_e2e_health.json` |
-| mesma rodada, 2ª execução | agregado **idêntico** byte a byte ao da 1ª (`mean_gold_ran/known_fact_stated/consumption_present/quote_survives/coordinates_match/citation_count/layers_connected=1.0`, `mean_operational_error=0.0`) — grava `eval_results/20260724_203227_e2e_health.json`; confirma determinismo |
+| `PYTHONPATH=src .venv/bin/python -m radar.core.eval run e2e_health` (1ª rodada) | `status=diagnostic`, `n_cases=1`, state presente e producer completo, além dos demais sinais, em `1.0`; `mean_operational_error=0.0` |
+| mesma rodada, 2ª execução | agregado **idêntico** byte a byte ao da 1ª (`mean_gold_ran/known_fact_stated/fact_state_present/producer_complete/consumption_present/quote_survives/coordinates_match/citation_count/layers_connected=1.0`, `mean_operational_error=0.0`); confirma determinismo |
 | `PYTHONPATH=src pytest -q tests/unit` | `1330 passed, 2 skipped` (2 skips pré-existentes, não relacionados) — inclui `tests/unit/test_eval_e2e_health.py` (9 testes) e o ajuste em `test_eval_harness.py` |
 | `ruff check src/radar/core/eval/e2e_health.py src/radar/core/eval/registry.py tests/unit/test_eval_e2e_health.py tests/unit/test_eval_harness.py` | `All checks passed!` |
 | `git diff --check` | saída vazia (sem trailing whitespace/conflitos) |
