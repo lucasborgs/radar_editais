@@ -11,8 +11,8 @@ alteração dos pipelines avaliados
 
 O repositório possui um harness unificado funcional. O estado inicialmente
 aprovado tinha dez suítes registradas. O registry atual, após a adição de
-`explore` e `relevance_shadow` (ambas diagnósticas e não bloqueantes), possui
-doze suítes registradas, goldens versionados, fallback local e integração com
+`explore`, `relevance_shadow`, `provenance` e `e2e_health`, possui catorze
+suítes registradas, goldens versionados, fallback local e integração com
 Langfuse. A suíte hermética
 do harness passa com nove testes. A divergência está na semântica operacional:
 
@@ -97,6 +97,8 @@ Uma pessoa técnica deve conseguir responder, a partir de um resultado oficial:
 | `profile_extractor` | diagnóstica | não | sem threshold aceito |
 | `reranker` | diagnóstica/opcional | não | backend produtivo pode estar desligado e extra local é opcional |
 | `structurer` | diagnóstica | não | sem threshold aceito e provider configurável |
+| `provenance` | diagnóstica | não | baseline comportamental de seis casos; sem representatividade para gate |
+| `e2e_health` | diagnóstica | não | smoke determinístico de um caminho; não é matriz E2E |
 | `explore` | diagnóstica (adicionada posteriormente) | não | sem threshold aceito |
 | `relevance_shadow` | diagnóstica (adicionada posteriormente) | não | sem threshold aceito; suíte shadow de classificação de relevância |
 
@@ -310,9 +312,9 @@ simultaneamente o novo critério e a aprovação do pipeline sem revisão explí
 
 - mudar prompts, modelos, ranking, retrieval, agentes ou dados de produto;
 - criar novos evaluators para aumentar cobertura;
-- inventar thresholds para as suítes diagnósticas (atualmente dez: `rag`,
-  `writing`, `writing_v2`, `triage`, `opportunity_type`, `profile_extractor`,
-  `reranker`, `structurer`, `explore` e `relevance_shadow`);
+- inventar thresholds para as suítes diagnósticas (atualmente onze: `rag`,
+  `writing`, `triage`, `opportunity_type`, `profile_extractor`, `reranker`,
+  `structurer`, `provenance`, `e2e_health`, `explore` e `relevance_shadow`);
 - versionar os 14 MB de resultados locais existentes;
 - publicar automaticamente todos os experimentos;
 - configurar secrets ou projetos Langfuse/GitHub externos;

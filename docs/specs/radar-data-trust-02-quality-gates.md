@@ -1,6 +1,6 @@
 # Radar Data Trust 02 — Quality gates e cobertura de avaliação
 
-**Status:** aprovada para planejamento e implementação (proprietário, 2026-07-24); promoção a vigente no fechamento · **Data:** 2026-07-24
+**Status:** implementação concluída; auditoria Codex pendente · **Data:** 2026-07-24
 **Spec-mãe:** [`radar-data-trust.md`](radar-data-trust.md)
 **Contrato anterior:** [`radar-data-trust-01-provenance.md`](radar-data-trust-01-provenance.md)
 **Ordem:** 02 · **Bloqueia:** alegações de cobertura e promoção de gates
@@ -32,7 +32,8 @@ Fotografia atual das classificações (início desta spec):
 | `extraction` | `gate` | sim (baseline 0.95) |
 | `matching` | `candidate` | proposto (mrr≥0.60, recall@10≥0.55), não aceito |
 | `relevance_shadow` | `diagnostic` | não |
-| `writing` / `writing_v2` | `experimental` | não |
+| `writing` | `diagnostic` | não |
+| `writing_v2` | `experimental` | não |
 | `triage`, `structurer`, `opportunity_type`, `rag`, `explore`, `reranker`, `profile_extractor` | `diagnostic` (default) | não |
 | **proveniência (§10 da spec 01)** | **inexistente** | não |
 
@@ -113,7 +114,7 @@ Extração             → extraction                         (gate, 0.95)
 Proveniência         → provenance                         (diagnostic, NOVA)
 Recuperação/consumo  → rag, matching, explore, reranker   (diagnostic/candidate)
 Perfil               → profile_extractor                  (diagnostic)
-Escrita              → writing, writing_v2                (experimental)
+Escrita              → writing (diagnostic), writing_v2   (experimental)
 E2E                  → e2e_health                         (diagnostic, NOVA)
 ```
 
@@ -223,7 +224,8 @@ threshold. Paralelismo seguro e dependências ficam a cargo do plano.
 
 ## 13. Critérios de conclusão
 
-A spec pode ser marcada vigente quando:
+A implementação está concluída e permanece pendente de auditoria Codex. A spec
+pode ser marcada vigente somente quando:
 
 1. `provenance` e `e2e_health` registradas, diagnósticas, rodando local com
    métrica agregada estável;
