@@ -10,6 +10,15 @@
 
 ---
 
+> **Nota de reconciliação (RT01-T13, 2026-07-24):** a implementação
+> (`RT01-T01` a `RT01-T13`) está concluída e validada — ver o consolidado em
+> [`docs/execution/radar-data-trust/reports/01-provenance/README.md`](../execution/radar-data-trust/reports/01-provenance/README.md),
+> com a matriz de fontes, a auditoria dos critérios §16 e as pendências
+> encaminhadas às specs 02/04 e ao proprietário. Esta spec está **pronta para
+> promoção a vigente**, pendente de confirmação da governança e do
+> proprietário — o status acima não foi alterado por esta task porque essa
+> promoção é ato de governança, não do implementador.
+
 ## 1. Problema comprovado
 
 O runtime já preserva partes importantes da proveniência:

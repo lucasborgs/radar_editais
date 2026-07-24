@@ -154,7 +154,7 @@ positivo/negativo (ver "Validação").
 
 | Comando/verificação | Resultado |
 |---|---|
-| `PYTHONPATH=src pytest -q tests/unit/test_provenance.py tests/unit/test_edital_extraction.py` | `65 passed` (59 em `test_provenance.py` + 6 pré-existentes em `test_edital_extraction.py`) |
+| `PYTHONPATH=src pytest -q tests/unit/test_provenance.py tests/unit/test_edital_extraction.py` | `65 passed` (57 em `test_provenance.py` + 8 pré-existentes em `test_edital_extraction.py`; correção cosmética RT01-T13 — o total de 65 estava correto, a quebra 59+6 não) |
 | `ruff check src/radar/domain/provenance.py src/radar/domain/__init__.py tests/unit/test_provenance.py tests/unit/test_edital_extraction.py` | All checks passed |
 | `git diff --check` (staged) | limpo |
 | Import `radar.domain.provenance` e `radar.domain` (re-export) | ok |

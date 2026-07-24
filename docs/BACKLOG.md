@@ -87,6 +87,32 @@ rotulado como **estado externo não verificado**, nunca como fato atual.
   regressão de código.
 - **Tipo:** gate operacional; não autoriza mudança de arquitetura.
 
+### Backfillar campos `inferred/deterministic` de investidor/programa/ICT (Radar Data Trust 01)
+
+- **Evidência atual:** `core/kg/provenance_backfill.py` (RT01-T12) carimba
+  apenas `name`/`url`/campos copiados verbatim de investidor, programa e ICT
+  (`unknown` + âncora de catálogo). Os campos re-derivados dessa mesma origem
+  — `ticket_min`/`ticket_max`/`status`/`mecanismo`/`formato` (investidor e
+  programa) e `uf`/`setores`/`tecnologias_tags` (ICT) — não são tocados pelo
+  backfill, mesmo já tendo builder de proveniência em `provenance_writer.py`
+  usado pelo ingest ao vivo (T07/T08).
+- **Motivo do adiamento:** backfillar esses campos exige a mesma checagem de
+  igualdade re-derivado-vs-armazenado que `status`/`mecanismo` de edital já
+  usam (`decide_status`/`decide_mecanismo` em `provenance_backfill.py`) —
+  gravar sem essa checagem arriscaria reivindicar `inferred` para um valor
+  que pode ter divergido do catálogo desde o ingest original. A task RT01-T12
+  não pediu essa checagem para esta origem; implementá-la sem instrução seria
+  extrapolar o escopo aprovado.
+- **Gatilho:** decisão explícita de estender `provenance_backfill.py` com
+  `decide_investidor_derived`/`decide_ict_derived` (mesmo padrão de
+  `decide_status`), ou abordagem equivalente aprovada.
+- **Ponto de entrada:** `src/radar/core/kg/provenance_backfill.py`,
+  `tests/unit/test_provenance_backfill.py`,
+  [`RT01-T12`](execution/radar-data-trust/reports/01-provenance/RT01-T12-sample-backfill.md).
+- **Restrição:** não estender o backfill de edital (`requisitos_texto`) em
+  paralelo — essa dívida é maior e está encaminhada à spec 04 (ver
+  [consolidado RT01](execution/radar-data-trust/reports/01-provenance/README.md)).
+
 ## Decisões atuais que não são backlog
 
 - `RERANK_BACKEND=off` em produção e o extra opcional `.[rerank]` são uma escolha
