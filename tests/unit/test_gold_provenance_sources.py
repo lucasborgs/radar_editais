@@ -111,14 +111,20 @@ class TestSourceProvenance:
         for payload in prov.values():
             FactProvenance.model_validate(payload)
 
-    def test_non_edital_entities_still_empty(self, monkeypatch):
-        """`ict` passou a gravar provenance na RT01-T07 (spec §6.4) — excluído
-        aqui e afirmado não-vazio em `test_gold_provenance_icts.py`.
-        investidor/programa/agencia seguem vazios até a T08."""
+    def test_all_entities_have_provenance(self, monkeypatch):
+        """Pós-pouso T07+T08 (resolução da governança): TODOS os kinds gravam
+        provenance — editais (T05/T06), ict (T07), investidor/programa/agencia
+        (T08). O antigo `test_non_edital_entities_still_empty` ficou vácuo e
+        foi substituído pelo contrato positivo: nenhuma entidade capturada sai
+        sem provenance não vazia e válida. Cobertura detalhada por kind vive
+        em test_gold_provenance_icts.py e test_gold_provenance_curated.py."""
         harness, _ = _run_capture(monkeypatch)
-        for key, rec in harness.projection.entities.items():
-            if rec["kind"] not in ("edital", "ict"):
-                assert harness.entity_provenance.get(key, {}) == {}, f"{key} deveria ter provenance vazia"
+        assert harness.projection.entities
+        for key in harness.projection.entities:
+            prov = harness.entity_provenance.get(key, {})
+            assert prov, f"{key} deveria ter provenance não vazia"
+            for payload in prov.values():
+                FactProvenance.model_validate(payload)
 
     def test_web_has_no_operado_por_edge(self, monkeypatch):
         harness, _ = _run_capture(monkeypatch)

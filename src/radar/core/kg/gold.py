@@ -616,6 +616,7 @@ def _replace_match_chunks(cur, entity_id: str, chunks: list[dict], embeddings: l
 def _get_agency(cur, cache: dict[str, str], name: str) -> str | None:
     """Upsert idempotente de uma agência (kind=agencia). Retorna o id (cacheado
     no run). Nome vazio → None."""
+    from radar.core.kg import provenance_writer
     from radar.core.retrieval.embedder import embed_query
 
     canon = _canon_agency(name)
@@ -627,6 +628,11 @@ def _get_agency(cur, cache: dict[str, str], name: str) -> str | None:
     eid = _upsert_entity(
         cur, kind="agencia", source="curadoria", native_id=nid, name=canon,
         description=canon, curated=True, embedding=embed_query(canon),
+        # RT01-T08 (spec §6.4): `name` de agência é sempre derivado da
+        # canonicalização determinística de um token de operador/fonte —
+        # nunca copiado verbatim de um catálogo próprio (agência não tem
+        # registro JSON dedicado).
+        provenance={"name": provenance_writer.build_agencia_name_provenance().model_dump(mode="json")},
     )
     cache[canon] = eid
     return eid
@@ -660,6 +666,7 @@ def _parse_date(v) -> date | None:
 
 
 def _ingest_investidores(conn, stats: dict) -> None:
+    from radar.core.kg import provenance_writer
     from radar.core.retrieval.embedder import embed_query
 
     path = SILVER_DIR / "investidores.json"
@@ -667,16 +674,25 @@ def _ingest_investidores(conn, stats: dict) -> None:
     for r in recs:
         try:
             desc = _ws(r.get("tese") or "")
+            setores = normalize_setores(list(r.get("setores") or []) + list(r.get("tese_themes") or []))
+            tags = normalize_tags(r.get("tese_keywords") or [])
+            status = "ativa" if r.get("fund_status") == "ativo" else "inativa"
+            tmin, tmax = _ticket_from_range(r.get("ticket_range"))
+            # RT01-T08 (spec §3.2/§6.4): curado != validado — campos copiados
+            # verbatim do catálogo começam `unknown`; setores/tags/status/
+            # ticket são `inferred/deterministic` (regra declarada).
+            entity_provenance = provenance_writer.build_investidor_fact_provenance(
+                r, setores=setores, tecnologias_tags=tags, status=status,
+                ticket_min=tmin, ticket_max=tmax,
+            )
             with conn.transaction(), conn.cursor() as cur:
                 _upsert_entity(
                     cur, kind="investidor", source="curadoria", native_id=r["id"],
                     name=r.get("name") or r["id"], description=desc, mecanismo="equity",
-                    setores=normalize_setores(list(r.get("setores") or []) + list(r.get("tese_themes") or [])),
-                    tecnologias_tags=normalize_tags(r.get("tese_keywords") or []),
-                    status="ativa" if r.get("fund_status") == "ativo" else "inativa",
-                    ticket_min=_ticket_from_range(r.get("ticket_range"))[0],
-                    ticket_max=_ticket_from_range(r.get("ticket_range"))[1],
+                    setores=setores, tecnologias_tags=tags,
+                    status=status, ticket_min=tmin, ticket_max=tmax,
                     curated=True, verificado_em=_parse_date(r.get("verificado_em")),
+                    provenance=entity_provenance,
                     metadata={
                         "estagio_alvo": r.get("estagio_alvo") or [],
                         # `setores` da coluna é vocabulário normalizado (1–3
@@ -701,7 +717,8 @@ def _ingest_investidores(conn, stats: dict) -> None:
 
 
 def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
-    from radar.core.kg.constraints_producer import produce_from_text
+    from radar.core.kg import provenance_writer
+    from radar.core.kg.constraints_producer import CONSTRAINTS_MODEL, produce_from_text
     from radar.core.retrieval.embedder import embed_query
 
     path = SILVER_DIR / "programas.json"
@@ -711,19 +728,37 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
             desc = _ws(" ".join(x for x in [r.get("descricao"), r.get("beneficio")] if x))
             tmin, tmax = _ticket_from_range(r.get("ticket_range"))
             constraints, requisitos, exclusoes, publico_alvo = produce_from_text(r.get("elegibilidade") or "")
+            mecanismo = _map_mecanismo(r.get("tipo"))
+            formato = _map_formato(r.get("formato"))
+            setores = normalize_setores(list(r.get("setores") or []) + list(r.get("tese_themes") or []))
+            tags = normalize_tags(r.get("tese_themes") or [])
+            status = "ativa" if r.get("status") == "ativo" else "inativa"
             chunks = _pack_chunks([{"section_path": [r.get("name") or ""], "kind": "paragraph", "text": desc}])
             chunk_embs = _embed_match_chunks(chunks)
+            # RT01-T08 (spec §3.2/§6.4): curado != validado — campos copiados
+            # verbatim começam `unknown`; derivados são `inferred/deterministic`;
+            # `constraints` reusa a call B (`inferred/llm`); `requisitos_texto`
+            # de programa NUNCA resolve evidência (sem blocos silver).
+            entity_provenance = provenance_writer.build_programa_fact_provenance(
+                r, setores=setores, tecnologias_tags=tags, status=status,
+                ticket_min=tmin, ticket_max=tmax, mecanismo=mecanismo, formato=formato,
+                constraints=constraints, requisitos_texto=requisitos,
+                constraints_model=CONSTRAINTS_MODEL,
+            )
+            operado_por_provenance = provenance_writer.build_programa_operado_por_provenance().model_dump(
+                mode="json"
+            )
             with conn.transaction(), conn.cursor() as cur:
                 eid = _upsert_entity(
                     cur, kind="programa", source="curadoria", native_id=r["id"],
                     name=r.get("name") or r["id"], description=desc,
-                    mecanismo=_map_mecanismo(r.get("tipo")), formato=_map_formato(r.get("formato")),
-                    setores=normalize_setores(list(r.get("setores") or []) + list(r.get("tese_themes") or [])),
-                    tecnologias_tags=normalize_tags(r.get("tese_themes") or []),
-                    status="ativa" if r.get("status") == "ativo" else "inativa",
+                    mecanismo=mecanismo, formato=formato,
+                    setores=setores, tecnologias_tags=tags,
+                    status=status,
                     ticket_min=tmin, ticket_max=tmax, constraints=constraints,
                     requisitos_texto=requisitos, curated=True,
                     verificado_em=_parse_date(r.get("verificado_em")),
+                    provenance=entity_provenance,
                     metadata={
                         "operador": r.get("operador"), "tipo": r.get("tipo"),
                         "cadencia": r.get("cadencia"), "beneficio": r.get("beneficio"),
@@ -739,7 +774,7 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
                 for ag in _split_operador(r.get("operador")):
                     aid = _get_agency(cur, agency_cache, ag)
                     if aid:
-                        _upsert_rel(cur, eid, aid, "operado_por")
+                        _upsert_rel(cur, eid, aid, "operado_por", provenance=operado_por_provenance)
                         stats["operado_por"] += 1
             stats["programa"] += 1
         except Exception as e:  # noqa: BLE001

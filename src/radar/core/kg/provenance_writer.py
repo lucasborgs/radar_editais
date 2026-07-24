@@ -406,6 +406,251 @@ def build_ict_fact_provenance(*, record: dict, anchor: EvidenceRef, uf: str | No
     return out
 
 
+# ===========================================================================
+# RT01-T08 — investidores, programas e agências (curadoria)
+#
+# docs/execution/radar-data-trust/plans/01-provenance/RT01-T08-curated-actors.md
+# + spec docs/specs/radar-data-trust-01-provenance.md §3.2/§4/§6.4 ("Investidores
+# e programas existentes"). Princípio: curado != validado — campos copiados
+# verbatim do catálogo JSON começam `unknown` (nunca `stated`; a curadoria
+# básica não é uma citação documental resolvida), mesmo carregando uma âncora
+# de evidência. Campos derivados no ingest (normalização/mapeamento) são
+# `inferred/deterministic`, sem refs. `constraints` de programa reusa
+# `build_constraints_provenance` (mesma call B); `requisitos_texto` de
+# programa NUNCA tenta `resolve_quote` — programas não têm blocos silver, a
+# tabela de fatos da task proíbe inventar resolução.
+#
+# Builders puros (sem I/O de rede/banco); chamados por `gold._ingest_investidores`,
+# `gold._ingest_programas` e `gold._get_agency`.
+# ===========================================================================
+
+#: Âncora de catálogo — documento lógico por kind (spec §6.4: "path lógico,
+#: chave, ... hash/commit"). Não é um caminho de disco resolvido pelo
+#: resolver do T03; é a identidade do catálogo versionado.
+CURATED_INVESTIDORES_DOCUMENT = "data/silver/investidores.json"
+CURATED_PROGRAMAS_DOCUMENT = "data/silver/programas.json"
+
+
+def _canonical_record_hash(record: dict) -> str:
+    """`md5:<hex>` do JSON canônico do registro (`sort_keys=True,
+    ensure_ascii=False`) — identifica a versão do registro curado sem copiar
+    o catálogo inteiro para a proveniência (spec §4.2: "ao menos um hash
+    identifica a versão recuperável")."""
+    canon = json.dumps(record, sort_keys=True, ensure_ascii=False)
+    return "md5:" + hashlib.md5(canon.encode("utf-8")).hexdigest()
+
+
+def build_curated_catalog_anchor(
+    record: dict, *, document: str, source_url: str | None = None
+) -> EvidenceRef:
+    """Âncora do catálogo — UM `EvidenceRef` por entidade (investidor ou
+    programa), `locator_quality=document_only` (registro identificado, sem
+    coordenada exata dentro do JSON), sem `quote` (não é uma citação
+    verbatim, é a referência ao registro curado inteiro). `source_url` é o
+    site do ator quando declarado no catálogo; `None` quando ausente."""
+    return EvidenceRef(
+        source="curadoria",
+        source_url=source_url or None,
+        document=document,
+        canonical_content_hash=_canonical_record_hash(record),
+        locator_quality=LocatorQuality.DOCUMENT_ONLY,
+    )
+
+
+def build_catalog_copied_provenance(anchor: EvidenceRef) -> FactProvenance:
+    """Campo copiado verbatim do catálogo (`name`/`description`/`metadata.*`)
+    — SEMPRE `unknown/human` (spec §3.2: "campos de curadoria básica... começam
+    como unknown"; curado != validado). Carrega a âncora do catálogo como
+    evidência de origem, sem prometer que o valor foi verificado."""
+    return FactProvenance(
+        state=FactState.UNKNOWN,
+        evidence_refs=[anchor],
+        producer=ProducerInfo(kind=ProducerKind.HUMAN, name="curadoria"),
+    )
+
+
+def build_curated_derived_provenance(*, producer_name: str, rule: str, inputs: list[str]) -> FactProvenance:
+    """Campo derivado no ingest (normalização/mapeamento determinístico sobre
+    o registro curado) — `inferred/deterministic`, sem `EvidenceRef` (regra
+    sobre um campo de entrada, não citação verbatim). Uma função por linha
+    da tabela de fatos da task chama isto com o `rule`/`inputs` próprios."""
+    return FactProvenance(
+        state=FactState.INFERRED,
+        producer=ProducerInfo(kind=ProducerKind.DETERMINISTIC, name=producer_name),
+        derivation=DerivationInfo(rule=rule, inputs=inputs),
+    )
+
+
+def build_programa_requisito_provenance(*, model: str) -> FactProvenance:
+    """`requisitos_texto.<i>` de PROGRAMA — `inferred/llm`, mesma call B
+    (`constraints_producer.produce_from_text`) do edital, mas SEM
+    `evidence_resolver.resolve_quote`: programas não têm blocos silver
+    (tabela de fatos T08: "não inventar resolução"). Nunca `stated`."""
+    return FactProvenance(
+        state=FactState.INFERRED,
+        producer=ProducerInfo(
+            kind=ProducerKind.LLM,
+            name=CONSTRAINTS_PRODUCER_NAME,
+            version=CONSTRAINTS_PRODUCER_VERSION,
+            model=model,
+            prompt_version=CONSTRAINTS_PROMPT_VERSION,
+        ),
+        derivation=DerivationInfo(inputs=["record.elegibilidade"]),
+    )
+
+
+def build_programa_operado_por_provenance() -> FactProvenance:
+    """Aresta `operado_por` de PROGRAMA — `inferred/deterministic`, regra
+    `gold._split_operador` (distinta da versão de edital, que usa
+    `_SOURCE_AGENCY`)."""
+    return FactProvenance(
+        state=FactState.INFERRED,
+        producer=ProducerInfo(kind=ProducerKind.DETERMINISTIC, name="_split_operador"),
+        derivation=DerivationInfo(rule="_split_operador:v1", inputs=["record.operador"]),
+    )
+
+
+def build_agencia_name_provenance() -> FactProvenance:
+    """`name` de uma entidade `agencia` (`gold._get_agency`) —
+    `inferred/deterministic`, regra `gold._canon_agency`. `inputs` é o valor
+    literal da tabela de fatos da task (`"operador|source"`): a canonicalização
+    roda tanto sobre um token de `operador` de programa quanto sobre a fonte
+    de um edital — o chamador não distingue qual das duas origens disparou
+    esta chamada, então o input declarado cobre ambas."""
+    return FactProvenance(
+        state=FactState.INFERRED,
+        producer=ProducerInfo(kind=ProducerKind.DETERMINISTIC, name="_canon_agency"),
+        derivation=DerivationInfo(rule="_canon_agency:v1", inputs=["operador|source"]),
+    )
+
+
+def build_investidor_fact_provenance(
+    record: dict,
+    *,
+    setores: list[str],
+    tecnologias_tags: list[str],
+    status: str | None,
+    ticket_min: float | None,
+    ticket_max: float | None,
+) -> dict[str, dict]:
+    """Compõe o dict `path -> FactProvenance.model_dump(mode="json")` de UM
+    investidor, pronto para `entities.provenance`. `record` é o registro cru
+    de `investidores.json` — usado tanto para a âncora quanto para decidir
+    quais paths copiados têm valor ("campo sem valor -> sem entrada").
+    `setores`/`tecnologias_tags`/`status`/`ticket_min`/`ticket_max` são os
+    valores JÁ computados pelo chamador (`gold._ingest_investidores`); esta
+    função não recalcula nada, só anota a proveniência."""
+    anchor = build_curated_catalog_anchor(
+        record, document=CURATED_INVESTIDORES_DOCUMENT, source_url=record.get("site") or None
+    )
+    copied = build_catalog_copied_provenance(anchor).model_dump(mode="json")
+    out: dict[str, dict] = {}
+    if record.get("name"):
+        out["name"] = copied
+    if record.get("tese"):
+        out["description"] = copied
+    if record.get("site"):
+        out["metadata.site"] = copied
+    out["setores"] = build_curated_derived_provenance(
+        producer_name="normalize_setores", rule="normalize_setores:v1",
+        inputs=["record.setores", "record.tese_themes"],
+    ).model_dump(mode="json")
+    out["tecnologias_tags"] = build_curated_derived_provenance(
+        producer_name="normalize_tags", rule="normalize_tags:v1",
+        inputs=["record.tese_keywords"],
+    ).model_dump(mode="json")
+    if status is not None:
+        out["status"] = build_curated_derived_provenance(
+            producer_name="_status_from_curated", rule="_status_from_curated:v1",
+            inputs=["record.fund_status"],
+        ).model_dump(mode="json")
+    if ticket_min is not None:
+        out["ticket_min"] = build_curated_derived_provenance(
+            producer_name="_ticket_from_range", rule="_ticket_from_range:v1",
+            inputs=["record.ticket_range"],
+        ).model_dump(mode="json")
+    if ticket_max is not None:
+        out["ticket_max"] = build_curated_derived_provenance(
+            producer_name="_ticket_from_range", rule="_ticket_from_range:v1",
+            inputs=["record.ticket_range"],
+        ).model_dump(mode="json")
+    return out
+
+
+def build_programa_fact_provenance(
+    record: dict,
+    *,
+    setores: list[str],
+    tecnologias_tags: list[str],
+    status: str | None,
+    ticket_min: float | None,
+    ticket_max: float | None,
+    mecanismo: str | None,
+    formato: str | None,
+    constraints: list[dict],
+    requisitos_texto: list[str],
+    constraints_model: str,
+) -> dict[str, dict]:
+    """Compõe o dict `path -> FactProvenance.model_dump(mode="json")` de UM
+    programa, pronto para `entities.provenance`. Mesma convenção de
+    `build_investidor_fact_provenance`: `record` é o registro cru de
+    `programas.json`; os demais parâmetros são valores JÁ computados pelo
+    chamador (`gold._ingest_programas`)."""
+    anchor = build_curated_catalog_anchor(
+        record, document=CURATED_PROGRAMAS_DOCUMENT, source_url=record.get("site") or None
+    )
+    copied = build_catalog_copied_provenance(anchor).model_dump(mode="json")
+    out: dict[str, dict] = {}
+    if record.get("name"):
+        out["name"] = copied
+    if record.get("operador"):
+        out["metadata.operador"] = copied
+    if record.get("beneficio"):
+        out["metadata.beneficio"] = copied
+    if record.get("elegibilidade"):
+        out["metadata.elegibilidade"] = copied
+    out["setores"] = build_curated_derived_provenance(
+        producer_name="normalize_setores", rule="normalize_setores:v1",
+        inputs=["record.setores", "record.tese_themes"],
+    ).model_dump(mode="json")
+    out["tecnologias_tags"] = build_curated_derived_provenance(
+        producer_name="normalize_tags", rule="normalize_tags:v1",
+        inputs=["record.tese_themes"],
+    ).model_dump(mode="json")
+    if status is not None:
+        out["status"] = build_curated_derived_provenance(
+            producer_name="_status_from_curated", rule="_status_from_curated:v1",
+            inputs=["record.status"],
+        ).model_dump(mode="json")
+    if ticket_min is not None:
+        out["ticket_min"] = build_curated_derived_provenance(
+            producer_name="_ticket_from_range", rule="_ticket_from_range:v1",
+            inputs=["record.ticket_range"],
+        ).model_dump(mode="json")
+    if ticket_max is not None:
+        out["ticket_max"] = build_curated_derived_provenance(
+            producer_name="_ticket_from_range", rule="_ticket_from_range:v1",
+            inputs=["record.ticket_range"],
+        ).model_dump(mode="json")
+    if mecanismo is not None:
+        out["mecanismo"] = build_curated_derived_provenance(
+            producer_name="_map_mecanismo", rule="_map_mecanismo:v1",
+            inputs=["record.tipo"],
+        ).model_dump(mode="json")
+    if formato is not None:
+        out["formato"] = build_curated_derived_provenance(
+            producer_name="_map_formato", rule="_map_formato:v1",
+            inputs=["record.formato"],
+        ).model_dump(mode="json")
+    if constraints:
+        out["constraints"] = build_constraints_provenance(model=constraints_model).model_dump(mode="json")
+    for i, _req in enumerate(requisitos_texto or []):
+        out[f"requisitos_texto.{i}"] = build_programa_requisito_provenance(
+            model=constraints_model
+        ).model_dump(mode="json")
+    return out
+
+
 __all__ = [
     "GOLD_TAGGER_PRODUCER_NAME",
     "GOLD_TAGGER_PROMPT_VERSION",
@@ -428,4 +673,14 @@ __all__ = [
     "build_ict_tags_provenance",
     "build_ict_credenciada_por_provenance",
     "build_ict_fact_provenance",
+    "CURATED_INVESTIDORES_DOCUMENT",
+    "CURATED_PROGRAMAS_DOCUMENT",
+    "build_curated_catalog_anchor",
+    "build_catalog_copied_provenance",
+    "build_curated_derived_provenance",
+    "build_programa_requisito_provenance",
+    "build_programa_operado_por_provenance",
+    "build_agencia_name_provenance",
+    "build_investidor_fact_provenance",
+    "build_programa_fact_provenance",
 ]
