@@ -94,4 +94,5 @@ SUITE = Suite(
     task=task,
     evaluators=[eval_field_accuracy, eval_low_confidence_guard],
     prereqs=_prereqs,
+    classification="diagnostic",
 )

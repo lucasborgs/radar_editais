@@ -148,6 +148,7 @@ SUITE = Suite(
     task=task,
     evaluators=[eval_route, eval_tool_contract, eval_answer_contract],
     prereqs=_prereqs,
+    classification="diagnostic",
     version="2",
     dataset_paths=[GOLDEN],
     expected_cases=4,

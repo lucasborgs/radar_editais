@@ -77,4 +77,5 @@ SUITE = Suite(
     task=task,
     evaluators=[eval_type_accuracy],
     prereqs=_prereqs,
+    classification="diagnostic",
 )
