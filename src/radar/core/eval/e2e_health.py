@@ -196,6 +196,11 @@ def _run_e2e(*, item: dict) -> dict:  # noqa: ARG001 — item é fixo (1 caso m�
     known_fact_present = fact is not None
     known_fact_state = fact.get("state") if isinstance(fact, dict) else None
     known_fact_stated = known_fact_state == "stated"
+    producer = fact.get("producer") if isinstance(fact, dict) else None
+    producer_complete = bool(
+        isinstance(producer, dict)
+        and all(producer.get(field) for field in ("kind", "name", "version"))
+    )
 
     consumption_view = provenance_read.public_provenance(entity_prov)
     consumption_entry = consumption_view.get(REQUISITO_PATH)
@@ -229,6 +234,8 @@ def _run_e2e(*, item: dict) -> dict:  # noqa: ARG001 — item é fixo (1 caso m�
         "known_fact_present": known_fact_present,
         "known_fact_state": known_fact_state,
         "known_fact_stated": known_fact_stated,
+        "fact_state_present": known_fact_state is not None,
+        "producer_complete": producer_complete,
         "consumption_present": consumption_present,
         "citation_count": len(citations),
         "citation_quote": citation.get("quote") if citation else None,
@@ -260,6 +267,8 @@ def _bool_evaluator(name: str, field: str) -> Any:
 
 eval_gold_ran = _bool_evaluator("gold_ran", "gold_ran")
 eval_known_fact_stated = _bool_evaluator("known_fact_stated", "known_fact_stated")
+eval_fact_state_present = _bool_evaluator("fact_state_present", "fact_state_present")
+eval_producer_complete = _bool_evaluator("producer_complete", "producer_complete")
 eval_consumption_present = _bool_evaluator("consumption_present", "consumption_present")
 eval_quote_survives = _bool_evaluator("quote_survives", "quote_survives")
 eval_coordinates_match = _bool_evaluator("coordinates_match", "coordinates_match")
@@ -320,6 +329,8 @@ SUITE = Suite(
     evaluators=[
         eval_gold_ran,
         eval_known_fact_stated,
+        eval_fact_state_present,
+        eval_producer_complete,
         eval_consumption_present,
         eval_quote_survives,
         eval_coordinates_match,

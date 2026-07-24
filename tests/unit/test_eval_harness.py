@@ -311,6 +311,35 @@ def test_env_production_refused_before_task(tmp_path, monkeypatch):
     assert not called
 
 
+def test_env_production_refused_before_any_suite_callback(tmp_path, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    called: list[str] = []
+
+    def _called(name, value=None):
+        def callback(*args, **kwargs):
+            called.append(name)
+            return value
+
+        return callback
+
+    suite = Suite(
+        name="dummy_env_callbacks",
+        description="env callbacks",
+        expected_cases=_called("expected_cases", 1),
+        expected_case_ids=_called("expected_case_ids", ["case-1"]),
+        prereqs=_called("prereqs"),
+        load_data=_called("load_data", [{"input": 1, "metadata": {"case_id": "case-1"}}]),
+        task=_called("task", {"ok": True}),
+        evaluators=[],
+    )
+
+    result = run_suite(suite, out_dir=tmp_path)
+    assert result["status"] == "error"
+    assert called == []
+
+
 def test_env_staging_refused_before_task(tmp_path, monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "staging")
     monkeypatch.delenv("DATABASE_URL", raising=False)

@@ -504,26 +504,20 @@ def _refuse_hostile_environment() -> str | None:
     possível (não configura um "alvo remoto" — Langfuse é telemetria de
     eval, não banco de dados do produto).
     """
-    from radar.core.environment import Environment, _host, _is_local_host, resolve_environment
+    from radar.core.environment import Environment, database_identity
 
-    env = resolve_environment()
+    identity = database_identity()
+    env = identity.environment
     if env is Environment.PRODUCTION:
         return "ambiente de produção não permitido para avaliação"
     if env is Environment.STAGING:
         return "ambiente de staging não permitido para avaliação"
 
     if env in (Environment.LOCAL, Environment.TEST, Environment.UNKNOWN):
-        import os
-
-        remote = []
-        for var in ("DATABASE_URL", "SUPABASE_URL"):
-            host = _host(os.getenv(var))
-            if host and not _is_local_host(host):
-                remote.append(var)
-        if remote:
+        configured = bool(identity.database_host or identity.supabase_host)
+        if configured and (identity.is_mixed or not identity.is_local):
             return (
-                f"ambiente {env.value} com alvo remoto em "
-                f"{' e '.join(remote)} recusado"
+                f"ambiente {env.value} com alvo remoto ou misto recusado"
             )
 
     return None
@@ -546,17 +540,18 @@ def run_suite(
     if push is not None:
         publish = push
     started_at = datetime.now(timezone.utc)
-    expected = _expected_cases(suite)
-    expected_ids = _expected_case_ids(suite)
 
     hostile = _refuse_hostile_environment()
     if hostile is not None:
         print(f"[block] {suite.name}: {hostile}")
         return _terminal_payload(
             suite, intent=intent, status="error", reason=hostile,
-            items=[], expected=expected, expected_ids=expected_ids, started_at=started_at,
+            items=[], expected=None, expected_ids=(), started_at=started_at,
             publish=publish,
         )
+
+    expected = _expected_cases(suite)
+    expected_ids = _expected_case_ids(suite)
 
     if intent == "gate" and limit is not None:
         return _terminal_payload(

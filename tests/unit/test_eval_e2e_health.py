@@ -65,6 +65,8 @@ class TestHappyPathSignals:
         agg = result["aggregate"]
         assert agg["mean_gold_ran"] == 1.0
         assert agg["mean_known_fact_stated"] == 1.0
+        assert agg["mean_fact_state_present"] == 1.0
+        assert agg["mean_producer_complete"] == 1.0
         assert agg["mean_consumption_present"] == 1.0
         assert agg["mean_quote_survives"] == 1.0
         assert agg["mean_coordinates_match"] == 1.0
@@ -76,6 +78,8 @@ class TestHappyPathSignals:
         result = self._run(tmp_path)
         output = result["item_results"][0]["output"]
         assert output["known_fact_state"] == "stated"
+        assert output["fact_state_present"] is True
+        assert output["producer_complete"] is True
         assert output["citation_quote"] == e2e_health.KNOWN_QUOTE
         assert output["independent_locator_quality"] == "exact"
         assert output["edital_ingested"] == 1

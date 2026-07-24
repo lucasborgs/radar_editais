@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from radar.core.eval.harness import run_suite
-from radar.core.eval.provenance import SUITE, load_data
+from radar.core.eval.provenance import SUITE, _get_expected_case_ids, load_data
 
 pytestmark = pytest.mark.unit
 
@@ -20,6 +20,16 @@ def test_golden_loads_six_cases():
     ids = [i["metadata"]["case_id"] for i in items]
     assert "provenance-01-unique-exact" in ids
     assert "provenance-06-legacy-no-silver" in ids
+
+
+def test_expected_case_ids_are_pure_and_unique_across_reloads():
+    load_data()
+    first = _get_expected_case_ids()
+    load_data()
+    second = _get_expected_case_ids()
+    assert first == second
+    assert len(first) == 6
+    assert len(set(first)) == 6
 
 
 def test_suite_classification_diagnostic():
@@ -50,32 +60,40 @@ def test_registry_has_provenance():
     assert suite.name == "provenance"
 
 
-def test_run_produces_locator_signals(tmp_path):
+def test_run_reports_concrete_locator_and_faithfulness_denominators(tmp_path):
     result = run_suite(SUITE, out_dir=tmp_path)
     assert result["status"] == "diagnostic"
     agg = result.get("aggregate", {})
-    # deve ter pelo menos os sinais de locator (exact, document_only, unresolved)
-    for key in ("mean_locator_exact", "mean_locator_document_only", "mean_locator_unresolved"):
-        assert key in agg, f"falta {key} no agregado"
+    assert agg["mean_locator_exact"] == 0.3333  # 2/6, arredondado pelo harness
+    assert agg["mean_locator_document_only"] == 0.3333  # 2/6
+    assert agg["mean_locator_unresolved"] == 0.3333  # 2/6
+    assert agg["mean_faithfulness_verbatim"] == 1.0
+    assert "mean_completeness_has_state" not in agg
+    assert "mean_completeness_has_producer" not in agg
+    assert "mean_critical_field_completeness" not in agg
+
+    faithfulness = {
+        item["metadata"]["case_id"]: next(
+            evaluation["value"]
+            for evaluation in item["evaluations"]
+            if evaluation["name"] == "faithfulness_verbatim"
+        )
+        for item in result["item_results"]
+    }
+    assert sum(value is not None for value in faithfulness.values()) == 4
+    assert faithfulness["provenance-05-absent-field"] is None
+    assert faithfulness["provenance-06-legacy-no-silver"] is None
 
 
-def test_run_produces_faithfulness_signal(tmp_path):
+def test_critical_field_null_does_not_change_locator_or_faithfulness_scope(tmp_path):
     result = run_suite(SUITE, out_dir=tmp_path)
-    agg = result.get("aggregate", {})
-    assert "mean_faithfulness_verbatim" in agg
-
-
-def test_critical_field_null_excluded_from_denominator(tmp_path):
-    """Casos com critical_field=null não entram no denominador de
-    critical_field_completeness. O evaluator devolve value=None para eles."""
-    items = load_data()
-    null_cases = [i for i in items if i["metadata"].get("critical_field") is None]
-    assert len(null_cases) >= 1  # caso 2 (repeated) e caso 6 (legacy)
-    result = run_suite(SUITE, out_dir=tmp_path)
-    agg = result.get("aggregate", {})
-    # critical_field_completeness média deve ignorar Nones
-    cf = agg.get("mean_critical_field_completeness")
-    assert cf is not None
+    null_ids = {
+        item["metadata"]["case_id"]
+        for item in result["item_results"]
+        if item["metadata"].get("critical_field") is None
+    }
+    assert null_ids == {"provenance-02-repeated-two-pages", "provenance-06-legacy-no-silver"}
+    assert "mean_critical_field_completeness" not in result["aggregate"]
 
 
 def test_legacy_unresolved_not_masked(tmp_path):
