@@ -1,0 +1,936 @@
+{
+  "entities": {
+    "agencia|curadoria|agencia:embrapii": {
+      "constraints": [],
+      "constraints_input_hash": null,
+      "curated": true,
+      "deadline": null,
+      "description": "EMBRAPII",
+      "embedding_dim": 8,
+      "embedding_input_hash": "9067a35880ddc8d4bdec2adb9fd92998d03f5e3dd14cdf6a324d8d9a086894df",
+      "embedding_model": "stub-embedder-v1",
+      "formato": null,
+      "kind": "agencia",
+      "mecanismo": null,
+      "metadata": {},
+      "name": "EMBRAPII",
+      "native_id": "agencia:embrapii",
+      "requisitos_texto": [],
+      "setores": [],
+      "source": "curadoria",
+      "status": null,
+      "tagger_input_hash": null,
+      "tecnologias_tags": [],
+      "ticket_max": null,
+      "ticket_min": null,
+      "uf": null,
+      "verificado_em": null
+    },
+    "agencia|curadoria|agencia:fapesc": {
+      "constraints": [],
+      "constraints_input_hash": null,
+      "curated": true,
+      "deadline": null,
+      "description": "FAPESC",
+      "embedding_dim": 8,
+      "embedding_input_hash": "0fc2cefe2ed946f00a1a74ea82953741f71b818ec4d801a00ffc2db55682f310",
+      "embedding_model": "stub-embedder-v1",
+      "formato": null,
+      "kind": "agencia",
+      "mecanismo": null,
+      "metadata": {},
+      "name": "FAPESC",
+      "native_id": "agencia:fapesc",
+      "requisitos_texto": [],
+      "setores": [],
+      "source": "curadoria",
+      "status": null,
+      "tagger_input_hash": null,
+      "tecnologias_tags": [],
+      "ticket_max": null,
+      "ticket_min": null,
+      "uf": null,
+      "verificado_em": null
+    },
+    "agencia|curadoria|agencia:fapesp": {
+      "constraints": [],
+      "constraints_input_hash": null,
+      "curated": true,
+      "deadline": null,
+      "description": "FAPESP",
+      "embedding_dim": 8,
+      "embedding_input_hash": "8b5afe96d5766d88332892df729caefbc09adab2de9657a88e8b382c83597604",
+      "embedding_model": "stub-embedder-v1",
+      "formato": null,
+      "kind": "agencia",
+      "mecanismo": null,
+      "metadata": {},
+      "name": "FAPESP",
+      "native_id": "agencia:fapesp",
+      "requisitos_texto": [],
+      "setores": [],
+      "source": "curadoria",
+      "status": null,
+      "tagger_input_hash": null,
+      "tecnologias_tags": [],
+      "ticket_max": null,
+      "ticket_min": null,
+      "uf": null,
+      "verificado_em": null
+    },
+    "agencia|curadoria|agencia:faps-estaduais": {
+      "constraints": [],
+      "constraints_input_hash": null,
+      "curated": true,
+      "deadline": null,
+      "description": "FAPs estaduais",
+      "embedding_dim": 8,
+      "embedding_input_hash": "d7bf064496b2e5c7ef919a4762a7568a52905d2d6bc69b516c97a8ff91a9e926",
+      "embedding_model": "stub-embedder-v1",
+      "formato": null,
+      "kind": "agencia",
+      "mecanismo": null,
+      "metadata": {},
+      "name": "FAPs estaduais",
+      "native_id": "agencia:faps-estaduais",
+      "requisitos_texto": [],
+      "setores": [],
+      "source": "curadoria",
+      "status": null,
+      "tagger_input_hash": null,
+      "tecnologias_tags": [],
+      "ticket_max": null,
+      "ticket_min": null,
+      "uf": null,
+      "verificado_em": null
+    },
+    "agencia|curadoria|agencia:finep": {
+      "constraints": [],
+      "constraints_input_hash": null,
+      "curated": true,
+      "deadline": null,
+      "description": "FINEP",
+      "embedding_dim": 8,
+      "embedding_input_hash": "6188231bd0a8ad81d07ed26c2dd17e0caccc4ffce50f311458fec7dcbb549228",
+      "embedding_model": "stub-embedder-v1",
+      "formato": null,
+      "kind": "agencia",
+      "mecanismo": null,
+      "metadata": {},
+      "name": "FINEP",
+      "native_id": "agencia:finep",
+      "requisitos_texto": [],
+      "setores": [],
+      "source": "curadoria",
+      "status": null,
+      "tagger_input_hash": null,
+      "tecnologias_tags": [],
+      "ticket_max": null,
+      "ticket_min": null,
+      "uf": null,
+      "verificado_em": null
+    },
+    "agencia|curadoria|agencia:mcti": {
+      "constraints": [],
+      "constraints_input_hash": null,
+      "curated": true,
+      "deadline": null,
+      "description": "MCTI",
+      "embedding_dim": 8,
+      "embedding_input_hash": "3236613108e74dcbae57ea60b056a93eb5024a64001934002f9c7ab533604aed",
+      "embedding_model": "stub-embedder-v1",
+      "formato": null,
+      "kind": "agencia",
+      "mecanismo": null,
+      "metadata": {},
+      "name": "MCTI",
+      "native_id": "agencia:mcti",
+      "requisitos_texto": [],
+      "setores": [],
+      "source": "curadoria",
+      "status": null,
+      "tagger_input_hash": null,
+      "tecnologias_tags": [],
+      "ticket_max": null,
+      "ticket_min": null,
+      "uf": null,
+      "verificado_em": null
+    },
+    "edital|fapesc|fapesc:35-2026": {
+      "constraints": [
+        {
+          "op": "in",
+          "tipo": "porte",
+          "valor": [
+            "mei",
+            "me",
+            "epp"
+          ]
+        }
+      ],
+      "constraints_input_hash": "40a4380bc4635e3695b60219f04fcfc55a1a34e319f902a7c5a916ec1989d614",
+      "curated": false,
+      "deadline": null,
+      "description": "EDITAL DE CHAMADA PÚBLICA FAPESC N.º 035/2026\nCREDENCIAMENTO DE INCUBADORAS DE EMPRESAS DO ESTADO DE SANTA CATARINA\nA FUNDAÇÃO DE AMPARO À PESQUISA E INOVAÇÃO DO ESTADO DE SANTA CATARINA (FAPESC) torna público o lançamento do presente Edital de Chamada Pública para o credenciamento de incubadoras de empresas inovadoras e convida as Instituições Científicas, Tecnológicas e de Inovação de natureza pública ou privada, sem fins lucrativos, a realizarem o credenciamento no âmbito do Programa de Apoio às Incubadoras de Empresas, nos termos do art. 25 da Lei n.º 14.328/2008, do art. 66, § 1º, IX da Lei Complementar n.º 741/2019, do art. 5º, IX, do Estatuto Social da FAPESC, aprovado pelo Decreto Estadual N.º 438/2024, e demais decretos específicos vigentes, e considerando:\n• que a FAPESC, agência de fomento executora da política estadual de ciência, tecnologia e inovação, e tem como finalidade a promoção do ecossistema catarinense de Ciência, Tecnologia e Inovação (CTI) para o avanço de todas as áreas do conhecimento, o equilíbrio regional, o desenvolvimento econômico sustentável e a melhoria da qualidade de vida da população do Estado;\n• que compete à FAPESC apoiar e promover a realização de estudos, a execução e divulgação de programas e projetos de pesquisa científica básica e aplicada, individuais ou institucionais, e o desenvolvimento de produtos e processos tecnológicos, de acordo com as diretrizes da Secretaria de Estado da Ciência, Tecnologia e Inovação;\n• que compete à FAPESC promover o intercâmbio e a cooperação técnico-científica regional, nacional e internacional; fomentar a internacionalização de empresas catarinenses inovadoras; fomentar o desenvolvimento tecnológico inovativo das empresas catarinenses e organizações públicas ou privadas, preferencialmente em parceria com instituições de ensino e pesquisa situadas no Estado, por meio da transferência de conhecimento e interação de competências, podendo, para tanto, subvencionar a permanência de pesquisadores de alto nível no âmbito de programas específicos;\n• que somente as incubadoras de empresas credenciadas e recredenciadas pela FAPESC nesta Chamada Pública poderão submeter propostas no âmbito do Progr",
+      "embedding_dim": 8,
+      "embedding_input_hash": "441a0fb23bc45fe35e404321a27a0e68c8b7af410f4c3e0cfbeefb45e4465130",
+      "embedding_model": "stub-embedder-v1",
+      "formato": null,
+      "kind": "edital",
+      "mecanismo": null,
+      "metadata": {
+        "exclusoes": [],
+        "publico_alvo": [
+          "startups"
+        ],
+        "source_hash": "5b1b0fbb4f62fa8d7e70ac083360aa16",
+        "url": "https://fapesc.sc.gov.br/edital-de-chamada-publica-fapesc-n-o-35-2026-credenciamento-de-incubadoras-de-empresas-do-estado-de-santa-catarina"
+      },
+      "name": "EDITAL DE CHAMADA PÚBLICA FAPESC N.º 35/2026 CREDENCIAMENTO DE INCUBADORAS DE EMPRESAS DO ESTADO DE SANTA CATARINA",
+      "native_id": "fapesc:35-2026",
+      "requisitos_texto": [
+        "Empresa brasileira em operação."
+      ],
+      "setores": [
+        "Multissetorial"
+      ],
+      "source": "fapesc",
+      "status": "aberta",
+      "tagger_input_hash": "abae503c02d4dae3241f108c4a317369ce9487d1e747619ba237571caaa4b667",
+      "tecnologias_tags": [
+        "stub-tag"
+      ],
+      "ticket_max": null,
+      "ticket_min": null,
+      "uf": "SC",
+      "verificado_em": null
+    },
+    "edital|fapesp|fapesp:16466": {
+      "constraints": [
+        {
+          "op": "in",
+          "tipo": "porte",
+          "valor": [
+            "mei",
+            "me",
+            "epp"
+          ]
+        }
+      ],
+      "constraints_input_hash": "3ab1dd118c11a5054bcff2acd900fbf13b73e8f88023ad49315f0d42704bbc0c",
+      "curated": false,
+      "deadline": null,
+      "description": "1. Introdução\nO Horizon Europe é uma iniciativa de pesquisa científica da União Europeia com duração de 7 anos, sucessora do Programa Horizon 2020. É o nono programa-quadro europeu de Pesquisa e Inovação (2021-2027). A expectativa é que este programa ajude a fortalecer a base de conhecimento europeia por meio de pesquisas de fronteira, estimular inovações e apoiar o desenvolvimento e a demonstração de soluções inovadoras.\nCom um orçamento de 95 bilhões de Euros, o programa vai financiar projetos de pesquisa e inovação comprometidos em resolver grandes desafios do mundo. As propostas do Horizon Europe podem incluir pesquisadores, instituições acadêmicas e não acadêmicas (incluindo empresas) de países fora da União Europeia (UE). Participantes de países que não fazem parte da UE devem obter financiamento de outras fontes.\nAs Chamadas de Propostas do Horizon Europe podem ser encontradas em: https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals.\nPesquisadores elegíveis para financiamento pela Fundação de Amparo à Pesquisa do Estado de São Paulo (FAPESP) podem utilizar as modalidades de Auxílio à Pesquisa Regular, Projeto Temático ou Jovem Pesquisador oferecidas pela Fundação, para apoiar sua participação em propostas junto ao Horizon Europe. As diretrizes abaixo oferecem instruções a esse respeito.\n2. Consulta de Elegibilidade\n3. Preparação e Submissão de Propostas\n3.1. A proposta submetida à FAPESP será aceita para revisão somente se deixar claro que o Co-PI em São Paulo tem uma participação relevante no projeto de pesquisa completo submetido ao Horizon Europe e liderará uma parte relevante do esforço de pesquisa; ou seja, sendo líder de pacotes de trabalho e/ou tarefas, ou cuja participação é fundamental para a realização de atividades específicas descritas na Proposta do Horizon Europe. A colaboração resultante deve ter como objetivo contribuir para o desenvolvimento científico e tecnológico do estado de São Paulo.\n3.2. A proposta submetida à FAPESP deve:\na) ser escrita em inglês;\nb) seguir as normas da modalidade de apoio específica da FAPESP escolhida pelo proponente (Auxílio à Pesquisa Regular, Projeto Temático",
+      "embedding_dim": 8,
+      "embedding_input_hash": "5c86b952967d03fe9224f62816772d8d7e070f06c8716747eb36de89346b22c4",
+      "embedding_model": "stub-embedder-v1",
+      "formato": null,
+      "kind": "edital",
+      "mecanismo": "bolsa",
+      "metadata": {
+        "exclusoes": [],
+        "modalidades": "Auxílio à Pesquisa Regular",
+        "publico_alvo": [
+          "startups"
+        ],
+        "source_hash": "329072644fcefa5cf130b051bce0365c",
+        "url": "https://fapesp.br/16466"
+      },
+      "name": "Chamada FAPESP/Confap/Horizon Europe",
+      "native_id": "fapesp:16466",
+      "requisitos_texto": [
+        "Empresa brasileira em operação."
+      ],
+      "setores": [
+        "Multissetorial"
+      ],
+      "source": "fapesp",
+      "status": null,
+      "tagger_input_hash": "66c261f97695fb597b0e7914e8eafdb4d74f705a68e1abcf4706489b6dfb55c0",
+      "tecnologias_tags": [
+        "stub-tag"
+      ],
+      "ticket_max": null,
+      "ticket_min": null,
+      "uf": "SP",
+      "verificado_em": null
+    },
+    "edital|finep|finep:602": {
+      "constraints": [
+        {
+          "op": "in",
+          "tipo": "porte",
+          "valor": [
+            "mei",
+            "me",
+            "epp"
+          ]
+        }
+      ],
+      "constraints_input_hash": "936ede6503e7bb08495ec110145c683da5bd06ab599d87a2cd06985bffac8d4a",
+      "curated": false,
+      "deadline": null,
+      "description": "CHAMADA PÚBLICA CONJUNTA ENTRE A FINANCIADORA DE ESTUDOS E PROJETOS (FINEP) E O CENTRO PARA EL DESARROLLO TECNOLÓGICO INDUSTRIAL (CDTI) COOPERAÇÃO ICT-EMPRESA – 01/2017 Apoiar, por meio de financiamento não reembolsável às ICTs brasileiras pela FINEP e financiamento a empresas espanholas pelo CDTI, projetos elaborados em cooperação entre ICTs, empresas brasileiras e empresas espanholas, cujos objetivos estejam em consonância com as linhas temáticas apresentadas no item 3 desta Chamada Pública Conjunta.",
+      "embedding_dim": 8,
+      "embedding_input_hash": "2cf0e7849ea7461613da5df6ea2b70936a51c3c335118ce50a6e69411d335134",
+      "embedding_model": "stub-embedder-v1",
+      "formato": null,
+      "kind": "edital",
+      "mecanismo": "subvencao",
+      "metadata": {
+        "exclusoes": [],
+        "publico_alvo": [
+          "startups"
+        ],
+        "source_hash": "e0c8a6f538aa9ab9b30f7ced0ad5edc5",
+        "tema": "Energia e Transição Sustentável",
+        "url": "https://www.finep.gov.br/e/chamada-publica/222684/721094"
+      },
+      "name": "Finep / CDTI - COOPERAÇÃO ICT-EMPRESA – 01/2017",
+      "native_id": "finep:602",
+      "requisitos_texto": [
+        "Empresa brasileira em operação."
+      ],
+      "setores": [
+        "Multissetorial"
+      ],
+      "source": "finep",
+      "status": "aberta",
+      "tagger_input_hash": "6cec98cd35172ad294b04c8fce3702fcf6f1da78e21deed12383c18e1a27daa1",
+      "tecnologias_tags": [
+        "stub-tag"
+      ],
+      "ticket_max": null,
+      "ticket_min": null,
+      "uf": null,
+      "verificado_em": null
+    },
+    "edital|web|web:ce032edb720c": {
+      "constraints": [],
+      "constraints_input_hash": null,
+      "curated": false,
+      "deadline": null,
+      "description": "Este é um grande desafio de inovação identificado em conjunto por empresas líderes interessadas em colaborar com startups. O objetivo é estimular o empreendedorismo e permitir o aumento da competitividade e sustentabilidade dos empreendimentos de micro e pequeno porte.",
+      "embedding_dim": 8,
+      "embedding_input_hash": "ccc76c366861f23f0605df8ba01a9dec1b5613d811e67a0d49704ad72e679a4f",
+      "embedding_model": "stub-embedder-v1",
+      "formato": null,
+      "kind": "edital",
+      "mecanismo": null,
+      "metadata": {
+        "exclusoes": [],
+        "publico_alvo": [
+          "startups"
+        ],
+        "source_hash": "cec120ff628438e5de2052cce8c79f5c",
+        "url": "https://www.opentechs.net/br-pt/challenges/smallbusiness"
+      },
+      "name": "100 Open Startups - Desafio Pequenas Empresas",
+      "native_id": "web:ce032edb720c",
+      "requisitos_texto": [],
+      "setores": [
+        "Multissetorial"
+      ],
+      "source": "web",
+      "status": "aberta",
+      "tagger_input_hash": "3c2719050c4e425743a36b54b31ee5549f04344be0f0de4852a11040b65324ff",
+      "tecnologias_tags": [
+        "stub-tag"
+      ],
+      "ticket_max": null,
+      "ticket_min": null,
+      "uf": null,
+      "verificado_em": null
+    },
+    "ict|embrapii|embrapii:inteligencia-artificial-ceia-ufg": {
+      "constraints": [],
+      "constraints_input_hash": null,
+      "curated": true,
+      "deadline": null,
+      "description": "Apresente sua demanda para o nosso assistente de inteligência artificial: bit.ly/matchias O Centro de Excelência em Inteligência Artificial – CEIA é uma instituição de referência no tema de Inteligência Artificial e Ciência de Dados, com atuação como Unidade Embrapii nas seguintes áreas: – Softwares Inteligentes – Inteligência Artificial para automação industrial – Integração de hardware e software (embarcados ou integrados) O CEIA conta com equipe técnica qualificada composta por pesquisadores, especialistas e discentes com experiência em atividades de PD&I com diferentes níveis de complexidade. A unidade conta com equipamentos modernos, tais como supercomputadores de Inteligência Artificial, laboratório de internet das coisas e de veículo elétrico autônomo, disponíveis para atender demandas tecnológicas. Destacam-se as seguintes soluções desenvolvidas: – Sintetização de voz com expressões emocionais – Desenvolvimento de um Apresentador Virtual em Português Brasileiro – Planejamento inteligente da linha de produção para indústria moveleira (Programa BNDES Embrapii) – Inteligência Artificial no Desenvolvimento de um Robô de monitoramento para condomínios (Programa SEBRAE Embrapii) – Sistema de recomendação para personalização de veiculação de anúncios digitais (Programa SEBRAE Embrapii) – Geração Automática de Textos Jurídicos Utilizando Modelos de Geradores de Linguagem Natural (Programa SEBRAE Embrapii) – Geração de datasets sintéticos com transferência de conhecimento para cenas reais com aplicações para segurança veicular e de pedestres (Programa Rota 2030) – Sensoriamento massivo de dados para navegação autônoma em cenários de mobilidade urbana no contexto Brasileiro (Programa Rota 2030) Sobre o CEIA O CEIA foi criado em parceria com a Fundação de Amparo à Pesquisa do Estado de Goiás – FAPEG e tem por missão disponibilizar e transferir tecnologias baseadas em Inteligência Artificial, promovendo a competitividade de organizações públicas e/ou privadas, através do desenvolvimento de soluções tecnológicas inovadoras com foco principal para o setor de saúde, logística, segurança, energia e cidades inteligentes envolvendo empresas, startups do ecossistema e inst",
+      "embedding_dim": 8,
+      "embedding_input_hash": "5a79a1ff6afdce0275aa26d5adfc98306b973e15a7457beadfcfc79b97e076ff",
+      "embedding_model": "stub-embedder-v1",
+      "formato": null,
+      "kind": "ict",
+      "mecanismo": null,
+      "metadata": {
+        "address": "Alameda Palmeiras, Quadra D, Câmpus Samambaia, Goiânia, GO",
+        "contact": {
+          "email": "ceia@ceia.ufg.br",
+          "responsavel": "",
+          "site": "http://www.ceia.ufg.br",
+          "telefone": ""
+        },
+        "embrapii_kind": "embrapii_unit",
+        "institution_type": "Universidade Federal",
+        "url": "https://embrapii.org.br/unidades/inteligencia-artificial-ceia-ufg/"
+      },
+      "name": "CEIA-UFG",
+      "native_id": "embrapii:inteligencia-artificial-ceia-ufg",
+      "requisitos_texto": [],
+      "setores": [
+        "Multissetorial"
+      ],
+      "source": "embrapii",
+      "status": null,
+      "tagger_input_hash": null,
+      "tecnologias_tags": [
+        "integração de hardware e software",
+        "inteligência artificial para automação industrial",
+        "softwares inteligentes",
+        "inteligência artificial"
+      ],
+      "ticket_max": null,
+      "ticket_min": null,
+      "uf": "GO",
+      "verificado_em": null
+    },
+    "investidor|curadoria|investidor:indicator-capital": {
+      "constraints": [],
+      "constraints_input_hash": null,
+      "curated": true,
+      "deadline": null,
+      "description": "Venture capital de deep-tech B2B (\"boosting deep-tech heroes\"); aposta em times com risco tecnológico real.",
+      "embedding_dim": 8,
+      "embedding_input_hash": "151010ad633770e5c4360febfa3f22bbb9ab6c521278efd3dcb4857899d05fea",
+      "embedding_model": "stub-embedder-v1",
+      "formato": null,
+      "kind": "investidor",
+      "mecanismo": "equity",
+      "metadata": {
+        "co_investidores": [],
+        "estagio_alvo": [
+          "seed",
+          "serie-a"
+        ],
+        "fund_status": "ativo",
+        "generalista": false,
+        "lead_follow": "lead",
+        "portfolio": [],
+        "site": "https://indicator.capital",
+        "tese_themes": [
+          "tecnologias digitais e conectividade",
+          "materiais, química e manufatura avançada"
+        ],
+        "verticais": [
+          "multissetorial"
+        ]
+      },
+      "name": "Indicator Capital",
+      "native_id": "investidor:indicator-capital",
+      "requisitos_texto": [],
+      "setores": [
+        "Multissetorial",
+        "TIC",
+        "Materiais"
+      ],
+      "source": "curadoria",
+      "status": "ativa",
+      "tagger_input_hash": null,
+      "tecnologias_tags": [
+        "deep-tech",
+        "b2b",
+        "hardware",
+        "internet das coisas",
+        "inteligência artificial"
+      ],
+      "ticket_max": null,
+      "ticket_min": null,
+      "uf": null,
+      "verificado_em": "2026-06-09"
+    },
+    "programa|curadoria|programa:centelha": {
+      "constraints": [
+        {
+          "op": "in",
+          "tipo": "porte",
+          "valor": [
+            "mei",
+            "me",
+            "epp"
+          ]
+        }
+      ],
+      "constraints_input_hash": "6d95b1956376fc69c0b2e05642d244b0f32d3e54383685694387ea8c05d10890",
+      "curated": true,
+      "deadline": null,
+      "description": "Programa nacional de estímulo à criação de empreendimentos inovadores: transforma ideias em negócios com capacitação e subvenção. Editais estadualizados pelas FAPs. Subvenção econômica (capital não-reembolsável), bolsas, mentorias e capacitação.",
+      "embedding_dim": 8,
+      "embedding_input_hash": "ee434be1778e2db64aa7f1c6a2b5ec4cea998183025073f132551ca7c58cd6dd",
+      "embedding_model": "stub-embedder-v1",
+      "formato": "edital_periodico",
+      "kind": "programa",
+      "mecanismo": "subvencao",
+      "metadata": {
+        "beneficio": "Subvenção econômica (capital não-reembolsável), bolsas, mentorias e capacitação.",
+        "cadencia": "anual",
+        "elegibilidade": "Pessoas físicas e empresas com faturamento até R$ 4,8 mi, criadas em até 12 meses do edital estadual.",
+        "estagio_alvo": [
+          "pre-seed"
+        ],
+        "exclusoes": [],
+        "faq_url": "https://programacentelha.com.br/duvidas-frequentes/",
+        "operador": "MCTI / FINEP / FAPs estaduais",
+        "publico_alvo": [
+          "startups"
+        ],
+        "site": "https://programacentelha.com.br",
+        "tipo": "subvencao"
+      },
+      "name": "Programa Centelha",
+      "native_id": "programa:centelha",
+      "requisitos_texto": [
+        "Empresa brasileira em operação."
+      ],
+      "setores": [
+        "Multissetorial"
+      ],
+      "source": "curadoria",
+      "status": "ativa",
+      "tagger_input_hash": null,
+      "tecnologias_tags": [],
+      "ticket_max": 130000,
+      "ticket_min": 50000,
+      "uf": null,
+      "verificado_em": null
+    }
+  },
+  "match_chunks": {
+    "edital|fapesc|fapesc:35-2026": [
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "a5ee5c39df4efb0216230e297f81230a5110e17a55b0b992839f03ecf3363dc6",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 0,
+        "kind": "heading",
+        "section_path": [],
+        "text": "EDITAL DE CHAMADA PÚBLICA FAPESC N.º 035/2026\nCREDENCIAMENTO DE INCUBADORAS DE EMPRESAS DO ESTADO DE SANTA CATARINA\nA FUNDAÇÃO DE AMPARO À PESQUISA E INOVAÇÃO DO ESTADO DE SANTA CATARINA (FAPESC) torna público o lançamento do presente Edital de Chamada Pública para o credenciamento de incubadoras de empresas inovadoras e convida as Instituições Científicas, Tecnológicas e de Inovação de natureza pública ou privada, sem fins lucrativos, a realizarem o credenciamento no âmbito do Programa de Apoio às Incubadoras de Empresas, nos termos do art. 25 da Lei n.º 14.328/2008, do art. 66, § 1º, IX da Lei Complementar n.º 741/2019, do art. 5º, IX, do Estatuto Social da FAPESC, aprovado pelo Decreto Estadual N.º 438/2024, e demais decretos específicos vigentes, e considerando:\n• que a FAPESC, agência de fomento executora da política estadual de ciência, tecnologia e inovação, e tem como finalidade a promoção do ecossistema catarinense de Ciência, Tecnologia e Inovação (CTI) para o avanço de todas as áreas do conhecimento, o equilíbrio regional, o desenvolvimento econômico sustentável e a melhoria da qualidade de vida da população do Estado;"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "b03c6d9d71ad89ad1405182cb74cfd45d26da174815577d485968e69f4fe6079",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 1,
+        "kind": "list",
+        "section_path": [
+          "EDITAL DE CHAMADA PÚBLICA FAPESC N.º 035/2026",
+          "CREDENCIAMENTO DE INCUBADORAS DE EMPRESAS DO ESTADO DE SANTA CATARINA"
+        ],
+        "text": "• que compete à FAPESC apoiar e promover a realização de estudos, a execução e divulgação de programas e projetos de pesquisa científica básica e aplicada, individuais ou institucionais, e o desenvolvimento de produtos e processos tecnológicos, de acordo com as diretrizes da Secretaria de Estado da Ciência, Tecnologia e Inovação;\n• que compete à FAPESC promover o intercâmbio e a cooperação técnico-científica regional, nacional e internacional; fomentar a internacionalização de empresas catarinenses inovadoras; fomentar o desenvolvimento tecnológico inovativo das empresas catarinenses e organizações públicas ou privadas, preferencialmente em parceria com instituições de ensino e pesquisa situadas no Estado, por meio da transferência de conhecimento e interação de competências, podendo, para tanto, subvencionar a permanência de pesquisadores de alto nível no âmbito de programas específicos;\n• que somente as incubadoras de empresas credenciadas e recredenciadas pela FAPESC nesta Chamada Pública poderão submeter propostas no âmbito do Programa de Apoio às Incubadoras de Empresas.\n1. DO OBJETIVO"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "1babde547896c6f62552b293bb9e86bf84db0ee68ab96e7edae3c22474898eda",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 2,
+        "kind": "paragraph",
+        "section_path": [
+          "EDITAL DE CHAMADA PÚBLICA FAPESC N.º 035/2026",
+          "CREDENCIAMENTO DE INCUBADORAS DE EMPRESAS DO ESTADO DE SANTA CATARINA",
+          "1. DO OBJETIVO"
+        ],
+        "text": "1.1. Realizar o credenciamento e o recredenciamento de incubadoras de empresas inovadoras por meio de suas instituições gestoras ou mantenedoras, como requisito para participar da Chamada Pública do Programa de Apoio às Incubadoras de Empresas.\n2. DA ADMISSIBILIDADE\n3. DA APRESENTAÇÃO DA PROPOSTA DE CREDENCIAMENTO\n3.1. Cada instituição poderá submeter apenas 1 (uma) proposta de credenciamento nesta Chamada Pública, que deverá ser submetida pelo(a) coordenador(a) da incubadora.\n3.2. A proposta deverá ser submetida no SIGFAPESC, disponível por meio do link https://sig.fapesc.sc.gov.br, sendo obrigatório o preenchimento do Anexo I, disponível no link https://forms.cloud.microsoft/r/mKETbkABuX.\n3.3. Não serão aceitas propostas por qualquer outro meio, tampouco após o prazo final de recebimento estabelecido no cronograma desta Chamada Pública.\n3.4. A proposta poderá ser submetida até as 18 (dezoito) horas, horário de Brasília, da data-limite de submissão das inscrições, determinado no cronograma. O(a) proponente receberá protocolo por e-mail em sua área restrita do SIGFAPESC imediatamente após o envio da proposta."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "e0014656f141e1b5da6b3b364aa3bce005559e62ab063ab65b5ea322fe7d89b7",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 3,
+        "kind": "paragraph",
+        "section_path": [
+          "3. DA APRESENTAÇÃO DA PROPOSTA DE CREDENCIAMENTO"
+        ],
+        "text": "3.5. A equipe técnica responsável pelo SIGFAPESC estará disponível para suporte dentro do horário de expediente da FAPESC.\n3.6. A FAPESC não se responsabiliza por quaisquer problemas na submissão das propostas motivados por eventuais falhas de conexão com a internet, falta de energia elétrica, congestionamento das linhas de comunicação, bem como outros fatores de ordem técnica que impossibilitem a conexão ou a transferência de dados. Essas eventualidades não serão aceitas como argumento para a submissão de propostas após o prazo. Recomenda-se que as propostas sejam encaminhadas com prudente antecedência.\n3.7. Expirado o prazo limite indicado na presente Chamada Pública, nenhuma outra proposta será recebida, assim como não serão aceitos adendos, substituições ou esclarecimentos que não forem, explícita ou formalmente, solicitados pela FAPESC.\n3.8. Serão aceitas somente as assinaturas eletrônicas devidamente certificadas, sendo vedado inserir digitalmente assinatura manuscrita nos documentos submetidos. Sugere-se a utilização de assinatura digital gratuita disponibilizada por meio do portal e/ou aplicativo Gov.br.\n3.9. Dos Documentos que acompanham a proposta:"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "7e057b80a925750d9558b0abc26f2590fdcbb3282f9097904f19a92a05434a2d",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 4,
+        "kind": "paragraph",
+        "section_path": [
+          "3. DA APRESENTAÇÃO DA PROPOSTA DE CREDENCIAMENTO",
+          "3.9. Dos Documentos que acompanham a proposta"
+        ],
+        "text": "3.9.1. Deverão ser anexados no SIGFAPESC, em formato PDF e de forma legível, completa, atualizada e não corrompida, os seguintes documentos:\n3.9.2. Da instituição proponente:\na) ato constitutivo, estatuto social ou lei de criação da instituição proponente, devidamente registrado no órgão competente;\nb) cópia do CNPJ na Receita Federal do Brasil, com indicação do nome e do endereço atualizados no Estado de Santa Catarina, com data de constituição de pelo menos 2 (dois) anos;\nc) cópia dos termos de posse, decreto de nomeação, ata da última assembleia que elegeu o corpo dirigente da instituição proponente ou ata de posse da atual Diretoria, registrados no cartório competente, comprovando a data de início do mandato do corpo dirigente;\nd) resolução de constituição ou ato de criação da incubadora de empresas junto à ICT, quando houver, mediante apresentação de resolução do conselho superior, portaria de designação de seus membros ou regimento interno, devidamente publicados em veículo oficial de comunicação da instituição ou boletim de serviço, que comprovem sua efetiva estrutura operacional, tempo de atuação e competências;"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "e7c7488953213d018bf2ef7822626530f6070d80cc33959365f08ef65c75ea51",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 5,
+        "kind": "list",
+        "section_path": [
+          "3. DA APRESENTAÇÃO DA PROPOSTA DE CREDENCIAMENTO",
+          "3.9. Dos Documentos que acompanham a proposta"
+        ],
+        "text": "e) portfólio de atuação da incubadora, organizado em ordem cronológica desde sua fundação, contanto documentos e evidências das atividades desenvolvidas, tais como fotos, relatórios, lista de empresas incubadas e graduadas, programas executados, eventos realizados, parcerias institucionais e demais ações relacionadas ao apoio ao empreendedorismo e à inovação;\nf) declaração de indicação do(a) coordenador(a) da incubadora, comprovando vínculo empregatício ou funcional junto à instituição.\na) cópia do documento oficial de identidade, emitido nos últimos 10 (dez) anos, e que possua número de Cadastro de Pessoas Físicas (CPF): I. brasileiro(a): Carteira de identidade (RG), Carteira de Identidade Nacional (CIN), Carteira Nacional de Habilitação (CNH), carteira de identidade profissional, carteira funcional emitida por órgão público, documento de identificação militar ou passaporte. II. estrangeiro(a) residente no Brasil, não naturalizado(a): Carteira de Registro Nacional Migratório (CRNM) e cópia do passaporte com o registro de entrada no Brasil."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "153cf275761da0d199e634713a0d10c6ce17f2e1e59fd05dc19721f0f35b7492",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 6,
+        "kind": "paragraph",
+        "section_path": [
+          "3. DA APRESENTAÇÃO DA PROPOSTA DE CREDENCIAMENTO",
+          "3.9. Dos Documentos que acompanham a proposta",
+          "3.9.3. Do(a) proponente/coordenador(a) da incubadora"
+        ],
+        "text": "b) cópia do comprovante de vínculo empregatício ou funcional junto à ICT interveniente. Para vínculo empregatício ou funcional: Carteira de Trabalho e Previdência Social (CTPS) ou contrato de trabalho assinado, holerites ou contracheques recentes, comprovante de recolhimento do FGTS ou do INSS, portaria de nomeação ou designação, certidão funcional emitida pelo setor de recursos humanos, termo de posse ou de exercício, portaria de nomeação publicada em diário oficial (no caso de instituições públicas), certidão de tempo de serviço emitida pelo órgão público ou documento oficial de posse no cargo. Não serão aceitas declarações;\nc) cópia da frente e do verso do diploma com a titulação de graduação ou de maior grau, emitido por instituição reconhecida pelo Ministério da Educação (MEC).\na) a proposta deverá ser submetida via SIGFAPESC, disponível por meio do link https://sig.fapesc.sc.gov.br, conforme orientações descritas no item 2.4;"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "4221e377ea9a4f1ebb57991dfcf8da583eafbf4330aa9850318af4f9f1e0fdb4",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 7,
+        "kind": "paragraph",
+        "section_path": [
+          "3. DA APRESENTAÇÃO DA PROPOSTA DE CREDENCIAMENTO",
+          "3.9. Dos Documentos que acompanham a proposta",
+          "3.9.4. Da proposta de credenciamento"
+        ],
+        "text": "b) preencher obrigatoriamente os dados no formulário correspondente ao Anexo I, disponível no link https://forms.cloud.microsoft/r/mKETbkABuX, garantindo que todas as informações estejam atualizadas e em conformidade com os critérios de admissibilidade desta Chamada Pública;\nc) o comprovante de envio com as respostas do formulário referente ao Anexo I deve ser anexado em campo específico no SIGFAPESC. O envio por outro meio implicará o não credenciamento da incubadora de empresas.\n9. DA CLÁUSULA ANTICORRUPÇÃO (IN CGE/SEA n.º 01/2020)\n9.1. Os(as) participantes da presente Chamada Pública, tanto pessoas físicas quanto jurídicas de qualquer natureza, concordam que executarão as obrigações assumidas de forma ética e de acordo com os princípios aplicáveis à Administração Pública Direta e Indireta e às atividades do Terceiro Setor.\n9.2. Declaram que têm conhecimento das normas previstas na legislação correspondente, entre as quais as que se encontram determinadas na Lei n.º 8.429/1992 (Lei de Improbidade Administrativa) e na Lei n.º 12.846/2013, em seus regulamentos e nas demais legislações federais e estaduais correlatas."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "3dd94e5a3da5c2991f48c92e99d6caa1839f1b0104384d67ed2d3c4f2cb9c27e",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 8,
+        "kind": "paragraph",
+        "section_path": [
+          "9. DA CLÁUSULA ANTICORRUPÇÃO (IN CGE/SEA n.º 01/2020)"
+        ],
+        "text": "9.3. As instituições proponentes de propostas de projeto beneficiárias se comprometem a não adotar práticas ou procedimentos que se enquadrem nas hipóteses previstas nas leis e regulamentos mencionados no inciso I do artigo 1º da IN CGE/SEA n.º 01/2020, bem como a exigir o mesmo zelo de terceiros por elas contratados.\n9.4. Comprometem-se a notificar a Controladoria-Geral do Estado qualquer irregularidade de que tiverem conhecimento acerca da inexecução da presente cláusula anticorrupção.\n9.5. Declaram, ainda, ter plena ciência de que a violação de qualquer das obrigações previstas na IN CGE/SEA n.º 01/2020, além de outras pertinentes à espécie, é causa para a sua imediata exclusão deste certame, sem prejuízo da cobrança das perdas e danos, inclusive danos potenciais, causados à parte inocente e das multas pactuadas.\n10. DA PROTEÇÃO DE DADOS"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "ad3eb326ee102db61e52a97e460eca794d80362ffb152f48216932de913da50a",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 9,
+        "kind": "paragraph",
+        "section_path": [
+          "10. DA PROTEÇÃO DE DADOS"
+        ],
+        "text": "10.1. Os(as) partícipes da presente Chamada Pública declaram que conhecem a Lei Geral de Proteção de Dados Pessoais (LGPD), Lei n.º 13.709, de 14 de agosto de 2018, e autorizam a FAPESC a coletar e tratar seus dados pessoais e das instituições proponentes de propostas de projeto, para o fim exclusivo de viabilizar a execução do objeto contratado, observando-se as exceções previstas no art. 11, inciso II, da LGPD e o seguinte:\na) fica autorizada a coleta e o tratamento do nome completo e das cópias dos números de identidade e CPF dos(as) representantes das instituições proponentes de propostas de projeto, bem como dos eventuais dados pessoais incluídos em contrato social, estatuto ou documento equivalente, enquanto forem necessários ao atingimento da finalidade a seguir exposta;\nb) a coleta e tratamento dos dados acima especificados tem por finalidade viabilizar a execução do objeto contratado;\nc) a FAPESC não divulgará os dados pessoais coletados.\nA FAPESC é a controladora dos dados pessoais tratados neste item, podendo ser contatada por meio do seguinte endereço eletrônico: fapesc@fapesc.sc.gov.br."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "88dd7424f972ad660aba3907a7b277430644bf1df07344eab5a3b9f39cf5e2fb",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 10,
+        "kind": "paragraph",
+        "section_path": [
+          "10. DA PROTEÇÃO DE DADOS",
+          "10.3"
+        ],
+        "text": "A FAPESC se responsabiliza por todas as medidas de segurança necessárias à proteção dos dados coletados ou tratados contra incidentes de segurança da informação e comunicará aos(às) titulares dos dados e à Autoridade Nacional de Proteção de Dados (ANPD) a ocorrência de incidente de segurança que possa acarretar risco ou dano relevante, em conformidade com o art. 48 da LGPD.\nOs(as) titulares dos dados, poderão exercer, no que couber, os direitos previstos no art. 18 da LGPD.\nOs(as) titulares dos dados poderão revogar a anuência aqui manifestada, ou solicitar que sejam eliminados seus dados pessoais não anonimizados, ficando cientes de que isto poderá impedir a continuidade do projeto.\nAs instituições proponentes de propostas de projeto, bem como toda a equipe técnica incluída no Plano de Trabalho deverão manter sob sigilo e confidencialidade as metodologias empregadas e os resultados obtidos/desenvolvidos na execução do projeto, que somente poderão ser divulgados e reproduzidos, total ou parcialmente, em concordância com as partes."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "cc40f27d532bdc7a1fca112856a38f4859b1d51a6eacdd90697c695bf4cb6ebf",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 11,
+        "kind": "paragraph",
+        "section_path": [
+          "10. DA PROTEÇÃO DE DADOS",
+          "10.7"
+        ],
+        "text": "Serão consideradas informações confidenciais todas as informações que assim forem identificadas pela instituição proponente de proposta de projeto, representante legal e pelas legislações aplicáveis, como a Lei n.º 13.709/2018, LGPD, ou que, devido às circunstâncias da revelação ou à própria natureza da informação, sejam consideradas confidenciais ou de propriedade da instituição proponente e do(a) representante legal.\nOutras condições referentes ao sigilo, à confidencialidade de dados e informações relativas ao objeto da presente Chamada Pública e aos seus resultados, serão estipuladas, quando for o caso, em instrumento jurídico específico posterior, entre as instituições proponentes de proposta de projeto, seu(sua) representante legal responsável pelo projeto e a FAPESC."
+      }
+    ],
+    "edital|fapesp|fapesp:16466": [
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "59f02e64b7625cecf707230ceaac57834c12f5393aec1ff120562fafcdc38ec4",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 0,
+        "kind": "heading",
+        "section_path": [],
+        "text": "1. Introdução\nO Horizon Europe é uma iniciativa de pesquisa científica da União Europeia com duração de 7 anos, sucessora do Programa Horizon 2020. É o nono programa-quadro europeu de Pesquisa e Inovação (2021-2027). A expectativa é que este programa ajude a fortalecer a base de conhecimento europeia por meio de pesquisas de fronteira, estimular inovações e apoiar o desenvolvimento e a demonstração de soluções inovadoras.\nCom um orçamento de 95 bilhões de Euros, o programa vai financiar projetos de pesquisa e inovação comprometidos em resolver grandes desafios do mundo. As propostas do Horizon Europe podem incluir pesquisadores, instituições acadêmicas e não acadêmicas (incluindo empresas) de países fora da União Europeia (UE). Participantes de países que não fazem parte da UE devem obter financiamento de outras fontes.\nAs Chamadas de Propostas do Horizon Europe podem ser encontradas em: https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "766ffa1c174a9ee065010f34a70ea32dbaf1b13cced2dbf44a2ef5f5919c35d9",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 1,
+        "kind": "paragraph",
+        "section_path": [
+          "1. Introdução"
+        ],
+        "text": "Pesquisadores elegíveis para financiamento pela Fundação de Amparo à Pesquisa do Estado de São Paulo (FAPESP) podem utilizar as modalidades de Auxílio à Pesquisa Regular, Projeto Temático ou Jovem Pesquisador oferecidas pela Fundação, para apoiar sua participação em propostas junto ao Horizon Europe. As diretrizes abaixo oferecem instruções a esse respeito.\n2. Consulta de Elegibilidade\n3. Preparação e Submissão de Propostas\n3.1. A proposta submetida à FAPESP será aceita para revisão somente se deixar claro que o Co-PI em São Paulo tem uma participação relevante no projeto de pesquisa completo submetido ao Horizon Europe e liderará uma parte relevante do esforço de pesquisa; ou seja, sendo líder de pacotes de trabalho e/ou tarefas, ou cuja participação é fundamental para a realização de atividades específicas descritas na Proposta do Horizon Europe. A colaboração resultante deve ter como objetivo contribuir para o desenvolvimento científico e tecnológico do estado de São Paulo.\n3.2. A proposta submetida à FAPESP deve:\na) ser escrita em inglês;"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "b612dcbdba0a3639fe3c952d622dccee2b449754edaf3bec937e10f3ebd4efed",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 2,
+        "kind": "list",
+        "section_path": [
+          "3. Preparação e Submissão de Propostas"
+        ],
+        "text": "b) seguir as normas da modalidade de apoio específica da FAPESP escolhida pelo proponente (Auxílio à Pesquisa Regular, Projeto Temático ou Jovem Pesquisador);\nc) mencionar claramente no título ou resumo, bem como na seção introdutória, que faz parte de uma proposta submetida ao Horizon Europe;\nd) incluir uma cópia completa da proposta submetida ao Horizon Europe na UE;\ne) incluir uma seção curta (máximo de duas páginas) demonstrando por que a participação do co-PI do estado de São Paulo é relevante para o projeto de pesquisa do Horizon Europe e como essa colaboração contribuirá para o desenvolvimento científico e tecnológico do estado de São Paulo. É muito importante que os revisores e membros do painel da FAPESP compreendam claramente como a colaboração do Co-PI em São Paulo é cientificamente relevante, integrada e determinante para o sucesso da proposta vinculada ao Horizon Europe. O Co-PI em São Paulo tem a responsabilidade de tornar esses elementos claros na proposta submetida à FAPESP.\nf) o orçamento solicitado deve ser compatível com as normas da modalidade de apoio escolhida da FAPESP.\n4. Submissão da Proposta"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "368c0edec1cdce66e12594c285ed3a41cbb1b7da7662bb8e6b5afd9d86fffdeb",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 3,
+        "kind": "paragraph",
+        "section_path": [
+          "4. Submissão da Proposta"
+        ],
+        "text": "4.1. A FAPESP receberá propostas associadas a propostas do Horizon Europe a qualquer momento. Por favor, observe que o Horizon tem seus próprios prazos, que devem ser cumpridos pelos proponentes da UE.\n4.2. A submissão da proposta na FAPESP deve ser feita pelo sistema SAGe – www.fapesp.br/sage: selecionar Nova Proposta Inicial > Outras Linhas de Fomento > Acordos de Cooperação > EU/Horizon Europe > Auxílio a Pesquisa - (selecionar opção: Regular, Temático ou Jovem Pesquisador).\n5. Avaliação da Proposta\n5.1. A avaliação da proposta submetida à FAPESP seguirá os procedimentos padrão utilizados pela Fundação para análise e seleção de propostas de pesquisa. O recebimento de financiamento da FAPESP requer o cumprimento de todas as demais normas da modalidade escolhida e está condicionado à assinatura do Termo de Outorga a ser emitido pela Fundação, em observância aos seus procedimentos administrativos usuais.\n5.2. A proposta será financiada pela FAPESP somente se também for aprovada pelo Horizon Europe. O Termo de Outorga da FAPESP só estará disponível para assinatura após a submissão do ‘Grant Contract’ através do qual a UE concede o financiamento ao consórcio."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "1c8cfda8c0417759df0b81ca4d138416351c0317f5cbd690ee61931bae2f6e3b",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 4,
+        "kind": "heading",
+        "section_path": [
+          "6. Ferramenta de Apoio à Formação de Rede de Pesquisa (matchmaking)"
+        ],
+        "text": "6. Ferramenta de Apoio à Formação de Rede de Pesquisa (matchmaking)\nPesquisadores da UE interessados em encontrar possíveis parceiros em São Paulo podem utilizar a Biblioteca Virtual da FAPESP (www.bv.fapesp.br/en/), que possui interface para entrar em contato com pesquisadores financiados pela FAPESP, enviando-lhes uma mensagem. Assim, é possível buscar informações sobre Auxílios e Bolsas concedidos pela FAPESP, incluindo resumos, bem como o nome dos pesquisadores participantes e suas instituições.\nBiblioteca Virtual\nCentro de Memória FAPESP\nCentros de Ciência para o Desenvolvimento\nCiência SP\nCiência para Todos\nEventos\nFAPESP na Mídia\nFAPESP Week\nImprensa\nPublicações e Exposições\nPesquisa para Inovação\nRevista Pesquisa FAPESP\nSobre a FAPESP\nA FAPESP\nAcordos e Convênios\nEstratégias de Fomento à Pesquisa\nConselho Superior e Diretoria\nCoordenações\nConverse com a FAPESP\nFornecedores\nIndicadores de CT&I - São Paulo\nImprensa\nLinha do Tempo\nLocalização\nOuvidoria\nParcerias com o Terceiro Setor\nPortarias\nProcesso Seletivo\nFAPESP\nHorário de funcionamento: de segunda a sexta das 8h às 17h\nCanais de atendimento\nE-mail:\nConverse com a FAPESP"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "21703b2b443b47ad23e5dea2e4bece1773169fe7d9a11674970f6226bd29034e",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 5,
+        "kind": "paragraph",
+        "section_path": [
+          "Canais de atendimento"
+        ],
+        "text": "Fone: +55 (11) 3838-4000 - segunda a sexta das 10h às 12h e das 14h às 16h\nEntrega de documentos: de segunda a sexta das 9h às 16h\nEndereço\nRua Pio XI, 1500 - Alto da Lapa\nSão Paulo - SP - Brasil\nCEP: 05468-901\nOutros canais de atendimento"
+      }
+    ],
+    "edital|finep|finep:602": [
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "f2ad430f9bdee4bf9a1927b5584edcff1092927e95d9f83fef5bfd4e6522b042",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 0,
+        "kind": "heading",
+        "section_path": [],
+        "text": "CHAMADA PÚBLICA CONJUNTA ENTRE A FINANCIADORA DE ESTUDOS E PROJETOS (FINEP) E O CENTRO PARA EL DESARROLLO TECNOLÓGICO INDUSTRIAL (CDTI) COOPERAÇÃO ICT-EMPRESA – 01/2017\nSELEÇÃO PÚBLICA DE PROJETOS COOPERATIVOS ENTRE INSTITUIÇÕES CIENTÍFICAS, TECNOLÓGICAS E DE INOVAÇÃO (ICTs) E EMPRESAS PARA O DESENVOLVIMENTO SUSTENTÁVEL E O CRESCIMENTO ECONÔMICO DO BRASIL E DA ESPANHA\n1. INTRODUÇÃO\n1.1. A Financiadora de Estudos e Projetos – FINEP e o Centro para el Desarrollo Tecnológico Industrial (CDTI), doravante denominados “Partes”, tornam pública a seleção conjunta de projetos cooperativos entre Instituições Científicas, Tecnológicas e de Inovação (ICTs) e empresas, no âmbito do Acordo de Cooperação entre as Partes, assinado em Madri em 27 de outubro de 2006 e renovado em São Paulo em 12 de dezembro de 2013.\n2. OBJETIVO\n2.1. Esta seleção tem como objetivo apoiar, por meio de financiamento não reembolsável às ICTs brasileiras pela FINEP e financiamento a empresas espanholas pelo CDTI, projetos elaborados em cooperação entre ICTs, empresas brasileiras e empresas espanholas, cujos objetivos estejam em consonância com as linhas temáticas apresentadas no item 3 desta Chamada Pública Conjunta."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "fa9889a915262fb67d6e14b5886b96c57b1b1336f6e227b68b9435735600e696",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 1,
+        "kind": "heading",
+        "section_path": [
+          "SELEÇÃO PÚBLICA DE PROJETOS COOPERATIVOS ENTRE INSTITUIÇÕES CIENTÍFICAS, TECNOLÓGICAS E DE INOVAÇÃO (ICTs) E EMPRESAS PARA O DESENVOLVIMENTO SUSTENTÁVEL E O CRESCIMENTO ECONÔMICO DO BRASIL E DA ESPANHA"
+        ],
+        "text": "3. PROJETOS DE INOVAÇÃO E ÁREAS TEMÁTICAS\n3.1. Em reposta à presente Chamada Pública, devem ser apresentadas propostas de projetos coordenados bilaterais, doravante denominados “Consórcios Internacionais”, que estimulem a pesquisa estratégica e o desenvolvimento de parcerias para inovação por meio de projetos selecionados nas seguintes áreas de conhecimento:\n3.1.1. Tecnologias da Informação e Comunicação. 3.1.2. Meio Ambiente e Eficiência Energética.\n4. ARRANJO INSTITUCIONAL E CRITÉRIOS DE ELEGIBILIDADE\n5. CARACTERÍSTICAS DE APRESENTAÇÃO DA PROPOSTA\nA Finep financiará as ICTs brasileiras e o CDTI financiará as empresas e eventuais ICTs espanholas. O financiamento se dará respeitando-se as respectivas regras de concessão de financiamento habituais de cada Parte.\nA duração máxima de cada projeto será de 2 (dois) anos.\n6.3. Empresas e ICTs Brasileiras\n6.3.1. As condições de financiamento não reembolsável dos projetos selecionados, as regras de liberação das parcelas, a avaliação de relatórios e outros detalhes do projeto submetido à Finep são definidos conforme critérios técnicos e em observância da legislação brasileira."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "b20bc6948d1b7f62800dd950e43ab94ea97142ddc564ceceb98c9718cfea51b3",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 2,
+        "kind": "paragraph",
+        "section_path": [
+          "6. FINANCIAMENTO DE PROJETOS",
+          "6.3 Empresas e ICTs Brasileiras"
+        ],
+        "text": "6.3.2. A liberação dos recursos não reembolsáveis somente ocorrerá em conformidade com a disponibilidade orçamentária e financeira do FNDCT/Fundos Setoriais, obedecidos os valores e o cronograma de desembolso aprovados pela Finep, assim como as condições contratuais pertinentes à referida liberação.\n6.3.3. A Finep poderá financiar os recursos financeiros alocados pelas Intervenientes Cofinanciadoras ao projeto como aporte obrigatório, assim como as atividades relacionadas ao projeto e que serão desenvolvidas internamente, por meio de financiamento reembolsável nas condições da Política Operacional: http://www.finep.gov.br/a-finep-externo/politica-operacional.\n6.4. Empresas espanholas"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "e6cde4fb866b45efd7f55a65b4e13ff21144369ac8a038ebd228308200296cc8",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 3,
+        "kind": "paragraph",
+        "section_path": [
+          "6. FINANCIAMENTO DE PROJETOS",
+          "6.4 Empresas espanholas"
+        ],
+        "text": "6.4.1. O financiamento não reembolsável espanhol dos projetos selecionados será concedido em parcelas semestrais ou anuais. Para fazer jus ao recebimento da primeira parcela do financiamento, o grupo espanhol deverá apresentar um Relatório Inicial ao CDTI e as cópias de aprovação do projeto por todos os participantes envolvidos no Consórcio Internacional. Para se verificar a aprovação e interesse de cada participante, um formulário específico será fornecido pelo CDTI. A liberação da parcela ocorrerá em seguida à aprovação do Relatório pelo CDTI.\n6.4.2. A autorização das parcelas subsequentes está condicionada à avaliação, por parte do CDTI, de um relatório enviado pelo grupo espanhol abordando aspectos técnicos e financeiros sobre a parcela anterior.\n6.5. Valores mínimos de contrapartida"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "6542e316a84f24923f525dc5cd69e520d82b10a0c2fbcf8e1c94222f5e4ed601",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 4,
+        "kind": "paragraph",
+        "section_path": [
+          "6. FINANCIAMENTO DE PROJETOS",
+          "6.5 Valores mínimos de contrapartida"
+        ],
+        "text": "6.5.1. A concessão de recursos não reembolsáveis pela Finep implica, obrigatoriamente, que a Interveniente Cofinanciadora aporte no projeto recursos de contrapartida financeira. O valor do aporte dependerá do faturamento bruto de 2016 da Interveniente Cofinanciadora, conforme quadro abaixo. Caso a Interveniente Cofinanciadora pertença a um Grupo Econômico, será utilizada a composição do faturamento deste para apuração do percentual de contrapartida.\nPercentual Mínimo Faturamento Bruto no Classificação por Porte de Contrapartida Exercício de 2015 Obrigatória\nMicroempresa e Empresa Até R$ 16.000.000,00 10% de Pequeno Porte De R$ 16.000.000,01 a R$ Média Empresa 30% 90.000.000,00 Grande Empresa Acima de R$ 90.000.000,01 50%\n6.5.2. O valor de contrapartida financeira da Interveniente Cofinanciadora poderá ser composto por despesas de custeio e de capital, desde que associadas à execução de atividades do projeto."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "ceaf6e67576de52845af1d2fd555f3d76a68c3508e1f3f694d53c1d4e4183ef7",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 5,
+        "kind": "paragraph",
+        "section_path": [
+          "6. FINANCIAMENTO DE PROJETOS",
+          "6.5 Valores mínimos de contrapartida"
+        ],
+        "text": "6.5.3. Os valores do projeto e da contrapartida devem ser calculados da seguinte forma: Valor do Total do Projeto (VTP) = Valor a ser financiado pela Finep (VF)* + Contrapartida (CP)** *No máximo R$600.000,00 (seiscentos mil reais), de acordo com o item 6.2.2 da Chamada Pública; **Valor mínimo, respeitando o item 6.5.1 da Chamada Pública. O percentual mínimo, referente à contrapartida, deve ser aplicado ao Valor Total do Projeto (VTP).\n7. PROCESSO DE SELEÇÃO\n7.1 O processo de seleção será constituído por uma única etapa, na qual as propostas serão avaliadas quanto à forma e quanto ao conteúdo.\n7.1.1. Quanto à Forma\n(a) Essa avaliação é de caráter eliminatório e consiste na verificação dos seguintes requisitos:\nVerificação do Item Requisitos do Edital 1 Adequação do Arranjo Institucional Item 4 2 Adequação da documentação apresentada Item 5 Atendimento aos valores limites solicitados à Finep e ao 3 Item 6 CDTI 4 Atendimento aos prazos estabelecidos Item 10\n(a) Essa avaliação é de caráter classificatório e eliminatório e será realizada por comitê de avaliação formado por especialistas da Finep e do CDTI, podendo envolver também, em casos oportunos, consultores externos."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "3efa0f0b824523049f450381415363bc9fc7310c2820272477c7991d88d9ffaa",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 6,
+        "kind": "paragraph",
+        "section_path": [
+          "7. PROCESSO DE SELEÇÃO",
+          "7.1.2. Quanto ao Conteúdo"
+        ],
+        "text": "(b) A Finep e o CDTI avaliarão os projetos baseados nos processos de seleção estabelecidos em seus respectivos editais.\n(c) A avaliação quanto ao conteúdo pelo CDTI ocorrerá conforme seus critérios de avaliação e processos internos.\n(d) A avaliação quanto ao conteúdo pela Finep ocorrerá a partir da aplicação de Parâmetros e Critérios, que podem possuir caráter eliminatório ou classificatório, a saber:\nParâmetros Critérios Notas Pesos Efetividade do Plano de Projeto Conjunto Aderência A 1 no cumprimento dos objetivos da 1 a 5 5 Temática Chamada Pública B Inovação 1 Risco Tecnológico Envolvido 1 a 5 5 Adequação do orçamento do Plano de 1 1 a 5 4 Projeto Conjunto Adequação do dimensionamento e da 2 disponibilidade da equipe do Plano de 1 a 5 4 Viabilidade Projeto Conjunto C Técnica Adequação da infraestrutura da(s) 3 empresa(s) para o desenvolvimento do 1 a 5 3 Plano de Projeto Conjunto 4 Experiência com projetos de inovação 1 a 5 3 Desenvolvimento Externalidades econômicas, ambientais e D 1 1 a 5 2 Sustentável sociais\nSerão recomendadas apenas as propostas que obtiverem média ponderada igual ou superior a 3,0 (três pontos) e que:"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "53e855218312c98e474c1389e18fa0b9a952459f204e788edf14239bba201d41",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 7,
+        "kind": "list",
+        "section_path": [
+          "7. PROCESSO DE SELEÇÃO",
+          "7.1.2. Quanto ao Conteúdo"
+        ],
+        "text": " não tiverem obtido nota abaixo de 3 no critério 1 do Parâmetro A (Aderência Temática).  não tiverem obtido nota igual a 1 em um ou mais critérios que compõem os parâmetros B, C e D.\n(e) Uma vez finalizado esse processo, a classificação das propostas recomendadas será definido em conjunto pelo CDTI e pela Finep.\n7.2. As propostas recomendadas serão classificadas em ordem decrescente de notas e apenas as propostas situadas dentro do limite de recursos disponíveis para esta Chamada Pública estarão pré-qualificadas ao recebimento de apoio por meio dos instrumentos operados pelas Partes.\n7.3. A Chamada Pública aqui tratada não obriga a FINEP ou o CDTI a conceder financiamento, separada ou conjuntamente, aos projetos que vierem a ser selecionados, servindo tão somente como pré-qualificação para este fim. A concessão dos financiamentos estará condicionada à observância dos fluxos usuais de tramitação vigentes em cada uma das Partes, inclusive no que concerne a análises técnica, financeira e jurídica, aprovação, contratação e acompanhamento e, também, aos demais requisitos estabelecidos legalmente e neste Edital."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "1f2113978e795c824c9d8ec63e9de4a178b0582bbc46a83bf0cc7e45a6d18c88",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 8,
+        "kind": "paragraph",
+        "section_path": [
+          "7. PROCESSO DE SELEÇÃO",
+          "7.1.2. Quanto ao Conteúdo"
+        ],
+        "text": "7.4. A documentação técnica, financeira e jurídica necessária à celebração do convênio de concessão de financiamento não reembolsável da FINEP será solicitada aos Consórcios Internacionais selecionados, por carta, após a divulgação do resultado final da Chamada Pública.\n7.4.1. Durante a análise jurídica, serão verificadas a elegibilidade das instituições que integram o Consórcio Internacional, a documentação necessária à contratação e a adequação a legislação vigente.\n7.5. Caso algum dos aspectos analisados não atenda às disposições da chamada ou à legislação vigente, a proposta será eliminada.\n7.6. A qualquer momento poderão ser solicitadas informações e documentação adicionais, realizadas visitas às instalações de ICTs/empresa participantes, promovidas reuniões presenciais ou adotadas outras medidas que se façam necessárias à condução da Chamada Pública.\n11. CONTRATAÇÃO E LIBERAÇÃO DOS RECURSOS FINANCEIROS\nAs condições para a contratação de cada projeto (parte brasileira) serão definidas na respectiva Decisão da Diretoria Executiva da Finep. Eventuais solicitações efetuadas pela Finep à Instituição Proponente necessárias à contratação da operação"
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "5fa07727b531e828ee434110f6edb76c7ac0bffa2eadb2b1f2e53834fa125c67",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 9,
+        "kind": "paragraph",
+        "section_path": [
+          "11. CONTRATAÇÃO E LIBERAÇÃO DOS RECURSOS FINANCEIROS",
+          "11.1"
+        ],
+        "text": "(condições pré-contratuais) deverão ser atendidas no prazo máximo de 15 (quinze) dias a contar do recebimento da solicitação.\nPara fins de contratação, um Termo de Parceria deverá ser celebrado entre as organizações do Consórcio Internacional e apresentado à Finep, com o propósito de esclarecer, entre outros:\n• A responsabilidade dos parceiros; • Os processos decisórios no âmbito do consórcio internacional; • O gerenciamento de qualquer mudança de parceiros; • Orçamento e financiamento do projeto; • Assuntos de Direitos de Propriedade Intelectual; e • Resolução de conflitos de interesse.\nO convênio assinado pelos representantes legais das Instituições Participantes, exceto a Concedente, deverá ser entregue para assinatura da Finep no prazo máximo de 30 (trinta) dias a contar do seu recebimento.\nO não cumprimento dos itens 11.1, 11.2 e 11.3 poderá acarretar o arquivamento da proposta.\nA Finep somente considerará a execução financeira de contrapartida, dos aportes e de recursos da Finep como gastos do projeto, a partir da data da assinatura do instrumento pelo concedente."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "9a702dcea74c79e9fb0122e92a521bc6bea146328bf9673ef16b823a2d464de7",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 10,
+        "kind": "paragraph",
+        "section_path": [
+          "11. CONTRATAÇÃO E LIBERAÇÃO DOS RECURSOS FINANCEIROS",
+          "11.6"
+        ],
+        "text": "A aprovação do Consórcio Internacional no âmbito deste edital não gera expectativa de direito com relação à concessão dos financiamentos, conforme item 7.3.\nO financiamento brasileiro e espanhol dos projetos selecionados será concedido em parcelas semestrais ou anuais.\nA validade da presente Chamada Pública é de 2 (dois) anos, incluindo a seleção, aprovação e a contratação das propostas, sem prejuízo da manutenção dos efeitos da Chamada até a quitação técnica e financeira pela Finep dos projetos contratados."
+      }
+    ],
+    "edital|web|web:ce032edb720c": [
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "1b3e18f1e6487d6a49e57166eb2ab1e0d787c1dd377607cb50a51f13b24272d6",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 0,
+        "kind": "paragraph",
+        "section_path": [],
+        "text": "100 Open Startups - Desafio Pequenas Empresas » Outros Desafios desafio PEQUENAS EMPRESAS Rede Corporativa As propostas deste desafio serÃ£o apresentadas a executivos das seguintes empresas: » 3M » Abbot » Accenture » Alelo » Algar Agro » Algar Telecom » Anima EducaÃ§Ã£o/li> » AOC / TPV » Aon Global » Ashok Leyland » Atlas Schindler » Audi » Avon » Braskem » BRF » Catho » Cellairis Brasil » Cemig » CIESP » Citrosuco » Coffee Day Group » Deloitte » Digitro Tecnologia » Dow » Dr.Reddy's Laboratories » EDP » Embraco » Envirochem » Ericsson » EY » Furukawa » Geofusion » Gerdau » Givaudan » Godrej & Boyce » Governo do Mato Grosso » Grupo BoticÃ¡rio » Grupo Globo » Grupo Positivo » Grupo Sabara » HCL Technologies » HCor » Hidrodema » Hospital SÃ£o Rafael » IBM » ICI » Ilegra » IMBEL » Indra Company » Instituto SENAI de InovaÃ§Ã£o » Instituto Votorantim » Intel » ItaÃº-Unibanco » Jacto » Johnson & Johnson » Kentech » Leucotron Telecom » Locaweb » Machani Group » Mane do Brasil » MATERA Systems » Mercado Livre » MDIC » Mondelez » Natura » Novozymes » Oracle » Porto Seguro » Procter&Gamble » PwC » Qualicorp » Quess Corp » Roche » SabarÃ¡ QuÃ­micos » Saint-Gobain » Samsung » Sascar » Sebrae » Senac » Senai » Senior Sistemas » SIDI » Softplan » Suzano » TIM » Totvs » TPV » Univ. Metodista de SÃ£o Paulo » Universidade Positivo » Visa » Votorantim » Votorantim Cimentos » Whirlpool » Y&R » Yara Fertilizantes » Zen Este Ã© um grande desafio de inovaÃ§Ã£o identificado em conjunto por empresas lÃ­deres interessadas em colaborar com startups."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "17de600b28bd86bec5d2e24d6667f547c1adcaf1b2c5fc71007d8cc5049aaf4b",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 1,
+        "kind": "paragraph",
+        "section_path": [],
+        "text": "Se vocÃª acredita que pode ser um protagonista da soluÃ§Ã£o cadastre sua startup: DescriÃ§Ã£o do Desafio: Mesmos nas principais economias do mundo onde as grandes empresas lideram mercados e ditam os rumos da inovaÃ§Ã£o, MPEs sÃ£o as responsÃ¡veis por grande parte da economia e sÃ£o em geral a principal geradora de empregos.\nEntretanto, pequenas empresas tem um Ã­ndice de mortalidade muito alto e sofrem com a falta de acesso a mercados, capacitaÃ§Ã£o e pessoal qualificados. HÃ¡ grandes desafios a serem superados envolvendo a capacitaÃ§Ã£o dos empresÃ¡rios, a alta complexidade nos trÃ¢mites tributÃ¡rios, jurÃ­dicos e trabalhistas, falta de ferramentas, carÃªncia de infraestrutura, dentre outros.\nPor meio da inovaÃ§Ã£o e colaboraÃ§Ã£o acredita-se ser possÃ­vel estimular o empreendedorismo e permitir o aumento da competitividade e sustentabilidade dos empreendimentos de micro e pequeno porte."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "751646695e5ec3c30e8da3c27ef68545c9de709aa048fea93f764a39147e71f5",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 2,
+        "kind": "paragraph",
+        "section_path": [],
+        "text": "Oportunidades para startups: » Novas ferramentas e metodologias em gestÃ£o empresarial (equipes, marketing, vendas, etc) adequadas a realidade do micro e pequeno empreendedor; » SoluÃ§Ãµes que permitam maior acesso ao crÃ©dito, aos mecanismos de fomento e investidores; » SoluÃ§Ãµes em mecanismos de desenvolvimento produtivo para o aumento de escalabilidade,capacidade de inovaÃ§Ã£o, expansÃ£o comercial e internacionalizaÃ§Ã£o; » Novos ambientes de trabalho que permitam o desenvolvimento de micro e pequenas empresas; » Plataformas de gestÃ£o contÃ¡bil e financeira que simplifiquem as operaÃ§Ãµes do empreendedor (ex: faturamento). » Ofertas de serviÃ§os de ERP, CRM (ex: fidelizaÃ§Ã£o de clientes para pequeno varejo), inteligÃªncia de vendas, emissÃ£o de NF-e, contabilidade, emissÃ£o de boletos e outros processos de forma centralizada para atender as micro e pequenas empresas, de forma a facilitar a adoÃ§Ã£o de soluÃ§Ãµes tecnolÃ³gicas e capacitaÃ§Ã£o para uso das ferramentas (ex: por meio de aplicativos); » Acesso a recursos de pesquisa e redes colaborativas de conhecimento; » SoluÃ§Ãµes que incentivem / facilitem a criaÃ§Ã£o de startups em universidades e outros; » Acesso a programas de capacitaÃ§Ã£o e treinamento."
+      },
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "95688338cbe9dbc3a2a4ebe3ebc634bd41f954734e5826a4f8cb2da8cdc3ff70",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 3,
+        "kind": "paragraph",
+        "section_path": [],
+        "text": "Select your country/language Global - English Global - EspaÃ±ol Argentina - EspaÃ±ol Brasil - PortuguÃªs Canada - English Chile - EspaÃ±ol Colombia - EspaÃ±ol India - English Mexico - EspaÃ±ol Peru - EspaÃ±ol helpme@openstartups.net Av. Queiroz Filho, 1.700 - Vila 44 05319-000 | SÃ£o Paulo-SP | Brasil\nO 100 Open Startups Ã© a principal plataforma de conexÃ£o de startups e grandes empresas criada e mantida por mais de 100 corporaÃ§Ãµes lÃ­deres mundiais que em conjunto avaliam e ranqueiam startups com foco em gerar oportunidades de negÃ³cio.\nO Wenovate conecta pessoas e instituiÃ§Ãµes em torno de programas de inovaÃ§Ã£o aberta. Trabalhamos com Comunidades de InovaÃ§Ã£o oferecendo um ambiente neutro, metodologias e tecnologias que favorecem o engajamento e a colaboraÃ§Ã£o.\n| Como funciona | Redes Conectadas | Grandes Desafios | CalendÃ¡rio de Eventos | Sobre o Movimento | Perguntas Frequentes | Copyright 2019 - Open Startups ParticipaÃ§Ãµes Ltda."
+      }
+    ],
+    "programa|curadoria|programa:centelha": [
+      {
+        "embedding_dim": 8,
+        "embedding_input_hash": "ee434be1778e2db64aa7f1c6a2b5ec4cea998183025073f132551ca7c58cd6dd",
+        "embedding_model": "stub-embedder-v1",
+        "idx": 0,
+        "kind": "paragraph",
+        "section_path": [
+          "Programa Centelha"
+        ],
+        "text": "Programa nacional de estímulo à criação de empreendimentos inovadores: transforma ideias em negócios com capacitação e subvenção. Editais estadualizados pelas FAPs. Subvenção econômica (capital não-reembolsável), bolsas, mentorias e capacitação."
+      }
+    ]
+  },
+  "relations": {
+    "edital|fapesc|fapesc:35-2026->agencia|curadoria|agencia:fapesc|operado_por": {
+      "properties": {},
+      "source_entity_key": "edital|fapesc|fapesc:35-2026",
+      "target_entity_key": "agencia|curadoria|agencia:fapesc",
+      "type": "operado_por"
+    },
+    "edital|fapesp|fapesp:16466->agencia|curadoria|agencia:fapesp|operado_por": {
+      "properties": {},
+      "source_entity_key": "edital|fapesp|fapesp:16466",
+      "target_entity_key": "agencia|curadoria|agencia:fapesp",
+      "type": "operado_por"
+    },
+    "edital|finep|finep:602->agencia|curadoria|agencia:finep|operado_por": {
+      "properties": {},
+      "source_entity_key": "edital|finep|finep:602",
+      "target_entity_key": "agencia|curadoria|agencia:finep",
+      "type": "operado_por"
+    },
+    "ict|embrapii|embrapii:inteligencia-artificial-ceia-ufg->agencia|curadoria|agencia:embrapii|credenciada_por": {
+      "properties": {},
+      "source_entity_key": "ict|embrapii|embrapii:inteligencia-artificial-ceia-ufg",
+      "target_entity_key": "agencia|curadoria|agencia:embrapii",
+      "type": "credenciada_por"
+    },
+    "programa|curadoria|programa:centelha->agencia|curadoria|agencia:faps-estaduais|operado_por": {
+      "properties": {},
+      "source_entity_key": "programa|curadoria|programa:centelha",
+      "target_entity_key": "agencia|curadoria|agencia:faps-estaduais",
+      "type": "operado_por"
+    },
+    "programa|curadoria|programa:centelha->agencia|curadoria|agencia:finep|operado_por": {
+      "properties": {},
+      "source_entity_key": "programa|curadoria|programa:centelha",
+      "target_entity_key": "agencia|curadoria|agencia:finep",
+      "type": "operado_por"
+    },
+    "programa|curadoria|programa:centelha->agencia|curadoria|agencia:mcti|operado_por": {
+      "properties": {},
+      "source_entity_key": "programa|curadoria|programa:centelha",
+      "target_entity_key": "agencia|curadoria|agencia:mcti",
+      "type": "operado_por"
+    }
+  },
+  "schema_version": 1
+}

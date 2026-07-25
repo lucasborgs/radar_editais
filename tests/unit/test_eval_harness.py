@@ -261,9 +261,9 @@ def test_suites_registered():
     from radar.core.eval.registry import SUITES
     assert set(SUITES) == {
         "matching", "rag", "writing", "extraction",
-        "opportunity_type", "triage", "writing_v2",
+        "opportunity_type", "provenance", "triage", "writing_v2",
         "profile_extractor", "reranker", "structurer",
-        "explore", "relevance_shadow",
+        "explore", "relevance_shadow", "e2e_health",
     }
 
 
@@ -282,3 +282,172 @@ def test_writing_skips_without_workspace(tmp_path, monkeypatch):
     from radar.core.eval.registry import get_suite
     res = run_suite(get_suite("writing"), out_dir=tmp_path)
     assert res.get("skipped")
+
+
+# --- ambiente fail-closed (RT02-TX) ---------------------------------------
+
+
+def test_env_production_refused_before_task(tmp_path, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    called: list[bool] = []
+
+    def _task(*, item, **kw):
+        called.append(True)
+        return {"ok": True}
+
+    suite = Suite(
+        name="dummy_env_test",
+        description="env test",
+        load_data=lambda: [{"input": 1, "expected_output": 1}],
+        task=_task,
+        evaluators=[],
+    )
+    res = run_suite(suite, out_dir=tmp_path)
+    assert res["status"] == "error"
+    msg = str(res.get("manifest", {}).get("execution", {}).get("errors", ""))
+    assert "produção" in msg.lower() or "production" in msg.lower()
+    assert not called
+
+
+def test_env_production_refused_before_any_suite_callback(tmp_path, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    called: list[str] = []
+
+    def _called(name, value=None):
+        def callback(*args, **kwargs):
+            called.append(name)
+            return value
+
+        return callback
+
+    suite = Suite(
+        name="dummy_env_callbacks",
+        description="env callbacks",
+        expected_cases=_called("expected_cases", 1),
+        expected_case_ids=_called("expected_case_ids", ["case-1"]),
+        prereqs=_called("prereqs"),
+        load_data=_called("load_data", [{"input": 1, "metadata": {"case_id": "case-1"}}]),
+        task=_called("task", {"ok": True}),
+        evaluators=[],
+    )
+
+    result = run_suite(suite, out_dir=tmp_path)
+    assert result["status"] == "error"
+    assert called == []
+
+
+def test_env_staging_refused_before_task(tmp_path, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "staging")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    called: list[bool] = []
+
+    def _task(*, item, **kw):
+        called.append(True)
+        return {"ok": True}
+
+    suite = Suite(
+        name="dummy_env_test",
+        description="env test",
+        load_data=lambda: [{"input": 1, "expected_output": 1}],
+        task=_task,
+        evaluators=[],
+    )
+    res = run_suite(suite, out_dir=tmp_path)
+    assert res["status"] == "error"
+    assert not called
+
+
+def test_env_local_with_remote_url_refused(tmp_path, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "local")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@ec2-1-2-3-4.compute-1.amazonaws.com/db")
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    called: list[bool] = []
+
+    def _task(*, item, **kw):
+        called.append(True)
+        return {"ok": True}
+
+    suite = Suite(
+        name="dummy_env_test",
+        description="env test",
+        load_data=lambda: [{"input": 1, "expected_output": 1}],
+        task=_task,
+        evaluators=[],
+    )
+    res = run_suite(suite, out_dir=tmp_path)
+    assert res["status"] == "error"
+    assert not called
+
+
+def test_env_local_without_remote_works(tmp_path, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    called: list[bool] = []
+
+    def _task(*, item, **kw):
+        called.append(True)
+        return {"ok": True}
+
+    suite = Suite(
+        name="dummy_env_test",
+        description="env test",
+        load_data=lambda: [{"input": 1, "expected_output": 1}],
+        task=_task,
+        evaluators=[],
+    )
+    res = run_suite(suite, out_dir=tmp_path)
+    assert res["status"] == "diagnostic"
+
+
+def test_env_error_message_no_credentials(tmp_path, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "local")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:secret@remote-host.internal:5432/proddb")
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    called: list[bool] = []
+
+    def _task(*, item, **kw):
+        called.append(True)
+        return {"ok": True}
+
+    suite = Suite(
+        name="dummy_env_test",
+        description="env test",
+        load_data=lambda: [{"input": 1, "expected_output": 1}],
+        task=_task,
+        evaluators=[],
+    )
+    res = run_suite(suite, out_dir=tmp_path)
+    msg = json.dumps(res)
+    assert "secret" not in msg
+    assert "postgresql://user" not in msg
+    assert "remote-host" not in msg  # hostname da URL não deve vazar
+    assert "user:secret" not in msg
+    assert not called
+
+
+def test_env_unknown_with_remote_supabase_refused(tmp_path, monkeypatch):
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("SUPABASE_URL", "https://project-ref.supabase.co")
+    called: list[bool] = []
+
+    def _task(*, item, **kw):
+        called.append(True)
+        return {"ok": True}
+
+    suite = Suite(
+        name="dummy_env_test",
+        description="env test",
+        load_data=lambda: [{"input": 1, "expected_output": 1}],
+        task=_task,
+        evaluators=[],
+    )
+    res = run_suite(suite, out_dir=tmp_path)
+    assert res["status"] == "error"
+    assert not called

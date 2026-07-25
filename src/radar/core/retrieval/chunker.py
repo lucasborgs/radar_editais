@@ -28,6 +28,11 @@ OVERLAP_TOKENS = 150
 MIN_TOKENS = 80
 MAX_TOKENS = 1500
 
+# Versão da política de agrupamento/overlap deste módulo — gravada em
+# edital_chunks.metadata (lineage, RT01 §6.2). Sobe quando TARGET/OVERLAP/MIN/
+# MAX ou o algoritmo de fronteira mudam; não é consumida por retrieval.
+CHUNKER_VERSION = "1"
+
 # Metadata detection — content-type flags consumidas no retrieval: o retriever
 # detecta a intenção da query (core/retrieval/retriever.py _QUERY_FLAG_PATTERNS)
 # e dá boost RRF aos chunks cuja flag casa. Lista deliberadamente curta: cada

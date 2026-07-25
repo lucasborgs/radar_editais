@@ -1,0 +1,33 @@
+{
+  "provenance_schema_version": 1,
+  "created_at": "2026-07-24",
+  "review_status": "pending",
+  "description": "RT02-T01 — golden representativo de proveniência (spec radar-data-trust-02-quality-gates.md §7.1). Um caso por tipo obrigatório (6 casos); conflicting/retificação ficam fora (encaminhados à spec 04). Fixtures apenas — nenhum código de suíte; a suíte diagnóstica que consome este golden é a task RT02-T02. Pendente de aceite do proprietário.",
+  "case_ids": [
+    "provenance-01-unique-exact",
+    "provenance-02-repeated-two-pages",
+    "provenance-03-html-no-page",
+    "provenance-04-normalized-value",
+    "provenance-05-absent-field",
+    "provenance-06-legacy-no-silver"
+  ],
+  "corpus_stats": {
+    "total_cases": 6,
+    "by_case_type": {
+      "unique_exact_quote": 1,
+      "repeated_two_pages": 1,
+      "html_no_page": 1,
+      "normalized_value": 1,
+      "absent_field": 1,
+      "legacy_no_silver": 1
+    },
+    "synthetic_cases": 2,
+    "real_silver_cases": 4
+  },
+  "notes": [
+    "Casos 1, 2, 4, 5 reusam blocos silver REAIS de tests/fixtures/gold_equivalence/silver/structured_docs/finep/602.jsonl (o mesmo doc FINEP, para minimizar fixtures novas).",
+    "Casos 3 (HTML sem página) e 6 (legado sem silver) usam blocos sintéticos mínimos porque nenhum fixture real de silver hoje tem page=None ou representa um registro sem bloco algum — ver plano RT02-T01.",
+    "Cada caso foi validado rodando radar.core.kg.evidence_resolver.resolve_quote() de fato contra o input, e o expected_output reflete o ResolveResult real (não foi transcrito à mão).",
+    "conflicting e retificação (spec 01 §10.2) ficam fora do escopo desta task — nenhum produtor os emite hoje; encaminhados à spec 04."
+  ]
+}

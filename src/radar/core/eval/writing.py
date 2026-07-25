@@ -438,6 +438,7 @@ SUITE = Suite(
     evaluators=[eval_save, eval_grounding, eval_n_claims, eval_factual_errors,
                 eval_coherence, eval_tool_calls],
     prereqs=_prereqs,
+    classification="diagnostic",
     dataset_paths=[GOLDEN],
     expected_cases=lambda: _expected_cases(GOLDEN),
 )

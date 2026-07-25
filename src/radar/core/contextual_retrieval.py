@@ -42,6 +42,12 @@ def _api_key() -> str | None:
     return os.getenv("CONTEXTUAL_RETRIEVAL_API_KEY") or os.getenv("OPENAI_API_KEY")
 
 
+def effective_model() -> str:
+    """Modelo efetivo desta contextualização (accessor público mínimo p/
+    lineage — RT01-T09). Não altera is_enabled()/contextualize_chunks()."""
+    return _MODEL
+
+
 def is_enabled() -> bool:
     """Liga por default; desliga com CONTEXTUAL_RETRIEVAL=false. Sem key
     (CONTEXTUAL_RETRIEVAL_API_KEY/OPENAI_API_KEY) também desliga (degrada para

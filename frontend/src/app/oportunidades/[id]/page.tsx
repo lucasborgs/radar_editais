@@ -13,7 +13,9 @@ import type {
   EligibilityConstraint,
   TicketRange,
   EditalStatus,
+  FieldProvenance,
 } from "@/types/edital";
+import { ProvenanceHint } from "@/components/ProvenanceHint";
 
 // ── Rótulos v2 ───────────────────────────────────────────────────────────────
 
@@ -80,11 +82,14 @@ function verdictKeyFor(detail: OportunidadeDetail): string {
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+function InfoRow({ label, value, provenance }: { label: string; value: React.ReactNode; provenance?: FieldProvenance }) {
   return (
     <div className="flex gap-3">
       <span className="text-xs font-sans text-content-secondary w-36 shrink-0">{label}</span>
-      <span className="text-xs font-sans text-content-primary">{value}</span>
+      <span className="text-xs font-sans text-content-primary">
+        {value}
+        {provenance && <ProvenanceHint provenance={provenance} />}
+      </span>
     </div>
   );
 }
@@ -100,12 +105,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function TagCard({ title, tags }: { title: string; tags: string[] }) {
+function TagCard({ title, tags, provenance, curationLabel }: { title: string; tags: string[]; provenance?: FieldProvenance; curationLabel?: "embrapii" | "catalogo" }) {
   if (!tags.length) return null;
   return (
     <div className="min-w-[250px] flex-1 bg-surface rounded-xl border border-border p-5">
-      <h2 className="font-heading text-sm font-bold text-content-primary mb-3 pb-2 border-b border-border">
+      <h2 className="font-heading text-sm font-bold text-content-primary mb-3 pb-2 border-b border-border flex items-center gap-1.5">
         {title}
+        {provenance && <ProvenanceHint provenance={provenance} curationLabel={curationLabel} />}
       </h2>
       <div className="flex flex-wrap gap-1.5">
         {tags.map((t) => (
@@ -201,8 +207,11 @@ export default function OportunidadeDetailPage() {
       {/* Header card */}
       <div className="bg-surface rounded-xl border border-border p-5 mb-4">
         <div className="flex items-start justify-between gap-4 mb-3">
-          <h1 className="font-heading text-lg font-bold text-content-primary leading-snug flex-1">
+          <h1 className="font-heading text-lg font-bold text-content-primary leading-snug flex-1 flex items-center gap-1.5">
             {detail.title}
+            {(detail.kind === "investimento" || detail.kind === "programa") && detail.provenance?.["name"] && (
+              <ProvenanceHint provenance={detail.provenance["name"]} curationLabel="catalogo" />
+            )}
           </h1>
           {isEdital && <StatusBadge status={detail.status as EditalStatus} />}
         </div>
@@ -229,7 +238,7 @@ export default function OportunidadeDetailPage() {
             const parsed = parseDeadline(detail.deadline);
             return <InfoRow label="Prazo" value={parsed ?? detail.deadline} />;
           })()}
-          {detail.mechanism && <InfoRow label="Mecanismo" value={detail.mechanism} />}
+          {detail.mechanism && <InfoRow label="Mecanismo" value={detail.mechanism} provenance={detail.provenance?.["mecanismo"]} />}
           {value && <InfoRow label="Valor" value={value} />}
           {ticket && !value && <InfoRow label="Ticket" value={ticket} />}
           {detail.estagio_alvo && detail.estagio_alvo.length > 0 && (
@@ -303,8 +312,8 @@ export default function OportunidadeDetailPage() {
 
       {/* Conceitos cobertos + atores relacionados */}
       <div className="flex flex-wrap gap-4 mb-4">
-        <TagCard title="Temas" tags={detail.themes} />
-        <TagCard title="Tecnologias" tags={detail.technologies} />
+        <TagCard title="Temas" tags={detail.themes} provenance={detail.provenance?.["setores"]} />
+        <TagCard title="Tecnologias" tags={detail.technologies} provenance={detail.provenance?.["tecnologias_tags"]} />
         <TagCard title="Programas" tags={detail.programs} />
         <TagCard title="Público-alvo" tags={detail.eligible_entities.length ? detail.eligible_entities : detail.publico_alvo} />
         <TagCard title="ICTs relacionadas" tags={detail.icts} />
@@ -319,6 +328,9 @@ export default function OportunidadeDetailPage() {
               <li key={i} className="text-sm font-sans text-content-primary flex gap-2">
                 <span className="text-primary shrink-0 mt-0.5">·</span>
                 {r}
+                {detail.provenance?.[`requisitos_texto.${i}`] && (
+                  <ProvenanceHint provenance={detail.provenance[`requisitos_texto.${i}`]} />
+                )}
               </li>
             ))}
           </ul>

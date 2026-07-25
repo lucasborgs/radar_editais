@@ -102,4 +102,5 @@ SUITE = Suite(
     task=task,
     evaluators=[eval_triage_accuracy, eval_fn_guard],
     prereqs=_prereqs,
+    classification="diagnostic",
 )

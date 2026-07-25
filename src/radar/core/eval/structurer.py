@@ -99,4 +99,5 @@ SUITE = Suite(
     task=task,
     evaluators=[eval_kind_recall, eval_heading_recall],
     prereqs=_prereqs,
+    classification="diagnostic",
 )

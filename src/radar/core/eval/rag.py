@@ -135,4 +135,5 @@ SUITE = Suite(
     task=task,
     evaluators=[eval_retrieval, eval_gold_text, eval_faithfulness],
     prereqs=_prereqs,
+    classification="diagnostic",
 )

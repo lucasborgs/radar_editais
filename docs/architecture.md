@@ -80,6 +80,25 @@ No gold, LLM aparece no tagger e na extração de elegibilidade. No índice de
 escrita, contextual retrieval injeta contexto de capítulo antes dos embeddings;
 as demais transformações são determinísticas e reexecutáveis.
 
+**Proveniência (Radar Data Trust 01):** `entities.provenance` e
+`entity_relationships.provenance` (JSONB aditivo, migration 042) guardam, por
+path de fato (`status`, `setores`, `requisitos_texto.<i>` etc.), o estado
+factual (`stated/inferred/absent/conflicting/unknown`), o produtor e, quando
+`stated`, um `EvidenceRef` verificável (documento/página/bloco/hash) resolvido
+contra o silver pelo mesmo `evidence_resolver` usado no ingest. `match_chunks`
+carrega `document`/`page`/`silver_block_idx`/`source_hash`; `edital_chunks`
+carrega `canonical_content_hash`/`chunker_version`/`context_version` no
+`metadata`. A leitura pública (`entity_catalog`, tools do Explorar, fichas do
+frontend) expõe só o subconjunto `{state, citations}` — nunca produtor,
+derivação ou validações. Cobertura por origem: FINEP/FAPESP/FAPESC/Web e
+EMBRAPII em dual-write pleno; investidores/programas/agências como "curado ≠
+validado" (campos copiados nunca são `stated`); registros anteriores ao
+programa e editais existentes seguem `provenance={}` (legado) até o próximo
+re-ingest ou um backfill válido. Detalhe completo:
+[`specs/radar-data-trust-01-provenance.md`](specs/radar-data-trust-01-provenance.md)
+e o consolidado em
+[`execution/radar-data-trust/reports/01-provenance/README.md`](execution/radar-data-trust/reports/01-provenance/README.md).
+
 ---
 
 ## 2. Radar — funil de match em 4 estágios

@@ -271,7 +271,14 @@ def _normalize_status(raw: str | None, deadline: date | None) -> str | None:
 
 def _pack_chunks(blocks: list[dict]) -> list[dict]:
     """Empacota blocos temáticos em match_chunks de ~_CHUNK_CHARS, preservando o
-    section_path/kind do primeiro bloco do chunk. Teto _CHUNK_CAP."""
+    section_path/kind do primeiro bloco do chunk. Teto _CHUNK_CAP.
+
+    Chaves aditivas `src_doc`/`src_page`/`src_idx` (RT01-T05, spec §6.2):
+    coordenadas do PRIMEIRO bloco constituinte do chunk — semântica de âncora
+    "o chunk começa aqui", não um range. Presentes para TODA fonte (o dict do
+    bloco silver já as carrega quando existem); só `_ingest_editais` decide
+    se persiste (`gold._replace_match_chunks`) — desde a RT01-T06, para
+    todas as fontes de EDITAL_SOURCES."""
     chunks: list[dict] = []
     buf: list[str] = []
     head: dict | None = None
@@ -284,6 +291,9 @@ def _pack_chunks(blocks: list[dict]) -> list[dict]:
                 "section_path": head.get("section_path") or [],
                 "kind": head.get("kind"),
                 "text": "\n".join(buf).strip(),
+                "src_doc": head.get("doc"),
+                "src_page": head.get("page"),
+                "src_idx": head.get("idx"),
             })
         buf, head, size = [], None, 0
 
@@ -517,12 +527,12 @@ _ENTITY_UPSERT = """
 insert into public.entities
   (kind, source, native_id, name, description, mecanismo, formato, setores, tecnologias_tags,
    status, deadline, uf, ticket_min, ticket_max, constraints, requisitos_texto, curated,
-   verificado_em, metadata, embedding, updated_at)
+   verificado_em, metadata, provenance, embedding, updated_at)
 values
   (%(kind)s, %(source)s, %(native_id)s, %(name)s, %(description)s, %(mecanismo)s, %(formato)s,
    %(setores)s, %(tags)s, %(status)s, %(deadline)s, %(uf)s, %(ticket_min)s, %(ticket_max)s,
    %(constraints)s::jsonb, %(requisitos)s, %(curated)s, %(verificado)s, %(metadata)s::jsonb,
-   %(embedding)s::vector, now())
+   %(provenance)s::jsonb, %(embedding)s::vector, now())
 on conflict (source, native_id) do update set
   kind=excluded.kind, name=excluded.name, description=excluded.description,
   mecanismo=excluded.mecanismo, formato=excluded.formato, setores=excluded.setores,
@@ -530,6 +540,7 @@ on conflict (source, native_id) do update set
   uf=excluded.uf, ticket_min=excluded.ticket_min, ticket_max=excluded.ticket_max,
   constraints=excluded.constraints, requisitos_texto=excluded.requisitos_texto,
   curated=excluded.curated, verificado_em=excluded.verificado_em, metadata=excluded.metadata,
+  provenance = case when excluded.provenance = '{}'::jsonb then entities.provenance else excluded.provenance end,
   embedding=excluded.embedding, updated_at=now()
 returning id
 """
@@ -547,28 +558,56 @@ def _upsert_entity(cur, **f) -> str:
         "requisitos": f.get("requisitos_texto") or [],
         "curated": bool(f.get("curated", False)), "verificado": f.get("verificado_em"),
         "metadata": json.dumps(f.get("metadata") or {}, ensure_ascii=False),
+        # RT01-T05: proveniência por path (dual-write, só finep preenche não
+        # vazio nesta task). `_ENTITY_UPSERT` faz o guard anti-clobber no
+        # conflito (excluded='{}' → mantém a proveniência já gravada).
+        "provenance": json.dumps(f.get("provenance") or {}, ensure_ascii=False),
         "embedding": _vec(f.get("embedding")),
     }
     cur.execute(_ENTITY_UPSERT, params)
     return cur.fetchone()[0]
 
 
-def _upsert_rel(cur, source_id: str, target_id: str, rtype: str, properties: dict | None = None) -> None:
+def _upsert_rel(
+    cur, source_id: str, target_id: str, rtype: str,
+    properties: dict | None = None, provenance: dict | None = None,
+) -> None:
+    """`provenance` (RT01-T05, spec §6.1) é opcional e gravada só no INSERT:
+    `on conflict do nothing` preserva a semântica atual — uma aresta
+    pré-existente NÃO é atualizada (nem `properties` nem `provenance`) por
+    uma chamada repetida. `_ingest_editais` passa `provenance` (edges
+    `operado_por`/`subordinado_a`, todas as fontes de edital desde a
+    RT01-T06); `_ingest_icts` passa `provenance` na aresta `credenciada_por`
+    desde a RT01-T07 (âncora document_only do registro EMBRAPII, spec §6.4);
+    `_ingest_programas` chama sem o kwarg (equivale a `{}`) até T08.
+    O stub do harness T02 (`tests/helpers/gold_projection.py::stub_upsert_rel`)
+    aceita e ignora o kwarg (emenda autorizada pela governança, 2026-07-24);
+    a persistência real é validada por
+    `tests/integration/test_provenance_dualwrite.py`."""
     cur.execute(
-        "insert into public.entity_relationships (source_id, target_id, type, properties) "
-        "values (%s, %s, %s, %s::jsonb) on conflict (source_id, target_id, type) do nothing",
-        (source_id, target_id, rtype, json.dumps(properties or {})),
+        "insert into public.entity_relationships (source_id, target_id, type, properties, provenance) "
+        "values (%s, %s, %s, %s::jsonb, %s::jsonb) on conflict (source_id, target_id, type) do nothing",
+        (source_id, target_id, rtype, json.dumps(properties or {}), json.dumps(provenance or {})),
     )
 
 
 def _replace_match_chunks(cur, entity_id: str, chunks: list[dict], embeddings: list[list[float]]) -> int:
+    """As 4 colunas novas (`document`/`page`/`silver_block_idx`/`source_hash`,
+    RT01-T05, spec §6.2) são lidas de cada dict de `chunks` quando presentes
+    (`_ingest_editais` as popula para `source == "finep"` via
+    `provenance_writer.chunk_storage_coords`; ausentes → NULL, mesmo
+    comportamento "legado" de antes desta task)."""
     cur.execute("delete from public.match_chunks where entity_id = %s", (entity_id,))
     n = 0
     for i, (c, emb) in enumerate(zip(chunks, embeddings, strict=True)):
         cur.execute(
-            "insert into public.match_chunks (entity_id, idx, section_path, kind, text, embedding) "
-            "values (%s, %s, %s, %s, %s, %s::vector)",
-            (entity_id, i, c.get("section_path") or [], c.get("kind"), c["text"], _vec(emb)),
+            "insert into public.match_chunks "
+            "(entity_id, idx, section_path, kind, text, embedding, document, page, silver_block_idx, source_hash) "
+            "values (%s, %s, %s, %s, %s, %s::vector, %s, %s, %s, %s)",
+            (
+                entity_id, i, c.get("section_path") or [], c.get("kind"), c["text"], _vec(emb),
+                c.get("document"), c.get("page"), c.get("silver_block_idx"), c.get("source_hash"),
+            ),
         )
         n += 1
     return n
@@ -577,6 +616,7 @@ def _replace_match_chunks(cur, entity_id: str, chunks: list[dict], embeddings: l
 def _get_agency(cur, cache: dict[str, str], name: str) -> str | None:
     """Upsert idempotente de uma agência (kind=agencia). Retorna o id (cacheado
     no run). Nome vazio → None."""
+    from radar.core.kg import provenance_writer
     from radar.core.retrieval.embedder import embed_query
 
     canon = _canon_agency(name)
@@ -588,6 +628,11 @@ def _get_agency(cur, cache: dict[str, str], name: str) -> str | None:
     eid = _upsert_entity(
         cur, kind="agencia", source="curadoria", native_id=nid, name=canon,
         description=canon, curated=True, embedding=embed_query(canon),
+        # RT01-T08 (spec §6.4): `name` de agência é sempre derivado da
+        # canonicalização determinística de um token de operador/fonte —
+        # nunca copiado verbatim de um catálogo próprio (agência não tem
+        # registro JSON dedicado).
+        provenance={"name": provenance_writer.build_agencia_name_provenance().model_dump(mode="json")},
     )
     cache[canon] = eid
     return eid
@@ -621,6 +666,7 @@ def _parse_date(v) -> date | None:
 
 
 def _ingest_investidores(conn, stats: dict) -> None:
+    from radar.core.kg import provenance_writer
     from radar.core.retrieval.embedder import embed_query
 
     path = SILVER_DIR / "investidores.json"
@@ -628,16 +674,25 @@ def _ingest_investidores(conn, stats: dict) -> None:
     for r in recs:
         try:
             desc = _ws(r.get("tese") or "")
+            setores = normalize_setores(list(r.get("setores") or []) + list(r.get("tese_themes") or []))
+            tags = normalize_tags(r.get("tese_keywords") or [])
+            status = "ativa" if r.get("fund_status") == "ativo" else "inativa"
+            tmin, tmax = _ticket_from_range(r.get("ticket_range"))
+            # RT01-T08 (spec §3.2/§6.4): curado != validado — campos copiados
+            # verbatim do catálogo começam `unknown`; setores/tags/status/
+            # ticket são `inferred/deterministic` (regra declarada).
+            entity_provenance = provenance_writer.build_investidor_fact_provenance(
+                r, setores=setores, tecnologias_tags=tags, status=status,
+                ticket_min=tmin, ticket_max=tmax,
+            )
             with conn.transaction(), conn.cursor() as cur:
                 _upsert_entity(
                     cur, kind="investidor", source="curadoria", native_id=r["id"],
                     name=r.get("name") or r["id"], description=desc, mecanismo="equity",
-                    setores=normalize_setores(list(r.get("setores") or []) + list(r.get("tese_themes") or [])),
-                    tecnologias_tags=normalize_tags(r.get("tese_keywords") or []),
-                    status="ativa" if r.get("fund_status") == "ativo" else "inativa",
-                    ticket_min=_ticket_from_range(r.get("ticket_range"))[0],
-                    ticket_max=_ticket_from_range(r.get("ticket_range"))[1],
+                    setores=setores, tecnologias_tags=tags,
+                    status=status, ticket_min=tmin, ticket_max=tmax,
                     curated=True, verificado_em=_parse_date(r.get("verificado_em")),
+                    provenance=entity_provenance,
                     metadata={
                         "estagio_alvo": r.get("estagio_alvo") or [],
                         # `setores` da coluna é vocabulário normalizado (1–3
@@ -662,7 +717,8 @@ def _ingest_investidores(conn, stats: dict) -> None:
 
 
 def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
-    from radar.core.kg.constraints_producer import produce_from_text
+    from radar.core.kg import provenance_writer
+    from radar.core.kg.constraints_producer import CONSTRAINTS_MODEL, produce_from_text
     from radar.core.retrieval.embedder import embed_query
 
     path = SILVER_DIR / "programas.json"
@@ -672,19 +728,37 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
             desc = _ws(" ".join(x for x in [r.get("descricao"), r.get("beneficio")] if x))
             tmin, tmax = _ticket_from_range(r.get("ticket_range"))
             constraints, requisitos, exclusoes, publico_alvo = produce_from_text(r.get("elegibilidade") or "")
+            mecanismo = _map_mecanismo(r.get("tipo"))
+            formato = _map_formato(r.get("formato"))
+            setores = normalize_setores(list(r.get("setores") or []) + list(r.get("tese_themes") or []))
+            tags = normalize_tags(r.get("tese_themes") or [])
+            status = "ativa" if r.get("status") == "ativo" else "inativa"
             chunks = _pack_chunks([{"section_path": [r.get("name") or ""], "kind": "paragraph", "text": desc}])
             chunk_embs = _embed_match_chunks(chunks)
+            # RT01-T08 (spec §3.2/§6.4): curado != validado — campos copiados
+            # verbatim começam `unknown`; derivados são `inferred/deterministic`;
+            # `constraints` reusa a call B (`inferred/llm`); `requisitos_texto`
+            # de programa NUNCA resolve evidência (sem blocos silver).
+            entity_provenance = provenance_writer.build_programa_fact_provenance(
+                r, setores=setores, tecnologias_tags=tags, status=status,
+                ticket_min=tmin, ticket_max=tmax, mecanismo=mecanismo, formato=formato,
+                constraints=constraints, requisitos_texto=requisitos,
+                constraints_model=CONSTRAINTS_MODEL,
+            )
+            operado_por_provenance = provenance_writer.build_programa_operado_por_provenance().model_dump(
+                mode="json"
+            )
             with conn.transaction(), conn.cursor() as cur:
                 eid = _upsert_entity(
                     cur, kind="programa", source="curadoria", native_id=r["id"],
                     name=r.get("name") or r["id"], description=desc,
-                    mecanismo=_map_mecanismo(r.get("tipo")), formato=_map_formato(r.get("formato")),
-                    setores=normalize_setores(list(r.get("setores") or []) + list(r.get("tese_themes") or [])),
-                    tecnologias_tags=normalize_tags(r.get("tese_themes") or []),
-                    status="ativa" if r.get("status") == "ativo" else "inativa",
+                    mecanismo=mecanismo, formato=formato,
+                    setores=setores, tecnologias_tags=tags,
+                    status=status,
                     ticket_min=tmin, ticket_max=tmax, constraints=constraints,
                     requisitos_texto=requisitos, curated=True,
                     verificado_em=_parse_date(r.get("verificado_em")),
+                    provenance=entity_provenance,
                     metadata={
                         "operador": r.get("operador"), "tipo": r.get("tipo"),
                         "cadencia": r.get("cadencia"), "beneficio": r.get("beneficio"),
@@ -700,7 +774,7 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
                 for ag in _split_operador(r.get("operador")):
                     aid = _get_agency(cur, agency_cache, ag)
                     if aid:
-                        _upsert_rel(cur, eid, aid, "operado_por")
+                        _upsert_rel(cur, eid, aid, "operado_por", provenance=operado_por_provenance)
                         stats["operado_por"] += 1
             stats["programa"] += 1
         except Exception as e:  # noqa: BLE001
@@ -710,31 +784,47 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
 
 
 def _ingest_icts(conn, agency_cache: dict, stats: dict) -> None:
+    from radar.core.kg import provenance_writer
     from radar.core.retrieval.embedder import embed_query
 
     files = sorted((BRONZE_DIR / "ict_raw").glob("embrapii_*.json"))
+    document = files[-1].name if files else None
     recs = json.loads(files[-1].read_text(encoding="utf-8")) if files else []
     for r in recs:
         try:
             slug = r.get("slug") or schema.slugify(r.get("name") or "")
+            native_id = f"embrapii:{slug}"
             desc = _ws(r.get("about") or "")
             areas = list(r.get("areas_raw") or [])
+            uf = _uf_from_address(r.get("address"))
+            # RT01-T07 (spec §6.4): âncora `document_only` do registro
+            # versionado do scraper — reusada em `name`/`metadata.url`/`uf`/
+            # tags e na aresta `credenciada_por`, sem recomputar o hash.
+            anchor = provenance_writer.build_ict_record_anchor(
+                record=r, document=document, source_url=r.get("url"), native_id=native_id,
+            )
+            provenance = provenance_writer.build_ict_fact_provenance(record=r, anchor=anchor, uf=uf)
             with conn.transaction(), conn.cursor() as cur:
                 eid = _upsert_entity(
-                    cur, kind="ict", source="embrapii", native_id=f"embrapii:{slug}",
+                    cur, kind="ict", source="embrapii", native_id=native_id,
                     name=r.get("name") or slug, description=desc[:_DESC_CHARS],
                     setores=normalize_setores(areas),
                     tecnologias_tags=normalize_tags(areas),
-                    uf=_uf_from_address(r.get("address")), curated=True,
+                    uf=uf, curated=True,
                     metadata={
                         "institution_type": r.get("institution_type"), "contact": r.get("contact") or {},
                         "url": r.get("url"), "address": r.get("address"), "embrapii_kind": r.get("kind"),
                     },
                     embedding=embed_query(desc or r.get("name") or slug),
+                    provenance=provenance,
                 )
                 aid = _get_agency(cur, agency_cache, "EMBRAPII")
                 if aid:
-                    _upsert_rel(cur, eid, aid, "credenciada_por")
+                    edge_provenance = provenance_writer.build_ict_credenciada_por_provenance(anchor)
+                    _upsert_rel(
+                        cur, eid, aid, "credenciada_por",
+                        provenance=edge_provenance.model_dump(mode="json"),
+                    )
                     stats["credenciada_por"] += 1
             stats["ict"] += 1
         except Exception as e:  # noqa: BLE001
@@ -793,7 +883,8 @@ def _ingest_editais(
     skip_unchanged: bool,
     edital_ids: list[str] | None = None,
 ) -> None:
-    from radar.core.kg.constraints_producer import produce_from_text
+    from radar.core.kg import provenance_writer
+    from radar.core.kg.constraints_producer import CONSTRAINTS_MODEL, produce_from_text
     from radar.core.llm.llm_client import make_client
     from radar.core.retrieval.embedder import embed_query
 
@@ -840,6 +931,9 @@ def _ingest_editais(
 
             setores_raw, tags_raw = _tag_edital(thematic_text, client=client, model=model)
             constraints, requisitos, exclusoes, publico_alvo = produce_from_text(elig_text)
+            mecanismo_value = _infer_mecanismo_from_text(md["descricao_bronze"] or thematic_text)
+            setores_norm = normalize_setores(setores_raw)
+            tags_norm = normalize_tags(tags_raw)
 
             chunks = _pack_chunks(thematic)
             chunk_embs = _embed_match_chunks(chunks)
@@ -855,14 +949,39 @@ def _ingest_editais(
             meta["exclusoes"] = exclusoes
             meta["publico_alvo"] = publico_alvo or ([str(bronze_pa)] if bronze_pa else [])
 
+            # RT01-T05+/T06 (spec docs/specs/radar-data-trust-01-provenance.md
+            # §4/§6): dual-write de proveniência para TODAS as fontes de
+            # edital (finep, fapesp, fapesc, web).
+            entity_provenance: dict = {}
+            operado_por_provenance: dict | None = None
+            subordinado_a_provenance: dict | None = None
+            silver_hash_ref = f"md5:{src_hash}" if src_hash else None
+            entity_provenance = provenance_writer.build_edital_fact_provenance(
+                status=md["status"], mecanismo=mecanismo_value,
+                constraints=constraints, requisitos_texto=requisitos, blocks=blocks,
+                source=src, native_id=stem, edital_id=native_id,
+                silver_source_hash=silver_hash_ref, source_url=md["metadata"].get("url"),
+                tagger_model=model, constraints_model=CONSTRAINTS_MODEL,
+            )
+            for c in chunks:
+                coords = provenance_writer.chunk_storage_coords(c, silver_hash_ref)
+                if coords:
+                    c.update(coords)
+            operado_por_provenance = provenance_writer.build_operado_por_provenance().model_dump(
+                mode="json"
+            )
+            subordinado_a_provenance = provenance_writer.build_subordinado_a_provenance().model_dump(
+                mode="json"
+            )
+
             with conn.transaction(), conn.cursor() as cur:
                 eid = _upsert_entity(
                     cur, kind="edital", source=src, native_id=native_id, name=md["name"],
-                    description=description, mecanismo=_infer_mecanismo_from_text(md["descricao_bronze"] or thematic_text),
-                    setores=normalize_setores(setores_raw), tecnologias_tags=normalize_tags(tags_raw),
+                    description=description, mecanismo=mecanismo_value,
+                    setores=setores_norm, tecnologias_tags=tags_norm,
                     status=md["status"], deadline=md["deadline"], uf=md["uf"],
                     constraints=constraints, requisitos_texto=requisitos, curated=False,
-                    metadata=meta, embedding=emb,
+                    metadata=meta, provenance=entity_provenance, embedding=emb,
                 )
                 if chunks:
                     _replace_match_chunks(cur, eid, chunks, chunk_embs)
@@ -871,11 +990,13 @@ def _ingest_editais(
                 if ag:
                     aid = _get_agency(cur, agency_cache, ag)
                     if aid:
-                        _upsert_rel(cur, eid, aid, "operado_por")
+                        _upsert_rel(cur, eid, aid, "operado_por", provenance=operado_por_provenance)
                         stats["operado_por"] += 1
                 pid = _detect_programa(md["name"])
                 if pid and pid in prog_ids:
-                    _upsert_rel(cur, eid, prog_ids[pid], "subordinado_a")
+                    _upsert_rel(
+                        cur, eid, prog_ids[pid], "subordinado_a", provenance=subordinado_a_provenance
+                    )
                     stats["subordinado_a"] += 1
             stats["edital"] += 1
         except Exception as e:  # noqa: BLE001 — 1 edital não derruba o batch

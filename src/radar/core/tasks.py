@@ -37,7 +37,7 @@ from radar.core.infra.db import get_supabase_service  # noqa: E402
 from radar.core.infra.logging_config import setup_logging  # noqa: E402
 from radar.core.infra.notify import send_alert  # noqa: E402
 from radar.core.ingestion.structurer import build_or_load_structured_doc  # noqa: E402
-from radar.core.retrieval.chunker import chunk_from_blocks  # noqa: E402
+from radar.core.retrieval.chunker import CHUNKER_VERSION, chunk_from_blocks  # noqa: E402
 from radar.core.retrieval.embedder import EMBEDDING_MODEL, embed_texts  # noqa: E402
 from radar.core.retrieval.retriever import RETRIEVAL_EMBEDDING_COLUMN  # noqa: E402
 from radar.core.services.content_library import enrich_content  # noqa: E402
@@ -510,8 +510,18 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
         return []
 
     chunks = chunk_from_blocks(blocks)
+    # Lineage (RT01 §6.2): `active` é o Documento Canônico REALMENTE usado
+    # neste chunking (chegou até aqui só se não-vazio — ver early-return
+    # acima). Hash do lote inteiro, não por-documento: mesmo espírito de
+    # `_index_is_current` (conteúdo agregado determina a versão do índice).
+    canonical_content_hash = f"md5:{source_docs.canonical_hash(active)}"
     for global_idx, chunk in enumerate(chunks):
         chunk["chunk_index"] = global_idx
+        chunk["metadata"] = {
+            **(chunk.get("metadata") or {}),
+            "canonical_content_hash": canonical_content_hash,
+            "chunker_version": CHUNKER_VERSION,
+        }
     return chunks
 
 
@@ -619,8 +629,14 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
     # Contextual Retrieval (Anthropic): embeda contexto+corpo; a coluna `text`
     # segue com o corpo original. Desligável por env; gateado pelo content_hash
     # acima (só editais que mudaram re-contextualizam). Ver core/contextual_retrieval.
-    from radar.core.contextual_retrieval import contextualize_chunks
-    embed_inputs = await asyncio.to_thread(contextualize_chunks, chunks)
+    from radar.core import contextual_retrieval
+    # Decisão lida UMA vez: env não muda no meio da task, e contextualize_chunks
+    # reavalia a mesma condição internamente (pure function do env — consistente).
+    context_enabled = contextual_retrieval.is_enabled()
+    context_version = (
+        {"model": contextual_retrieval.effective_model()} if context_enabled else None
+    )
+    embed_inputs = await asyncio.to_thread(contextual_retrieval.contextualize_chunks, chunks)
     embeddings = await asyncio.to_thread(embed_texts, embed_inputs)
 
     if len(embeddings) != len(chunks):
@@ -628,6 +644,12 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
             f"chunk_edital_task: mismatch embeddings ({len(embeddings)}) vs "
             f"chunks ({len(chunks)}) para edital={edital_id}"
         )
+
+    def _row_metadata(c: dict) -> dict:
+        meta = dict(c.get("metadata") or {})
+        if context_version is not None:
+            meta["context_version"] = context_version
+        return meta
 
     rows = [
         {
@@ -640,7 +662,7 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
             RETRIEVAL_EMBEDDING_COLUMN: emb,
             # SEM content_hash aqui — o marcador de conclusão é gravado no
             # chunk 0 só depois do último batch (ver abaixo).
-            "metadata": c.get("metadata") or {},
+            "metadata": _row_metadata(c),
         }
         for c, emb in zip(chunks, embeddings, strict=True)
     ]
@@ -675,7 +697,7 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
     #    entraram; uma run que morreu no meio deixa o índice sem marcador e a
     #    próxima run reindexa (gate `_index_is_current` retorna False).
     marker_meta = {
-        **(chunks[0].get("metadata") or {}),
+        **rows[0]["metadata"],
         "content_hash": content_hash,
         "n_chunks": len(rows),
     }

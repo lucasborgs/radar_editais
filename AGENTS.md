@@ -71,14 +71,16 @@ python -m radar.core.eval gate extraction --publish # decisão bloqueante oficia
 ```
 Suítes: `matching`, `rag`, `writing`, `writing_v2`, `extraction`,
 `opportunity_type`, `triage`, `profile_extractor`, `reranker`, `structurer`,
-`explore` e `relevance_shadow` — todas em `src/radar/core/eval/`,
+`provenance`, `e2e_health`, `explore` e `relevance_shadow` — todas em
+`src/radar/core/eval/`,
 registro em `src/radar/core/eval/registry.py`. Cada uma é uma `Suite`: `task` roda o pipeline real,
 `evaluators` reaproveitam `src/radar/core/*_eval.py`. `run` nunca bloqueia por qualidade;
 `gate` aplica somente critérios aceitos e não permite `--limit`. Runs são locais
 por padrão e sempre gravam `eval_results/*.json`; `--publish` envia a rodada
 completa ao Langfuse. O manifesto do resultado define se runs são comparáveis.
-NÃO criar harnesses novos paralelos — registrar uma suíte aqui. `explore` e
-`relevance_shadow` são **diagnósticas**, sem threshold/gate. Prereqs: `rag`
+NÃO criar harnesses novos paralelos — registrar uma suíte aqui. `provenance`,
+`e2e_health`, `explore` e `relevance_shadow` são **diagnósticas**, sem
+threshold/gate. Prereqs: `rag`
 exige SUPABASE+OPENAI+golden; `writing` exige SUPABASE+LLM+`EVAL_WORKSPACE_ID`.
 Triggers e contratos completos: `docs/specs/evaluation-operations.md`.
 

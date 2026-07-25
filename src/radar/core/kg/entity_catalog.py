@@ -30,6 +30,8 @@ import re
 from datetime import date
 from typing import Any
 
+from radar.core.kg.provenance_read import public_provenance
+
 logger = logging.getLogger(__name__)
 
 
@@ -190,6 +192,7 @@ def _row_to_card(
         "constraints": list(row.get("constraints") or []),
         "document_urls": [],
         "collected_at": row.get("updated_at") or "",
+        "provenance": public_provenance(row.get("provenance")),
     }
 
 
@@ -294,6 +297,7 @@ def _curated_card(row: dict, *, agencies: dict[str, list[str]]) -> dict:
         "official_url": meta.get("site") or meta.get("url") or "",
         "document_urls": [],
         "collected_at": row.get("updated_at") or "",
+        "provenance": public_provenance(row.get("provenance")),
     }
 
 
@@ -454,6 +458,7 @@ def get_investidor(native_id: str) -> dict | None:
         "site": meta.get("site") or "",
         "source_urls": list(meta.get("source_urls") or []),
         "verificado_em": meta.get("verificado_em"),
+        "provenance": public_provenance(row.get("provenance")),
     }
 
 
@@ -478,6 +483,7 @@ def get_programa(native_id: str) -> dict | None:
         "elegibilidade": meta.get("elegibilidade") or "",
         "site": meta.get("site") or "",
         "faq_url": meta.get("faq_url") or "",
+        "provenance": public_provenance(row.get("provenance")),
     }
 
 
