@@ -279,7 +279,7 @@ afirmar cobertura total do ecossistema.
 |---:|---|---|---|---|
 | 00 | [`radar-data-trust-00-relevance-contract.md`](radar-data-trust-00-relevance-contract.md) | relevância de oportunidades e atores, com critérios próprios por `kind` | esta spec-mãe | vigente (RT00-T01 a T07 concluídas) |
 | 01 | [`radar-data-trust-01-provenance.md`](radar-data-trust-01-provenance.md) | evidência estruturada do documento ao consumo | 00 | implementação concluída (RT01-T01 a RT01-T13); pendências encaminhadas às specs 02/04 e ao proprietário — pronta para promoção a vigente, pendente de confirmação da governança |
-| 02 | `radar-data-trust-02-quality-gates.md` | goldens representativos, gates por camada e E2E | 00; contrato de 01 | implementacao concluida; auditoria Codex pendente |
+| 02 | `radar-data-trust-02-quality-gates.md` | goldens representativos, gates por camada e E2E | 00; contrato de 01 | vigente; auditoria Codex aprovada |
 | 03 | `radar-data-trust-03-source-coverage.md` | registro vivo, saúde, frescor e métricas de cobertura | 00 | planejada |
 | 04 | `radar-data-trust-04-source-bundles.md` | documentos de oportunidades, retificações e páginas oficiais de atores versionados | 01; métricas de 02 | planejada |
 | 05 | `radar-data-trust-05-exception-review.md` | revisão humana por conflito/baixa confiança e feedback | 01, 02 e 04 | planejada |

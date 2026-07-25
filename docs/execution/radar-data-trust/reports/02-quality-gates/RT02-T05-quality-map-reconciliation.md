@@ -1,10 +1,10 @@
 # RT02-T05 — Fechamento, mapa de qualidade e reconciliação
 
-**Status:** implementação concluída; auditoria Codex pendente
+**Status:** concluída; auditoria Codex aprovada
 **Plano:** [`RT02-T05-quality-map-reconciliation.md`](../../plans/02-quality-gates/RT02-T05-quality-map-reconciliation.md)
 **Branch/base:** `codex/radar-data-trust-02-completion` / `37f34a74d112b441b91279d058209f127ce1e1d9`
 **Correção auditada:** `641b6e648` (sinais observados e fail-closed antes de callbacks)
-**Auditoria Codex:** pendente
+**Auditoria Codex:** aprovada em 2026-07-24
 
 ## Realizado
 
@@ -14,8 +14,8 @@
   `docs/specs/evaluation-operations.md`.
 - Corrigida a fotografia documental: `writing` é `diagnostic` (agora explícito
   no runtime, sem mudança efetiva); `writing_v2` permanece `experimental`.
-- Atualizados o status da spec 02 e a tabela da spec-mãe para
-  “implementação concluída; auditoria Codex pendente”.
+- Atualizados o status da spec 02 e a tabela da spec-mãe; após a auditoria
+  final, ambos foram marcados como vigentes.
 
 ## Validação local hermética
 

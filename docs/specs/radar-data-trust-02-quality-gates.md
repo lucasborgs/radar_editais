@@ -1,6 +1,6 @@
 # Radar Data Trust 02 — Quality gates e cobertura de avaliação
 
-**Status:** implementação concluída; auditoria Codex pendente · **Data:** 2026-07-24
+**Status:** vigente; implementação concluída e auditoria Codex aprovada · **Data:** 2026-07-24
 **Spec-mãe:** [`radar-data-trust.md`](radar-data-trust.md)
 **Contrato anterior:** [`radar-data-trust-01-provenance.md`](radar-data-trust-01-provenance.md)
 **Ordem:** 02 · **Bloqueia:** alegações de cobertura e promoção de gates

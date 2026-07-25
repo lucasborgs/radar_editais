@@ -6,7 +6,7 @@
 **Commits:** `8b9640a1df01f332492c1879db45f1a0b7562d36`,
 `641b6e648` (correção auditada de sinais observados)
 **Implementador/modelo:** claude-sonnet, worktree isolado
-**Auditoria Codex:** pendente
+**Auditoria Codex:** aprovada em 2026-07-24
 
 ## Realizado
 

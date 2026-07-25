@@ -1,6 +1,6 @@
 # Radar Data Trust 02 — Quality Gates e Cobertura de Avaliacao
 
-**Status da spec:** implementacao concluida; auditoria Codex pendente
+**Status da spec:** concluida; auditoria Codex aprovada em 2026-07-24
 **Branch de integracao:** codex/radar-data-trust-02-completion
 **Base:** 37f34a74d112b441b91279d058209f127ce1e1d9
 
@@ -23,7 +23,8 @@ Commits proprios:
 | 3495c03d9 | docs: fix reports and add RT02-T02 report |
 | 641b6e648 | fix(eval): make RT02 signals fail-closed and observed (correções métricas) |
 | 4a4bf7ca8 | docs: record RT02 audit corrections |
-| 5a5cbc5d2 | fix: add tests/__init__.py + fix 5 gold imports (resolve No module named 'tests') |
+| 5a5cbc5d2 | fix: add tests/__init__.py e tests/helpers/__init__.py |
+| b113ad61b | fix: normalize 5 gold imports to tests.helpers.gold_projection |
 | 5026b1325 | docs: RT02-T05 quality-map reconciliation (fechamento) |
 
 ## Mapa camada -> suite -> classificacao
@@ -96,7 +97,7 @@ e AGENTS.md. Nenhuma suite nova e gate ou candidate.
 
 ## Validação final local (pós-auditoria)
 
-- **Regressão corrigida (5a5cbc5d2):** `src/radar/core/eval/e2e_health.py` importava
+- **Regressão corrigida (5a5cbc5d2 + b113ad61b):** `src/radar/core/eval/e2e_health.py` importava
   `tests.helpers.gold_projection` sem que `tests` fosse pacote (`ModuleNotFoundError`).
   Correção: `tests/__init__.py` + `tests/helpers/__init__.py`. Simultaneamente, 5
   testes gold com `from helpers.gold_projection` reescritos para
@@ -117,6 +118,15 @@ e AGENTS.md. Nenhuma suite nova e gate ou candidate.
 Todas as validações desta task usaram `ENVIRONMENT=test` e fixtures locais:
 sem `.env`, credenciais, rede, LLM, banco remoto, publicação Langfuse ou
 produção.
+
+## Auditoria Codex
+
+**Veredito:** aprovada em 2026-07-24.
+
+A única falha da suíte completa foi reproduzida independentemente na base
+`37f34a74d` e não foi causada pela RT02. As correções de auditoria tornaram
+as métricas observadas e fail-closed, e a proteção de ambiente é executada
+antes de qualquer callback da suíte.
 
 ## Artefatos
 

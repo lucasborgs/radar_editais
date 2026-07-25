@@ -5,7 +5,7 @@
 **Branch/commit-base:** `codex/radar-data-trust-02-completion` / base `37f34a74d`
 **Commits:** `d3cbed372bc8691149e09650f5c83a5f931ebbc5`
 **Implementador/modelo:** claude-sonnet, worktree isolado
-**Auditoria Codex:** pendente
+**Auditoria Codex:** aprovada em 2026-07-24
 
 ## Realizado
 
@@ -160,7 +160,7 @@ fixture existente tocado.
 
 ## Auditoria Codex
 
-**Veredito:** pendente
+**Veredito:** aprovado
 
 - Enumeração dos 6 casos confere 1:1 com spec §7.1 e o plano
   RT02-T01-provenance-golden.md; `conflicting`/retificação conscientemente

@@ -6,7 +6,7 @@
 **Commits:** `ba136c695` (`feat(data-trust): e2e_health diagnostic eval signal`),
 `641b6e648` (sinais E2E de state/producer observados)
 **Implementador/modelo:** claude-sonnet, worktree isolado
-**Auditoria Codex:** pendente
+**Auditoria Codex:** aprovada em 2026-07-24
 
 ## Realizado
 
@@ -148,4 +148,4 @@ arquivo de T01/T03 (goldens de proveniência, `triage`/`structurer`/etc.,
 
 ## Auditoria Codex
 
-**Veredito:** pendente
+**Veredito:** aprovado
