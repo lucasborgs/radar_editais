@@ -280,7 +280,7 @@ afirmar cobertura total do ecossistema.
 | 00 | [`radar-data-trust-00-relevance-contract.md`](radar-data-trust-00-relevance-contract.md) | relevância de oportunidades e atores, com critérios próprios por `kind` | esta spec-mãe | vigente (RT00-T01 a T07 concluídas) |
 | 01 | [`radar-data-trust-01-provenance.md`](radar-data-trust-01-provenance.md) | evidência estruturada do documento ao consumo | 00 | vigente (RT01-T01 a RT01-T13 concluídas e auditadas) |
 | 02 | `radar-data-trust-02-quality-gates.md` | goldens representativos, gates por camada e E2E | 00; contrato de 01 | vigente; auditoria Codex aprovada |
-| 03 | [`radar-data-trust-03-source-coverage.md`](radar-data-trust-03-source-coverage.md) | descoberta aberta multicanal, saúde, atribuição e métricas de cobertura | 00 e sinais de 02 | proposta revisada para aprovação |
+| 03 | [`radar-data-trust-03-source-coverage.md`](radar-data-trust-03-source-coverage.md) | descoberta aberta multicanal, saúde, atribuição e métricas de cobertura | 00 e sinais de 02 | aprovada para implementação |
 | 04 | `radar-data-trust-04-source-bundles.md` | documentos de oportunidades, retificações e páginas oficiais de atores versionados | 01; métricas de 02 | planejada |
 | 05 | `radar-data-trust-05-exception-review.md` | revisão humana por conflito/baixa confiança e feedback | 01, 02 e 04 | planejada |
 | 06 | `radar-data-trust-06-adaptive-extraction.md` | cascata texto/layout/OCR/visão dirigida por falhas medidas | 02 e 04; sinais de 05 | planejada |

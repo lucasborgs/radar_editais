@@ -1,6 +1,6 @@
 # Radar Data Trust 03 — Cobertura da Descoberta e saúde dos canais
 
-**Status:** proposta revisada para aprovação · **Data:** 2026-07-26
+**Status:** aprovada para implementação · **Data:** 2026-07-26
 **Spec-mãe:** [`radar-data-trust.md`](radar-data-trust.md)
 **Contratos anteriores:** [`radar-data-trust-00-relevance-contract.md`](radar-data-trust-00-relevance-contract.md), [`radar-data-trust-02-quality-gates.md`](radar-data-trust-02-quality-gates.md)
 **Ordem:** 03 · **Impacto:** alto e incremental; aquisição e operação da Descoberta
