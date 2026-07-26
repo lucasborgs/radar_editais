@@ -35,7 +35,6 @@ class ChannelEditorialFunnel:
     approved: int = 0
     rejected: int = 0
     pending: int = 0
-    unassigned: int = 0
     approval_rate: float | None = None
     avg_review_hours: float | None = None
 
@@ -48,16 +47,6 @@ class FamilyEditorialFunnel:
     pending: int = 0
     approval_rate: float | None = None
     avg_review_hours: float | None = None
-
-
-_HEALTH_STATES = (
-    "disabled",
-    "failing",
-    "degraded",
-    "stale",
-    "healthy",
-    "unknown",
-)
 
 
 @dataclass
@@ -95,13 +84,17 @@ def _parse_timestamp(val: Any) -> datetime | None:
     if val is None:
         return None
     if isinstance(val, datetime):
-        return val
-    if isinstance(val, str):
+        timestamp = val
+    elif isinstance(val, str):
         try:
-            return datetime.fromisoformat(val)
+            timestamp = datetime.fromisoformat(val)
         except (ValueError, TypeError):
             return None
-    return None
+    else:
+        return None
+    if timestamp.tzinfo is None:
+        return timestamp.replace(tzinfo=timezone.utc)
+    return timestamp.astimezone(timezone.utc)
 
 
 def _safe_int(val: Any) -> int | None:
@@ -120,12 +113,11 @@ def _safe_int(val: Any) -> int | None:
 
 
 def compute_channel_run_metrics(
-    channel_key: str,
     runs: list[dict[str, Any]],
 ) -> ChannelRunMetrics:
     """Agrega runs de um canal: última tentativa/sucesso e totais.
 
-    ``runs`` deve vir ordenada por ``started_at`` descendente.
+    As datas retornadas são normalizadas para UTC.
     """
     last_attempt: datetime | None = None
     last_success: datetime | None = None
@@ -138,13 +130,13 @@ def compute_channel_run_metrics(
 
     for r in runs:
         started = _parse_timestamp(r.get("started_at"))
-        if started is not None and last_attempt is None:
+        if started is not None and (last_attempt is None or started > last_attempt):
             last_attempt = started
 
         completed = _parse_timestamp(r.get("completed_at"))
         status = r.get("status", "")
-        if completed is not None and status in ("succeeded", "partial"):
-            if last_success is None:
+        if completed is not None and status == "succeeded":
+            if last_success is None or completed > last_success:
                 last_success = completed
 
         obs = _safe_int(r.get("records_observed"))
@@ -184,7 +176,6 @@ def compute_channel_run_metrics(
 def compute_channel_editorial_funnel(
     channel_key: str,
     discovered: list[dict[str, Any]],
-    ref_dt: datetime,
 ) -> ChannelEditorialFunnel:
     """Agrega decisões editoriais de ``discovered_opportunities`` por canal."""
     funnel = ChannelEditorialFunnel(source_key=channel_key)
@@ -209,23 +200,6 @@ def compute_channel_editorial_funnel(
                 if delta >= 0:
                     total_review_hours += delta
                     review_count += 1
-        elif ch is None and row.get("_bucket_unassigned"):
-            status = row.get("status", "")
-            if status == "promoted":
-                funnel.approved += 1
-            elif status == "rejected":
-                funnel.rejected += 1
-            else:
-                funnel.pending += 1
-
-            reviewed_at = _parse_timestamp(row.get("reviewed_at"))
-            created_at = _parse_timestamp(row.get("created_at"))
-            if reviewed_at is not None and created_at is not None:
-                delta = (reviewed_at - created_at).total_seconds() / 3600
-                if delta >= 0:
-                    total_review_hours += delta
-                    review_count += 1
-
     funnel.approval_rate = _compute_approval_rate(funnel.approved, funnel.rejected)
     funnel.avg_review_hours = (total_review_hours / review_count) if review_count > 0 else None
     return funnel
@@ -234,7 +208,6 @@ def compute_channel_editorial_funnel(
 def compute_channel_editorial_funnels(
     discovered: list[dict[str, Any]],
     channel_keys: list[str],
-    ref_dt: datetime,
 ) -> dict[str, ChannelEditorialFunnel]:
     """Agrega decisões editoriais por canal, incluindo bucket não atribuído."""
     unassigned: list[dict[str, Any]] = []
@@ -249,7 +222,7 @@ def compute_channel_editorial_funnels(
 
     result: dict[str, ChannelEditorialFunnel] = {}
     for k in channel_keys:
-        result[k] = compute_channel_editorial_funnel(k, channel_rows[k], ref_dt)
+        result[k] = compute_channel_editorial_funnel(k, channel_rows[k])
 
     unassigned_funnel = ChannelEditorialFunnel(source_key="__unassigned__")
     for row in unassigned:
@@ -263,7 +236,7 @@ def compute_channel_editorial_funnels(
     unassigned_funnel.approval_rate = _compute_approval_rate(
         unassigned_funnel.approved, unassigned_funnel.rejected
     )
-    unassigned_funnel.avg_review_hours = _compute_avg_review_hours(unassigned, ref_dt)
+    unassigned_funnel.avg_review_hours = _compute_avg_review_hours(unassigned)
     result["__unassigned__"] = unassigned_funnel
 
     return result
@@ -272,15 +245,17 @@ def compute_channel_editorial_funnels(
 def compute_family_editorial_funnels(
     discovered: list[dict[str, Any]],
     family_keys: list[str],
-    ref_dt: datetime,
 ) -> dict[str, FamilyEditorialFunnel]:
     """Agrega decisões editoriais por família de query."""
     family_rows: dict[str, list[dict[str, Any]]] = {k: [] for k in family_keys}
+    unassigned: list[dict[str, Any]] = []
 
     for row in discovered:
         fam = row.get("query_family")
         if fam is not None and fam in family_rows:
             family_rows[fam].append(row)
+        elif fam is None:
+            unassigned.append(row)
 
     result: dict[str, FamilyEditorialFunnel] = {}
     for k in family_keys:
@@ -306,6 +281,20 @@ def compute_family_editorial_funnels(
         funnel.approval_rate = _compute_approval_rate(funnel.approved, funnel.rejected)
         funnel.avg_review_hours = (total_review_hours / review_count) if review_count > 0 else None
         result[k] = funnel
+    unassigned_funnel = FamilyEditorialFunnel(family_key="__unassigned__")
+    for row in unassigned:
+        status = row.get("status", "")
+        if status == "promoted":
+            unassigned_funnel.approved += 1
+        elif status == "rejected":
+            unassigned_funnel.rejected += 1
+        else:
+            unassigned_funnel.pending += 1
+    unassigned_funnel.approval_rate = _compute_approval_rate(
+        unassigned_funnel.approved, unassigned_funnel.rejected
+    )
+    unassigned_funnel.avg_review_hours = _compute_avg_review_hours(unassigned)
+    result["__unassigned__"] = unassigned_funnel
     return result
 
 
@@ -316,9 +305,7 @@ def _compute_approval_rate(approved: int, rejected: int) -> float | None:
     return approved / denominator
 
 
-def _compute_avg_review_hours(
-    rows: list[dict[str, Any]], ref_dt: datetime
-) -> float | None:
+def _compute_avg_review_hours(rows: list[dict[str, Any]]) -> float | None:
     total = 0.0
     count = 0
     for row in rows:
@@ -368,12 +355,19 @@ def derive_channel_health(
     if not _is_channel_enabled(channel, env):
         return "disabled"
 
+    reference = _parse_timestamp(ref_dt)
+    if reference is None:
+        return "unknown"
     interval_h = channel.get("expected_interval_hours", 24)
 
     if not runs:
         return "unknown"
 
-    last_run = runs[0]
+    last_run = max(
+        runs,
+        key=lambda run: _parse_timestamp(run.get("started_at"))
+        or datetime.min.replace(tzinfo=timezone.utc),
+    )
     status = last_run.get("status", "")
 
     if status == "failed":
@@ -382,27 +376,25 @@ def derive_channel_health(
     if status == "partial":
         return "degraded"
 
-    latest_healthy: dict[str, Any] | None = None
+    latest_healthy: datetime | None = None
     for r in runs:
-        s = r.get("status", "")
-        if s in ("succeeded", "partial") and _has_observable_result(r):
+        if r.get("status", "") == "succeeded" and _has_observable_result(r):
             completed = _parse_timestamp(r.get("completed_at"))
-            if completed is not None:
-                latest_healthy = r
-                break
+            if completed is not None and (
+                latest_healthy is None or completed > latest_healthy
+            ):
+                latest_healthy = completed
 
     if latest_healthy is not None:
-        completed = _parse_timestamp(latest_healthy["completed_at"])
-        if completed is not None:
-            elapsed = (ref_dt - completed).total_seconds() / 3600
-            if elapsed >= 2 * interval_h:
-                return "stale"
+        elapsed = (reference - latest_healthy).total_seconds() / 3600
+        if elapsed >= 2 * interval_h:
+            return "stale"
 
-    if status in ("succeeded", "partial") and _has_observable_result(last_run):
-        started = _parse_timestamp(last_run.get("started_at"))
-        if started is not None:
-            elapsed = (ref_dt - started).total_seconds() / 3600
-            if elapsed <= interval_h:
+    if status == "succeeded" and _has_observable_result(last_run):
+        completed = _parse_timestamp(last_run.get("completed_at"))
+        if completed is not None:
+            elapsed = (reference - completed).total_seconds() / 3600
+            if 0 <= elapsed <= interval_h:
                 return "healthy"
 
     return "unknown"
@@ -436,6 +428,9 @@ def detect_gaps(
     env: dict[str, str] | None = None,
 ) -> list[CoverageGap]:
     """Detecta sinais explícitos de lacuna."""
+    reference = _parse_timestamp(ref_dt)
+    if reference is None:
+        return []
     gaps: list[CoverageGap] = []
 
     for ch in channels:
@@ -448,7 +443,11 @@ def detect_gaps(
             continue
 
         if runs:
-            last_run = runs[0]
+            last_run = max(
+                runs,
+                key=lambda run: _parse_timestamp(run.get("started_at"))
+                or datetime.min.replace(tzinfo=timezone.utc),
+            )
             status = last_run.get("status", "")
             if status in ("succeeded", "partial") and not _has_observable_result(last_run):
                 gaps.append(CoverageGap(source_key=key, signal="ambiguous_run"))
@@ -456,7 +455,7 @@ def detect_gaps(
             interval_h = ch.get("expected_interval_hours", 24)
             completed = _parse_timestamp(last_run.get("completed_at"))
             if completed is not None and enabled:
-                elapsed = (ref_dt - completed).total_seconds() / 3600
+                elapsed = (reference - completed).total_seconds() / 3600
                 if elapsed > interval_h:
                     gaps.append(CoverageGap(source_key=key, signal="delayed"))
 
@@ -502,19 +501,22 @@ def compute_emerging_domains(
     - status ``promoted``
     - ``reviewed_at`` nos últimos ``window_days`` dias
     """
-    cutoff = ref_dt - timedelta(days=window_days)
+    reference = _parse_timestamp(ref_dt)
+    if reference is None:
+        return []
+    cutoff = reference - timedelta(days=window_days)
     domain_approvals: dict[str, list[datetime]] = {}
 
     for row in discovered:
-        domain = row.get("origin_domain")
-        if not domain:
+        domain = _normalize_hostname(row.get("origin_domain"))
+        if domain is None:
             continue
         if row.get("status") != "promoted":
             continue
         reviewed_at = _parse_timestamp(row.get("reviewed_at"))
         if reviewed_at is None:
             continue
-        if reviewed_at < cutoff:
+        if reviewed_at < cutoff or reviewed_at > reference:
             continue
 
         if domain not in domain_approvals:
@@ -537,6 +539,23 @@ def compute_emerging_domains(
 
     result.sort(key=lambda d: d.approval_count, reverse=True)
     return result
+
+
+def _normalize_hostname(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    hostname = value.lower().rstrip(".")
+    if not hostname or len(hostname) > 253:
+        return None
+    labels = hostname.split(".")
+    for label in labels:
+        if not label or len(label) > 63:
+            return None
+        if not label[0].isalnum() or not label[-1].isalnum():
+            return None
+        if any(not (char.isascii() and (char.isalnum() or char == "-")) for char in label):
+            return None
+    return hostname
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -564,6 +583,10 @@ def compute_source_coverage(
     """
     if ref_dt is None:
         ref_dt = datetime.now(timezone.utc)
+    else:
+        ref_dt = _parse_timestamp(ref_dt)
+        if ref_dt is None:
+            raise ValueError("ref_dt must be a valid datetime")
 
     # Agrupa runs por source_key
     runs_by_channel: dict[str, list[dict[str, Any]]] = {}
@@ -576,7 +599,8 @@ def compute_source_coverage(
     # Ordena runs por started_at desc
     for sk in runs_by_channel:
         runs_by_channel[sk].sort(
-            key=lambda x: _parse_timestamp(x.get("started_at")) or datetime.min,
+            key=lambda x: _parse_timestamp(x.get("started_at"))
+            or datetime.min.replace(tzinfo=timezone.utc),
             reverse=True,
         )
 
@@ -586,16 +610,16 @@ def compute_source_coverage(
     for ch in channels:
         sk = ch["source_key"]
         report.channel_runs[sk] = compute_channel_run_metrics(
-            sk, runs_by_channel.get(sk, [])
+            runs_by_channel.get(sk, [])
         )
 
     # 2. Editorial funnel
     all_channel_keys = [ch["source_key"] for ch in channels]
     report.channel_funnel = compute_channel_editorial_funnels(
-        discovered, all_channel_keys, ref_dt
+        discovered, all_channel_keys
     )
     report.family_funnel = compute_family_editorial_funnels(
-        discovered, family_keys, ref_dt
+        discovered, family_keys
     )
 
     # 3. Health

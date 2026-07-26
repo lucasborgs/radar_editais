@@ -11,14 +11,14 @@ emergentes. Nenhuma escrita no staging, fonte/scraper automático, eval ou LLM.
 | Arquivo | Função |
 |---|---|
 | `src/radar/core/services/source_coverage_metrics.py` | Serviço read-only com funções puras que recebem dados + data de referência |
-| `tests/unit/test_source_coverage_metrics.py` | 42 testes direcionados |
+| `tests/unit/test_source_coverage_metrics.py` | 49 testes direcionados |
 
 ## Comportamento implementado
 
 ### 1. Runs e rendimento (`compute_channel_run_metrics`)
 
 - última tentativa (mais recente `started_at`)
-- último sucesso técnico (mais recente `completed_at` de `succeeded`/`partial`)
+- último sucesso técnico (mais recente `completed_at` de `succeeded`)
 - totais acumulados de `records_observed`, `records_emitted`, `records_staged`
 - `yield_rate = total_staged / total_emitted` — `None` quando denominador é
   zero ou ausente (nunca 0 fabricado)
@@ -27,7 +27,8 @@ emergentes. Nenhuma escrita no staging, fonte/scraper automático, eval ou LLM.
 
 - aprovados (`promoted`), rejeitados (`rejected`), pendentes (`pending`) por
   canal e por família de query
-- bucket `__unassigned__` para linhas legadas (`discovery_channel IS NULL`)
+- bucket `__unassigned__` para linhas legadas (`discovery_channel IS NULL` ou
+  `query_family IS NULL`)
 - `approval_rate` somente com denominador válido (`approved + rejected > 0`)
 - `avg_review_hours` somente quando ambos `created_at` e `reviewed_at` existem
 
@@ -38,9 +39,10 @@ Precedência exata da spec: `disabled → failing → degraded → stale → hea
 - `disabled`: flag gated desligada
 - `failing`: última run `failed`
 - `degraded`: última run `partial`
-- `stale`: último sucesso saudável > 2× `expected_interval_hours` atrás
-- `healthy`: última run `succeeded`/`partial` com resultado observável dentro
-  de 1× intervalo
+- `stale`: última execução `succeeded` com resultado observável há pelo menos
+  2× `expected_interval_hours`
+- `healthy`: última run `succeeded` com resultado observável, medida por
+  `completed_at`, dentro de 1× intervalo
 - `unknown`: nunca executado, zero ambíguo ou fora de 1× intervalo
 
 `_has_observable_result`: `records_observed > 0` ou `records_staged > 0`.
@@ -63,6 +65,8 @@ Nenhum sinal afirma ausência de oportunidades ou baixa cobertura da web.
 
 - exclusivamente `origin_domain` válido, `status = promoted`, `reviewed_at`
   nos últimos 90 dias
+- hostname normalizado em lowercase, sem trailing dot; URLs, paths, userinfo,
+  ports e aprovações futuras são ignorados
 - `candidate_for_dedicated_monitoring = True` quando ≥ 2 aprovações do mesmo
   domínio no período
 - expõe domínio, contagem, `first_approved_at`, `last_approved_at`
@@ -73,7 +77,7 @@ Nenhum sinal afirma ausência de oportunidades ou baixa cobertura da web.
 
 Coordena as 5 etapas acima em um `SourceCoverageReport` único.
 
-## Testes direcionados — 42 passed
+## Testes direcionados — 49 passed
 
 | Teste | O que cobre |
 |---|---|
@@ -83,10 +87,12 @@ Coordena as 5 etapas acima em um `SourceCoverageReport` único.
 | `TestRunMetricsDenominator::test_empty_runs_returns_nulls` | sem runs → tudo None |
 | `TestRunMetricsDenominator::test_aggregates_multiple_runs` | totais acumulados |
 | `TestRunMetricsDenominator::test_last_attempt_and_success_from_latest` | temporais corretos |
+| `TestRunMetricsDenominator::test_partial_never_becomes_last_success` | `partial` não vira sucesso |
 | `TestEditorialFunnel::test_by_channel` | aprovação/rejeição por canal |
 | `TestEditorialFunnel::test_unassigned_bucket` | linhas legadas no bucket não atribuído |
 | `TestEditorialFunnel::test_no_denominator_returns_none_rate` | approval_rate None sem revisão |
 | `TestFamilyFunnel::test_by_family` | aprovação/rejeição por família |
+| `TestFamilyFunnel::test_unassigned_bucket_includes_legacy_rows` | legado sem família |
 | `TestHealthPrecedence::test_disabled` | flag off → disabled |
 | `TestHealthPrecedence::test_disabled_overrides_failing` | disabled precede failing |
 | `TestHealthPrecedence::test_failing` | última run failed → failing |
@@ -94,6 +100,8 @@ Coordena as 5 etapas acima em um `SourceCoverageReport` único.
 | `TestHealthPrecedence::test_stale_two_windows` | > 2× intervalo → stale |
 | `TestHealthPrecedence::test_not_stale_within_two_windows` | entre 1-2× → unknown |
 | `TestHealthPrecedence::test_healthy` | saudável recente → healthy |
+| `TestHealthPrecedence::test_healthy_uses_completed_at_not_started_at` | frescor por conclusão |
+| `TestHealthPrecedence::test_partial_is_not_a_healthy_history_entry` | `partial` fora do histórico saudável |
 | `TestHealthPrecedence::test_unknown_no_runs` | sem runs → unknown |
 | `TestHealthPrecedence::test_ambiguous_zero` | sucesso com 0 registros → unknown |
 | `TestHealthPrecedence::test_ambiguous_zero_staged_with_observed` | observed > 0 → healthy |
@@ -115,18 +123,22 @@ Coordena as 5 etapas acima em um `SourceCoverageReport` único.
 | `TestEmergingDomains::test_outside_90_days_window` | fora da janela → ignorado |
 | `TestEmergingDomains::test_mixed_domains` | múltiplos domínios |
 | `TestEmergingDomains::test_boundary_90_days_exactly` | exatamente 90 dias → incluído |
+| `TestEmergingDomains::test_domain_normalization_and_invalid_values` | hostname normalizado e inválidos excluídos |
+| `TestEmergingDomains::test_future_approval_is_not_counted` | aprovação futura excluída |
 | `TestEmergingDomains::test_no_side_effects` | sem efeitos colaterais |
 | `TestSourceCoverageReport::test_full_report_no_side_effects` | integração completa |
 | `TestSourceCoverageReport::test_empty_report` | todos os canais com valores default |
+| `TestSourceCoverageReport::test_mixed_naive_and_utc_timestamps_are_normalized` | UTC consistente para ordenação e saúde |
 | `TestSourceCoverageReport::test_input_runs_unchanged` | side-effect free |
 
 ## Validação
 
-- `pytest tests/unit/test_source_coverage_metrics.py`: **42 passed**
-- Suíte completa (excluindo T05): **1523 passed, 2 skipped** (inalterado)
-- Suíte completa (com T05): **1565 passed, 2 skipped**
-- `ruff check src/radar/core/services/source_coverage_metrics.py tests/unit/test_source_coverage_metrics.py`: **All checks passed**
+- `PYTHONPATH=src ENVIRONMENT=test pytest -q tests/unit/test_source_coverage_metrics.py`: **49 passed**
+- `PYTHONPATH=src ENVIRONMENT=test ruff check src/radar/core/services/source_coverage_metrics.py tests/unit/test_source_coverage_metrics.py`: **All checks passed**
 - `git diff --check`: **sem whitespace errors**
+
+Não foi usada baseline de suíte completa neste ciclo corretivo; a validação
+integral permanece responsabilidade da auditoria final.
 
 ## Ambiente
 

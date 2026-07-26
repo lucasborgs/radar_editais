@@ -110,7 +110,7 @@ class TestRunMetricsDenominator:
                  completed_at="2026-07-26T10:30:00+00:00",
                  records_observed=20, records_emitted=10, records_staged=5),
         ]
-        m = compute_channel_run_metrics("finep", runs)
+        m = compute_channel_run_metrics(runs)
         assert m.last_attempt == _dt("2026-07-26T10:00:00+00:00")
         assert m.last_success == _dt("2026-07-26T10:30:00+00:00")
         assert m.total_records_observed == 20
@@ -124,7 +124,7 @@ class TestRunMetricsDenominator:
                  completed_at="2026-07-26T10:30:00+00:00",
                  records_observed=20, records_emitted=None, records_staged=5),
         ]
-        m = compute_channel_run_metrics("finep", runs)
+        m = compute_channel_run_metrics(runs)
         assert m.total_records_emitted is None
         assert m.yield_rate is None
 
@@ -134,12 +134,12 @@ class TestRunMetricsDenominator:
                  completed_at="2026-07-26T10:30:00+00:00",
                  records_observed=0, records_emitted=0, records_staged=0),
         ]
-        m = compute_channel_run_metrics("finep", runs)
+        m = compute_channel_run_metrics(runs)
         assert m.total_records_emitted == 0
         assert m.yield_rate is None
 
     def test_empty_runs_returns_nulls(self):
-        m = compute_channel_run_metrics("finep", [])
+        m = compute_channel_run_metrics([])
         assert m.last_attempt is None
         assert m.last_success is None
         assert m.total_records_observed is None
@@ -156,7 +156,7 @@ class TestRunMetricsDenominator:
                  completed_at="2026-07-25T10:30:00+00:00",
                  records_observed=10, records_emitted=8, records_staged=3),
         ]
-        m = compute_channel_run_metrics("finep", runs)
+        m = compute_channel_run_metrics(runs)
         assert m.total_records_observed == 30
         assert m.total_records_emitted == 18
         assert m.total_records_staged == 8
@@ -171,9 +171,20 @@ class TestRunMetricsDenominator:
             _run("finep", "succeeded", "2026-07-24T10:00:00+00:00",
                  completed_at="2026-07-24T10:30:00+00:00"),
         ]
-        m = compute_channel_run_metrics("finep", runs)
+        m = compute_channel_run_metrics(runs)
         assert m.last_attempt == _dt("2026-07-26T10:00:00+00:00")
         assert m.last_success == _dt("2026-07-26T10:30:00+00:00")
+
+    def test_partial_never_becomes_last_success(self):
+        runs = [
+            _run("finep", "partial", "2026-07-26T11:00:00+00:00",
+                 completed_at="2026-07-26T11:30:00+00:00", records_observed=5),
+            _run("finep", "succeeded", "2026-07-26T10:00:00+00:00",
+                 completed_at="2026-07-26T10:30:00+00:00", records_observed=5),
+        ]
+        assert compute_channel_run_metrics(runs).last_success == _dt(
+            "2026-07-26T10:30:00+00:00"
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -197,7 +208,7 @@ class TestEditorialFunnel:
             _disc(status="promoted", discovery_channel="dou"),
         ]
         result = compute_channel_editorial_funnels(
-            discovered, ["open_search", "dou", "finep"], self.REF
+            discovered, ["open_search", "dou", "finep"]
         )
         os_funnel = result["open_search"]
         assert os_funnel.approved == 1
@@ -227,7 +238,7 @@ class TestEditorialFunnel:
             _disc(status="promoted", discovery_channel="open_search"),
         ]
         result = compute_channel_editorial_funnels(
-            discovered, ["open_search"], self.REF
+            discovered, ["open_search"]
         )
         unassigned = result["__unassigned__"]
         assert unassigned.approved == 1
@@ -242,7 +253,7 @@ class TestEditorialFunnel:
             _disc(status="pending", discovery_channel="open_search"),
         ]
         result = compute_channel_editorial_funnels(
-            discovered, ["open_search"], self.REF
+            discovered, ["open_search"]
         )
         assert result["open_search"].approval_rate is None
 
@@ -263,7 +274,6 @@ class TestFamilyFunnel:
         result = compute_family_editorial_funnels(
             discovered,
             ["state_innovation_funding", "corporate_open_innovation"],
-            self.REF,
         )
         sif = result["state_innovation_funding"]
         assert sif.approved == 1
@@ -275,6 +285,21 @@ class TestFamilyFunnel:
         assert coi.approved == 1
         assert coi.rejected == 0
         assert coi.approval_rate == 1.0
+
+    def test_unassigned_bucket_includes_legacy_rows(self):
+        discovered = [
+            _disc(status="promoted", query_family=None,
+                  created_at="2026-07-25T10:00:00+00:00",
+                  reviewed_at="2026-07-25T12:00:00+00:00"),
+            _disc(status="rejected", query_family=None),
+            _disc(status="pending", query_family=None),
+        ]
+        result = compute_family_editorial_funnels(discovered, _FAMILY_KEYS)
+
+        unassigned = result["__unassigned__"]
+        assert (unassigned.approved, unassigned.rejected, unassigned.pending) == (1, 1, 1)
+        assert unassigned.approval_rate == 0.5
+        assert unassigned.avg_review_hours == 2.0
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -359,6 +384,32 @@ class TestHealthPrecedence:
             self.REF,
         )
         assert healths["finep"] == "healthy"
+
+    def test_healthy_uses_completed_at_not_started_at(self):
+        healths = derive_channel_healths(
+            [_CHANNELS[0]],
+            {"finep": [_run("finep", "succeeded", "2026-07-24T10:00:00+00:00",
+                             completed_at="2026-07-26T10:30:00+00:00",
+                             records_observed=5)]},
+            self.REF,
+        )
+        assert healths["finep"] == "healthy"
+
+    def test_partial_is_not_a_healthy_history_entry(self):
+        old_success = self.REF - timedelta(hours=72)
+        healths = derive_channel_healths(
+            [_CHANNELS[0]],
+            {"finep": [
+                _run("finep", "succeeded", "2026-07-26T10:00:00+00:00",
+                     completed_at="2026-07-26T10:30:00+00:00", records_observed=0),
+                _run("finep", "partial", "2026-07-25T10:00:00+00:00",
+                     completed_at="2026-07-25T10:30:00+00:00", records_observed=5),
+                _run("finep", "succeeded", (old_success - timedelta(hours=1)).isoformat(),
+                     completed_at=old_success.isoformat(), records_observed=5),
+            ]},
+            self.REF,
+        )
+        assert healths["finep"] == "stale"
 
     def test_unknown_no_runs(self):
         healths = derive_channel_healths(
@@ -627,6 +678,34 @@ class TestEmergingDomains:
         assert len(domains) == 1
         assert domains[0].candidate_for_dedicated_monitoring is True
 
+    def test_domain_normalization_and_invalid_values(self):
+        discovered = [
+            _disc(status="promoted", origin_domain="EXEMPLO.GOV.BR.",
+                  reviewed_at="2026-07-20T10:00:00+00:00"),
+            _disc(status="promoted", origin_domain="exemplo.gov.br",
+                  reviewed_at="2026-07-21T10:00:00+00:00"),
+            *[
+                _disc(status="promoted", origin_domain=value,
+                      reviewed_at="2026-07-21T10:00:00+00:00")
+                for value in [
+                    "https://url.gov.br", "path.gov.br/edital",
+                    "user@host.gov.br", "host.gov.br:443",
+                ]
+            ],
+        ]
+        domains = compute_emerging_domains(discovered, self.REF)
+
+        assert [(domain.domain, domain.approval_count) for domain in domains] == [
+            ("exemplo.gov.br", 2)
+        ]
+
+    def test_future_approval_is_not_counted(self):
+        discovered = [
+            _disc(status="promoted", origin_domain="futuro.gov.br",
+                  reviewed_at="2026-07-27T10:00:00+00:00"),
+        ]
+        assert compute_emerging_domains(discovered, self.REF) == []
+
     def test_no_side_effects(self):
         """Testa que a função não modifica os dados de entrada."""
         discovered = [
@@ -719,6 +798,19 @@ class TestSourceCoverageReport:
             assert sk in report.channel_funnel
             assert sk in report.channel_health
         assert len(report.emerging_domains) == 0
+
+    def test_mixed_naive_and_utc_timestamps_are_normalized(self):
+        runs = [
+            _run("finep", "succeeded", "2026-07-26T10:00:00",
+                 completed_at="2026-07-26T10:30:00", records_observed=5),
+            _run("finep", "failed", "2026-07-25T10:00:00+00:00"),
+        ]
+        report = compute_source_coverage(runs, [], [_CHANNELS[0]], [], self.REF)
+
+        assert report.channel_runs["finep"].last_attempt == _dt(
+            "2026-07-26T10:00:00+00:00"
+        )
+        assert report.channel_health["finep"] == "healthy"
 
     def test_input_runs_unchanged(self):
         """Garante side-effect free: inputs não são modificados."""
