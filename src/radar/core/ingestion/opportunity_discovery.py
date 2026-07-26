@@ -25,7 +25,10 @@ import json
 import logging
 import os
 import re
+import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
 
 from radar.core import web_search as websearch
 from radar.core.config import BRONZE_DIR
@@ -49,6 +52,61 @@ _TEXTO_CRU_CAP = 60_000
 # `reject_cache_ttl_days` em docs/domain/sources/_discovery.md. Após o TTL, uma URL antes
 # rejeitada volta a ser triada (o conteúdo da página pode ter mudado).
 _DEFAULT_REJECT_TTL_DAYS = 30
+
+
+# ---------------------------------------------------------------------------
+# Channel attribution and reporting (RT03-T04)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _ChannelReport:
+    channel: str
+    returned: int = 0
+    after_dedup: int = 0
+    query_failures: int = 0
+    hubs_expanded: int = 0
+    hub_children_found: int = 0
+    triages_executed: int = 0
+    triage_skipped_cache: int = 0
+    triage_rejected: int = 0
+    triage_failed: int = 0
+    extraction_failed: int = 0
+    records_produced: int = 0
+    records_staged: int = 0
+    error_count: int = 0
+    reason: str | None = None
+    skipped: bool = False
+
+    def to_metrics(self) -> dict:
+        d = {
+            "returned": self.returned,
+            "after_dedup": self.after_dedup,
+            "triages": self.triages_executed,
+            "triage_skipped": self.triage_skipped_cache,
+            "triage_rejected": self.triage_rejected,
+            "triage_failed": self.triage_failed,
+            "extraction_failed": self.extraction_failed,
+            "produced": self.records_produced,
+            "staged": self.records_staged,
+        }
+        if self.channel == "open_search":
+            d["query_failures"] = self.query_failures
+        if self.channel == "hub_expansion":
+            d["hubs_expanded"] = self.hubs_expanded
+            d["hub_children"] = self.hub_children_found
+        return d
+
+
+def _get_db():
+    try:
+        from radar.core.infra.db import get_supabase_service  # noqa: PLC0415
+        return get_supabase_service()
+    except Exception:
+        return None
+
+
+def _origin_domain(url: str) -> str:
+    return urlsplit(url).netloc.lower()
 
 
 # =============================================================================
@@ -440,7 +498,13 @@ def _stage_records(records: list[dict]) -> int:
     except Exception as e:
         logger.warning("staging: sem cliente Supabase (%s) — achados NÃO persistidos", e)
         return 0
-    rows = [_row_with_relevance(r) for r in records]
+    rows = []
+    for r in records:
+        row = _row_with_relevance(r)
+        for key in ("discovery_run_id", "discovery_channel", "query_family", "origin_domain"):
+            if key in r and r[key] is not None:
+                row[key] = r[key]
+        rows.append(row)
     try:
         (db.table("discovered_opportunities")
            .upsert(rows, on_conflict="url_hash", ignore_duplicates=True)
@@ -525,13 +589,67 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     max_hub_children = int(cfg.get("max_hub_children", 8))
     reject_ttl_days = int(cfg.get("reject_cache_ttl_days", _DEFAULT_REJECT_TTL_DAYS))
     hub_enabled = os.getenv("DISCOVERY_HUB_CRAWL_ENABLED", "0") == "1"
+
+    # --- RT03-T04: multi-channel instrumentation ---
+    from radar.core.kg.schema import discovery_queries as _disc_queries  # noqa: PLC0415
+    from radar.core.services.source_runs import finish_run as _finish_run  # noqa: PLC0415
+    from radar.core.services.source_runs import start_run as _start_run  # noqa: PLC0415
+
+    batch_id = str(uuid.uuid4())
+    db = _get_db()
+
+    reports: dict[str, _ChannelReport] = {
+        "dou": _ChannelReport(channel="dou"),
+        "open_search": _ChannelReport(channel="open_search"),
+        "hub_expansion": _ChannelReport(channel="hub_expansion"),
+    }
+    run_ids: dict[str, str | None] = {}
+
+    for ch_key, mode in (
+        ("dou", "official_feed"),
+        ("open_search", "open_search"),
+        ("hub_expansion", "hub"),
+    ):
+        rid = _start_run(db, batch_id=batch_id, source_key=ch_key, mode=mode)
+        if rid:
+            run_ids[ch_key] = rid
+
+    def _finish_all():
+        for ch_key, report in reports.items():
+            rid = run_ids.get(ch_key)
+            if not rid:
+                continue
+            if report.skipped:
+                _finish_run(
+                    db, run_id=rid, status="skipped",
+                    records_observed=report.returned,
+                    records_emitted=report.after_dedup,
+                    records_staged=report.records_staged,
+                    error_count=report.error_count,
+                    reason_code=report.reason,
+                    metrics=report.to_metrics(),
+                )
+            else:
+                status = "partial" if report.error_count > 0 else "succeeded"
+                _finish_run(
+                    db, run_id=rid, status=status,
+                    records_observed=report.returned,
+                    records_emitted=report.after_dedup,
+                    records_staged=report.records_staged,
+                    error_count=report.error_count,
+                    metrics=report.to_metrics(),
+                )
+
     if not queries:
         logger.warning("descoberta: sem queries em docs/domain/sources/_discovery.md")
+        reports["open_search"].skipped = True
+        _finish_all()
         return []
 
     known = _known_urls()
     seen_now: set[str] = set()
     candidates: list[websearch.SearchHit] = []
+    _attribution: dict[str, dict] = {}
 
     # Gerador DOU (espinha de alta precisão) — ANTES do
     # Tavily e com ORÇAMENTO PRÓPRIO (max_dou_candidates): no 1º shadow-run
@@ -542,46 +660,81 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     # INLABS cair). Busca o DOU de ONTEM (UTC): o cron roda 04:00 UTC, antes da
     # publicação da edição do dia (manhã BRT) — "hoje" seria sempre vazio; D-1 é
     # determinístico e o ledger mantém a idempotência.
-    if os.getenv("DISCOVERY_DOU_ENABLED", "0") == "1":
+    dou_enabled = os.getenv("DISCOVERY_DOU_ENABLED", "0") == "1"
+    dou_report = reports["dou"]
+    if dou_enabled:
         from radar.core.ingestion.dou_feeder import dou_candidates  # noqa: PLC0415
         day = datetime.now(timezone.utc).date() - timedelta(days=1)
-        for h in dou_candidates(day):
-            if len(candidates) >= max_dou:
-                break
-            nu = _norm_url(h.url)
-            if nu and nu not in known and nu not in seen_now and not _is_dedicated_source(h.url):
-                seen_now.add(nu)
-                candidates.append(h)
-        logger.info("descoberta: %d candidatos DOU (%s)", len(candidates),
+        if day.weekday() >= 5:
+            dou_report.skipped = True
+            dou_report.reason = "weekend_skip"
+        else:
+            dou_hits = dou_candidates(day)
+            dou_report.returned = len(dou_hits)
+            for h in dou_hits:
+                if len(candidates) >= max_dou:
+                    break
+                nu = _norm_url(h.url)
+                if nu and nu not in known and nu not in seen_now and not _is_dedicated_source(h.url):
+                    seen_now.add(nu)
+                    _attribution[nu] = {"channel": "dou", "family": None}
+                    candidates.append(h)
+            dou_report.after_dedup = sum(
+                1 for nu, att in _attribution.items() if att["channel"] == "dou"
+            ) if _attribution else 0
+            # Recalculate actual candidates attributed to DOU
+            dou_count = sum(1 for nu, att in _attribution.items() if att["channel"] == "dou")
+            if dou_count > 0:
+                dou_report.after_dedup = dou_count
+        logger.info("descoberta: %d candidatos DOU (%s)", dou_report.after_dedup,
                     day.isoformat())
+    else:
+        dou_report.skipped = True
 
     # Tavily conta o próprio orçamento (max_candidates) — separado do DOU.
+    os_report = reports["open_search"]
+    structured_queries = _disc_queries() if queries else []
     n_dou = len(candidates)
-    for q in queries:
+    for sq in structured_queries:
+        q_text = sq["text"]
+        q_family = sq.get("family")
         if len(candidates) - n_dou >= max_cand:
             break
         try:
-            hits = websearch.web_search(q, k=k)
+            hits = websearch.web_search(q_text, k=k)
         except Exception as e:
-            logger.warning("busca falhou (%s): %s", q, e)
+            logger.warning("busca falhou (%s): %s", q_text, e)
+            os_report.query_failures += 1
+            os_report.error_count += 1
             continue
+        os_report.returned += len(hits)
         for h in hits:
             nu = _norm_url(h.url)
             if not nu or nu in known or nu in seen_now or _is_social(h.url) or _is_dedicated_source(h.url):
                 continue
             seen_now.add(nu)
+            _attribution[nu] = {"channel": "open_search", "family": q_family}
             candidates.append(h)
             if len(candidates) - n_dou >= max_cand:
                 break
+    os_report.after_dedup = sum(
+        1 for nu, att in _attribution.items() if att["channel"] == "open_search"
+    ) if _attribution else 0
 
     if not candidates:
         logger.info("descoberta: nenhum candidato novo")
+        _finish_all()
         return []
 
     tri_client, tri_model = _make_client("triage")
     ext_client, ext_model = _make_client("extract")
     if tri_client is None or ext_client is None:
         logger.warning("descoberta: sem credencial LLM — abortando triagem/extração")
+        for report in reports.values():
+            if not report.skipped:
+                report.skipped = True
+                report.reason = "no_credentials"
+        _finish_all()
         return []
 
     # Fila (hit, depth): candidatos de busca são depth 0; desafios-filho de um
@@ -599,38 +752,49 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     while i < len(queue):
         h, depth = queue[i]
         i += 1
+        nu = _norm_url(h.url)
+        att = _attribution.get(nu, {"channel": "unknown", "family": None})
+        ch_key = att["channel"]
+        report = reports.get(ch_key) or reports["open_search"]
         # Cache negativo: URL rejeitada na triagem e ainda dentro do TTL é pulada
         # SEM chamada LLM (corta a re-triagem diária das mesmas URLs lixo).
-        if _reject_fresh(rejected, _norm_url(h.url), now, reject_ttl_days):
+        if _reject_fresh(rejected, nu, now, reject_ttl_days):
+            report.triage_skipped_cache += 1
             triage_skipped += 1
             logger.debug("descoberta: cache negativo pula triagem de %s", h.url)
             continue
         verdict = _triage(h, tri_client, tri_model)
         if verdict is None:
-            # Falha TRANSIENTE de triagem (timeout/5xx/JSON malformado): pula a
-            # URL SEM tocar o ledger — nem cache negativo, nem dedup positivo.
-            # Ela volta na próxima rodada. Rejeição REAL (o LLM respondeu
-            # is_opportunity=false) segue o caminho normal abaixo.
+            report.triage_failed += 1
+            report.error_count += 1
             continue
+        report.triages_executed += 1
         # Hub de inovação aberta (só depth 0): em vez de descartar, faz fan-out
         # raso — cada desafio-filho vira candidato normal (passa por triagem +
         # extração e classifica opportunity_type=desafio na extração).
         if (hub_enabled and depth == 0 and verdict.get("is_hub")
                 and hubs_expanded < _MAX_HUBS_PER_RUN):
             hubs_expanded += 1
+            report.hubs_expanded += 1
             for child in _expand_hub(h, known | seen_now, max_hub_children):
-                nu = _norm_url(child.url)
-                if nu in seen_now:
+                child_nu = _norm_url(child.url)
+                if child_nu in seen_now:
                     continue
-                seen_now.add(nu)
+                seen_now.add(child_nu)
+                _attribution[child_nu] = {
+                    "channel": "hub_expansion", "family": att["family"],
+                }
+                reports["hub_expansion"].hub_children_found += 1
                 queue.append((child, 1))
             if not verdict["is_opportunity"]:
-                continue  # o hub em si raramente é UMA oportunidade (não cacheia
-                          # como rejeição: já foi expandido e pode render filhos)
+                # o hub em si raramente é UMA oportunidade (não cacheia
+                # como rejeição: já foi expandido e pode render filhos)
+                continue
         if not verdict["is_opportunity"]:
             # Cache negativo + log de descarte: registra a rejeição para que a
             # próxima rodada pule esta URL sem re-pagar a triagem (dentro do TTL).
-            _record_rejection(rejected, _norm_url(h.url), verdict.get("reason", ""), now)
+            report.triage_rejected += 1
+            _record_rejection(rejected, nu, verdict.get("reason", ""), now)
             continue
         page_text = _page_text(h)
         # Prefere o órgão que a FONTE já conhece (ex.: DOU lê do artCategory) ao
@@ -644,13 +808,18 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
                 try:
                     from radar.core.services.crawl4ai_discovery import enrich_record
                     rec["evidence_package"] = enrich_record(rec)
-                except Exception as exc:  # extra ausente ou falha inesperada
+                except Exception as exc:
                     logger.warning("descoberta: enriquecimento Crawl4AI falhou (%s): %s", h.url, exc)
+            # RT03-T04: attribution fields
+            rec["discovery_run_id"] = run_ids.get(ch_key)
+            rec["discovery_channel"] = ch_key
+            rec["query_family"] = att["family"]
+            rec["origin_domain"] = _origin_domain(h.url)
+            report.records_produced += 1
             records.append(rec)
-        # rec=None (falha de extração) NÃO toca o ledger: não entra no cache
-        # negativo (só a triagem grava rejeição) nem no dedup positivo (o
-        # _save_ledger abaixo só soma URLs de `records`) — a URL volta na
-        # próxima rodada. Simétrico ao tratamento de falha do _triage acima.
+        else:
+            report.extraction_failed += 1
+            report.error_count += 1
 
     logger.info("descoberta: %d triagens puladas pelo cache negativo (TTL %dd)",
                 triage_skipped, reject_ttl_days)
@@ -659,11 +828,11 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         n = _stage_records(records)
         if n:
             logger.info("descoberta: %d oportunidades → staging discovered_opportunities (pending)", n)
-        # Persiste o ledger SEMPRE que escrevemos: aprovados (dedup positivo) +
-        # cache negativo (rejeições desta rodada), mesmo sem nenhum aprovado — é o
-        # caso comum (rodada só de lixo) e é justamente quando o cache mais paga.
+        for r in reports.values():
+            r.records_staged = r.records_produced if n > 0 else 0
         _save_ledger(known | {_norm_url(r["url"]) for r in records}, rejected)
 
+    _finish_all()
     return records
 
 
