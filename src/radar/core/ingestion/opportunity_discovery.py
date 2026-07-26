@@ -26,7 +26,7 @@ import logging
 import os
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
@@ -76,6 +76,7 @@ class _ChannelReport:
     error_count: int = 0
     reason: str | None = None
     skipped: bool = False
+    family_metrics: dict[str, dict[str, int]] = field(default_factory=dict)
 
     def to_metrics(self) -> dict:
         d = {
@@ -91,6 +92,9 @@ class _ChannelReport:
         }
         if self.channel == "open_search":
             d["query_failures"] = self.query_failures
+            for fam, m in self.family_metrics.items():
+                d[f"returned_family_{fam}"] = m.get("returned", 0)
+                d[f"query_failures_family_{fam}"] = m.get("query_failures", 0)
         if self.channel == "hub_expansion":
             d["hubs_expanded"] = self.hubs_expanded
             d["hub_children"] = self.hub_children_found
@@ -105,8 +109,11 @@ def _get_db():
         return None
 
 
-def _origin_domain(url: str) -> str:
-    return urlsplit(url).netloc.lower()
+def _origin_domain(url: str) -> str | None:
+    hostname = urlsplit(url).hostname
+    if not hostname:
+        return None
+    return hostname.lower().rstrip(".")
 
 
 # =============================================================================
@@ -603,46 +610,63 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         "open_search": _ChannelReport(channel="open_search"),
         "hub_expansion": _ChannelReport(channel="hub_expansion"),
     }
+    if not hub_enabled:
+        reports["hub_expansion"].skipped = True
     run_ids: dict[str, str | None] = {}
 
-    for ch_key, mode in (
-        ("dou", "official_feed"),
-        ("open_search", "open_search"),
-        ("hub_expansion", "hub"),
-    ):
-        rid = _start_run(db, batch_id=batch_id, source_key=ch_key, mode=mode)
-        if rid:
-            run_ids[ch_key] = rid
+    if db is not None:
+        for ch_key, mode in (
+            ("dou", "official_feed"),
+            ("open_search", "open_search"),
+            ("hub_expansion", "hub"),
+        ):
+            try:
+                rid = _start_run(db, batch_id=batch_id, source_key=ch_key, mode=mode)
+                if rid:
+                    run_ids[ch_key] = rid
+            except Exception:
+                logger.exception("start_run falhou para %s (best-effort)", ch_key)
 
     def _finish_all():
+        if db is None:
+            return
         for ch_key, report in reports.items():
             rid = run_ids.get(ch_key)
             if not rid:
                 continue
-            if report.skipped:
-                _finish_run(
-                    db, run_id=rid, status="skipped",
-                    records_observed=report.returned,
-                    records_emitted=report.after_dedup,
-                    records_staged=report.records_staged,
-                    error_count=report.error_count,
-                    reason_code=report.reason,
-                    metrics=report.to_metrics(),
-                )
-            else:
-                status = "partial" if report.error_count > 0 else "succeeded"
-                _finish_run(
-                    db, run_id=rid, status=status,
-                    records_observed=report.returned,
-                    records_emitted=report.after_dedup,
-                    records_staged=report.records_staged,
-                    error_count=report.error_count,
-                    metrics=report.to_metrics(),
-                )
+            try:
+                if report.skipped:
+                    _finish_run(
+                        db, run_id=rid, status="skipped",
+                        records_observed=report.returned,
+                        records_emitted=report.after_dedup,
+                        records_staged=report.records_staged,
+                        error_count=report.error_count,
+                        reason_code=report.reason,
+                        metrics=report.to_metrics(),
+                    )
+                else:
+                    status = "partial" if report.error_count > 0 else "succeeded"
+                    rc = None
+                    if status == "partial":
+                        rc = "provider_error" if report.query_failures > 0 else "unknown"
+                    _finish_run(
+                        db, run_id=rid, status=status,
+                        records_observed=report.returned,
+                        records_emitted=report.after_dedup,
+                        records_staged=report.records_staged,
+                        error_count=report.error_count,
+                        reason_code=rc,
+                        metrics=report.to_metrics(),
+                    )
+            except Exception:
+                logger.exception("finish_run falhou para %s (best-effort)", ch_key)
 
     if not queries:
         logger.warning("descoberta: sem queries em docs/domain/sources/_discovery.md")
-        reports["open_search"].skipped = True
+        for ch_key in ("dou", "open_search", "hub_expansion"):
+            reports[ch_key].skipped = True
+            reports[ch_key].reason = "empty_result"
         _finish_all()
         return []
 
@@ -694,32 +718,41 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     # Tavily conta o próprio orçamento (max_candidates) — separado do DOU.
     os_report = reports["open_search"]
     structured_queries = _disc_queries() if queries else []
-    n_dou = len(candidates)
-    for sq in structured_queries:
-        q_text = sq["text"]
-        q_family = sq.get("family")
-        if len(candidates) - n_dou >= max_cand:
-            break
-        try:
-            hits = websearch.web_search(q_text, k=k)
-        except Exception as e:
-            logger.warning("busca falhou (%s): %s", q_text, e)
-            os_report.query_failures += 1
-            os_report.error_count += 1
-            continue
-        os_report.returned += len(hits)
-        for h in hits:
-            nu = _norm_url(h.url)
-            if not nu or nu in known or nu in seen_now or _is_social(h.url) or _is_dedicated_source(h.url):
-                continue
-            seen_now.add(nu)
-            _attribution[nu] = {"channel": "open_search", "family": q_family}
-            candidates.append(h)
+    if not websearch.search_available():
+        os_report.skipped = True
+        os_report.reason = "no_credentials"
+    else:
+        n_dou = len(candidates)
+        for sq in structured_queries:
+            q_text = sq["text"]
+            q_family = sq.get("family") or "unknown"
             if len(candidates) - n_dou >= max_cand:
                 break
-    os_report.after_dedup = sum(
-        1 for nu, att in _attribution.items() if att["channel"] == "open_search"
-    ) if _attribution else 0
+            try:
+                hits = websearch.web_search(q_text, k=k)
+            except Exception as e:
+                logger.warning("busca falhou (%s): %s", q_text, e)
+                os_report.query_failures += 1
+                os_report.error_count += 1
+                os_report.reason = "provider_error"
+                fm = os_report.family_metrics.setdefault(q_family, {"returned": 0, "query_failures": 0})
+                fm["query_failures"] += 1
+                continue
+            os_report.returned += len(hits)
+            fm = os_report.family_metrics.setdefault(q_family, {"returned": 0, "query_failures": 0})
+            fm["returned"] += len(hits)
+            for h in hits:
+                nu = _norm_url(h.url)
+                if not nu or nu in known or nu in seen_now or _is_social(h.url) or _is_dedicated_source(h.url):
+                    continue
+                seen_now.add(nu)
+                _attribution[nu] = {"channel": "open_search", "family": q_family}
+                candidates.append(h)
+                if len(candidates) - n_dou >= max_cand:
+                    break
+        os_report.after_dedup = sum(
+            1 for nu, att in _attribution.items() if att["channel"] == "open_search"
+        ) if _attribution else 0
 
     if not candidates:
         logger.info("descoberta: nenhum candidato novo")
@@ -767,6 +800,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         if verdict is None:
             report.triage_failed += 1
             report.error_count += 1
+            report.reason = "unknown"
             continue
         report.triages_executed += 1
         # Hub de inovação aberta (só depth 0): em vez de descartar, faz fan-out
@@ -775,7 +809,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         if (hub_enabled and depth == 0 and verdict.get("is_hub")
                 and hubs_expanded < _MAX_HUBS_PER_RUN):
             hubs_expanded += 1
-            report.hubs_expanded += 1
+            reports["hub_expansion"].hubs_expanded += 1
             for child in _expand_hub(h, known | seen_now, max_hub_children):
                 child_nu = _norm_url(child.url)
                 if child_nu in seen_now:
@@ -820,6 +854,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         else:
             report.extraction_failed += 1
             report.error_count += 1
+            report.reason = "unknown"
 
     logger.info("descoberta: %d triagens puladas pelo cache negativo (TTL %dd)",
                 triage_skipped, reject_ttl_days)

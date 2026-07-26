@@ -169,6 +169,7 @@ class Harness:
 
         self.search_hits: list[SearchHit] = []
         monkeypatch.setattr(od.websearch, "web_search", lambda q, k=8: list(self.search_hits))
+        monkeypatch.setattr(od.websearch, "search_available", lambda: True)
 
         self.env: dict[str, str] = {}
         monkeypatch.setattr(od.os, "getenv", self._fake_getenv)
@@ -481,6 +482,42 @@ class TestEmptyResult:
         assert h.store.ledger == before
 
 
+class TestNoQueries:
+    """Empty queries config → todos os canais skipped/empty_result."""
+
+    def test_empty_config_returns_empty(self, monkeypatch):
+        h = Harness(monkeypatch)
+        h.monkeypatch.setattr(od.ws, "discovery_config", lambda: {
+            "queries": [],
+            "max_results_per_query": 8,
+            "max_candidates": 40,
+            "max_dou_candidates": 80,
+            "max_hub_children": 8,
+            "reject_cache_ttl_days": 30,
+        })
+        records = h.run()
+        assert records == []
+
+    def test_all_three_channels_skipped(self, monkeypatch):
+        h = Harness(monkeypatch)
+        h.monkeypatch.setattr(od.ws, "discovery_config", lambda: {
+            "queries": [],
+            "max_results_per_query": 8,
+            "max_candidates": 40,
+            "max_dou_candidates": 80,
+            "max_hub_children": 8,
+            "reject_cache_ttl_days": 30,
+        })
+        h.run()
+        # start_run deve ter sido chamado 3x (dou, open_search, hub_expansion)
+        assert len(h.start_calls) == 3, "deve ter 3 start_run calls"
+        # finish_run deve ter sido chamado 3x, todos skipped/empty_result
+        assert len(h.finish_calls) == 3, "deve ter 3 finish_run calls"
+        for fc in h.finish_calls:
+            assert fc["status"] == "skipped", f"todos os canais devem ser skipped: {fc}"
+            assert fc.get("reason_code") == "empty_result", f"reason deve ser empty_result: {fc}"
+
+
 class TestFailures:
     """Failures of query, triage, extraction → error_count but no crash."""
 
@@ -537,8 +574,8 @@ class TestTelemetryUnavailable:
         h.triage_map = {_HIT_A.url: _APPROVE}
         h.extract_map = {_HIT_A.url: _make_record(_HIT_A.url)}
         h.run()
-        assert len(h.start_calls) == 3
-        assert len(h.finish_calls) == 0
+        assert len(h.start_calls) == 0, "db=None → start_run não chamado"
+        assert len(h.finish_calls) == 0, "db=None → finish_run não chamado"
 
 
 class TestPublicReturn:

@@ -108,6 +108,7 @@ def _setup_discovery(monkeypatch, store):
                  "max_hub_children": 8, "reject_cache_ttl_days": 30},
     )
     monkeypatch.setattr(od.websearch, "web_search", lambda q, k=8: [_HIT])
+    monkeypatch.setattr(od.websearch, "search_available", lambda: True)
     monkeypatch.setattr(od, "_stage_records", lambda records: len(records))
 
 
