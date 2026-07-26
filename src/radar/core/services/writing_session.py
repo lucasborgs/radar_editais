@@ -31,6 +31,7 @@ Gerenciamento de histórico:
     writing_sessions.summary
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -91,6 +92,26 @@ WR_PREFIX_MSG_ID = "wr:stable-prefix"
 # _compress_history comprimia acima de COMPRESS_THRESHOLD; aqui o corte é por
 # nº de mensagens humanas mantidas). Trim é paridade, não feature nova.
 WR_THREAD_HISTORY_WINDOW = HISTORY_WINDOW
+
+# Cancelamento de turno em andamento (Sprint 1 — C3).
+# Dict session_id → asyncio.Event. O SSE generator checa o evento entre tokens;
+# o endpoint /cancel o seta.
+_in_flight_cancel: dict[str, asyncio.Event] = {}
+
+def register_cancel_token(session_id: str) -> asyncio.Event:
+    ev = asyncio.Event()
+    _in_flight_cancel[session_id] = ev
+    return ev
+
+def unregister_cancel_token(session_id: str) -> None:
+    _in_flight_cancel.pop(session_id, None)
+
+def cancel_turn(session_id: str) -> bool:
+    ev = _in_flight_cancel.get(session_id)
+    if ev is None:
+        return False
+    ev.set()
+    return True
 
 # @ mentions: usuário pode referenciar items da library no input com @<uuid>.
 # O resolver injeta o conteúdo do item como contexto adicional e atualiza
@@ -1511,6 +1532,153 @@ class WritingSession:
             # — o front mostra aviso discreto ("continue a conversa").
             "truncated":          result.stop_reason == "max_steps",
         }
+
+    def _turn_agent_streaming(
+        self,
+        user_message: str,
+        section_hint: str | None,
+        user_turn_index: int,
+        resume_ctx: dict | None = None,
+        max_steps: int | None = None,
+    ) -> dict:
+        """Sync generator: yields streaming events during agent execution,
+        then a final dict with the result. Used by the SSE endpoint via
+        a background thread + asyncio.Queue bridge.
+
+        Yields:
+            {"kind": "token", "text": str}
+            {"kind": "tool_end", "name": str}
+            {"kind": "final", ...result_dict...}
+        """
+        from radar.core.llm.agent_graph import (
+            WritingTurnOutcome,
+            get_thread_message_count,
+            run_writing_turn_streaming,
+        )
+        from radar.core.llm.agent_runtime import resolve_agent_provider
+        from radar.core.llm.agent_tools import build_writing_tools
+
+        self._tool_results = []
+        tools = build_writing_tools(self)
+        provider, model = resolve_agent_provider("anthropic", ANTHROPIC_MODEL_AGENT)
+
+        thread_id = f"{self.workspace_id}:{self.session_id}"
+        n_in_thread = get_thread_message_count(thread_id)
+        seed_history = resume_ctx is None and n_in_thread == 0 and bool(self._history)
+
+        if resume_ctx is None and not seed_history:
+            self._trim_thread_history(thread_id)
+
+        abort_event = register_cancel_token(self.session_id)
+        abort_registered = True
+        try:
+            if resume_ctx:
+                stream_gen = run_writing_turn_streaming(
+                    system=self._writer_system(),
+                    initial_messages=[],
+                    tools=tools, model=model, provider=provider,
+                    max_steps=max_steps or AGENT_MAX_STEPS,
+                    thread_id=thread_id,
+                    resume=user_message,
+                    prior_n_msgs=get_thread_message_count(thread_id),
+                    mode="writing",
+                    abort_event=abort_event,
+                )
+            else:
+                mentions_context = self._resolve_mentions(user_message)
+                messages = self._build_thread_initial_messages(
+                    user_message, section_hint, mentions_context,
+                    include_history=seed_history,
+                )
+                prior_n_msgs = (
+                    2 + len(self._history) if seed_history
+                    else get_thread_message_count(thread_id)
+                )
+                stream_gen = run_writing_turn_streaming(
+                    system=self._writer_system(),
+                    initial_messages=messages,
+                    tools=tools, model=model, provider=provider,
+                    max_steps=max_steps or AGENT_MAX_STEPS,
+                    thread_id=thread_id,
+                    resume=None,
+                    prior_n_msgs=prior_n_msgs,
+                    mode="writing",
+                    abort_event=abort_event,
+                )
+
+            done_outcome: WritingTurnOutcome | None = None
+            for ev in stream_gen:
+                if ev.kind == "token":
+                    yield {"kind": "token", "text": ev.text}
+                elif ev.kind == "tool_end":
+                    yield {"kind": "tool_end", "name": ev.name}
+                elif ev.kind == "done":
+                    done_outcome = ev.result
+
+            if done_outcome is None:
+                self._turn_count -= 1
+                yield {"kind": "final",
+                       "session_id": self.session_id,
+                       "assistant_message": "",
+                       "success": False,
+                       "error": "Agente falhou — resposta vazia do grafo."}
+                return
+
+            outcome = done_outcome
+            result = outcome.result
+
+            if result.stop_reason == "error":
+                self._turn_count -= 1
+                yield self._error_result("Agente falhou ao processar — tente novamente em instantes.", "AGENT_ERROR")
+                return
+
+            tool_trace = self._extract_tool_trace(result.steps)
+
+            if outcome.interrupt:
+                question = outcome.interrupt.get("prompt", "") or ""
+                self._pending_user_input = {
+                    "field": outcome.interrupt.get("field"),
+                    "prompt": outcome.interrupt.get("prompt"),
+                    "thread_id": thread_id,
+                    "n_msgs": outcome.n_messages,
+                }
+                self._history.append({"role": "user", "content": user_message})
+                self._history.append({"role": "assistant", "content": question})
+                self._persist_turn(user_turn_index, "user", user_message, section_hint)
+                self._persist_turn(user_turn_index, "assistant", question, section_hint, tool_use=tool_trace)
+                yield {"kind": "final",
+                       "session_id": self.session_id,
+                       "assistant_message": question,
+                       "draft_content": None,
+                       "pending_user_input": {
+                           "field": outcome.interrupt.get("field"),
+                           "prompt": outcome.interrupt.get("prompt"),
+                       },
+                       "turn_number": self._turn_count,
+                       "success": True,
+                       "error": None,
+                       "tool_trace": tool_trace,
+                       "truncated": False}
+                return
+
+            assistant_text = result.final_text or ""
+            self._history.append({"role": "user", "content": user_message})
+            self._history.append({"role": "assistant", "content": assistant_text})
+            self._persist_turn(user_turn_index, "user", user_message, section_hint)
+            self._persist_turn(user_turn_index, "assistant", assistant_text, section_hint, tool_use=tool_trace)
+
+            yield {"kind": "final",
+                   "session_id": self.session_id,
+                   "assistant_message": assistant_text,
+                   "draft_content": None,
+                   "pending_user_input": None,
+                   "turn_number": self._turn_count,
+                   "success": True,
+                   "error": None,
+                   "tool_trace": tool_trace,
+                   "truncated": result.stop_reason == "max_steps"}
+        finally:
+            unregister_cancel_token(self.session_id)
 
     # ------------------------------------------------------------------
     # Geração de proposta completa (batch)

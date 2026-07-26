@@ -4,10 +4,12 @@ documento, checklist e export."""
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import threading
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from radar.api.common import (
@@ -23,9 +25,12 @@ from radar.core.services.content_library import get_workspace_id
 from radar.core.services.writing_session import (
     ProfileIncompleteError,
     WritingSession,
+    cancel_turn,
     delete_session,
     get_session_document,
     list_sessions,
+    register_cancel_token,
+    unregister_cancel_token,
 )
 
 logger = logging.getLogger(__name__)
@@ -140,6 +145,15 @@ class WritingRefineRequest(BaseModel):
     session_id: str
     section_title: str
     instruction: str = Field(max_length=4_000)
+
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+
+def _sse(event: str, data: dict) -> bytes:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
 
 
 # =============================================================================
@@ -271,6 +285,142 @@ async def writing_turn(
     sections_done = turn_result.get("sections_done", [])
     return {**turn_result, "compliance_flags": [],
             "draft_ready": bool(sections_done)}
+
+
+@router.post(
+    "/writing/turn/stream",
+    summary="Turno da sessão de escrita em streaming SSE",
+    response_model=None,
+)
+@limiter.limit("10/minute")
+async def writing_turn_stream(
+    request: Request,
+    req: WritingTurnRequest,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """Variação SSE de `/writing/turn` — tokens ao vivo durante a geração,
+    seguidos de um frame `done` com o MESMO payload do endpoint síncrono.
+
+    Formato:
+        event: token  data: {"text": "<delta>"}
+        event: tool   data: {"name": "<tool>", "phase": "end"}
+        event: done   data: {...payload idêntico ao /writing/turn...}
+        event: error  data: {"message": "<msg>"}
+    """
+    from radar.core.infra.llm_router import resolve_model
+
+    workspace_id = get_workspace_id(db, user_id)
+    profile = (
+        to_py_profile(req.profile) if req.profile
+        else profile_from_workspace(db, workspace_id)
+    )
+    library_items = load_library_items(db, workspace_id, req.library_item_ids)
+
+    try:
+        session = WritingSession(
+            db=db,
+            workspace_id=workspace_id,
+            profile=profile,
+            session_id=req.session_id,
+            library_items=library_items,
+            model=resolve_model(req.model_tier),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def _produce():
+        """Runs in background thread: iterates _turn_agent_streaming
+        and feeds events to the async queue."""
+        session_id_val = session.session_id
+        cancel_ev = register_cancel_token(session_id_val)
+        try:
+            for event in session._turn_agent_streaming(
+                req.user_message, req.section_hint,
+            ):
+                if cancel_ev.is_set():
+                    break
+                loop.call_soon_threadsafe(queue.put_nowait, event)
+        except Exception as e:
+            logger.error("writing_turn_stream[%s]: producer error: %s", session_id_val, e)
+            loop.call_soon_threadsafe(queue.put_nowait, {
+                "kind": "final",
+                "session_id": session_id_val,
+                "assistant_message": "",
+                "success": False,
+                "error": f"Erro interno: {e}",
+            })
+        finally:
+            unregister_cancel_token(session_id_val)
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    thread = threading.Thread(target=_produce, daemon=True)
+    thread.start()
+
+    async def gen():
+        try:
+            was_tool_or_token = False
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                kind = item.get("kind")
+                if kind == "token":
+                    was_tool_or_token = True
+                    yield _sse("token", {"text": item.get("text", "")})
+                elif kind == "tool_end":
+                    was_tool_or_token = True
+                    yield _sse("tool", {"name": item.get("name", ""), "phase": "end"})
+                elif kind == "final":
+                    payload = {k: v for k, v in item.items() if k != "kind"}
+                    yield _sse("done", payload)
+                    break
+        except Exception as e:
+            logger.error("writing_turn_stream[%s]: SSE error: %s", session.session_id, e)
+            if not was_tool_or_token:
+                # Fallback silencioso: stream nunca começou → tenta batch
+                try:
+                    result = await asyncio.to_thread(
+                        session.turn, req.user_message, req.section_hint,
+                    )
+                    yield _sse("done", result)
+                except Exception as e2:
+                    logger.error("writing_turn_stream[%s]: fallback error: %s", session.session_id, e2)
+                    yield _sse("error", {"message": str(e2)})
+            else:
+                yield _sse("error", {"message": str(e)})
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@router.post(
+    "/writing/{session_id}/cancel",
+    summary="Cancela um turno de escrita em andamento",
+)
+def writing_cancel_turn(
+    session_id: str,
+    user_id: CurrentUserId,
+    db: DbClient,
+):
+    """Cancela o turno de escrita em andamento para a sessão especificada.
+    O turno em execução será interrompido na próxima verificação de cancelamento."""
+    ok = cancel_turn(session_id)
+    if not ok:
+        return {"ok": False, "message": "Nenhum turno em andamento para esta sessão."}
+    return {"ok": True, "message": "Turno cancelado."}
 
 
 @router.post(

@@ -5,15 +5,17 @@ import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import {
+  cancelWritingTurn,
   getWritingDocument,
-  sendWritingTurn,
   generateWritingProposal,
   saveDocumentSection,
   getLibraryItems,
   getEditalById,
   autoReviewChecklist,
   refineSection,
+  sendWritingTurn,
   workspaceMode,
+  writingTurnStream,
   type WritingRefineResponse,
 } from "@/lib/api";
 import type {
@@ -100,6 +102,11 @@ export default function WorkspacePage() {
   // F4: plan-first — plano pendente de confirmação
   const [planPending, setPlanPending] = useState<Record<string, unknown> | null>(null);
   const [generating, setGenerating] = useState(false);
+
+  // Sprint 1 — streaming + tool trace + stop
+  const [streamingText, setStreamingText] = useState<string | null>(null);
+  const [streamingTrace, setStreamingTrace] = useState<Array<{ name: string }>>([]);
+  const abortRef = useRef<AbortController | null>(null);
 
   const chatRef = useRef<WorkspaceChatHandle>(null);
   const scrollToSectionRef = useRef<(title: string) => void>(() => {});
@@ -345,23 +352,49 @@ export default function WorkspacePage() {
         return;
       }
 
-      // Modo /escrita: fluxo normal de escrita
+      // Modo /escrita: fluxo normal de escrita (streaming first, fallback batch)
       setMessages((prev) => [...prev, { role: "user", content: message || content, timestamp: nowTime() }]);
       setInput("");
       setPending(null);
       setWorking(true);
+      setStreamingText("");
+      setStreamingTrace([]);
 
-      try {
-        const res = await sendWritingTurn(sessionId, message || content, sectionHint);
+      const ac = new AbortController();
+      abortRef.current = ac;
 
-        // F4: detecta plano pendente de confirmação
-        if (res.plan_pending && res.plan) {
-          setPlanPending(res.plan);
+      let streamOk = false;
+      const tryStream = async (): Promise<Record<string, unknown> | null> => {
+        return new Promise((resolve) => {
+          writingTurnStream(
+            sessionId,
+            message || content,
+            sectionHint,
+            [],
+            null,
+            {
+              onToken: (text) => setStreamingText((prev) => (prev ?? "") + text),
+              onTool: (name) => setStreamingTrace((prev) => [...prev, { name }]),
+              onDone: (payload) => { streamOk = true; resolve(payload); },
+              onError: (msg) => { resolve({ error: msg }); },
+            },
+            ac.signal,
+          ).catch((err: unknown) => { resolve({ error: err instanceof Error ? err.message : "Stream error" }); });
+        });
+      };
+
+      const streamResult = await tryStream();
+
+      if (streamOk && !(streamResult as Record<string, unknown>).error) {
+        const payload = streamResult as Record<string, unknown>;
+        if (payload.plan_pending && payload.plan) {
+          setPlanPending(payload.plan as Record<string, unknown>);
         }
 
+        const rawTrace = (payload.tool_trace ?? []) as Array<Record<string, unknown>>;
         const editedSections = Array.from(
           new Set(
-            (res.tool_trace ?? [])
+            rawTrace
               .filter((t) => t.name === "save_draft" && t.saved_section)
               .map((t) => t.saved_section as string),
           ),
@@ -379,28 +412,27 @@ export default function WorkspacePage() {
           ...prev,
           {
             role: "assistant",
-            content: res.assistant_message,
+            content: (payload.assistant_message as string) ?? (streamingText ?? ""),
             timestamp: nowTime(),
             editedSections: editedSections.length > 0 ? editedSections : undefined,
             complianceFlags:
-              (res.compliance_flags?.length ?? 0) > 0 ? res.compliance_flags : undefined,
-            truncated: res.truncated || undefined,
+              ((payload.compliance_flags as unknown[])?.length ?? 0) > 0
+                ? (payload.compliance_flags as { message: string }[])
+                : undefined,
+            truncated: (payload.truncated as boolean) || undefined,
+            toolTrace: rawTrace.map((t) => ({
+              name: t.name as string,
+              input_summary: typeof t.input === "string" ? t.input as string : JSON.stringify(t.input).slice(0, 200),
+              output_summary: typeof t.output === "string" ? t.output as string : undefined,
+            })),
           },
         ]);
 
-        if (res.draft_ready || (res.sections_done?.length ?? 0) > 0 || res.plan_pending) {
+        if (payload.draft_ready || ((payload.sections_done as string[])?.length ?? 0) > 0 || payload.plan_pending) {
           setMobileTab("doc");
-          try {
-            await reloadDocument();
-          } catch {
-            /* mantém estado local */
-          }
+          try { await reloadDocument(); } catch { /* mantém estado local */ }
         } else {
-          try {
-            await reloadDocument();
-          } catch {
-            /* ignore */
-          }
+          try { await reloadDocument(); } catch { /* ignore */ }
         }
 
         if (editedSections.length > 0) {
@@ -410,14 +442,77 @@ export default function WorkspacePage() {
             return next;
           });
         }
-        if (res.pending_user_input) setPending(res.pending_user_input);
-      } catch (e) {
-        toast.error(
-          e instanceof Error ? e.message : "Erro ao enviar mensagem ao agente.",
-        );
-      } finally {
-        setWorking(false);
+        if (payload.pending_user_input) setPending(payload.pending_user_input as PendingUserInput);
+      } else {
+        // Fallback batch
+        try {
+          const res = await sendWritingTurn(sessionId, message || content, sectionHint);
+
+          if (res.plan_pending && res.plan) {
+            setPlanPending(res.plan);
+          }
+
+          const editedSections = Array.from(
+            new Set(
+              (res.tool_trace ?? [])
+                .filter((t) => t.name === "save_draft" && t.saved_section)
+                .map((t) => t.saved_section as string),
+            ),
+          );
+
+          setSections((prevSections) => {
+            for (const title of editedSections) {
+              const before = prevSections.find((s) => s.title === title)?.content ?? "";
+              undoSnapshots.current[title] = before;
+            }
+            return prevSections;
+          });
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: res.assistant_message,
+              timestamp: nowTime(),
+              editedSections: editedSections.length > 0 ? editedSections : undefined,
+              complianceFlags:
+                (res.compliance_flags?.length ?? 0) > 0 ? res.compliance_flags : undefined,
+              truncated: res.truncated || undefined,
+              toolTrace: (res.tool_trace ?? []).map((t) => {
+                const tr = t as unknown as Record<string, unknown>;
+                return {
+                  name: tr.name as string,
+                  input_summary: typeof tr.input === "string" ? tr.input as string : JSON.stringify(tr.input).slice(0, 200),
+                  output_summary: typeof tr.output === "string" ? tr.output as string : undefined,
+                };
+              }),
+            },
+          ]);
+
+          if (res.draft_ready || (res.sections_done?.length ?? 0) > 0 || res.plan_pending) {
+            setMobileTab("doc");
+            try { await reloadDocument(); } catch { /* mantém estado local */ }
+          } else {
+            try { await reloadDocument(); } catch { /* ignore */ }
+          }
+
+          if (editedSections.length > 0) {
+            setHighlighted((prev) => {
+              const next = new Set(prev);
+              editedSections.forEach((t) => next.add(t));
+              return next;
+            });
+          }
+          if (res.pending_user_input) setPending(res.pending_user_input);
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Erro ao enviar mensagem ao agente.");
+        }
       }
+
+      setStreamingText(null);
+      setStreamingTrace([]);
+      abortRef.current = null;
+      setWorking(false);
     },
     [sessionId, working, reloadDocument, wsMode],
   );
@@ -688,6 +783,13 @@ export default function WorkspacePage() {
             onUndoSection={(title) => void handleUndoSection(title)}
             token={token}
             fullWidth={wsMode !== "escrita" || sections.length === 0}
+            streamingText={streamingText}
+            agentTrace={streamingTrace.length > 0 ? streamingTrace : undefined}
+            onStop={() => {
+              abortRef.current?.abort();
+              abortRef.current = null;
+              cancelWritingTurn(sessionId).catch(() => {});
+            }}
           />
         </div>
       </div>

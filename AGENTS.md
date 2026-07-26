@@ -255,3 +255,10 @@ hipergrafo JSON nem resolução cross-source por `(type, name)`.
 `src/radar/core/kg/kg_store.py` permanece por compatibilidade operacional do ledger de
 Descoberta e das ferramentas de vocabulário. Não é o backend do catálogo ou do
 match v3.
+
+## Próximos passos planejados
+
+O plano de implementação de design conversacional vive em
+[docs/specs/conversational-design-impl.md](docs/specs/conversational-design-impl.md).
+4 sprints: Fundação → Confiança → Memória → Refinamento. **Sprint 1 em andamento**
+(stream writing, tool trace visível, stop generation).

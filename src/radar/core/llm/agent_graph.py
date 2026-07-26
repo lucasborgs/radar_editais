@@ -1419,6 +1419,136 @@ async def _writing_turn_async(
     return WritingTurnOutcome(result, intr_payload, len(msgs))
 
 
+async def _writing_turn_streaming_async(
+    *,
+    system: str,
+    initial_messages: list[dict[str, Any]],
+    tools: list[BaseTool],
+    model: str,
+    provider: Provider,
+    max_steps: int,
+    thread_id: str,
+    checkpointer,
+    resume: Any | None,
+    prior_n_msgs: int,
+    span_name: str | None,
+    temperature: float | None,
+    openai_base_url: str | None,
+    openai_api_key: str | None,
+    mode: str | None = None,
+    abort_event: asyncio.Event | None = None,
+) -> AsyncIterator[StreamDelta]:
+    """Async generator version of `_writing_turn_async` — yields token/tool_end
+    events during agent execution, then a `done` event with the WritingTurnOutcome.
+    Supports cancellation via `abort_event`: when set, stops early."""
+    from langgraph.types import Command
+
+    chat = _build_chat_model(
+        provider, model, temperature=temperature,
+        openai_base_url=openai_base_url, openai_api_key=openai_api_key,
+    )
+    graph = _build_graph(
+        chat, tools, max_steps=max_steps,
+        checkpointer=checkpointer,
+    )
+    config: dict[str, Any] = {
+        "configurable": {"thread_id": thread_id},
+        "recursion_limit": 3 * max_steps + 5,
+    }
+
+    if resume is not None:
+        payload: Any = Command(resume=resume)
+    else:
+        payload = {
+            "messages": [
+                _build_system_message(system, provider, msg_id=WR_SYSTEM_MSG_ID),
+                *_to_lc_messages(initial_messages, provider=provider),
+            ],
+            "llm_calls": 0,
+            "tool_rounds": 0,
+            "documents": {},
+        }
+
+    from radar.core.infra import telemetry
+
+    with telemetry.agent_run(
+        name=span_name or f"agent.{provider}.{model}",
+        input={"system": system, "resume": resume is not None},
+        metadata={
+            "provider": provider, "model": model, "max_steps": max_steps,
+            "runtime": "langgraph-streaming", "thread_id": thread_id,
+            "tools": [t.name for t in tools], "mode": mode,
+        },
+    ) as agent_span:
+        handler = telemetry.make_callback_handler()
+        if handler is not None:
+            config["callbacks"] = [handler]
+
+        final_state: dict | None = None
+        try:
+            async for stream_mode, chunk in graph.astream(
+                payload, config=config, stream_mode=["messages", "values"],
+            ):
+                if abort_event and abort_event.is_set():
+                    logger.info("writing_turn_streaming: cancelado via abort_event (thread=%s)", thread_id)
+                    break
+                if stream_mode == "messages":
+                    msg_chunk, _meta = chunk
+                    if isinstance(msg_chunk, AIMessageChunk):
+                        delta = _msg_text(msg_chunk)
+                        if delta:
+                            yield StreamDelta(kind="token", text=delta)
+                    elif isinstance(msg_chunk, ToolMessage):
+                        yield StreamDelta(kind="tool_end", name=msg_chunk.name or "")
+                elif stream_mode == "values":
+                    final_state = chunk
+        except GraphRecursionError:
+            logger.warning("writing_turn_streaming: recursion_limit (backstop) — max_steps")
+            degraded = AgentResult(final_text="", steps=[], stop_reason="max_steps", usage={})
+            yield StreamDelta(kind="error", text="max_steps")
+            yield StreamDelta(kind="done", result=WritingTurnOutcome(degraded, None, 0))
+            return
+        except Exception as e:
+            logger.error("writing_turn_streaming: grafo falhou: %s", e)
+            if agent_span is not None:
+                agent_span.update(level="ERROR", status_message=str(e))
+            degraded = AgentResult(final_text="", steps=[], stop_reason="error", usage={})
+            yield StreamDelta(kind="error", text=str(e))
+            yield StreamDelta(kind="done", result=WritingTurnOutcome(degraded, None, 0))
+            return
+
+        if final_state is None:
+            logger.error("writing_turn_streaming: astream não emitiu estado final (values)")
+            degraded = AgentResult(final_text="", steps=[], stop_reason="error", usage={})
+            yield StreamDelta(kind="error", text="sem estado final do stream")
+            yield StreamDelta(kind="done", result=WritingTurnOutcome(degraded, None, 0))
+            return
+
+        msgs = final_state["messages"]
+        delta = msgs[prior_n_msgs:]
+
+        interrupts = final_state.get("__interrupt__")
+        intr_payload: dict | None = None
+        if interrupts:
+            v = interrupts[0].value
+            intr_payload = v if isinstance(v, dict) else {"prompt": str(v)}
+            stop: StopReason = "end_turn"
+        else:
+            stop = _derive_stop_reason(final_state, max_steps)
+
+        result = _messages_to_agent_result(delta, stop)
+
+        if agent_span is not None:
+            agent_span.update(
+                output={"final_text": result.final_text, "interrupted": bool(intr_payload)},
+                metadata={"stop_reason": result.stop_reason, "n_steps": len(result.steps),
+                          "usage": result.usage},
+            )
+
+    outcome = WritingTurnOutcome(result, intr_payload, len(msgs))
+    yield StreamDelta(kind="done", result=outcome)
+
+
 def run_writing_turn(
     *,
     system: str,
@@ -1463,6 +1593,59 @@ def run_writing_turn(
         openai_api_key=openai_api_key,
         mode=mode,
     ))
+
+
+def run_writing_turn_streaming(
+    *,
+    system: str,
+    initial_messages: list[dict[str, Any]],
+    tools: list[BaseTool],
+    model: str,
+    provider: Provider = "anthropic",
+    max_steps: int = 8,
+    thread_id: str,
+    resume: Any | None = None,
+    prior_n_msgs: int = 0,
+    span_name: str | None = None,
+    temperature: float | None = None,
+    openai_base_url: str | None = None,
+    openai_api_key: str | None = None,
+    mode: str | None = None,
+    abort_event: asyncio.Event | None = None,
+) -> Iterator[StreamDelta]:
+    """Sync generator: itera `_writing_turn_streaming_async` no bg-loop
+    e YIELDS cada StreamDelta à medida que chega. O caller itera este
+    generator para obter eventos em tempo real."""
+    checkpointer = _get_writing_checkpointer()
+    gen = _writing_turn_streaming_async(
+        system=system,
+        initial_messages=initial_messages,
+        tools=tools,
+        model=model,
+        provider=provider,
+        max_steps=max_steps,
+        thread_id=thread_id,
+        checkpointer=checkpointer,
+        resume=resume,
+        prior_n_msgs=prior_n_msgs,
+        span_name=span_name,
+        temperature=temperature,
+        openai_base_url=openai_base_url,
+        openai_api_key=openai_api_key,
+        mode=mode,
+        abort_event=abort_event,
+    )
+    it = gen.__aiter__()
+    while True:
+        try:
+            ev = asyncio.run_coroutine_threadsafe(
+                it.__anext__(), _get_bg_loop()
+            ).result()
+            yield ev
+            if ev.kind == "done":
+                break
+        except StopAsyncIteration:
+            break
 
 
 # =============================================================================

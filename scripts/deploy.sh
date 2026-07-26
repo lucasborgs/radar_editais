@@ -49,21 +49,21 @@ cat <<'EOF'
    a. .env na raiz com as env vars de produção (ver bloco ENV no fim).
    b. Gere uma tag imutável a partir do commit e suba a release:
         export IMAGE_TAG="$(git rev-parse --short HEAD)"
-        docker compose build app worker
-        docker compose up -d
+        scripts/compose.sh production build app worker
+        scripts/compose.sh production up -d
       Sobe 3 serviços: app (uvicorn, porta 8000), worker (procrastinate,
       sem HTTP) e tunnel (cloudflared, lê cloudflared/config.yml). App e worker
       ficam retidos como imagens separadas com a mesma tag de commit.
    c. Verificar:
-        docker compose ps                 # os 3 "Up"
-        docker compose logs -f app        # sem erro no boot
+        scripts/compose.sh production ps                 # os 3 "Up"
+        scripts/compose.sh production logs -f app        # sem erro no boot
         curl --fail https://api.seudominio.com.br/health  # API + Postgres
    d. O worker é quem roda chunk_edital / enrich_content / os crons de
       scrape+discovery (03:00/04:00 UTC) — sem ele nada disso roda.
    e. Rollback (as imagens da tag anterior precisam continuar no host):
         docker image ls 'radar-editais-*'   # escolha o SHA anterior validado
         export IMAGE_TAG=<sha-anterior>
-        docker compose up -d --no-build app worker
+        scripts/compose.sh production up -d --no-build app worker
         curl --fail https://api.seudominio.com.br/health
       Se o healthcheck falhar, restaure `IMAGE_TAG` para a tag que estava ativa
       e repita o `up --no-build`. Não rode `docker image prune` antes de encerrar
@@ -80,12 +80,12 @@ cat <<'EOF'
    No .env do Docker Compose (host):
         FRONTEND_URL=https://<app>.vercel.app
    (CSV se houver mais de uma origem). Preserve `IMAGE_TAG` e rode
-   `docker compose up -d --build app`.
+   `scripts/compose.sh production up -d --build app`.
 
 ════════════════════════════════════════════════════════════════════════════
 6) PÓS-DEPLOY
    a. Reindex com Contextual Retrieval se precisar forçar re-chunking:
-        docker compose exec app python scripts/reindex_edital.py --all --force
+        scripts/compose.sh production exec app python scripts/reindex_edital.py --all --force
    b. Abrir o frontend e fazer um turno de escrita real (smoke manual).
 
 ────────────────────────────────────────────────────────────────────────────
