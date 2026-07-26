@@ -58,7 +58,7 @@ não acionado — registry compatível.
   - `_SOURCE_RUN_MAP` — mapeamento scraper → source_key/mode
   - `_PIPELINE_CATEGORY_TO_REASON` — mapeamento category → reason_code
   - Instrumentação em `_run_daily_etl`: batch_id, DB client, start_run/finish_run
-- `tests/unit/test_source_coverage_etl.py` (+378 linhas, novo):
+- `tests/unit/test_source_coverage_etl.py` (+533 linhas, novo):
   - 22 testes direcionados
 
 ## Testes direcionados — 22 passed
@@ -95,13 +95,15 @@ não acionado — registry compatível.
 - `ENVIRONMENT=test pytest tests/unit/test_source_runs.py`: **39 passed**
 - `ruff check src/radar/core/tasks.py tests/unit/test_source_coverage_etl.py`: **All checks passed**
 - `git diff --check`: **sem whitespace errors**
-- Suíte completa: **1504 passed, 64 skipped** (baseline: 1504 passed, 64 skipped)
+- Suíte completa, reexecutada pela auditoria com ambiente hermético:
+  **1491 passed, 77 skipped**
 - Nenhum teste novo quebrou, nenhum existente regrediu
 
 ## Divergências e limitações
 
-- Migration T02 não aplicada no banco local; `start_run`/`finish_run` validados
-  por mocks.
+- Migration T02 não foi reaplicada neste worktree; `start_run`/`finish_run`
+  foram validados por mocks. A migration 043 já havia sido aplicada com
+  sucesso pelo Supabase local do CI da base (`30213789808`).
 - `reason_code` não possui CHECK no SQL (já documentado em T02).
 - O leitor de saúde, API administrativa e UI não foram implementados (escopo
   da task).
@@ -118,3 +120,10 @@ não acionado — registry compatível.
   merge/push
 - Scrapers mockados; DB mockado
 - RT03-T04 **não foi iniciada**
+
+## Auditoria Codex
+
+**Aprovada em 2026-07-26.** Validação independente: 64 testes direcionados,
+1491 passed/77 skipped na suíte completa, Ruff e `git diff --check` limpos.
+A contagem 1504/64 informada na entrega original dependia de pré-requisitos
+presentes no ambiente do implementador e não foi usada como baseline.
