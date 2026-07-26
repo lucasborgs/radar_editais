@@ -25,7 +25,7 @@ import os
 import re
 import threading
 import weakref
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 

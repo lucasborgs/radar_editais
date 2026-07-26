@@ -1570,7 +1570,6 @@ class WritingSession:
             self._trim_thread_history(thread_id)
 
         abort_event = register_cancel_token(self.session_id)
-        abort_registered = True
         try:
             if resume_ctx:
                 stream_gen = run_writing_turn_streaming(
