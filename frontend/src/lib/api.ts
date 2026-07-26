@@ -386,6 +386,90 @@ export async function exploreStream(
   }
 }
 
+// ── Writing Turn Stream (Sprint 1 — C1) ─────────────────────
+
+export interface WritingStreamCallbacks {
+  onToken: (text: string) => void;
+  onTool?: (name: string) => void;
+  onDone: (payload: Record<string, unknown>) => void;
+  onError: (message: string) => void;
+}
+
+export async function writingTurnStream(
+  sessionId: string,
+  message: string,
+  sectionHint: string | null | undefined,
+  libraryItemIds: string[],
+  profile: Partial<CompanyProfile> | null,
+  callbacks: WritingStreamCallbacks,
+  signal?: AbortSignal,
+): Promise<void> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "text/event-stream",
+  };
+  const token = await getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE_URL}/writing/turn/stream`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      session_id: sessionId,
+      user_message: message,
+      section_hint: sectionHint ?? null,
+      profile: profile?.nome ? profile : null,
+      library_item_ids: libraryItemIds,
+    }),
+    signal,
+  });
+  if (!res.ok) throw await buildApiError(res);
+  if (!res.body) throw new Error("Streaming não suportado neste navegador.");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      const frame = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+
+      let eventName = "message";
+      let dataLine = "";
+      for (const line of frame.split("\n")) {
+        if (line.startsWith("event:")) eventName = line.slice(6).trim();
+        else if (line.startsWith("data:")) dataLine += line.slice(5).trim();
+      }
+      if (!dataLine) continue;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(dataLine);
+      } catch {
+        continue;
+      }
+
+      if (eventName === "token") {
+        callbacks.onToken((parsed as { text: string }).text);
+      } else if (eventName === "tool") {
+        callbacks.onTool?.((parsed as { name: string }).name);
+      } else if (eventName === "done") {
+        callbacks.onDone(parsed as Record<string, unknown>);
+        return;
+      } else if (eventName === "error") {
+        callbacks.onError((parsed as { message: string }).message);
+        return;
+      }
+    }
+  }
+}
+
 // Poll cache-only dos vereditos (Estágio 2): a chave é o file_key do hipergrado
 // (`${source}__${edital_id}`). Auth obrigatória — anônimo não tem workspace.
 export const fetchMatchVerdicts = (oportunidadeIds: string[]) =>
@@ -453,6 +537,11 @@ export const sendWritingTurn = (
       section_hint: sectionHint,
       model_tier: modelTier,
     }),
+  });
+
+export const cancelWritingTurn = (sessionId: string) =>
+  apiFetch<{ ok: boolean }>(`/writing/${sessionId}/cancel`, {
+    method: "POST",
   });
 
 export interface WritingGenerateResponse {

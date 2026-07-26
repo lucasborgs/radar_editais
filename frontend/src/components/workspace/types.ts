@@ -5,6 +5,7 @@
 
 import type { WritingMode } from "@/types/api";
 import type { AutoReview } from "@/lib/api";
+import type { AgentTraceStep } from "@/components/chat/AgentTrace";
 
 // ── Findings do auto-review, normalizados para a UI (N3) ────────────────────
 // Cada finding já carrega a seção a que pertence ("Geral" = sem âncora). Os 3
@@ -93,6 +94,8 @@ export interface WorkspaceMessage {
   complianceFlags?: Array<Record<string, unknown>>;
   // PR6.2: resposta interrompida no limite de passos do agente (aviso discreto).
   truncated?: boolean;
+  // Sprint 1 (C2): tool trace do agente para exibição no chat.
+  toolTrace?: AgentTraceStep[];
 }
 
 // Uma seção no documento contínuo. `content` vem do backend; os demais campos

@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { AgentTrace, type AgentTraceStep } from "@/components/chat/AgentTrace";
 import { ChatBubble } from "@/components/chat/ChatBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { MentionsTextarea } from "@/components/ui/MentionsTextarea";
@@ -18,10 +19,11 @@ export interface WorkspaceChatHandle {
  * Chat à direita do workspace: transcript (ChatBubble) + composer (mentions).
  *
  * Renderiza:
- *  - "agente trabalhando…" enquanto o turno roda;
+ *  - streaming text + tool trace durante a geração;
+ *  - botão "Parar" para cancelar o turno;
  *  - `pending_user_input` como prompt destacado (PendingUserInputPrompt);
  *  - `compliance_flags` como aviso âmbar no turno;
- *  - chips "§ {seção} atualizada · ↶ desfazer" por seção co-editada pelo agente.
+ *  - chips "§ {seção} atualizada · ↶ desfazer" por seção co-editada.
  */
 export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
   messages: WorkspaceMessage[];
@@ -33,9 +35,17 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
   onAnswerPending: (answer: string) => void;
   onUndoSection: (title: string) => void;
   token: string | null;
-  fullWidth?: boolean; // quando true, ocupa toda a largura disponível (chat-first)
+  fullWidth?: boolean;
+  // Sprint 1 — streaming + tool trace + stop
+  streamingText?: string | null;
+  agentTrace?: AgentTraceStep[];
+  onStop?: () => void;
 }>(function WorkspaceChat(
-  { messages, input, onInput, onSend, working, pending, onAnswerPending, onUndoSection, token, fullWidth },
+  {
+    messages, input, onInput, onSend, working, pending,
+    onAnswerPending, onUndoSection, token, fullWidth,
+    streamingText, agentTrace, onStop,
+  },
   ref,
 ) {
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -43,7 +53,6 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
 
   useImperativeHandle(ref, () => ({
     appendToComposer(text: string) {
-      // Acrescenta com espaço de separação e foca o composer.
       const sep = input && !input.endsWith(" ") ? " " : "";
       onInput(input + sep + text + " ");
       composerRef.current?.focus();
@@ -52,7 +61,7 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, working]);
+  }, [messages, working, streamingText]);
 
   return (
     <div className={cn(fullWidth ? "w-full" : "w-[26rem] shrink-0", "border-l border-border bg-app-bg flex flex-col min-w-0")}>
@@ -69,14 +78,17 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
               <pre className="whitespace-pre-wrap font-sans text-inherit">{msg.content}</pre>
             </ChatBubble>
 
-            {/* aviso discreto de truncamento (PR6.2): resposta cortada no teto de passos */}
+            {/* tool trace on completed messages */}
+            {msg.role === "assistant" && (msg.toolTrace?.length ?? 0) > 0 && (
+              <AgentTrace steps={msg.toolTrace!} />
+            )}
+
             {msg.role === "assistant" && msg.truncated && (
               <p className="px-1 text-[11px] italic text-content-secondary font-sans">
                 Resposta interrompida no limite de passos — continue a conversa para o agente retomar.
               </p>
             )}
 
-            {/* avisos de compliance (âmbar) */}
             {msg.role === "assistant" && (msg.complianceFlags?.length ?? 0) > 0 && (
               <div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 font-sans">
                 {msg.complianceFlags!.map((flag, fi) => (
@@ -87,7 +99,6 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
               </div>
             )}
 
-            {/* chips de co-edição: seção atualizada · desfazer */}
             {msg.role === "assistant" && (msg.editedSections?.length ?? 0) > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {msg.editedSections!.map((title) => (
@@ -111,7 +122,22 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
           </div>
         ))}
 
-        {working && (
+        {/* Streaming bubble — texto incremental + tool trace ao vivo */}
+        {streamingText != null && (
+          <div className="space-y-1.5">
+            <ChatBubble role="assistant">
+              <pre className="whitespace-pre-wrap font-sans text-inherit">
+                {streamingText}
+                <span className="inline-block w-1.5 h-4 bg-content-secondary animate-pulse ml-0.5 align-text-bottom" />
+              </pre>
+            </ChatBubble>
+            {(agentTrace?.length ?? 0) > 0 && (
+              <AgentTrace steps={agentTrace!} />
+            )}
+          </div>
+        )}
+
+        {working && streamingText == null && (
           <div className="flex items-center gap-2 text-xs text-content-secondary font-sans px-1">
             <TypingIndicator />
             <span>agente trabalhando…</span>
@@ -144,17 +170,29 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
             )}
             disabled={working}
           />
-          <button
-            onClick={onSend}
-            disabled={working || !input.trim()}
-            className={cn(
-              "self-end px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold font-sans",
-              "hover:bg-primary-hover transition-colors",
-              "disabled:opacity-50 disabled:cursor-not-allowed",
-            )}
-          >
-            Enviar
-          </button>
+          {working ? (
+            <button
+              onClick={onStop}
+              className={cn(
+                "self-end px-4 py-2.5 rounded-xl bg-destructive text-white text-sm font-semibold font-sans",
+                "hover:bg-destructive-hover transition-colors",
+              )}
+            >
+              ■ Parar
+            </button>
+          ) : (
+            <button
+              onClick={onSend}
+              disabled={!input.trim()}
+              className={cn(
+                "self-end px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold font-sans",
+                "hover:bg-primary-hover transition-colors",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+              )}
+            >
+              Enviar
+            </button>
+          )}
         </div>
       </div>
     </div>
