@@ -24,9 +24,11 @@ domínios emergentes; não muda nenhuma decisão e não cria fonte automática.
 3. Definir lacunas como sinais explícitos, não score: canal habilitado sem run,
    run ambígua/atrasada, família sem dados suficientes ou fila pendente. Não
    concluir que há ausência de oportunidades ou cobertura ruim.
-4. Agrupar somente `origin_domain` normalizado de oportunidades aprovadas;
-   domínio com aprovações recorrentes é `candidate_for_dedicated_monitoring`.
-   Expor contagem/período e nunca cadastrar fonte, scraper ou regra automática.
+4. Agrupar somente `origin_domain` normalizado de oportunidades aprovadas nos
+   últimos 90 dias; domínio com ao menos 2 aprovações é
+   `candidate_for_dedicated_monitoring`. Expor contagem/período e nunca
+   cadastrar fonte, scraper ou regra automática. O limiar é uma regra pré-beta
+   ajustável, não um score de qualidade.
 5. Manter a derivação de saúde separada e pura para T06: precedência da spec,
    duas janelas para `stale`, zero ambíguo `unknown` e sem segunda persistência.
 

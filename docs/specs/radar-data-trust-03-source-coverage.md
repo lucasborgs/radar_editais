@@ -257,9 +257,10 @@ As decisões existentes em `discovered_opportunities` permitem calcular:
 - tempo entre descoberta e revisão; e
 - domínios que originaram oportunidades aprovadas repetidamente.
 
-Domínio recorrente aparece como **candidato** a monitoramento dedicado. A spec
-não o cadastra automaticamente, não cria scraper e não promove conteúdo sem
-operador.
+Domínio com **ao menos 2 oportunidades aprovadas nos últimos 90 dias** aparece
+como **candidato** a monitoramento dedicado. Essa regra é um sinal operacional
+pré-beta, simples e ajustável; não é score de qualidade. A spec não cadastra o
+domínio automaticamente, não cria scraper e não promove conteúdo sem operador.
 
 ## 10. Métricas de cobertura
 
