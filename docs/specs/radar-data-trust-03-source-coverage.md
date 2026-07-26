@@ -1,336 +1,375 @@
-# Radar Data Trust 03 — Cobertura e saúde das fontes
+# Radar Data Trust 03 — Cobertura da Descoberta e saúde dos canais
 
-**Status:** proposta para aprovação · **Data:** 2026-07-26
+**Status:** proposta revisada para aprovação · **Data:** 2026-07-26
 **Spec-mãe:** [`radar-data-trust.md`](radar-data-trust.md)
 **Contratos anteriores:** [`radar-data-trust-00-relevance-contract.md`](radar-data-trust-00-relevance-contract.md), [`radar-data-trust-02-quality-gates.md`](radar-data-trust-02-quality-gates.md)
-**Ordem:** 03 · **Impacto:** médio; ingestão, Descoberta e operação
+**Ordem:** 03 · **Impacto:** alto e incremental; aquisição e operação da Descoberta
 
 ---
 
 ## 1. Problema comprovado
 
-O Radar já possui quatro scrapers registrados (`finep`, `fapesp`, `fapesc` e
-`web`), Descoberta por Tavily/DOU, catálogos versionados de atores e
-`pipeline_errors`. Entretanto, o sistema não consegue responder de forma
-durável:
+O Radar precisa encontrar oportunidades relevantes para startups e PMEs de
+base tecnológica mesmo quando não conhece previamente a organização que as
+publicará.
 
-- quais canais deveriam estar ativos;
-- quando cada canal foi tentado e quando funcionou pela última vez;
-- quantos registros foram observados e persistidos;
-- se uma fonte está atrasada, falhando ou nunca foi observada;
-- qual é o rendimento da Descoberta até o gate editorial; ou
-- quão recentes são os catálogos versionados.
+Hoje há dois caminhos complementares:
 
-`run_daily_etl` persiste falhas, mas não sucessos. Vários coletores toleram
-falhas por item e retornam uma lista parcial ou vazia; por isso, ausência de
-exceção não prova completude. A Descoberta também captura falhas por
-query/candidato e retorna apenas os registros finais. Hoje, “zero resultados”
-pode significar nenhuma novidade, fonte indisponível, credencial ausente ou
-falha absorvida.
+- fontes dedicadas e Web curada, com coleta determinística; e
+- Descoberta aberta por Tavily, DOU e expansão opcional de hubs.
 
-Sem esse control plane, cobertura não é mensurável e fontes silenciosamente
-degradadas parecem saudáveis.
+Esse desenho é correto, mas ainda não é governável:
+
+- sucessos de coleta não possuem histórico por canal;
+- várias falhas são absorvidas e ficam visíveis apenas em logs;
+- Tavily, DOU e filhos de hubs perdem sua identidade antes do staging;
+- queries são strings sem identidade estável nem rendimento posterior;
+- a decisão humana não retroalimenta a estratégia de busca;
+- não sabemos quais canais e famílias de query encontram material útil; e
+- um domínio novo que produz oportunidades relevantes não é reconhecido como
+  candidato a monitoramento recorrente.
+
+O problema não é a ausência de um cadastro completo de órgãos brasileiros. É a
+ausência de instrumentos para saber se a combinação de canais está encontrando
+oportunidades relevantes na cauda longa desconhecida.
 
 ## 2. Resultado
 
-Entregar uma visão operacional mínima e auditável das fontes que o Radar
-deliberadamente monitora:
+Entregar uma Descoberta aberta multicanal, observável e adaptável:
 
-1. registro autoritativo dos canais e de sua modalidade;
-2. histórico aditivo de execuções e resultados por canal;
-3. estado derivado de saúde e frescor, com semântica conservadora;
-4. métricas de rendimento da Descoberta e dos catálogos versionados;
-5. API e painel administrativo somente leitura; e
-6. baseline local reproduzível, sem alegação de cobertura exaustiva.
+1. declarar os canais de aquisição existentes e suas responsabilidades;
+2. registrar saúde, frescor e resultados de cada execução;
+3. atribuir candidatos a canal e família de busca;
+4. medir o funil até a decisão editorial;
+5. revelar lacunas e domínios emergentes;
+6. permitir que queries sejam ajustadas com evidência; e
+7. mostrar ao operador o que está funcionando e quais limites permanecem.
 
-Esta spec mede o sistema existente. Ela não adiciona fontes, não muda o escopo
-de relevância e não promove automaticamente oportunidades.
+Esta spec não promete encontrar toda oportunidade publicada. Ela maximiza o
+recall dentro da tese do produto e torna pontos cegos detectáveis.
 
-## 3. Princípios de produto
+## 3. Tese de cobertura
 
-1. **Cobertura declarada, não universal:** o denominador é o conjunto de canais
-   registrados como monitorados, nunca “todos os órgãos do Brasil”.
-2. **Canal não é oportunidade:** uma instituição pode publicar itens dentro e
-   fora do escopo; a relevância continua sendo decidida por oportunidade.
-3. **Operação não prova conteúdo:** uma coleta concluída prova que o caminho
-   técnico terminou, não que o portal publicou tudo nem que os dados estão
-   corretos.
-4. **Zero é ambíguo:** resultado vazio nunca é convertido automaticamente em
-   “saudável” quando o produtor não consegue distinguir ausência real de falha.
-5. **Frescor depende da modalidade:** cron diário, descoberta aberta e catálogo
-   versionado não compartilham a mesma régua.
-6. **Sem score mágico:** estados categóricos e contadores observados substituem
-   uma nota numérica subjetiva de cobertura.
+O Radar usa duas camadas:
 
-## 4. Estado atual reutilizável
+```text
+FONTES CONHECIDAS
+FINEP, FAPESP, FAPESC e URLs Web curadas
+→ coleta determinística e alta precisão
 
-| Capacidade | Reuso | Limitação atual |
+DESCOBERTA ABERTA
+busca web + DOU + expansão de hubs
+→ recall sobre organizações e oportunidades não cadastradas
+
+AMBAS
+→ triagem de relevância → staging → revisão → pipeline canônico
+```
+
+Fontes conhecidas são âncoras, não o limite do universo pesquisado. A
+Descoberta aberta existe justamente para alcançar a cauda longa sem exigir um
+scraper dedicado para cada órgão, empresa ou programa.
+
+Quando um domínio desconhecido produz oportunidades aprovadas repetidamente,
+ele vira candidato a monitoramento dedicado. Isso melhora eficiência e
+confiabilidade, mas não é pré-requisito para que suas oportunidades sejam
+encontradas.
+
+## 4. Princípios
+
+1. **Oportunidade primeiro:** cobertura mede oportunidades relevantes
+   encontradas, não quantidade de instituições cadastradas.
+2. **Multicanal:** busca aberta não depende conceitualmente de uma única lista
+   de fontes nem confunde Tavily com garantia de completude.
+3. **Âncoras + cauda longa:** scrapers dedicados cobrem fontes previsíveis; a
+   descoberta aberta procura o que não foi antecipado.
+4. **Feedback editorial:** aprovação e rejeição humanas medem rendimento dos
+   canais e das famílias de query.
+5. **Zero é ambíguo:** ausência de resultados não prova ausência de
+   oportunidades.
+6. **Operação não prova conteúdo:** execução concluída não garante que o portal
+   publicou tudo nem que o motor de busca indexou tudo.
+7. **Sem score mágico:** estados e contadores observados prevalecem sobre nota
+   subjetiva de “cobertura”.
+8. **Sem blacklist institucional:** resultado irrelevante não elimina o domínio
+   ou organização de buscas futuras.
+
+## 5. Canais iniciais
+
+O registro contém somente canais de aquisição de oportunidades já existentes:
+
+| Canal | Tipo | Papel |
 |---|---|---|
-| `SCRAPER_REGISTRY` | identidade dos scrapers ativos | não declara finalidade, cadência nem saúde |
-| `run_daily_etl` | ponto único de orquestração dos scrapers | só agrega logs e erros |
-| `pipeline_errors` | detalhe técnico de falhas | não registra sucesso nem agrupa uma rodada |
-| Descoberta Tavily/DOU | aquisição aberta | métricas intermediárias ficam apenas em logs |
-| `discovered_opportunities` | resultados e decisões editoriais | não guarda uma execução nem todos os descartes |
-| `web_sources` | URLs curadas ativas | não guarda última tentativa ou sucesso |
-| catálogos versionados | investidores, programas e ICTs | frescor não é observado uniformemente |
-| página `/discovered` | console administrativo existente | não mostra saúde das fontes |
+| `finep` | `dedicated` | coleta determinística do portal FINEP |
+| `fapesp` | `dedicated` | coleta determinística do portal FAPESP |
+| `fapesc` | `dedicated` | coleta determinística do portal FAPESC |
+| `web_curated` | `curated_web` | URLs aprovadas em `web_sources` |
+| `open_search` | `open_search` | busca ampla pelo port existente, hoje Tavily |
+| `dou` | `official_feed` | oportunidades publicadas no DOU |
+| `hub_expansion` | `hub` | desafios-filho encontrados em hubs |
 
-Nenhuma tabela nova substitui `pipeline_errors`, `web_sources`,
-`discovered_opportunities` ou os artefatos versionados.
+`open_search` é o canal lógico. Tavily é o backend atual de
+`radar.core.web_search`, não uma decisão permanente do domínio. Trocar ou
+adicionar provider no futuro não muda staging, triagem ou métricas públicas.
 
-## 5. Tipos de canal
+Investidores, ICTs e programas versionados não entram neste registro: são
+catálogos de atores, não canais de aquisição de oportunidades. Uma chamada
+publicada por um investidor, empresa ou ICT continua sendo encontrada pela
+Descoberta como oportunidade.
 
-O registro distingue a modalidade porque “frescor” significa coisas
-diferentes:
-
-| Modalidade | Canais iniciais | Sinal observado |
-|---|---|---|
-| `scheduled_scraper` | FINEP, FAPESP, FAPESC, Web curada | execução diária e registros retornados |
-| `discovery` | Tavily, DOU | candidatos, triagens, aceites e staging |
-| `versioned_catalog` | investidores, programas, ICTs EMBRAPII | hash do artefato, registros e datas declaradas de verificação |
-
-O conjunto inicial reflete somente produtores que já existem. Adicionar fonte
-futura exige documentação de domínio e entrada explícita no registro; descobrir
-uma URL nova não cria automaticamente um novo canal monitorado.
-
-### 5.1 Autoridade do registro
+### 5.1 Autoridade
 
 As definições vivem em bloco YAML versionado em
-`docs/domain/sources/_coverage.md` e são lidas pelo loader existente
-`radar.core.kg.schema`. Código não mantém uma segunda lista normativa.
+`docs/domain/sources/_coverage.md`, lido pelo loader existente
+`radar.core.kg.schema`. Código não mantém lista normativa paralela.
 
-Cada definição contém:
+Cada canal declara:
 
 ```yaml
-source_key: finep
-display_name: FINEP
-mode: scheduled_scraper
-scope_note: Chamadas empresariais publicadas no portal FINEP
+source_key: open_search
+display_name: Busca aberta
+mode: open_search
+scope_note: Oportunidades não cobertas pelas fontes dedicadas e pelo DOU
 expected_interval_hours: 24
 enabled_by_default: true
 ```
 
-Regras:
+Canal gated por flag registra o nome da flag, nunca seu valor ou segredo.
 
-- `source_key` é estável e lowercase;
-- `expected_interval_hours` só existe para canal realmente periódico;
-- canal gated por flag informa a flag, sem copiar seu valor para o banco;
-- catálogos versionados não recebem SLA fictício;
-- segredo, query completa e URL com parâmetros sensíveis não entram no registro.
+## 6. Famílias de busca
 
-## 6. Contrato operacional
+As queries de `_discovery.md` passam a ter identificadores estáveis e uma
+finalidade de negócio:
 
-### 6.1 Uma tabela aditiva
+| Família inicial | O que procura |
+|---|---|
+| `state_innovation_funding` | chamadas estaduais e FAPs fora das fontes dedicadas |
+| `corporate_open_innovation` | desafios e pilotos publicados por empresas/hubs |
+| `startup_acceleration` | aceleração, incubação e programas com benefício concreto |
+| `international_brazil_access` | oportunidades internacionais acessíveis a empresas brasileiras |
 
-`source_runs` registra uma linha por canal observado em uma execução:
+O texto da query continua configurável em documentação. Métricas persistem
+somente o identificador da família, não a query completa.
+
+Uma família pode possuir várias queries. Adicionar ou ajustar query exige
+registrar o motivo e comparar seu rendimento, mas não exige criar uma nova
+fonte canônica.
+
+## 7. Contrato operacional
+
+### 7.1 `source_runs`
+
+Uma tabela aditiva registra uma linha por canal observado em uma execução:
 
 | Campo | Contrato |
 |---|---|
 | `id` | UUID |
-| `batch_id` | UUID compartilhado pela rodada do cron |
-| `source_key` | chave do registro |
-| `mode` | modalidade congelada na execução |
+| `batch_id` | UUID compartilhado pela rodada |
+| `source_key` | chave do canal |
+| `mode` | modalidade congelada |
 | `status` | `running`, `succeeded`, `partial`, `failed` ou `skipped` |
 | `started_at`, `completed_at` | timestamps UTC |
-| `records_observed` | itens retornados pelo produtor, nullable |
+| `records_observed` | itens retornados, nullable |
 | `records_emitted` | itens que atravessaram a etapa, nullable |
 | `records_staged` | itens enviados ao staging, nullable |
-| `error_count` | falhas observadas, default zero |
-| `reason_code` | motivo canônico curto para `partial`, `failed` ou `skipped` |
-| `metrics` | contadores adicionais não sensíveis, JSON |
+| `error_count` | falhas observadas |
+| `reason_code` | razão canônica curta |
+| `metrics` | contadores adicionais não sensíveis |
 
-`source_runs` é global, RLS habilitada e sem policy para usuários finais.
-Worker escreve com service role; a API administrativa lê com service role após
-o gate `AdminUserId`.
+RLS fica habilitada sem policy de usuário final. Worker escreve via service
+role; API administrativa lê após `AdminUserId`.
 
-Não persistir traceback, chave, corpo de documento, prompt, resposta LLM ou URL
-com query string. Detalhes técnicos continuam em logs e `pipeline_errors`.
+Não persistir traceback, credencial, prompt, resposta LLM, corpo documental,
+query completa ou URL com parâmetros sensíveis.
 
-### 6.2 Estados públicos derivados
+### 7.2 Atribuição no staging
 
-A API deriva, sem gravar uma segunda verdade:
+`discovered_opportunities` recebe campos aditivos e nullable:
+
+| Campo | Função |
+|---|---|
+| `discovery_run_id` | liga o candidato à rodada |
+| `discovery_channel` | `open_search`, `dou` ou `hub_expansion` |
+| `query_family` | família estável; nullable para DOU/hub sem query |
+| `origin_domain` | hostname normalizado e sem query/path |
+
+Dados legados permanecem válidos com todos os campos `null`.
+
+Esses campos não alteram relevância, status editorial, dedup, promoção ou
+materialização. Servem apenas para atribuição e aprendizado operacional.
+
+## 8. Saúde e frescor
+
+A API deriva estados; não grava uma segunda verdade:
 
 | Estado | Condição |
 |---|---|
-| `disabled` | canal condicionado a flag explicitamente desligada |
-| `unknown` | nunca observado ou resultado vazio ambíguo sem sucesso comprovável |
-| `healthy` | última execução comprovadamente concluída dentro da janela esperada |
-| `degraded` | última execução parcial ou com falhas absorvidas |
+| `disabled` | canal gated explicitamente desligado |
+| `unknown` | nunca observado ou resultado ambíguo |
+| `healthy` | execução comprovadamente concluída dentro da janela |
+| `degraded` | execução parcial ou com falhas absorvidas |
 | `failing` | última execução falhou |
-| `stale` | canal periódico passou duas janelas esperadas sem conclusão saudável |
+| `stale` | duas janelas esperadas sem conclusão saudável |
 
 Precedência: `disabled` → `failing` → `degraded` → `stale` → `healthy` →
 `unknown`.
 
-Para os crons diários, `stale` significa duas janelas perdidas
-(`2 × expected_interval_hours`). Isso é detector operacional, não garantia de
-que uma oportunidade foi publicada ou encontrada.
+“Healthy” significa que o caminho técnico concluiu; não significa cobertura
+completa da internet. Resultado vazio sem prova suficiente permanece
+`unknown`.
 
-Catálogos versionados exibem `last_artifact_observed_at`, hash, quantidade de
-registros e completude de `verificado_em`; não recebem artificialmente
-`healthy/stale` sem política de revisão aprovada.
+## 9. Instrumentação
 
-## 7. Instrumentação
+### 9.1 Fontes dedicadas e Web curada
 
-### 7.1 ETL diário
+O loop de `run_daily_etl` abre e finaliza um run por scraper sem alterar
+payload, retry, alertas, bronze, silver ou gold.
 
-Para cada item de `SCRAPER_REGISTRY`, o orquestrador:
+Registra contagem observada e falha do scraper. Não infere falha parcial quando
+o produtor não a expõe.
 
-1. abre `source_run`;
-2. executa o scraper sem alterar seu payload;
-3. registra `records_observed`;
-4. finaliza como `succeeded` ou `failed`; e
-5. mantém `pipeline_errors` como detalhe da falha.
+### 9.2 Descoberta aberta
 
-Quando o scraper expuser falhas parciais de forma confiável, registra
-`partial`. A primeira versão não infere falha parcial a partir de silêncio.
-Persistência da observabilidade é best-effort e nunca derruba a ingestão.
-
-### 7.2 Descoberta
-
-Tavily e DOU são canais distintos. A execução mede, quando observável:
+A rodada preserva a origem interna dos candidatos e mede por canal/família:
 
 - candidatos retornados;
-- falhas por query;
 - candidatos deduplicados;
+- falhas por query;
 - triagens executadas e puladas por cache;
-- rejeições;
-- falhas de triagem/extração;
+- rejeições da triagem;
+- falhas de triagem e extração;
+- filhos de hubs encontrados;
 - registros produzidos; e
 - registros enviados ao staging.
 
-A função pública existente continua retornando `list[dict]`. A instrumentação
-deve usar um relatório interno/aditivo e não quebrar scripts ou testes atuais.
-Uma rodada sem credencial é `skipped`, não sucesso com zero.
+O retorno público `discover_opportunities(...)->list[dict]` permanece
+compatível.
 
-DOU em fim de semana pode ser `skipped` com motivo canônico. Em dia útil,
-retorno vazio que não distingue indisponibilidade de edição vazia permanece
-`unknown`; não é marcado como saudável.
+Ausência de credencial é `skipped`. DOU em fim de semana pode ser `skipped`.
+Retorno vazio em condição indistinguível permanece ambíguo.
 
-### 7.3 Catálogos versionados
+### 9.3 Feedback da revisão
 
-Uma inspeção determinística e sem rede registra:
+As decisões existentes em `discovered_opportunities` permitem calcular:
 
-- caminho lógico do artefato;
-- hash de conteúdo;
-- quantidade de registros;
-- quantidade com/sem `verificado_em`; e
-- maior e menor data declarada, quando válidas.
+- taxa de aprovação por canal;
+- taxa de aprovação por família de query;
+- pendências e rejeições;
+- tempo entre descoberta e revisão; e
+- domínios que originaram oportunidades aprovadas repetidamente.
 
-Isso vale para investidores, programas e o snapshot EMBRAPII consumido pelo
-gold. A inspeção não reclassifica, enriquece nem corrige registros.
+Domínio recorrente aparece como **candidato** a monitoramento dedicado. A spec
+não o cadastra automaticamente, não cria scraper e não promove conteúdo sem
+operador.
 
-## 8. Métricas de cobertura
+## 10. Métricas de cobertura
 
-O serviço de leitura agrega:
+O painel apresenta:
 
-- canais registrados, habilitados e observados;
-- distribuição por estado operacional;
-- última tentativa e último sucesso por canal;
-- registros observados por execução;
-- rendimento da Descoberta: `staged / candidates`, com denominador explícito;
-- decisão editorial posterior: promovidos/rejeitados/pendentes por período; e
-- completude de verificação dos catálogos versionados.
+- canais ativos, observados, degradados e atrasados;
+- última tentativa e último sucesso;
+- volume e rendimento por canal;
+- rendimento por família de query;
+- distribuição dos aprovados por tipo de oportunidade e origem disponível;
+- domínios emergentes com aprovações; e
+- limitações e denominadores.
 
-Métricas sem denominador retornam `null`, nunca zero fabricado.
+Métrica sem denominador retorna `null`, nunca zero fabricado.
 
-Recall retrospectivo de oportunidades relevantes fica **fora desta versão**:
-não existe ainda corpus representativo de oportunidades conhecidas e perdidas.
-Os 14 casos de relevância validam o classificador, não a cobertura das fontes.
+### 10.1 Recall
 
-## 9. API e experiência do operador
+Recall absoluto da web é impossível de provar. O Radar usa três sinais:
 
-Adicionar `GET /source-coverage`, protegido por `AdminUserId`, com:
+1. rendimento prospectivo dos canais e queries;
+2. oportunidades relevantes conhecidas que foram ou não encontradas; e
+3. diversidade dos aprovados por mecanismo, região e tipo.
 
-- `generated_at`;
-- resumo agregado;
-- uma linha por canal registrado;
-- últimos contadores não sensíveis; e
-- limitações explícitas.
+Esta versão prepara a atribuição e o baseline. Um corpus retrospectivo só pode
+virar gate depois de curadoria representativa; os goldens de relevância não
+servem como denominador de descoberta.
 
-O painel entra no topo de `/discovered`, recolhido por padrão, porque essa já é
-a superfície administrativa de Descoberta. Exibe estado, última execução,
-último sucesso e contadores essenciais. Não cria edição de registry, reexecução
-de job, retry ou configuração de flags.
+## 11. API e experiência do operador
 
-O frontend nunca apresenta “cobertura do Brasil”. Texto canônico:
-“Fontes monitoradas pelo Radar”.
+Adicionar `GET /source-coverage`, protegido por `AdminUserId`, e painel
+recolhido no topo de `/discovered`.
 
-## 10. Compatibilidade, rollout e rollback
+Texto canônico:
 
-1. Migration aditiva; nenhuma tabela ou coluna existente muda.
+> Fontes e canais monitorados pelo Radar
+
+O painel mostra saúde, rendimento, famílias de busca e domínios emergentes.
+Não oferece edição de registry, query, flag, retry, crawler ou promoção
+automática.
+
+Falha do painel não bloqueia listar, promover ou rejeitar oportunidades.
+
+## 12. Compatibilidade e rollout
+
+1. Migration aditiva: cria `source_runs` e acrescenta colunas nullable ao
+   staging.
 2. Aplicar migration antes do runtime instrumentado.
-3. Escrita de telemetria nasce best-effort; falha não bloqueia coleta.
-4. API tolera tabela vazia e retorna todos os canais como `unknown/disabled`.
-5. UI tolera API indisponível sem bloquear a fila editorial.
-6. Não há backfill de execuções fictícias.
-7. Rollback remove o runtime leitor/escritor; a tabela pode permanecer sem
-   consumidor.
+3. Telemetria é best-effort e nunca bloqueia aquisição.
+4. API tolera tabela vazia e registros legados.
+5. UI tolera API indisponível.
+6. Não existe backfill fictício de runs ou atribuição legada.
+7. Rollback remove leitores/escritores; schema pode permanecer.
 8. Nenhum prompt, modelo, classificador, ranking, KG ou RAG muda.
 
-## 11. Segurança de ambiente
-
-- testes usam `ENVIRONMENT=test`, fixtures e banco fake/local;
-- nunca carregar `.env` de produção;
-- nenhuma execução externa é necessária para concluir a spec;
-- não consultar Supabase Cloud, Tavily, DOU ou LLM durante implementação;
-- erros expostos pela API são categóricos e sanitizados; e
-- migration remota, deploy e backfill exigem autorização separada.
-
-## 12. Validação proporcional
+## 13. Validação proporcional
 
 Cobertura mínima:
 
-- parse e invariantes do registro YAML;
-- persistência/idempotência de início e término de uma execução;
-- derivação de cada estado público e precedência;
-- ETL: sucesso, falha e falha da própria telemetria;
-- Descoberta: Tavily/DOU separados, credencial ausente e zero ambíguo;
-- catálogos: hash, contagem e datas ausentes;
-- API: auth administrativa, tabela vazia e sanitização;
-- frontend: TypeScript/lint e estados de fallback.
+- registry e famílias de query válidos;
+- persistência/idempotência de runs;
+- derivação conservadora de saúde;
+- ETL: sucesso, falha, vazio ambíguo e telemetria indisponível;
+- Descoberta: atribuição Tavily/DOU/hub e dedup entre canais;
+- funil editorial por canal/família;
+- domínio emergente sem promoção automática;
+- API administrativa, tabela vazia e sanitização;
+- frontend e fallback.
 
-Uma fixture por modalidade basta. Não criar nova suíte de eval: esta spec mede
-operação determinística, não qualidade de modelo.
+Uma fixture por canal relevante basta. Não criar threshold ou gate de recall
+sem corpus aprovado.
 
 Por task: testes direcionados, Ruff e `git diff --check`. Suíte completa,
 TypeScript e lint somente no fechamento.
 
-## 13. Tasks propostas
+## 14. Tasks propostas
 
 | Task | Resultado |
 |---|---|
-| `RT03-T01` | contrato de domínio + registry autoritativo |
-| `RT03-T02` | migration e persistência de `source_runs` |
-| `RT03-T03` | instrumentação do ETL diário |
-| `RT03-T04` | snapshot dos catálogos versionados |
-| `RT03-T05` | métricas da Descoberta Tavily/DOU |
-| `RT03-T06` | agregação, API administrativa e painel |
-| `RT03-T07` | baseline local, reconciliação e fechamento |
+| `RT03-T01` | contrato de canais e famílias de busca |
+| `RT03-T02` | migration, `source_runs` e atribuição nullable no staging |
+| `RT03-T03` | saúde das fontes dedicadas/Web curada |
+| `RT03-T04` | instrumentação multicanal da Descoberta |
+| `RT03-T05` | métricas do funil, lacunas e domínios emergentes |
+| `RT03-T06` | API administrativa e painel |
+| `RT03-T07` | baseline, reconciliação e fechamento |
 
-T01 e T02 podem ser implementadas em paralelo após aprovação da spec. T03 e
-T04 dependem delas. T05 depende de T01/T02, mas não de T03/T04. T06 depende de
+T01 precede T02. T03 e T04 podem avançar em paralelo após T02, com pouso
+serial em `tasks.py` se necessário. T05 depende de T04. T06 depende de
 T03–T05. T07 fecha tudo.
 
-## 14. Não objetivos
+## 15. Não objetivos
 
-- catalogar todos os órgãos ou fontes do Brasil;
-- adicionar novos scrapers, queries ou canais;
-- medir recall sem corpus conhecido;
-- criar alertas, pager, SLA contratual ou plataforma de observabilidade;
-- editar fontes ou disparar jobs pela UI;
-- classificar relevância, corrigir extração ou promover oportunidades;
-- monitorar páginas individuais de cada ator; ou
-- aplicar políticas automáticas de remoção por frescor.
+- cadastrar todos os órgãos, empresas ou fontes do Brasil;
+- depender de lista completa de instituições para buscar oportunidades;
+- garantir matematicamente completude da web;
+- descobrir ou enriquecer o catálogo de investidores/ICTs como atores;
+- criar scraper dedicado automaticamente;
+- trocar provider de busca sem evidência;
+- criar alertas, pager ou plataforma genérica de observabilidade;
+- alterar relevância, promoção, extração, gold, matching ou RAG; ou
+- remover oportunidade/fonte automaticamente por baixo rendimento.
 
-## 15. Critérios de conclusão
+## 16. Critérios de conclusão
 
-1. todos os canais existentes e intencionais estão no registro autoritativo;
-2. cron ETL e Descoberta persistem resultados sem mudar seu comportamento;
-3. catálogos versionados produzem snapshot determinístico;
-4. estados públicos seguem as regras conservadoras desta spec;
-5. operador vê fontes monitoradas, última execução e limitações;
-6. nenhuma métrica sem denominador vira zero;
-7. nenhum teste ou implementação acessa produção/rede;
+1. canais conhecidos e abertos são observáveis separadamente;
+2. todo novo candidato possui atribuição quando tecnicamente disponível;
+3. decisões editoriais retroalimentam métricas de canal e query;
+4. domínios emergentes são visíveis sem promoção automática;
+5. zero e falha absorvida não aparecem como sucesso enganoso;
+6. operador entende saúde, rendimento e limitações;
+7. nenhuma implementação acessa produção/rede durante testes;
 8. suíte completa e frontend permanecem no baseline comparativo; e
-9. documentação autoritativa e relatório final refletem o runtime entregue.
+9. a documentação não confunde cobertura medida com promessa de exaustividade.
