@@ -139,11 +139,17 @@ Coordena as 5 etapas acima em um `SourceCoverageReport` único.
 ## Validação
 
 - `PYTHONPATH=src ENVIRONMENT=test pytest -q tests/unit/test_source_coverage_metrics.py`: **51 passed**
+- `PYTHONPATH=src ENVIRONMENT=test pytest -q`: **1590 passed, 77 skipped**
 - `PYTHONPATH=src ENVIRONMENT=test ruff check src/radar/core/services/source_coverage_metrics.py tests/unit/test_source_coverage_metrics.py`: **All checks passed**
+- `ruff check $(git ls-files '*.py')`: **All checks passed**
 - `git diff --check`: **sem whitespace errors**
 
-Não foi usada baseline de suíte completa neste ciclo corretivo; a validação
-integral permanece responsabilidade da auditoria final.
+## Auditoria Codex
+
+**Aprovada em 2026-07-26.** Foram corrigidos antes da aprovação: semântica de
+sucesso estrita (`succeeded`), frescor por `completed_at`, bucket legado por
+família, normalização UTC, validação e ordenação estável de domínios, e
+isolamento completo do ambiente do processo.
 
 ## Ambiente
 
