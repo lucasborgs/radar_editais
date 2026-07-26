@@ -11,7 +11,7 @@ emergentes. Nenhuma escrita no staging, fonte/scraper automático, eval ou LLM.
 | Arquivo | Função |
 |---|---|
 | `src/radar/core/services/source_coverage_metrics.py` | Serviço read-only com funções puras que recebem dados + data de referência |
-| `tests/unit/test_source_coverage_metrics.py` | 49 testes direcionados |
+| `tests/unit/test_source_coverage_metrics.py` | 51 testes direcionados |
 
 ## Comportamento implementado
 
@@ -45,6 +45,9 @@ Precedência exata da spec: `disabled → failing → degraded → stale → hea
   `completed_at`, dentro de 1× intervalo
 - `unknown`: nunca executado, zero ambíguo ou fora de 1× intervalo
 
+Flags são lidas somente do dicionário `env` injetado. Sem ele, canais gated
+respeitam `enabled_by_default`; o ambiente do processo não participa do cálculo.
+
 `_has_observable_result`: `records_observed > 0` ou `records_staged > 0`.
 
 ### 4. Lacunas (`detect_gaps`)
@@ -77,7 +80,7 @@ Nenhum sinal afirma ausência de oportunidades ou baixa cobertura da web.
 
 Coordena as 5 etapas acima em um `SourceCoverageReport` único.
 
-## Testes direcionados — 49 passed
+## Testes direcionados — 51 passed
 
 | Teste | O que cobre |
 |---|---|
@@ -107,6 +110,7 @@ Coordena as 5 etapas acima em um `SourceCoverageReport` único.
 | `TestHealthPrecedence::test_ambiguous_zero_staged_with_observed` | observed > 0 → healthy |
 | `TestHealthPrecedence::test_disabled_via_flag_env_off` | hub_expansion off → disabled |
 | `TestHealthPrecedence::test_enabled_via_flag_env_on` | hub_expansion on → unknown |
+| `TestHealthPrecedence::test_missing_env_is_not_read_from_process` | ambiente do processo não altera a flag |
 | `TestHealthPrecedence::test_full_precedence_chain` | 4 estados em sequência |
 | `TestGaps::test_enabled_no_run` | canal habilitado sem run |
 | `TestGaps::test_disabled_no_run_no_gap` | desabilitado sem run → sem gap |
@@ -122,6 +126,7 @@ Coordena as 5 etapas acima em um `SourceCoverageReport` único.
 | `TestEmergingDomains::test_pending_not_counted` | pendentes ignorados |
 | `TestEmergingDomains::test_outside_90_days_window` | fora da janela → ignorado |
 | `TestEmergingDomains::test_mixed_domains` | múltiplos domínios |
+| `TestEmergingDomains::test_tied_domain_order_is_stable` | empate ordenado por domínio |
 | `TestEmergingDomains::test_boundary_90_days_exactly` | exatamente 90 dias → incluído |
 | `TestEmergingDomains::test_domain_normalization_and_invalid_values` | hostname normalizado e inválidos excluídos |
 | `TestEmergingDomains::test_future_approval_is_not_counted` | aprovação futura excluída |
@@ -133,7 +138,7 @@ Coordena as 5 etapas acima em um `SourceCoverageReport` único.
 
 ## Validação
 
-- `PYTHONPATH=src ENVIRONMENT=test pytest -q tests/unit/test_source_coverage_metrics.py`: **49 passed**
+- `PYTHONPATH=src ENVIRONMENT=test pytest -q tests/unit/test_source_coverage_metrics.py`: **51 passed**
 - `PYTHONPATH=src ENVIRONMENT=test ruff check src/radar/core/services/source_coverage_metrics.py tests/unit/test_source_coverage_metrics.py`: **All checks passed**
 - `git diff --check`: **sem whitespace errors**
 

@@ -9,7 +9,6 @@ referência. Não acessam rede, DB, LLM ou filesystem.
 """
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -330,8 +329,9 @@ def _is_channel_enabled(
     """Verifica se o canal está habilitado considerando flag e default."""
     flag_name = channel.get("flag_name")
     if flag_name:
-        actual_env = env if env is not None else os.environ
-        return actual_env.get(flag_name, "0") == "1"
+        if env is None:
+            return channel.get("enabled_by_default", False)
+        return env.get(flag_name) == "1"
     return channel.get("enabled_by_default", True)
 
 
@@ -537,7 +537,7 @@ def compute_emerging_domains(
             )
         )
 
-    result.sort(key=lambda d: d.approval_count, reverse=True)
+    result.sort(key=lambda domain: (-domain.approval_count, domain.domain))
     return result
 
 

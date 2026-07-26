@@ -463,6 +463,11 @@ class TestHealthPrecedence:
         )
         assert healths["hub_expansion"] == "unknown"
 
+    def test_missing_env_is_not_read_from_process(self, monkeypatch):
+        monkeypatch.setenv("DISCOVERY_DOU_ENABLED", "1")
+        healths = derive_channel_healths([_CHANNELS[1]], {}, self.REF)
+        assert healths["dou"] == "disabled"
+
     def test_full_precedence_chain(self):
         """Testa todos os estados em sequência."""
         for ch_cfg, runs, env, expected in [
@@ -479,7 +484,7 @@ class TestHealthPrecedence:
                 [ch_cfg],
                 {ch_cfg["source_key"]: runs},
                 self.REF,
-                env=env or None,
+                env=env,
             )
             sk = ch_cfg["source_key"]
             assert healths[sk] == expected, f"expected {expected} for {sk}"
@@ -665,6 +670,16 @@ class TestEmergingDomains:
         assert by_domain["candidato.gov.br"].approval_count == 3
         assert by_domain["unico.gov.br"].candidate_for_dedicated_monitoring is False
         assert by_domain["unico.gov.br"].approval_count == 1
+
+    def test_tied_domain_order_is_stable(self):
+        discovered = [
+            _disc(status="promoted", origin_domain="zeta.gov.br",
+                  reviewed_at="2026-07-20T10:00:00+00:00"),
+            _disc(status="promoted", origin_domain="alfa.gov.br",
+                  reviewed_at="2026-07-20T10:00:00+00:00"),
+        ]
+        domains = compute_emerging_domains(discovered, self.REF)
+        assert [domain.domain for domain in domains] == ["alfa.gov.br", "zeta.gov.br"]
 
     def test_boundary_90_days_exactly(self):
         exactly_90_ago = self.REF - timedelta(days=90)
