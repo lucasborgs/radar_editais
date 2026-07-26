@@ -27,6 +27,15 @@ class WebSearchError(Exception):
     """Falha controlada de busca (config ausente, provedor fora). A tool que
     chama converte em string; nunca propaga pro loop do agente."""
 
+def search_available() -> bool:
+    """Provider-neutral check if the search backend is configured.
+    Returns False when credentials are missing, never inspects
+    exception text or couples domain to a specific provider."""
+    backend = os.getenv("WEB_SEARCH_BACKEND", "tavily").lower()
+    if backend == "tavily":
+        return bool(os.getenv("TAVILY_API_KEY"))
+    return False
+
 
 @dataclass
 class SearchHit:
