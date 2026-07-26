@@ -41,6 +41,7 @@ CARD_KEYS = {
     "aperture", "macro_temas", "kind", "objective", "mecanismo", "mechanism",
     "eligible_entities", "key_requirements", "exclusoes", "value",
     "icts", "investidores", "constraints", "document_urls", "collected_at",
+    "provenance",
 }
 
 
