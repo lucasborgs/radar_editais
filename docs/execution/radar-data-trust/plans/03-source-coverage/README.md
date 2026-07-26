@@ -1,7 +1,7 @@
 # Plano executável — Radar Data Trust 03 (cobertura e saúde das fontes)
 
-**Spec:** [`../../../../specs/radar-data-trust-03-source-coverage.md`](../../../../specs/radar-data-trust-03-source-coverage.md)  
-**Spec-mãe:** [`../../../../specs/radar-data-trust.md`](../../../../specs/radar-data-trust.md)  
+**Spec:** [`../../../../specs/radar-data-trust-03-source-coverage.md`](../../../../specs/radar-data-trust-03-source-coverage.md)
+**Spec-mãe:** [`../../../../specs/radar-data-trust.md`](../../../../specs/radar-data-trust.md)
 **Status:** pronto para aprovação
 
 ## Resultado

@@ -1,8 +1,8 @@
 # Radar Data Trust 03 — Cobertura e saúde das fontes
 
-**Status:** proposta para aprovação · **Data:** 2026-07-26  
-**Spec-mãe:** [`radar-data-trust.md`](radar-data-trust.md)  
-**Contratos anteriores:** [`radar-data-trust-00-relevance-contract.md`](radar-data-trust-00-relevance-contract.md), [`radar-data-trust-02-quality-gates.md`](radar-data-trust-02-quality-gates.md)  
+**Status:** proposta para aprovação · **Data:** 2026-07-26
+**Spec-mãe:** [`radar-data-trust.md`](radar-data-trust.md)
+**Contratos anteriores:** [`radar-data-trust-00-relevance-contract.md`](radar-data-trust-00-relevance-contract.md), [`radar-data-trust-02-quality-gates.md`](radar-data-trust-02-quality-gates.md)
 **Ordem:** 03 · **Impacto:** médio; ingestão, Descoberta e operação
 
 ---
@@ -334,4 +334,3 @@ T03–T05. T07 fecha tudo.
 7. nenhum teste ou implementação acessa produção/rede;
 8. suíte completa e frontend permanecem no baseline comparativo; e
 9. documentação autoritativa e relatório final refletem o runtime entregue.
-
