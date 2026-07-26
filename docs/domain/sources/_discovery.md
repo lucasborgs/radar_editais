@@ -45,18 +45,23 @@ discovery:
       description: Oportunidades internacionais acessíveis a empresas brasileiras
 
   # Queries de busca (Tavily), escopadas pras zonas NÃO-DOU (ver divisão acima).
-  # Tunáveis conforme a taxa de aprovação observada.
+  # Cada query declara `text` e `family`. A família deve estar registrada em
+  # `query_families` acima. Tunáveis conforme a taxa de aprovação observada.
   queries:
-    # state_innovation_funding — FAPs / fomento estadual
-    - "FAP estadual edital inovação chamada aberta"
-    - "fundação de amparo à pesquisa edital empresas inovação inscrições abertas"
-    - "edital fomento inovação empresas governo estadual aberto"
-    # corporate_open_innovation — desafios corporativos / open innovation
-    - "desafio de inovação aberto empresas inscrições"
-    - "open innovation desafio tecnológico startups inscrições abertas"
-    # startup_acceleration — programas de aceleração / incubação
-    - "programa de aceleração startups inscrições abertas edital"
-    - "incubadora seleção de startups chamada aberta"
+    - text: "FAP estadual edital inovação chamada aberta"
+      family: state_innovation_funding
+    - text: "fundação de amparo à pesquisa edital empresas inovação inscrições abertas"
+      family: state_innovation_funding
+    - text: "edital fomento inovação empresas governo estadual aberto"
+      family: state_innovation_funding
+    - text: "desafio de inovação aberto empresas inscrições"
+      family: corporate_open_innovation
+    - text: "open innovation desafio tecnológico startups inscrições abertas"
+      family: corporate_open_innovation
+    - text: "programa de aceleração startups inscrições abertas edital"
+      family: startup_acceleration
+    - text: "incubadora seleção de startups chamada aberta"
+      family: startup_acceleration
   # Caps por execução (controle de custo do crawl diário). Orçamentos SEPARADOS
   # por gerador: no 1º shadow-run o DOU rendeu ~63 candidatos/dia e, num cap
   # compartilhado, zerava o Tavily. max_candidates = busca cega (Tavily);

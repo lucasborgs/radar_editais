@@ -2,13 +2,17 @@
 
 Valida:
   - _coverage.md carrega 7 canais com source_key/mode corretos;
-  - _discovery.md carrega 4 famílias de busca;
-  - invariantes: lowercase, unicidade, modos canônicos, fluxos sem flag;
+  - modos carregados do doc autoritativo (não de lista Python);
+  - _discovery.md carrega 4 famílias + queries estruturadas {text, family};
+  - invariantes: lowercase, unicidade, modos canônicos, enabled+flag;
   - fixtures inválidas acionam ValueError;
   - compatibilidade: discovery_config() ainda devolve queries planas;
-  - código não mantém lista normativa paralela.
+  - código não mantém lista normativa paralela;
+  - cada query pertence a exatamente uma família registrada.
 """
 from __future__ import annotations
+
+import inspect
 
 import pytest
 
@@ -16,9 +20,29 @@ from radar.core.kg.schema import (
     clear_cache,
     coverage_channel,
     coverage_channels,
+    coverage_modes,
     discovery_config,
+    discovery_queries,
+    discovery_queries_flat,
     query_families,
 )
+
+
+# Helpers de monkeypatch para testes
+def _patch_discovery(monkeypatch, data: dict):
+    """Patches _discovery_raw (usado por families + queries) e discovery_config."""
+    import radar.core.kg.schema as _schema_mod
+    monkeypatch.setattr(_schema_mod, "_discovery_raw", lambda: data)
+    monkeypatch.setattr(_schema_mod, "discovery_config", lambda: _projected(data))
+
+
+def _projected(data: dict) -> dict:
+    """Simula a projeção que discovery_config faz."""
+    cfg = dict(data)
+    raw_q = cfg.get("queries", [])
+    if raw_q and isinstance(raw_q[0], dict):
+        cfg["queries"] = [q["text"] for q in raw_q]
+    return cfg
 
 pytestmark = pytest.mark.unit
 
@@ -35,12 +59,51 @@ def _clear_caches():
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# Modes — carregados do doc autoritativo
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class TestModesFromDoc:
+
+    def test_modes_loaded_from_yaml(self):
+        modes = coverage_modes()
+        assert len(modes) >= 5
+        assert "dedicated" in modes
+        assert "curated_web" in modes
+        assert "open_search" in modes
+        assert "official_feed" in modes
+        assert "hub" in modes
+
+    def test_no_parallel_list_in_python(self):
+        """_VALID_CHANNEL_MODES foi removido; modos vêm exclusivamente do doc."""
+        import radar.core.kg.schema as s
+        assert not hasattr(s, "_VALID_CHANNEL_MODES")
+
+    def test_invalid_mode_in_channel_raises(self, monkeypatch):
+        monkeypatch.setattr(
+            "radar.core.kg.schema.coverage_config",
+            lambda: {
+                "modes": [{"key": "dedicated"}],
+                "channels": [{"source_key": "x", "mode": "nonexistent",
+                              "display_name": "X", "scope_note": "test",
+                              "expected_interval_hours": 24, "enabled_by_default": True}],
+            },
+        )
+        with pytest.raises(ValueError, match="invalid mode"):
+            coverage_channels()
+
+    def test_missing_modes_raises(self, monkeypatch):
+        monkeypatch.setattr("radar.core.kg.schema.coverage_config", lambda: {})
+        with pytest.raises(ValueError, match="no channel modes found"):
+            coverage_modes()
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # Channels — contrato RT03-T01
 # ══════════════════════════════════════════════════════════════════════════
 
 
 class TestChannelsContract:
-    """Validates the 7-channel contract from _coverage.md."""
 
     EXPECTED_KEYS = {
         "finep", "fapesp", "fapesc",
@@ -70,24 +133,7 @@ class TestChannelsContract:
             expected = self.EXPECTED_MODES[key]
             assert ch["mode"] == expected, f"{key}: expected mode {expected}, got {ch['mode']}"
 
-    def test_every_channel_has_display_name(self):
-        for ch in coverage_channels():
-            assert ch.get("display_name"), f"{ch['source_key']} missing display_name"
-
-    def test_every_channel_has_scope_note(self):
-        for ch in coverage_channels():
-            assert ch.get("scope_note"), f"{ch['source_key']} missing scope_note"
-
-    def test_every_channel_has_expected_interval(self):
-        for ch in coverage_channels():
-            assert "expected_interval_hours" in ch, f"{ch['source_key']} missing expected_interval_hours"
-
-    def test_every_channel_has_enabled_by_default(self):
-        for ch in coverage_channels():
-            assert "enabled_by_default" in ch, f"{ch['source_key']} missing enabled_by_default"
-
-    def test_channel_allows_flag_name_only_for_gated(self):
-        """Canais com flag registram o nome, não o valor."""
+    def test_flag_name_only_for_gated(self):
         gated = {"dou": "DISCOVERY_DOU_ENABLED", "hub_expansion": "DISCOVERY_HUB_CRAWL_ENABLED"}
         for ch in coverage_channels():
             key = ch["source_key"]
@@ -96,23 +142,32 @@ class TestChannelsContract:
             else:
                 assert "flag_name" not in ch, f"{key} should not have flag_name"
 
+    def test_gated_channels_have_enabled_false(self):
+        for ch in coverage_channels():
+            if "flag_name" in ch:
+                assert ch["enabled_by_default"] is False, (
+                    f"{ch['source_key']} with flag_name must have enabled_by_default=false"
+                )
+
+    def test_non_gated_channels_have_enabled_true(self):
+        for ch in coverage_channels():
+            if "flag_name" not in ch:
+                if ch["source_key"] not in ("finep", "fapesp", "fapesc", "web_curated", "open_search"):
+                    continue
+                assert ch["enabled_by_default"] is True, (
+                    f"{ch['source_key']} without flag_name must have enabled_by_default=true"
+                )
+
     def test_source_key_lowercase(self):
         for ch in coverage_channels():
             key = ch["source_key"]
             assert key == key.lower(), f"source_key {key!r} is not lowercase"
 
     def test_open_search_is_logical_not_tavily(self):
-        """open_search não nomeia Tavily como canal normativo."""
         ch = coverage_channel("open_search")
         assert ch is not None
         assert ch["mode"] == "open_search"
         assert "tavily" not in ch.get("scope_note", "").lower()
-
-    def test_no_upstream_search_provider_in_contract(self):
-        """Nenhum canal referencia provider de busca upstream."""
-        for ch in coverage_channels():
-            note = ch.get("scope_note", "")
-            assert "tavily" not in note.lower(), f"{ch['source_key']} mentions tavily in scope_note"
 
     def test_lookup_by_key(self):
         ch = coverage_channel("finep")
@@ -125,41 +180,77 @@ class TestChannelsContract:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# Channels — validation / edge cases
+# Channels — field validation
 # ══════════════════════════════════════════════════════════════════════════
 
 
-class TestChannelsValidation:
+class TestChannelsFieldValidation:
+
+    _BASE = {"display_name": "X", "scope_note": "x", "expected_interval_hours": 24, "enabled_by_default": True}
+
+    def test_channels_missing_source_key_raises(self, monkeypatch):
+        monkeypatch.setattr(
+            "radar.core.kg.schema.coverage_config",
+            lambda: {"modes": [{"key": "dedicated"}], "channels": [{"mode": "dedicated", **self._BASE}]},
+        )
+        with pytest.raises(ValueError, match="missing source_key"):
+            coverage_channels()
+
+    def test_channels_missing_display_name_raises(self, monkeypatch):
+        monkeypatch.setattr(
+            "radar.core.kg.schema.coverage_config",
+            lambda: {"modes": [{"key": "dedicated"}], "channels": [{"source_key": "x", "mode": "dedicated",
+                      "scope_note": "x", "expected_interval_hours": 24, "enabled_by_default": True}]},
+        )
+        with pytest.raises(ValueError, match="missing display_name"):
+            coverage_channels()
+
+    def test_channels_missing_scope_note_raises(self, monkeypatch):
+        monkeypatch.setattr(
+            "radar.core.kg.schema.coverage_config",
+            lambda: {"modes": [{"key": "dedicated"}], "channels": [{"source_key": "x", "mode": "dedicated",
+                      "display_name": "X", "expected_interval_hours": 24, "enabled_by_default": True}]},
+        )
+        with pytest.raises(ValueError, match="missing scope_note"):
+            coverage_channels()
+
+    def test_non_positive_interval_raises(self, monkeypatch):
+        monkeypatch.setattr(
+            "radar.core.kg.schema.coverage_config",
+            lambda: {"modes": [{"key": "dedicated"}], "channels": [{"source_key": "x", "mode": "dedicated",
+                      "display_name": "X", "scope_note": "x", "expected_interval_hours": -1, "enabled_by_default": True}]},
+        )
+        with pytest.raises(ValueError, match="expected_interval_hours must be positive"):
+            coverage_channels()
+
+    def test_non_bool_enabled_raises(self, monkeypatch):
+        monkeypatch.setattr(
+            "radar.core.kg.schema.coverage_config",
+            lambda: {"modes": [{"key": "dedicated"}], "channels": [{"source_key": "x", "mode": "dedicated",
+                      "display_name": "X", "scope_note": "x", "expected_interval_hours": 24, "enabled_by_default": "yes"}]},
+        )
+        with pytest.raises(ValueError, match="enabled_by_default must be boolean"):
+            coverage_channels()
 
     def test_duplicate_source_key_raises(self, monkeypatch):
-        """Duplicata dentro do YAML é erro de validação."""
-        bad = {
-            "channels": [
-                {"source_key": "finep", "mode": "dedicated"},
-                {"source_key": "finep", "mode": "dedicated"},
-            ]
-        }
-        monkeypatch.setattr("radar.core.kg.schema.coverage_config", lambda: bad)
+        monkeypatch.setattr(
+            "radar.core.kg.schema.coverage_config",
+            lambda: {
+                "modes": [{"key": "dedicated"}],
+                "channels": [
+                    {"source_key": "finep", "mode": "dedicated", **self._BASE},
+                    {"source_key": "finep", "mode": "dedicated", **self._BASE},
+                ],
+            },
+        )
         with pytest.raises(ValueError, match="duplicate source_key"):
             coverage_channels()
 
-    def test_invalid_mode_raises(self, monkeypatch):
-        bad = {
-            "channels": [
-                {"source_key": "bad_mode", "mode": "invalid_mode"},
-            ]
-        }
-        monkeypatch.setattr("radar.core.kg.schema.coverage_config", lambda: bad)
-        with pytest.raises(ValueError, match="invalid mode"):
-            coverage_channels()
-
     def test_uppercase_source_key_raises(self, monkeypatch):
-        bad = {
-            "channels": [
-                {"source_key": "Finep", "mode": "dedicated"},
-            ]
-        }
-        monkeypatch.setattr("radar.core.kg.schema.coverage_config", lambda: bad)
+        monkeypatch.setattr(
+            "radar.core.kg.schema.coverage_config",
+            lambda: {"modes": [{"key": "dedicated"}], "channels": [{"source_key": "Finep", "mode": "dedicated", **self._BASE}]},
+        )
         with pytest.raises(ValueError, match="source_key must be lowercase"):
             coverage_channels()
 
@@ -195,38 +286,78 @@ class TestQueryFamiliesContract:
             key = fam["key"]
             assert key == key.lower(), f"family key {key!r} is not lowercase"
 
+    def test_missing_family_key_raises(self, monkeypatch):
+        _patch_discovery(monkeypatch, {"query_families": [{"description": "no key"}]})
+        with pytest.raises(ValueError, match="missing key"):
+            query_families()
 
-# ══════════════════════════════════════════════════════════════════════════
-# Query families — validation / edge cases
-# ══════════════════════════════════════════════════════════════════════════
-
-
-class TestQueryFamiliesValidation:
+    def test_missing_family_description_raises(self, monkeypatch):
+        _patch_discovery(monkeypatch, {"query_families": [{"key": "x"}]})
+        with pytest.raises(ValueError, match="missing description"):
+            query_families()
 
     def test_duplicate_family_key_raises(self, monkeypatch):
-        bad = {
-            "query_families": [
-                {"key": "state_innovation_funding", "description": "dup"},
-                {"key": "state_innovation_funding", "description": "dup2"},
-            ]
-        }
-        monkeypatch.setattr("radar.core.kg.schema.discovery_config", lambda: bad)
+        _patch_discovery(monkeypatch, {"query_families": [
+            {"key": "a", "description": "x"},
+            {"key": "a", "description": "y"},
+        ]})
         with pytest.raises(ValueError, match="duplicate query_family key"):
             query_families()
 
     def test_uppercase_family_key_raises(self, monkeypatch):
-        bad = {
-            "query_families": [
-                {"key": "State_Innovation", "description": "bad casing"},
-            ]
-        }
-        monkeypatch.setattr("radar.core.kg.schema.discovery_config", lambda: bad)
+        _patch_discovery(monkeypatch, {"query_families": [{"key": "Foo", "description": "bad"}]})
         with pytest.raises(ValueError, match="query_family key must be lowercase"):
             query_families()
 
     def test_empty_families_returns_empty_list(self, monkeypatch):
-        monkeypatch.setattr("radar.core.kg.schema.discovery_config", lambda: {})
+        _patch_discovery(monkeypatch, {})
         assert query_families() == []
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Structured queries — {text, family} com validação de vínculo
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class TestStructuredQueries:
+
+    def test_discovery_queries_returns_structured(self):
+        queries = discovery_queries()
+        assert len(queries) >= 7
+        for q in queries:
+            assert isinstance(q["text"], str)
+            assert isinstance(q["family"], str)
+            assert q["family"] in ("state_innovation_funding", "corporate_open_innovation",
+                                    "startup_acceleration", "international_brazil_access")
+
+    def test_each_query_belongs_to_registered_family(self):
+        valid = {fam["key"] for fam in query_families()}
+        for q in discovery_queries():
+            assert q["family"] in valid, f"query {q['text'][:30]!r} has unregistered family {q['family']!r}"
+
+    def test_queries_with_unknown_family_raises(self, monkeypatch):
+        _patch_discovery(monkeypatch, {"query_families": [{"key": "a", "description": "x"}],
+                                       "queries": [{"text": "q1", "family": "nonexistent"}]})
+        with pytest.raises(ValueError, match="not in registered families"):
+            discovery_queries()
+
+    def test_query_missing_text_raises(self, monkeypatch):
+        _patch_discovery(monkeypatch, {"query_families": [{"key": "a", "description": "x"}],
+                                       "queries": [{"family": "a"}]})
+        with pytest.raises(ValueError, match="missing or empty.*text"):
+            discovery_queries()
+
+    def test_query_missing_family_raises(self, monkeypatch):
+        _patch_discovery(monkeypatch, {"query_families": [{"key": "a", "description": "x"}],
+                                       "queries": [{"text": "q1"}]})
+        with pytest.raises(ValueError, match="missing or empty.*family"):
+            discovery_queries()
+
+    def test_flat_projection(self):
+        flat = discovery_queries_flat()
+        assert len(flat) >= 7
+        for q in flat:
+            assert isinstance(q, str)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -265,15 +396,15 @@ class TestDiscoveryCompat:
 class TestNoParallelLists:
 
     def test_coverage_channels_comes_from_yaml_not_hardcoded(self):
-        """O código não mantém lista normativa paralela — lê do YAML."""
-        import inspect
         src = inspect.getsource(coverage_channels)
-        assert "_coverage.md" not in src  # não referencia o path
-        channels = coverage_channels()
-        assert len(channels) == 7
+        assert "_VALID_CHANNEL_MODES" not in src
+        assert "coverage_modes" in src or "coverage_config" in src
 
-    def test_query_families_comes_from_yaml_not_hardcoded(self):
-        import inspect
+    def test_modes_not_hardcoded_in_channels(self):
+        src = inspect.getsource(coverage_channels)
+        assert '"dedicated"' not in src
+        assert '"open_search"' not in src
+
+    def test_query_families_not_hardcoded(self):
         src = inspect.getsource(query_families)
-        # A validação itera sobre o que o YAML devolve, não repete a lista
         assert "state_innovation_funding" not in src

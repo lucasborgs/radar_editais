@@ -12,10 +12,22 @@ spec.
 `radar.core.web_search`, não uma decisão permanente do domínio. Trocar ou adicionar
 provider no futuro não muda staging, triagem ou métricas públicas.
 
-## Canais de aquisição
+## Modos canônicos
 
 ```yaml
 coverage:
+  modes:
+    - key: dedicated
+      description: Scraper dedicado por fonte (FINEP, FAPESP, FAPESC)
+    - key: curated_web
+      description: URLs de web curadas aprovadas em web_sources
+    - key: open_search
+      description: Busca ampla por motor de busca (canal lógico)
+    - key: official_feed
+      description: Feed oficial governamental (DOU)
+    - key: hub
+      description: Expansão de desafios-filho de hubs de inovação
+
   channels:
     - source_key: finep
       display_name: FINEP
@@ -68,16 +80,6 @@ coverage:
       enabled_by_default: false
       flag_name: DISCOVERY_HUB_CRAWL_ENABLED
 ```
-
-## Modos canônicos
-
-| Modo | Finalidade |
-|---|---|
-| `dedicated` | Scraper dedicado por fonte (FINEP, FAPESP, FAPESC) |
-| `curated_web` | URLs de web curadas aprovadas em web_sources |
-| `open_search` | Busca ampla por motor de busca (canal lógico) |
-| `official_feed` | Feed oficial governamental (DOU) |
-| `hub` | Expansão de desafios-filho de hubs de inovação |
 
 ## Invariantes
 

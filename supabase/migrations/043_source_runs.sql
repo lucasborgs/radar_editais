@@ -27,9 +27,12 @@ create table if not exists public.source_runs (
                         )),
     started_at        timestamptz not null default now(),
     completed_at      timestamptz,
-    records_observed  integer,
-    records_emitted   integer,
-    records_staged    integer,
+    records_observed  integer
+                        check (records_observed >= 0),
+    records_emitted   integer
+                        check (records_emitted >= 0),
+    records_staged    integer
+                        check (records_staged >= 0),
     error_count       integer not null default 0
                         check (error_count >= 0),
     reason_code       text,
@@ -99,7 +102,8 @@ comment on column public.source_runs.metrics is
 -- ──────────────────────────────────────────────────────────────────────────
 
 alter table public.discovered_opportunities
-    add column if not exists discovery_run_id uuid;
+    add column if not exists discovery_run_id uuid
+        references public.source_runs(id) on delete set null;
 
 alter table public.discovered_opportunities
     add column if not exists discovery_channel text
