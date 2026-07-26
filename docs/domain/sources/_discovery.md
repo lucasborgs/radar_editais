@@ -31,17 +31,30 @@ outra torneira do mesmo bronze é a seed list manual (`web_sources`).
 
 ```yaml
 discovery:
+  # Famílias de busca estáveis (RT03-T01). Identificam a finalidade de negócio
+  # da query; métricas persistem somente o identificador, não a query completa.
+  # Adicionar família exige registrar motivo no histórico, não criar novo canal.
+  query_families:
+    - key: state_innovation_funding
+      description: Chamadas estaduais e FAPs fora das fontes dedicadas
+    - key: corporate_open_innovation
+      description: Desafios e pilotos publicados por empresas/hubs
+    - key: startup_acceleration
+      description: Aceleração, incubação e programas com benefício concreto
+    - key: international_brazil_access
+      description: Oportunidades internacionais acessíveis a empresas brasileiras
+
   # Queries de busca (Tavily), escopadas pras zonas NÃO-DOU (ver divisão acima).
   # Tunáveis conforme a taxa de aprovação observada.
   queries:
-    # FAPs / fomento estadual (DOEs não entram no feeder DOU federal)
+    # state_innovation_funding — FAPs / fomento estadual
     - "FAP estadual edital inovação chamada aberta"
     - "fundação de amparo à pesquisa edital empresas inovação inscrições abertas"
     - "edital fomento inovação empresas governo estadual aberto"
-    # Desafios corporativos / open innovation (anúncio só-no-site)
+    # corporate_open_innovation — desafios corporativos / open innovation
     - "desafio de inovação aberto empresas inscrições"
     - "open innovation desafio tecnológico startups inscrições abertas"
-    # Programas de aceleração / incubação (Q4)
+    # startup_acceleration — programas de aceleração / incubação
     - "programa de aceleração startups inscrições abertas edital"
     - "incubadora seleção de startups chamada aberta"
   # Caps por execução (controle de custo do crawl diário). Orçamentos SEPARADOS

@@ -24,6 +24,16 @@ _WIKI_MD = _ROOT / "docs" / "domain" / "schema.md"
 _WIKIS_DIR = _ROOT / "docs" / "domain" / "sources"
 _PME_FILTER_MD = _WIKIS_DIR / "_pme_filter.md"
 _DISCOVERY_MD = _WIKIS_DIR / "_discovery.md"
+_COVERAGE_MD = _WIKIS_DIR / "_coverage.md"
+
+# Modos canônicos de canal de aquisição (RT03-T01, docs/domain/sources/_coverage.md)
+_VALID_CHANNEL_MODES: frozenset[str] = frozenset({
+    "dedicated",
+    "curated_web",
+    "open_search",
+    "official_feed",
+    "hub",
+})
 
 _YAML_BLOCK_RE = re.compile(r"```yaml\n(.*?)```", re.DOTALL)
 
@@ -238,9 +248,64 @@ def discovery_config() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Cobertura — canais de aquisição (docs/domain/sources/_coverage.md, RT03-T01)
+# ---------------------------------------------------------------------------
+
+@lru_cache(maxsize=1)
+def coverage_config() -> dict:
+    return _parse_md(_COVERAGE_MD).get("coverage", {})
+
+
+def coverage_channels() -> list[dict]:
+    """Canais de aquisição registrados, validados contra modos canônicos."""
+    channels = coverage_config().get("channels", [])
+    seen: set[str] = set()
+    validated: list[dict] = []
+    for ch in channels:
+        key = ch.get("source_key", "")
+        if not isinstance(key, str) or not key.islower():
+            raise ValueError(f"source_key must be lowercase: {key!r}")
+        if key in seen:
+            raise ValueError(f"duplicate source_key: {key}")
+        mode = ch.get("mode", "")
+        if mode not in _VALID_CHANNEL_MODES:
+            raise ValueError(f"invalid mode {mode!r} for channel {key!r}")
+        seen.add(key)
+        validated.append(ch)
+    return validated
+
+
+def coverage_channel(source_key: str) -> dict | None:
+    """Retorna um canal por source_key ou None."""
+    for ch in coverage_channels():
+        if ch.get("source_key") == source_key:
+            return ch
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Famílias de busca (docs/domain/sources/_discovery.md, RT03-T01)
+# ---------------------------------------------------------------------------
+
+def query_families() -> list[dict]:
+    """Famílias de busca registradas, valida unicidade de chave."""
+    families = discovery_config().get("query_families", [])
+    seen: set[str] = set()
+    for fam in families:
+        key = fam.get("key", "")
+        if not isinstance(key, str) or not key.islower():
+            raise ValueError(f"query_family key must be lowercase: {key!r}")
+        if key in seen:
+            raise ValueError(f"duplicate query_family key: {key}")
+        seen.add(key)
+    return families
+
+
+# ---------------------------------------------------------------------------
 # Testes
 # ---------------------------------------------------------------------------
 
 def clear_cache() -> None:
     load.cache_clear()
     pme_filter_rules.cache_clear()
+    coverage_config.cache_clear()
