@@ -1,4 +1,4 @@
-# Plano executável — Radar Data Trust 03 (cobertura e saúde das fontes)
+# Plano executável — Radar Data Trust 03 (Descoberta e cobertura)
 
 **Spec:** [`../../../../specs/radar-data-trust-03-source-coverage.md`](../../../../specs/radar-data-trust-03-source-coverage.md)
 **Spec-mãe:** [`../../../../specs/radar-data-trust.md`](../../../../specs/radar-data-trust.md)
@@ -6,73 +6,72 @@
 
 ## Resultado
 
-Medir somente as **Fontes monitoradas pelo Radar**: um registry normativo
-versionado, histórico aditivo de `source_runs`, estados operacionais
-conservadores, snapshots locais dos três catálogos e uma consulta/painel de
-operador apenas para leitura. Não mede cobertura do Brasil, não cria uma suíte
-de eval, não altera relevância, gold, ranking, RAG, promoção editorial ou os
-produtores de dados.
+Tornar observável o funil de oportunidades: as quatro âncoras conhecidas
+(`finep`, `fapesp`, `fapesc`, `web_curated`) e a Descoberta aberta
+(`open_search`, `dou`, `hub_expansion`). O resultado é atribuição de novos
+candidatos, saúde conservadora dos canais, rendimento editorial por canal e
+família de busca, domínios emergentes e painel administrativo de leitura.
+
+Catálogos de atores estão fora deste plano, assim como nova fonte, scraper
+automático, eval, gate de recall, mudança de relevância/promoção/gold/RAG ou
+promessa de cobertura exaustiva.
 
 ## Ordem e dependências
 
 | Task | Plano | Resultado | Depende de |
 |---|---|---|---|
-| `RT03-T01` | [`domain-registry.md`](RT03-T01-domain-registry.md) | registry YAML e contrato puro | aprovação da spec |
-| `RT03-T02` | [`source-runs-storage.md`](RT03-T02-source-runs-storage.md) | migration + escrita best-effort | T01 |
-| `RT03-T03` | [`daily-etl-observability.md`](RT03-T03-daily-etl-observability.md) | um run por scraper/rodada diária | T01, T02 |
-| `RT03-T04` | [`catalog-snapshots.md`](RT03-T04-catalog-snapshots.md) | inspeção determinística dos catálogos | T01, T02 |
-| `RT03-T05` | [`discovery-observability.md`](RT03-T05-discovery-observability.md) | Tavily/DOU separados sem quebrar `list[dict]` | T01, T02 |
-| `RT03-T06` | [`admin-read-model.md`](RT03-T06-admin-read-model.md) | agregação, `GET /source-coverage` e painel | T03–T05 |
-| `RT03-T07` | [`final-validation.md`](RT03-T07-final-validation.md) | baseline, reconciliação e fechamento | T01–T06 |
+| `RT03-T01` | [`channels-query-families.md`](RT03-T01-channels-query-families.md) | contrato de canais e famílias | aprovação da spec |
+| `RT03-T02` | [`source-runs-staging-attribution.md`](RT03-T02-source-runs-staging-attribution.md) | tabela única + colunas nullable | T01 |
+| `RT03-T03` | [`dedicated-curated-health.md`](RT03-T03-dedicated-curated-health.md) | saúde das fontes dedicadas/Web | T01, T02 |
+| `RT03-T04` | [`open-discovery-observability.md`](RT03-T04-open-discovery-observability.md) | atribuição open-search/DOU/hub | T01, T02 |
+| `RT03-T05` | [`editorial-funnel-emerging-domains.md`](RT03-T05-editorial-funnel-emerging-domains.md) | métricas, lacunas e domínios | T04 |
+| `RT03-T06` | [`admin-api-panel.md`](RT03-T06-admin-api-panel.md) | API e painel somente leitura | T03–T05 |
+| `RT03-T07` | [`final-validation.md`](RT03-T07-final-validation.md) | baseline e reconciliação | T01–T06 |
 
 ## Ondas seguras e sobreposição
 
-- **Onda A:** T01 e T02 em sequência curta. T02 consome o formato e as
-  invariantes de T01; nenhum dos dois toca produtores existentes.
-- **Onda B:** T03 e T04 são independentes no contrato, mas disputam o mesmo
-  bloco de `src/radar/core/tasks.py`; aterrar T03 primeiro e T04 em seguida,
-  que acrescenta a chamada de snapshot. T05 (Descoberta) pode correr em
-  paralelo a essa sequência, pois consome só o contrato estável de T02.
-- **Onda C:** T06 só depois que os três escritores produzem linhas reais. Ele
-  concentra `src/radar/core/services/source_coverage.py`, router/app,
-  `frontend/src/lib/api.ts` e `/discovered`; não concorre com T03–T05.
-- **Onda D:** T07 é o único ponto que atualiza relatórios e status/documentação
-  de fechamento. Não reconciliar a spec durante tasks intermediárias.
+- **Onda A:** T01, depois T02. A migration e a atribuição dependem do vocabulário
+  documental estável; não executar em paralelo.
+- **Onda B:** T03 e T04 podem avançar em paralelo depois de T02. T03 pousa no
+  loop de `src/radar/core/tasks.py`; T04 deve manter a instrumentação na
+  Descoberta e preservar sua assinatura. Se o implementador optar por criar o
+  `batch_id` no wrapper do cron, aterrar o único bloco de `tasks.py`
+  serialmente.
+- **Onda C:** T05 consome a atribuição já gravada por T04 e produz somente o
+  read model. T06 vem depois de T03–T05 e é o único autor de router, app e UI.
+- **Onda D:** T07 fecha testes, relatórios e documentação; não atualizar status
+  da spec em tarefas intermediárias.
 
-Arquivos de pouso compartilhados a tratar serialmente: `src/radar/core/tasks.py`
-(T03/T04), `src/radar/core/services/source_coverage.py` (T02/T03/T06) e
-`docs/domain/sources/_coverage.md` (T01 é seu único autor). T04 e T05 usam
-módulos próprios para não disputar o repositório de runs. T05 deve manter a
-compatibilidade da assinatura pública de Descoberta; T06 é o único autor de
-API/UI nesta spec.
+Pontos de pouso a serializar: `docs/domain/sources/_coverage.md` e
+`_discovery.md` (T01); migration/staging (T02); eventual `tasks.py` (T03/T04);
+e o contrato do repositório de runs (T02 antes de seus consumidores). T06 é o
+único autor de API/frontend. Não incluir catálogos de atores nesta spec.
 
 ## Invariantes transversais
 
-- O registry em `docs/domain/sources/_coverage.md` é a única lista normativa;
-  Python só o carrega/valida e nunca duplica canais, cadência ou flags.
-- Só existe a tabela nova `source_runs`; ela é aditiva, global, RLS habilitada e
-  sem policy de usuário final. `pipeline_errors`, `web_sources`, staging e
-  artefatos continuam suas autoridades.
-- Telemetria é best-effort: erro de abrir/finalizar um run não muda payload,
-  retorno, retry, alerta nem sucesso/falha do coletor.
-- `0` sem prova de ausência é ambíguo. Estado público é derivado em leitura,
-  nunca materializado, e métricas sem denominador são `null`, não `0`.
-- Não persistir URL com query, conteúdo, traceback, prompt, resposta de LLM ou
-  segredo. A API expõe só contadores e razões canônicas sanitizadas.
-- Não há backfill fictício, alerta, reexecução, edição de registry, nova eval,
-  acesso a produção/rede ou mudança de modelo/prompt.
+- O registry documental é a única lista normativa de canais, e famílias/queries
+  continuam configuradas em `_discovery.md`; `open_search` é lógico, não Tavily.
+- A única tabela nova é `source_runs`. Staging recebe apenas quatro colunas
+  nullable aditivas; linhas legadas, dedup, status e promoção permanecem válidos.
+- Telemetria é best-effort. `0` ambíguo não vira sucesso/saúde e denominador
+  ausente retorna `null`.
+- Não persistir query completa, URL com path/query, conteúdo, traceback, prompt,
+  resposta LLM, segredo ou credencial. `origin_domain` é só hostname normalizado.
+- Estados são derivados em leitura; domínio emergente é candidato visível, nunca
+  fonte/scraper/promoção automática.
+- Não acessar produção/rede/LLM durante testes, nem criar eval, threshold, gate,
+  backfill fictício, alerta, retry ou ação de operador nova.
 
-## Gate proporcional
+## Gate proporcional e relatório
 
-- Cada task: testes direcionados, `ruff check` no escopo e `git diff --check`.
-- Migration: aplicar/reaplicar apenas contra banco local de teste e verificar
-  schema, RLS e transição idempotente.
-- Uma fixture por modalidade basta; mocks/fakes substituem Supabase, Tavily,
-  DOU e LLM. Não carregar `.env` nem chamar `supabase db push`.
-- T06 adiciona `npx tsc --noEmit` e `npm run lint` do frontend; T07 roda a suíte
+- Por task: testes direcionados, `ruff check` no escopo e `git diff --check`.
+- Migration/RLS: somente banco local/fake; reexecução e transições idempotentes.
+- Uma fixture por canal relevante basta. Mocks substituem DB, busca, DOU e LLM;
+  não carregar `.env` nem executar coleta real.
+- T06 inclui `cd frontend && npx tsc --noEmit` e `npm run lint`; T07 roda a suíte
   Python completa e compara falhas com a branch-base.
 
-Cada relatório de task deve ser criado em
-`docs/execution/radar-data-trust/reports/03-source-coverage/` pelo implementador
-da task, com diff/commit, testes executados, limitações observadas e confirmação
-explícita de ambiente hermético. T07 consolida o `README.md` daquele diretório.
+Cada task entrega um relatório em
+`docs/execution/radar-data-trust/reports/03-source-coverage/` com commits,
+testes, limitações e confirmação explícita de ambiente hermético. T07 consolida
+o `README.md` desse diretório.
