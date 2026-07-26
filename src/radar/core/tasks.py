@@ -30,6 +30,7 @@ import hashlib  # noqa: E402
 import json  # noqa: E402
 import logging  # noqa: E402
 import os  # noqa: E402
+import uuid  # noqa: E402
 
 from procrastinate import App, PsycopgConnector, RetryStrategy  # noqa: E402
 
@@ -760,6 +761,26 @@ def _insert_chunks_psycopg(rows: list[dict]) -> None:
 # Para ativar mais fontes: implemente um BaseScraper concreto e registre em SCRAPER_REGISTRY.
 
 
+# Mapa: chave do SCRAPER_REGISTRY → (source_key do canal, mode).
+# O scraper `web` é mapeado como `web_curated` (curated_web).
+_SOURCE_RUN_MAP: dict[str, tuple[str, str]] = {
+    "finep": ("finep", "dedicated"),
+    "fapesp": ("fapesp", "dedicated"),
+    "fapesc": ("fapesc", "dedicated"),
+    "web": ("web_curated", "curated_web"),
+}
+
+# PipelineError.category → reason_code canônico de source_runs.
+_PIPELINE_CATEGORY_TO_REASON: dict[str, str] = {
+    "timeout": "timeout",
+    "parse_error": "parse_error",
+    "schema_violation": "parse_error",
+    "llm_refusal": "provider_error",
+    "duplicate": "empty_result",
+    "unknown": "unknown",
+}
+
+
 def _build_all_silver() -> int:
     """Persiste o canônico fresco e materializa Silver dos editais scraped.
 
@@ -839,6 +860,16 @@ async def _run_daily_etl(timestamp: int) -> None:
     # Import tardio para evitar custo no boot do worker
     from radar.pipeline.extractors import SCRAPER_REGISTRY
 
+    # Telemetria: batch_id único para todos os canais desta rodada.
+    batch_id = str(uuid.uuid4())
+    db = None
+    try:
+        db = get_supabase_service()
+    except Exception:
+        logger.warning("run_daily_etl: falha ao conectar DB para telemetria", exc_info=True)
+
+    from radar.core.services.source_runs import finish_run, start_run  # noqa: PLC0415
+
     # Falhas parciais da run (scraper por fonte + etapas pós-scraping).
     # Não derrubam a run; viram 1 e-mail AGREGADO ao final.
     step_errors: list[str] = []
@@ -850,6 +881,25 @@ async def _run_daily_etl(timestamp: int) -> None:
         # `display_name` (ex: "FINEP") é só pra log/UX, não pra prefixo.
         source = cfg.get("source", source_key)
         display_name = cfg.get("display_name", source_key)
+
+        # Telemetria: abrir run antes da coleta (best-effort).
+        run_id = None
+        coverage_info = _SOURCE_RUN_MAP.get(source_key)
+        if coverage_info is not None and db is not None:
+            cov_source_key, cov_mode = coverage_info
+            try:
+                run_id = await asyncio.to_thread(
+                    start_run, db,
+                    batch_id=batch_id,
+                    source_key=cov_source_key,
+                    mode=cov_mode,
+                )
+            except Exception:
+                logger.warning(
+                    "run_daily_etl: start_run falhou (best-effort) source=%s",
+                    source_key, exc_info=True,
+                )
+
         try:
             scraper = cls(**cfg.get("kwargs", {}))
             results = await asyncio.to_thread(scraper.extract)
@@ -858,6 +908,22 @@ async def _run_daily_etl(timestamp: int) -> None:
             logger.info(
                 "run_daily_etl_task: %s — %d resultados", display_name, new_count,
             )
+
+            # Telemetria: finalizar run com sucesso (best-effort).
+            if run_id:
+                try:
+                    await asyncio.to_thread(
+                        finish_run, db,
+                        run_id=run_id,
+                        status="succeeded",
+                        records_observed=new_count,
+                        error_count=0,
+                    )
+                except Exception:
+                    logger.warning(
+                        "run_daily_etl: finish_run falhou (best-effort) source=%s",
+                        source_key, exc_info=True,
+                    )
 
             # O cron das 03:00 não produz edital_chunks. O corpus de escrita é
             # aquecido pelo cron dedicado das 05:00 e também garantido por
@@ -872,6 +938,25 @@ async def _run_daily_etl(timestamp: int) -> None:
             logger.warning("run_daily_etl_task: %s falhou (%s): %s",
                           display_name, e.category, e)
             step_errors.append(f"scraper {display_name} [{e.category}]: {e}")
+
+            # Telemetria: finalizar run com falha (best-effort).
+            if run_id:
+                reason = _PIPELINE_CATEGORY_TO_REASON.get(e.category, "unknown")
+                try:
+                    await asyncio.to_thread(
+                        finish_run, db,
+                        run_id=run_id,
+                        status="failed",
+                        records_observed=0,
+                        error_count=1,
+                        reason_code=reason,
+                    )
+                except Exception:
+                    logger.warning(
+                        "run_daily_etl: finish_run falhou (best-effort) source=%s",
+                        source_key, exc_info=True,
+                    )
+
         except Exception as raw_err:
             # Genérico: tenta classificar (HTTPError → ParseError/Timeout, etc.)
             typed = classify_requests_error(raw_err)
@@ -887,6 +972,24 @@ async def _run_daily_etl(timestamp: int) -> None:
             step_errors.append(
                 f"scraper {display_name} [{typed.category}]: {raw_err}"
             )
+
+            # Telemetria: finalizar run com falha (best-effort).
+            if run_id:
+                reason = _PIPELINE_CATEGORY_TO_REASON.get(typed.category, "unknown")
+                try:
+                    await asyncio.to_thread(
+                        finish_run, db,
+                        run_id=run_id,
+                        status="failed",
+                        records_observed=0,
+                        error_count=1,
+                        reason_code=reason,
+                    )
+                except Exception:
+                    logger.warning(
+                        "run_daily_etl: finish_run falhou (best-effort) source=%s",
+                        source_key, exc_info=True,
+                    )
 
     # -------------------------------------------------------------------
     # Pós-scraping (pipeline v3 — spec docs/specs/v3-unified.md §10):
