@@ -22,7 +22,7 @@ Exemplo: `"http://user:pass@example.com:8080."` → `"example.com"`.
 ### Fix 2 — `db=None` guard + `try/except` em telemetria
 
 - `start_run` só é chamado quando `db is not None`. Cada chamada individual é
-  protegida por `try/except RuntimeError` — uma falha não derruba os outros canais.
+  protegida por `try/except Exception` — uma falha não derruba os outros canais.
 - `_finish_all` também guarda `if db is None: return` e envolve cada
   `_finish_run` em `try/except`.
 - Sem `start_run` nem `_finish_run` sem DB — a descoberta prossegue normalmente.
@@ -218,6 +218,8 @@ faltando.
 ## Validação
 
 - `pytest tests/unit/test_source_coverage_discovery.py tests/unit/test_opportunity_discovery_cache.py tests/unit/test_hardening_pr4.py tests/unit/test_source_runs.py tests/unit/test_source_coverage_registry.py`: **149 passed**
+- Suíte completa, reexecutada pela auditoria em ambiente hermético:
+  **1539 passed, 77 skipped**
 - `ruff check src/radar/core/ingestion/opportunity_discovery.py src/radar/core/web_search.py tests/unit/test_source_coverage_discovery.py tests/unit/test_opportunity_discovery_cache.py tests/unit/test_hardening_pr4.py`: **All checks passed**
 - `git diff --check`: **sem whitespace errors**
 
@@ -237,3 +239,8 @@ faltando.
 - Branch: `codex/radar-data-trust-03-t04`
 - Sem `.env`, produção, rede, Tavily, DOU, LLM, ingestão gold real ou merge/push
 - RT03-T05 **não foi iniciada**
+
+## Auditoria Codex
+
+**Aprovada em 2026-07-26.** Validação independente: 149 testes direcionados,
+1539 passed/77 skipped na suíte completa, Ruff e `git diff --check` limpos.
