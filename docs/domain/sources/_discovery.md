@@ -31,19 +31,37 @@ outra torneira do mesmo bronze é a seed list manual (`web_sources`).
 
 ```yaml
 discovery:
+  # Famílias de busca estáveis (RT03-T01). Identificam a finalidade de negócio
+  # da query; métricas persistem somente o identificador, não a query completa.
+  # Adicionar família exige registrar motivo no histórico, não criar novo canal.
+  query_families:
+    - key: state_innovation_funding
+      description: Chamadas estaduais e FAPs fora das fontes dedicadas
+    - key: corporate_open_innovation
+      description: Desafios e pilotos publicados por empresas/hubs
+    - key: startup_acceleration
+      description: Aceleração, incubação e programas com benefício concreto
+    - key: international_brazil_access
+      description: Oportunidades internacionais acessíveis a empresas brasileiras
+
   # Queries de busca (Tavily), escopadas pras zonas NÃO-DOU (ver divisão acima).
-  # Tunáveis conforme a taxa de aprovação observada.
+  # Cada query declara `text` e `family`. A família deve estar registrada em
+  # `query_families` acima. Tunáveis conforme a taxa de aprovação observada.
   queries:
-    # FAPs / fomento estadual (DOEs não entram no feeder DOU federal)
-    - "FAP estadual edital inovação chamada aberta"
-    - "fundação de amparo à pesquisa edital empresas inovação inscrições abertas"
-    - "edital fomento inovação empresas governo estadual aberto"
-    # Desafios corporativos / open innovation (anúncio só-no-site)
-    - "desafio de inovação aberto empresas inscrições"
-    - "open innovation desafio tecnológico startups inscrições abertas"
-    # Programas de aceleração / incubação (Q4)
-    - "programa de aceleração startups inscrições abertas edital"
-    - "incubadora seleção de startups chamada aberta"
+    - text: "FAP estadual edital inovação chamada aberta"
+      family: state_innovation_funding
+    - text: "fundação de amparo à pesquisa edital empresas inovação inscrições abertas"
+      family: state_innovation_funding
+    - text: "edital fomento inovação empresas governo estadual aberto"
+      family: state_innovation_funding
+    - text: "desafio de inovação aberto empresas inscrições"
+      family: corporate_open_innovation
+    - text: "open innovation desafio tecnológico startups inscrições abertas"
+      family: corporate_open_innovation
+    - text: "programa de aceleração startups inscrições abertas edital"
+      family: startup_acceleration
+    - text: "incubadora seleção de startups chamada aberta"
+      family: startup_acceleration
   # Caps por execução (controle de custo do crawl diário). Orçamentos SEPARADOS
   # por gerador: no 1º shadow-run o DOU rendeu ~63 candidatos/dia e, num cap
   # compartilhado, zerava o Tavily. max_candidates = busca cega (Tavily);

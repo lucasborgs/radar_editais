@@ -24,6 +24,7 @@ _WIKI_MD = _ROOT / "docs" / "domain" / "schema.md"
 _WIKIS_DIR = _ROOT / "docs" / "domain" / "sources"
 _PME_FILTER_MD = _WIKIS_DIR / "_pme_filter.md"
 _DISCOVERY_MD = _WIKIS_DIR / "_discovery.md"
+_COVERAGE_MD = _WIKIS_DIR / "_coverage.md"
 
 _YAML_BLOCK_RE = re.compile(r"```yaml\n(.*?)```", re.DOTALL)
 
@@ -233,8 +234,155 @@ def pme_filter_rules() -> dict:
 # ---------------------------------------------------------------------------
 
 @lru_cache(maxsize=1)
-def discovery_config() -> dict:
+def _discovery_raw() -> dict:
+    """YAML bruto sem projeção. Fonte única para funções que precisam
+    da estrutura original (ex. discovery_queries, _valid_family_keys)."""
     return _parse_md(_DISCOVERY_MD).get("discovery", {})
+
+
+@lru_cache(maxsize=1)
+def discovery_config() -> dict:
+    """Config da Descoberta com queries projetadas para lista plana —
+    preserva compatibilidade com consumidor atual (opportunity_discovery.py)."""
+    cfg = dict(_discovery_raw())
+    raw_q = cfg.get("queries", [])
+    if raw_q and isinstance(raw_q[0], dict):
+        cfg["queries"] = [q["text"] for q in raw_q]
+    return cfg
+
+
+# ---------------------------------------------------------------------------
+# Cobertura — canais de aquisição (docs/domain/sources/_coverage.md, RT03-T01)
+# ---------------------------------------------------------------------------
+
+@lru_cache(maxsize=1)
+def coverage_config() -> dict:
+    return _parse_md(_COVERAGE_MD).get("coverage", {})
+
+
+def coverage_modes() -> list[str]:
+    """Modos canônicos de canal carregados do doc autoritativo."""
+    raw = coverage_config().get("modes", [])
+    modes = [m["key"] for m in raw if isinstance(m, dict) and m.get("key")]
+    if not modes:
+        raise ValueError("no channel modes found in coverage config")
+    return modes
+
+
+def coverage_channels() -> list[dict]:
+    """Canais de aquisição registrados, validados contra modos canônicos."""
+    valid_modes = frozenset(coverage_modes())
+    channels = coverage_config().get("channels", [])
+    seen: set[str] = set()
+    validated: list[dict] = []
+    for ch in channels:
+        key = ch.get("source_key", "")
+        if not key:
+            raise ValueError("channel missing source_key")
+        if not isinstance(key, str) or not key.islower():
+            raise ValueError(f"source_key must be lowercase: {key!r}")
+        if key in seen:
+            raise ValueError(f"duplicate source_key: {key}")
+        mode = ch.get("mode", "")
+        if mode not in valid_modes:
+            raise ValueError(f"invalid mode {mode!r} for channel {key!r}")
+        display = ch.get("display_name")
+        if not display:
+            raise ValueError(f"channel {key!r} missing display_name")
+        scope = ch.get("scope_note")
+        if not scope:
+            raise ValueError(f"channel {key!r} missing scope_note")
+        interval = ch.get("expected_interval_hours")
+        if interval is not None and (not isinstance(interval, (int, float)) or interval <= 0):
+            raise ValueError(f"channel {key!r} expected_interval_hours must be positive, got {interval!r}")
+        enabled = ch.get("enabled_by_default")
+        if enabled is not None and not isinstance(enabled, bool):
+            raise ValueError(f"channel {key!r} enabled_by_default must be boolean, got {enabled!r}")
+        has_flag = "flag_name" in ch
+        if has_flag and enabled is not False:
+            raise ValueError(f"channel {key!r} with flag_name must have enabled_by_default=false")
+        if not has_flag and enabled is False:
+            raise ValueError(f"channel {key!r} without flag_name must have enabled_by_default=true (or omit for true)")
+        seen.add(key)
+        validated.append(ch)
+    return validated
+
+
+def coverage_channel(source_key: str) -> dict | None:
+    """Retorna um canal por source_key ou None."""
+    for ch in coverage_channels():
+        if ch.get("source_key") == source_key:
+            return ch
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Famílias de busca (docs/domain/sources/_discovery.md, RT03-T01)
+# ---------------------------------------------------------------------------
+
+def _valid_family_keys() -> frozenset[str]:
+    families = _discovery_raw().get("query_families", [])
+    seen: set[str] = set()
+    for fam in families:
+        key = fam.get("key", "")
+        if not key:
+            raise ValueError("query_family entry missing key")
+        if not isinstance(key, str) or not key.islower():
+            raise ValueError(f"query_family key must be lowercase: {key!r}")
+        if key in seen:
+            raise ValueError(f"duplicate query_family key: {key}")
+        if not fam.get("description"):
+            raise ValueError(f"query_family {key!r} missing description")
+        seen.add(key)
+    return frozenset(seen)
+
+
+def query_families() -> list[dict]:
+    """Famílias de busca registradas."""
+    _valid_family_keys()
+    return list(discovery_config().get("query_families", []))
+
+
+def discovery_queries_raw() -> list:
+    """Queries do YAML sem projeção."""
+    return _discovery_raw().get("queries", [])
+
+
+def discovery_queries() -> list[dict]:
+    """Queries estruturadas com ``text`` e ``family``, validadas contra famílias registradas.
+
+    Cada entrada: ``{'text': str, 'family': str}``.
+    Erro se ``family`` não estiver em ``query_families()``.
+    """
+    valid = _valid_family_keys()
+    raw = discovery_queries_raw()
+    if not raw:
+        return []
+    out: list[dict] = []
+    for i, q in enumerate(raw):
+        if not isinstance(q, dict):
+            raise TypeError(f"query[{i}] must be a dict with 'text' and 'family'")
+        text = q.get("text")
+        family = q.get("family")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError(f"query[{i}] missing or empty 'text'")
+        if not isinstance(family, str) or not family.strip():
+            raise ValueError(f"query[{i}] missing or empty 'family'")
+        if family not in valid:
+            raise ValueError(
+                f"query[{i}] family {family!r} not in registered families: {sorted(valid)}"
+            )
+        out.append({"text": text, "family": family})
+    return out
+
+
+def discovery_queries_flat() -> list[str]:
+    """Projeção compatível: lista plana de strings de query.
+
+    Preserva o contrato do consumidor atual (``opportunity_discovery.py``).
+    """
+    structured = discovery_queries()
+    return [q["text"] for q in structured]
 
 
 # ---------------------------------------------------------------------------
@@ -244,3 +392,4 @@ def discovery_config() -> dict:
 def clear_cache() -> None:
     load.cache_clear()
     pme_filter_rules.cache_clear()
+    coverage_config.cache_clear()
