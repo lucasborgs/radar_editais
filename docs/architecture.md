@@ -56,8 +56,9 @@ flowchart TB
   EVID --> GATE["Staging + gate admin<br/>(promote/reject)"]
   GATE -->|promote| BRONZE["Bronze<br/>evidência por fonte"]
   AG --> BRONZE
-  BRONZE --> BUNDLE[("Histórico documental<br/>source_bundles · append-only")]
-  BUNDLE --> CDOC[("Documento Canônico<br/>edital_source_docs · fallback local")]
+  BRONZE -.->|"produtores suportados"| BUNDLE[("Histórico documental<br/>source_bundles · append-only")]
+  BRONZE --> CDOC[("Documento Canônico<br/>edital_source_docs · fallback local")]
+  BUNDLE -.->|"projeção compatível"| CDOC
   CDOC --> SILVER["Silver — transcrição estrutural<br/>verbatim, por seção (LLM leve por página)"]
 
   SILVER --> INGEST["Ingestão gold (incremental, diária)<br/>· metadados determinísticos<br/>· tagger LLM: setores (16) + tags de tecnologia<br/>· extração de elegibilidade (constraints + exclusões + público-alvo)<br/>· embeddings da entidade e dos trechos de match"]

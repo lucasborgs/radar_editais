@@ -78,4 +78,13 @@ writing), sem falha.
 
 ## Auditoria Codex
 
-**Auditoria Codex: pendente.**
+**Auditoria Codex: aprovada em 2026-07-27.**
+
+- As métricas contam fatos, não referências, e não fabricam denominadores.
+- `partial` permanece histórico e não substitui a visão corrente.
+- Conflito e precedência são somente entradas declaradas.
+- O diagrama final representa `source_bundles` como dual-write dos produtores
+  suportados, não como passagem obrigatória de todo bronze.
+- Limitações de `match_chunks`, consolidado e atores incompletos permanecem
+  explícitas.
+- Gate independente RT04: `171 passed`, Ruff limpo e `git diff --check` limpo.
