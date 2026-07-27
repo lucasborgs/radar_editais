@@ -20,21 +20,35 @@ endpoint `/stats/source-coverage` e payload com campos `source_id`,
 | `frontend/src/lib/api.ts` | Tipos `ChannelHealth`, `ChannelRunMetrics`, `EditorialFunnel`, `FamilyFunnel`, `CoverageGap`, `EmergingDomain`, `ChannelHealthStatus`, `SourceCoverageResponse` e função `getSourceCoverage` — espelho do contrato de `source_coverage.py` |
 | `frontend/src/app/discovered/page.tsx` | Estado/efeito isolado, painel recolhível com 6 seções compactas |
 
+## Correções aplicadas (corretivo 1)
+
+| # | Correção | Detalhes |
+|---|---|---|
+| 1 | Efeito com cancelamento | `coverageReqId` ref evita que resposta de requisição antiga atualize estado após troca de token ou desmontagem; limpa `coverage` quando `token` é `null` |
+| 2 | Tabelas responsivas | Runs, channel_funnel e family_funnel envolvidos em `overflow-x-auto` |
+| 3 | Funil por canal + família | Seção "Funil editorial" mostra ambas as tabelas (`channel_funnel` e `family_funnel`) |
+| 4 | Sinais de lacuna traduzidos | Mapa `enabled_no_run→canal habilitado sem execução`, `ambiguous_run→execução sem resultado observável`, `delayed→execução atrasada`, `family_no_denominator→família sem decisões revisadas`, `pending_queue→fila com itens pendentes`; fallback para código desconhecido |
+| 5 | `aria-expanded` | Botão do painel agora tem `aria-expanded={coverageExpanded}` |
+| 6 | Relatório corrigido | Lint: 5 warnings preexistentes (não 4) |
+
 ## Comportamento
 
 - **Recolhido**: "Fontes e canais monitorados pelo Radar — X saudáveis, Y com
   problema" (só categorias não-zero aparecem)
-- **Expandido**: até 6 seções compactas:
+- **Expandido**: até 7 seções compactas:
   1. badges de canal + estado (saudável, degradado, falhando, atrasado,
      desativado, desconhecido)
   2. tabela de execuções (última tentativa, último sucesso, observados,
      emitidos, stage, rendimento)
-  3. funil editorial por família (aprovados, rejeitados, pendentes, taxa,
+  3. funil editorial por canal (aprovados, rejeitados, pendentes, taxa,
      revisão média)
-  4. lacunas (badges âmbar)
-  5. domínios candidatos a monitoramento dedicado (badges azuis)
-  6. limitações da API (lista)
+  4. funil editorial por família (mesmas colunas)
+  5. lacunas com sinais traduzidos (badges âmbar)
+  6. domínios candidatos a monitoramento dedicado (badges azuis)
+  7. limitações da API (lista)
 - **`null`**: exibido como `—` ou "sem denominador", nunca zero fabricado
+- **Proteção na troca de token**: requisições concorrentes não sobrescrevem
+  estado; `coverage` limpo quando token é removido
 - **Cobertura vazia**: mostra geração sem canais (sem crash)
 - **Falha/403**: painel mostra "Painel indisponível no momento." — não altera
   `forbidden`, não mostra toast, não bloqueia promoção/rejeição/filtros
@@ -43,7 +57,7 @@ endpoint `/stats/source-coverage` e payload com campos `source_id`,
 ## Validação
 
 - `npx tsc --noEmit`: 0 erros
-- `npm run lint`: sem warnings novos (apenas 4 preexistentes)
+- `npm run lint`: sem warnings novos (5 preexistentes)
 - `ENVIRONMENT=test pytest -q test_source_coverage_api.py
   test_source_coverage_metrics.py test_admin_gate.py`: 81 passed
 - `git diff --check`: sem whitespace errors

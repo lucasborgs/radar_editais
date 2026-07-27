@@ -32,6 +32,7 @@ export default function DiscoveredPage() {
   const [coverageLoading, setCoverageLoading] = useState(false);
   const [coverageError, setCoverageError] = useState(false);
   const [coverageExpanded, setCoverageExpanded] = useState(false);
+  const coverageReqId = useRef(0);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
@@ -67,13 +68,15 @@ export default function DiscoveredPage() {
   }, [reload]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) { setCoverage(null); setCoverageLoading(false); setCoverageError(false); return; }
+    const id = ++coverageReqId.current;
     setCoverageLoading(true);
     setCoverageError(false);
     getSourceCoverage(token)
-      .then((data) => { setCoverage(data); setCoverageError(false); })
-      .catch(() => { setCoverage(null); setCoverageError(true); })
-      .finally(() => setCoverageLoading(false));
+      .then((data) => { if (id === coverageReqId.current) { setCoverage(data); setCoverageError(false); } })
+      .catch(() => { if (id === coverageReqId.current) { setCoverage(null); setCoverageError(true); } })
+      .finally(() => { if (id === coverageReqId.current) setCoverageLoading(false); });
+    return () => { coverageReqId.current += 1; };
   }, [token]);
 
   function badge(quality: string | null) {
@@ -321,6 +324,7 @@ export default function DiscoveredPage() {
       <div className="mb-4 rounded-xl border border-border bg-surface overflow-hidden">
         <button
           onClick={() => setCoverageExpanded(!coverageExpanded)}
+          aria-expanded={coverageExpanded}
           className="flex items-center justify-between w-full px-4 py-2.5 text-xs font-sans text-content-secondary hover:bg-surface/80 transition-colors"
         >
           <span className="font-medium text-content-primary">
@@ -381,6 +385,7 @@ export default function DiscoveredPage() {
             {Object.keys(coverage.runs).length > 0 && (
               <div>
                 <p className="font-medium text-content-primary mb-1">Execuções</p>
+                <div className="overflow-x-auto">
                 <table className="w-full text-[11px]">
                   <thead>
                     <tr className="text-content-secondary border-b border-border">
@@ -407,14 +412,49 @@ export default function DiscoveredPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
 
-            {/* Funil por família */}
-            {Object.keys(coverage.family_funnel).length > 0 && (
-              <div>
-                <p className="font-medium text-content-primary mb-1">Funil editorial por família</p>
-                <table className="w-full text-[11px]">
+            {/* Funil editorial */}
+            <div>
+              <p className="font-medium text-content-primary mb-1">Funil editorial</p>
+              {Object.keys(coverage.channel_funnel).length > 0 && (
+                <div className="mb-2">
+                  <p className="text-[10px] text-content-secondary mb-0.5">Por canal</p>
+                  <div className="overflow-x-auto">
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr className="text-content-secondary border-b border-border">
+                        <th className="text-left py-1 pr-3 font-medium">Canal</th>
+                        <th className="text-right py-1 pr-3 font-medium">Aprovados</th>
+                        <th className="text-right py-1 pr-3 font-medium">Rejeitados</th>
+                        <th className="text-right py-1 pr-3 font-medium">Pendentes</th>
+                        <th className="text-right py-1 pr-3 font-medium">Taxa aprovação</th>
+                        <th className="text-right py-1 font-medium whitespace-nowrap">Revisão (média h)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(coverage.channel_funnel).map(([key, f]) => (
+                        <tr key={key} className="border-b border-border/50 last:border-0">
+                          <td className="py-1 pr-3 text-content-primary whitespace-nowrap">{f.source_key}</td>
+                          <td className="py-1 pr-3 text-content-secondary text-right">{f.approved}</td>
+                          <td className="py-1 pr-3 text-content-secondary text-right">{f.rejected}</td>
+                          <td className="py-1 pr-3 text-content-secondary text-right">{f.pending}</td>
+                          <td className="py-1 pr-3 text-content-secondary text-right">{f.approval_rate !== null ? `${(f.approval_rate * 100).toFixed(0)}%` : "sem denominador"}</td>
+                          <td className="py-1 text-content-secondary text-right">{f.avg_review_hours !== null ? f.avg_review_hours.toFixed(1) : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  </div>
+                </div>
+              )}
+              {Object.keys(coverage.family_funnel).length > 0 && (
+                <div>
+                  <p className="text-[10px] text-content-secondary mb-0.5">Por família</p>
+                  <div className="overflow-x-auto">
+                  <table className="w-full text-[11px]">
                   <thead>
                     <tr className="text-content-secondary border-b border-border">
                       <th className="text-left py-1 pr-3 font-medium">Família</th>
@@ -438,8 +478,10 @@ export default function DiscoveredPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-            )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Lacunas */}
             {coverage.gaps.length > 0 && (
@@ -448,7 +490,13 @@ export default function DiscoveredPage() {
                 <div className="flex flex-wrap gap-1.5">
                   {coverage.gaps.map((g, i) => (
                     <span key={i} className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300">
-                      {g.source_key ? `${g.source_key}: ` : ""}{g.signal}
+                      {g.source_key ? `${g.source_key}: ` : ""}{({
+                        enabled_no_run: "canal habilitado sem execução",
+                        ambiguous_run: "execução sem resultado observável",
+                        delayed: "execução atrasada",
+                        family_no_denominator: "família sem decisões revisadas",
+                        pending_queue: "fila com itens pendentes",
+                      } as Record<string, string>)[g.signal] ?? g.signal}
                     </span>
                   ))}
                 </div>
