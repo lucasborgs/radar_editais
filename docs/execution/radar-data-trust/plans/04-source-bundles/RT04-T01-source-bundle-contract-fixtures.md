@@ -24,7 +24,8 @@ normativo vai para `docs/domain/schema.md`, não para constante paralela.
 1. Validar versão, kind/ID canônico, fonte, coleta, produtor, status e um
    documento válido; aceitar somente papéis/estados da spec.
 2. Normalizar envelope/documentos de modo estável; recoleta idêntica mantém
-   hash, conteúdo/papel/autoridade materialmente alterados criam hash novo.
+   hash mesmo com nova coleta/produtor; conteúdo, conjunto documental, papel
+   ou autoridade materialmente alterados criam hash novo.
 3. Criar as três fixtures obrigatórias e rejeições para hash/papel/estado/ID
    inválidos e documento vazio. `partial` é válido, mas não ganha semântica
    de projeção nesta task.

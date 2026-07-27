@@ -215,12 +215,19 @@ autoriza inferi-los pelo nome do arquivo.
 
 - `content_hash` identifica o conteúdo de um documento, independentemente de
   URL ou nome.
-- `bundle_hash` identifica o envelope normalizado completo.
+- `bundle_hash` identifica sujeito, fonte, documentos e metadados documentais
+  materiais normalizados. Exclui `collected_at`, `created_at` e
+  `producer_version`, que descrevem a execução/produtor e não uma mudança do
+  dossiê.
 - Recoletar conteúdo idêntico não cria versão material duplicada.
 - Mudança de conteúdo, conjunto de documentos, papel ou autoridade cria nova
   versão.
 - Hashes novos usam SHA-256. O MD5 legado de `edital_source_docs` permanece
   compatível até migração deliberada; não é usado como prova criptográfica.
+
+Na persistência append-only, `collected_at` registra quando aquela versão
+material foi observada pela primeira vez. Reobservações idênticas pertencem à
+telemetria de `source_runs`; não atualizam nem duplicam o bundle histórico.
 
 ## 6. Persistência mínima
 
