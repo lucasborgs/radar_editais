@@ -70,6 +70,7 @@ export default function DiscoveredPage() {
   useEffect(() => {
     if (!token) { setCoverage(null); setCoverageLoading(false); setCoverageError(false); return; }
     const id = ++coverageReqId.current;
+    setCoverage(null);
     setCoverageLoading(true);
     setCoverageError(false);
     getSourceCoverage(token)

@@ -24,7 +24,7 @@ endpoint `/stats/source-coverage` e payload com campos `source_id`,
 
 | # | Correção | Detalhes |
 |---|---|---|
-| 1 | Efeito com cancelamento | `coverageReqId` ref evita que resposta de requisição antiga atualize estado após troca de token ou desmontagem; limpa `coverage` quando `token` é `null` |
+| 1 | Efeito com cancelamento | `coverageReqId` ref evita que resposta de requisição antiga atualize estado após troca de token ou desmontagem; limpa `coverage` quando `token` é `null`; `setCoverage(null)` adicional antes de toda nova requisição para token válido |
 | 2 | Tabelas responsivas | Runs, channel_funnel e family_funnel envolvidos em `overflow-x-auto` |
 | 3 | Funil por canal + família | Seção "Funil editorial" mostra ambas as tabelas (`channel_funnel` e `family_funnel`) |
 | 4 | Sinais de lacuna traduzidos | Mapa `enabled_no_run→canal habilitado sem execução`, `ambiguous_run→execução sem resultado observável`, `delayed→execução atrasada`, `family_no_denominator→família sem decisões revisadas`, `pending_queue→fila com itens pendentes`; fallback para código desconhecido |
