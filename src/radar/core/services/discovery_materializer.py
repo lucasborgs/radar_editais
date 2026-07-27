@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 
 from radar.core.config import BRONZE_DIR
 from radar.core.kg import source_bundles
+from radar.core.kg.source_bundle_projection import (
+    attach_bundle_metadata_to_documents,
+    current_complete_bundle,
+)
 from radar.core.kg.source_bundles import BundleStorageError
 from radar.core.web_identity import normalize_web_url, web_url_hash
 from radar.domain.source_bundle import (
@@ -88,9 +92,12 @@ def _bundle_from_evidence(opportunity: dict, evidence: dict) -> SourceBundle | N
         ),
         "documents": documents,
     })
-
-
-def canonical_documents_from_evidence(opportunity: dict, evidence: dict) -> CanonicalDoc:
+def canonical_documents_from_evidence(
+    opportunity: dict,
+    evidence: dict,
+    *,
+    persisted_bundle: SourceBundle | None = None,
+) -> CanonicalDoc:
     """Gera o Documento Canônico com a página e PDFs já aprovados.
 
     O adapter web continua sendo o fallback a partir do bronze. Quando houver
@@ -119,7 +126,7 @@ def canonical_documents_from_evidence(opportunity: dict, evidence: dict) -> Cano
                 "doc_name": related_page.get("label") or f"pagina-relacionada-{index}",
                 "units": split_into_units(related_text),
             })
-    return docs
+    return attach_bundle_metadata_to_documents(docs, persisted_bundle)
 
 
 def materialize_approved_evidence(opportunity: dict, evidence: dict | None = None) -> str:
@@ -155,15 +162,24 @@ def materialize_approved_evidence(opportunity: dict, evidence: dict | None = Non
     edital_id = f"web:{url_hash}"
     # Persistência durável é best-effort e não muda o contrato do adapter web:
     # sem Supabase, o job continua lendo o bronze local como já fazia.
+    persisted_bundle = None
     try:
         bundle = _bundle_from_evidence(opportunity, evidence)
-        if bundle is not None:
-            source_bundles.save(bundle)
+        if bundle is not None and source_bundles.save(bundle) is True:
+            persisted_bundle = current_complete_bundle(bundle)
     except BundleStorageError as exc:
         logger.warning(
             "source_bundles: falha best-effort; categoria=%s",
             type(exc).__name__,
         )
     from radar.core.kg import source_docs
-    source_docs.save(edital_id, "web", canonical_documents_from_evidence(opportunity, evidence))
+    source_docs.save(
+        edital_id,
+        "web",
+        canonical_documents_from_evidence(
+            opportunity,
+            evidence,
+            persisted_bundle=persisted_bundle,
+        ),
+    )
     return edital_id

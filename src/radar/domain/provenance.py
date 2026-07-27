@@ -24,6 +24,8 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from radar.domain.edital_extraction import Extracted
 
 PROVENANCE_SCHEMA_VERSION: Literal[1] = 1
+_SHA256_PREFIX = "sha256:"
+_SHA256_HEX_LEN = 64
 
 
 class FactState(str, Enum):
@@ -90,6 +92,8 @@ class EvidenceRef(BaseModel):
     quote: str | None = None
     canonical_content_hash: str | None = None
     silver_source_hash: str | None = None
+    bundle_hash: str | None = None
+    content_hash: str | None = None
     collected_at: datetime | None = None
     locator_quality: LocatorQuality = LocatorQuality.UNRESOLVED
 
@@ -114,12 +118,34 @@ class EvidenceRef(BaseModel):
             raise ValueError("block_idx must be >= 0")
         return v
 
+    @field_validator("bundle_hash", "content_hash")
+    @classmethod
+    def _sha256_hash_must_be_valid(cls, v: str | None, info) -> str | None:
+        if v is None:
+            return None
+        if not v.startswith(_SHA256_PREFIX):
+            raise ValueError(f"{info.field_name} must start with '{_SHA256_PREFIX}'")
+        hex_part = v[len(_SHA256_PREFIX):]
+        if len(hex_part) != _SHA256_HEX_LEN:
+            raise ValueError(
+                f"{info.field_name} hex part must have {_SHA256_HEX_LEN} chars"
+            )
+        try:
+            int(hex_part, 16)
+        except ValueError as exc:
+            raise ValueError(f"{info.field_name} hex part is not valid hex") from exc
+        return v
+
     @model_validator(mode="after")
     def _check_invariants(self) -> EvidenceRef:
         if not self.canonical_content_hash and not self.silver_source_hash:
             raise ValueError(
                 "EvidenceRef requires canonical_content_hash or silver_source_hash "
                 "to identify a recoverable version"
+            )
+        if (self.bundle_hash is None) != (self.content_hash is None):
+            raise ValueError(
+                "bundle_hash and content_hash must appear together or both be absent"
             )
         has_exact_coordinate = (
             self.page is not None or self.block_idx is not None or bool(self.section_path)

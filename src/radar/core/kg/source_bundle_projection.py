@@ -136,9 +136,89 @@ def resolve_all(bundle: SourceBundle, claims: list[ExplicitClaim]) -> dict[str, 
     return {field: resolve_field(bundle, claims, field) for field in fields}
 
 
+def current_complete_bundle(bundle: SourceBundle | None) -> SourceBundle | None:
+    if bundle is None or bundle.acquisition_status is not AcquisitionStatus.COMPLETE:
+        return None
+    return bundle
+
+
+def find_current_document(
+    bundle: SourceBundle,
+    *,
+    content_hash: str,
+    doc_name: str | None = None,
+) -> DocumentMetadata | None:
+    projection = project_current_documents(bundle)
+    matches = [
+        doc
+        for doc in projection.documents
+        if doc.content_hash == content_hash and (doc_name is None or doc.doc_name == doc_name)
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def attach_bundle_lineage(
+    ref: EvidenceRef,
+    *,
+    bundle: SourceBundle,
+    document: DocumentMetadata,
+) -> EvidenceRef:
+    complete_bundle = current_complete_bundle(bundle)
+    if complete_bundle is None:
+        raise ValueError("Cannot attach bundle lineage: bundle is not complete")
+    current = find_current_document(
+        complete_bundle,
+        content_hash=document.content_hash,
+        doc_name=document.doc_name,
+    )
+    if current is None:
+        raise ValueError(
+            "Cannot attach bundle lineage: document is absent, ambiguous, or superseded"
+        )
+    return ref.model_copy(
+        update={
+            "bundle_hash": complete_bundle.compute_bundle_hash(),
+            "content_hash": current.content_hash,
+        }
+    )
+
+
+def attach_bundle_metadata_to_documents(
+    documents: list[dict],
+    bundle: SourceBundle | None,
+) -> list[dict]:
+    bundle = current_complete_bundle(bundle)
+    if bundle is None:
+        return documents
+    bundle_hash = bundle.compute_bundle_hash()
+    enriched: list[dict] = []
+    for entry in documents:
+        current = find_current_document(
+            bundle,
+            content_hash=_content_hash_for_units(entry.get("units") or []),
+            doc_name=entry.get("doc_name"),
+        )
+        if current is None:
+            enriched.append(entry)
+            continue
+        metadata = dict(entry.get("metadata") or {})
+        metadata.update({
+            "bundle_hash": bundle_hash,
+            "content_hash": current.content_hash,
+        })
+        enriched.append({**entry, "metadata": metadata})
+    return enriched
+
+
 def _require_complete_bundle(bundle: SourceBundle) -> None:
     if bundle.acquisition_status is not AcquisitionStatus.COMPLETE:
         raise ValueError("BundleProjection requires a complete SourceBundle")
+
+
+def _content_hash_for_units(units: list[str]) -> str:
+    from radar.domain.source_bundle import compute_content_hash
+
+    return compute_content_hash(units)
 
 
 def _group_by_value(supports: list[ClaimSupport]) -> list[list[ClaimSupport]]:
@@ -202,7 +282,13 @@ def _evidence_refs(bundle: SourceBundle, supports: list[ClaimSupport]) -> list[E
             ref_kwargs["edital_id"] = bundle.subject_id
         else:
             ref_kwargs["native_id"] = bundle.subject_id
-        refs.append(EvidenceRef(**ref_kwargs))
+        refs.append(
+            attach_bundle_lineage(
+                EvidenceRef(**ref_kwargs),
+                bundle=bundle,
+                document=doc,
+            )
+        )
     return refs
 
 
@@ -211,6 +297,10 @@ __all__ = [
     "ClaimSupport",
     "ExplicitClaim",
     "FieldResolution",
+    "attach_bundle_metadata_to_documents",
+    "attach_bundle_lineage",
+    "current_complete_bundle",
+    "find_current_document",
     "project_current_documents",
     "resolve_all",
     "resolve_field",

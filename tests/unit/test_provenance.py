@@ -82,6 +82,24 @@ def test_evidence_ref_roundtrip():
     assert again_json == ref
 
 
+def test_evidence_ref_roundtrip_legado_sem_bundle_fields():
+    payload = _evidence_ref().model_dump(mode="json")
+    payload.pop("bundle_hash", None)
+    payload.pop("content_hash", None)
+    ref = EvidenceRef.model_validate(payload)
+    assert ref.bundle_hash is None
+    assert ref.content_hash is None
+
+
+def test_evidence_ref_accepts_bundle_and_content_hash_together():
+    ref = _evidence_ref(
+        bundle_hash="sha256:" + "a" * 64,
+        content_hash="sha256:" + "b" * 64,
+    )
+    assert ref.bundle_hash == "sha256:" + "a" * 64
+    assert ref.content_hash == "sha256:" + "b" * 64
+
+
 def test_fact_provenance_roundtrip():
     fp = FactProvenance(
         state=FactState.STATED,
@@ -188,6 +206,36 @@ def test_ausencia_dos_dois_hashes_rejeitada():
 def test_um_hash_basta():
     ref = _evidence_ref(canonical_content_hash=None, silver_source_hash="sha256:def")
     assert ref.silver_source_hash == "sha256:def"
+
+
+@pytest.mark.parametrize(
+    ("bundle_hash", "content_hash"),
+    [
+        ("sha256:" + "a" * 64, None),
+        (None, "sha256:" + "b" * 64),
+    ],
+)
+def test_bundle_hash_and_content_hash_must_appear_together(bundle_hash, content_hash):
+    with pytest.raises(ValidationError, match="must appear together"):
+        _evidence_ref(bundle_hash=bundle_hash, content_hash=content_hash)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("bundle_hash", "md5:abc"),
+        ("content_hash", "sha256:abc"),
+        ("content_hash", "sha256:" + "z" * 64),
+    ],
+)
+def test_bundle_lineage_hashes_must_be_valid_sha256(field, value):
+    kwargs = {
+        "bundle_hash": "sha256:" + "a" * 64,
+        "content_hash": "sha256:" + "b" * 64,
+    }
+    kwargs[field] = value
+    with pytest.raises(ValidationError):
+        _evidence_ref(**kwargs)
 
 
 # --- locator_quality: unresolved -----------------------------------------
