@@ -3,12 +3,13 @@
 **Status:** `passed`
 **Plano:** [`plans/04-source-bundles/RT04-T01-source-bundle-contract-fixtures.md`](../../plans/04-source-bundles/RT04-T01-source-bundle-contract-fixtures.md)
 **Autoridade base:** `c8d8b7fbb`
-**Branch/HEAD corretivo:** `codex/radar-data-trust-04-t01` / `25e6168d7`
+**Branch/commit funcional auditado:** `codex/radar-data-trust-04-t01` / `25e6168d7`
 **Worktree:** `/private/tmp/radar-editais-rt04-t01`
 **Commits:**
 - `d883515d3` feat(rt04-t01): correct SourceBundle contract per audit
 - `ebef6a693` docs(rt04-t01): update execution report with audit corrections
 - `25e6168d7` fix(rt04-t01): aplica 6 correções finais no contrato SourceBundle
+- `060f099ef` docs(rt04-t01): update execution report with 6 final corrections
 **Implementador/modelo:** opencode (deepseek-v4-flash-free)
 
 ## Realizado (correção pós-auditoria)
@@ -103,13 +104,17 @@
 
 ## Pendências
 
-- Auditoria Codex: pendente (6 correções finais aplicadas, aguarda fechamento).
-- 7 novos testes de regressão adicionados; 72 testes no total.
 - `test_local_run_is_faster_in_parallel` (eval harness) flaky — preexistente, fora do escopo T01.
 
 ## Auditoria Codex
 
-**Veredito:** `pendente` (correções aplicadas; aguarda re-auditoria)
+**Veredito:** `aprovado` em 2026-07-27.
+
+Validação independente: 236 testes direcionados passaram (72 de
+`source_bundles` + 164 de proveniência/relevância), Ruff e
+`git diff --check c8d8b7fbb..HEAD` limpos. Casos adicionais confirmaram
+ordenação total, distinção `partial`/`complete`, exclusão dos metadados
+operacionais do hash e normalização UTC.
 
 ## Ambiente
 
