@@ -55,3 +55,11 @@ Os testes cobrem edital-base, base + emenda sem vínculo/ordem inventados,
 recoleta idêntica, timestamp ausente/inválido/sem fuso, fallback HTML, ordem
 bundle antes de `source_docs`, falha sanitizada do histórico e execução real dos
 três caminhos de task com mocks de suas dependências.
+
+## Auditoria Codex
+
+**T04 aprovada em 2026-07-27.** Validação independente: 131 testes
+direcionados, Ruff e `git diff --check` limpos. A autoridade normativa deriva
+dos marcadores confiáveis, sem inferir vínculo ou ordem; somente timestamps com
+fuso explícito entram no histórico; os três caminhos produtivos foram
+exercitados em runtime com doubles locais.
