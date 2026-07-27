@@ -6,6 +6,11 @@ policies de usuário final — acesso exclusivo via get_supabase_service().
 
 Sem Supabase configurado, save → no-op False, load → None (degrada
 gracioso como source_docs).
+
+Falhas reais de persistência (banco indisponível, schema ausente, etc.)
+são sinalizadas via BundleStorageError — nunca retornam False/None.
+Isso permite ao futuro produtor continuar pelo fallback e registrar que
+o versionamento falhou.
 """
 from __future__ import annotations
 
@@ -20,13 +25,26 @@ from radar.domain.source_bundle import SourceBundle
 logger = logging.getLogger(__name__)
 
 _TABLE = "source_bundles"
+_PG_UNIQUE_VIOLATION = "23505"
+
+
+class BundleStorageError(Exception):
+    """Erro real de persistência do SourceBundle.
+
+    Indica falha de comunicação com o banco, schema ausente ou outra
+    condição que impede a operação. Não inclui:
+
+    - duplicata (código 23505) → idempotente, tratado como sucesso
+    - Supabase não configurado → degradação graciosa (False / None)
+    - registro inexistente na leitura → None legítimo
+
+    A mensagem é sanitizada — não expõe detalhes do provedor, URLs
+    ou corpos de resposta.
+    """
 
 
 def _pg_configured() -> bool:
     return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY"))
-
-
-_PG_UNIQUE_VIOLATION = "23505"
 
 
 def save(bundle: SourceBundle) -> bool:
@@ -36,15 +54,15 @@ def save(bundle: SourceBundle) -> bool:
     para detectar duplicatas materialmente idênticas. Retorna True tanto na
     primeira inserção quanto na repetição idempotente.
 
-    Falhas reais de persistência (ex.: banco indisponível, schema ausente)
-    são logadas e retornam False — nunca silenciadas como sucesso.
-
     Args:
         bundle: SourceBundle já validado pelo contrato do domínio.
 
     Returns:
         True se persistiu ou já existia (idempotente).
-        False em falha real de persistência.
+        False se Supabase não está configurado (degrada gracioso).
+
+    Raises:
+        BundleStorageError: em falha real de persistência.
     """
     if not _pg_configured():
         logger.info("source_bundles.save: Supabase ausente — no-op")
@@ -71,21 +89,28 @@ def save(bundle: SourceBundle) -> bool:
             return True  # idempotente: mesmo bundle já existe
         logger.warning(
             "source_bundles.save: erro de persistência "
-            "(%s/%s): code=%s",
+            "(%s/%s): code=%s type=%s",
             bundle.subject_kind.value,
             bundle.subject_id,
             e.code,
+            type(e).__name__,
         )
-        return False
-    except Exception as e:
+        raise BundleStorageError(
+            f"save failed (kind={bundle.subject_kind.value}, "
+            f"id={bundle.subject_id}): code={e.code}"
+        ) from e
+    except Exception as exc:
         logger.warning(
             "source_bundles.save: erro inesperado "
-            "(%s/%s): %s",
+            "(%s/%s): type=%s",
             bundle.subject_kind.value,
             bundle.subject_id,
-            e,
+            type(exc).__name__,
         )
-        return False
+        raise BundleStorageError(
+            f"save failed (kind={bundle.subject_kind.value}, "
+            f"id={bundle.subject_id}): type={type(exc).__name__}"
+        ) from exc
 
 
 def load(subject_kind: str, subject_id: str) -> SourceBundle | None:
@@ -100,7 +125,11 @@ def load(subject_kind: str, subject_id: str) -> SourceBundle | None:
         subject_id: ID canônico do sujeito.
 
     Returns:
-        SourceBundle ou None se nenhum bundle complete existir.
+        SourceBundle ou None se nenhum bundle complete existir
+        (ou Supabase não configurado).
+
+    Raises:
+        BundleStorageError: em falha real de leitura.
     """
     if not _pg_configured():
         return None
@@ -121,14 +150,17 @@ def load(subject_kind: str, subject_id: str) -> SourceBundle | None:
             .limit(1)
             .execute()
         )
-    except Exception as e:
+    except Exception as exc:
         logger.warning(
-            "source_bundles.load: falha lendo %s/%s: %s",
+            "source_bundles.load: falha lendo %s/%s: type=%s",
             subject_kind,
             subject_id,
-            e,
+            type(exc).__name__,
         )
-        return None
+        raise BundleStorageError(
+            f"load failed (kind={subject_kind}, id={subject_id}): "
+            f"type={type(exc).__name__}"
+        ) from exc
 
     rows = resp.data or []
     if not rows:

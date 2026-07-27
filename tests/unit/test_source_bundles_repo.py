@@ -20,6 +20,7 @@ import pytest
 from postgrest.exceptions import APIError
 
 from radar.core.kg import source_bundles as repo
+from radar.core.kg.source_bundles import BundleStorageError
 from radar.domain.source_bundle import (
     AcquisitionStatus,
     SourceBundle,
@@ -287,31 +288,34 @@ class TestMaterialChange:
 # ---------------------------------------------------------------------------
 
 class TestRealErrors:
-    def test_api_error_non_duplicate_returns_false(self, monkeypatch, pg_on):
-        """Erro 500 ou outro código não 23505 retorna False."""
+    def test_api_error_non_duplicate_raises(self, monkeypatch, pg_on):
+        """Erro 500 ou outro código não 23505 levanta BundleStorageError."""
         error = APIError({"code": "500", "message": "Internal Server Error"})
         db = _FakeDB(insert_error=error)
         monkeypatch.setattr("radar.core.infra.db.get_supabase_service", lambda: db)
 
         bundle = _make_bundle()
-        assert repo.save(bundle) is False
+        with pytest.raises(BundleStorageError, match="save failed"):
+            repo.save(bundle)
 
-    def test_unexpected_exception_returns_false(self, monkeypatch, pg_on):
-        """Erro não-API (ex.: conexão) retorna False."""
+    def test_unexpected_exception_raises(self, monkeypatch, pg_on):
+        """Erro não-API (ex.: conexão) levanta BundleStorageError."""
         db = _FakeDB(insert_error=RuntimeError("connection refused"))
         monkeypatch.setattr("radar.core.infra.db.get_supabase_service", lambda: db)
 
         bundle = _make_bundle()
-        assert repo.save(bundle) is False
+        with pytest.raises(BundleStorageError, match="save failed"):
+            repo.save(bundle)
 
-    def test_api_error_without_code_returns_false(self, monkeypatch, pg_on):
+    def test_api_error_without_code_raises(self, monkeypatch, pg_on):
         """APIError sem code não é classificado como duplicidade."""
         error = APIError({"message": "some error"})
         db = _FakeDB(insert_error=error)
         monkeypatch.setattr("radar.core.infra.db.get_supabase_service", lambda: db)
 
         bundle = _make_bundle()
-        assert repo.save(bundle) is False
+        with pytest.raises(BundleStorageError, match="save failed"):
+            repo.save(bundle)
 
 
 # ---------------------------------------------------------------------------
@@ -395,14 +399,25 @@ class TestLoad:
         limit_calls = [c[1] for c in fake.calls if c[0] == "limit"]
         assert 1 in limit_calls
 
-    def test_load_error_returns_none(self, monkeypatch, pg_on):
-        db = _FakeDB(rows=None)
-        db._insert_error = RuntimeError("connection lost")
-        monkeypatch.setattr("radar.core.infra.db.get_supabase_service",
-                            lambda: type("DB", (), {"table": lambda s, n: _SelectChain(
-                                rows=[], error=RuntimeError("connection lost")
-                            )})())
-        assert repo.load("opportunity", "fapesc:test") is None
+    def test_load_error_raises(self, monkeypatch, pg_on):
+        class _FailingChain:
+            def select(self, *a, **k):
+                return self
+            def eq(self, col, val):
+                return self
+            def order(self, col, **k):
+                return self
+            def limit(self, n):
+                return self
+            def execute(self):
+                raise RuntimeError("connection lost")
+
+        monkeypatch.setattr(
+            "radar.core.infra.db.get_supabase_service",
+            lambda: type("DB", (), {"table": lambda s, n: _FailingChain()})(),
+        )
+        with pytest.raises(BundleStorageError, match="load failed"):
+            repo.load("opportunity", "fapesc:test")
 
 
 # ---------------------------------------------------------------------------
