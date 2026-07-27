@@ -65,7 +65,7 @@ Cobertura validada:
 ## Checks executados
 
 - `PYTHONPATH=src python3 -m pytest tests/unit/test_gold_actor_source_bundles.py tests/unit/test_gold_provenance_curated.py tests/unit/test_gold_provenance_sources.py tests/unit/test_source_bundles.py tests/unit/test_source_bundles_repo.py`
-  - resultado: `151 passed`
+  - resultado: `152 passed`
 - `ruff check src/radar/core/kg/gold.py tests/unit/test_gold_actor_source_bundles.py`
   - resultado: `All checks passed!`
 - `git diff --check`
@@ -74,3 +74,15 @@ Cobertura validada:
 ## Observação de ambiente
 
 - `ruff check .` no repositório inteiro falhou por um problema preexistente e fora do escopo desta task em `src/radar/domain/__init__.py` (ordenação de imports). A RT04-T05 ficou limpa nos arquivos alterados.
+
+## Auditoria Codex
+
+**Aprovada em 2026-07-27.**
+
+- O bundle versiona somente material já consumido pelo gold.
+- A origem oficial/curada não foi promovida indevidamente.
+- Ausência, data inválida e datetime sem fuso não fabricam evidência.
+- Falhas esperadas de validação ou persistência não bloqueiam a ingestão nem
+  alteram suas estatísticas.
+- Os estados de proveniência existentes permanecem inalterados.
+- Gate independente: `152 passed`, Ruff limpo e `git diff --check` limpo.
