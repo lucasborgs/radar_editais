@@ -318,7 +318,13 @@ ICT_SCRAPER_PRODUCER_NAME = "embrapii_scraper"
 
 
 def build_ict_record_anchor(
-    *, record: dict, document: str, source_url: str | None, native_id: str | None = None,
+    *,
+    record: dict,
+    document: str,
+    source_url: str | None,
+    native_id: str | None = None,
+    bundle=None,
+    bundle_document=None,
 ) -> EvidenceRef:
     """Âncora `document_only` de UM registro EMBRAPII (spec §6.4).
 
@@ -327,7 +333,7 @@ def build_ict_record_anchor(
     `quote`: identidade de um registro estruturado, não citação verbatim."""
     canonical = json.dumps(record, sort_keys=True, ensure_ascii=False)
     digest = hashlib.md5(canonical.encode("utf-8")).hexdigest()
-    return EvidenceRef(
+    ref = EvidenceRef(
         source="embrapii",
         native_id=native_id,
         source_url=source_url,
@@ -335,6 +341,11 @@ def build_ict_record_anchor(
         canonical_content_hash=f"md5:{digest}",
         locator_quality=LocatorQuality.DOCUMENT_ONLY,
     )
+    if bundle is not None and bundle_document is not None:
+        from radar.core.kg.source_bundle_projection import attach_bundle_lineage
+
+        return attach_bundle_lineage(ref, bundle=bundle, document=bundle_document)
+    return ref
 
 
 def build_ict_identity_provenance(anchor: EvidenceRef) -> FactProvenance:
@@ -441,20 +452,30 @@ def _canonical_record_hash(record: dict) -> str:
 
 
 def build_curated_catalog_anchor(
-    record: dict, *, document: str, source_url: str | None = None
+    record: dict,
+    *,
+    document: str,
+    source_url: str | None = None,
+    bundle=None,
+    bundle_document=None,
 ) -> EvidenceRef:
     """Âncora do catálogo — UM `EvidenceRef` por entidade (investidor ou
     programa), `locator_quality=document_only` (registro identificado, sem
     coordenada exata dentro do JSON), sem `quote` (não é uma citação
     verbatim, é a referência ao registro curado inteiro). `source_url` é o
     site do ator quando declarado no catálogo; `None` quando ausente."""
-    return EvidenceRef(
+    ref = EvidenceRef(
         source="curadoria",
         source_url=source_url or None,
         document=document,
         canonical_content_hash=_canonical_record_hash(record),
         locator_quality=LocatorQuality.DOCUMENT_ONLY,
     )
+    if bundle is not None and bundle_document is not None:
+        from radar.core.kg.source_bundle_projection import attach_bundle_lineage
+
+        return attach_bundle_lineage(ref, bundle=bundle, document=bundle_document)
+    return ref
 
 
 def build_catalog_copied_provenance(anchor: EvidenceRef) -> FactProvenance:
@@ -532,6 +553,8 @@ def build_investidor_fact_provenance(
     status: str | None,
     ticket_min: float | None,
     ticket_max: float | None,
+    bundle=None,
+    bundle_document=None,
 ) -> dict[str, dict]:
     """Compõe o dict `path -> FactProvenance.model_dump(mode="json")` de UM
     investidor, pronto para `entities.provenance`. `record` é o registro cru
@@ -541,7 +564,11 @@ def build_investidor_fact_provenance(
     valores JÁ computados pelo chamador (`gold._ingest_investidores`); esta
     função não recalcula nada, só anota a proveniência."""
     anchor = build_curated_catalog_anchor(
-        record, document=CURATED_INVESTIDORES_DOCUMENT, source_url=record.get("site") or None
+        record,
+        document=CURATED_INVESTIDORES_DOCUMENT,
+        source_url=record.get("site") or None,
+        bundle=bundle,
+        bundle_document=bundle_document,
     )
     copied = build_catalog_copied_provenance(anchor).model_dump(mode="json")
     out: dict[str, dict] = {}
@@ -590,6 +617,8 @@ def build_programa_fact_provenance(
     constraints: list[dict],
     requisitos_texto: list[str],
     constraints_model: str,
+    bundle=None,
+    bundle_document=None,
 ) -> dict[str, dict]:
     """Compõe o dict `path -> FactProvenance.model_dump(mode="json")` de UM
     programa, pronto para `entities.provenance`. Mesma convenção de
@@ -597,7 +626,11 @@ def build_programa_fact_provenance(
     `programas.json`; os demais parâmetros são valores JÁ computados pelo
     chamador (`gold._ingest_programas`)."""
     anchor = build_curated_catalog_anchor(
-        record, document=CURATED_PROGRAMAS_DOCUMENT, source_url=record.get("site") or None
+        record,
+        document=CURATED_PROGRAMAS_DOCUMENT,
+        source_url=record.get("site") or None,
+        bundle=bundle,
+        bundle_document=bundle_document,
     )
     copied = build_catalog_copied_provenance(anchor).model_dump(mode="json")
     out: dict[str, dict] = {}

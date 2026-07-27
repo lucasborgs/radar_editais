@@ -790,7 +790,7 @@ def _persist_actor_source_bundle_best_effort(
     document_role: str,
     source_url: str | None,
     record: dict,
-) -> None:
+):
     from radar.core.kg import source_bundles
     from radar.core.kg.source_bundles import BundleStorageError
 
@@ -806,19 +806,27 @@ def _persist_actor_source_bundle_best_effort(
             record=record,
         )
         if bundle is None:
-            return
-        source_bundles.save(bundle)
+            return None
+        if source_bundles.save(bundle) is not True:
+            logger.warning(
+                "source_bundles: bundle não persistido para ator; subject_id=%s",
+                subject_id,
+            )
+            return None
+        return bundle
     except ValidationError:
         logger.warning(
             "source_bundles: bundle inválido para ator; categoria=ValidationError subject_id=%s",
             subject_id,
         )
+        return None
     except BundleStorageError:
         logger.warning(
             "source_bundles: falha best-effort para ator; categoria=%s subject_id=%s",
             "BundleStorageError",
             subject_id,
         )
+        return None
 
 
 def _note_agency_bundle_not_applicable(subject_id: str) -> None:
@@ -838,6 +846,17 @@ def _ingest_investidores(conn, stats: dict) -> None:
     collected_at_raw = catalog.get("last_updated")
     for r in recs:
         try:
+            bundle = _persist_actor_source_bundle_best_effort(
+                subject_kind="investor",
+                subject_id=r["id"],
+                source="curadoria",
+                collected_at_raw=collected_at_raw,
+                document_name=path.name,
+                document_role="curated_record",
+                source_url=r.get("site"),
+                record=r,
+            )
+            bundle_document = bundle.documents[0] if bundle is not None else None
             desc = _ws(r.get("tese") or "")
             setores = normalize_setores(list(r.get("setores") or []) + list(r.get("tese_themes") or []))
             tags = normalize_tags(r.get("tese_keywords") or [])
@@ -849,6 +868,7 @@ def _ingest_investidores(conn, stats: dict) -> None:
             entity_provenance = provenance_writer.build_investidor_fact_provenance(
                 r, setores=setores, tecnologias_tags=tags, status=status,
                 ticket_min=tmin, ticket_max=tmax,
+                bundle=bundle, bundle_document=bundle_document,
             )
             with conn.transaction(), conn.cursor() as cur:
                 _upsert_entity(
@@ -874,16 +894,6 @@ def _ingest_investidores(conn, stats: dict) -> None:
                     },
                     embedding=embed_query(desc or r.get("name") or r["id"]),
                 )
-            _persist_actor_source_bundle_best_effort(
-                subject_kind="investor",
-                subject_id=r["id"],
-                source="curadoria",
-                collected_at_raw=collected_at_raw,
-                document_name=path.name,
-                document_role="curated_record",
-                source_url=r.get("site"),
-                record=r,
-            )
             stats["investidor"] += 1
         except Exception as e:  # noqa: BLE001
             logger.warning("investidor %s falhou: %s", r.get("id"), e)
@@ -902,6 +912,17 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
     collected_at_raw = catalog.get("last_updated")
     for r in recs:
         try:
+            bundle = _persist_actor_source_bundle_best_effort(
+                subject_kind="program",
+                subject_id=r["id"],
+                source="curadoria",
+                collected_at_raw=collected_at_raw,
+                document_name=path.name,
+                document_role="curated_record",
+                source_url=r.get("site"),
+                record=r,
+            )
+            bundle_document = bundle.documents[0] if bundle is not None else None
             desc = _ws(" ".join(x for x in [r.get("descricao"), r.get("beneficio")] if x))
             tmin, tmax = _ticket_from_range(r.get("ticket_range"))
             constraints, requisitos, exclusoes, publico_alvo = produce_from_text(r.get("elegibilidade") or "")
@@ -921,6 +942,7 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
                 ticket_min=tmin, ticket_max=tmax, mecanismo=mecanismo, formato=formato,
                 constraints=constraints, requisitos_texto=requisitos,
                 constraints_model=CONSTRAINTS_MODEL,
+                bundle=bundle, bundle_document=bundle_document,
             )
             operado_por_provenance = provenance_writer.build_programa_operado_por_provenance().model_dump(
                 mode="json"
@@ -953,16 +975,6 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
                     if aid:
                         _upsert_rel(cur, eid, aid, "operado_por", provenance=operado_por_provenance)
                         stats["operado_por"] += 1
-            _persist_actor_source_bundle_best_effort(
-                subject_kind="program",
-                subject_id=r["id"],
-                source="curadoria",
-                collected_at_raw=collected_at_raw,
-                document_name=path.name,
-                document_role="curated_record",
-                source_url=r.get("site"),
-                record=r,
-            )
             stats["programa"] += 1
         except Exception as e:  # noqa: BLE001
             logger.warning("programa %s falhou: %s", r.get("id"), e)
@@ -979,6 +991,18 @@ def _ingest_icts(conn, agency_cache: dict, stats: dict) -> None:
     recs = json.loads(files[-1].read_text(encoding="utf-8")) if files else []
     for r in recs:
         try:
+            subject_id = f"ict:embrapii:{r.get('slug') or schema.slugify(r.get('name') or '')}"
+            bundle = _persist_actor_source_bundle_best_effort(
+                subject_kind="ict",
+                subject_id=subject_id,
+                source="embrapii",
+                collected_at_raw=r.get("data_extracao"),
+                document_name=document or "embrapii.json",
+                document_role="official_record",
+                source_url=r.get("url"),
+                record=r,
+            )
+            bundle_document = bundle.documents[0] if bundle is not None else None
             slug = r.get("slug") or schema.slugify(r.get("name") or "")
             native_id = f"embrapii:{slug}"
             desc = _ws(r.get("about") or "")
@@ -988,10 +1012,14 @@ def _ingest_icts(conn, agency_cache: dict, stats: dict) -> None:
             # versionado do scraper — reusada em `name`/`metadata.url`/`uf`/
             # tags e na aresta `credenciada_por`, sem recomputar o hash.
             anchor = provenance_writer.build_ict_record_anchor(
-                record=r, document=document, source_url=r.get("url"), native_id=native_id,
+                record=r,
+                document=document,
+                source_url=r.get("url"),
+                native_id=native_id,
+                bundle=bundle,
+                bundle_document=bundle_document,
             )
             provenance = provenance_writer.build_ict_fact_provenance(record=r, anchor=anchor, uf=uf)
-            subject_id = f"ict:embrapii:{slug}"
             with conn.transaction(), conn.cursor() as cur:
                 eid = _upsert_entity(
                     cur, kind="ict", source="embrapii", native_id=native_id,
@@ -1014,16 +1042,6 @@ def _ingest_icts(conn, agency_cache: dict, stats: dict) -> None:
                         provenance=edge_provenance.model_dump(mode="json"),
                     )
                     stats["credenciada_por"] += 1
-            _persist_actor_source_bundle_best_effort(
-                subject_kind="ict",
-                subject_id=subject_id,
-                source="embrapii",
-                collected_at_raw=r.get("data_extracao"),
-                document_name=document or "embrapii.json",
-                document_role="official_record",
-                source_url=r.get("url"),
-                record=r,
-            )
             stats["ict"] += 1
         except Exception as e:  # noqa: BLE001
             logger.warning("ict %s falhou: %s", r.get("slug"), e)

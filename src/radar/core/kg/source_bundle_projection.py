@@ -136,6 +136,44 @@ def resolve_all(bundle: SourceBundle, claims: list[ExplicitClaim]) -> dict[str, 
     return {field: resolve_field(bundle, claims, field) for field in fields}
 
 
+def find_current_document(
+    bundle: SourceBundle,
+    *,
+    content_hash: str,
+    doc_name: str | None = None,
+) -> DocumentMetadata | None:
+    projection = project_current_documents(bundle)
+    matches = [
+        doc
+        for doc in projection.documents
+        if doc.content_hash == content_hash and (doc_name is None or doc.doc_name == doc_name)
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def attach_bundle_lineage(
+    ref: EvidenceRef,
+    *,
+    bundle: SourceBundle,
+    document: DocumentMetadata,
+) -> EvidenceRef:
+    current = find_current_document(
+        bundle,
+        content_hash=document.content_hash,
+        doc_name=document.doc_name,
+    )
+    if current is None:
+        raise ValueError(
+            "Cannot attach bundle lineage: document is absent, ambiguous, or superseded"
+        )
+    return ref.model_copy(
+        update={
+            "bundle_hash": bundle.compute_bundle_hash(),
+            "content_hash": current.content_hash,
+        }
+    )
+
+
 def _require_complete_bundle(bundle: SourceBundle) -> None:
     if bundle.acquisition_status is not AcquisitionStatus.COMPLETE:
         raise ValueError("BundleProjection requires a complete SourceBundle")
@@ -202,7 +240,13 @@ def _evidence_refs(bundle: SourceBundle, supports: list[ClaimSupport]) -> list[E
             ref_kwargs["edital_id"] = bundle.subject_id
         else:
             ref_kwargs["native_id"] = bundle.subject_id
-        refs.append(EvidenceRef(**ref_kwargs))
+        refs.append(
+            attach_bundle_lineage(
+                EvidenceRef(**ref_kwargs),
+                bundle=bundle,
+                document=doc,
+            )
+        )
     return refs
 
 
@@ -211,6 +255,8 @@ __all__ = [
     "ClaimSupport",
     "ExplicitClaim",
     "FieldResolution",
+    "attach_bundle_lineage",
+    "find_current_document",
     "project_current_documents",
     "resolve_all",
     "resolve_field",

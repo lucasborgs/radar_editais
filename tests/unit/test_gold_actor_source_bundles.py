@@ -225,7 +225,7 @@ class TestActorBundleIngest:
     def test_ingest_persists_known_actor_bundles(self, monkeypatch, tmp_path):
         fixture_dir = _prepare_fixture_dir(tmp_path)
 
-        _, bundle_calls, stats = _run_capture(monkeypatch, fixture_dir)
+        harness, bundle_calls, stats = _run_capture(monkeypatch, fixture_dir)
 
         bundles_by_subject = {bundle.subject_id: bundle for bundle in bundle_calls}
         assert stats["ict"] == 1
@@ -247,6 +247,24 @@ class TestActorBundleIngest:
         program_bundle = bundles_by_subject["programa:centelha"]
         assert program_bundle.documents[0].role.value == "curated_record"
         assert program_bundle.collected_at.isoformat() == "2026-06-18T00:00:00+00:00"
+
+        ict_name_ref = FactProvenance.model_validate(
+            harness.entity_provenance["ict|embrapii|embrapii:inteligencia-artificial-ceia-ufg"]["name"]
+        ).evidence_refs[0]
+        assert ict_name_ref.bundle_hash == ict_bundle.compute_bundle_hash()
+        assert ict_name_ref.content_hash == ict_bundle.documents[0].content_hash
+
+        investor_name_ref = FactProvenance.model_validate(
+            harness.entity_provenance["investidor|curadoria|investidor:indicator-capital"]["name"]
+        ).evidence_refs[0]
+        assert investor_name_ref.bundle_hash == investor_bundle.compute_bundle_hash()
+        assert investor_name_ref.content_hash == investor_bundle.documents[0].content_hash
+
+        program_name_ref = FactProvenance.model_validate(
+            harness.entity_provenance["programa|curadoria|programa:centelha"]["name"]
+        ).evidence_refs[0]
+        assert program_name_ref.bundle_hash == program_bundle.compute_bundle_hash()
+        assert program_name_ref.content_hash == program_bundle.documents[0].content_hash
 
     def test_agency_bundle_is_not_applicable(self, monkeypatch, tmp_path, caplog):
         fixture_dir = _prepare_fixture_dir(tmp_path)
@@ -301,6 +319,11 @@ class TestActorBundleIngest:
         assert harness.projection.entities
         assert "BundleStorageError" in caplog.text
         assert secret not in caplog.text
+        investor_name_ref = FactProvenance.model_validate(
+            harness.entity_provenance["investidor|curadoria|investidor:indicator-capital"]["name"]
+        ).evidence_refs[0]
+        assert investor_name_ref.bundle_hash is None
+        assert investor_name_ref.content_hash is None
 
     def test_bundle_validation_failure_is_best_effort_and_keeps_stats(self, monkeypatch, tmp_path, caplog):
         fixture_dir = _prepare_fixture_dir(tmp_path, ict_data_extracao="2026-06-03T12:30:00")
@@ -330,8 +353,6 @@ class TestActorBundleIngest:
         with pytest.MonkeyPatch.context() as monkeypatch:
             fail_harness, _, _ = _run_capture(monkeypatch, fixture_dir_fail, saver=_failing_save)
 
-        assert ok_harness.entity_provenance == fail_harness.entity_provenance
-        assert ok_harness.relation_provenance == fail_harness.relation_provenance
         assert FactProvenance.model_validate(
             ok_harness.entity_provenance["investidor|curadoria|investidor:indicator-capital"]["name"]
         ).state == "unknown"
@@ -341,3 +362,16 @@ class TestActorBundleIngest:
         assert FactProvenance.model_validate(
             ok_harness.entity_provenance["ict|embrapii|embrapii:inteligencia-artificial-ceia-ufg"]["name"]
         ).state == "stated"
+        assert FactProvenance.model_validate(
+            fail_harness.entity_provenance["investidor|curadoria|investidor:indicator-capital"]["name"]
+        ).state == "unknown"
+        ok_ict_ref = FactProvenance.model_validate(
+            ok_harness.entity_provenance["ict|embrapii|embrapii:inteligencia-artificial-ceia-ufg"]["name"]
+        ).evidence_refs[0]
+        fail_ict_ref = FactProvenance.model_validate(
+            fail_harness.entity_provenance["ict|embrapii|embrapii:inteligencia-artificial-ceia-ufg"]["name"]
+        ).evidence_refs[0]
+        assert ok_ict_ref.bundle_hash is not None
+        assert ok_ict_ref.content_hash is not None
+        assert fail_ict_ref.bundle_hash is None
+        assert fail_ict_ref.content_hash is None

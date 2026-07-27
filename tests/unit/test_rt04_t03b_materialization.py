@@ -67,6 +67,11 @@ def test_portal_and_challenge_create_complete_bundle_and_projection(monkeypatch,
     ]
     assert len(source_docs_calls) == 1
     assert len(source_docs_calls[0][2]) == 2
+    projected_docs = source_docs_calls[0][2]
+    assert projected_docs[0]["metadata"]["bundle_hash"] == bundle.compute_bundle_hash()
+    assert projected_docs[0]["metadata"]["content_hash"] == bundle.documents[0].content_hash
+    assert projected_docs[1]["metadata"]["bundle_hash"] == bundle.compute_bundle_hash()
+    assert projected_docs[1]["metadata"]["content_hash"] == bundle.documents[1].content_hash
 
 
 def test_isolated_challenge_creates_complete_bundle_without_context(monkeypatch, tmp_path):
@@ -129,6 +134,7 @@ def test_bundle_storage_failure_does_not_block_projection(monkeypatch, tmp_path)
     assert edital_id.startswith("web:")
     assert len(source_docs_calls) == 1
     assert len(source_docs_calls[0][2]) == 2
+    assert all("metadata" not in doc for doc in source_docs_calls[0][2])
     bronze = next((tmp_path / "web_raw").glob("*.json"))
     assert json.loads(bronze.read_text())[0]["url_hash"]
 

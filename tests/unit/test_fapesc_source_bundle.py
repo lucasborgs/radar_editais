@@ -161,6 +161,28 @@ def test_chunking_path_executes_bundle_before_source_docs(monkeypatch):
     assert events == ["bundle", "source_docs"]
 
 
+def test_saved_bundle_enriches_source_docs_payload(monkeypatch, tmp_path):
+    _write_bronze(monkeypatch, tmp_path, _record(normative=_normative()))
+    saved_docs = {}
+    adapter = fapesc.Adapter()
+    monkeypatch.setattr(tasks, "get_adapter", lambda source: adapter)
+    monkeypatch.setattr("radar.pipeline.adapters.base.get_adapter", lambda source: adapter)
+    monkeypatch.setattr(
+        source_docs,
+        "save",
+        lambda edital_id, source, docs: saved_docs.setdefault("docs", docs) or True,
+    )
+    monkeypatch.setattr(source_docs, "active_documents", lambda docs: docs)
+    monkeypatch.setattr(tasks, "build_or_load_structured_doc", lambda source, native, docs: [])
+    monkeypatch.setattr(source_bundles, "save", lambda bundle: True)
+
+    tasks._build_chunks_for_edital("fapesc:37-2026")
+
+    docs = saved_docs["docs"]
+    assert docs[0]["metadata"]["bundle_hash"].startswith("sha256:")
+    assert docs[0]["metadata"]["content_hash"].startswith("sha256:")
+
+
 def test_promoted_ingestion_path_executes_bundle_before_source_docs(monkeypatch):
     import asyncio
 

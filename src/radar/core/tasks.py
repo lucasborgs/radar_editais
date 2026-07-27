@@ -33,6 +33,7 @@ import os  # noqa: E402
 import uuid  # noqa: E402
 
 from procrastinate import App, PsycopgConnector, RetryStrategy  # noqa: E402
+from pydantic import ValidationError  # noqa: E402
 
 from radar.core.infra.db import get_supabase_service  # noqa: E402
 from radar.core.infra.logging_config import setup_logging  # noqa: E402
@@ -471,21 +472,65 @@ async def purge_agent_checkpoints(timestamp: int) -> None:
 def _save_fapesc_bundle_if_available(source: str, native: str) -> None:
     """Persiste o bundle FAPESC antes da projeção canônica, sem bloquear o ETL."""
     if source != "fapesc":
-        return
+        return None
     from radar.core.kg import source_bundles  # noqa: PLC0415
     from radar.core.kg.source_bundles import BundleStorageError  # noqa: PLC0415
     from radar.pipeline.adapters.fapesc import build_source_bundle  # noqa: PLC0415
 
-    bundle = build_source_bundle(native)
-    if bundle is None:
-        return
     try:
-        source_bundles.save(bundle)
+        bundle = build_source_bundle(native)
+    except ValidationError:
+        logger.warning(
+            "fapesc bundle: bundle inválido para %s (type=%s)",
+            native,
+            ValidationError.__name__,
+        )
+        return None
+    if bundle is None:
+        return None
+    try:
+        if source_bundles.save(bundle) is not True:
+            return None
+        return bundle
     except BundleStorageError:
         logger.warning(
             "fapesc bundle: falha best-effort para %s (type=%s)",
             native, BundleStorageError.__name__,
         )
+        return None
+
+
+def _attach_bundle_metadata_to_documents(documents, bundle):
+    if not documents or bundle is None:
+        return documents
+    from radar.domain.source_bundle import (  # noqa: PLC0415
+        AuthorityState,
+        compute_content_hash,
+    )
+
+    bundle_hash = bundle.compute_bundle_hash()
+    current_documents = [
+        doc for doc in bundle.documents if doc.authority_state is not AuthorityState.SUPERSEDED
+    ]
+    enriched = []
+    for entry in documents:
+        entry_hash = compute_content_hash(entry.get("units") or [])
+        matches = [
+            doc
+            for doc in current_documents
+            if doc.content_hash == entry_hash and doc.doc_name == entry.get("doc_name")
+        ]
+        if len(matches) != 1:
+            enriched.append(entry)
+            continue
+        current = matches[0]
+        metadata = dict(entry.get("metadata") or {})
+        metadata.update({
+            "bundle_hash": bundle_hash,
+            "content_hash": current.content_hash,
+        })
+        enriched.append({**entry, "metadata": metadata})
+    return enriched
 
 
 def _build_chunks_for_edital(edital_id: str) -> list[dict]:
@@ -510,7 +555,10 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
     # versão normativa antiga que ainda esteja persistida.
     documents = get_adapter(source).to_documents(native)
     if documents:
-        _save_fapesc_bundle_if_available(source, native)
+        documents = _attach_bundle_metadata_to_documents(
+            documents,
+            _save_fapesc_bundle_if_available(source, native),
+        )
         source_docs.save(edital_id, source, documents)
     else:
         documents = source_docs.load(edital_id)
@@ -538,11 +586,23 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
     # `_index_is_current` (conteúdo agregado determina a versão do índice).
     canonical_content_hash = f"md5:{source_docs.canonical_hash(active)}"
     for global_idx, chunk in enumerate(chunks):
+        matched_docs = [
+            entry for entry in active if entry.get("doc_name") == chunk.get("source_file")
+        ]
+        bundle_lineage = {}
+        if len(matched_docs) == 1:
+            metadata = matched_docs[0].get("metadata") or {}
+            if metadata.get("bundle_hash") and metadata.get("content_hash"):
+                bundle_lineage = {
+                    "bundle_hash": metadata["bundle_hash"],
+                    "content_hash": metadata["content_hash"],
+                }
         chunk["chunk_index"] = global_idx
         chunk["metadata"] = {
             **(chunk.get("metadata") or {}),
             "canonical_content_hash": canonical_content_hash,
             "chunker_version": CHUNKER_VERSION,
+            **bundle_lineage,
         }
     return chunks
 
@@ -576,7 +636,8 @@ def _index_is_current(db, edital_id: str, content_hash: str, n_chunks: int) -> b
         row = res.data if res else None
         if not (row and isinstance(row.get("metadata"), dict)):
             return False
-        if row["metadata"].get("content_hash") != content_hash:
+        current_hash = row["metadata"].get("index_content_hash") or row["metadata"].get("content_hash")
+        if current_hash != content_hash:
             return False
         cnt = (
             db.table("edital_chunks")
@@ -598,7 +659,7 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
     the fresh batch. Re-runnable without manual cleanup.
 
     Gate de conteúdo (requisito 3): após o ÚLTIMO batch inserido, grava um
-    marcador `{content_hash, n_chunks}` no metadata do chunk_index=0. Em
+    marcador `{index_content_hash, n_chunks}` no metadata do chunk_index=0. Em
     re-runs, se o hash bater E o count(*) estiver íntegro, pula o re-embed —
     só editais cujo conteúdo mudou pagam OpenAI. O marcador vem por último de
     propósito: uma run que morre no meio dos inserts deixa o índice SEM
@@ -718,11 +779,7 @@ async def chunk_edital_task(edital_id: str, force: bool = False) -> None:
     # 3. Marcador de conclusão — POR ÚLTIMO. Só existe se todos os batches
     #    entraram; uma run que morreu no meio deixa o índice sem marcador e a
     #    próxima run reindexa (gate `_index_is_current` retorna False).
-    marker_meta = {
-        **rows[0]["metadata"],
-        "content_hash": content_hash,
-        "n_chunks": len(rows),
-    }
+    marker_meta = {**rows[0]["metadata"], "index_content_hash": content_hash, "n_chunks": len(rows)}
     await asyncio.to_thread(
         lambda: db.table("edital_chunks")
         .update({"metadata": marker_meta})

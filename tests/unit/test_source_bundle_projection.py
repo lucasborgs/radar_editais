@@ -7,10 +7,12 @@ import pytest
 from radar.core.kg import source_bundles
 from radar.core.kg.source_bundle_projection import (
     ExplicitClaim,
+    attach_bundle_lineage,
+    find_current_document,
     project_current_documents,
     resolve_field,
 )
-from radar.domain.provenance import FactState
+from radar.domain.provenance import EvidenceRef, FactState, LocatorQuality
 from radar.domain.source_bundle import SourceBundle, compute_content_hash
 from tests.fixtures.source_bundles.fixtures import fapesc_base_amendment, web_portal_challenge
 
@@ -260,6 +262,48 @@ def test_claim_for_absent_or_superseded_document_is_ignored_safely():
     assert resolution.value == "2026-09-30"
     assert len(resolution.limitations) == 2
     assert all("Claim ignorado" in item for item in resolution.limitations)
+
+
+def test_attach_bundle_lineage_adds_bundle_and_content_hash():
+    bundle = _bundle(web_portal_challenge())
+    document = bundle.documents[0]
+    ref = attach_bundle_lineage(
+        resolve_field(
+            bundle,
+            [_claim("beneficio", "A", document.content_hash)],
+            "beneficio",
+        ).evidence_refs[0],
+        bundle=bundle,
+        document=document,
+    )
+
+    assert ref.bundle_hash == bundle.compute_bundle_hash()
+    assert ref.content_hash == document.content_hash
+
+
+def test_attach_bundle_lineage_rejects_superseded_document():
+    data = fapesc_base_amendment()
+    data["documents"][0]["authority_state"] = "superseded"
+    bundle = _bundle(data)
+    superseded_doc = bundle.documents[0]
+    ref = EvidenceRef(
+        source="fapesc",
+        edital_id=bundle.subject_id,
+        document=superseded_doc.doc_name,
+        canonical_content_hash=superseded_doc.content_hash,
+        locator_quality=LocatorQuality.DOCUMENT_ONLY,
+    )
+
+    with pytest.raises(ValueError, match="superseded"):
+        attach_bundle_lineage(ref, bundle=bundle, document=superseded_doc)
+
+
+def test_find_current_document_returns_none_for_superseded_or_ambiguous():
+    data = web_portal_challenge()
+    first = data["documents"][0]
+    data["documents"].append({**first})
+    bundle = _bundle(data)
+    assert find_current_document(bundle, content_hash=first["content_hash"], doc_name=first["doc_name"]) is None
 
 
 def test_absence_of_claims_does_not_fabricate_value_or_conflict():

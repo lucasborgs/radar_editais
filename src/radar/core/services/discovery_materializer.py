@@ -90,7 +90,40 @@ def _bundle_from_evidence(opportunity: dict, evidence: dict) -> SourceBundle | N
     })
 
 
-def canonical_documents_from_evidence(opportunity: dict, evidence: dict) -> CanonicalDoc:
+def _attach_bundle_metadata(documents: CanonicalDoc, bundle: SourceBundle | None) -> CanonicalDoc:
+    if bundle is None:
+        return documents
+    bundle_hash = bundle.compute_bundle_hash()
+    current_documents = [
+        doc for doc in bundle.documents if doc.authority_state is not AuthorityState.SUPERSEDED
+    ]
+    enriched: CanonicalDoc = []
+    for entry in documents:
+        entry_hash = compute_content_hash(entry.get("units") or [])
+        matches = [
+            doc
+            for doc in current_documents
+            if doc.content_hash == entry_hash and doc.doc_name == entry.get("doc_name")
+        ]
+        if len(matches) != 1:
+            enriched.append(entry)
+            continue
+        current = matches[0]
+        metadata = dict(entry.get("metadata") or {})
+        metadata.update({
+            "bundle_hash": bundle_hash,
+            "content_hash": current.content_hash,
+        })
+        enriched.append({**entry, "metadata": metadata})
+    return enriched
+
+
+def canonical_documents_from_evidence(
+    opportunity: dict,
+    evidence: dict,
+    *,
+    persisted_bundle: SourceBundle | None = None,
+) -> CanonicalDoc:
     """Gera o Documento Canônico com a página e PDFs já aprovados.
 
     O adapter web continua sendo o fallback a partir do bronze. Quando houver
@@ -119,7 +152,7 @@ def canonical_documents_from_evidence(opportunity: dict, evidence: dict) -> Cano
                 "doc_name": related_page.get("label") or f"pagina-relacionada-{index}",
                 "units": split_into_units(related_text),
             })
-    return docs
+    return _attach_bundle_metadata(docs, persisted_bundle)
 
 
 def materialize_approved_evidence(opportunity: dict, evidence: dict | None = None) -> str:
@@ -155,15 +188,24 @@ def materialize_approved_evidence(opportunity: dict, evidence: dict | None = Non
     edital_id = f"web:{url_hash}"
     # Persistência durável é best-effort e não muda o contrato do adapter web:
     # sem Supabase, o job continua lendo o bronze local como já fazia.
+    persisted_bundle = None
     try:
         bundle = _bundle_from_evidence(opportunity, evidence)
-        if bundle is not None:
-            source_bundles.save(bundle)
+        if bundle is not None and source_bundles.save(bundle) is True:
+            persisted_bundle = bundle
     except BundleStorageError as exc:
         logger.warning(
             "source_bundles: falha best-effort; categoria=%s",
             type(exc).__name__,
         )
     from radar.core.kg import source_docs
-    source_docs.save(edital_id, "web", canonical_documents_from_evidence(opportunity, evidence))
+    source_docs.save(
+        edital_id,
+        "web",
+        canonical_documents_from_evidence(
+            opportunity,
+            evidence,
+            persisted_bundle=persisted_bundle,
+        ),
+    )
     return edital_id

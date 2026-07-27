@@ -272,3 +272,55 @@ async def test_hash_changes_when_canonical_doc_changes(monkeypatch):
     hash_b = db_b.rows()[0]["metadata"]["canonical_content_hash"]
 
     assert hash_a != hash_b
+
+
+async def test_chunk_receives_bundle_lineage_only_when_document_is_unequivocal(monkeypatch):
+    db = _FakeDB()
+    docs = [
+        {
+            "doc_name": "Edital.pdf",
+            "units": ["Texto do edital sobre elegibilidade das empresas participantes."],
+            "metadata": {
+                "bundle_hash": "sha256:" + "a" * 64,
+                "content_hash": "sha256:" + "b" * 64,
+            },
+        }
+    ]
+    _wire_common(monkeypatch, db, documents=docs, blocks=SILVER_BLOCKS)
+    _wire_context_off(monkeypatch)
+
+    await tasks.chunk_edital_task(EDITAL_ID, force=True)
+
+    row = db.rows()[0]
+    assert row["metadata"]["bundle_hash"] == "sha256:" + "a" * 64
+    assert row["metadata"]["content_hash"] == "sha256:" + "b" * 64
+
+
+async def test_chunk_preserves_legacy_metadata_when_document_match_is_ambiguous(monkeypatch):
+    db = _FakeDB()
+    docs = [
+        {
+            "doc_name": "Edital.pdf",
+            "units": ["Texto do edital sobre elegibilidade das empresas participantes."],
+            "metadata": {
+                "bundle_hash": "sha256:" + "a" * 64,
+                "content_hash": "sha256:" + "b" * 64,
+            },
+        },
+        {
+            "doc_name": "Edital.pdf",
+            "units": ["Texto alternativo com mesmo nome de documento."],
+            "metadata": {
+                "bundle_hash": "sha256:" + "c" * 64,
+                "content_hash": "sha256:" + "d" * 64,
+            },
+        },
+    ]
+    _wire_common(monkeypatch, db, documents=docs, blocks=SILVER_BLOCKS)
+    _wire_context_off(monkeypatch)
+
+    await tasks.chunk_edital_task(EDITAL_ID, force=True)
+
+    row = db.rows()[0]
+    assert "bundle_hash" not in row["metadata"]
+    assert "content_hash" not in row["metadata"]
