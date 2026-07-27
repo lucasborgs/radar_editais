@@ -8,7 +8,7 @@
   - relatório inicial: `56e38a00f`
   - implementação de correção: `fccf8fc2c`
   - relatório final: `03239787c`
-- Auditoria Codex: pendente
+- Auditoria Codex: aprovada em 2026-07-27
 
 ## Escopo
 
@@ -73,7 +73,8 @@ Foi adicionado um helper mínimo em [`src/radar/core/kg/source_bundle_projection
   - os blocos silver carregam `document_metadata`;
   - a resolução documental é `exact` ou `document_only`;
   - a linhagem documental é única e inequívoca entre os blocos candidatos.
-- quando os blocos têm metadados conflitantes, ausentes ou ambíguos, a evidência permanece legada.
+- quando os blocos têm metadados conflitantes, ausentes, ambíguos ou inválidos, a evidência permanece legada.
+- o anexo de linhagem em `evidence_resolver.py` reconstrói a `EvidenceRef` via validação Pydantic; se `bundle_hash`/`content_hash` forem malformados, incompletos ou incompatíveis, a referência legada é preservada sem bloquear o gold.
 
 ## Chunks
 
@@ -103,10 +104,18 @@ Foi adicionado um helper mínimo em [`src/radar/core/kg/source_bundle_projection
 ## Validação executada
 
 - `ENVIRONMENT=test PYTHONPATH=src /Users/lucasborges/radar_editais/.venv/bin/pytest -q tests/unit/test_provenance.py tests/unit/test_source_bundles.py tests/unit/test_source_bundles_repo.py tests/unit/test_source_bundle_projection.py tests/unit/test_gold_actor_source_bundles.py tests/unit/test_rt04_t03b_materialization.py tests/unit/test_fapesc_source_bundle.py tests/unit/test_chunk_lineage.py tests/unit/test_chunk_edital_gate.py tests/unit/test_gold_provenance_icts.py tests/unit/test_gold_provenance_curated.py tests/unit/test_gold_provenance_dualwrite.py tests/unit/test_gold_provenance_sources.py`
-  - resultado: `309 passed`
+  - resultado: `312 passed`
 - `ENVIRONMENT=test PYTHONPATH=src /Users/lucasborges/radar_editais/.venv/bin/python -m radar.core.eval run provenance`
   - resultado: suíte local executada com sucesso; arquivo gerado em `/private/tmp/radar-editais-rt04-t06b/eval_results/20260727_172321_provenance.json`
 - `ruff check <arquivos alterados>`
   - resultado: `All checks passed!`
 - `git diff --check`
   - resultado: sem diferenças inválidas
+
+## Auditoria Codex
+
+- Bundles `partial` permanecem históricos, sem virar linhagem corrente.
+- Metadados documentais inválidos ou ambíguos preservam a evidência legada.
+- Web, FAPESC, atores e `edital_chunks` só recebem referência recuperável.
+- `match_chunks` permanece explicitamente legado, sem migration ou workaround.
+- Gate independente: `312 passed`, Ruff limpo e `git diff --check` limpo.

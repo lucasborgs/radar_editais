@@ -57,6 +57,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from pydantic import ValidationError
+
 from radar.domain.provenance import EvidenceRef, LocatorQuality
 
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -177,7 +179,7 @@ def resolve_quote(
             resolved_document=resolved_document,
         )
         if bundle_lineage is not None:
-            evidence_ref = evidence_ref.model_copy(update=bundle_lineage)
+            evidence_ref = _validated_with_bundle_lineage(evidence_ref, bundle_lineage)
 
     return ResolveResult(
         candidates=candidates,
@@ -246,6 +248,19 @@ def _bundle_lineage_from_blocks(
         "bundle_hash": bundle_hash,
         "content_hash": content_hash,
     }
+
+
+def _validated_with_bundle_lineage(
+    evidence_ref: EvidenceRef,
+    bundle_lineage: dict[str, str],
+) -> EvidenceRef:
+    try:
+        return EvidenceRef.model_validate({
+            **evidence_ref.model_dump(mode="json"),
+            **bundle_lineage,
+        })
+    except ValidationError:
+        return evidence_ref
 
 
 __all__ = [

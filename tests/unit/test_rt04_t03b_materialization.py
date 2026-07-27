@@ -104,6 +104,7 @@ def test_context_without_challenge_page_creates_partial_bundle(monkeypatch, tmp_
     assert len(bundle.documents) == 1
     assert bundle.documents[0].role is DocumentRole.PROGRAM_PAGE
     assert len(source_docs_calls[0][2]) == 1
+    assert "metadata" not in source_docs_calls[0][2][0]
 
 
 def test_absent_document_does_not_fabricate_bundle(monkeypatch, tmp_path):
