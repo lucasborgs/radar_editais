@@ -133,6 +133,55 @@ def test_bundle_storage_failure_does_not_block_projection(monkeypatch, tmp_path)
     assert json.loads(bronze.read_text())[0]["url_hash"]
 
 
+@pytest.mark.parametrize("collected_at", [None, "não-é-um-timestamp"])
+def test_missing_or_invalid_collected_at_skips_bundle_and_preserves_projection(
+    monkeypatch, tmp_path, caplog, collected_at,
+):
+    source_docs_calls, bundle_calls = _capture_materialization(monkeypatch, tmp_path)
+    evidence = _evidence()
+    evidence["identity"]["collected_at"] = collected_at
+
+    materializer.materialize_approved_evidence(_opportunity(), evidence)
+
+    assert bundle_calls == []
+    assert len(source_docs_calls) == 1
+    assert len(source_docs_calls[0][2]) == 1
+    assert "collected_at ausente ou inválido" in caplog.text
+
+
+def test_bundle_is_saved_before_source_docs_projection(monkeypatch, tmp_path):
+    monkeypatch.setattr(materializer, "BRONZE_DIR", tmp_path)
+    events: list[str] = []
+    monkeypatch.setattr(
+        materializer.source_bundles,
+        "save",
+        lambda bundle: events.append("bundle") or True,
+    )
+    monkeypatch.setattr(
+        "radar.core.kg.source_docs.save",
+        lambda *args: events.append("source_docs") or True,
+    )
+
+    materializer.materialize_approved_evidence(_opportunity(), _evidence())
+
+    assert events == ["bundle", "source_docs"]
+
+
+def test_bundle_storage_failure_log_does_not_expose_exception_message(monkeypatch, tmp_path, caplog):
+    _capture_materialization(monkeypatch, tmp_path)
+    secret = "segredo-nao-pode-aparecer"
+    monkeypatch.setattr(
+        materializer.source_bundles,
+        "save",
+        lambda bundle: (_ for _ in ()).throw(BundleStorageError(secret)),
+    )
+
+    materializer.materialize_approved_evidence(_opportunity(), _evidence())
+
+    assert "BundleStorageError" in caplog.text
+    assert secret not in caplog.text
+
+
 def test_recollecting_identical_evidence_keeps_bundle_hash_stable(monkeypatch, tmp_path):
     _, bundle_calls = _capture_materialization(monkeypatch, tmp_path)
     evidence = _evidence(related=[{"status": "loaded", "text": "contexto"}])

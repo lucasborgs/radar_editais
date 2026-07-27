@@ -15,6 +15,7 @@ após promoção humana, sem rede, recrawl ou LLM.
 - Worktree: `/private/tmp/radar-editais-rt04-t03b`
 - T03-A integrada na base: `f5425a0ad`
 - T03-B: `2157efd7e` (`feat(data-trust): materialize web evidence bundle`)
+- Correção residual T03-B: `fix(data-trust): preserve evidence timestamps`
 
 ## Implementação
 
@@ -30,6 +31,11 @@ após promoção humana, sem rede, recrawl ou LLM.
   último `complete` na leitura.
 - `BundleStorageError` é tratado como best-effort: bronze, `source_docs`,
   promoção e jobs existentes continuam preservados.
+- Evidência sem `collected_at` válido não fabrica horário de coleta: o bundle é
+  omitido com aviso sanitizado, mantendo bronze e a projeção compatível.
+- A persistência append-only do bundle é tentada antes de `source_docs`; em
+  `BundleStorageError`, o log expõe somente a categoria da falha e a projeção
+  continua sendo gravada.
 - A projeção compatível em `source_docs` inclui a página do desafio e o contexto
   carregado. Documentos auxiliares sem papel declarado não são promovidos a
   papel normativo no bundle.
@@ -46,12 +52,12 @@ consumers downstream, T04 ou qualquer etapa posterior.
 
 ## Validação
 
-- Testes direcionados e regressão T03-A/T03-B:
-  `212 passed`
+- Testes direcionados e regressões relacionadas: `143 passed`
 - Ruff nos arquivos Python alterados: aprovado
 - `git diff --check`: aprovado
 
 A suíte cobre portal + desafio (`complete`), desafio isolado, contexto sem
 página específica (`partial`), ausência documental, falha de
 `BundleStorageError`, idempotência por `bundle_hash`, projeção em `source_docs`
-e ausência de fetch adicional.
+e ausência de fetch adicional, inclusive timestamp ausente/inválido, ordem
+bundle→projeção e sanitização do log de armazenamento.

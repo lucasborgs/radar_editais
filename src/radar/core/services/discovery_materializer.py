@@ -72,7 +72,10 @@ def _bundle_from_evidence(opportunity: dict, evidence: dict) -> SourceBundle | N
         if collected_at.tzinfo is None:
             collected_at = collected_at.replace(tzinfo=timezone.utc)
     except (TypeError, ValueError):
-        collected_at = datetime.now(timezone.utc)
+        logger.warning(
+            "source_bundles: collected_at ausente ou inválido; bundle não persistido",
+        )
+        return None
     return SourceBundle.model_validate({
         "subject_kind": SubjectKind.OPPORTUNITY.value,
         "subject_id": f"web:{web_url_hash(canonical_url)}",
@@ -152,15 +155,15 @@ def materialize_approved_evidence(opportunity: dict, evidence: dict | None = Non
     edital_id = f"web:{url_hash}"
     # Persistência durável é best-effort e não muda o contrato do adapter web:
     # sem Supabase, o job continua lendo o bronze local como já fazia.
-    from radar.core.kg import source_docs
-    source_docs.save(edital_id, "web", canonical_documents_from_evidence(opportunity, evidence))
     try:
         bundle = _bundle_from_evidence(opportunity, evidence)
         if bundle is not None:
             source_bundles.save(bundle)
     except BundleStorageError as exc:
         logger.warning(
-            "source_bundles: falha best-effort para %s: %s",
-            edital_id, exc,
+            "source_bundles: falha best-effort; categoria=%s",
+            type(exc).__name__,
         )
+    from radar.core.kg import source_docs
+    source_docs.save(edital_id, "web", canonical_documents_from_evidence(opportunity, evidence))
     return edital_id
