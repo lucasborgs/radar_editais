@@ -93,6 +93,13 @@ Contrato: enums vs YAML, construção, hash stabilité, hash mutabilidade, fixtu
 3. **Sem testes de integração contra Postgres real.** Proporcional ao pré-beta; a suíte `provenance` poderá cobrir isso em T06/T07.
 4. **`edital_source_docs` permanece intacto.** A projeção compatível continua sendo a fonte de verdade do runtime existente.
 
+## Auditoria Codex
+
+**Aprovada em 2026-07-27.** Validação independente: 104 testes direcionados,
+Ruff e `git diff --check` limpos. Falhas reais são diferenciadas de ausência
+legítima, payload persistido ausente ou inválido é observável e as exceções do
+provedor não são encadeadas nem expostas em mensagens ou logs.
+
 ## Commits
 
 ```
