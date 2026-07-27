@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
-from radar.domain.provenance import EvidenceRef, FactState
+from radar.domain.provenance import FactProvenance, FactState
 from radar.domain.source_bundle import DocumentRole, SourceBundle, SubjectKind
 
 _ACTOR_KINDS = frozenset({
@@ -57,12 +57,12 @@ class SourceBundleDiagnostics:
 def compute_source_bundle_diagnostics(
     bundles: Iterable[SourceBundle],
     *,
-    critical_fact_refs: Iterable[EvidenceRef] | None = None,
+    critical_facts: Iterable[FactProvenance] | None = None,
     composition_outcomes: Iterable[CompositionOutcome] | None = None,
 ) -> SourceBundleDiagnostics:
     """Deriva o baseline RT04 a partir de entradas já recuperadas.
 
-    A ausência de ``critical_fact_refs`` ou ``composition_outcomes`` significa
+    A ausência de ``critical_facts`` ou ``composition_outcomes`` significa
     denominador não observado e retorna ``None`` nos respectivos campos; uma
     lista vazia é um denominador observado de zero.
     """
@@ -99,11 +99,15 @@ def compute_source_bundle_diagnostics(
     total_facts: int | None = None
     linked_facts: int | None = None
     lineage_rate: float | None = None
-    if critical_fact_refs is not None:
-        refs = list(critical_fact_refs)
-        total_facts = len(refs)
+    if critical_facts is not None:
+        facts = list(critical_facts)
+        total_facts = len(facts)
         linked_facts = sum(
-            ref.bundle_hash is not None and ref.content_hash is not None for ref in refs
+            any(
+                ref.bundle_hash is not None and ref.content_hash is not None
+                for ref in fact.evidence_refs
+            )
+            for fact in facts
         )
         lineage_rate = linked_facts / total_facts if total_facts else None
 

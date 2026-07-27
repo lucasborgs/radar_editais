@@ -17,14 +17,16 @@ Métricas derivadas:
 - sujeitos com bundle e sujeitos com ao menos uma versão `complete`;
 - versões por sujeito;
 - documentos por papel;
-- fatos críticos com `bundle_hash` + `content_hash` recuperáveis;
+- fatos críticos (`FactProvenance`) com ao menos uma evidência contendo
+  `bundle_hash` + `content_hash` recuperáveis;
 - campos `conflicting` e precedências explicitamente declaradas; e
 - atores sem conteúdo oficial e/ou sem bundle `complete`.
 
 Ausência de denominador retorna `null`: a métrica não fabrica cobertura
-factual, conflito ou resolução. `precedence_applied` é entrada explícita do
-resultado de composição; não é deduzido de data, nome, ordem ou número de
-evidências.
+factual, conflito ou resolução. O denominador factual conta fatos, nunca
+`EvidenceRef`: duas evidências ligadas do mesmo fato contam como 1/1.
+`precedence_applied` é entrada explícita do resultado de composição; não é
+deduzido de data, nome, ordem ou número de evidências.
 
 ## Baseline de fixture
 
@@ -60,16 +62,19 @@ uma versão e continua fora de qualquer denominador não observado.
 
 ## Validação
 
-- testes RT04 direcionados + métricas: **194 passed**;
-- suíte completa: **1799 passed, 77 skipped**;
+- testes RT04 direcionados + métricas: **194 passed** (reexecutados após a
+  correção do denominador factual);
+- suíte completa anterior: **1799 passed, 77 skipped**;
 - `python -m radar.core.eval run provenance` local, sem `--publish`:
   `aggregate_signals=1.0`, faithfulness `1.0`, locator exact/document-only/
   unresolved `1/3` cada;
 - Ruff em Python alterado: aprovado; e
 - `git diff --check`: aprovado.
 
-As únicas mensagens da suíte completa são cinco warnings pré-existentes de
-depreciação (FastAPI/TestClient e `datetime.utcnow()` em writing), sem falha.
+A suíte completa não foi repetida após esta correção localizada no read model
+e em seu teste. As únicas mensagens daquele gate são cinco warnings
+pré-existentes de depreciação (FastAPI/TestClient e `datetime.utcnow()` em
+writing), sem falha.
 
 ## Auditoria Codex
 

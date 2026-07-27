@@ -5,7 +5,14 @@ from radar.core.services.source_bundle_metrics import (
     CompositionOutcome,
     compute_source_bundle_diagnostics,
 )
-from radar.domain.provenance import EvidenceRef, FactState, LocatorQuality
+from radar.domain.provenance import (
+    EvidenceRef,
+    FactProvenance,
+    FactState,
+    LocatorQuality,
+    ProducerInfo,
+    ProducerKind,
+)
 from radar.domain.source_bundle import SourceBundle
 from tests.fixtures.source_bundles.fixtures import (
     actor_insufficient,
@@ -32,13 +39,28 @@ def _ref(*, with_lineage: bool) -> EvidenceRef:
     )
 
 
+def _fact(*refs: EvidenceRef, state: FactState = FactState.STATED) -> FactProvenance:
+    return FactProvenance(
+        state=state,
+        evidence_refs=list(refs),
+        producer=ProducerInfo(kind=ProducerKind.DETERMINISTIC),
+    )
+
+
+def _partial(bundle: SourceBundle) -> SourceBundle:
+    data = bundle.model_dump(mode="json")
+    data.update({
+        "acquisition_status": "partial",
+        "collected_at": "2026-07-28T12:00:00Z",
+    })
+    return SourceBundle.model_validate(data)
+
+
 def test_fixture_baseline_measures_versions_roles_and_actor_gaps():
     web = _bundle(web_portal_challenge())
     fapesc = _bundle(fapesc_base_amendment())
     actor = _bundle(actor_insufficient())
-    fapesc_partial = fapesc.model_copy(
-        update={"acquisition_status": "partial", "collected_at": "2026-07-28T12:00:00Z"}
-    )
+    fapesc_partial = _partial(fapesc)
 
     result = compute_source_bundle_diagnostics([web, fapesc, actor, fapesc_partial])
 
@@ -62,9 +84,7 @@ def test_fixture_baseline_measures_versions_roles_and_actor_gaps():
 
 def test_partial_posterior_does_not_remove_current_complete_subject():
     complete = _bundle(fapesc_base_amendment())
-    partial = complete.model_copy(
-        update={"acquisition_status": "partial", "collected_at": "2026-07-28T12:00:00Z"}
-    )
+    partial = _partial(complete)
 
     result = compute_source_bundle_diagnostics([complete, partial])
 
@@ -99,10 +119,13 @@ def test_fact_and_composition_denominators_are_null_when_not_observed():
     assert result.precedence_resolutions is None
 
 
-def test_fact_lineage_and_explicit_composition_outcomes_are_counted_without_inference():
+def test_fact_lineage_counts_each_fact_once_and_composition_is_explicit():
     result = compute_source_bundle_diagnostics(
         [_bundle(web_portal_challenge())],
-        critical_fact_refs=[_ref(with_lineage=True), _ref(with_lineage=False)],
+        critical_facts=[
+            _fact(_ref(with_lineage=True), _ref(with_lineage=True)),
+            _fact(_ref(with_lineage=False)),
+        ],
         composition_outcomes=[
             CompositionOutcome(state=FactState.STATED, precedence_applied=True),
             CompositionOutcome(state=FactState.CONFLICTING),
@@ -119,7 +142,7 @@ def test_fact_lineage_and_explicit_composition_outcomes_are_counted_without_infe
 
 def test_observed_empty_denominators_remain_explicitly_empty():
     result = compute_source_bundle_diagnostics(
-        [], critical_fact_refs=[], composition_outcomes=[]
+        [], critical_facts=[], composition_outcomes=[]
     )
 
     assert result.subjects_with_bundle == 0

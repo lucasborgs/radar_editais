@@ -55,9 +55,11 @@ incompleto e uma versão `partial` posterior.
 | ator sem bundle completo | 1 |
 | fatos críticos / composição no baseline | não observados (`null`) |
 
-Métricas de linhagem factual, conflitos e precedência retornam `null` sem
-denominador fornecido; não convertem ausência em zero. Não há threshold, gate,
-alerta ou automação de decisão.
+Métricas de linhagem factual contam `FactProvenance`, não referências: um fato
+fica ligado quando ao menos uma de suas `EvidenceRef` contém o par recuperável
+de hashes. Conflitos e precedência retornam `null` sem denominador fornecido;
+nenhuma métrica converte ausência em zero. Não há threshold, gate, alerta ou
+automação de decisão.
 
 ## Limitações e decisões futuras
 
