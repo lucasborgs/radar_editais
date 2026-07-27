@@ -21,6 +21,7 @@ Funções de LLM/busca/staging isoladas para teste com mocks.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -47,6 +48,10 @@ _LEGACY_LEDGER = BRONZE_DIR / "discovery_raw" / ".ledger.json"
 # Cap defensivo do texto guardado por página (o chunker re-fatia depois). Páginas
 # de fomento ficam bem abaixo; evita um caso patológico inflar o bronze.
 _TEXTO_CRU_CAP = 60_000
+
+# Snapshot contextual do hub: suficiente para regras gerais sem carregar um
+# portal inteiro no candidato-filho. O hash é calculado depois deste corte.
+_HUB_SNAPSHOT_TEXT_CAP = 20_000
 
 # TTL default do cache negativo (dias) — sobrescrito por
 # `reject_cache_ttl_days` em docs/domain/sources/_discovery.md. Após o TTL, uma URL antes
@@ -391,8 +396,8 @@ def _hub_child_hits(
 
 def _expand_hub(
     hit: websearch.SearchHit, known_norm: set[str], max_children: int,
-) -> list[websearch.SearchHit]:
-    """Fetcha o HTML do hub e extrai os desafios-filho (1 nível). [] em falha."""
+) -> list[dict]:
+    """Fetcha o hub uma vez e anexa seu snapshot sanitizado a cada filho."""
     try:
         from radar.core.llm.agent_tools.profile_tools import _fetch_and_parse
         data = _fetch_and_parse(hit.url) or {}
@@ -400,8 +405,22 @@ def _expand_hub(
         logger.warning("hub-crawl: falha ao buscar hub %s: %s", hit.url, e)
         return []
     children = _hub_child_hits(hit.url, data.get("links", []), known_norm, max_children)
+    text = str(data.get("text") or "").strip()[:_HUB_SNAPSHOT_TEXT_CAP]
+    snapshot = {
+        "canonical_url": normalize_web_url(hit.url),
+        "text": text,
+        "content_hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "status": "loaded" if text else "empty",
+    }
     logger.info("hub-crawl: %s → %d desafios-filho", hit.url, len(children))
-    return children
+    return [{"hit": child, "hub_snapshot": dict(snapshot)} for child in children]
+
+
+def _hub_child_context(entry: object) -> tuple[websearch.SearchHit, dict | None]:
+    """Normaliza o retorno novo e o retorno SearchHit usado por callers legados."""
+    if isinstance(entry, dict):
+        return entry["hit"], entry.get("hub_snapshot")
+    return entry, None
 
 
 def _load_ledger() -> set[str]:
@@ -770,7 +789,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         _finish_all()
         return []
 
-    # Fila (hit, depth): candidatos de busca são depth 0; desafios-filho de um
+    # Fila (hit, depth, hub_snapshot): candidatos de busca são depth 0; desafios-filho de um
     # hub entram em depth 1 e NÃO re-expandem (crawl de 1 nível, sem loop). Quando
     # hub_enabled=False a fila se comporta exatamente como o loop antigo.
     records: list[dict] = []
@@ -779,11 +798,11 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
     rejected = _load_rejected()
     now = datetime.now(timezone.utc)
     triage_skipped = 0
-    queue: list[tuple[websearch.SearchHit, int]] = [(h, 0) for h in candidates]
+    queue: list[tuple[websearch.SearchHit, int, dict | None]] = [(h, 0, None) for h in candidates]
     hubs_expanded = 0
     i = 0
     while i < len(queue):
-        h, depth = queue[i]
+        h, depth, hub_snapshot = queue[i]
         i += 1
         nu = _norm_url(h.url)
         att = _attribution.get(nu, {"channel": "unknown", "family": None})
@@ -810,7 +829,8 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
                 and hubs_expanded < _MAX_HUBS_PER_RUN):
             hubs_expanded += 1
             reports["hub_expansion"].hubs_expanded += 1
-            for child in _expand_hub(h, known | seen_now, max_hub_children):
+            for child_entry in _expand_hub(h, known | seen_now, max_hub_children):
+                child, child_snapshot = _hub_child_context(child_entry)
                 child_nu = _norm_url(child.url)
                 if child_nu in seen_now:
                     continue
@@ -819,7 +839,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
                     "channel": "hub_expansion", "family": att["family"],
                 }
                 reports["hub_expansion"].hub_children_found += 1
-                queue.append((child, 1))
+                queue.append((child, 1, child_snapshot))
             if not verdict["is_opportunity"]:
                 # o hub em si raramente é UMA oportunidade (não cacheia
                 # como rejeição: já foi expandido e pode render filhos)
@@ -836,6 +856,10 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         agency = getattr(h, "agency", "") or verdict["agency"]
         rec = _extract(h, page_text, agency, ext_client, ext_model)
         if rec:
+            if hub_snapshot:
+                rec["hub_snapshot"] = hub_snapshot
+                from radar.core.services.discovery_evidence import build_evidence_package
+                rec["evidence_package"] = build_evidence_package(rec)
             # Crawl4AI é capacidade opcional do worker, nunca requisito do
             # radar.api. Uma falha preserva o pacote legado e não bloqueia a fila.
             if os.getenv("DISCOVERY_CRAWL4AI_ENABLED", "0") == "1":

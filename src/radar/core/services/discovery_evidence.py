@@ -51,6 +51,19 @@ def build_evidence_package(record: dict[str, Any], *, collector: str = "legacy_f
         }
         for name in _FIELD_NAMES
     }
+    documents = []
+    snapshot = record.get("hub_snapshot") or {}
+    if snapshot.get("status") == "loaded" and snapshot.get("text"):
+        snapshot_text = str(snapshot["text"])
+        documents.append({
+            "label": "Portal de inovação",
+            "url": snapshot.get("canonical_url") or "",
+            "text": snapshot_text,
+            "content_hash": _digest(snapshot_text),
+            "role": "program_page",
+            "authority_state": "contextual",
+            "status": "loaded",
+        })
     return {
         "version": EVIDENCE_VERSION,
         "identity": {
@@ -63,7 +76,7 @@ def build_evidence_package(record: dict[str, Any], *, collector: str = "legacy_f
             "text": page_text, "html": _text(record.get("html")),
             "content_hash": _digest(page_text), "status": "loaded" if page_text else "empty",
         },
-        "documents": [],
+        "documents": documents,
         "fields": fields,
         "operation": {"collector": collector, "status": "ready", "errors": []},
     }
