@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import sys
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -70,7 +72,7 @@ def test_empty_hub_snapshot_does_not_fabricate_program_page(monkeypatch):
         "title": "Desafio",
         "hub_snapshot": child["hub_snapshot"],
     })
-    assert package["documents"] == []
+    assert package["related_pages"] == []
 
 
 def test_isolated_challenge_keeps_legacy_evidence_shape():
@@ -82,6 +84,7 @@ def test_isolated_challenge_keeps_legacy_evidence_shape():
 
     assert package["page"]["status"] == "loaded"
     assert package["documents"] == []
+    assert package["related_pages"] == []
 
 
 def test_crawl4ai_path_preserves_hub_context(monkeypatch):
@@ -97,16 +100,30 @@ def test_crawl4ai_path_preserves_hub_context(monkeypatch):
         },
     }
 
-    async def fake_crawl(value):
-        return build_evidence_package(value, collector="crawl4ai")
+    class FakeCrawler:
+        async def __aenter__(self):
+            return self
 
-    monkeypatch.setattr(crawl4ai_discovery, "_crawl", fake_crawl)
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def arun(self, **kwargs):
+            return SimpleNamespace(markdown="texto crawl4ai")
+
+    fake_crawl4ai = SimpleNamespace(
+        AsyncWebCrawler=FakeCrawler,
+        CacheMode=SimpleNamespace(BYPASS="bypass"),
+        CrawlerRunConfig=lambda **kwargs: kwargs,
+    )
+    monkeypatch.setitem(sys.modules, "crawl4ai", fake_crawl4ai)
+    monkeypatch.setattr(crawl4ai_discovery, "_document_links", lambda result: [])
     package = crawl4ai_discovery.enrich_record(record)
 
     assert package["identity"]["collector"] == "crawl4ai"
-    assert package["documents"][0]["role"] == "program_page"
-    assert package["documents"][0]["authority_state"] == "contextual"
-    assert package["documents"][0]["text"] == "regras gerais"
+    assert package["documents"] == []
+    assert package["related_pages"][0]["role"] == "program_page"
+    assert package["related_pages"][0]["authority_state"] == "contextual"
+    assert package["related_pages"][0]["text"] == "regras gerais"
 
 
 def test_staging_raw_keeps_evidence_package(monkeypatch):
@@ -141,4 +158,21 @@ def test_staging_raw_keeps_evidence_package(monkeypatch):
 
     row = db.table.return_value.upsert.call_args[0][0][0]
     assert row["raw"]["evidence_package"] == record["evidence_package"]
-    assert row["raw"]["evidence_package"]["documents"][0]["role"] == "program_page"
+    assert row["raw"]["evidence_package"]["related_pages"][0]["role"] == "program_page"
+
+
+def test_t03a_materializer_does_not_consume_related_page():
+    from radar.core.services.discovery_materializer import canonical_documents_from_evidence
+
+    docs = canonical_documents_from_evidence(
+        {"title": "Desafio"},
+        {
+            "page": {"text": "texto do desafio"},
+            "documents": [],
+            "related_pages": [{"status": "loaded", "text": "regras gerais"}],
+        },
+    )
+
+    assert len(docs) == 1
+    assert docs[0]["units"]
+    assert all("regras" not in unit.lower() for unit in docs[0]["units"])

@@ -23,8 +23,11 @@ Nenhuma materialização pós-promoção foi implementada.
   e estado `loaded`/`empty`.
 - O contrato público de `SearchHit` não foi alterado. O loop aceita também o
   retorno antigo `SearchHit` para manter doubles/callers existentes compatíveis.
-- Snapshot `loaded` vira documento relacionado com papel `program_page` e
-  autoridade `contextual`. Snapshot `empty` não cria documento.
+- Snapshot `loaded` vira item em `related_pages`, com papel `program_page` e
+  autoridade `contextual`. Snapshot `empty` não cria item.
+- `documents` permanece reservado aos documentos já consumidos pelo fluxo atual;
+  o materializador legado não lê `related_pages`. A criação formal do
+  `program_page` fica para T03-B.
 - O desafio continua sendo a página principal. Candidatos isolados e pacotes
   legados permanecem sem `documents` adicionais.
 - O caminho opcional Crawl4AI parte do registro que já contém o snapshot, então
@@ -47,8 +50,9 @@ Nenhuma materialização pós-promoção foi implementada.
 - `git diff --check`: aprovado
 
 Os testes cobrem cap/hash, compartilhamento entre filhos, snapshot vazio,
-desafio isolado, compatibilidade do pacote legado, preservação no caminho
-Crawl4AI, ausência de fetch adicional do portal e retenção do pacote em `raw`.
+desafio isolado, compatibilidade do pacote legado, preservação no caminho real
+do Crawl4AI, ausência de fetch adicional do portal, retenção do pacote em `raw`
+e não-consumo de `related_pages` pelo materializador legado.
 
 ## Limitações e pendências
 
