@@ -14,7 +14,8 @@ continua a projeção atual. Revalidar a numeração de migration antes do pouso
 ## Arquivos prováveis
 
 - `supabase/migrations/044_source_bundles.sql` (número revalidável);
-- `src/radar/core/kg/source_bundles.py`;
+- `src/radar/domain/source_bundle.py` (contrato de T01) e
+  `src/radar/core/kg/source_bundles.py` (novo; somente repositório);
 - `tests/unit/test_source_bundles.py` e teste local de migration/RLS, se necessário.
 
 ## Passos delimitados

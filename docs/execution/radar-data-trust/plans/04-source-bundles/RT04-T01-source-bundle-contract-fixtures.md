@@ -15,7 +15,8 @@ normativo vai para `docs/domain/schema.md`, não para constante paralela.
 ## Arquivos prováveis
 
 - `docs/domain/schema.md` e, se necessário, `docs/domain/sources/fapesc.md`;
-- `src/radar/core/kg/source_bundles.py` (novo, tipos/validador/hash puros);
+- `src/radar/domain/source_bundle.py` e export em `src/radar/domain/__init__.py`
+  (novos; tipos, validação, normalização e hash puros);
 - `tests/fixtures/source_bundles/` e `tests/unit/test_source_bundles.py`.
 
 ## Passos delimitados
