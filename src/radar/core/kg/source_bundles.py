@@ -96,9 +96,8 @@ def save(bundle: SourceBundle) -> bool:
             type(e).__name__,
         )
         raise BundleStorageError(
-            f"save failed (kind={bundle.subject_kind.value}, "
-            f"id={bundle.subject_id}): code={e.code}"
-        ) from e
+            f"save failed: code={e.code}"
+        ) from None
     except Exception as exc:
         logger.warning(
             "source_bundles.save: erro inesperado "
@@ -108,9 +107,8 @@ def save(bundle: SourceBundle) -> bool:
             type(exc).__name__,
         )
         raise BundleStorageError(
-            f"save failed (kind={bundle.subject_kind.value}, "
-            f"id={bundle.subject_id}): type={type(exc).__name__}"
-        ) from exc
+            f"save failed: type={type(exc).__name__}"
+        ) from None
 
 
 def load(subject_kind: str, subject_id: str) -> SourceBundle | None:
@@ -152,22 +150,25 @@ def load(subject_kind: str, subject_id: str) -> SourceBundle | None:
         )
     except Exception as exc:
         logger.warning(
-            "source_bundles.load: falha lendo %s/%s: type=%s",
-            subject_kind,
-            subject_id,
+            "source_bundles.load: falha de leitura: type=%s",
             type(exc).__name__,
         )
         raise BundleStorageError(
-            f"load failed (kind={subject_kind}, id={subject_id}): "
-            f"type={type(exc).__name__}"
-        ) from exc
+            f"load failed: type={type(exc).__name__}"
+        ) from None
 
     rows = resp.data or []
     if not rows:
         return None
 
-    bundle_data = rows[0].get("bundle")
-    if not bundle_data:
-        return None
-
-    return SourceBundle.model_validate(bundle_data)
+    try:
+        bundle_data = rows[0]["bundle"]
+        if not bundle_data:
+            raise ValueError("missing or empty bundle")
+        return SourceBundle.model_validate(bundle_data)
+    except Exception as exc:
+        logger.warning(
+            "source_bundles.load: bundle inválido: type=%s",
+            type(exc).__name__,
+        )
+        raise BundleStorageError("load failed: invalid bundle payload") from None

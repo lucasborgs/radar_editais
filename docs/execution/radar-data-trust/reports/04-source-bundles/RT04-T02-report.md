@@ -15,7 +15,7 @@
 |---|---|
 | `supabase/migrations/044_source_bundles.sql` | Migration aditiva, idempotente: tabela `source_bundles` com UUID, sujeito, hash, JSONB, status, timestamps, UNIQUE `(subject_kind, subject_id, bundle_hash)`, RLS sem policies, 2 índices |
 | `src/radar/core/kg/source_bundles.py` | Repositório service-role-only: `save(bundle) -> bool` (raise `BundleStorageError` em falha real), `load(subject_kind, subject_id) -> SourceBundle \| None` (raise `BundleStorageError` em falha real) |
-| `tests/unit/test_source_bundles_repo.py` | 29 testes de unidade do repositório (stubs, sem DB real) |
+| `tests/unit/test_source_bundles_repo.py` | 32 testes de unidade do repositório (stubs, sem DB real) |
 
 Arquivos **não** alterados (preservados da T01): `src/radar/domain/source_bundle.py`, `tests/unit/test_source_bundles.py`, `tests/fixtures/source_bundles/fixtures.py`.
 
@@ -36,14 +36,14 @@ Arquivos **não** alterados (preservados da T01): `src/radar/domain/source_bundl
   - Usa `bundle.compute_bundle_hash()` — produtor canônico do domínio — e serializa o envelope completo em JSONB.
   - Insere via `supabase.table("source_bundles").insert(payload).execute()` — sem upsert, sem on_conflict.
   - Detecta duplicata pelo código `23505` (unique_violation) do `APIError` do PostgREST — retorna `True` (idempotente).
-  - Erros com outro código (`500`, etc.) ou exceções inesperadas levantam `BundleStorageError` — nunca silenciados como sucesso.
+  - Erros com outro código (`500`, etc.) ou exceções inesperadas levantam `BundleStorageError` — nunca silenciados como sucesso, sem encadear a exceção bruta do provedor.
   - Sem Supabase configurado → no-op `False` (degrada gracioso, como `source_docs.save`).
 
 - **`load(subject_kind: str, subject_id: str) -> SourceBundle | None`:**
   - Filtra `acquisition_status='complete'`, ordena por `collected_at DESC, created_at DESC, id DESC` (desempate determinístico via UUID PK), LIMIT 1.
   - Bundles `partial` NUNCA são retornados — mesmo que sejam posteriores.
-  - Desserializa o JSONB como `SourceBundle.model_validate()` — round-trip completo do contrato.
-  - `None` apenas para ausência legítima (sem registro ou Supabase não configurado). Falhas reais levantam `BundleStorageError`.
+  - Desserializa o JSONB como `SourceBundle.model_validate()` — round-trip completo do contrato. Payload ausente, vazio ou inválido levanta `BundleStorageError` sanitizado.
+  - `None` apenas para ausência legítima (sem registro ou Supabase não configurado). Falhas reais levantam `BundleStorageError`, sem causa bruta encadeada.
 
 ### Padrão reutilizado
 
@@ -57,7 +57,7 @@ Arquivos **não** alterados (preservados da T01): `src/radar/domain/source_bundl
 
 Contrato: enums vs YAML, construção, hash stabilité, hash mutabilidade, fixtures, rejeições de validação.
 
-### T02 (novos) — 29 testes
+### T02 (novos) — 32 testes
 
 | Classe | Testes | O que cobre |
 |---|---|---|
@@ -65,8 +65,8 @@ Contrato: enums vs YAML, construção, hash stabilité, hash mutabilidade, fixtu
 | `TestSaveFirstInsert` | 3 | estrutura do payload, campos obrigatórios, bundle_hash |
 | `TestIdempotentRepeat` | 2 | duplicata 23505 → True; sujeitos diferentes não conflitam |
 | `TestMaterialChange` | 2 | conteúdo diferente altera hash; status altera hash |
-| `TestRealErrors` | 3 | APIError 500 levanta BundleStorageError; exceção inesperada levanta; APIError sem code levanta |
-| `TestLoad` | 5 | complete rows; empty; missing key; query structure; erro de leitura levanta BundleStorageError |
+| `TestRealErrors` | 3 | APIError 500 levanta BundleStorageError; exceção inesperada sanitizada; APIError sem code levanta |
+| `TestLoad` | 8 | complete rows; empty; payload ausente/vazio; payload inválido; query structure; erro de leitura sanitizado |
 | `TestPartialVsComplete` | 2 | hashes diferentes; load só retorna complete |
 | `TestRoundTrip` | 3 | envelope preservado; campos opcionais; bundle_hash/created_at ausentes no modelo |
 | `TestMigrationContract` | 5 | migration existe; UNIQUE; RLS; índices; IF NOT EXISTS |
@@ -77,7 +77,7 @@ Contrato: enums vs YAML, construção, hash stabilité, hash mutabilidade, fixtu
 - `ruff check src/radar/core/kg/source_bundles.py` — All checks passed
 - `ruff check tests/unit/test_source_bundles_repo.py` — All checks passed
 - `git diff --check` — sem espaços em branco ou conflitos
-- `pytest tests/unit/test_source_bundles.py tests/unit/test_source_bundles_repo.py` — **101 passed**
+- `pytest tests/unit/test_source_bundles.py tests/unit/test_source_bundles_repo.py` — **104 passed**
 
 ## Ambiente
 

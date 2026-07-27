@@ -298,14 +298,18 @@ class TestRealErrors:
         with pytest.raises(BundleStorageError, match="save failed"):
             repo.save(bundle)
 
-    def test_unexpected_exception_raises(self, monkeypatch, pg_on):
-        """Erro não-API (ex.: conexão) levanta BundleStorageError."""
-        db = _FakeDB(insert_error=RuntimeError("connection refused"))
+    def test_unexpected_exception_is_sanitized(self, monkeypatch, pg_on, caplog):
+        """A causa do provedor e seu conteúdo não chegam ao erro ou log."""
+        secret = "https://provider.example/secret-response"
+        db = _FakeDB(insert_error=RuntimeError(secret))
         monkeypatch.setattr("radar.core.infra.db.get_supabase_service", lambda: db)
 
         bundle = _make_bundle()
-        with pytest.raises(BundleStorageError, match="save failed"):
+        with pytest.raises(BundleStorageError, match="save failed") as raised:
             repo.save(bundle)
+        assert raised.value.__cause__ is None
+        assert secret not in str(raised.value)
+        assert secret not in caplog.text
 
     def test_api_error_without_code_raises(self, monkeypatch, pg_on):
         """APIError sem code não é classificado como duplicidade."""
@@ -343,11 +347,29 @@ class TestLoad:
 
         assert repo.load("opportunity", "inexistente") is None
 
-    def test_load_missing_bundle_key_returns_none(self, monkeypatch, pg_on):
-        db = _FakeDB(rows=[{"not_bundle": "nope"}])
+    @pytest.mark.parametrize("row", [
+        {"not_bundle": "nope"},
+        {"bundle": None},
+        {"bundle": {}},
+    ])
+    def test_load_missing_or_empty_bundle_raises(self, monkeypatch, pg_on, row):
+        db = _FakeDB(rows=[row])
         monkeypatch.setattr("radar.core.infra.db.get_supabase_service", lambda: db)
 
-        assert repo.load("opportunity", "fapesc:test") is None
+        with pytest.raises(BundleStorageError, match="invalid bundle payload") as raised:
+            repo.load("opportunity", "fapesc:test")
+        assert raised.value.__cause__ is None
+
+    def test_load_invalid_bundle_is_sanitized(self, monkeypatch, pg_on, caplog):
+        secret = "https://provider.example/invalid-bundle"
+        db = _FakeDB(rows=[{"bundle": {"source": secret}}])
+        monkeypatch.setattr("radar.core.infra.db.get_supabase_service", lambda: db)
+
+        with pytest.raises(BundleStorageError, match="invalid bundle payload") as raised:
+            repo.load("opportunity", "fapesc:test")
+        assert raised.value.__cause__ is None
+        assert secret not in str(raised.value)
+        assert secret not in caplog.text
 
     def test_load_query_structure(self, monkeypatch, pg_on):
         """Verifica que a query filtra acquisition_status='complete'."""
@@ -399,7 +421,8 @@ class TestLoad:
         limit_calls = [c[1] for c in fake.calls if c[0] == "limit"]
         assert 1 in limit_calls
 
-    def test_load_error_raises(self, monkeypatch, pg_on):
+    def test_load_error_is_sanitized(self, monkeypatch, pg_on, caplog):
+        secret = "https://provider.example/connection-lost"
         class _FailingChain:
             def select(self, *a, **k):
                 return self
@@ -410,14 +433,17 @@ class TestLoad:
             def limit(self, n):
                 return self
             def execute(self):
-                raise RuntimeError("connection lost")
+                raise RuntimeError(secret)
 
         monkeypatch.setattr(
             "radar.core.infra.db.get_supabase_service",
             lambda: type("DB", (), {"table": lambda s, n: _FailingChain()})(),
         )
-        with pytest.raises(BundleStorageError, match="load failed"):
+        with pytest.raises(BundleStorageError, match="load failed") as raised:
             repo.load("opportunity", "fapesc:test")
+        assert raised.value.__cause__ is None
+        assert secret not in str(raised.value)
+        assert secret not in caplog.text
 
 
 # ---------------------------------------------------------------------------
