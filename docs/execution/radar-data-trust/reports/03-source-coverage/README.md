@@ -18,8 +18,10 @@ saudáveis, degradados, falhando e atrasados; zero ambíguo não vira sucesso;
 denominador ausente retorna `null`; painel indisponível não bloqueia a fila
 editorial.
 
-Nenhum código novo acessa produção/rede/LLM. Nenhum eval, threshold, gate de
-recall, scraper automático ou promessa de cobertura exaustiva foi introduzido.
+Todas as validações foram herméticas (ENVIRONMENT=test, mocks, sem `.env`,
+sem rede, sem Tavily/DOU/LLM). A spec não adicionou provider, coleta externa
+ou chamada de LLM. Nenhum eval, threshold, gate de recall, scraper automático
+ou promessa de cobertura exaustiva foi introduzido.
 
 ---
 
@@ -27,9 +29,9 @@ recall, scraper automático ou promessa de cobertura exaustiva foi introduzido.
 
 ### T01 — Contrato de canais e famílias
 
-| Commit | Base |
+| Hash | Base |
 |---|---|
-| RT03-T01 (merge na branch) | main, preparatório para T02 |
+| `4a6cf19d8` · corretivo `f78385b6f` · relatório `d2b581b00` | main |
 
 **Arquivos:** `_coverage.md`, `_discovery.md`, `schema.py`,
 `test_source_coverage_registry.py`
@@ -38,9 +40,9 @@ paralelas em Python. `open_search` como canal lógico (não Tavily).
 
 ### T02 — Migration e atribuição
 
-| Commit | Base |
+| Hash | Base |
 |---|---|
-| RT03-T02 (merge na branch) | T01 |
+| `a6f38d737` · corretivo `f78385b6f` · relatório `d2b581b00` | T01 |
 
 **Arquivos:** `043_source_runs.sql`, `source_runs.py`, `test_source_runs.py`
 **Resultado:** Tabela `source_runs` com RLS sem policy de usuário final; staging
@@ -48,9 +50,9 @@ recebe 4 colunas nullable; `start_run`/`finish_run` idempotente e best-effort.
 
 ### T03 — Saúde das fontes dedicadas/Web curada
 
-| Commit | Base |
+| Hash | Base |
 |---|---|
-| RT03-T03 (merge na branch) | T02 |
+| `87bb86de9` · auditoria `27bfc149f` | T02 |
 
 **Arquivos:** `tasks.py`, `test_source_coverage_etl.py`
 **Resultado:** `run_daily_etl` instrumentado com `source_runs` para
@@ -59,32 +61,32 @@ finep/fapesp/fapesc/web_curated. Telemetria best-effort; falha nunca vira
 
 ### T04 — Instrumentação multicanal da Descoberta
 
-| Commit | Base |
+| Hash | Base |
 |---|---|
-| RT03-T04 (merge na branch) | T02 |
+| `5dc39aec1` · corretivo `81b6ca266` · auditoria `71bf9ab1b` | T02 |
 
 **Arquivos:** `opportunity_discovery.py`, `web_search.py`,
 `test_source_coverage_discovery.py`, `test_opportunity_discovery_cache.py`
 **Resultado:** `discover_opportunities` instrumentado para
 open_search/dou/hub_expansion com atribuição completa, `search_available()`
-provider-neutral, 8 correções de auditoria aplicadas.
+provider-neutral.
 
 ### T05 — Métricas do funil, lacunas e domínios emergentes
 
-| Commit | Base |
+| Hash | Base |
 |---|---|
-| RT03-T05 (merge na branch) | main (pós-T04) |
+| `b828edb8d` · `9efef77a9` · `525b92582` · auditoria `b33868207` | main (pós-T04) |
 
 **Arquivos:** `source_coverage_metrics.py`, `test_source_coverage_metrics.py`
 **Resultado:** Read model determinístico: rendimento, funil editorial, saúde
 (precedência exata da spec), lacunas, domínios emergentes (threshold >= 2 em
-90 dias). Nenhuma escrita. Sete correções de auditoria aplicadas.
+90 dias). Nenhuma escrita.
 
 ### T06A — API administrativa
 
-| Commits | Base |
+| Hash | Base |
 |---|---|
-| `ee1f1d5fd`, `298400d9d` | T05 |
+| `ee1f1d5fd` · `298400d9d` · auditoria `02b0d106c` | T05 |
 
 **Arquivos:** `routers/source_coverage.py`, `app.py`,
 `test_source_coverage_api.py`
@@ -93,9 +95,9 @@ explícitas, erro sanitizado (só nome da classe), sem escrita.
 
 ### T06B — Painel frontend
 
-| Base |
+| Hash |
 |---|
-| T06A |
+| `0caf0f148` · `b541b6486` · `22e17ae3c` · auditoria `c113641bf` |
 
 **Arquivos:** `api.ts`, `discovered/page.tsx`
 **Resultado:** Painel recolhível em `/discovered` com 6 seções compactas.
@@ -132,7 +134,8 @@ no momento." sem bloquear a fila. Zero TypeScript/lint novos.
 ## Migration e atribuição
 
 - **Migration:** aditiva `043_source_runs.sql`, após `042_provenance_columns.sql`.
-  Nenhuma tabela/dado existente alterado.
+  Cria a tabela `source_runs` e adiciona quatro colunas nullable ao staging
+  `discovered_opportunities`. Nenhuma linha existente foi reescrita.
 - **source_runs:** RLS habilitada, sem policy de usuário final (espelha
   `pipeline_errors`/`discovery_promotion_runs`). Worker escreve via service-role;
   API lê via service-role.
@@ -152,8 +155,10 @@ Precedência: `disabled → failing → degraded → stale → healthy → unkno
 - `healthy`: última run `succeeded` com resultado observável dentro de 1×
   intervalo esperado.
 - `unknown`: nunca executado ou sucesso sem resultado observável (zero ambíguo).
-- Flags lidas exclusivamente do dicionário `env` injetado; ambiente do processo
-  não participa.
+- Flags lidas exclusivamente do dicionário `env` injetado no read model; a API
+  constrói esse dicionário a partir das flags declaradas no registry
+  (`flag_name` em `_coverage.md`). O ambiente do processo (`os.environ`) nunca
+  é consultado diretamente.
 
 ### Funil editorial
 
@@ -218,15 +223,15 @@ ENVIRONMENT=test PYTHONPATH=src pytest -q \
   tests/unit/test_admin_gate.py
 ```
 
-**Resultado: 214 passed, 0 failed** (1 warning: StarletteDeprecationWarning)
+**Resultado: 214 passed** (nenhuma falha; 1 warning: StarletteDeprecationWarning)
 
-### Completo
+### Completo (ambiente hermético ENVIRONMENT=test)
 
 ```bash
-ENVIRONMENT=test PYTHONPATH=src pytest -q
+ENVIRONMENT=test PYTHONPATH=src pytest -q --tb=short 2>&1
 ```
 
-**Resultado: 1627 passed, 64 skipped, 0 failed**
+**Resultado oficial: 1614 passed, 77 skipped, 0 failed** (total coletado = 1.691). A execução inicial `1627/64` teve 13 testes opcionais habilitados por variáveis do ambiente local — sem falhas em nenhuma das duas execuções.
 
 ```bash
 ENVIRONMENT=test PYTHONPATH=src ruff check $(git ls-files '*.py')
@@ -281,8 +286,9 @@ https://github.com/lucasborgs/radar_editais/actions/runs/30260170224
 - **DB fake/mocks:** `source_runs`, `discovered_opportunities` simulados;
   nenhuma conexão com Supabase Cloud ou Postgres local.
 - **Sem `.env`:** nenhuma credencial carregada.
-- **Sem rede:** Tavily, DOU, LLM, web search, Tavily — todos mockados ou
-  desabilitados por `search_available()` falso.
+- **Provider externo não invocado:** Tavily, DOU e LLM substituídos por mocks.
+  `search_available()` retorna `False` (sem credencial). Nenhuma chamada de
+  rede durante os testes.
 - **Worktree isolado:** `/private/tmp/radar-editais-rt03-t07`.
 - **Branch isolada:** `codex/radar-data-trust-03-t07`.
 - **Base fixa:** `17dcca615` (main).

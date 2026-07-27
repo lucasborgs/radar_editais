@@ -177,6 +177,29 @@ oportunidade então entra no catálogo, no match e no RAG como qualquer edital d
 agência. Descoberta nunca escreve diretamente no catálogo; falhas no
 enriquecimento permanecem isoladas no staging e não publicam conteúdo pendente.
 
+### 5.1 Monitoramento de cobertura (RT03)
+
+Duas camadas de aquisição — **canais conhecidos** (finep, fapesp, fapesc,
+web_curated, coleta determinística) e **descoberta aberta** (open_search, dou,
+hub_expansion) — registram telemetria best-effort em `source_runs` (tabela
+aditiva, sem impacto no pipeline). Cada execução compartilha um `batch_id`; cada
+canal recebe uma linha com status, contadores e timestamps.
+
+Candidatos no staging recebem atribuição de origem: `discovery_channel`,
+`query_family`, `origin_domain` (hostname normalizado, sem path/query). Linhas
+legadas mantêm campos `null`.
+
+Um read model determinístico (`source_coverage_metrics.py`) deriva saúde dos
+canais, rendimento, funil editorial, lacunas e domínios com aprovações
+recorrentes. O endpoint `GET /source-coverage` (protegido por `AdminUserId`,
+read-only) expõe o relatório consolidado. O painel recolhível em `/discovered`
+("Fontes e canais monitorados pelo Radar") apresenta a informação ao operador.
+
+Nenhuma promessa de completude: o painel declara limitações, zero ambíguo não
+vira sucesso, denominador ausente retorna `null` e falha da API não bloqueia a
+fila editorial. Domínios emergentes são candidatos visuais — sem scraper,
+promoção ou fonte automática.
+
 ---
 
 ## 6. Runtime agêntico e memória
