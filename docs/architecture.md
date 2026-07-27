@@ -56,7 +56,9 @@ flowchart TB
   EVID --> GATE["Staging + gate admin<br/>(promote/reject)"]
   GATE -->|promote| BRONZE["Bronze<br/>evidência por fonte"]
   AG --> BRONZE
+  BRONZE -.->|"produtores suportados"| BUNDLE[("Histórico documental<br/>source_bundles · append-only")]
   BRONZE --> CDOC[("Documento Canônico<br/>edital_source_docs · fallback local")]
+  BUNDLE -.->|"projeção compatível"| CDOC
   CDOC --> SILVER["Silver — transcrição estrutural<br/>verbatim, por seção (LLM leve por página)"]
 
   SILVER --> INGEST["Ingestão gold (incremental, diária)<br/>· metadados determinísticos<br/>· tagger LLM: setores (16) + tags de tecnologia<br/>· extração de elegibilidade (constraints + exclusões + público-alvo)<br/>· embeddings da entidade e dos trechos de match"]
@@ -98,6 +100,18 @@ re-ingest ou um backfill válido. Detalhe completo:
 [`specs/radar-data-trust-01-provenance.md`](specs/radar-data-trust-01-provenance.md)
 e o consolidado em
 [`execution/radar-data-trust/reports/01-provenance/README.md`](execution/radar-data-trust/reports/01-provenance/README.md).
+
+**Pacotes documentais (Radar Data Trust 04):** `source_bundles` (migration
+044) preserva versões materiais de editais, páginas Web e registros conhecidos
+de atores. A tabela é append-only e a projeção corrente considera somente a
+última versão `complete`; uma coleta `partial` posterior permanece diagnóstico,
+sem substituir o Documento Canônico. Quando o vínculo é inequívoco,
+`EvidenceRef` carrega `bundle_hash` + `content_hash` do documento usado. A
+composição é conservadora: documentos explicitamente superados saem da visão
+corrente e conflito sem precedência comprovada permanece `conflicting`.
+`match_chunks` ainda não armazena essa linhagem, por não ter colunas no schema;
+não há backfill, migration adicional ou inferência por nome/data. Detalhe em
+[`specs/radar-data-trust-04-source-bundles.md`](specs/radar-data-trust-04-source-bundles.md).
 
 ---
 

@@ -1,6 +1,6 @@
 # Spec-mãe — Radar Data Trust
 
-**Status:** vigente (specs 00–03 concluídas; spec 04 aprovada para implementação) · **Data:** 2026-07-27
+**Status:** vigente (specs 00–04 concluídas) · **Data:** 2026-07-27
 **Documento-pai:** [`system-coherence.md`](system-coherence.md)
 **Família de specs:** `radar-data-trust-NN-<capacidade>.md`
 **Perfis afetados:** usuário de produto, operador e usuário técnico

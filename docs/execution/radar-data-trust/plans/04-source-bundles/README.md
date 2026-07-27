@@ -2,7 +2,7 @@
 
 **Spec:** [`../../../../specs/radar-data-trust-04-source-bundles.md`](../../../../specs/radar-data-trust-04-source-bundles.md)  
 **Spec-mãe:** [`../../../../specs/radar-data-trust.md`](../../../../specs/radar-data-trust.md)  
-**Status:** pronto para implementação
+**Status:** concluído
 
 ## Resultado
 

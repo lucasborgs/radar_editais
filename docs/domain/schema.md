@@ -1128,3 +1128,15 @@ documental (`units` do documento); `bundle_hash` cobre a identidade material
 do pacote (schema_version, subject_kind, subject_id, source,
 acquisition_status, documentos, papéis e autoridades), excluindo
 `collected_at` e `producer_version` (metadados de execução).
+
+### 14.6 Histórico, projeção e diagnóstico
+
+O histórico append-only vive em `source_bundles` (migration 044). A leitura
+corrente seleciona somente a última versão `complete` de cada sujeito; uma
+versão `partial` posterior é preservada como diagnóstico e não substitui a
+projeção compatível em `edital_source_docs`.
+
+`EvidenceRef` pode carregar, de forma aditiva, `bundle_hash` e `content_hash`
+quando ambos identificam o pacote e o documento efetivamente usados. Ausência
+dos dois campos mantém registros legados válidos. As métricas RT04 são apenas
+leitura local: não criam score, gate, alerta ou nova fonte de verdade.
