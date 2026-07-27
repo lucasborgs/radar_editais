@@ -64,8 +64,21 @@ Cada fonte tem um schema específico em `docs/domain/sources/<fonte>.md` que **e
 | FINEP | [sources/finep.md](sources/finep.md) | ativo (v1) |
 | FAPESP | [sources/fapesp.md](sources/fapesp.md) | ativo (v1) |
 | FAPESC | [sources/fapesc.md](sources/fapesc.md) | ativo (v1) |
-| Web | regras globais §12.4 + [sources/_discovery.md](sources/_discovery.md) | ativo, com gate humano |
+| Web | regras globais §12.4 + [sources/_discovery.md](sources/_discovery.md) | ativo, com gate humano + monitoramento de cobertura |
 | EMBRAPII | extractor curado `src/radar/pipeline/extractors/ict_embrapii.py` | ativo para ICTs |
+
+**Artefato operacional da Descoberta — `source_runs`** (migration 043): tabela
+aditiva que registra uma linha por canal observado em cada execução (canal,
+mode, status, contadores, timestamps). Quatro colunas nullable associam cada
+candidato no staging `discovered_opportunities` à sua origem:
+`discovery_run_id`, `discovery_channel`, `query_family`, `origin_domain`.
+Linhas legadas permanecem `null` (bucket `__unassigned__` nos reports).
+
+O vocabulário de canais e modos vive em
+[`_coverage.md`](sources/_coverage.md) e é o registro normativo único; as
+famílias de query e seu texto vivem em [`_discovery.md`](sources/_discovery.md)
+— nenhuma lista paralela em Python. O código lê ambos via
+`radar.core.kg.schema` e valida contra os modos/famílias canônicos.
 
 ---
 

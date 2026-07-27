@@ -2,7 +2,7 @@
 
 **Spec:** [`../../../../specs/radar-data-trust-03-source-coverage.md`](../../../../specs/radar-data-trust-03-source-coverage.md)
 **Spec-mãe:** [`../../../../specs/radar-data-trust.md`](../../../../specs/radar-data-trust.md)
-**Status:** aprovado para implementação
+**Status:** concluído (RT03-T01 a T07 entregues e auditadas)
 
 ## Resultado
 
