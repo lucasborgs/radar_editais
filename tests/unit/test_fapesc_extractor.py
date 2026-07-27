@@ -7,6 +7,7 @@ Não faz HTTP real nem abre PDFs de verdade.
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -156,6 +157,7 @@ def test_parse_chamada_uses_pdf_text():
     assert row["data_limite"] == "17/06/2026"
     assert row["status"] == "ABERTA"
     assert row["fluxo_continuo"] is False
+    assert datetime.fromisoformat(row["data_extracao"]).tzinfo is not None
 
 
 def test_parse_chamada_ignores_signature_far_future_date():

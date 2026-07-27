@@ -43,15 +43,20 @@ import os
 import re
 import unicodedata
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime, timezone
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
 import psycopg
+from pydantic import ValidationError
 
 from radar.core.config import BRONZE_DIR, SILVER_DIR
 from radar.core.environment import assert_database_target
 from radar.core.kg import schema
 from radar.core.kg.canonicalize import anti_class_verdict
+
+if TYPE_CHECKING:
+    from radar.domain.source_bundle import SourceBundle
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +89,7 @@ _CHUNK_CHARS = 1200   # empacotamento de blocos temáticos em match_chunks
 _CHUNK_CAP = 60       # teto de chunks por edital
 _DESC_CHARS = 2200    # teto da description (embed da entidade)
 _TAGGER_CHARS = 9000  # teto do input do tagger LLM
+_ACTOR_BUNDLE_PRODUCER_VERSION = "gold-actor-source-bundles-v1"
 
 
 # ===========================================================================
@@ -634,6 +640,7 @@ def _get_agency(cur, cache: dict[str, str], name: str) -> str | None:
         # registro JSON dedicado).
         provenance={"name": provenance_writer.build_agencia_name_provenance().model_dump(mode="json")},
     )
+    _note_agency_bundle_not_applicable(nid)
     cache[canon] = eid
     return eid
 
@@ -665,14 +672,196 @@ def _parse_date(v) -> date | None:
         return None
 
 
+def _parse_bundle_collected_at(raw: str | None, *, subject_id: str) -> datetime | None:
+    if raw in (None, ""):
+        logger.warning(
+            "source_bundles: collected_at ausente para ator; bundle não persistido (%s)",
+            subject_id,
+        )
+        return None
+    raw_str = str(raw).strip()
+    if not raw_str:
+        logger.warning(
+            "source_bundles: collected_at ausente para ator; bundle não persistido (%s)",
+            subject_id,
+        )
+        return None
+    try:
+        if "T" not in raw_str and " " not in raw_str:
+            collected_date = date.fromisoformat(raw_str)
+            return datetime.combine(collected_date, datetime.min.time(), tzinfo=timezone.utc)
+        collected_at = datetime.fromisoformat(raw_str.replace("Z", "+00:00"))
+    except ValueError:
+        logger.warning(
+            "source_bundles: collected_at inválido para ator; bundle não persistido (%s)",
+            subject_id,
+        )
+        return None
+    if collected_at.tzinfo is None:
+        logger.warning(
+            "source_bundles: collected_at inválido para ator; bundle não persistido (%s)",
+            subject_id,
+        )
+        return None
+    return collected_at.astimezone(timezone.utc)
+
+
+def _canonical_record_unit(record: dict) -> str:
+    return json.dumps(record, sort_keys=True, ensure_ascii=False)
+
+
+def _record_has_substantive_content(record: dict, *, kind: str) -> bool:
+    substantive_keys = {
+        "ict": ("about", "areas_raw", "address", "institution_type", "contact"),
+        "investor": (
+            "tese", "tese_themes", "tese_keywords", "setores", "estagio_alvo",
+            "ticket_range", "portfolio", "co_investidores",
+        ),
+        "program": (
+            "descricao", "beneficio", "elegibilidade", "operador", "tipo",
+            "formato", "cadencia", "ticket_range", "setores", "tese_themes",
+            "estagio_alvo", "faq_url",
+        ),
+    }
+
+    def _has_content(value) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return bool(value.strip())
+        if isinstance(value, dict):
+            return any(_has_content(v) for v in value.values())
+        if isinstance(value, list):
+            return any(_has_content(v) for v in value)
+        return True
+
+    return any(_has_content(record.get(key)) for key in substantive_keys.get(kind, ()))
+
+
+def _build_actor_source_bundle(
+    *,
+    subject_kind: str,
+    subject_id: str,
+    source: str,
+    collected_at_raw: str | None,
+    document_name: str,
+    document_role: str,
+    source_url: str | None,
+    record: dict,
+) -> object | None:
+    from radar.domain.source_bundle import (
+        AcquisitionStatus,
+        AuthorityState,
+        SourceBundle,
+        compute_content_hash,
+    )
+
+    collected_at = _parse_bundle_collected_at(collected_at_raw, subject_id=subject_id)
+    if collected_at is None:
+        return None
+
+    unit = _canonical_record_unit(record)
+    acquisition_status = (
+        AcquisitionStatus.COMPLETE.value
+        if _record_has_substantive_content(record, kind=subject_kind)
+        else AcquisitionStatus.PARTIAL.value
+    )
+    return SourceBundle.model_validate({
+        "subject_kind": subject_kind,
+        "subject_id": subject_id,
+        "source": source,
+        "collected_at": collected_at,
+        "producer_version": _ACTOR_BUNDLE_PRODUCER_VERSION,
+        "acquisition_status": acquisition_status,
+        "documents": [{
+            "doc_name": document_name,
+            "units": [unit],
+            "role": document_role,
+            "source_url": source_url or None,
+            "content_hash": compute_content_hash([unit]),
+            "authority_state": AuthorityState.ACTIVE.value,
+        }],
+    })
+
+
+def _persist_actor_source_bundle_best_effort(
+    *,
+    subject_kind: str,
+    subject_id: str,
+    source: str,
+    collected_at_raw: str | None,
+    document_name: str,
+    document_role: str,
+    source_url: str | None,
+    record: dict,
+) -> SourceBundle | None:
+    from radar.core.kg import source_bundles
+    from radar.core.kg.source_bundle_projection import current_complete_bundle
+    from radar.core.kg.source_bundles import BundleStorageError
+
+    try:
+        bundle = _build_actor_source_bundle(
+            subject_kind=subject_kind,
+            subject_id=subject_id,
+            source=source,
+            collected_at_raw=collected_at_raw,
+            document_name=document_name,
+            document_role=document_role,
+            source_url=source_url,
+            record=record,
+        )
+        if bundle is None:
+            return None
+        if source_bundles.save(bundle) is not True:
+            logger.warning(
+                "source_bundles: bundle não persistido para ator; subject_id=%s",
+                subject_id,
+            )
+            return None
+        return current_complete_bundle(bundle)
+    except ValidationError:
+        logger.warning(
+            "source_bundles: bundle inválido para ator; categoria=ValidationError subject_id=%s",
+            subject_id,
+        )
+        return None
+    except BundleStorageError:
+        logger.warning(
+            "source_bundles: falha best-effort para ator; categoria=%s subject_id=%s",
+            "BundleStorageError",
+            subject_id,
+        )
+        return None
+
+
+def _note_agency_bundle_not_applicable(subject_id: str) -> None:
+    logger.info(
+        "source_bundles: não aplicável para agência derivada; sem registro documental próprio (%s)",
+        subject_id,
+    )
+
+
 def _ingest_investidores(conn, stats: dict) -> None:
     from radar.core.kg import provenance_writer
     from radar.core.retrieval.embedder import embed_query
 
     path = SILVER_DIR / "investidores.json"
-    recs = json.loads(path.read_text(encoding="utf-8")).get("investidores", []) if path.exists() else []
+    catalog = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    recs = catalog.get("investidores", [])
+    collected_at_raw = catalog.get("last_updated")
     for r in recs:
         try:
+            bundle = _persist_actor_source_bundle_best_effort(
+                subject_kind="investor",
+                subject_id=r["id"],
+                source="curadoria",
+                collected_at_raw=collected_at_raw,
+                document_name=path.name,
+                document_role="curated_record",
+                source_url=r.get("site"),
+                record=r,
+            )
+            bundle_document = bundle.documents[0] if bundle is not None else None
             desc = _ws(r.get("tese") or "")
             setores = normalize_setores(list(r.get("setores") or []) + list(r.get("tese_themes") or []))
             tags = normalize_tags(r.get("tese_keywords") or [])
@@ -684,6 +873,7 @@ def _ingest_investidores(conn, stats: dict) -> None:
             entity_provenance = provenance_writer.build_investidor_fact_provenance(
                 r, setores=setores, tecnologias_tags=tags, status=status,
                 ticket_min=tmin, ticket_max=tmax,
+                bundle=bundle, bundle_document=bundle_document,
             )
             with conn.transaction(), conn.cursor() as cur:
                 _upsert_entity(
@@ -722,9 +912,22 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
     from radar.core.retrieval.embedder import embed_query
 
     path = SILVER_DIR / "programas.json"
-    recs = json.loads(path.read_text(encoding="utf-8")).get("programas", []) if path.exists() else []
+    catalog = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    recs = catalog.get("programas", [])
+    collected_at_raw = catalog.get("last_updated")
     for r in recs:
         try:
+            bundle = _persist_actor_source_bundle_best_effort(
+                subject_kind="program",
+                subject_id=r["id"],
+                source="curadoria",
+                collected_at_raw=collected_at_raw,
+                document_name=path.name,
+                document_role="curated_record",
+                source_url=r.get("site"),
+                record=r,
+            )
+            bundle_document = bundle.documents[0] if bundle is not None else None
             desc = _ws(" ".join(x for x in [r.get("descricao"), r.get("beneficio")] if x))
             tmin, tmax = _ticket_from_range(r.get("ticket_range"))
             constraints, requisitos, exclusoes, publico_alvo = produce_from_text(r.get("elegibilidade") or "")
@@ -744,6 +947,7 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
                 ticket_min=tmin, ticket_max=tmax, mecanismo=mecanismo, formato=formato,
                 constraints=constraints, requisitos_texto=requisitos,
                 constraints_model=CONSTRAINTS_MODEL,
+                bundle=bundle, bundle_document=bundle_document,
             )
             operado_por_provenance = provenance_writer.build_programa_operado_por_provenance().model_dump(
                 mode="json"
@@ -792,6 +996,18 @@ def _ingest_icts(conn, agency_cache: dict, stats: dict) -> None:
     recs = json.loads(files[-1].read_text(encoding="utf-8")) if files else []
     for r in recs:
         try:
+            subject_id = f"ict:embrapii:{r.get('slug') or schema.slugify(r.get('name') or '')}"
+            bundle = _persist_actor_source_bundle_best_effort(
+                subject_kind="ict",
+                subject_id=subject_id,
+                source="embrapii",
+                collected_at_raw=r.get("data_extracao"),
+                document_name=document or "embrapii.json",
+                document_role="official_record",
+                source_url=r.get("url"),
+                record=r,
+            )
+            bundle_document = bundle.documents[0] if bundle is not None else None
             slug = r.get("slug") or schema.slugify(r.get("name") or "")
             native_id = f"embrapii:{slug}"
             desc = _ws(r.get("about") or "")
@@ -801,7 +1017,12 @@ def _ingest_icts(conn, agency_cache: dict, stats: dict) -> None:
             # versionado do scraper — reusada em `name`/`metadata.url`/`uf`/
             # tags e na aresta `credenciada_por`, sem recomputar o hash.
             anchor = provenance_writer.build_ict_record_anchor(
-                record=r, document=document, source_url=r.get("url"), native_id=native_id,
+                record=r,
+                document=document,
+                source_url=r.get("url"),
+                native_id=native_id,
+                bundle=bundle,
+                bundle_document=bundle_document,
             )
             provenance = provenance_writer.build_ict_fact_provenance(record=r, anchor=anchor, uf=uf)
             with conn.transaction(), conn.cursor() as cur:

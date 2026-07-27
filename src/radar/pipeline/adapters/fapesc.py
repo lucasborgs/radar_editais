@@ -14,8 +14,17 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 
 from radar.core.config import BRONZE_DIR
+from radar.domain.source_bundle import (
+    AcquisitionStatus,
+    AuthorityState,
+    DocumentRole,
+    SourceBundle,
+    SubjectKind,
+    compute_content_hash,
+)
 
 from .base import CanonicalDoc, SourceAdapter, coletado_em, split_into_units
 
@@ -40,6 +49,80 @@ def _load_latest_bronze() -> list[dict]:
         return []
 
 
+def _find_bronze_record(bronze: list[dict], edital_id: str) -> dict | None:
+    """Localiza a primeira ocorrência do edital, preservando a dedup do adapter."""
+    seen: set[str] = set()
+    for ch in bronze:
+        url = (ch.get("url") or "").replace("http://", "https://").rstrip("/")
+        if url and url in seen:
+            continue
+        if url:
+            seen.add(url)
+        if ch.get("native_id") == edital_id:
+            return ch
+    return None
+
+
+def _collected_at(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        collected_at = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if collected_at.tzinfo is None:
+        return None
+    return collected_at.astimezone(timezone.utc)
+
+
+def build_source_bundle(edital_id: str) -> SourceBundle | None:
+    """Constrói somente o bundle normativo já presente no bronze FAPESC."""
+    match = _find_bronze_record(_load_latest_bronze(), edital_id)
+    if not match or not (match.get("documentos_normativos") or []):
+        return None
+    collected_at = _collected_at(match.get("data_extracao"))
+    if collected_at is None:
+        logger.warning("fapesc bundle: coleta ausente ou inválida para %s", edital_id)
+        return None
+
+    documents: list[dict] = []
+    has_base = False
+    for item in match["documentos_normativos"]:
+        family = item.get("family")
+        role = {
+            "edital-base": DocumentRole.BASE_NOTICE,
+            "emenda": DocumentRole.AMENDMENT,
+        }.get(family)
+        text = (item.get("text") or "").strip()
+        source_url = (item.get("url") or "").strip()
+        if role is None or not text or not source_url:
+            continue
+        units = split_into_units(text)
+        documents.append({
+            "doc_name": item.get("doc_name") or source_url.rsplit("/", 1)[-1],
+            "units": units,
+            "role": role.value,
+            "source_url": source_url,
+            "content_hash": compute_content_hash(units),
+            "authority_state": AuthorityState.ACTIVE.value,
+        })
+        has_base |= role is DocumentRole.BASE_NOTICE
+    if not documents:
+        return None
+    return SourceBundle.model_validate({
+        "subject_kind": SubjectKind.OPPORTUNITY.value,
+        "subject_id": f"fapesc:{edital_id}",
+        "source": "fapesc",
+        "collected_at": collected_at,
+        "producer_version": "fapesc-adapter-v1",
+        "acquisition_status": (
+            AcquisitionStatus.COMPLETE.value if has_base
+            else AcquisitionStatus.PARTIAL.value
+        ),
+        "documents": documents,
+    })
+
+
 class Adapter(SourceAdapter):
     """L1 FAPESC — bronze JSON → Documento Canônico (1 doc, units do texto_cru)."""
 
@@ -50,18 +133,7 @@ class Adapter(SourceAdapter):
         if not bronze:
             return []
 
-        # Dedup interno por URL — primeira ocorrência vence; casa por native_id.
-        seen: set[str] = set()
-        match: dict | None = None
-        for ch in bronze:
-            url = (ch.get("url") or "").replace("http://", "https://").rstrip("/")
-            if url and url in seen:
-                continue
-            if url:
-                seen.add(url)
-            if ch.get("native_id") == edital_id:
-                match = ch
-                break
+        match = _find_bronze_record(bronze, edital_id)
 
         if match is None:
             logger.info("fapesc adapter: chamada %s não encontrada no bronze", edital_id)

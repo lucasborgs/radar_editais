@@ -46,9 +46,12 @@ cada assunto; não substitui os documentos indicados.
 | Spec | Status | Função |
 |---|---|---|
 | [`system-coherence.md`](specs/system-coherence.md) | vigente | propósito, capacidades e invariantes globais |
-| [`radar-data-trust.md`](specs/radar-data-trust.md) | proposta para aprovação | programa de cobertura, proveniência e qualidade do plano de dados |
-| [`radar-data-trust-00-relevance-contract.md`](specs/radar-data-trust-00-relevance-contract.md) | proposta para aprovação | relevância de oportunidades e atores para startups e PMEs tecnológicas |
-| [`radar-data-trust-01-provenance.md`](specs/radar-data-trust-01-provenance.md) | proposta para aprovação | evidência rastreável do documento ao gold e às superfícies do produto |
+| [`radar-data-trust.md`](specs/radar-data-trust.md) | vigente (00–04 concluídas) | programa de cobertura, proveniência e qualidade do plano de dados |
+| [`radar-data-trust-00-relevance-contract.md`](specs/radar-data-trust-00-relevance-contract.md) | vigente | relevância de oportunidades e atores para startups e PMEs tecnológicas |
+| [`radar-data-trust-01-provenance.md`](specs/radar-data-trust-01-provenance.md) | vigente | evidência rastreável do documento ao gold e às superfícies do produto |
+| [`radar-data-trust-02-quality-gates.md`](specs/radar-data-trust-02-quality-gates.md) | vigente | avaliações diagnósticas e contratos de qualidade |
+| [`radar-data-trust-03-source-coverage.md`](specs/radar-data-trust-03-source-coverage.md) | vigente | cobertura declarada e observabilidade da Descoberta |
+| [`radar-data-trust-04-source-bundles.md`](specs/radar-data-trust-04-source-bundles.md) | vigente | versões documentais, composição conservadora e linhagem factual |
 | [`document-authority.md`](specs/document-authority.md) | vigente | autoridade e ciclo de vida documental |
 | [`user-mental-model.md`](specs/user-mental-model.md) | vigente | Explorar, Radar e Projetos como modelo mental do produto |
 | [`evaluation-operations.md`](specs/evaluation-operations.md) | aprovada; matching candidato | runs reproduzíveis e gates operacionais explícitos |

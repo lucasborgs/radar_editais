@@ -1,6 +1,6 @@
 # Spec-mãe — Radar Data Trust
 
-**Status:** vigente (specs 00–03 concluídas; spec 04 planejada) · **Data:** 2026-07-27
+**Status:** vigente (specs 00–04 concluídas) · **Data:** 2026-07-27
 **Documento-pai:** [`system-coherence.md`](system-coherence.md)
 **Família de specs:** `radar-data-trust-NN-<capacidade>.md`
 **Perfis afetados:** usuário de produto, operador e usuário técnico
@@ -281,7 +281,7 @@ afirmar cobertura total do ecossistema.
 | 01 | [`radar-data-trust-01-provenance.md`](radar-data-trust-01-provenance.md) | evidência estruturada do documento ao consumo | 00 | vigente (RT01-T01 a RT01-T13 concluídas e auditadas) |
 | 02 | `radar-data-trust-02-quality-gates.md` | goldens representativos, gates por camada e E2E | 00; contrato de 01 | vigente; auditoria Codex aprovada |
 | 03 | [`radar-data-trust-03-source-coverage.md`](radar-data-trust-03-source-coverage.md) | descoberta aberta multicanal, saúde, atribuição e métricas de cobertura | 00 e sinais de 02 | vigente (RT03-T01 a T07 concluídas e auditadas) |
-| 04 | `radar-data-trust-04-source-bundles.md` | documentos de oportunidades, retificações e páginas oficiais de atores versionados | 01; métricas de 02 | planejada |
+| 04 | [`radar-data-trust-04-source-bundles.md`](radar-data-trust-04-source-bundles.md) | documentos de oportunidades, retificações e páginas oficiais de atores versionados | 01; métricas de 02 | aprovada para implementação |
 | 05 | `radar-data-trust-05-exception-review.md` | revisão humana por conflito/baixa confiança e feedback | 01, 02 e 04 | planejada |
 | 06 | `radar-data-trust-06-adaptive-extraction.md` | cascata texto/layout/OCR/visão dirigida por falhas medidas | 02 e 04; sinais de 05 | planejada |
 

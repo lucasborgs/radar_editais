@@ -90,9 +90,21 @@ canonical_doc:
 ```
 
 Campos extras no bronze para rastreio: `edital_pdf_url` (PDF-base escolhido),
-`documentos_normativos` (edital-base + retificações/erratas, com URL e texto) e
-`content_source` (`pdf` | `html`). Retificações e erratas compõem o edital-base
-em ordem cronológica; não são descartadas nem tratadas isoladamente.
+`documentos_normativos` (edital-base + retificações/erratas, com `family`, URL e
+texto) e `content_source` (`pdf` | `html`). A fonte fornece a família e o
+conteúdo de cada peça; não fornece, neste contrato, vínculo jurídico,
+`amends_content_hash` ou `composition_order` confiáveis. Esses campos não devem
+ser inferidos pelo adapter de bundles. O scraper emite `data_extracao` como
+timestamp ISO-8601 com fuso UTC explícito. Timestamps legados sem fuso, ausentes
+ou inválidos são rejeitados para bundles, sem backfill ou substituição por
+`now()`.
+
+Na T04, `family: edital-base` é versionado como `base_notice` e `family: emenda`
+como `amendment`; esses marcadores confiáveis de peça normativa recebem
+`authority_state: active`. Isso não converte o legado `authority_state: vigente`
+da projeção canônica em nova prova de autoridade. Quando `content_source` é
+`html` por fallback sem `documentos_normativos` extraídos, o edital continua
+funcionando no pipeline atual, mas não produz bundle normativo.
 
 ---
 
@@ -150,8 +162,9 @@ graph_overrides:
   normalização (§7.1 docs/domain/schema.md) trata sem-prazo + ABERTA como vigente.
 - **Retificações/erratas são normativas.** O scraper preserva o edital-base e
   todas as emendas anexadas à página. O Documento Canônico marca a família e a
-  data de cada peça; o conteúdo vigente é a composição cronológica. Resultado,
-  manual e demais peças de andamento continuam fora pela skip-list.
+  data de cada peça; a composição factual/jurídica entre elas permanece
+  pendente de vínculo explícito e da T06. Resultado, manual e demais peças de
+  andamento continuam fora pela skip-list.
 - **Só chamadas ABERTAS.** A fonte varre `/chamadas-abertas/`; encerradas vivem
   em `/category/chamadas-encerradas/` e NÃO são coletadas (status sempre ABERTA,
   salvo "fluxo contínuo" detectado no texto).
