@@ -294,11 +294,11 @@ https://github.com/lucasborgs/radar_editais/actions/runs/30260170224
 
 ---
 
-## Auditoria Codex: pendente
+## Auditoria Codex: aprovada em 2026-07-27
 
-Esta task (RT03-T07) executa a auditoria de fechamento. Após confirmação
-independente dos 15 itens de auditoria estática, do ambiente hermético e
-da não regressão da suíte comparativa, o campo abaixo deve ser preenchido.
+Os 15 itens abaixo foram confirmados independentemente. A validação repetida
+produziu `214 passed` no escopo RT03 e `1614 passed, 77 skipped` na suíte
+hermética completa, sem regressão.
 
 | Item | Status |
 |---|---|
