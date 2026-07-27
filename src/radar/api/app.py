@@ -41,6 +41,7 @@ from radar.api.routers.planning import router as planning_router
 from radar.api.routers.profile import router as profile_router
 from radar.api.routers.radar import router as radar_router
 from radar.api.routers.research import router as research_router
+from radar.api.routers.source_coverage import router as source_coverage_router
 from radar.api.routers.workspace import router as workspace_router
 from radar.api.routers.writing import router as writing_router
 from radar.core.infra.logging_config import request_id_var, setup_logging
@@ -214,4 +215,5 @@ app.include_router(conversations_router)
 app.include_router(profile_router)
 app.include_router(radar_router)
 app.include_router(research_router)
+app.include_router(source_coverage_router)
 app.include_router(discovered_router)
