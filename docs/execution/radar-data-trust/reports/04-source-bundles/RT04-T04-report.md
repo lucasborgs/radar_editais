@@ -8,7 +8,7 @@
 - Branch: `codex/radar-data-trust-04-t04`
 - Worktree: `/private/tmp/radar-editais-rt04-t04`
 - Commit de implementação: `0057c59b5`
-- Commit de correções semânticas: será registrado após a validação final
+- Commit de correções semânticas: `d9b55735e`
 
 ## Implementação
 
