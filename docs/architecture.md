@@ -185,9 +185,9 @@ hub_expansion) — registram telemetria best-effort em `source_runs` (tabela
 aditiva, sem impacto no pipeline). Cada execução compartilha um `batch_id`; cada
 canal recebe uma linha com status, contadores e timestamps.
 
-Candidatos no staging recebem atribuição de origem: `discovery_channel`,
-`query_family`, `origin_domain` (hostname normalizado, sem path/query). Linhas
-legadas mantêm campos `null`.
+Candidatos no staging recebem atribuição de origem: `discovery_run_id`,
+`discovery_channel`, `query_family`, `origin_domain` (hostname normalizado, sem
+path/query). Linhas legadas mantêm campos `null`.
 
 Um read model determinístico (`source_coverage_metrics.py`) deriva saúde dos
 canais, rendimento, funil editorial, lacunas e domínios com aprovações

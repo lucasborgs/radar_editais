@@ -100,7 +100,7 @@ explícitas, erro sanitizado (só nome da classe), sem escrita.
 | `0caf0f148` · `b541b6486` · `22e17ae3c` · auditoria `c113641bf` |
 
 **Arquivos:** `api.ts`, `discovered/page.tsx`
-**Resultado:** Painel recolhível em `/discovered` com 6 seções compactas.
+**Resultado:** Painel recolhível em `/discovered` (seções compactas).
 `setCoverage(null)` antes de carregar token. Falha da API → "Painel indisponível
 no momento." sem bloquear a fila. Zero TypeScript/lint novos.
 
@@ -155,10 +155,8 @@ Precedência: `disabled → failing → degraded → stale → healthy → unkno
 - `healthy`: última run `succeeded` com resultado observável dentro de 1×
   intervalo esperado.
 - `unknown`: nunca executado ou sucesso sem resultado observável (zero ambíguo).
-- Flags lidas exclusivamente do dicionário `env` injetado no read model; a API
-  constrói esse dicionário a partir das flags declaradas no registry
-  (`flag_name` em `_coverage.md`). O ambiente do processo (`os.environ`) nunca
-  é consultado diretamente.
+- O read model não consulta `os.environ`; a API lê do ambiente somente os
+  `flag_name` declarados no registry e injeta um dicionário explícito.
 
 ### Funil editorial
 
@@ -231,7 +229,7 @@ ENVIRONMENT=test PYTHONPATH=src pytest -q \
 ENVIRONMENT=test PYTHONPATH=src pytest -q --tb=short 2>&1
 ```
 
-**Resultado oficial: 1614 passed, 77 skipped, 0 failed** (total coletado = 1.691). A execução inicial `1627/64` teve 13 testes opcionais habilitados por variáveis do ambiente local — sem falhas em nenhuma das duas execuções.
+**Resultado oficial: 1614 passed, 77 skipped, 0 failed** (total coletado = 1.691). A execução inicial `1627/64` teve 13 testes opcionais com pré-requisitos resolvidos de forma diferente entre os ambientes — sem falhas em nenhuma das duas execuções.
 
 ```bash
 ENVIRONMENT=test PYTHONPATH=src ruff check $(git ls-files '*.py')
