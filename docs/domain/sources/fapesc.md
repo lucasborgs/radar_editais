@@ -94,14 +94,15 @@ Campos extras no bronze para rastreio: `edital_pdf_url` (PDF-base escolhido),
 texto) e `content_source` (`pdf` | `html`). A fonte fornece a família e o
 conteúdo de cada peça; não fornece, neste contrato, vínculo jurídico,
 `amends_content_hash` ou `composition_order` confiáveis. Esses campos não devem
-ser inferidos pelo adapter de bundles. O timestamp de coleta é o
-`data_extracao` do registro bronze; sem timestamp válido, não há bundle
-normativo novo.
+ser inferidos pelo adapter de bundles. O scraper emite `data_extracao` como
+timestamp ISO-8601 com fuso UTC explícito. Timestamps legados sem fuso, ausentes
+ou inválidos são rejeitados para bundles, sem backfill ou substituição por
+`now()`.
 
 Na T04, `family: edital-base` é versionado como `base_notice` e `family: emenda`
-como `amendment`. O legado `authority_state: vigente` usado na projeção
-canônica não é promovido automaticamente a `active`; a autoridade permanece
-contextual até uma decisão posterior de composição. Quando `content_source` é
+como `amendment`; esses marcadores confiáveis de peça normativa recebem
+`authority_state: active`. Isso não converte o legado `authority_state: vigente`
+da projeção canônica em nova prova de autoridade. Quando `content_source` é
 `html` por fallback sem `documentos_normativos` extraídos, o edital continua
 funcionando no pipeline atual, mas não produz bundle normativo.
 

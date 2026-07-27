@@ -26,6 +26,7 @@ import io
 import logging
 import re
 import time
+from datetime import datetime, timezone
 
 import requests
 from bs4 import BeautifulSoup
@@ -265,7 +266,7 @@ class FAPESCScraper(BaseScraper):
         # distante — o rodapé de assinatura SGP-e diz "válido até 15/04/2126" (100
         # anos), que casaria o contexto "até …" e venceria o max. Deadlines reais
         # ficam em [ano-1, ano+3].
-        from datetime import date, datetime
+        from datetime import date
         _yr_min, _yr_max = date.today().year - 1, date.today().year + 3
         data_limite = None
         parsed: list[tuple[str, str, str, str]] = []
@@ -299,7 +300,7 @@ class FAPESCScraper(BaseScraper):
             "content_source": content_source,
             "fluxo_continuo": fluxo_continuo,
             "fonte": "FAPESC",
-            "data_extracao": self._get_timestamp(),
+            "data_extracao": datetime.now(timezone.utc).isoformat(),
         }
 
     # ------------------------------------------------------------------

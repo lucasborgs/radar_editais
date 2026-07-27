@@ -71,7 +71,7 @@ def _collected_at(value: object) -> datetime | None:
     except ValueError:
         return None
     if collected_at.tzinfo is None:
-        collected_at = collected_at.replace(tzinfo=timezone.utc)
+        return None
     return collected_at.astimezone(timezone.utc)
 
 
@@ -98,20 +98,13 @@ def build_source_bundle(edital_id: str) -> SourceBundle | None:
         if role is None or not text or not source_url:
             continue
         units = split_into_units(text)
-        legacy_state = item.get("authority_state")
-        authority = (
-            AuthorityState(legacy_state)
-            if legacy_state in {state.value for state in AuthorityState}
-            and legacy_state != "vigente"
-            else AuthorityState.CONTEXTUAL
-        )
         documents.append({
             "doc_name": item.get("doc_name") or source_url.rsplit("/", 1)[-1],
             "units": units,
             "role": role.value,
             "source_url": source_url,
             "content_hash": compute_content_hash(units),
-            "authority_state": authority.value,
+            "authority_state": AuthorityState.ACTIVE.value,
         })
         has_base |= role is DocumentRole.BASE_NOTICE
     if not documents:
