@@ -207,27 +207,43 @@ Campos obrigatórios por documento:
 - `source_url` quando a origem a fornece; e
 - `authority_state`: `active`, `superseded` ou `contextual`.
 
-`published_at`, vínculo com documento alterado e ordem de composição são
-nullable. A ausência desses dados reduz a capacidade de precedência; não
-autoriza inferi-los pelo nome do arquivo.
+`published_at`, `amends_content_hash` e ordem de composição são nullable.
+`amends_content_hash`, quando presente, aponta para o `content_hash` do
+documento alterado no mesmo bundle; não usa nome de arquivo nem implica que a
+emenda substituiu o documento inteiro. A ausência desses dados reduz a
+capacidade de precedência; não autoriza inferi-los pelo nome do arquivo.
 
 ### 5.1 Identidade e hashes
 
 - `content_hash` identifica o conteúdo de um documento, independentemente de
   URL ou nome.
-- `bundle_hash` identifica sujeito, fonte, documentos e metadados documentais
-  materiais normalizados. Exclui `collected_at`, `created_at` e
-  `producer_version`, que descrevem a execução/produtor e não uma mudança do
-  dossiê.
+- `bundle_hash` identifica `schema_version`, sujeito, fonte,
+  `acquisition_status`, documentos e metadados documentais materiais
+  normalizados. Exclui `collected_at`, `created_at` e `producer_version`, que
+  descrevem a execução/produtor e não uma mudança do dossiê.
 - Recoletar conteúdo idêntico não cria versão material duplicada.
-- Mudança de conteúdo, conjunto de documentos, papel ou autoridade cria nova
-  versão.
+- Mudança de conteúdo, conjunto de documentos, papel, autoridade ou
+  `acquisition_status` cria nova versão. Assim, um bundle `partial` nunca
+  impede a persistência posterior do mesmo conjunto confirmado como
+  `complete`.
 - Hashes novos usam SHA-256. O MD5 legado de `edital_source_docs` permanece
   compatível até migração deliberada; não é usado como prova criptográfica.
 
 Na persistência append-only, `collected_at` registra quando aquela versão
 material foi observada pela primeira vez. Reobservações idênticas pertencem à
 telemetria de `source_runs`; não atualizam nem duplicam o bundle histórico.
+
+### 5.2 Identidade do sujeito
+
+`subject_id` reutiliza a identidade canônica existente:
+
+- oportunidade: `<source>:<native_id>`, incluindo `web:<url_hash>`;
+- investidor: `investidor:<slug>`;
+- ICT: `ict:<source>:<slug>`;
+- programa: `programa:<slug>`; e
+- agência: `agencia:<slug>`.
+
+Não criar um segundo ID específico de bundles.
 
 ## 6. Persistência mínima
 

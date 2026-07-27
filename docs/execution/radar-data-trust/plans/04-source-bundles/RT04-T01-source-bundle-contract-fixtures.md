@@ -21,14 +21,17 @@ normativo vai para `docs/domain/schema.md`, não para constante paralela.
 
 ## Passos delimitados
 
-1. Validar versão, kind/ID canônico, fonte, coleta, produtor, status e um
-   documento válido; aceitar somente papéis/estados da spec.
+1. Validar versão, kind/ID canônico, fonte, coleta UTC, produtor, status e um
+   documento não vazio; aceitar somente papéis/estados aplicáveis ao kind.
 2. Normalizar envelope/documentos de modo estável; recoleta idêntica mantém
    hash mesmo com nova coleta/produtor; conteúdo, conjunto documental, papel
-   ou autoridade materialmente alterados criam hash novo.
+   autoridade ou `acquisition_status` materialmente alterados criam hash novo.
+   Incluir `schema_version` no hash e usar desempate total entre documentos.
 3. Criar as três fixtures obrigatórias e rejeições para hash/papel/estado/ID
-   inválidos e documento vazio. `partial` é válido, mas não ganha semântica
-   de projeção nesta task.
+   inválidos, vínculo documental instável e documento vazio. O teste de
+   igualdade dos enums deve ler o YAML autoritativo pelo loader real, não
+   repetir seus valores numa terceira lista. `partial` é válido, mas não ganha
+   semântica de projeção nesta task.
 
 ## Testes proporcionais
 
