@@ -1,69 +1,57 @@
-# RT04-T03 — Relatório parcial
+# RT04-T03 — Relatório final
 
-**Status:** T03-A concluída; T03-B pendente
+**Status:** T03 concluída
 
 ## Escopo executado
 
-Esta entrega implementa somente a propagação do snapshot do portal Web já
-coletado por `_expand_hub()` até o `evidence_package` e o `raw` da staging.
-Nenhuma materialização pós-promoção foi implementada.
+T03-A preserva o snapshot do portal no candidato-filho, em `related_pages`,
+até o `evidence_package` e a staging. T03-B materializa essa evidência somente
+após promoção humana, sem rede, recrawl ou LLM.
 
-## Base e branch
+## Base, branch e commits
 
-- Base obrigatória: `3ae6e62e5`
-- Branch: `codex/radar-data-trust-04-t03a`
-- Worktree: `/private/tmp/radar-editais-rt04-t03a`
-- Commit: registrado no handoff final desta entrega
+- Base obrigatória T03-B: `f5425a0ad`
+- Branch: `codex/radar-data-trust-04-t03b`
+- Worktree: `/private/tmp/radar-editais-rt04-t03b`
+- T03-A integrada na base: `f5425a0ad`
+- T03-B: `2157efd7e` (`feat(data-trust): materialize web evidence bundle`)
 
-## Decisões
+## Implementação
 
-- `_expand_hub()` continua usando exatamente um `_fetch_and_parse()` e retorna
-  cada filho acompanhado de um dicionário interno com URL canônica, texto
-  sanitizado, cap explícito de `20_000` caracteres, SHA-256 do texto armazenado
-  e estado `loaded`/`empty`.
-- O contrato público de `SearchHit` não foi alterado. O loop aceita também o
-  retorno antigo `SearchHit` para manter doubles/callers existentes compatíveis.
-- Snapshot `loaded` vira item em `related_pages`, com papel `program_page` e
-  autoridade `contextual`. Snapshot `empty` não cria item.
-- `documents` permanece reservado aos documentos já consumidos pelo fluxo atual;
-  o materializador legado não lê `related_pages`. A criação formal do
-  `program_page` fica para T03-B.
-- O desafio continua sendo a página principal. Candidatos isolados e pacotes
-  legados permanecem sem `documents` adicionais.
-- O caminho opcional Crawl4AI parte do registro que já contém o snapshot, então
-  não apaga o contexto preservado.
-- `_stage_records()` não ganhou campos nem schema novo: o pacote existente
-  continua sendo enviado dentro de `raw`.
+- A página específica carregada gera `opportunity_page` com autoridade `active`.
+- Cada item carregado de `related_pages` gera `program_page` com autoridade
+  `contextual`.
+- O sujeito mantém `web:<url_hash>` e os hashes documentais são recalculados
+  no formato SHA-256 do contrato `SourceBundle`.
+- `complete` exige a página específica carregada; contexto sem página específica
+  gera `partial`; ausência de documento carregado não fabrica bundle.
+- `source_bundles.save()` é usado de forma append-only/idempotente. `partial`
+  não substitui `complete`, pois o repositório existente seleciona somente o
+  último `complete` na leitura.
+- `BundleStorageError` é tratado como best-effort: bronze, `source_docs`,
+  promoção e jobs existentes continuam preservados.
+- A projeção compatível em `source_docs` inclui a página do desafio e o contexto
+  carregado. Documentos auxiliares sem papel declarado não são promovidos a
+  papel normativo no bundle.
 
-## Arquivos
+## Arquivos alterados
 
-- `src/radar/core/ingestion/opportunity_discovery.py`
-- `src/radar/core/services/discovery_evidence.py`
+- `src/radar/core/services/discovery_materializer.py`
 - `tests/unit/test_rt04_t03a_hub_evidence.py`
+- `tests/unit/test_rt04_t03b_materialization.py`
 - `docs/execution/radar-data-trust/reports/04-source-bundles/RT04-T03-report.md`
+
+Não foram alterados API, migrations, frontend, gate humano, deduplicação,
+consumers downstream, T04 ou qualquer etapa posterior.
 
 ## Validação
 
-- `PYTHONPATH=src pytest -q tests/unit/test_rt04_t03a_hub_evidence.py tests/unit/test_discovery_evidence.py tests/unit/test_opportunity_discovery_cache.py tests/unit/test_source_coverage_discovery.py tests/unit/test_relevance_staging.py`
-  - `85 passed`
-- Ruff nos três arquivos Python alterados: aprovado
+- Testes direcionados e regressão T03-A/T03-B:
+  `212 passed`
+- Ruff nos arquivos Python alterados: aprovado
 - `git diff --check`: aprovado
 
-Os testes cobrem cap/hash, compartilhamento entre filhos, snapshot vazio,
-desafio isolado, compatibilidade do pacote legado, preservação no caminho real
-do Crawl4AI, ausência de fetch adicional do portal, retenção do pacote em `raw`
-e não-consumo de `related_pages` pelo materializador legado.
-
-## Limitações e pendências
-
-- A materialização pós-promoção de `program_page`/`opportunity_page`, o bundle
-  versionado e a projeção em `source_docs` permanecem para T03-B.
-- Não foram tocados promoção, `discovery_materializer.py`, `source_bundles.py`,
-  `source_docs.py`, API, frontend, migrations, T04 ou tarefas posteriores.
-
-## Auditoria Codex
-
-**T03-A aprovada em 2026-07-27.** Validação independente: 86 testes
-direcionados, Ruff e `git diff --check` limpos. O caminho real do Crawl4AI
-preserva `related_pages`, não há fetch adicional do portal e o materializador
-legado não consome esse contexto antes da T03-B.
+A suíte cobre portal + desafio (`complete`), desafio isolado, contexto sem
+página específica (`partial`), ausência documental, falha de
+`BundleStorageError`, idempotência por `bundle_hash`, projeção em `source_docs`
+e ausência de fetch adicional.
