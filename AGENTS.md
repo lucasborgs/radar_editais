@@ -208,6 +208,7 @@ POST /writing/start, /writing/turn, /writing/section-start
 GET  /writing/sessions, /writing/{id}/document
 POST /writing/{id}/checklist/auto-review
 GET  /discovered-opportunities, POST /discovered-opportunities/{id}/promote|reject
+GET  /source-coverage                            # admin-only, read-only (RT03)
 GET  /me, PUT /me/profile, PUT /me/preferences
 GET/POST/PUT/DELETE /library, POST /library/{id}/archive
 ```
