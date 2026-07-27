@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
@@ -212,7 +212,7 @@ class SourceBundle(BaseModel):
     def _collected_at_tz_aware(cls, v: datetime) -> datetime:
         if v.tzinfo is None:
             raise ValueError("collected_at must be timezone-aware (use UTC)")
-        return v
+        return v.astimezone(timezone.utc)
 
     @model_validator(mode="after")
     def _check_invariants(self) -> SourceBundle:
@@ -244,10 +244,18 @@ class SourceBundle(BaseModel):
         sid = self.subject_id
 
         if kind is SubjectKind.OPPORTUNITY:
-            if ":" not in sid:
+            expected_prefix = f"{self.source}:"
+            if not sid.startswith(expected_prefix):
                 raise ValueError(
-                    f"opportunity subject_id must be '<source>:<native_id>', "
+                    f"opportunity subject_id must start with "
+                    f"'{expected_prefix}' (source followed by colon), "
                     f"got '{sid}'"
+                )
+            native = sid[len(expected_prefix):]
+            if not native:
+                raise ValueError(
+                    f"opportunity subject_id must have content "
+                    f"after '<source>:', got '{sid}'"
                 )
             if sid.startswith(_ACTOR_ID_PREFIXES):
                 raise ValueError(
@@ -261,9 +269,18 @@ class SourceBundle(BaseModel):
                     f"got '{sid}'"
                 )
         elif kind is SubjectKind.ICT:
-            if not sid.startswith("ict:"):
+            expected_prefix = f"ict:{self.source}:"
+            if not sid.startswith(expected_prefix):
                 raise ValueError(
-                    f"ict subject_id must start with 'ict:', got '{sid}'"
+                    f"ict subject_id must start with "
+                    f"'{expected_prefix}' (ict:<source>:), "
+                    f"got '{sid}'"
+                )
+            slug = sid[len(expected_prefix):]
+            if not slug:
+                raise ValueError(
+                    f"ict subject_id must have slug after "
+                    f"'ict:<source>:', got '{sid}'"
                 )
         elif kind is SubjectKind.PROGRAM:
             if not sid.startswith("programa:"):
@@ -299,6 +316,11 @@ class SourceBundle(BaseModel):
                         f"in document '{doc.doc_name}' does not match any "
                         f"document's content_hash in this bundle"
                     )
+                if doc.amends_content_hash == doc.content_hash:
+                    raise ValueError(
+                        f"amends_content_hash in document '{doc.doc_name}' "
+                        f"refers to its own content_hash (self-reference)"
+                    )
 
     def compute_bundle_hash(self) -> str:
         """SHA-256 determinístico; exclui collected_at e producer_version.
@@ -312,6 +334,7 @@ class SourceBundle(BaseModel):
                 d.get("composition_order", 0) if d.get("composition_order") is not None else 0,
                 d["doc_name"],
                 d["content_hash"],
+                _canonical_json(d),
             )
         )
         payload = _canonical_json({

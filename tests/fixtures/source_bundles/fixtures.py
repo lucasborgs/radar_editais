@@ -40,7 +40,7 @@ def web_portal_challenge() -> dict:
     return {
         "schema_version": 1,
         "subject_kind": "opportunity",
-        "subject_id": "web:a1b2c3d4e5",  # url_hash sintético
+        "subject_id": "web:a1b2c3d4e5f6",  # url_hash sintético (12 hex chars)
         "source": "web",
         "collected_at": "2026-07-27T10:00:00Z",
         "producer_version": "web-adapter-v1",

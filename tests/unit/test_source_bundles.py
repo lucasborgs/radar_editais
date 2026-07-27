@@ -18,6 +18,7 @@ Cobre:
 from __future__ import annotations
 
 import json
+from datetime import timezone
 
 import pytest
 from pydantic import ValidationError
@@ -265,6 +266,21 @@ class TestHashStability:
         b2 = SourceBundle.model_validate(_make_bundle(documents=docs_b))
         assert b1.compute_bundle_hash() != b2.compute_bundle_hash()
 
+    def test_same_name_order_content_diff_role_authority_stable(self):
+        """Mesmo nome/ordem/conteúdo, mas papel/autoridade diferentes →
+        a ordenação total (full canonical dict como tiebreaker) garante
+        hash estável independentemente da ordem incidental do input."""
+        docs = [
+            _make_doc(doc_name="same.pdf", composition_order=0,
+                      role="annex", authority_state="active"),
+            _make_doc(doc_name="same.pdf", composition_order=0,
+                      role="official_page", authority_state="contextual"),
+        ]
+        docs_rev = list(reversed(docs))
+        b1 = SourceBundle.model_validate(_make_bundle(documents=docs))
+        b2 = SourceBundle.model_validate(_make_bundle(documents=docs_rev))
+        assert b1.compute_bundle_hash() == b2.compute_bundle_hash()
+
 
 # ---------------------------------------------------------------------------
 # Hash mutability (material changes)
@@ -309,7 +325,9 @@ class TestHashMutability:
 
     def test_source_change_alters_hash(self):
         b1 = SourceBundle.model_validate(_make_bundle(source="fapesc"))
-        b2 = SourceBundle.model_validate(_make_bundle(source="finep"))
+        b2 = SourceBundle.model_validate(
+            _make_bundle(source="finep", subject_id="finep:test-2026")
+        )
         assert b1.compute_bundle_hash() != b2.compute_bundle_hash()
 
     def test_acquisition_status_change_alters_hash(self):
@@ -335,7 +353,7 @@ class TestFixtures:
         data = web_portal_challenge()
         bundle = SourceBundle.model_validate(data)
         assert bundle.subject_kind == SubjectKind.OPPORTUNITY
-        assert bundle.subject_id == "web:a1b2c3d4e5"
+        assert bundle.subject_id == "web:a1b2c3d4e5f6"
         assert bundle.source == "web"
         assert bundle.acquisition_status == AcquisitionStatus.COMPLETE
         assert len(bundle.documents) == 2
@@ -504,11 +522,12 @@ class TestRejections:
         with pytest.raises(ValidationError, match="timezone-aware"):
             SourceBundle.model_validate(data)
 
-    def test_collected_at_non_utc_accepted(self):
-        """Timezone-aware mas não UTC é aceito; normalizado pelo produtor."""
+    def test_collected_at_non_utc_normalized(self):
+        """09:00-03:00 é armazenado como 12:00+00:00."""
+        from datetime import datetime
         data = _make_bundle(collected_at="2026-07-27T09:00:00-03:00")
         bundle = SourceBundle.model_validate(data)
-        assert bundle.collected_at.tzinfo is not None
+        assert bundle.collected_at == datetime(2026, 7, 27, 12, 0, tzinfo=timezone.utc)
 
     # --- composition_order ---
     def test_composition_order_negative_rejected(self):
@@ -517,14 +536,14 @@ class TestRejections:
             SourceBundle.model_validate(_make_bundle(documents=[doc]))
 
     # --- Canonical ID ---
-    def test_opportunity_id_without_colon_rejected(self):
-        with pytest.raises(ValidationError, match="<source>:<native_id>"):
+    def test_opportunity_id_wrong_source_prefix_rejected(self):
+        with pytest.raises(ValidationError, match="start with 'fapesc:'"):
             SourceBundle.model_validate(_make_bundle(subject_id="no-colon"))
 
     def test_opportunity_id_with_actor_prefix_rejected(self):
         with pytest.raises(ValidationError, match="must not start with actor"):
             SourceBundle.model_validate(
-                _make_bundle(subject_id="investidor:test")
+                _make_bundle(source="investidor", subject_id="investidor:test")
             )
 
     def test_investor_id_must_start_with_investidor(self):
@@ -534,8 +553,8 @@ class TestRejections:
                                    subject_id="my-fund:abc")
             )
 
-    def test_ict_id_must_start_with_ict(self):
-        with pytest.raises(ValidationError, match="start with 'ict:'"):
+    def test_ict_id_must_start_with_ict_source(self):
+        with pytest.raises(ValidationError, match="start with 'ict:exemplo:'"):
             SourceBundle.model_validate(
                 _make_actor_bundle(subject_id="exemplo:lab")
             )
@@ -552,6 +571,36 @@ class TestRejections:
             SourceBundle.model_validate(
                 _make_actor_bundle(subject_kind="agency",
                                    subject_id="finep")
+            )
+
+    def test_opportunity_id_source_prefix_mismatch(self):
+        """source=web com subject_id=tupy:abc → prefixo 'web:' não corresponde."""
+        with pytest.raises(ValidationError, match="start with 'web:'"):
+            SourceBundle.model_validate(
+                _make_bundle(source="web", subject_id="tupy:abc")
+            )
+
+    def test_opportunity_id_no_native_id(self):
+        """subject_id='web:' → vazio após o prefixo source:."""
+        with pytest.raises(ValidationError, match="must have content"):
+            SourceBundle.model_validate(
+                _make_bundle(source="web", subject_id="web:")
+            )
+
+    def test_ict_id_without_source_in_prefix(self):
+        """ICT com source=embrapii, subject_id=ict:senai → falta 'embrapii:'."""
+        with pytest.raises(ValidationError, match="start with 'ict:embrapii:'"):
+            SourceBundle.model_validate(
+                _make_actor_bundle(source="embrapii",
+                                   subject_id="ict:senai")
+            )
+
+    def test_ict_id_no_slug(self):
+        """subject_id='ict:embrapii:' → sem slug após o prefixo."""
+        with pytest.raises(ValidationError, match="must have slug"):
+            SourceBundle.model_validate(
+                _make_actor_bundle(source="embrapii",
+                                   subject_id="ict:embrapii:")
             )
 
     # --- Role per kind ---
@@ -601,6 +650,20 @@ class TestRejections:
             amends_content_hash="sha256:" + "b" * 64,
         )
         with pytest.raises(ValidationError, match="does not match any"):
+            SourceBundle.model_validate(_make_bundle(documents=[doc]))
+
+    def test_amends_content_hash_self_reference_rejected(self):
+        """Amendment não pode referenciar o próprio content_hash."""
+        units = ["autorreferente"]
+        ch = compute_content_hash(units)
+        doc = _make_doc(
+            doc_name="self.pdf",
+            role="amendment",
+            units=units,
+            content_hash=ch,
+            amends_content_hash=ch,
+        )
+        with pytest.raises(ValidationError, match="self-reference"):
             SourceBundle.model_validate(_make_bundle(documents=[doc]))
 
     # --- Partial ---
