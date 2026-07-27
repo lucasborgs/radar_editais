@@ -60,3 +60,10 @@ e não-consumo de `related_pages` pelo materializador legado.
   versionado e a projeção em `source_docs` permanecem para T03-B.
 - Não foram tocados promoção, `discovery_materializer.py`, `source_bundles.py`,
   `source_docs.py`, API, frontend, migrations, T04 ou tarefas posteriores.
+
+## Auditoria Codex
+
+**T03-A aprovada em 2026-07-27.** Validação independente: 86 testes
+direcionados, Ruff e `git diff --check` limpos. O caminho real do Crawl4AI
+preserva `related_pages`, não há fetch adicional do portal e o materializador
+legado não consome esse contexto antes da T03-B.
