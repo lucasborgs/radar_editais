@@ -30,6 +30,12 @@ permitem rastrear parte da origem, mas não formam um pacote recuperável e
 atualizável. ICTs e investidores continuam com conteúdo insuficiente em vários
 casos; a spec deve tornar essa insuficiência explícita, não preenchê-la.
 
+Descobertas Web também podem ser compostas por mais de uma página. Um portal
+corporativo de inovação aberta pode concentrar regras gerais e FAQ, enquanto
+cada desafio possui uma página própria com problema, benefício e caminho de
+participação. Guardar somente a página encontrada primeiro perde parte do
+contrato da oportunidade.
+
 ## 2. Resultado
 
 Entregar um pacote documental versionado para oportunidades e atores que:
@@ -75,14 +81,37 @@ O pacote de uma oportunidade pode conter:
 | Papel | Uso |
 |---|---|
 | `base_notice` | edital, chamada ou regulamento principal |
+| `opportunity_page` | página principal de desafio ou oportunidade sem edital formal |
+| `program_page` | regras gerais compartilhadas por oportunidades de um programa ou portal |
 | `annex` | anexo normativo ou operacional |
 | `amendment` | retificação, errata ou rerratificação |
-| `official_page` | página oficial da oportunidade |
+| `official_page` | página oficial complementar, como landing page ou estado |
 | `faq` | esclarecimento oficial, quando efetivamente normativo |
 
 FINEP, FAPESP, FAPESC e Web/Descoberta continuam usando seus adapters e IDs
-atuais. A primeira vertical de retificação deve reutilizar a FAPESC, porque o
-produtor já entrega base e emendas reais.
+atuais. As fixtures iniciais devem conter tanto uma oportunidade Web composta
+por portal + desafio quanto uma retificação FAPESC. Isso impede que o contrato
+seja otimizado apenas para PDFs e fontes públicas dedicadas.
+
+Para um portal corporativo:
+
+- a página específica do desafio é `opportunity_page`;
+- a página geral do portal é `program_page` e fica `contextual`;
+- FAQ geral permanece associada ao programa e pode complementar a
+  oportunidade;
+- conteúdo específico do desafio prevalece sobre conteúdo geral quando ambos
+  tratam do mesmo campo; e
+- a oportunidade pode continuar ligada a um `programa` estável pelo
+  `subordinado_a` existente.
+
+A mesma `program_page` pode integrar, como contexto, os bundles de diferentes
+desafios. O `content_hash` comum prova que se trata do mesmo snapshot; no
+pré-beta não é necessário criar uma tabela adicional apenas para deduplicar
+fisicamente esse texto.
+
+A empresa operadora não deve ser convertida em `agencia`. Enquanto não houver
+uso comprovado para um novo tipo de ator corporativo, seu nome permanece como
+operador do programa e origem oficial dos documentos.
 
 ### 4.2 Atores
 
@@ -97,7 +126,29 @@ O pacote de um investidor, ICT, programa ou agência pode conter:
 O pacote não transforma ator em oportunidade e não cria RAG artificial.
 Ausência de conteúdo oficial suficiente permanece um gap visível.
 
-### 4.3 Fora do escopo
+### 4.3 Enriquecimento incremental de atores
+
+Esta spec não exige que um ator possua uma “página completa”. Ela permite
+acumular evidência oficial fragmentada ao longo do tempo:
+
+- ICT: registro EMBRAPII, página institucional, competências, laboratórios e
+  projetos/casos publicados;
+- investidor: site, tese declarada, portfólio e notícias de investimentos;
+- programa: página institucional, FAQ, edições e resultados publicados; e
+- agência: mandato, instrumentos e páginas oficiais relevantes.
+
+Cada novo documento oficial cria uma versão do pacote; os fatos por campo são
+recalculados somente quando necessário. Campo sem fonte continua `unknown`.
+Descoberta de uma oportunidade pode revelar uma nova página útil do programa
+ou operador, mas não cria automaticamente um novo ator nem publica afirmações
+sem revisão do contrato correspondente.
+
+O pacote é, portanto, a base para incorporar futuramente histórico de projetos,
+investimentos e parcerias sem redesenhar a proveniência. Esta spec apenas
+versiona o material adquirido; a modelagem de novas relações de negócio depende
+de necessidade comprovada.
+
+### 4.4 Fora do escopo
 
 - procurar novas oportunidades ou ampliar os canais da spec 03;
 - construir crawler, CMS ou arquivo web genérico;
@@ -209,8 +260,10 @@ juntos.
    `authority_state=superseded`, mas sai da projeção factual corrente.
 6. FAQ ou página oficial é `contextual` por padrão e não vence edital ou
    retificação normativa.
-7. Registro curado não vence silenciosamente documento oficial.
-8. Entre valores incompatíveis sem vínculo, papel ou ordem confiáveis, o fato
+7. Conteúdo específico de `opportunity_page` vence conteúdo geral de
+   `program_page` somente para o mesmo campo da oportunidade.
+8. Registro curado não vence silenciosamente documento oficial.
+9. Entre valores incompatíveis sem vínculo, papel ou ordem confiáveis, o fato
    fica `conflicting`.
 
 `published_at` sozinho não transforma documento contextual em autoridade
@@ -295,8 +348,9 @@ Casos mínimos:
 5. documento consolidado explicitamente identificado;
 6. recoleta idêntica idempotente;
 7. mudança material produz nova versão;
-8. ator com página oficial + registro curado; e
-9. legado sem bundle.
+8. portal corporativo + página específica de desafio;
+9. ator com página oficial + registro curado; e
+10. legado sem bundle.
 
 Uma fixture por caso basta. Não testar combinações cartesianas de fonte, papel
 e estado. Testes de rede usam doubles locais; nenhuma validação acessa produção
@@ -317,17 +371,16 @@ Nenhum threshold novo é bloqueante sem baseline observado e aprovação.
 
 | Task | Resultado |
 |---|---|
-| `RT04-T01` | contrato `SourceBundle`, papéis e fixtures mínimas |
+| `RT04-T01` | contrato `SourceBundle` e fixtures Web, retificação e ator incompleto |
 | `RT04-T02` | migration e repositório append-only idempotente |
-| `RT04-T03` | vertical FAPESC: base, anexos, retificações e projeção atual |
-| `RT04-T04` | demais oportunidades, incluindo Web promovida |
+| `RT04-T03` | vertical Web: portal/programa + desafio promovido |
+| `RT04-T04` | documentos normativos: FAPESC primeiro e demais adapters aplicáveis |
 | `RT04-T05` | fontes existentes de ICTs, investidores, programas e agências |
 | `RT04-T06` | precedência por campo, conflito e ligação à proveniência |
 | `RT04-T07` | métricas diagnósticas, validação final e reconciliação |
 
-T01 precede T02. T03 e T05 podem avançar em paralelo após T02, mas T03 pousa
-primeiro por validar a composição normativa. T04 reutiliza o padrão comprovado
-em T03. T06 depende de T03–T05. T07 fecha a spec.
+T01 precede T02. T03, T04 e T05 podem avançar em paralelo após T02, com pouso
+serial nos seams compartilhados. T06 depende de T03–T05. T07 fecha a spec.
 
 Cada task deve caber em um commit funcional mais um commit documental quando
 necessário. Se uma task exigir framework novo, tabela adicional ou mudança
