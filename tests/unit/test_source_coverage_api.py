@@ -14,6 +14,7 @@ Cobre:
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -452,7 +453,8 @@ class TestErrorSanitization:
         assert resp.status_code == 503
         detail = resp.json()["detail"]
         assert "CONNECTION FAILED" not in detail
-        assert "supabase" not in detail.lower() or "http" not in detail.lower()
+        assert "supabase" not in detail.lower()
+        assert "http" not in detail
         assert "secret" not in detail.lower()
         assert "Traceback" not in detail
         assert "Erro ao gerar" in detail
@@ -475,7 +477,172 @@ class TestErrorSanitization:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 7. No write operations
+# 7. Exact projections
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class TestExactProjections:
+
+    def test_source_runs_selects_expected_fields(self, monkeypatch):
+        """source_runs recebe projeção exata, sem *."""
+        monkeypatch.setenv("ADMIN_EMAILS", "ops@exemplo.com")
+
+        db = MagicMock()
+
+        calls: list[str] = []
+
+        def _table_side_effect(name: str):
+            t = MagicMock()
+            if name == "source_runs":
+                def _select(cols: str):
+                    calls.append(("source_runs", cols))
+                    resp = MagicMock()
+                    resp.data = []
+                    sel = MagicMock()
+                    sel.execute.return_value = resp
+                    return sel
+                t.select.side_effect = _select
+            elif name == "discovered_opportunities":
+                def _select(cols: str):
+                    calls.append(("discovered_opportunities", cols))
+                    resp = MagicMock()
+                    resp.data = []
+                    sel = MagicMock()
+                    sel.execute.return_value = resp
+                    return sel
+                t.select.side_effect = _select
+            return t
+
+        db.table.side_effect = _table_side_effect
+
+        with (
+            patch("radar.api.routers.source_coverage.get_supabase_service") as mock_get_db,
+        ):
+            mock_get_db.return_value = db
+            from radar.api.routers.source_coverage import get_source_coverage
+            get_source_coverage("u1")
+
+        assert len(calls) == 2
+        table_name, cols = calls[0]
+        assert table_name == "source_runs"
+        assert "source_key" in cols
+        assert "status" in cols
+        assert "started_at" in cols
+        assert "completed_at" in cols
+        assert "records_observed" in cols
+        assert "records_emitted" in cols
+        assert "records_staged" in cols
+        assert "*" not in cols
+
+    def test_discovered_omits_id(self, monkeypatch):
+        """discovered_opportunities não projeta id."""
+        monkeypatch.setenv("ADMIN_EMAILS", "ops@exemplo.com")
+
+        db = MagicMock()
+
+        discovered_cols: str | None = None
+
+        def _table_side_effect(name: str):
+            t = MagicMock()
+            if name == "source_runs":
+                def _select(cols: str):
+                    resp = MagicMock()
+                    resp.data = []
+                    sel = MagicMock()
+                    sel.execute.return_value = resp
+                    return sel
+                t.select.side_effect = _select
+            elif name == "discovered_opportunities":
+                def _select(cols: str):
+                    nonlocal discovered_cols
+                    discovered_cols = cols
+                    resp = MagicMock()
+                    resp.data = []
+                    sel = MagicMock()
+                    sel.execute.return_value = resp
+                    return sel
+                t.select.side_effect = _select
+            return t
+
+        db.table.side_effect = _table_side_effect
+
+        with (
+            patch("radar.api.routers.source_coverage.get_supabase_service") as mock_get_db,
+        ):
+            mock_get_db.return_value = db
+            from radar.api.routers.source_coverage import get_source_coverage
+            get_source_coverage("u1")
+
+        assert discovered_cols is not None
+        assert "id" not in discovered_cols, f"id ainda projetado: {discovered_cols}"
+        assert "status" in discovered_cols
+        assert "discovery_channel" in discovered_cols
+        assert "query_family" in discovered_cols
+        assert "origin_domain" in discovered_cols
+        assert "created_at" in discovered_cols
+        assert "reviewed_at" in discovered_cols
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 8. get_supabase_service failure
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class TestGetSupabaseServiceFailure:
+
+    def test_service_failure_returns_503_sanitized(self, monkeypatch):
+        """get_supabase_service() levanta → 503 categórico."""
+        monkeypatch.setenv("ADMIN_EMAILS", "ops@exemplo.com")
+
+        app = _make_app()
+        app.dependency_overrides[get_admin_user_id] = lambda: "u1"
+
+        with (
+            patch("radar.api.routers.source_coverage.get_supabase_service") as mock_get,
+        ):
+            mock_get.side_effect = RuntimeError(
+                "TIMEOUT connecting to supabase://user:secret@prod"
+            )
+
+            client = TestClient(app)
+            resp = client.get("/source-coverage")
+
+        assert resp.status_code == 503
+        detail = resp.json()["detail"]
+        assert "TIMEOUT" not in detail
+        assert "secret" not in detail.lower()
+        assert "supabase" not in detail.lower()
+        assert "Erro ao gerar" in detail
+
+    def test_service_failure_does_not_log_exc_info(self, monkeypatch, caplog):
+        """Log contém apenas o nome da classe, não o segredo da exceção."""
+        monkeypatch.setenv("ADMIN_EMAILS", "ops@exemplo.com")
+
+        app = _make_app()
+        app.dependency_overrides[get_admin_user_id] = lambda: "u1"
+
+        with (
+            patch("radar.api.routers.source_coverage.get_supabase_service") as mock_get,
+            caplog.at_level(logging.ERROR, logger="radar.api.routers.source_coverage"),
+        ):
+            mock_get.side_effect = RuntimeError(
+                "DB_PASSWORD=supersecret connection refused"
+            )
+
+            client = TestClient(app)
+            client.get("/source-coverage")
+
+        log_text = caplog.text
+        # O nome da classe deve aparecer
+        assert "RuntimeError" in log_text
+        # O segredo da exceção não deve aparecer
+        assert "supersecret" not in log_text
+        assert "DB_PASSWORD" not in log_text
+        assert "exc_info" not in log_text.lower()
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 9. No write operations
 # ══════════════════════════════════════════════════════════════════════════
 
 
@@ -511,7 +678,7 @@ class TestNoWrites:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 8. Wiring — router registration
+# 10. Wiring — router registration
 # ══════════════════════════════════════════════════════════════════════════
 
 

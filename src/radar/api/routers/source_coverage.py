@@ -112,8 +112,12 @@ def _build_env_from_channels(channels: list[dict]) -> dict[str, str]:
 
 
 def _sanitize_error(exc: Exception) -> str:
-    """Retorna mensagem de erro categórica sem expor detalhes internos."""
-    logger.error("source-coverage: erro ao computar relatório", exc_info=exc)
+    """Retorna mensagem de erro categórica sem expor detalhes internos.
+
+    Registra apenas o nome da classe da exceção — nunca ``str(exc)``,
+    ``exc_info``, traceback ou mensagem arbitrária do provider.
+    """
+    logger.error("source-coverage: %s", type(exc).__name__)
     return "Erro ao gerar relatório de cobertura. Tente novamente."
 
 
@@ -135,14 +139,16 @@ def get_source_coverage(user_id: AdminUserId):
     family_keys = [fam["key"] for fam in families]
     env = _build_env_from_channels(channels)
 
-    db = get_supabase_service()
-
     try:
-        runs_result = db.table("source_runs").select("*").execute()
+        db = get_supabase_service()
+        runs_result = db.table("source_runs").select(
+            "source_key,status,started_at,completed_at,"
+            "records_observed,records_emitted,records_staged"
+        ).execute()
         discovered_result = (
             db.table("discovered_opportunities")
             .select(
-                "id,status,discovery_channel,query_family,origin_domain,"
+                "status,discovery_channel,query_family,origin_domain,"
                 "created_at,reviewed_at"
             )
             .execute()
