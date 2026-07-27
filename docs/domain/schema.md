@@ -1062,3 +1062,69 @@ constraint_vocab:
     forma_juridica:
       empresa: [empresa, startup, ltda, sa, eireli, me, epp]
 ```
+
+---
+
+## 14. Vocabulário SourceBundle (RT04)
+
+Contrato RT04-T01. `subject_kind` reutiliza os valores de `ClassificationKind`
+(definidos em §5.12 / `relevance.py`); `source` é o mesmo identificador de fonte
+usado no data plane (`finep`, `fapesp`, `fapesc`, `web`, `embrapii`, etc.).
+Os blocos YAML abaixo são a autoridade; os enums Python em
+`src/radar/domain/source_bundle.py` os espelham. Um teste unitário garante
+igualdade entre este YAML e os enums.
+
+### 14.1 Subject kinds
+
+```yaml
+source_bundle_subject_kinds:
+  - opportunity
+  - investor
+  - ict
+  - program
+  - agency
+```
+
+### 14.2 Acquisition status
+
+```yaml
+source_bundle_acquisition_statuses:
+  - complete
+  - partial
+```
+
+### 14.3 Document roles
+
+```yaml
+source_bundle_document_roles:
+  - base_notice      # edital, chamada ou regulamento principal
+  - opportunity_page # página principal de desafio ou oportunidade sem edital formal
+  - program_page     # regras gerais compartilhadas por oportunidades de um programa/portal
+  - annex            # anexo normativo ou operacional
+  - amendment        # retificação, errata ou rerratificação
+  - official_page    # página oficial complementar (landing page, estado)
+  - faq              # esclarecimento oficial, quando efetivamente normativo
+  - official_record  # registro oficial estruturado (ex.: EMBRAPII)
+  - curated_record   # registro versionado do repositório
+```
+
+### 14.4 Authority states
+
+```yaml
+source_bundle_authority_states:
+  - active       # documento vigente
+  - superseded   # explicitamente superado por documento posterior
+  - contextual   # FAQ/página contextual; não vence documento normativo
+```
+
+### 14.5 Hash prefix
+
+```yaml
+source_bundle_hash_prefix: "sha256:"
+```
+
+O prefixo é `sha256:` (64 caracteres hex). `content_hash` cobre o conteúdo
+documental (`units` do documento); `bundle_hash` cobre a identidade material
+do pacote (schema_version, subject_kind, subject_id, source,
+acquisition_status, documentos, papéis e autoridades), excluindo
+`collected_at` e `producer_version` (metadados de execução).

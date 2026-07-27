@@ -1,3 +1,13 @@
+from radar.domain.source_bundle import (
+    SOURCE_BUNDLE_SCHEMA_VERSION,
+    AcquisitionStatus,
+    AuthorityState,
+    DocumentMetadata,
+    DocumentRole,
+    SourceBundle,
+    SubjectKind,
+    compute_content_hash,
+)
 from radar.domain.provenance import (
     PROVENANCE_SCHEMA_VERSION,
     DerivationInfo,
@@ -44,6 +54,14 @@ from radar.domain.relevance import (
 __all__ = [
     "CLASSIFIER_VERSION",
     "PROVENANCE_SCHEMA_VERSION",
+    "SOURCE_BUNDLE_SCHEMA_VERSION",
+    "SubjectKind",
+    "AcquisitionStatus",
+    "DocumentRole",
+    "AuthorityState",
+    "DocumentMetadata",
+    "SourceBundle",
+    "compute_content_hash",
     "ActorEvidence",
     "ActorVerdict",
     "ActorVerdictUnion",
