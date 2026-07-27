@@ -76,4 +76,12 @@
 
 ## Auditoria
 
-- Auditoria Codex: pendente
+**Auditoria Codex: aprovada em 2026-07-27.**
+
+- A projeção é pura e não altera o histórico persistido.
+- Claims ausentes ou sem documento autorizado não fabricam fatos.
+- As três precedências implementadas ficam restritas ao mesmo campo.
+- Conflito exige valores incompatíveis sustentados e ausência de precedência.
+- Nenhuma autoridade foi inferida de data, nome ou ordem incidental.
+- A ausência de marcador de consolidado foi preservada como limitação.
+- Gate independente: `116 passed`, Ruff limpo e `git diff --check` limpo.
