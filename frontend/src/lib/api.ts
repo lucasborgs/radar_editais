@@ -1064,3 +1064,72 @@ export interface ProfileDriftSignal {
 
 export const getProfileDrift = (token: string) =>
   apiFetch<ProfileDriftSignal>("/me/profile/drift", undefined, token);
+
+// ── Source Coverage ────────────────────────────────────
+
+export type ChannelHealth =
+  | "disabled"
+  | "failing"
+  | "degraded"
+  | "stale"
+  | "healthy"
+  | "unknown";
+
+export interface ChannelRunMetrics {
+  last_attempt: string | null;
+  last_success: string | null;
+  total_records_observed: number | null;
+  total_records_emitted: number | null;
+  total_records_staged: number | null;
+  yield_rate: number | null;
+}
+
+export interface EditorialFunnel {
+  source_key: string;
+  approved: number;
+  rejected: number;
+  pending: number;
+  approval_rate: number | null;
+  avg_review_hours: number | null;
+}
+
+export interface FamilyFunnel {
+  family_key: string;
+  approved: number;
+  rejected: number;
+  pending: number;
+  approval_rate: number | null;
+  avg_review_hours: number | null;
+}
+
+export interface CoverageGap {
+  source_key: string | null;
+  signal: string;
+}
+
+export interface EmergingDomain {
+  domain: string;
+  approval_count: number;
+  first_approved_at: string;
+  last_approved_at: string;
+  candidate_for_dedicated_monitoring: boolean;
+}
+
+export interface ChannelHealthStatus {
+  source_key: string;
+  health: ChannelHealth;
+}
+
+export interface SourceCoverageResponse {
+  generated_at: string;
+  channels: ChannelHealthStatus[];
+  runs: Record<string, ChannelRunMetrics>;
+  channel_funnel: Record<string, EditorialFunnel>;
+  family_funnel: Record<string, FamilyFunnel>;
+  gaps: CoverageGap[];
+  emerging_domains: EmergingDomain[];
+  limitations: string[];
+}
+
+export const getSourceCoverage = (token: string) =>
+  apiFetch<SourceCoverageResponse>("/source-coverage", undefined, token);
