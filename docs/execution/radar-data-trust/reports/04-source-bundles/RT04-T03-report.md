@@ -15,7 +15,8 @@ após promoção humana, sem rede, recrawl ou LLM.
 - Worktree: `/private/tmp/radar-editais-rt04-t03b`
 - T03-A integrada na base: `f5425a0ad`
 - T03-B: `2157efd7e` (`feat(data-trust): materialize web evidence bundle`)
-- Correção residual T03-B: `fix(data-trust): preserve evidence timestamps`
+- Correção residual T03-B: `a0b1f85fc`
+  (`fix(data-trust): preserve evidence timestamps`)
 
 ## Implementação
 
@@ -61,3 +62,10 @@ página específica (`partial`), ausência documental, falha de
 `BundleStorageError`, idempotência por `bundle_hash`, projeção em `source_docs`
 e ausência de fetch adicional, inclusive timestamp ausente/inválido, ordem
 bundle→projeção e sanitização do log de armazenamento.
+
+## Auditoria Codex
+
+**T03 aprovada em 2026-07-27.** Validação independente: 144 testes
+direcionados, Ruff e `git diff --check` limpos. O histórico é tentado antes da
+projeção; falhas previstas não bloqueiam o fluxo nem vazam detalhes; timestamps
+de coleta ausentes ou inválidos não são fabricados.
