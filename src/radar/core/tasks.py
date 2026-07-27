@@ -468,6 +468,26 @@ async def purge_agent_checkpoints(timestamp: int) -> None:
 # vive em pipeline/adapters/finep.py via o Source Adapter (docs/domain/schema.md §12).
 
 
+def _save_fapesc_bundle_if_available(source: str, native: str) -> None:
+    """Persiste o bundle FAPESC antes da projeção canônica, sem bloquear o ETL."""
+    if source != "fapesc":
+        return
+    from radar.core.kg import source_bundles  # noqa: PLC0415
+    from radar.core.kg.source_bundles import BundleStorageError  # noqa: PLC0415
+    from radar.pipeline.adapters.fapesc import build_source_bundle  # noqa: PLC0415
+
+    bundle = build_source_bundle(native)
+    if bundle is None:
+        return
+    try:
+        source_bundles.save(bundle)
+    except BundleStorageError:
+        logger.warning(
+            "fapesc bundle: falha best-effort para %s (type=%s)",
+            native, BundleStorageError.__name__,
+        )
+
+
 def _build_chunks_for_edital(edital_id: str) -> list[dict]:
     """Pipeline da Retrieval gold (L3b, §12): Source Adapter → Documento
     Canônico → structurer/silver → chunk_from_blocks.
@@ -490,6 +510,7 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
     # versão normativa antiga que ainda esteja persistida.
     documents = get_adapter(source).to_documents(native)
     if documents:
+        _save_fapesc_bundle_if_available(source, native)
         source_docs.save(edital_id, source, documents)
     else:
         documents = source_docs.load(edital_id)
@@ -798,6 +819,7 @@ def _build_all_silver() -> int:
         try:
             fresh = get_adapter(source).to_documents(native)
             if fresh:
+                _save_fapesc_bundle_if_available(source, native)
                 source_docs.save(eid, source, fresh)
             docs = fresh or source_docs.load(eid)
             active = source_docs.active_documents(docs or [])
@@ -1083,6 +1105,7 @@ async def ingest_promoted_edital_task(edital_id: str) -> None:
     native = native_id_of(edital_id)
     fresh = get_adapter(source).to_documents(native)
     if fresh:
+        _save_fapesc_bundle_if_available(source, native)
         source_docs.save(edital_id, source, fresh)
     docs = source_docs.active_documents(fresh or source_docs.load(edital_id) or [])
     if not docs or not build_or_load_structured_doc(source, native, docs):
