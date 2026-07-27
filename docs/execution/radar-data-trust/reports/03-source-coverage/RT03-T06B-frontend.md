@@ -63,4 +63,8 @@ endpoint `/stats/source-coverage` e payload com campos `source_id`,
 - `git diff --check`: sem whitespace errors
 - Backend T06-A inalterado (0 arquivos .py no diff)
 
-## Auditoria Codex: pendente
+## Auditoria Codex
+
+**Aprovada em 2026-07-27.** Contrato da API, isolamento da fila editorial,
+fallback, responsividade, funis por canal/família e proteção na troca de token
+foram verificados independentemente.
