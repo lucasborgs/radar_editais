@@ -117,12 +117,14 @@ def resolve_quote(
     normalized_quote = _normalize_ws(quote)
 
     raw_candidates: list[EvidenceCandidate] = []
+    matched_blocks: list[dict] = []
     if normalized_quote:
         for block in blocks:
             text = block.get("text")
             if not text:
                 continue
             if normalized_quote in _normalize_ws(text):
+                matched_blocks.append(block)
                 raw_candidates.append(
                     EvidenceCandidate(
                         doc=block.get("doc") or "",
@@ -169,6 +171,13 @@ def resolve_quote(
             collected_at=collected_at,
             locator_quality=locator_quality,
         )
+        bundle_lineage = _bundle_lineage_from_blocks(
+            matched_blocks,
+            locator_quality=locator_quality,
+            resolved_document=resolved_document,
+        )
+        if bundle_lineage is not None:
+            evidence_ref = evidence_ref.model_copy(update=bundle_lineage)
 
     return ResolveResult(
         candidates=candidates,
@@ -213,6 +222,30 @@ def _classify(
     # mesmo doc + mesma página + mesmo bloco.
     only = candidates[0]
     return LocatorQuality.EXACT, only.page, only.block_idx, only.section_path
+
+
+def _bundle_lineage_from_blocks(
+    blocks: list[dict],
+    *,
+    locator_quality: LocatorQuality,
+    resolved_document: str | None,
+) -> dict[str, str] | None:
+    if locator_quality is LocatorQuality.UNRESOLVED or not resolved_document:
+        return None
+    lineage_pairs = {
+        (metadata.get("bundle_hash"), metadata.get("content_hash"))
+        for block in blocks
+        if block.get("doc") == resolved_document
+        for metadata in [block.get("document_metadata") or {}]
+        if metadata.get("bundle_hash") and metadata.get("content_hash")
+    }
+    if len(lineage_pairs) != 1:
+        return None
+    bundle_hash, content_hash = next(iter(lineage_pairs))
+    return {
+        "bundle_hash": bundle_hash,
+        "content_hash": content_hash,
+    }
 
 
 __all__ = [

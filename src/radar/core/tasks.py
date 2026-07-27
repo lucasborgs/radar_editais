@@ -31,6 +31,7 @@ import json  # noqa: E402
 import logging  # noqa: E402
 import os  # noqa: E402
 import uuid  # noqa: E402
+from typing import TYPE_CHECKING  # noqa: E402
 
 from procrastinate import App, PsycopgConnector, RetryStrategy  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
@@ -44,6 +45,9 @@ from radar.core.retrieval.embedder import EMBEDDING_MODEL, embed_texts  # noqa: 
 from radar.core.retrieval.retriever import RETRIEVAL_EMBEDDING_COLUMN  # noqa: E402
 from radar.core.services.content_library import enrich_content  # noqa: E402
 from radar.pipeline.adapters.base import get_adapter  # noqa: E402
+
+if TYPE_CHECKING:  # noqa: E402
+    from radar.domain.source_bundle import SourceBundle
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -469,11 +473,12 @@ async def purge_agent_checkpoints(timestamp: int) -> None:
 # vive em pipeline/adapters/finep.py via o Source Adapter (docs/domain/schema.md §12).
 
 
-def _save_fapesc_bundle_if_available(source: str, native: str) -> None:
+def _save_fapesc_bundle_if_available(source: str, native: str) -> SourceBundle | None:
     """Persiste o bundle FAPESC antes da projeção canônica, sem bloquear o ETL."""
     if source != "fapesc":
         return None
     from radar.core.kg import source_bundles  # noqa: PLC0415
+    from radar.core.kg.source_bundle_projection import current_complete_bundle  # noqa: PLC0415
     from radar.core.kg.source_bundles import BundleStorageError  # noqa: PLC0415
     from radar.pipeline.adapters.fapesc import build_source_bundle  # noqa: PLC0415
 
@@ -491,46 +496,13 @@ def _save_fapesc_bundle_if_available(source: str, native: str) -> None:
     try:
         if source_bundles.save(bundle) is not True:
             return None
-        return bundle
+        return current_complete_bundle(bundle)
     except BundleStorageError:
         logger.warning(
             "fapesc bundle: falha best-effort para %s (type=%s)",
             native, BundleStorageError.__name__,
         )
         return None
-
-
-def _attach_bundle_metadata_to_documents(documents, bundle):
-    if not documents or bundle is None:
-        return documents
-    from radar.domain.source_bundle import (  # noqa: PLC0415
-        AuthorityState,
-        compute_content_hash,
-    )
-
-    bundle_hash = bundle.compute_bundle_hash()
-    current_documents = [
-        doc for doc in bundle.documents if doc.authority_state is not AuthorityState.SUPERSEDED
-    ]
-    enriched = []
-    for entry in documents:
-        entry_hash = compute_content_hash(entry.get("units") or [])
-        matches = [
-            doc
-            for doc in current_documents
-            if doc.content_hash == entry_hash and doc.doc_name == entry.get("doc_name")
-        ]
-        if len(matches) != 1:
-            enriched.append(entry)
-            continue
-        current = matches[0]
-        metadata = dict(entry.get("metadata") or {})
-        metadata.update({
-            "bundle_hash": bundle_hash,
-            "content_hash": current.content_hash,
-        })
-        enriched.append({**entry, "metadata": metadata})
-    return enriched
 
 
 def _build_chunks_for_edital(edital_id: str) -> list[dict]:
@@ -546,6 +518,9 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
     """
     from radar.core.kg import source_docs  # noqa: PLC0415
     from radar.core.kg.edital_id import native_id_of, source_of  # noqa: PLC0415
+    from radar.core.kg.source_bundle_projection import (
+        attach_bundle_metadata_to_documents,  # noqa: PLC0415
+    )
 
     source = source_of(edital_id)
     native = native_id_of(edital_id)
@@ -555,7 +530,7 @@ def _build_chunks_for_edital(edital_id: str) -> list[dict]:
     # versão normativa antiga que ainda esteja persistida.
     documents = get_adapter(source).to_documents(native)
     if documents:
-        documents = _attach_bundle_metadata_to_documents(
+        documents = attach_bundle_metadata_to_documents(
             documents,
             _save_fapesc_bundle_if_available(source, native),
         )

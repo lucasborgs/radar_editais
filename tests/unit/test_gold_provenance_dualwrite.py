@@ -146,6 +146,74 @@ class TestRequisitoResolution:
         assert fp.evidence_refs == []
         FactProvenance.model_validate(fp.model_dump(mode="json"))
 
+    def test_document_metadata_bundle_lineage_is_attached_when_unequivocal(self):
+        blocks = [
+            {
+                "idx": 7,
+                "doc": "pagina-oficial",
+                "page": None,
+                "section_path": ["Elegibilidade"],
+                "kind": "paragraph",
+                "text": "Empresas brasileiras podem participar.",
+                "document_metadata": {
+                    "bundle_hash": "sha256:" + "a" * 64,
+                    "content_hash": "sha256:" + "b" * 64,
+                },
+            }
+        ]
+        fp = provenance_writer.build_requisito_provenance(
+            "Empresas brasileiras podem participar.",
+            blocks=blocks,
+            source="web",
+            native_id="ce032edb720c",
+            edital_id="web:ce032edb720c",
+            silver_source_hash="md5:legacy",
+            model="gpt-4o-mini",
+        )
+        ref = fp.evidence_refs[0]
+        assert ref.bundle_hash == "sha256:" + "a" * 64
+        assert ref.content_hash == "sha256:" + "b" * 64
+
+    def test_document_metadata_lineage_is_not_attached_when_ambiguous(self):
+        blocks = [
+            {
+                "idx": 7,
+                "doc": "pagina-oficial",
+                "page": 1,
+                "section_path": ["Elegibilidade"],
+                "kind": "paragraph",
+                "text": "Empresas brasileiras podem participar.",
+                "document_metadata": {
+                    "bundle_hash": "sha256:" + "a" * 64,
+                    "content_hash": "sha256:" + "b" * 64,
+                },
+            },
+            {
+                "idx": 8,
+                "doc": "pagina-oficial",
+                "page": 2,
+                "section_path": ["Elegibilidade"],
+                "kind": "paragraph",
+                "text": "Empresas brasileiras podem participar.",
+                "document_metadata": {
+                    "bundle_hash": "sha256:" + "c" * 64,
+                    "content_hash": "sha256:" + "d" * 64,
+                },
+            },
+        ]
+        fp = provenance_writer.build_requisito_provenance(
+            "Empresas brasileiras podem participar.",
+            blocks=blocks,
+            source="fapesc",
+            native_id="37-2026",
+            edital_id="fapesc:37-2026",
+            silver_source_hash="md5:legacy",
+            model="gpt-4o-mini",
+        )
+        ref = fp.evidence_refs[0]
+        assert ref.bundle_hash is None
+        assert ref.content_hash is None
+
 
 class TestEditalFactProvenanceComposition:
     def test_composes_expected_paths_and_all_validate(self):

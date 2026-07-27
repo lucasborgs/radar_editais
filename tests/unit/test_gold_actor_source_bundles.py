@@ -192,6 +192,32 @@ class TestActorBundleBuilders:
         assert bundle is not None
         assert bundle.acquisition_status.value == "partial"
 
+    def test_partial_actor_bundle_is_persisted_but_not_used_as_current_lineage(self, monkeypatch, tmp_path):
+        fixture_dir = _prepare_fixture_dir(tmp_path)
+        investidores_path = fixture_dir / "silver" / "investidores.json"
+        investidores = _load_json(investidores_path)
+        investidores["investidores"][0] = {
+            "id": "investidor:indicator-capital",
+            "name": "Indicator Capital",
+            "site": "https://indicatorcapital.com.br",
+            "source_urls": ["https://indicatorcapital.com.br"],
+        }
+        investidores_path.write_text(
+            json.dumps(investidores, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        harness, bundle_calls, stats = _run_capture(monkeypatch, fixture_dir)
+
+        assert stats["investidor"] == 1
+        investor_bundle = next(bundle for bundle in bundle_calls if bundle.subject_id == "investidor:indicator-capital")
+        assert investor_bundle.acquisition_status.value == "partial"
+        investor_name_ref = FactProvenance.model_validate(
+            harness.entity_provenance["investidor|curadoria|investidor:indicator-capital"]["name"]
+        ).evidence_refs[0]
+        assert investor_name_ref.bundle_hash is None
+        assert investor_name_ref.content_hash is None
+
     def test_date_only_timestamp_normalizes_to_midnight_utc(self):
         bundle = gold._build_actor_source_bundle(
             subject_kind="program",

@@ -45,6 +45,7 @@ import unicodedata
 from collections import defaultdict
 from datetime import date, datetime, timezone
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
 import psycopg
 from pydantic import ValidationError
@@ -53,6 +54,9 @@ from radar.core.config import BRONZE_DIR, SILVER_DIR
 from radar.core.environment import assert_database_target
 from radar.core.kg import schema
 from radar.core.kg.canonicalize import anti_class_verdict
+
+if TYPE_CHECKING:
+    from radar.domain.source_bundle import SourceBundle
 
 logger = logging.getLogger(__name__)
 
@@ -790,8 +794,9 @@ def _persist_actor_source_bundle_best_effort(
     document_role: str,
     source_url: str | None,
     record: dict,
-):
+) -> SourceBundle | None:
     from radar.core.kg import source_bundles
+    from radar.core.kg.source_bundle_projection import current_complete_bundle
     from radar.core.kg.source_bundles import BundleStorageError
 
     try:
@@ -813,7 +818,7 @@ def _persist_actor_source_bundle_best_effort(
                 subject_id,
             )
             return None
-        return bundle
+        return current_complete_bundle(bundle)
     except ValidationError:
         logger.warning(
             "source_bundles: bundle inválido para ator; categoria=ValidationError subject_id=%s",
