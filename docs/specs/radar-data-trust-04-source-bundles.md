@@ -1,6 +1,6 @@
 # Radar Data Trust 04 — Pacotes documentais versionados
 
-**Status:** vigente · **Data:** 2026-07-27
+**Status:** vigente (RT04-T01 a T07 concluídas e auditadas; merge `285a89746`) · **Data:** 2026-07-27
 **Spec-mãe:** [`radar-data-trust.md`](radar-data-trust.md)  
 **Contratos anteriores:** [`radar-data-trust-01-provenance.md`](radar-data-trust-01-provenance.md), [`radar-data-trust-02-quality-gates.md`](radar-data-trust-02-quality-gates.md)  
 **Ordem:** 04 · **Impacto:** alto e incremental; aquisição, vigência e confiança documental
