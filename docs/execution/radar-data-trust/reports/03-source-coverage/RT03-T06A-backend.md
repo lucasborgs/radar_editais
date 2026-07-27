@@ -4,7 +4,7 @@
 **Branch:** `codex/radar-data-trust-03-t06a`
 **Base:** `25a9bf3a5` (main, merge `codex/radar-data-trust-03-t05`)
 **Worktree:** `/private/tmp/radar-editais-rt03-t06a`
-**Auditoria Codex:** pendente
+**Auditoria Codex:** aprovada em 2026-07-26
 
 ---
 
@@ -20,7 +20,7 @@
 ## Commits
 
 1. `ee1f1d5fd` feat(rt03-t06a): add GET /source-coverage administrative endpoint
-2. `(pending)` fix(rt03-t06a): auditoria — projeções, sanitização de erro, logs
+2. `298400d9d` fix(rt03-t06a): auditoria — projeções, sanitização de erro, logs
 
 ## O que foi feito
 
