@@ -7,7 +7,7 @@
   - implementação inicial: `9cf4d428c`
   - relatório inicial: `56e38a00f`
   - implementação de correção: `fccf8fc2c`
-  - relatório final: `<pending>`
+  - relatório final: `03239787c`
 - Auditoria Codex: pendente
 
 ## Escopo
