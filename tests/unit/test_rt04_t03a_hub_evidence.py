@@ -161,7 +161,7 @@ def test_staging_raw_keeps_evidence_package(monkeypatch):
     assert row["raw"]["evidence_package"]["related_pages"][0]["role"] == "program_page"
 
 
-def test_t03a_materializer_does_not_consume_related_page():
+def test_t03b_materializer_projection_consumes_related_page():
     from radar.core.services.discovery_materializer import canonical_documents_from_evidence
 
     docs = canonical_documents_from_evidence(
@@ -173,6 +173,6 @@ def test_t03a_materializer_does_not_consume_related_page():
         },
     )
 
-    assert len(docs) == 1
+    assert len(docs) == 2
     assert docs[0]["units"]
-    assert all("regras" not in unit.lower() for unit in docs[0]["units"])
+    assert docs[1]["units"] == ["regras gerais"]
