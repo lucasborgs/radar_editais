@@ -1748,7 +1748,7 @@ class WritingSession:
             verify_saved=lambda section: bool(
                 self._doc_sections.get(section, "").strip()
             ),
-            auto_save=lambda section, text: self.set_section_content(section, text),
+            auto_save=lambda section, text, citations=None: self.set_section_content(section, text, citations),
         )
         logger.info("[%s] generate_full_proposal: run_generation_turn retornou — "
                     "done=%d failed=%d",
@@ -1808,7 +1808,7 @@ class WritingSession:
                     raw = (resp.choices[0].message.content or "").strip()
                     parsed = _try_parse_generation_json(raw)
                     if parsed and parsed.get("content", "").strip():
-                        self.set_section_content(section, parsed["content"])
+                        self.set_section_content(section, parsed["content"], parsed.get("citations"))
                         outcome.sections_done.append(section)
                         logger.info("[%s] generation: fallback ✓ '%s' (%d chars)",
                                     self.session_id, section, len(parsed["content"]))
@@ -2520,7 +2520,7 @@ class WritingSession:
             "plan_pending": self._plan_pending_confirmation,
         }
 
-    def set_section_content(self, section_title: str, content: str) -> None:
+    def set_section_content(self, section_title: str, content: str, citations: list | None = None) -> None:
         # Task 4 (plano playbook-overlays-plan.md, severável) — antes de
         # sobrescrever, se já existe rascunho para a seção e o conteúdo novo
         # difere, guarda o par para alimentar um futuro extrator de estilo.
@@ -2545,11 +2545,17 @@ class WritingSession:
             )
 
         self._doc_sections[section_title] = content
+        if citations:
+            key = f"_citations_{section_title}"
+            self._doc_sections[key] = citations
         try:
             # Preserva anotações do critic que vivem em _doc_sections só durante
             # geração — a persistência delas é feita explicitamente em
             # generate_full_proposal via chave _critic_annotations no JSONB.
             drafts = dict(self._doc_sections)
+            if citations:
+                section_key = f"_citations_{section_title}"
+                drafts[section_key] = citations
             if self._generation_critic_annotations:
                 drafts["_critic_annotations"] = self._generation_critic_annotations
             if self._style_edit_log:
@@ -3082,7 +3088,11 @@ def get_session_document(
         "session_id": row["id"],
         "edital_id": row["edital_id"],
         "sections": [
-            {"title": t, "content": drafts.get(t, "")}
+            {
+                "title": t,
+                "content": drafts.get(t, ""),
+                "citations": drafts.get(f"_citations_{t}"),
+            }
             for t in outline
         ],
         "generation_critic_annotations": critic_annotations,

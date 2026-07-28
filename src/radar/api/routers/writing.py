@@ -653,6 +653,14 @@ def writing_save_section(
     return {"success": True, "section_title": req.section_title}
 
 
+@router.get("/writing/chunks/{chunk_id}", summary="Retorna texto de um chunk para exibição em tooltip de citação")
+def writing_get_chunk(chunk_id: str, db: DbClient):
+    row = db.table("edital_chunks").select("id, text, section").eq("id", chunk_id).maybe_single().execute()
+    if not row.data:
+        raise HTTPException(status_code=404, detail="Chunk não encontrado")
+    return {"id": row.data["id"], "text": row.data["text"], "section": row.data.get("section", "")}
+
+
 @router.get("/writing/{session_id}/export", summary="Exporta documento completo como Markdown")
 def writing_export(session_id: str, user_id: CurrentUserId, db: DbClient):
     workspace_id = get_workspace_id(db, user_id)

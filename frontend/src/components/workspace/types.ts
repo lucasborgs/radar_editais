@@ -103,6 +103,7 @@ export interface WorkspaceMessage {
 export interface WorkspaceSection {
   title: string;
   content: string;
+  citations?: Array<{ chunk_id: string; claim: string }>;
 }
 
 // Âncora estável por seção — usada para rolar o editor até a seção a partir do

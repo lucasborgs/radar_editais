@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { sectionAnchorId, type Finding, type WorkspaceSection } from "./types";
+import { CitationTooltip } from "./CitationTooltip";
 
 /**
  * Editor central do workspace: documento contínuo, uma âncora por seção.
@@ -335,6 +336,7 @@ function SectionBlock({
               — rascunhe aqui ou peça ao agente
             </p>
           )}
+          <CitationTooltip citations={section.citations ?? []} />
         </button>
       )}
     </section>

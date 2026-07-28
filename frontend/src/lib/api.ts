@@ -693,6 +693,9 @@ export const saveDocumentSection = (
 export const exportDocument = (sessionId: string) =>
   apiFetch<{ markdown: string; session_id: string }>(`/writing/${sessionId}/export`);
 
+export const getChunkText = (chunkId: string) =>
+  apiFetch<{ id: string; text: string; section: string }>(`/writing/chunks/${chunkId}`);
+
 // ── Auto-review (checklist 3-passes, ancorado por seção) ───
 // Shape REAL do core/services/checklist_service.py + enriquecimento `section`
 // feito no router (backend/routers/writing.py:_attach_issue_sections).

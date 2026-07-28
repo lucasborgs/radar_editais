@@ -1765,7 +1765,7 @@ async def _generate_section(
             if parsed and parsed.get("content", "").strip():
                 content = parsed["content"]
                 logger.info("tripwire: generation_path path=structured section=%s", section)
-                auto_save(section, content)
+                auto_save(section, content, parsed.get("citations"))
                 ok = verify_saved(section) if verify_saved else True
             else:
                 logger.info("tripwire: generation_path path=fallback_raw section=%s", section)
@@ -1888,7 +1888,7 @@ def run_generation_turn(
     max_steps: int = 8,
     thread_id: str,
     verify_saved: Callable[[str], bool] | None = None,
-    auto_save: Callable[[str, str], None] | None = None,
+    auto_save: Callable[[str, str, list | None], None] | None = None,
     span_name: str | None = None,
     temperature: float | None = None,
     openai_base_url: str | None = None,
