@@ -23,7 +23,6 @@ from radar.api.rate_limit import get_client_ip, limiter
 from radar.core.infra.auth import CurrentUserId, DbClient, OptionalDbClient, OptionalUserId
 from radar.core.ingestion.profile_extractor import ProfileExtractor
 from radar.core.kg.planning_node import is_complex_proposal
-from radar.core.services import match_v3, match_verdict
 from radar.core.services.content_library import get_workspace_id
 from radar.core.services.writing_session import persist_frontdoor_turn
 
@@ -91,33 +90,6 @@ def _explore_limit(key: str) -> str:
     return "3/minute"
 
 
-def _match_cards_intro(editais: list[dict], entities: list[dict]) -> str:
-    """Texto canônico para resultados que já serão exibidos como cards.
-
-    O agente usa uma chamada de tool própria para raciocinar; os cards são
-    recalculados pelo motor v3 para a UI. A introdução não pode usar a contagem
-    da tool do agente, pois ela pode ter outro ``top_k`` que o payload visual.
-    """
-    funding = len(editais) + sum(item.get("kind") == "programa" for item in entities)
-    capital = sum(item.get("kind") == "investidor" for item in entities)
-
-    parts: list[str] = []
-    if funding:
-        noun = "oportunidade de fomento" if funding == 1 else "oportunidades de fomento"
-        parts.append(f"{funding} {noun}")
-    if capital:
-        noun = "potencial parceiro de capital" if capital == 1 else "potenciais parceiros de capital"
-        parts.append(f"{capital} {noun}")
-
-    if not parts:
-        return "Não encontrei oportunidades com afinidade suficiente no momento."
-    listed = " e ".join(parts)
-    return (
-        f"Encontrei {listed} com afinidade ao perfil. Os cards abaixo mostram "
-        "as evidências e, quando necessário, critérios de elegibilidade a confirmar."
-    )
-
-
 @router.post(
     "/explore",
     summary="Chat exploratório + extração de perfil (auth opcional)",
@@ -172,12 +144,12 @@ def _post_process(
     user_id: str | None,
     db,
 ) -> dict:
-    """Pós-processamento do turno de explore — match v3, diff de perfil,
-    persistência, vereditos. Compartilhado por `/explore` (sync) e
-    `/explore/stream` (SSE, TASK 3 do item 1 — a mesma pipeline roda depois
-    do `done` do streaming, via `asyncio.to_thread`, pra manter os dois
-    caminhos byte-a-byte idênticos aqui e nunca divergir cards/persistência
-    entre eles). Extração pura de `/explore` — nenhuma lógica mudou."""
+    """Pós-processamento do turno de explore — extração de diff de perfil e
+    persistência. Match NÃO é mais acionado automaticamente aqui (P2): o
+    usuário acessa os resultados via `/radar/matches` ou navegando até
+    a página /radar. Compartilhado por `/explore` (sync) e
+    `/explore/stream` — a mesma pipeline roda depois do `done` do
+    streaming, via `asyncio.to_thread`."""
     # PR1 (four-phase-workflow): detecta se pergunta pede planejamento.
     result: dict = {
         "answer": answer,
@@ -198,30 +170,6 @@ def _post_process(
         diff = ProfileExtractor().extract_diff_from_message(message, current)
         result["profile_diff"] = diff or None
 
-    # Structured match data (motor v3): funil Stage 0-2 sobre editais/programas
-    # + trilha investidor. Só roda quando o agente chamou uma das ferramentas
-    # de match — senão cartões apareceriam em toda mensagem com perfil.
-    # O sinal vem dos steps do agente (explore_meta["called_match"]).
-    if explore_meta.get("called_match") and req.profile is not None and ctx:
-        try:
-            # Perfil estruturado alimenta o lado empresa (chunks efêmeros — o
-            # endpoint aceita anônimo) E o Stage 1 (unsat some do radar; perfil
-            # incompleto mantém o card com flag "não verificada").
-            opps = match_v3.find_matching_opportunities(current, top_k=8)
-            result["matched_editais"] = [m.to_dict() for m in opps if m.kind == "edital"]
-            entity_dicts = [m.to_dict() for m in opps if m.kind == "programa"]
-            entity_dicts += [
-                m.to_dict() for m in match_v3.find_matching_investors(current, top_k=5)
-            ]
-            entity_dicts.sort(key=lambda m: m.get("affinity", 0), reverse=True)
-            result["matched_entities"] = entity_dicts
-            # Os cards são a fonte de verdade visual. Substitui a narração do
-            # agente por uma introdução calculada do mesmo payload para não
-            # prometer quantidades diferentes do que a UI exibe.
-            result["answer"] = _match_cards_intro(result["matched_editais"], entity_dicts)
-        except Exception as e:
-            logger.warning("explore: falha ao extrair matched_editais: %s", e)
-
     if user_id and db:
         workspace_id = None
         try:
@@ -236,27 +184,6 @@ def _post_process(
             result["entry_ids"] = persisted["entry_ids"]
         except Exception as e:
             logger.warning("explore: falha ao persistir turno: %s", e)
-
-        # Estágio 3 (precisão): veredito LLM no top-K — cache-first; LLM só na
-        # fila. Anônimo fica sem veredito (não há workspace p/ chavear o cache).
-        # O snapshot persistido acima fica SEM veredito de propósito (o card
-        # restaurado re-hidrata via POST /match/verdicts, cache-only). A
-        # geometria rankeia (afinidade decrescente); o veredito é SINALIZAÇÃO
-        # no card, não posição (`reorder_by_verdict` fica definido p/ outros
-        # usos). attach único: editais, programas e investidores usam a mesma
-        # chave (`verdict_key`).
-        if workspace_id and (result.get("matched_editais") or result.get("matched_entities")):
-            try:
-                misses: list[dict] = []
-                for key in ("matched_editais", "matched_entities"):
-                    if result.get(key):
-                        misses += match_verdict.attach_cached_verdicts(
-                            db, workspace_id, result[key], current,
-                        )
-                if misses:
-                    _enqueue_verdicts(workspace_id, misses, current)
-            except Exception as e:
-                logger.warning("explore: falha no veredito do match: %s", e)
 
     return result
 
@@ -280,8 +207,8 @@ async def explore_stream_endpoint(
 ):
     """Variação SSE de `/explore` — tokens ao vivo durante a geração,
     seguidos de um frame `done` com o MESMO shape do `/explore` síncrono
-    (pós-processamento idêntico: match v3, diff de perfil, persistência,
-    vereditos — `_post_process`, rodado em thread por ser bloqueante).
+    (pós-processamento idêntico: diff de perfil, persistência —
+    `_post_process`, rodado em thread por ser bloqueante).
 
     Formato:
         event: token  data: {"text": "<delta>"}
@@ -290,13 +217,6 @@ async def explore_stream_endpoint(
         event: error  data: {"message": "<msg>"}  — TERMINAL: nunca é seguido
             de um "done" no mesmo turno (ver `except` em `gen()`); a UI deve
             encerrar o turno no "error", não esperar um "done" que não vem.
-
-    Wrinkle (não é bug): quando o agente chama tool de match, o `answer`
-    final é SOBRESCRITO por `_match_cards_intro` no pós-processamento — os
-    tokens streamados são um preview progressivo; `done.answer` é
-    AUTORITATIVO e pode divergir do texto que chegou token a token. O
-    frontend trata `done.answer` como a verdade final (critério de aceite
-    da TASK 4).
 
     `/explore` (sync) fica intacto — este é um endpoint novo, aditivo.
     """
@@ -362,26 +282,6 @@ async def explore_stream_endpoint(
             "Connection": "keep-alive",
         },
     )
-
-
-def _enqueue_verdicts(workspace_id: str, items: list[dict], profile: dict) -> None:
-    """Defer síncrono da task de vereditos (o endpoint /explore é sync).
-
-    `queueing_lock` por workspace: turnos em rajada não empilham jobs duplicados
-    na fila — o job rejeitado re-entra no próximo refresh (os misses continuam
-    sem veredito e serão re-detectados)."""
-    from procrastinate.exceptions import AlreadyEnqueued
-
-    from radar.core.tasks import app as tasks_app
-
-    try:
-        with tasks_app.open():
-            tasks_app.configure_task(
-                "compute_match_verdicts",
-                queueing_lock=f"match_verdicts:{workspace_id}",
-            ).defer(workspace_id=workspace_id, items=items, profile=profile)
-    except AlreadyEnqueued:
-        logger.info("explore: vereditos já na fila p/ workspace=%s", workspace_id)
 
 
 class VerdictsRequest(BaseModel):

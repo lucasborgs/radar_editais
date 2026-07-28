@@ -18,6 +18,7 @@ import { GateCard } from "@/components/frontdoor/GateCard";
 import { ProfileIncompleteCard } from "@/components/frontdoor/ProfileIncompleteCard";
 import { UrlHero } from "@/components/frontdoor/UrlHero";
 import { UnlockCard } from "@/components/frontdoor/UnlockCard";
+import { ProfileGate } from "@/components/frontdoor/ProfileGate";
 import {
   frontdoorTurn,
   exploreStream,
@@ -148,6 +149,7 @@ function Bubble({
 // ── Página ──────────────────────────────────────────────────────────────────
 export default function FrontDoorPage() {
   const { session, getToken, signOut } = useAuth();
+  const router = useRouter();
   const isAuthed = !!session;
 
   const [profile, setProfile] = useState<CompanyProfile>(EMPTY_PROFILE);
@@ -341,6 +343,12 @@ export default function FrontDoorPage() {
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || sending) return;
+
+      // P2: comando /match → redireciona para o Radar
+      if (trimmed === "/match") {
+        router.push("/radar");
+        return;
+      }
 
       const userEntry: TranscriptEntry = { kind: "msg", role: "user", content: trimmed };
       const withUser = [...entries, userEntry];
@@ -662,15 +670,20 @@ export default function FrontDoorPage() {
   const gaps = isRadarReady(profile) ? missingHighImpact(profile) : [];
   const showUnlock = gaps.length > 0 && !unlockDismissed;
 
+  const profileReady = hydrated && isRadarReady(profile);
+
   return (
-    // A home é a tela principal do chat — o sidebar de conversas vive aqui
-    // também (não só nas páginas com DashboardLayout). Oculto em telas pequenas,
-    // como nos apps de chat de referência.
     <div className="flex h-[100dvh] bg-app-bg">
       <div className="hidden md:flex">
         <ConversationSidebar />
       </div>
       <div className="flex flex-1 flex-col min-w-0">
+        {!profileReady ? (
+          <div className="flex flex-1 items-center justify-center px-4">
+            <ProfileGate onReady={(p) => void persistProfile(p)} />
+          </div>
+        ) : (
+        <>
         <FrontDoorHeader isAuthed={isAuthed} onReset={handleReset} onSignOut={signOut} />
       <StatusBar
         completeness={completeness}
@@ -776,6 +789,17 @@ export default function FrontDoorPage() {
           </div>
         )}
 
+        <div className="mx-auto flex w-full max-w-2xl items-center justify-between px-1 pb-1.5">
+          <div />
+          <button
+            type="button"
+            onClick={() => router.push("/radar")}
+            className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+          >
+            Ver matches no Radar →
+          </button>
+        </div>
+
         <Composer
           value={input}
           onChange={setInput}
@@ -783,8 +807,10 @@ export default function FrontDoorPage() {
           onAttach={handleAttachClick}
           onPickFile={handlePickFile}
           disabled={sending}
-          placeholder="Conte o que sua empresa faz, ou pergunte sobre fomento…"
+          placeholder="Conte o que sua empresa faz, ou digite /match para o Radar…"
         />
+        </>
+        )}
       </div>
     </div>
   );
