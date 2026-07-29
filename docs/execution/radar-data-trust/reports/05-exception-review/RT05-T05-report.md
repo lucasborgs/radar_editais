@@ -1,5 +1,6 @@
 # RT05-T05 — API administrativa de exceções
 
+**Status:** Auditoria Codex: aprovada em 2026-07-29  
 **Data:** 2026-07-29
 **Branch:** `codex/radar-data-trust-05-t05`
 **Base:** `463b8be41`
