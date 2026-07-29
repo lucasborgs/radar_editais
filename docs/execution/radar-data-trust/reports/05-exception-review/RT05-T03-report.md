@@ -8,7 +8,7 @@
 - `263d0f94b` — docs(temporal): T03 report + T02 auditoria aprovada
 - `e833879d8` — fix(temporal): preserve raw status and explicit continuous evidence
 
-**Auditoria Codex: pendente**
+**Auditoria Codex: aprovada em 2026-07-29**
 
 ---
 
