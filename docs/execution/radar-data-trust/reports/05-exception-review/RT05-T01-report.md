@@ -17,6 +17,7 @@
 | **Documental** | `fa048494c` | `docs(schema): reconcile deadline rule to >= hoje (RT05-T01)` |
 | **Relatório** | `519f3085f` | `docs(rt05-t01): implementation report` |
 | **Funcional (corretivo)** | `388aae58b` | `fix(rt05-t01): corrige classificacao de status, invariantes e reuso de tipos` |
+| **Funcional (precedência)** | `6f35e7f53` | `fix(rt05-t01): continuous_evidence conflicts have precedence over deadline/status` |
 
 ## Arquivos alterados/criados (total)
 
@@ -49,9 +50,11 @@
 - **Reutiliza:** `EvidenceRef`, `ReviewInfo`, `SubjectKind`, `FactState` dos contratos RT01/RT04
 - **Sem:** score, confiança, taxonomia aberta, `date.today()`, banco, API, frontend
 
-## Correções aplicadas (commit `388aae58b`)
+## Correções aplicadas
 
-### 1. Classificação explícita de status
+### Commit `388aae58b` — classificação, invariantes e reuso
+
+#### 1. Classificação explícita de status
 
 - Removido `closed_status_values` da API pública de `evaluate_temporal()`
 - Conjuntos canônicos internos: `_OPEN_STATUSES = {"aberta"}`, `_CLOSED_STATUSES = {"encerrada", "resultado_divulgado", "fechada", "closed", "finished"}`
@@ -83,15 +86,23 @@
 - `DataQualityException.produced_state` agora é `FactState` (enum canônico)
 - Valores inválidos em ambos são rejeitados pelo Pydantic
 
+### Commit `6f35e7f53` — precedência de conflitos com continuous_evidence
+
+1. **deadline presente + continuous_evidence** → `UNKNOWN/NEEDS_REVIEW/TEMPORAL_STATUS_CONFLICT` (prazo fixo contradiz evidência de fluxo contínuo)
+2. **status fechado + continuous_evidence** (mesmo sem deadline) → mesmo resultado (não pode estar encerrado e ser contínuo)
+3. **`CONTINUOUS/ACTIVE`** só é emitido quando: `deadline=None`, status não fechado e `continuous_evidence` válida
+4. As regras de conflito de continuous_evidence têm precedência sobre as regras de conflito deadline/status e sobre as regras simples
+
 ## Testes
 
-**~68 testes** em `tests/unit/test_temporal_exception_contract.py`:
+**~75 testes** em `tests/unit/test_temporal_exception_contract.py`:
 
 | Grupo | Testes | Cobertura |
 |---|---|---|
 | EnumValues | 3 | Valores canônicos |
 | TemporalEvaluationInvariants | 11 | active/closed sem issue; needs_review com issue; extra=forbid; roundtrip |
 | EvaluateTemporal | 9 | Prazo futuro, hoje, vencido; contínuo; fechado sem prazo; Finep/Eureka; sem status → CRITICAL |
+| ContinuousEvidenceConflicts | 7 | deadline+continuous conflito; fechado+continuous conflito; aberto/neutro com continuous → ACTIVE |
 | Desconhecido | 3 | Neutro: +prazo passado, +prazo futuro, sem prazo → CRITICAL |
 | ArbitraryStatusNotOpen | 4 | Valor arbitrário não classificado como aberto |
 | Conflicts | 2 | deadline futuro + fechado; deadline passado + aberto |
@@ -102,12 +113,12 @@
 | NoScoreOrConfidence | 3 | Nenhum modelo expõe confidence/score |
 | DataQualitySchemaVersionFixed | 3 | schema_version Literal[1] |
 
-**Resultados:** `204 passed in 0.34s` (68 novos + 136 existentes)
+**Resultados:** `211 passed in 0.59s` (75 novos + 136 existentes)
 
 ## Validação
 
 ```
-pytest:   204 passed in 0.34s
+pytest:   211 passed in 0.59s
 ruff:     All checks passed! (3 arquivos)
 git diff --check 9b86c3e70..HEAD: (sem saída)
 ```
