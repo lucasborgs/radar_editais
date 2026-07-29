@@ -4,6 +4,7 @@
 **Branch:** `codex/radar-data-trust-05-t04`
 **Base:** `2febd97a5`
 **Commit de implementação:** `7abc6549e`
+**Commit de correções da auditoria:** `0229b996f`
 **Auditoria Codex: pendente**
 
 ---
@@ -24,13 +25,17 @@ consumidores.
 |---|---|---|
 | `confirm` | Preserva o valor produzido; exige valor recuperável e evidência versionada já ligada à exceção | Data ISO → `fixed`, active/closed conforme `as_of`; status fechado sem prazo → `unknown/closed` |
 | `correct` | Exige data ISO `YYYY-MM-DD` e evidência versionada já ligada | `fixed`, active/closed conforme `as_of`; `overridden=true` |
-| `confirm_continuous` | Somente `field_path=deadline`; exige evidência versionada já ligada | `continuous/active`, sem fabricar prazo; `overridden=false` |
+| `confirm_continuous` | Somente `field_path=deadline`; exige evidência versionada já ligada com `quote` não vazia | `continuous/active`, sem fabricar prazo; `overridden=false` |
 | `mark_unknown` | Não aceita valor corrigido | `unknown/needs_review`; não vira contínuo nem ativo |
 
 `confirm` de status aberto sem prazo é rejeitado. URL, quote ou hash isolado
 não cria nova autoridade: toda evidência selecionada deve corresponder a um
 `EvidenceRef` já persistido na exceção corrente. Nova evidência documental deve
 entrar primeiro pelo bundle ou produtor aplicável.
+
+Documento e hash sem trecho não provam continuidade. O serviço exige `quote`
+não vazia, mas não interpreta seu conteúdo por keyword, regex semântica, LLM
+ou rede. Uma futura evidência estruturada sem quote exigirá contrato próprio.
 
 ## Persistência e retry
 
@@ -80,6 +85,12 @@ provedor.
   conservadoramente `needs_review`; e
 - falha de leitura nunca concede `active`.
 
+Sem revisão humana, tanto a projeção coerente quanto a conservadora preservam
+por identidade a `original_provenance` recebida, sem modificá-la. Se o chamador
+não fornecer proveniência original, `provenance` permanece `None`; o read model
+não fabrica um produtor temporal. Uma revisão válida substitui apenas a
+proveniência da projeção pela proveniência humana abaixo.
+
 `as_of` permanece injetável. O default usa a data corrente em
 `America/Sao_Paulo`.
 
@@ -97,7 +108,7 @@ A projeção revisada cria `FactProvenance` somente no read model:
 - estado `stated` para confirmação, correção e continuidade sustentada; e
 - estado `unknown` para `mark_unknown`.
 
-O `FactProvenance` salvo no gold não é alterado.
+O `FactProvenance` original e o salvo no gold não são alterados.
 
 ## Arquivos
 
@@ -110,10 +121,10 @@ O `FactProvenance` salvo no gold não é alterado.
 
 ## Testes
 
-Foram adicionados 38 testes herméticos:
+Os dois arquivos focais contêm 46 testes herméticos:
 
-- 23 em `test_data_quality_reviews.py`;
-- 15 em `test_temporal_validity_projection.py`.
+- 28 em `test_data_quality_reviews.py`;
+- 18 em `test_temporal_validity_projection.py`.
 
 Cobertura:
 
@@ -124,9 +135,12 @@ Cobertura:
 - ordem append → resolved;
 - retry após falha parcial sem revisão duplicada;
 - proveniência humana, autoria, override, evidência e derivação;
+- proveniência original preservada por igualdade e identidade nos caminhos
+  normal e conservador, sem mutação ou fabricação quando ausente;
 - Finep/Eureka, exceção aberta e `mark_unknown` fail-closed;
 - correção limitada à projeção;
-- continuidade explícita;
+- continuidade aceita somente com `EvidenceRef` ligada, versionada e com
+  `quote` não vazia; documento/hash ou evidência genérica não bastam;
 - fingerprint nova sem herança;
 - leitura ausente ou falhando sem concessão de `active`;
 - transição mínima do repositório com fake Supabase; e
@@ -135,7 +149,7 @@ Cobertura:
 Validação:
 
 ```text
-pytest dos 6 arquivos do gate  → 306 passed
+pytest dos 6 arquivos do gate  → 314 passed
 ruff check nos 4 arquivos Python alterados → pass
 git diff --check 2febd97a5..HEAD → pass
 ```
@@ -144,7 +158,7 @@ git diff --check 2febd97a5..HEAD → pass
 
 1. Revisões existentes nunca são atualizadas ou removidas.
 2. O valor produzido permanece imutável; correção existe apenas na projeção.
-3. Continuidade exige evidência explícita já versionada.
+3. Continuidade exige evidência ligada e versionada com `quote` não vazia.
 4. Ausência de prazo não prova continuidade.
 5. Fingerprint material nova exige nova avaliação.
 6. Falha operacional não vira certeza factual.
@@ -163,3 +177,5 @@ git diff --check 2febd97a5..HEAD → pass
 - `2febd97a5` — base aprovada da RT05-T03.
 - `7abc6549e` —
   `feat(data-trust): add temporal review projection service`.
+- `0229b996f` —
+  `fix(data-trust): preserve provenance and require continuous quote`.
