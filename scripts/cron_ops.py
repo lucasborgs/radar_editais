@@ -17,8 +17,8 @@ def main() -> int:
     p.add_argument("--job-id", type=int, action="append", default=[])
     p.add_argument("--apply", action="store_true")
     args = p.parse_args()
-    if args.action != "list" and (not args.apply or not args.job_id):
-        p.error("ações mutáveis exigem --apply e ao menos um --job-id")
+    if args.action != "list" and not args.job_id:
+        p.error("ações operacionais exigem ao menos um --job-id")
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
         p.error("DATABASE_URL ausente")
