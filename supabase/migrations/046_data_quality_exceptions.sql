@@ -7,8 +7,9 @@
 -- Chave lógica da exceção:
 --   (subject_kind, subject_id, field_path, issue_code, input_fingerprint)
 -- Mesmo fingerprint → atualiza só last_observed_at.
--- Fingerprint novo → cria novo registro, marca anteriores como superseded.
--- Revisões são append-only, nunca atualizadas ou removidas.
+-- Fingerprint novo → insere, depois marca anteriores como superseded.
+-- Revisões são append-only: triggers rejeitam UPDATE e DELETE.
+-- review_id textual único preserva a identidade externa da decisão.
 
 -- Tabela 1: data_quality_exceptions
 
@@ -110,6 +111,7 @@ alter table public.data_quality_exceptions enable row level security;
 
 create table if not exists public.data_quality_reviews (
     id                  uuid        primary key default gen_random_uuid(),
+    review_id           text        not null unique,
     schema_version      int         not null default 1,
     exception_id        uuid        not null
                         references public.data_quality_exceptions(id)
@@ -135,6 +137,10 @@ comment on table public.data_quality_reviews is
 comment on column public.data_quality_reviews.id is
     'UUID gerado pelo banco. Identificador interno estável.';
 
+comment on column public.data_quality_reviews.review_id is
+    'Identificador textual único da revisão. '
+    'Usado para idempotência de append_review.';
+
 comment on column public.data_quality_reviews.schema_version is
     'Versão do contrato (1 = data_quality.py).';
 
@@ -152,7 +158,8 @@ comment on column public.data_quality_reviews.justification is
     'Justificativa curta da revisão (max 2000 caracteres).';
 
 comment on column public.data_quality_reviews.evidence_refs is
-    'JSONB: lista de EvidenceRef que sustentam a decisão.';
+    'JSONB: lista de EvidenceRef que sustentam a decisão. '
+    'source_url é removido antes da persistência.';
 
 comment on column public.data_quality_reviews.actor_id is
     'Identidade do revisor administrativo. '
@@ -173,3 +180,16 @@ create index if not exists data_quality_reviews_created_at_idx
     on public.data_quality_reviews (exception_id, created_at);
 
 alter table public.data_quality_reviews enable row level security;
+
+-- Trigger: rejeita UPDATE e DELETE em data_quality_reviews
+
+create or replace function public.reject_review_mutations()
+returns trigger as $$
+begin
+    raise exception 'data_quality_reviews is append-only: updates and deletes are not allowed';
+end;
+$$ language plpgsql;
+
+create trigger trg_reviews_append_only
+    before update or delete on public.data_quality_reviews
+    for each row execute function public.reject_review_mutations();

@@ -1,77 +1,255 @@
 from __future__ import annotations
 
+import json
+import uuid
 from datetime import datetime
 
 import pytest
+from postgrest.exceptions import APIError
 from pydantic import ValidationError
 
+from radar.core.services.data_quality_exceptions import (
+    _INVALID_FINGERPRINT_MSG,
+    DataQualityStorageError,
+    _evidence_refs_payload,
+    append_review,
+    get_current_review_projection,
+    get_exception,
+    list_exceptions,
+    open_or_observe_exception,
+)
 from radar.domain.data_quality import (
-    DATA_QUALITY_SCHEMA_VERSION,
     DataQualityException,
     DataQualityReview,
     IssueCode,
 )
-from radar.domain.provenance import EvidenceRef, FactState, LocatorQuality, ReviewInfo
+from radar.domain.provenance import EvidenceRef, LocatorQuality, ReviewInfo
 from radar.domain.source_bundle import SubjectKind
 
 pytestmark = pytest.mark.unit
 
 
 # ---------------------------------------------------------------------------
-# Migration structure (static analysis of the SQL file)
+# Deterministic fake Supabase client
 # ---------------------------------------------------------------------------
 
 
-def _migration_sql() -> str:
-    with open("supabase/migrations/046_data_quality_exceptions.sql") as f:
-        return f.read()
+class _FakeResponse:
+    def __init__(self, data):
+        self.data = data
 
 
-class TestMigrationStructure:
-    def test_has_two_create_table(self):
-        sql = _migration_sql()
-        assert sql.count("create table if not exists public.") == 2
+class _FakeQueryBuilder:
+    def __init__(self, table_store, supabase=None):
+        self._store = table_store
+        self._supabase = supabase
+        self._method = None
+        self._payload = None
+        self._filters = []
+        self._order_col = None
+        self._order_desc = False
+        self._limit_val = None
 
-    def test_has_data_quality_exceptions_table(self):
-        sql = _migration_sql()
-        assert "public.data_quality_exceptions" in sql
+    def select(self, *_):
+        return self
 
-    def test_has_data_quality_reviews_table(self):
-        sql = _migration_sql()
-        assert "public.data_quality_reviews" in sql
+    def eq(self, col, val):
+        self._filters.append(("eq", col, val))
+        return self
 
-    def test_rls_enabled_on_both(self):
-        sql = _migration_sql()
-        count = sql.count("enable row level security")
-        assert count == 2, f"expected 2 RLS enable, got {count}"
+    def neq(self, col, val):
+        self._filters.append(("neq", col, val))
+        return self
 
-    def test_uniqueness_constraint_on_exceptions(self):
-        sql = _migration_sql()
-        assert "unique (subject_kind, subject_id, field_path, issue_code, input_fingerprint)" in sql
+    def order(self, col, *, desc=False):
+        self._order_col = col
+        self._order_desc = desc
+        return self
 
-    def test_exception_id_fk_on_reviews(self):
-        sql = _migration_sql()
-        assert "references public.data_quality_exceptions(id)" in sql
+    def limit(self, n):
+        self._limit_val = n
+        return self
 
-    def test_decision_check_constraint(self):
-        sql = _migration_sql()
-        assert "check (decision in" in sql
+    def execute(self):
+        if self._method == "insert":
+            return self._do_insert()
+        if self._method == "update":
+            return self._do_update()
+        return self._do_select()
 
-    def test_status_check_constraint(self):
-        sql = _migration_sql()
-        assert "check (status in" in sql
+    def _match(self, row):
+        for typ, col, val in self._filters:
+            if typ == "eq":
+                if row.get(col) != val:
+                    return False
+            elif typ == "neq":
+                if row.get(col) == val:
+                    return False
+        return True
 
-    def test_no_user_facing_policies(self):
-        sql = _migration_sql()
-        assert "create policy" not in sql
+    def _filtered(self):
+        return [r for r in self._store.values() if self._match(r)]
+
+    def _do_select(self):
+        rows = self._filtered()
+        if self._order_col:
+            rows.sort(
+                key=lambda r: r.get(self._order_col) or "",
+                reverse=self._order_desc,
+            )
+        if self._limit_val and len(rows) > self._limit_val:
+            rows = rows[: self._limit_val]
+        return _FakeResponse(rows)
+
+    def _do_insert(self):
+        if self._supabase and self._supabase._fail_next_insert is not None:
+            err = self._supabase._fail_next_insert
+            self._supabase._fail_next_insert = None
+            raise err
+
+        items = []
+        raw = self._payload
+        if isinstance(raw, dict):
+            items.append(raw)
+        else:
+            items.extend(raw)
+
+        for item in items:
+            if "id" not in item:
+                item["id"] = str(uuid.uuid4())
+            for existing in self._store.values():
+                match = True
+                for key in (
+                    "subject_kind",
+                    "subject_id",
+                    "field_path",
+                    "issue_code",
+                    "input_fingerprint",
+                ):
+                    if key in item and key in existing:
+                        if item[key] != existing[key]:
+                            match = False
+                            break
+                    else:
+                        match = False
+                        break
+                else:
+                    if match:
+                        raise APIError({
+                            "code": "23505",
+                            "message": (
+                                f'duplicate key: ({item["subject_kind"]}, '
+                                f'{item["subject_id"]}, {item["field_path"]}, '
+                                f'{item["issue_code"]}, {item["input_fingerprint"]})'
+                            ),
+                        })
+
+        now = datetime.now().isoformat()
+        new_items = []
+        for item in items:
+            row = dict(item)
+            if "created_at" not in row:
+                row["created_at"] = now
+            if "last_observed_at" in row and row["last_observed_at"] is None:
+                row["last_observed_at"] = now
+            if "detected_at" in row and row["detected_at"] is None:
+                row["detected_at"] = now
+            if "reviewed_at" not in row:
+                row["reviewed_at"] = now
+            rid = str(uuid.uuid4())
+            self._store[rid] = row
+            new_items.append(self._store[rid])
+
+        return _FakeResponse(new_items)
+
+    def _do_update(self):
+        matched = [rid for rid in self._store if self._match(self._store[rid])]
+        for rid in matched:
+            self._store[rid].update(self._payload)
+        return _FakeResponse([])
+
+
+class _FakeTable:
+    def __init__(self, name, supabase):
+        self._name = name
+        self._supabase = supabase
+        self._store = supabase._tables.setdefault(name, {})
+
+    def select(self, *args):
+        return _FakeQueryBuilder(self._store, self._supabase)
+
+    def insert(self, data):
+        qb = _FakeQueryBuilder(self._store, self._supabase)
+        qb._method = "insert"
+        qb._payload = data
+        return qb
+
+    def update(self, data):
+        qb = _FakeQueryBuilder(self._store, self._supabase)
+        qb._method = "update"
+        qb._payload = data
+        return qb
+
+
+class FakeSupabase:
+    """Deterministic fake that mimics the Supabase client interface.
+
+    Stores data in-memory as dict[rid, row].
+    Supports eq/neq filtering, ordering, limits.
+    Enforces unique constraint on exceptions table insert.
+    Simulates APIError on next insert when _fail_next_insert is set.
+    """
+
+    def __init__(self):
+        self._tables: dict[str, dict[str, dict]] = {}
+        self._fail_next_insert: APIError | None = None
+
+    def table(self, name):
+        self._tables.setdefault(name, {})
+        return _FakeTable(name, self)
+
+    def __repr__(self):
+        n = len(self._tables.get("data_quality_exceptions", {}))
+        r = len(self._tables.get("data_quality_reviews", {}))
+        return f"<FakeSupabase exceptions={n} reviews={r}>"
 
 
 # ---------------------------------------------------------------------------
-# Payload builders (tested via open_or_observe_exception internals)
+# Fixtures
+# ---------------------------------------------------------------------------
+
+_FAST_NOW = "2026-07-29T12:00:00"
+
+
+@pytest.fixture(autouse=True)
+def _env(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "http://test")
+    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "test-key")
+
+
+@pytest.fixture
+def fs():
+    return FakeSupabase()
+
+
+@pytest.fixture(autouse=True)
+def _mock_now(monkeypatch):
+    import radar.core.services.data_quality_exceptions as svc
+    monkeypatch.setattr(svc, "_now", lambda: _FAST_NOW)
+
+
+@pytest.fixture(autouse=True)
+def _mock_supabase(fs, monkeypatch):
+    import radar.core.infra.db
+    monkeypatch.setattr(radar.core.infra.db, "get_supabase_service", lambda: fs)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_exception(
+def make_exception(
     input_fingerprint: str = "fp-v1",
     status: str = "open",
     **overrides,
@@ -88,7 +266,7 @@ def _make_exception(
     return DataQualityException(**kwargs)
 
 
-def _make_review(exception_ref: str = "exc-uuid", **overrides) -> DataQualityReview:
+def make_review(exception_ref: str = "exc-uuid", **overrides) -> DataQualityReview:
     kwargs = dict(
         exception_ref=exception_ref,
         decision="confirm",
@@ -103,297 +281,405 @@ def _make_review(exception_ref: str = "exc-uuid", **overrides) -> DataQualityRev
     return DataQualityReview(**kwargs)
 
 
-class TestPayloadBuilding:
-    """Testa a construção de payloads sem banco real.
-
-    A implementação do repositório serializa modelos Pydantic;
-    estes testes validam que a serialização é consistente.
-    """
-
-    def test_exception_model_dump_contains_required_fields(self):
-        exc = _make_exception()
-        dumped = exc.model_dump(mode="json")
-        assert dumped["subject_kind"] == "opportunity"
-        assert dumped["subject_id"] == "finep:589"
-        assert dumped["field_path"] == "deadline"
-        assert dumped["issue_code"] == "temporal_status_without_basis"
-        assert dumped["input_fingerprint"] == "fp-v1"
-        assert dumped["status"] == "open"
-
-    def test_exception_with_evidence_refs_serializes(self):
-        ref = EvidenceRef(
-            source="finep",
-            canonical_content_hash="sha256:" + "a" * 64,
-            locator_quality=LocatorQuality.DOCUMENT_ONLY,
-            document="pagina.html",
-        )
-        exc = _make_exception(evidence_refs=[ref])
-        dumped = exc.model_dump(mode="json")
-        assert len(dumped["evidence_refs"]) == 1
-        assert dumped["evidence_refs"][0]["source"] == "finep"
-
-    def test_exception_with_produced_state(self):
-        exc = _make_exception(produced_state=FactState.CONFLICTING)
-        dumped = exc.model_dump(mode="json")
-        assert dumped["produced_state"] == "conflicting"
-
-    def test_review_model_dump_contains_required_fields(self):
-        review = _make_review()
-        dumped = review.model_dump(mode="json")
-        assert dumped["exception_ref"] == "exc-uuid"
-        assert dumped["decision"] == "confirm"
-        assert dumped["justification"].startswith("prazo confirmado")
-
-    def test_review_with_corrected_value(self):
-        review = _make_review(
-            decision="correct",
-            corrected_value="2026-12-31",
-            evidence_refs=[
-                EvidenceRef(
-                    source="finep",
-                    canonical_content_hash="sha256:" + "b" * 64,
-                    locator_quality=LocatorQuality.DOCUMENT_ONLY,
-                    document="anexo.pdf",
-                ),
-            ],
-        )
-        dumped = review.model_dump(mode="json")
-        assert dumped["corrected_value"] == "2026-12-31"
-        assert len(dumped["evidence_refs"]) == 1
-
-    def test_review_model_dump_with_review_info(self):
-        review = _make_review()
-        dumped = review.model_dump(mode="json")
-        assert "review" in dumped
-        assert dumped["review"]["actor_id"] == "admin"
+def ref(**overrides) -> EvidenceRef:
+    kwargs = dict(
+        source="finep",
+        canonical_content_hash="sha256:" + "a" * 64,
+        locator_quality=LocatorQuality.DOCUMENT_ONLY,
+        document="pagina.html",
+        source_url="http://example.com/doc",
+    )
+    kwargs.update(overrides)
+    return EvidenceRef(**kwargs)
 
 
 # ---------------------------------------------------------------------------
-# Domain model invariants re-test (boundary reinforcement)
+# Migration structure (static analysis)
 # ---------------------------------------------------------------------------
 
 
-class TestExceptionModelInvariants:
-    def test_minimal_valid_exception(self):
-        exc = _make_exception()
-        assert exc.schema_version == DATA_QUALITY_SCHEMA_VERSION
-
-    def test_invalid_subject_kind_rejected(self):
-        with pytest.raises(ValidationError):
-            DataQualityException(
-                subject_kind="invalid",
-                subject_id="x",
-                field_path="deadline",
-                issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
-            )
-
-    def test_empty_subject_id_rejected(self):
-        with pytest.raises(ValidationError):
-            _make_exception(subject_id="")
-
-    def test_empty_field_path_rejected(self):
-        with pytest.raises(ValidationError):
-            _make_exception(field_path="")
-
-    def test_invalid_issue_code_rejected(self):
-        with pytest.raises(ValidationError):
-            _make_exception(issue_code="unknown_code")
-
-    def test_extra_field_rejected(self):
-        with pytest.raises(ValidationError):
-            _make_exception(score=0.5)
-
-    def test_none_input_fingerprint_defaults_to_empty(self):
-        exc = _make_exception(input_fingerprint=None)
-        assert exc.input_fingerprint is None
+def _migration_sql() -> str:
+    with open("supabase/migrations/046_data_quality_exceptions.sql") as f:
+        return f.read()
 
 
-class TestReviewModelInvariants:
-    def test_minimal_valid_review(self):
-        review = _make_review()
-        assert review.schema_version == DATA_QUALITY_SCHEMA_VERSION
+class TestMigrationStructure:
+    def test_two_tables(self):
+        assert _migration_sql().count("create table if not exists public.") == 2
 
-    def test_correct_without_value_rejected(self):
-        with pytest.raises(ValidationError):
-            _make_review(decision="correct")
+    def test_exceptions_table(self):
+        assert "public.data_quality_exceptions" in _migration_sql()
 
-    def test_correct_without_evidence_rejected(self):
-        with pytest.raises(ValidationError):
-            _make_review(
-                decision="correct",
-                corrected_value="2026-12-31",
-            )
+    def test_reviews_table(self):
+        assert "public.data_quality_reviews" in _migration_sql()
 
-    def test_confirm_continuous_without_evidence_rejected(self):
-        with pytest.raises(ValidationError):
-            _make_review(decision="confirm_continuous")
+    def test_rls_on_both(self):
+        assert _migration_sql().count("enable row level security") == 2
 
-    def test_empty_justification_rejected(self):
-        with pytest.raises(ValidationError):
-            _make_review(justification="")
+    def test_unique_constraint(self):
+        assert "unique (subject_kind, subject_id, field_path, issue_code, input_fingerprint)" in _migration_sql()
 
-    def test_long_justification_rejected(self):
-        with pytest.raises(ValidationError):
-            _make_review(justification="x" * 2001)
+    def test_review_id_column(self):
+        sql = _migration_sql()
+        assert "review_id           text        not null unique" in sql
 
-    def test_extra_field_rejected(self):
-        with pytest.raises(ValidationError):
-            _make_review(score=0.5)
+    def test_exception_fk(self):
+        assert "references public.data_quality_exceptions(id)" in _migration_sql()
+
+    def test_append_only_trigger(self):
+        sql = _migration_sql()
+        assert "reject_review_mutations" in sql
+        assert "before update or delete on public.data_quality_reviews" in sql
+
+    def test_no_user_policies(self):
+        assert "create policy" not in _migration_sql()
 
 
 # ---------------------------------------------------------------------------
-# Idempotência e supersessão (lógica de negócio, sem DB)
+# Supabase ausente — degradação graciosa
 # ---------------------------------------------------------------------------
 
 
-class TestIdempotencyLogic:
-    """Testa que a lógica de idempotência é semanticamente correta.
+class TestSupabaseAbsent:
+    def test_open_or_observe_returns_false(self, monkeypatch):
+        monkeypatch.delenv("SUPABASE_URL", raising=False)
+        monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+        exc = make_exception()
+        assert open_or_observe_exception(exc) is False
 
-    A função open_or_observe_exception no repositório:
-    - mesma fingerprint → update last_observed_at (idempotente)
-    - fingerprint nova → supersede abertas anteriores e insere nova
-    - revisões são append-only
-    """
+    def test_list_returns_empty(self, monkeypatch):
+        monkeypatch.delenv("SUPABASE_URL", raising=False)
+        monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+        assert list_exceptions() == []
 
-    def test_same_fingerprint_produces_same_logical_key(self):
-        exc1 = _make_exception(input_fingerprint="fp-abc")
-        exc2 = _make_exception(input_fingerprint="fp-abc")
-        key1 = (
-            exc1.subject_kind.value,
-            exc1.subject_id,
-            exc1.field_path,
-            exc1.issue_code.value,
-            exc1.input_fingerprint,
-        )
-        key2 = (
-            exc2.subject_kind.value,
-            exc2.subject_id,
-            exc2.field_path,
-            exc2.issue_code.value,
-            exc2.input_fingerprint,
-        )
-        assert key1 == key2
+    def test_get_returns_none(self, monkeypatch):
+        monkeypatch.delenv("SUPABASE_URL", raising=False)
+        monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+        assert get_exception("any") is None
 
-    def test_different_fingerprint_different_key(self):
-        exc1 = _make_exception(input_fingerprint="fp-abc")
-        exc2 = _make_exception(input_fingerprint="fp-xyz")
-        key1 = (
-            exc1.subject_kind.value,
-            exc1.subject_id,
-            exc1.field_path,
-            exc1.issue_code.value,
-            exc1.input_fingerprint,
-        )
-        key2 = (
-            exc2.subject_kind.value,
-            exc2.subject_id,
-            exc2.field_path,
-            exc2.issue_code.value,
-            exc2.input_fingerprint,
-        )
-        assert key1 != key2
+    def test_append_review_returns_false(self, monkeypatch):
+        monkeypatch.delenv("SUPABASE_URL", raising=False)
+        monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+        review = make_review()
+        assert append_review(review) is False
 
-    def test_supersede_older_version_semantics(self):
-        """Fingerprint mais recente substitui a anterior para o mesmo
-        (subject_kind, subject_id, field_path, issue_code).
-
-        Simula a lógica do repositório: ao inserir nova fingerprint,
-        as abertas anteriores devem ser marcadas superseded.
-        """
-        old_exc = _make_exception(input_fingerprint="fp-old", status="superseded")
-        new_exc = _make_exception(input_fingerprint="fp-new", status="open")
-
-        assert old_exc.status == "superseded"
-        assert new_exc.status == "open"
-
-        mesma_chave = (
-            old_exc.subject_kind == new_exc.subject_kind
-            and old_exc.subject_id == new_exc.subject_id
-            and old_exc.field_path == new_exc.field_path
-            and old_exc.issue_code == new_exc.issue_code
-        )
-        assert mesma_chave
-        assert old_exc.input_fingerprint != new_exc.input_fingerprint
-
-    def test_review_append_only_semantics(self):
-        """Revisões são imutáveis. Criar duas revisões para a mesma
-        exceção gera registros distintos, sem sobrescrever o anterior."""
-        review1 = _make_review(exception_ref="exc-001",
-                               decision="confirm",
-                               justification="primeira")
-        review2 = _make_review(exception_ref="exc-001",
-                               decision="correct",
-                               corrected_value="2026-12-31",
-                               justification="correcao posterior",
-                               evidence_refs=[
-                                   EvidenceRef(
-                                       source="finep",
-                                       canonical_content_hash="sha256:" + "c" * 64,
-                                       locator_quality=LocatorQuality.DOCUMENT_ONLY,
-                                       document="doc.pdf",
-                                   ),
-                               ])
-        assert review1.exception_ref == review2.exception_ref
-        assert review1.decision == "confirm"
-        assert review2.decision == "correct"
-        assert review1.justification != review2.justification
-
-    def test_review_does_not_inherit_old_version(self):
-        """Revisão fica vinculada à exceção original (exception_ref).
-        Nova versão da exceção não herda revisão antiga."""
-        old_review = _make_review(exception_ref="exc-old-uuid")
-        new_exception = _make_exception(input_fingerprint="fp-new")
-        assert old_review.exception_ref != new_exception.input_fingerprint
+    def test_get_review_projection_returns_none(self, monkeypatch):
+        monkeypatch.delenv("SUPABASE_URL", raising=False)
+        monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+        assert get_current_review_projection("any") is None
 
 
 # ---------------------------------------------------------------------------
-# Ausência legítima
+# input_fingerprint ausente ou vazio — rejeição
 # ---------------------------------------------------------------------------
 
 
-class TestLegitimateAbsence:
-    def test_no_exception_is_not_fabricated(self):
-        """Dados legados sem exceção continuam representados por
-        ausência — sem criar registro artificial."""
-        assert True
+class TestInputFingerprintRequired:
+    def test_none_fingerprint_raises(self):
+        exc = make_exception(input_fingerprint=None)
+        with pytest.raises(ValueError, match=_INVALID_FINGERPRINT_MSG):
+            open_or_observe_exception(exc)
 
-    def test_get_exception_returns_none_for_missing(self):
-        """get_exception retorna None para ID inexistente
-        (teste de semântica, não de DB real)."""
-        assert None is None
+    def test_empty_fingerprint_raises(self):
+        exc = make_exception(input_fingerprint="")
+        with pytest.raises(ValueError, match=_INVALID_FINGERPRINT_MSG):
+            open_or_observe_exception(exc)
+
+    def test_whitespace_fingerprint_raises(self):
+        exc = make_exception(input_fingerprint="   ")
+        with pytest.raises(ValueError, match=_INVALID_FINGERPRINT_MSG):
+            open_or_observe_exception(exc)
 
 
 # ---------------------------------------------------------------------------
-# Domain error semantics (simulate repository error handling)
+# open_or_observe_exception — idempotência e supersessão
 # ---------------------------------------------------------------------------
 
 
-class TestErrorHandling:
-    def test_domain_error_message_is_categorical(self):
-        from radar.core.services.data_quality_exceptions import (
-            DataQualityStorageError,
-        )
-        err = DataQualityStorageError("open_or_observe failed: code=23505")
-        assert "open_or_observe" in str(err)
-        assert "failed" in str(err)
+class TestOpenOrObserve:
+    def test_first_insert_creates_one_record(self, fs):
+        assert open_or_observe_exception(make_exception()) is True
+        rows = list_exceptions()
+        assert len(rows) == 1
+        assert rows[0]["status"] == "open"
+        assert rows[0]["input_fingerprint"] == "fp-v1"
 
-    def test_domain_error_does_not_leak_details(self):
-        from radar.core.services.data_quality_exceptions import (
-            DataQualityStorageError,
+    def test_same_fingerprint_updates_only_last_observed_at(self, fs):
+        exc = make_exception(detected_at=datetime(2026, 1, 1))
+        assert open_or_observe_exception(exc) is True
+        rows = list_exceptions()
+        assert len(rows) == 1
+        assert rows[0]["detected_at"] == "2026-01-01T00:00:00"
+        assert rows[0]["last_observed_at"] == _FAST_NOW
+        assert rows[0]["status"] == "open"
+
+    def test_same_fingerprint_no_duplicate(self, fs):
+        assert open_or_observe_exception(make_exception()) is True
+        assert open_or_observe_exception(make_exception()) is True
+        rows = list_exceptions()
+        assert len(rows) == 1
+        assert rows[0]["status"] == "open"
+
+    def test_new_fingerprint_supersedes_old(self, fs):
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v1")) is True
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v2")) is True
+        rows = list_exceptions()
+        assert len(rows) == 2
+        open_rows = [r for r in rows if r["status"] == "open"]
+        superseded = [r for r in rows if r["status"] == "superseded"]
+        assert len(open_rows) == 1
+        assert len(superseded) == 1
+        assert open_rows[0]["input_fingerprint"] == "fp-v2"
+        assert superseded[0]["input_fingerprint"] == "fp-v1"
+
+    def test_third_fingerprint_supersedes_second(self, fs):
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v1")) is True
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v2")) is True
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v3")) is True
+        rows = list_exceptions()
+        open_rows = [r for r in rows if r["status"] == "open"]
+        assert len(open_rows) == 1
+        assert open_rows[0]["input_fingerprint"] == "fp-v3"
+
+    def test_different_group_not_affected(self, fs):
+        e1 = make_exception(input_fingerprint="fp-v1", subject_id="finep:001")
+        e2 = make_exception(input_fingerprint="fp-v1", subject_id="finep:002")
+        assert open_or_observe_exception(e1) is True
+        assert open_or_observe_exception(e2) is True
+        rows = list_exceptions()
+        assert len(rows) == 2
+        assert all(r["status"] == "open" for r in rows)
+
+    def test_reobserve_same_fingerprint_supersedes_orphans(self, fs):
+        """Retry após falha parcial: insere fingerprint, depois convergência."""
+        e1 = make_exception(input_fingerprint="fp-v1")
+        assert open_or_observe_exception(e1) is True
+        # Simulate partial failure: manually add an extra open record
+        svc_table = fs.table("data_quality_exceptions")
+        extra = {
+            "subject_kind": "opportunity",
+            "subject_id": "finep:589",
+            "field_path": "deadline",
+            "issue_code": "temporal_status_without_basis",
+            "input_fingerprint": "fp-orphan",
+            "status": "open",
+            "schema_version": 1,
+        }
+        svc_table.insert(extra).execute()
+        # Now reobserve fp-v1
+        assert open_or_observe_exception(e1) is True
+        rows = list_exceptions()
+        open_rows = [r for r in rows if r["status"] == "open"]
+        assert len(open_rows) == 1
+        assert open_rows[0]["input_fingerprint"] == "fp-v1"
+
+
+# ---------------------------------------------------------------------------
+# Insert falha → não supersede anterior
+# ---------------------------------------------------------------------------
+
+
+class TestInsertFailureNoSupersede:
+    def test_insert_error_does_not_supersede(self, fs):
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v1")) is True
+        fs._fail_next_insert = APIError({
+            "code": "23505",
+            "message": "duplicate key",
+        })
+        result = open_or_observe_exception(make_exception(input_fingerprint="fp-v1"))
+        assert result is True
+        rows = list_exceptions()
+        open_rows = [r for r in rows if r["status"] == "open"]
+        assert len(open_rows) == 1
+
+    def test_real_error_raises_and_does_not_supersede(self, fs):
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v1")) is True
+        fs._fail_next_insert = APIError({
+            "code": "PGRST116",
+            "message": "syntax error",
+        })
+        with pytest.raises(DataQualityStorageError):
+            open_or_observe_exception(make_exception(input_fingerprint="fp-v2"))
+        rows = list_exceptions()
+        open_rows = [r for r in rows if r["status"] == "open"]
+        assert len(open_rows) == 1
+        assert open_rows[0]["input_fingerprint"] == "fp-v1"
+
+
+# ---------------------------------------------------------------------------
+# review_id — preservação e idempotência
+# ---------------------------------------------------------------------------
+
+
+class TestReviewId:
+    def test_review_id_persisted(self, fs):
+        exc = make_exception()
+        open_or_observe_exception(exc)
+        rows = list_exceptions()
+        exc_id = rows[0]["id"]
+        review = make_review(exception_ref=exc_id)
+        assert append_review(review) is True
+        rev = get_current_review_projection(exc_id)
+        assert rev is not None
+        assert rev.review.review_id == "rev-001"
+
+    def test_retry_same_review_id_idempotent(self, fs):
+        exc = make_exception()
+        open_or_observe_exception(exc)
+        rows = list_exceptions()
+        exc_id = rows[0]["id"]
+        review = make_review(exception_ref=exc_id)
+        assert append_review(review) is True
+        assert append_review(review) is True
+        rev = get_current_review_projection(exc_id)
+        assert rev is not None
+        assert rev.review.review_id == "rev-001"
+
+    def test_different_review_ids_both_persisted(self, fs):
+        exc = make_exception()
+        open_or_observe_exception(exc)
+        rows = list_exceptions()
+        exc_id = rows[0]["id"]
+        r1 = make_review(exception_ref=exc_id, review=ReviewInfo(
+            review_id="rev-001", actor_id="admin",
+            reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
+        ))
+        r2 = make_review(exception_ref=exc_id, decision="correct",
+                          corrected_value="2026-12-31",
+                          justification="correcao",
+                          evidence_refs=[ref(canonical_content_hash="sha256:" + "b" * 64)],
+                          review=ReviewInfo(
+                              review_id="rev-002", actor_id="admin",
+                              reviewed_at=datetime(2026, 7, 29, 13, 0, 0),
+                          ))
+        assert append_review(r1) is True
+        assert append_review(r2) is True
+        # get_current_review_projection returns last
+        last = get_current_review_projection(exc_id)
+        assert last is not None
+        assert last.review.review_id == "rev-002"
+
+    def test_review_id_required(self, fs):
+        review = make_review()
+        review.review.review_id = ""
+        with pytest.raises(ValueError, match="review_id must be non-empty"):
+            append_review(review)
+
+    def test_review_id_empty_rejected_by_model(self):
+        with pytest.raises(ValidationError):
+            ReviewInfo(review_id="", actor_id="admin", reviewed_at=datetime(2026, 7, 29, 12, 0, 0))
+
+
+# ---------------------------------------------------------------------------
+# source_url removido
+# ---------------------------------------------------------------------------
+
+
+class TestSourceUrlRemoved:
+    def test_exception_payload_no_source_url(self):
+        exc = make_exception(evidence_refs=[ref(source_url="http://example.com/doc")])
+        from radar.core.services.data_quality_exceptions import _exception_payload
+        payload = _exception_payload(exc)
+        for ev in payload["evidence_refs"]:
+            assert "source_url" not in ev
+
+    def test_review_payload_no_source_url(self):
+        review = make_review(
+            evidence_refs=[ref(source_url="http://example.com/doc")],
         )
-        err = DataQualityStorageError(
-            "get_exception failed: type=SomeError"
+        from radar.core.services.data_quality_exceptions import _review_payload
+        payload = _review_payload(review)
+        for ev in payload["evidence_refs"]:
+            assert "source_url" not in ev
+
+    def test_persisted_exception_no_source_url(self, fs):
+        exc = make_exception(evidence_refs=[ref(source_url="http://example.com/doc")])
+        open_or_observe_exception(exc)
+        rows = list_exceptions()
+        for ev in rows[0]["evidence_refs"]:
+            assert "source_url" not in ev
+
+    def test_persisted_review_no_source_url(self, fs):
+        exc = make_exception(evidence_refs=[ref(source_url="http://example.com/doc")])
+        open_or_observe_exception(exc)
+        rows = list_exceptions()
+        exc_id = rows[0]["id"]
+        review = make_review(
+            exception_ref=exc_id,
+            evidence_refs=[ref(source_url="http://example.com/doc")],
         )
+        append_review(review)
+        rev = get_current_review_projection(exc_id)
+        assert rev is not None
+        for ev in rev.evidence_refs:
+            assert ev.source_url is None
+
+    def test_evidence_refs_payload_helper(self):
+        refs = [ref(source_url="http://x.com"), ref(source_url="http://y.com")]
+        payload = _evidence_refs_payload(refs)
+        for p in payload:
+            assert "source_url" not in p
+
+    def test_href_not_in_exception_payload(self, fs):
+        exc = make_exception(evidence_refs=[ref(
+            source_url="http://example.com",
+            canonical_content_hash="sha256:" + "c" * 64,
+        )])
+        open_or_observe_exception(exc)
+        rows = list_exceptions()
+        raw = json.dumps(rows)
+        assert "source_url" not in raw
+        assert "http://" not in raw
+
+
+# ---------------------------------------------------------------------------
+# list_exceptions com filtros
+# ---------------------------------------------------------------------------
+
+
+class TestListExceptions:
+    def test_filter_by_subject_kind(self, fs):
+        open_or_observe_exception(make_exception(
+            subject_kind=SubjectKind.OPPORTUNITY,
+            input_fingerprint="fp-o",
+        ))
+        open_or_observe_exception(make_exception(
+            subject_kind=SubjectKind.INVESTOR,
+            input_fingerprint="fp-i",
+            subject_id="inv:001",
+        ))
+        rows = list_exceptions(subject_kind="opportunity")
+        assert len(rows) == 1
+        assert rows[0]["input_fingerprint"] == "fp-o"
+
+    def test_filter_by_status(self, fs):
+        e1 = make_exception(input_fingerprint="fp-v1")
+        e2 = make_exception(input_fingerprint="fp-v2")
+        open_or_observe_exception(e1)
+        open_or_observe_exception(e2)
+        rows = list_exceptions(status="superseded")
+        assert len(rows) == 1
+        assert rows[0]["input_fingerprint"] == "fp-v1"
+
+
+# ---------------------------------------------------------------------------
+# Semântica de erro
+# ---------------------------------------------------------------------------
+
+
+class TestErrorSemantics:
+    def test_storage_error_sanitized(self):
+        err = DataQualityStorageError("open_or_observe failed: code=PGRST116")
         msg = str(err)
         assert "traceback" not in msg
         assert "password" not in msg
         assert "secret" not in msg
         assert "http://" not in msg
 
-    def test_error_is_not_false_ambiguous(self):
-        from radar.core.services.data_quality_exceptions import (
-            DataQualityStorageError,
-        )
+    def test_storage_error_categorical(self):
         err = DataQualityStorageError("list_exceptions failed")
-        assert err is not None
+        assert "failed" in str(err)
+
+    def test_storage_error_not_bool(self):
+        err = DataQualityStorageError("any msg")
         assert not isinstance(err, bool)

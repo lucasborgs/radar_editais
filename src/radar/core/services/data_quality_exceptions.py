@@ -42,8 +42,28 @@ def _now() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Sanitizacao de EvidenceRef
+# ---------------------------------------------------------------------------
+
+
+def _evidence_refs_payload(refs: list[EvidenceRef]) -> list[dict]:
+    """Serializa lista de EvidenceRef removendo source_url."""
+    return json.loads(
+        json.dumps([
+            {k: v for k, v in ref.model_dump(mode="json").items()
+             if k != "source_url"}
+            for ref in refs
+        ])
+    )
+
+
+# ---------------------------------------------------------------------------
 # Exception persistence
 # ---------------------------------------------------------------------------
+
+_INVALID_FINGERPRINT_MSG = (
+    "input_fingerprint must be non-empty for open_or_observe_exception"
+)
 
 
 def open_or_observe_exception(
@@ -51,10 +71,13 @@ def open_or_observe_exception(
 ) -> bool:
     """Persiste ou reobserva uma exceção de forma idempotente.
 
-    Se a mesma fingerprint já existir: atualiza apenas last_observed_at.
-    Se fingerprint diferente para o mesmo (subject_kind, subject_id,
-    field_path, issue_code): insere novo registro, marca os anteriores
-    abertos como superseded.
+    1. Rejeita input_fingerprint ausente/vazio.
+    2. Se mesma fingerprint já existe: atualiza last_observed_at,
+       depois supersede outras abertas do mesmo grupo.
+    3. Se fingerprint nova: insere, depois supersede as abertas
+       anteriores do mesmo grupo (nunca antes).
+    4. Retry após falha parcial (insert ok, supersede falhou)
+       converge para exatamente uma versão aberta.
 
     Args:
         exception: DataQualityException validado pelo contrato.
@@ -64,8 +87,12 @@ def open_or_observe_exception(
         False se Supabase não está configurado.
 
     Raises:
+        ValueError: se input_fingerprint for None ou vazio.
         DataQualityStorageError: em falha real de persistência.
     """
+    if not exception.input_fingerprint or not exception.input_fingerprint.strip():
+        raise ValueError(_INVALID_FINGERPRINT_MSG)
+
     if not _configured():
         logger.info("data_quality_exceptions: Supabase ausente — no-op")
         return False
@@ -74,14 +101,14 @@ def open_or_observe_exception(
     sid = exception.subject_id
     field = exception.field_path
     code = exception.issue_code.value
-    fingerprint = exception.input_fingerprint or ""
+    fingerprint = exception.input_fingerprint
 
     try:
         from radar.core.infra.db import get_supabase_service
 
         svc = get_supabase_service()
 
-        # 1. Check se a mesma fingerprint já existe
+        # 1. Verificar se a mesma fingerprint já existe
         existing = (
             svc.table(_TABLE_EXCEPTIONS)
             .select("id, status")
@@ -96,30 +123,41 @@ def open_or_observe_exception(
 
         if existing.data:
             row = existing.data[0]
-            svc.table(_TABLE_EXCEPTIONS).update({
-                "last_observed_at": _now(),
-            }).eq("id", row["id"]).execute()
+            # Atualiza last_observed_at
+            updated = (
+                svc.table(_TABLE_EXCEPTIONS)
+                .update({"last_observed_at": _now()})
+                .eq("id", row["id"])
+                .execute()
+            )
+            if not updated.data:
+                logger.warning(
+                    "open_or_observe: reobservacao nao retornou registros "
+                    "(%s/%s/%s)", kind, sid, fingerprint
+                )
+            # Depois de confirmar a reobservacao, supersede outras abertas
+            _supersede_other_open(svc, kind, sid, field, code, fingerprint)
             return True
 
-        # 2. Nova fingerprint: supersede abertas anteriores do mesmo
-        # sujeito/campo/código
-        svc.table(_TABLE_EXCEPTIONS).update({
-            "status": "superseded",
-        }).eq("subject_kind", kind).eq("subject_id", sid).eq(
-            "field_path", field
-        ).eq("issue_code", code).eq(
-            "status", "open"
-        ).neq(
-            "input_fingerprint", fingerprint
-        ).execute()
-
-        # 3. Inserir
+        # 2. Inserir — se falhar (exceto 23505), nao supersede nada
         payload = _exception_payload(exception)
-        svc.table(_TABLE_EXCEPTIONS).insert(payload).execute()
+        inserted = svc.table(_TABLE_EXCEPTIONS).insert(payload).execute()
+
+        if not inserted.data:
+            logger.warning(
+                "open_or_observe: insert nao retornou registros "
+                "(%s/%s/%s)", kind, sid, fingerprint
+            )
+
+        # 3. Insert ok: agora supersede as abertas anteriores
+        _supersede_other_open(svc, kind, sid, field, code, fingerprint)
         return True
 
     except APIError as e:
         if e.code == _PG_UNIQUE_VIOLATION:
+            # Race: outro processo inseriu a mesma fingerprint
+            # Reobserva e supersede
+            _reobserve_and_supersede(svc, kind, sid, field, code, fingerprint)
             return True
         logger.warning(
             "data_quality_exceptions.open_or_observe: "
@@ -138,6 +176,46 @@ def open_or_observe_exception(
         raise DataQualityStorageError(
             f"open_or_observe failed: type={type(exc).__name__}"
         ) from None
+
+
+def _reobserve_and_supersede(svc, kind, sid, field, code, fingerprint):
+    """Reobserva fingerprint (apos race/violacao) + supersede."""
+    existing = (
+        svc.table(_TABLE_EXCEPTIONS)
+        .select("id")
+        .eq("subject_kind", kind)
+        .eq("subject_id", sid)
+        .eq("field_path", field)
+        .eq("issue_code", code)
+        .eq("input_fingerprint", fingerprint)
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        svc.table(_TABLE_EXCEPTIONS).update({
+            "last_observed_at": _now(),
+        }).eq("id", existing.data[0]["id"]).execute()
+    _supersede_other_open(svc, kind, sid, field, code, fingerprint)
+
+
+def _supersede_other_open(svc, kind, sid, field, code, fingerprint):
+    """Marca como superseded as abertas do mesmo grupo com fingerprint
+    diferente."""
+    svc.table(_TABLE_EXCEPTIONS).update({
+        "status": "superseded",
+    }).eq("subject_kind", kind).eq("subject_id", sid).eq(
+        "field_path", field
+    ).eq("issue_code", code).eq(
+        "status", "open"
+    ).neq(
+        "input_fingerprint", fingerprint
+    ).execute()
+
+    logger.info(
+        "open_or_observe: superseded anteriores para "
+        "%s/%s/%s/%s exceto fingerprint=%s",
+        kind, sid, field, code, fingerprint,
+    )
 
 
 def list_exceptions(
@@ -240,20 +318,24 @@ def get_exception(exception_id: str) -> dict | None:
 
 
 def append_review(review: DataQualityReview) -> bool:
-    """Registra uma revisão append-only.
+    """Registra uma revisão append-only, idempotente por review_id.
 
-    A revisão é vinculada à exceção por exception_ref (que deve ser o
-    UUID da exceção). Nunca atualiza ou remove revisões existentes.
+    Se o mesmo review_id já existir, retorna True sem criar novo
+    registro. Nunca atualiza ou remove revisões existentes.
 
     Args:
         review: DataQualityReview validado pelo contrato.
 
     Returns:
-        True se persistiu. False se Supabase não configurado.
+        True se persistiu ou já existia. False se Supabase não configurado.
 
     Raises:
+        ValueError: se review_id for vazio.
         DataQualityStorageError: em falha real de persistência.
     """
+    if not review.review.review_id or not review.review.review_id.strip():
+        raise ValueError("review_id must be non-empty")
+
     if not _configured():
         logger.info("data_quality_reviews: Supabase ausente — no-op")
         return False
@@ -261,8 +343,25 @@ def append_review(review: DataQualityReview) -> bool:
     try:
         from radar.core.infra.db import get_supabase_service
 
+        svc = get_supabase_service()
+
+        # Idempotencia por review_id
+        existing = (
+            svc.table(_TABLE_REVIEWS)
+            .select("id")
+            .eq("review_id", review.review.review_id)
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            logger.info(
+                "append_review: review_id=%s ja existe — idempotente",
+                review.review.review_id,
+            )
+            return True
+
         payload = _review_payload(review)
-        get_supabase_service().table(_TABLE_REVIEWS).insert(payload).execute()
+        svc.table(_TABLE_REVIEWS).insert(payload).execute()
         return True
 
     except Exception as exc:
@@ -321,7 +420,7 @@ def get_current_review_projection(
                 EvidenceRef(**ref) for ref in (row.get("evidence_refs") or [])
             ],
             review=ReviewInfo(
-                review_id=row["id"],
+                review_id=row["review_id"],
                 actor_id=row["actor_id"],
                 reviewed_at=row["reviewed_at"],
                 overridden=row["decision"] == "correct",
@@ -356,11 +455,7 @@ def _exception_payload(exception: DataQualityException) -> dict:
             exception.produced_state.value if exception.produced_state else None
         ),
         "produced_value": exception.produced_value,
-        "evidence_refs": json.loads(
-            json.dumps(
-                [ref.model_dump(mode="json") for ref in exception.evidence_refs]
-            )
-        ),
+        "evidence_refs": _evidence_refs_payload(exception.evidence_refs),
         "bundle_hash": exception.bundle_hash,
         "producer_version": exception.producer_version,
         "input_fingerprint": exception.input_fingerprint or "",
@@ -379,15 +474,12 @@ def _exception_payload(exception: DataQualityException) -> dict:
 def _review_payload(review: DataQualityReview) -> dict:
     return {
         "schema_version": review.schema_version,
+        "review_id": review.review.review_id,
         "exception_id": review.exception_ref,
         "decision": review.decision,
         "corrected_value": review.corrected_value,
         "justification": review.justification,
-        "evidence_refs": json.loads(
-            json.dumps(
-                [ref.model_dump(mode="json") for ref in review.evidence_refs]
-            )
-        ),
+        "evidence_refs": _evidence_refs_payload(review.evidence_refs),
         "actor_id": review.review.actor_id,
         "reviewed_at": review.review.reviewed_at.isoformat(),
     }
@@ -400,4 +492,6 @@ __all__ = [
     "get_exception",
     "append_review",
     "get_current_review_projection",
+    "_evidence_refs_payload",
+    "_INVALID_FINGERPRINT_MSG",
 ]
