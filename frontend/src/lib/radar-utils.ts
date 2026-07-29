@@ -1,4 +1,9 @@
 import type { MatchedEdital, MatchedEntity } from "@/lib/api";
+import {
+  isContinuousConfirmed,
+  temporalDeadlineText,
+  type TemporalConsumerPayload,
+} from "@/lib/opportunity-temporal";
 
 export type DeadlineUrgency = "closing" | "soon" | "future" | "continuous" | "confirm";
 export type DeadlineFilter = "all" | "closing" | "soon" | "continuous";
@@ -46,8 +51,10 @@ export function parseDeadline(prazo: string | null): Date | null {
     : null;
 }
 
-export function deadlineUrgency(prazo: string | null, now = new Date()): DeadlineUrgency {
-  if (!prazo) return "continuous";
+export function deadlineUrgency(payload: TemporalConsumerPayload, now = new Date()): DeadlineUrgency {
+  if (isContinuousConfirmed(payload)) return "continuous";
+  const prazo = temporalDeadlineText(payload);
+  if (!prazo) return "confirm";
   const deadline = parseDeadline(prazo);
   if (!deadline) return "confirm";
   const days = Math.round((deadline.getTime() - saoPauloToday(now).getTime()) / 86_400_000);
@@ -57,10 +64,15 @@ export function deadlineUrgency(prazo: string | null, now = new Date()): Deadlin
   return "future";
 }
 
-export function urgencyLabel(prazo: string | null, now = new Date()): string {
-  const urgency = deadlineUrgency(prazo, now);
-  if (urgency === "continuous") return "Fluxo contínuo ou prazo não informado";
-  if (urgency === "confirm") return "Prazo a confirmar";
+export function urgencyLabel(payload: TemporalConsumerPayload, now = new Date()): string {
+  const prazo = temporalDeadlineText(payload);
+  const urgency = deadlineUrgency(payload, now);
+  if (urgency === "continuous") return "Fluxo contínuo";
+  if (urgency === "confirm") {
+    return (payload.validity_state ?? "").toLowerCase() === "needs_review"
+      ? "Validade a confirmar"
+      : "Prazo a confirmar";
+  }
   const deadline = parseDeadline(prazo)!;
   const days = Math.round((deadline.getTime() - saoPauloToday(now).getTime()) / 86_400_000);
   if (days === 0) return "Encerra hoje";
@@ -73,7 +85,7 @@ function matchesSetores(item: { setores?: string[] }, selected: string[]): boole
 
 export function filterEditais(editais: MatchedEdital[], filters: RadarFilters): MatchedEdital[] {
   return editais.filter((edital) => {
-    const urgency = deadlineUrgency(edital.prazo);
+    const urgency = deadlineUrgency(edital);
     const eligible = filters.eligibility === "all" || edital.elegibilidade?.status === filters.eligibility;
     const deadline = filters.deadline === "all"
       || urgency === filters.deadline

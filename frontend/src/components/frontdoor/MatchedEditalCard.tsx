@@ -5,6 +5,7 @@ import { STATUS_CONFIG } from "@/lib/constants";
 import type { EditalStatus } from "@/types/edital";
 import type { MatchedEdital, MatchedExcerpt } from "@/lib/api";
 import { deadlineUrgency, urgencyLabel, type DeadlineUrgency } from "@/lib/radar-utils";
+import { temporalBadge, temporalDeadlineText } from "@/lib/opportunity-temporal";
 import { VerdictBlock } from "./VerdictBlock";
 
 function ScoreRing({ score }: { score: number }) {
@@ -71,9 +72,11 @@ export function MatchedEditalCard({
   onCompare?: () => void;
   isCompared?: boolean;
 }) {
-  const statusKey = (edital.status?.toUpperCase() as EditalStatus) ?? "Desconhecido";
-  const statusCfg = STATUS_CONFIG[statusKey] ?? { label: edital.status ?? "—", className: "" };
-  const urgency: DeadlineUrgency = deadlineUrgency(edital.prazo);
+  const badge = temporalBadge(edital);
+  const statusKey = (badge.tone === "active" ? "ABERTA" : "ENCERRADA") as EditalStatus;
+  const statusCfg = STATUS_CONFIG[statusKey] ?? { label: badge.label, className: "" };
+  const urgency: DeadlineUrgency = deadlineUrgency(edital);
+  const prazo = temporalDeadlineText(edital);
 
   return (
     <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm font-sans">
@@ -89,11 +92,17 @@ export function MatchedEditalCard({
             {edital.name}
           </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-content-secondary">
-            <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium", statusCfg.className)}>
-              {statusCfg.label}
-            </span>
-            {edital.prazo && (
-              <span>⏰ {edital.prazo}</span>
+            {badge.tone === "review" ? (
+              <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                {badge.label}
+              </span>
+            ) : (
+              <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium", statusCfg.className)}>
+                {statusCfg.label}
+              </span>
+            )}
+            {prazo && urgency !== "continuous" && urgency !== "confirm" && (
+              <span>⏰ {prazo}</span>
             )}
             {edital.valor && (
               <span>💰 {edital.valor}</span>
@@ -105,7 +114,7 @@ export function MatchedEditalCard({
               "mt-1 text-[11px] font-medium",
               urgency === "closing" ? "text-red-600 dark:text-red-300" : "text-content-secondary",
             )}>
-              {urgencyLabel(edital.prazo)}
+              {urgencyLabel(edital)}
             </p>
           )}
         </div>

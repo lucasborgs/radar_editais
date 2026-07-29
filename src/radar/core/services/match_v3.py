@@ -5,11 +5,9 @@ DELETADO nesta fase). O match usa TEXTO REAL: chunks da empresa (company_chunks,
 §5.4) × chunks do edital (match_chunks, embed contextualizado — gate 1.5) no
 mesmo espaço de embedding. Sem LLM no ranking; parâmetros fixados pelo gate:
 
-  Stage 0 — Vivo (determinístico): deadline MANDA quando presente (>= as_of
-            passa; as_of parametrizável, default hoje); deadline NULL = fluxo
-            contínuo PASSA e o status decide (NULL/aberta/ativa passam). O
-            status congelado no ingest nunca mata um deadline futuro (mesma
-            postura do entity_catalog: "deadline manda").
+  Stage 0 — Vivo (determinístico): usa exclusivamente o read model temporal
+            canônico. Apenas ``active`` passa; ``closed`` e ``needs_review``
+            ficam fora do match ativo.
   Stage 1 — Elegibilidade (eligibility.py, camada única): unsat ELIMINA;
             unknown NUNCA elimina (perfil incompleto é o estado normal).
   Stage 2 — Afinidade: sum-of-max por chunk DA EMPRESA (família ColBERT;
@@ -42,6 +40,7 @@ import os
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from zoneinfo import ZoneInfo
 
 import numpy as np
 
@@ -92,7 +91,7 @@ class _Snapshot:
 _SNAPSHOT: _Snapshot | None = None
 
 _OPP_SQL = """
-select id, kind, source, native_id, name, description, status, deadline, uf,
+select id, kind, source, native_id, name, description, status, deadline, uf, updated_at,
        setores, tecnologias_tags, ticket_min, ticket_max, constraints,
        requisitos_texto, metadata
 from public.entities where kind in ('edital','programa')
@@ -180,13 +179,16 @@ def _get_snapshot() -> _Snapshot:
 # Stages 0-1 (determinísticos, testáveis sem DB)
 # ===========================================================================
 
-def stage0_alive(entity: dict, as_of: datetime.date) -> bool:
-    """Vivo: deadline MANDA quando presente (staleness do status congelado no
-    ingest nunca mata um prazo futuro); deadline NULL = fluxo contínuo, o
-    status decide (NULL passa)."""
-    if entity.get("deadline") is not None:
-        return entity["deadline"] >= as_of
-    return entity.get("status") is None or entity.get("status") in ("aberta", "ativa")
+def stage0_alive(temporal) -> bool:
+    """Stage 0 só aceita a projeção temporal canônica ``active``."""
+    from radar.domain.data_quality import ValidityState
+
+    return temporal.validity_state is ValidityState.ACTIVE
+
+
+def _today_sao_paulo() -> datetime.date:
+    """Dia civil canônico do Stage 0; ``as_of`` explícito sempre prevalece."""
+    return datetime.datetime.now(ZoneInfo("America/Sao_Paulo")).date()
 
 
 def stage1_eligibility(entity: dict, profile) -> dict | None:
@@ -283,6 +285,11 @@ class OpportunityMatch:
     valor: str | None
     url: str | None
     elegibilidade: dict | None = None
+    temporal_mode: str | None = None
+    validity_state: str | None = None
+    temporal_value: str | None = None
+    decision_source: str | None = None
+    last_verified_at: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -301,6 +308,11 @@ class OpportunityMatch:
             "valor": self.valor,
             "url": self.url,
             "elegibilidade": self.elegibilidade,
+            "temporal_mode": self.temporal_mode,
+            "validity_state": self.validity_state,
+            "temporal_value": self.temporal_value,
+            "decision_source": self.decision_source,
+            "last_verified_at": self.last_verified_at,
         }
 
 
@@ -343,14 +355,28 @@ def _valor_display(e: dict) -> str | None:
     return f"R$ {(tmin if tmin is not None else tmax):,.0f}"
 
 
-def _prazo_display(e: dict) -> str | None:
-    d = e.get("deadline")
-    return d.strftime("%d/%m/%Y") if d else None
+def _prazo_display(temporal) -> str | None:
+    if temporal.temporal_mode.value != "fixed" or not temporal.temporal_value:
+        return None
+    try:
+        return datetime.date.fromisoformat(temporal.temporal_value).strftime("%d/%m/%Y")
+    except ValueError:
+        return None
 
 
 def _split_native(native_id: str) -> tuple[str, str]:
     src, _, local = (native_id or "").partition(":")
     return (src, local) if local else ("", native_id)
+
+
+def _status_from_temporal(temporal) -> str:
+    from radar.domain.data_quality import ValidityState
+
+    if temporal.validity_state is ValidityState.ACTIVE:
+        return "aberta"
+    if temporal.validity_state is ValidityState.CLOSED:
+        return "encerrada"
+    return "desconhecido"
 
 
 # ===========================================================================
@@ -405,7 +431,7 @@ def find_matching_opportunities(
     `as_of` parametriza o Stage 0 (default: hoje). `min_affinity` sobrescreve o
     piso (0 = sem piso — usado pela eval p/ medir o ranking completo).
     `rerank` força/desliga o Stage 3 (default: env MATCH_RERANK_ENABLED)."""
-    as_of = as_of or datetime.date.today()
+    as_of = as_of or _today_sao_paulo()
     floor = MIN_AFFINITY if min_affinity is None else min_affinity
     prof = _as_profile_dict(profile)
 
@@ -417,6 +443,14 @@ def find_matching_opportunities(
         return []
 
     snap = _get_snapshot()
+    from radar.core.services.temporal_read_model import (
+        resolve_temporal_read_models,
+        subjects_from_rows,
+    )
+
+    temporal_by_id = resolve_temporal_read_models(
+        subjects_from_rows(snap.opportunities), as_of=as_of,
+    )
     company_setores = infer_company_setores(prof) if boost else set()
 
     matches: list[OpportunityMatch] = []
@@ -424,7 +458,8 @@ def find_matching_opportunities(
     for e in snap.opportunities:
         if e["kind"] not in kinds:
             continue
-        if not stage0_alive(e, as_of):
+        temporal = temporal_by_id.get(e["native_id"])
+        if temporal is None or not stage0_alive(temporal):
             n_stage0 += 1
             continue
         eleg = stage1_eligibility(e, prof)
@@ -446,10 +481,11 @@ def find_matching_opportunities(
             description=(e.get("description") or "")[:240],
             score=best, affinity=affinity,
             setores=list(e.get("setores") or []), matched_excerpts=excerpts,
-            status=("aberta" if e.get("deadline") else e.get("status")),
-            prazo=_prazo_display(e), valor=_valor_display(e),
+            status=_status_from_temporal(temporal),
+            prazo=_prazo_display(temporal), valor=_valor_display(e),
             url=(e.get("metadata") or {}).get("url"),
             elegibilidade=eleg,
+            **temporal.public_payload(),
         ))
     matches.sort(key=lambda m: m.affinity, reverse=True)
     matches = matches[:top_k]

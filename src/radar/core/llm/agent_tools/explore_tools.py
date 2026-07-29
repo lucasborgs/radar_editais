@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from langchain_core.tools import BaseTool, tool
 
@@ -49,6 +50,48 @@ def _format_provenance(provenance: dict) -> str:
         else:
             lines.append(f"[PROVENANCE:{path}] state={state} (sem citação verificável)")
     return "\n".join(lines)
+
+
+def _temporal_status_label(card: dict) -> str:
+    state = str(card.get("validity_state") or "").strip().lower()
+    if state == "active":
+        return "ABERTA"
+    if state == "closed":
+        return "ENCERRADA"
+    return "Validade a confirmar"
+
+
+def _temporal_deadline_label(card: dict) -> str | None:
+    state = str(card.get("validity_state") or "").strip().lower()
+    mode = str(card.get("temporal_mode") or "").strip().lower()
+    deadline = (card.get("deadline") or "").strip()
+    if state == "needs_review":
+        return "Validade a confirmar"
+    if state == "active" and mode == "continuous":
+        return "Fluxo contínuo confirmado"
+    return deadline or None
+
+
+def _temporal_verification_label(card: dict) -> str | None:
+    source = str(card.get("decision_source") or "").strip().lower()
+    verified_at = str(card.get("last_verified_at") or "").strip()
+    source_label = {
+        "human_review": "Revisão humana",
+        "source": "Fonte monitorada",
+        "legacy": "Catálogo legado",
+    }.get(source)
+    if verified_at:
+        try:
+            formatted = datetime.fromisoformat(
+                verified_at.replace("Z", "+00:00")
+            ).astimezone(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")
+        except ValueError:
+            formatted = ""
+    else:
+        formatted = ""
+    if source_label and formatted:
+        return f"{source_label} em {formatted}"
+    return source_label or (f"Verificado em {formatted}" if formatted else None)
 
 
 def build_explore_tools() -> list[BaseTool]:
@@ -83,9 +126,10 @@ def build_explore_tools() -> list[BaseTool]:
         lines = [f"Encontrados {len(editais)} editais:"]
         for e in editais:
             themes = ", ".join(e.get("themes", [])[:3])[:60]
+            prazo = _temporal_deadline_label(e) or "não informado"
             lines.append(
-                f"  ID:{e['id']} | {e['title'][:60]} | {e.get('status', '?')} "
-                f"| prazo:{e.get('deadline', '?')} | temas:{themes}"
+                f"  ID:{e['id']} | {e['title'][:60]} | {_temporal_status_label(e)} "
+                f"| prazo:{prazo} | temas:{themes}"
             )
         return "\n".join(lines)
 
@@ -110,10 +154,14 @@ def build_explore_tools() -> list[BaseTool]:
             )
         parts = [
             f"Edital {edital_id} — {card.get('title', '(sem título)')}",
-            f"Status: {card.get('status', '?')}",
+            f"Status: {_temporal_status_label(card)}",
         ]
-        if card.get("deadline"):
-            parts.append(f"Prazo: {card['deadline']}")
+        deadline_label = _temporal_deadline_label(card)
+        if deadline_label:
+            parts.append(f"Prazo: {deadline_label}")
+        verification = _temporal_verification_label(card)
+        if verification:
+            parts.append(f"Verificação: {verification}")
         if card.get("objective"):
             parts.append(f"Objetivo: {card['objective']}")
         if card.get("mechanism"):
@@ -253,11 +301,18 @@ def build_explore_tools() -> list[BaseTool]:
             return f"Erro ao explorar oportunidades: {e}."
 
         out: list[str] = [f"Panorama de oportunidades em '{tema}':"]
-        abertos = sum(1 for e in editais if e.get("status") == "ABERTA")
+        abertos = sum(
+            1 for e in editais
+            if str(e.get("validity_state") or "").strip().lower() == "active"
+        )
         info = f" ({abertos} {'aberto' if abertos == 1 else 'abertos'})" if abertos else ""
         out.append(f"\n📋 Editais/desafios ({len(editais)}){info}:")
         for e in editais[:10]:
-            out.append(f"  ID:{e.get('id', '?')} | {e.get('title', '')[:60]} | {e.get('status', '?')} | prazo:{e.get('deadline', '?')}")
+            prazo = _temporal_deadline_label(e) or "não informado"
+            out.append(
+                f"  ID:{e.get('id', '?')} | {e.get('title', '')[:60]} | "
+                f"{_temporal_status_label(e)} | prazo:{prazo}"
+            )
         if not editais:
             out.append("  (nenhum edital com esse tema)")
         out.append(f"\n🔬 ICTs parceiras ({len(icts)}):")

@@ -113,6 +113,16 @@ corrente e conflito sem precedência comprovada permanece `conflicting`.
 não há backfill, migration adicional ou inferência por nome/data. Detalhe em
 [`specs/radar-data-trust-04-source-bundles.md`](specs/radar-data-trust-04-source-bundles.md).
 
+**Revisão humana de exceções (Radar Data Trust 05):** a migration 046 adiciona
+`data_quality_exceptions` e `data_quality_reviews` como fila administrativa
+service-role-only. O detector temporal roda em shadow após o ingest gold,
+revisões são append-only e idempotentes por `review_id`, e um único read model
+temporal em lote expõe apenas `temporal_mode`, `validity_state`,
+`temporal_value`, `decision_source` e `last_verified_at`. `continuous` exige
+evidência oficial explícita e recuperável; `needs_review` e `closed` não entram
+no Radar ativo. Ecossistema, Explorar, Escrita e Aplicações leem o mesmo
+payload canônico, enquanto investidores continuam fora dessas regras.
+
 ---
 
 ## 2. Radar — funil de match em 4 estágios
@@ -123,7 +133,7 @@ nunca sobre conceitos abstratos extraídos.
 ```mermaid
 flowchart TB
   P["Perfil da empresa + documentos da library<br/>(chunkados por workspace; HyDE expande<br/>perfis ralos no cold start)"]
-  P --> S0["Stage 0 — Vivo<br/>prazo futuro ou fluxo contínuo (determinístico)"]
+  P --> S0["Stage 0 — Vigência canônica<br/>read model temporal (active only)<br/>prazo >= hoje ou contínuo confirmado"]
   S0 --> S1["Stage 1 — Elegibilidade dura<br/>constraints × perfil · inelegível ELIMINA<br/>desconhecido NUNCA elimina"]
   S1 --> S2["Stage 2 — Afinidade semântica<br/>melhor pareamento por trecho da empresa<br/>(sum-of-max) + boost de setores · sem LLM"]
   S2 --> S3["Stage 3 — Precisão (top 5-10)<br/>veredito LLM lendo os trechos pareados<br/>+ ficha da oportunidade (async, cacheado)"]

@@ -1,6 +1,6 @@
 # Spec-mãe — Radar Data Trust
 
-**Status:** vigente (specs 00–04 concluídas) · **Data:** 2026-07-27
+**Status:** vigente (specs 00–05 concluídas) · **Data:** 2026-07-29
 **Documento-pai:** [`system-coherence.md`](system-coherence.md)
 **Família de specs:** `radar-data-trust-NN-<capacidade>.md`
 **Perfis afetados:** usuário de produto, operador e usuário técnico
@@ -282,7 +282,7 @@ afirmar cobertura total do ecossistema.
 | 02 | `radar-data-trust-02-quality-gates.md` | goldens representativos, gates por camada e E2E | 00; contrato de 01 | vigente; auditoria Codex aprovada |
 | 03 | [`radar-data-trust-03-source-coverage.md`](radar-data-trust-03-source-coverage.md) | descoberta aberta multicanal, saúde, atribuição e métricas de cobertura | 00 e sinais de 02 | vigente (RT03-T01 a T07 concluídas e auditadas) |
 | 04 | [`radar-data-trust-04-source-bundles.md`](radar-data-trust-04-source-bundles.md) | documentos de oportunidades, retificações e páginas oficiais de atores versionados | 01; métricas de 02 | vigente (RT04-T01 a T07 concluídas e auditadas; merge `285a89746`) |
-| 05 | [`radar-data-trust-05-exception-review.md`](radar-data-trust-05-exception-review.md) | revisão humana por conflito/baixa confiança e feedback | 01, 02 e 04 | aprovada; implementação não iniciada |
+| 05 | [`radar-data-trust-05-exception-review.md`](radar-data-trust-05-exception-review.md) | revisão humana por conflito/baixa confiança e feedback | 01, 02 e 04 | vigente (RT05-T01 a T09 concluídas; reconciliação local fechada em 2026-07-29) |
 | 06 | `radar-data-trust-06-adaptive-extraction.md` | cascata texto/layout/OCR/visão dirigida por falhas medidas | 02 e 04; sinais de 05 | planejada |
 
 Specs futuras só entram nesta tabela após problema comprovado. A numeração não

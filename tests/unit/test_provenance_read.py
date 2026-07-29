@@ -258,8 +258,8 @@ def test_row_to_card_chaves_preexistentes_inalteradas() -> None:
     assert card["id"] == "finep:591"
     assert card["title"] == "Edital Stable"
     assert card["source"] == "finep"
-    assert card["status"] == "ABERTA"
-    assert card["deadline"] == "31/12/2026"
+    assert card["status"] == "Desconhecido"
+    assert card["deadline"] == ""
     assert card["themes"] == ["energia"]
     assert card["objective"] == "Descrição estável"
     assert card["key_requirements"] == ["requisito A"]

@@ -62,16 +62,13 @@ def _to_date(raw: Any) -> date | None:
         return None
 
 
-def _status_from_row(row: dict) -> str:
-    """ABERTA/ENCERRADA pelo deadline (recomputado a cada leitura, não confia no
-    valor congelado da coluna `status`); fallback ao status extraído."""
-    d = _to_date(row.get("deadline"))
-    if d:
-        return "ABERTA" if d >= date.today() else "ENCERRADA"
-    raw = (row.get("status") or "").strip().lower()
-    if raw.startswith("abert") or raw == "ativa":
+def _status_from_temporal(temporal) -> str:
+    """Display derivado apenas do read model temporal canônico."""
+    from radar.domain.data_quality import ValidityState
+
+    if temporal.validity_state is ValidityState.ACTIVE:
         return "ABERTA"
-    if raw.startswith(("encerr", "fechad", "conclu", "expir")) or raw == "inativa":
+    if temporal.validity_state is ValidityState.CLOSED:
         return "ENCERRADA"
     return "Desconhecido"
 
@@ -81,6 +78,33 @@ def _deadline_display(row: dict) -> str:
     SQL é ISO."""
     d = _to_date(row.get("deadline"))
     return d.strftime("%d/%m/%Y") if d else ""
+
+
+def _deadline_from_temporal(temporal) -> str:
+    """Prazo de display somente quando a projeção canônica é fixa."""
+    if temporal.temporal_mode.value != "fixed":
+        return ""
+    return _deadline_display({"deadline": temporal.temporal_value})
+
+
+def _missing_temporal_read_model(row: dict):
+    """Fallback estritamente conservador para chamadas internas legadas.
+
+    Os caminhos produtivos sempre injetam o lote por ``_temporal_for_rows``.
+    Este fallback preserva segurança para helpers históricos chamados isoladamente
+    por testes e integrações, sem reimplementar nenhuma regra temporal local.
+    """
+    from radar.core.services.temporal_read_model import TemporalReadModel
+    from radar.domain.data_quality import TemporalMode, ValidityState
+
+    value = _to_date(row.get("deadline"))
+    return TemporalReadModel(
+        temporal_mode=TemporalMode.UNKNOWN,
+        validity_state=ValidityState.NEEDS_REVIEW,
+        temporal_value=value.isoformat() if value else None,
+        decision_source="legacy",
+        last_verified_at=row.get("updated_at") or None,
+    )
 
 
 def _value_display(row: dict) -> str | None:
@@ -153,10 +177,11 @@ def _rel_names_batch(client, entity_ids: list[str], rel_type: str) -> dict[str, 
 
 def _row_to_card(
     row: dict, *, programs: dict[str, list[str]], icts: dict[str, list[str]],
-    agencies: dict[str, list[str]],
+    agencies: dict[str, list[str]], temporal=None,
 ) -> dict:
     from radar.core.skills import mechanism_display
 
+    temporal = temporal or _missing_temporal_read_model(row)
     eid = row["id"]
     meta = row.get("metadata") or {}
     mecanismo = [row["mecanismo"]] if row.get("mecanismo") else []
@@ -166,8 +191,8 @@ def _row_to_card(
         "id": row["native_id"],
         "source": row["source"],
         "title": row.get("name") or "",
-        "status": _status_from_row(row),
-        "deadline": _deadline_display(row),
+        "status": _status_from_temporal(temporal),
+        "deadline": _deadline_from_temporal(temporal),
         "themes": list(row.get("setores") or []),
         "technologies": tags,
         "programs": programs.get(eid, []),
@@ -193,6 +218,7 @@ def _row_to_card(
         "document_urls": [],
         "collected_at": row.get("updated_at") or "",
         "provenance": public_provenance(row.get("provenance")),
+        **temporal.public_payload(),
     }
 
 
@@ -225,7 +251,10 @@ def get_edital(edital_id: str) -> dict | None:
     programs = _rel_names_batch(client, [rid], "subordinado_a")
     icts = _rel_names_batch(client, [rid], "exige_parceria_com")
     agencies = _rel_names_batch(client, [rid], "operado_por")
-    return _row_to_card(row, programs=programs, icts=icts, agencies=agencies)
+    temporal = _temporal_for_rows([row]).get(row["native_id"])
+    if temporal is None:
+        return None
+    return _row_to_card(row, programs=programs, icts=icts, agencies=agencies, temporal=temporal)
 
 
 def list_editais(
@@ -237,7 +266,14 @@ def list_editais(
     programs = _rel_names_batch(client, ids, "subordinado_a")
     icts = _rel_names_batch(client, ids, "exige_parceria_com")
     agencies = _rel_names_batch(client, ids, "operado_por")
-    cards = [_row_to_card(r, programs=programs, icts=icts, agencies=agencies) for r in rows]
+    temporal_by_id = _temporal_for_rows(rows)
+    cards = [
+        _row_to_card(
+            r, programs=programs, icts=icts, agencies=agencies,
+            temporal=temporal_by_id[r["native_id"]],
+        )
+        for r in rows if r["native_id"] in temporal_by_id
+    ]
 
     if status:
         cards = [c for c in cards if c["status"].upper() == status.upper()]
@@ -257,7 +293,7 @@ def list_editais(
 _CURATED_STATUS = {"ativa": "ABERTA", "inativa": "ENCERRADA"}
 
 
-def _curated_card(row: dict, *, agencies: dict[str, list[str]]) -> dict:
+def _curated_card(row: dict, *, agencies: dict[str, list[str]], temporal=None) -> dict:
     """Ficha de um curado (programa/investidor) — mesmo shape de `_curated_card`
     do legado, derivado da linha de `entities` + arestas."""
     from radar.core.skills import mechanism_display
@@ -266,14 +302,18 @@ def _curated_card(row: dict, *, agencies: dict[str, list[str]]) -> dict:
     mecanismo = [row["mecanismo"]] if row.get("mecanismo") else []
     tags = list(row.get("tecnologias_tags") or [])
     estagio = _as_list(meta.get("estagio_alvo"))
-    return {
+    card = {
         "id": row["native_id"],
         "source": row["source"],
         "kind": row.get("kind") or "",
         "aperture": row.get("formato") or "",
         "title": row.get("name") or "",
-        "status": _CURATED_STATUS.get((row.get("status") or "").strip().lower(), "Desconhecido"),
-        "deadline": _deadline_display(row),
+        "status": (
+            _status_from_temporal(temporal)
+            if temporal is not None
+            else _CURATED_STATUS.get((row.get("status") or "").strip().lower(), "Desconhecido")
+        ),
+        "deadline": _deadline_from_temporal(temporal) if temporal is not None else _deadline_display(row),
         "objective": row.get("description") or "",
         "mecanismo": mecanismo,
         "mechanism": ", ".join(mechanism_display(m) for m in mecanismo),
@@ -299,21 +339,80 @@ def _curated_card(row: dict, *, agencies: dict[str, list[str]]) -> dict:
         "collected_at": row.get("updated_at") or "",
         "provenance": public_provenance(row.get("provenance")),
     }
+    if temporal is not None:
+        card.update(temporal.public_payload())
+    return card
 
 
 def get_opportunity(opp_id: str) -> dict | None:
     """Ficha unificada (D1): resolve edital OU curado (programa/investidor).
     Superset de `get_edital` — o router /oportunidades/{id} chama esta. ICT não
     é ficha direta (paridade com o legado)."""
-    card = get_edital(opp_id)
-    if card is not None:
-        return card
+    if not (opp_id or "").startswith("investidor:"):
+        card = get_edital(opp_id)
+        if card is not None:
+            return card
     client = _client()
     row = _resolve_native(client, opp_id, ["programa", "investidor"])
     if row is None:
         return None
     agencies = _rel_names_batch(client, [row["id"]], "operado_por")
-    return _curated_card(row, agencies=agencies)
+    if row.get("kind") == "investidor":
+        return _curated_card(row, agencies=agencies)
+    temporal = _temporal_for_rows([row]).get(row["native_id"])
+    if temporal is None:
+        return None
+    return _curated_card(row, agencies=agencies, temporal=temporal)
+
+
+def get_opportunity_cards_by_native_ids(native_ids: list[str]) -> dict[str, dict]:
+    """Cards de editais/programas com um único lote temporal.
+
+    Destinado aos consumidores que já carregaram uma coleção de oportunidades.
+    Investidores são propositalmente excluídos: não são sujeitos temporais.
+    """
+    ids = sorted({item.strip() for item in native_ids if isinstance(item, str) and item.strip()})
+    if not ids:
+        return {}
+    client = _client()
+    rows = (
+        client.table("entities").select("*").in_("native_id", ids)
+        .in_("kind", ["edital", "programa"]).execute().data or []
+    )
+    if not rows:
+        return {}
+    entity_ids = [row["id"] for row in rows]
+    agencies = _rel_names_batch(client, entity_ids, "operado_por")
+    programs = _rel_names_batch(client, entity_ids, "subordinado_a")
+    icts = _rel_names_batch(client, entity_ids, "exige_parceria_com")
+    temporal_by_id = _temporal_for_rows(rows)
+    cards: dict[str, dict] = {}
+    for row in rows:
+        temporal = temporal_by_id.get(row["native_id"])
+        if temporal is None:
+            continue
+        if row.get("kind") == "edital":
+            cards[row["native_id"]] = _row_to_card(
+                row, programs=programs, icts=icts, agencies=agencies, temporal=temporal,
+            )
+        else:
+            cards[row["native_id"]] = _curated_card(row, agencies=agencies, temporal=temporal)
+    return cards
+
+
+def get_opportunity_titles(native_ids: list[str]) -> dict[str, str]:
+    """Títulos em lote para listas; não toca no read model temporal."""
+    ids = sorted({item.strip() for item in native_ids if isinstance(item, str) and item.strip()})
+    if not ids:
+        return {}
+    rows = (
+        _client().table("entities").select("native_id,name").in_("native_id", ids)
+        .execute().data or []
+    )
+    return {
+        row["native_id"]: (row.get("name") or "").strip()
+        for row in rows if row.get("native_id") and (row.get("name") or "").strip()
+    }
 
 
 # ===========================================================================
@@ -339,21 +438,26 @@ def list_entity_catalog(
     if kind is None:
         return []
     client = _client()
-    rows = client.table("entities").select(
-        "native_id,name,description,setores,tecnologias_tags"
-    ).eq("kind", kind).execute().data or []
+    fields = "native_id,name,description,setores,tecnologias_tags"
+    if kind == "programa":
+        fields += ",deadline,status,updated_at"
+    rows = client.table("entities").select(fields).eq("kind", kind).execute().data or []
+    temporal_by_id = _temporal_for_rows(rows) if kind == "programa" else {}
     out: list[dict] = []
     for r in rows:
         themes = list(r.get("setores") or []) + list(r.get("tecnologias_tags") or [])
         if tema and not _theme_match(tema, themes):
             continue
-        out.append({
+        item = {
             "id": r["native_id"],
             "name": (r.get("name") or "").strip(),
             "description": r.get("description") or "",
             "themes": sorted(set(themes)),
             "type": _KIND_TYPE[kind],
-        })
+        }
+        if kind == "programa" and r["native_id"] in temporal_by_id:
+            item.update(temporal_by_id[r["native_id"]].public_payload())
+        out.append(item)
         if len(out) >= limit:
             break
     return out
@@ -405,6 +509,10 @@ def list_opportunities(tipo: str | None = None, limit: int = 200) -> list[dict]:
                 "themes": c.get("themes", []), "status": c.get("status", "Desconhecido"),
                 "deadline": c.get("deadline", ""), "fonte_recurso": c.get("fonte_recurso", []),
                 "aperture": c.get("aperture", ""), "macro_temas": c.get("macro_temas", []),
+                **{key: c.get(key) for key in (
+                    "temporal_mode", "validity_state", "temporal_value",
+                    "decision_source", "last_verified_at",
+                )},
             })
     for want, catalog_key, t in (
         ("programa", "programas", "programa"),
@@ -416,6 +524,10 @@ def list_opportunities(tipo: str | None = None, limit: int = 200) -> list[dict]:
                 result.append({
                     "id": e["id"], "title": e["name"], "type": t,
                     "themes": e.get("themes", []), "description": e.get("description", ""),
+                    **({key: e.get(key) for key in (
+                        "temporal_mode", "validity_state", "temporal_value",
+                        "decision_source", "last_verified_at",
+                    )} if t == "programa" else {}),
                 })
     return result[:limit]
 
@@ -498,7 +610,26 @@ def get_entity_temporal(native_id: str) -> dict | None:
     row = _resolve_native(client, native_id, ["edital", "programa"])
     if row is None:
         return None
-    return {"deadline": _deadline_display(row) or None, "status": row.get("status")}
+    temporal = _temporal_for_rows([row]).get(row["native_id"])
+    if temporal is None:
+        return None
+    value = temporal.temporal_value
+    deadline = _deadline_display({"deadline": value}) if temporal.temporal_mode.value == "fixed" else None
+    return {
+        "deadline": deadline or None,
+        "status": _status_from_temporal(temporal),
+        **temporal.public_payload(),
+    }
+
+
+def _temporal_for_rows(rows: list[dict]):
+    """Única ponte do catálogo para o read model temporal em lote."""
+    from radar.core.services.temporal_read_model import (
+        resolve_temporal_read_models,
+        subjects_from_rows,
+    )
+
+    return resolve_temporal_read_models(subjects_from_rows(rows))
 
 
 # ===========================================================================

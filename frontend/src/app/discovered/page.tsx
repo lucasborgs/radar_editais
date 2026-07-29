@@ -17,6 +17,7 @@ import {
   type SourceCoverageResponse,
   ApiError,
 } from "@/lib/api";
+import { AdminDataQualityExceptions } from "@/components/discovered/AdminDataQualityExceptions";
 
 export default function DiscoveredPage() {
   const { getToken } = useAuth();
@@ -27,6 +28,7 @@ export default function DiscoveredPage() {
   const [actingOn, setActingOn] = useState<string | null>(null);
   const [editalInputs, setEditalInputs] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<"pending" | "all">("pending");
+  const [section, setSection] = useState<"discovery" | "exceptions">("discovery");
   const [expandedRelevance, setExpandedRelevance] = useState<Record<string, boolean>>({});
   const [coverage, setCoverage] = useState<SourceCoverageResponse | null>(null);
   const [coverageLoading, setCoverageLoading] = useState(false);
@@ -293,8 +295,38 @@ export default function DiscoveredPage() {
           Oportunidades encontradas pela torneira web. Revise, cole o link do
           edital (PDF) e promova para entrar no sistema.
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSection("discovery")}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-xs font-semibold font-sans transition-colors",
+              section === "discovery"
+                ? "bg-primary text-white"
+                : "bg-surface text-content-secondary border border-border hover:bg-surface/80",
+            )}
+          >
+            Descoberta
+          </button>
+          <button
+            type="button"
+            onClick={() => setSection("exceptions")}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-xs font-semibold font-sans transition-colors",
+              section === "exceptions"
+                ? "bg-primary text-white"
+                : "bg-surface text-content-secondary border border-border hover:bg-surface/80",
+            )}
+          >
+            Exceções de dados
+          </button>
+        </div>
       </div>
 
+      {section === "exceptions" ? (
+        <AdminDataQualityExceptions token={token} />
+      ) : (
+        <>
       {/* Filtros */}
       <div className="mb-4 flex items-center gap-2">
         <button
@@ -705,6 +737,8 @@ export default function DiscoveredPage() {
             </li>
           ))}
         </ul>
+      )}
+        </>
       )}
     </div>
   );

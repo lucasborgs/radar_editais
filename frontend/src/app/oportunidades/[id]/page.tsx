@@ -7,6 +7,12 @@ import { StatusBadge } from "@/components/ui";
 import { VerdictBlock } from "@/components/frontdoor/VerdictBlock";
 import { getOportunidadeById, fetchMatchVerdicts } from "@/lib/api";
 import { cn, parseDeadline } from "@/lib/utils";
+import {
+  isContinuousConfirmed,
+  temporalBadge,
+  temporalDeadlineText,
+  temporalVerificationNote,
+} from "@/lib/opportunity-temporal";
 import type { MatchVerdict } from "@/lib/api";
 import type {
   OportunidadeDetail,
@@ -24,13 +30,6 @@ const KIND_LABEL: Record<string, string> = {
   programa: "Programa",
   investimento: "Investimento",
   desafio: "Desafio",
-};
-
-const APERTURE_LABEL: Record<string, string> = {
-  prazo: "Prazo definido",
-  continua: "Fluxo contínuo",
-  recorrente: "Recorrente",
-  fechada: "Encerrada",
 };
 
 const PORTE_LABEL: Record<string, string> = {
@@ -188,8 +187,16 @@ export default function OportunidadeDetailPage() {
   }
 
   const kindLabel = KIND_LABEL[detail.kind] ?? detail.kind;
-  const apertureLabel = APERTURE_LABEL[detail.aperture];
   const isEdital = detail.kind === "edital";
+  const badge = temporalBadge(detail);
+  const temporalDeadline = temporalDeadlineText(detail);
+  const verificationNote = temporalVerificationNote(detail);
+  const apertureLabel = isContinuousConfirmed(detail)
+    ? "Fluxo contínuo"
+    : detail.aperture === "recorrente"
+      ? "Recorrente"
+      : "";
+  const showsTemporalStatus = detail.kind === "edital" || detail.kind === "programa" || !!detail.validity_state;
   const value = valueLabel(detail.value);
   const ticket = valueLabel(detail.ticket_range);
 
@@ -213,7 +220,15 @@ export default function OportunidadeDetailPage() {
               <ProvenanceHint provenance={detail.provenance["name"]} curationLabel="catalogo" />
             )}
           </h1>
-          {isEdital && <StatusBadge status={detail.status as EditalStatus} />}
+          {showsTemporalStatus && (
+            badge.tone === "review" ? (
+              <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium font-sans text-amber-700 dark:text-amber-300">
+                {badge.label}
+              </span>
+            ) : (
+              <StatusBadge status={(badge.tone === "active" ? "ABERTA" : "ENCERRADA") as EditalStatus} />
+            )
+          )}
         </div>
 
         {/* Kind / aperture / fonte badges */}
@@ -233,11 +248,18 @@ export default function OportunidadeDetailPage() {
           ))}
         </div>
 
+        {badge.tone === "review" && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+            Validade a confirmar. Esta oportunidade permanece consultável, mas não deve ser tratada como aberta até nova verificação.
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 mb-4">
-          {detail.deadline && (() => {
-            const parsed = parseDeadline(detail.deadline);
-            return <InfoRow label="Prazo" value={parsed ?? detail.deadline} />;
+          {temporalDeadline && (() => {
+            const parsed = parseDeadline(temporalDeadline);
+            return <InfoRow label="Prazo" value={parsed ?? temporalDeadline} />;
           })()}
+          {verificationNote && <InfoRow label="Verificação" value={verificationNote} />}
           {detail.mechanism && <InfoRow label="Mecanismo" value={detail.mechanism} provenance={detail.provenance?.["mecanismo"]} />}
           {value && <InfoRow label="Valor" value={value} />}
           {ticket && !value && <InfoRow label="Ticket" value={ticket} />}

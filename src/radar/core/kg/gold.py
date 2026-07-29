@@ -468,6 +468,7 @@ def _edital_metadata(source: str, stem: str, blocks: list[dict]) -> dict:
         "uf": _SOURCE_UF.get(source),
         "descricao_bronze": _ws(rec.get("descricao") or ""),
         "metadata": {k: v for k, v in meta.items() if v},
+        "raw_status": rec.get("status"),
     }
 
 
@@ -1108,6 +1109,9 @@ def _ingest_editais(
     from radar.core.kg.constraints_producer import CONSTRAINTS_MODEL, produce_from_text
     from radar.core.llm.llm_client import make_client
     from radar.core.retrieval.embedder import embed_query
+    from radar.core.services.temporal_quality import (
+        check_edital_temporal_quality as _check_temporal,
+    )
 
     model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
     client = make_client(api_key=os.environ["OPENAI_API_KEY"], max_retries=6)
@@ -1220,6 +1224,12 @@ def _ingest_editais(
                     )
                     stats["subordinado_a"] += 1
             stats["edital"] += 1
+            # RT05-T03: temporal quality detector (shadow, best-effort)
+            _check_temporal(
+                subject_id=native_id,
+                deadline=md["deadline"],
+                status=md.get("raw_status", md["status"]),
+            )
         except Exception as e:  # noqa: BLE001 — 1 edital não derruba o batch
             logger.warning("edital %s falhou: %s", native_id, e)
             stats["errors"] += 1

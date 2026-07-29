@@ -1,7 +1,8 @@
 """Serialização do pipeline (GET /applications).
 
 Foca na lógica pura de junção/serialização (sem rede/HTTP):
-  - days_left derivado do prazo do card (futuro → +, passado → -, ausente → None);
+  - days_left derivado do prazo do card com o dia civil de São Paulo
+    (futuro → +, passado → -, ausente → None);
   - progress_pct a partir da writing_session (preenchidas/total);
   - edital_title cai para None quando o card não existe.
 
@@ -106,15 +107,25 @@ def test_serialize_uses_session_progress():
     assert item["session_id"] == "sess-1"
 
 
-# ---- _build_pipeline_items (junção wiki + sessions em lote) -----------------
+# ---- _build_pipeline_items (cards temporais + sessions em lote) -------------
 
 def test_build_pipeline_items_maps_card_and_session(monkeypatch):
     future = (date.today() + timedelta(days=3)).strftime("%d/%m/%Y")
     cards = {
         "finep:1": {"title": "Edital Um", "deadline": future},
-        "finep:2": None,  # card ausente
+        # card ausente não precisa aparecer no mapa
     }
-    monkeypatch.setattr(api.entity_catalog, "get_edital", lambda eid: cards.get(eid))
+    calls = []
+
+    def batch(ids):
+        calls.append(ids)
+        return cards
+
+    monkeypatch.setattr(api.entity_catalog, "get_opportunity_cards_by_native_ids", batch)
+    monkeypatch.setattr(
+        api.entity_catalog, "get_edital",
+        lambda _: (_ for _ in ()).throw(AssertionError("não usar leitura unitária")),
+    )
 
     rows = [
         _row(id="a1", edital_id="finep:1", session_id="s1"),
@@ -135,3 +146,16 @@ def test_build_pipeline_items_maps_card_and_session(monkeypatch):
     assert items[1]["edital_title"] is None
     assert items[1]["days_left"] is None
     assert items[1]["progress_pct"] == 0
+    assert calls == [["finep:1", "finep:2"]]
+
+
+def test_days_left_uses_sao_paulo_day_helper(monkeypatch):
+    monkeypatch.setattr(api, "today_sao_paulo", lambda: date(2030, 1, 1))
+
+    item = api._serialize_application(
+        _row(),
+        {"title": "Edital SP", "deadline": "02/01/2030"},
+        None,
+    )
+
+    assert item["days_left"] == 1

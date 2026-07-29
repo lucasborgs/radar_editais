@@ -526,7 +526,7 @@ constraint_enums:
 
 ```yaml
 vigencia_rules:
-  vigente: "deadline parseável E deadline > hoje"
+  vigente: "deadline parseável E deadline >= hoje (fim do dia America/Sao_Paulo)"
   historico: "caso contrário"
   deadline_format: "dd/mm/yyyy"
 ```
@@ -537,12 +537,29 @@ Aplicada ao construir o índice, antes de classificar vigência:
 
 ```yaml
 status_normalization:
-  - "SE deadline parseável AND deadline > hoje  → status = ABERTA"
+  - "SE deadline parseável AND deadline >= hoje (fim do dia)  → status = ABERTA"
   - "SENÃO SE raw_status == 'ENCERRADA'         → status = ENCERRADA"
   - "SENÃO                                      → status = raw_status (preserva Desconhecido, RESULTADO_DIVULGADO, etc.)"
 ```
 
 Motivação: status bruto do portal nem sempre é confiável; prazo futuro é evidência forte de abertura.
+
+### 7.3 Projeção temporal canônica
+
+```yaml
+temporal_review_contract:
+  temporal_mode: [fixed, continuous, unknown]
+  validity_state: [active, closed, needs_review]
+  continuous: "somente com evidencia oficial explicita e recuperavel"
+  open_without_deadline: "status aberto sem prazo e sem evidencia -> unknown/needs_review"
+  radar_active: "somente validity_state=active entra no Radar ativo"
+  public_payload:
+    [temporal_mode, validity_state, temporal_value, decision_source, last_verified_at]
+```
+
+O payload acima e o read model temporal correspondente valem para oportunidades
+e programas. Investidores permanecem fora dessas regras temporais e nao recebem
+esses campos.
 
 ---
 

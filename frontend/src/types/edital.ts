@@ -95,6 +95,11 @@ export interface OportunidadeDetail {
   official_url: string;
   document_urls: string[];
   collected_at: string;
+  temporal_mode?: string | null;
+  validity_state?: string | null;
+  temporal_value?: string | null;
+  decision_source?: string | null;
+  last_verified_at?: string | null;
   // Curated-only (programa/investimento):
   estagio_alvo?: string[];
   ticket_range?: TicketRange | "";

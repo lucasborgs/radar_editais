@@ -8,15 +8,9 @@ import type { Column } from "@/components/ui";
 import { truncate, parseDeadline } from "@/lib/utils";
 import { getDashboardStats, getOpportunities } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
+import { temporalBadge, temporalDeadlineText } from "@/lib/opportunity-temporal";
 import type { DashboardStats, EditalStatus } from "@/types/edital";
 import type { OpportunityEntry } from "@/types/oportunidade";
-
-const APERTURE_LABEL: Record<string, string> = {
-  prazo: "",
-  continua: "Fluxo contínuo",
-  recorrente: "Recorrente",
-  fechada: "Encerrada",
-};
 
 type TypeFilter = "all" | "edital" | "programa" | "investidor" | "ict";
 
@@ -79,22 +73,38 @@ const COLUMNS: Column<OpportunityEntry>[] = [
   {
     key: "status",
     header: "Status",
-    render: (v, row) =>
-      row.type === "edital" ? <StatusBadge status={(v as EditalStatus) ?? "Desconhecido"} /> : <span className="text-xs text-content-secondary">—</span>,
+    render: (_v, row) => {
+      if (row.type !== "edital" && row.type !== "programa") {
+        return <span className="text-xs text-content-secondary">—</span>;
+      }
+      const badge = temporalBadge(row);
+      if (badge.tone === "review") {
+        return (
+          <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium font-sans text-amber-700 dark:text-amber-300">
+            {badge.label}
+          </span>
+        );
+      }
+      const status = (badge.tone === "active" ? "ABERTA" : "ENCERRADA") as EditalStatus;
+      return <StatusBadge status={status} />;
+    },
   },
   {
     key: "deadline",
     header: "Prazo",
     numeric: true,
-    render: (v, row) => {
-      if (row.type !== "edital") return <span className="text-xs text-content-secondary">—</span>;
-      const aperture = (row as unknown as Record<string, unknown>).aperture as string | undefined;
-      const label = APERTURE_LABEL[aperture ?? ""];
-      if (label) return <span className="text-xs">{label}</span>;
-      const raw = String(v || "");
-      const parsed = parseDeadline(raw);
-      if (parsed) return <span className="text-xs font-data">{parsed}</span>;
-      return <span className="text-xs text-content-secondary">—</span>;
+    render: (_v, row) => {
+      if (row.type !== "edital" && row.type !== "programa") {
+        return <span className="text-xs text-content-secondary">—</span>;
+      }
+      const temporal = temporalDeadlineText(row);
+      if (!temporal) return <span className="text-xs text-content-secondary">—</span>;
+      const parsed = parseDeadline(temporal);
+      return (
+        <span className={`text-xs ${parsed ? "font-data" : ""}`}>
+          {parsed ?? temporal}
+        </span>
+      );
     },
   },
   {
