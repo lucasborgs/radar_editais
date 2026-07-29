@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from radar.core.infra.auth import AdminUserId
 from radar.core.services.data_quality_exceptions import (
+    DataQualityReviewConflictError,
     DataQualityStorageError,
     get_current_review_projection,
     get_exception,
@@ -152,20 +153,19 @@ def _sanitize_storage_error(exc: Exception) -> HTTPException:
 
 
 def _sanitize_review_error(exc: Exception) -> HTTPException:
-    message = str(exc).lower()
     logger.warning(
         "data-quality api review failure category=%s",
         type(exc).__name__,
     )
-    if "not found" in message:
-        return HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Exceção de qualidade não encontrada.",
-        )
-    if "already has a different review" in message or "collision" in message:
+    if isinstance(exc, DataQualityReviewConflictError):
         return HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Conflito de revisão para esta exceção.",
+        )
+    if isinstance(exc, ReviewValidationError) and "not found" in str(exc).lower():
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exceção de qualidade não encontrada.",
         )
     return HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -289,23 +289,24 @@ def list_data_quality_exceptions(
             issue_code=code.value if code else None,
             source=source,
             field_path=field,
-            limit=limit + offset,
-            offset=0,
+            limit=limit + 1,
+            offset=offset,
         )
     except DataQualityStorageError as exc:
         raise _sanitize_storage_error(exc) from exc
 
-    window = rows[offset: offset + limit]
+    has_more = len(rows) > limit
+    window = rows[:limit]
     items = [
         _exception_out(row, current_review=_fetch_current_review(row["id"]))
         for row in window
     ]
-    next_offset = offset + limit if len(rows) > offset + limit else None
+    next_offset = offset + limit if has_more else None
     return DataQualityExceptionListOut(
         items=items,
         limit=limit,
         offset=offset,
-        has_more=next_offset is not None,
+        has_more=has_more,
         next_offset=next_offset,
     )
 
@@ -357,6 +358,8 @@ def create_data_quality_review(
             ],
         )
     except ReviewValidationError as exc:
+        raise _sanitize_review_error(exc) from exc
+    except DataQualityReviewConflictError as exc:
         raise _sanitize_review_error(exc) from exc
     except DataQualityStorageError as exc:
         raise _sanitize_storage_error(exc) from exc

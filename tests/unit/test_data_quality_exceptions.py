@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from radar.core.services.data_quality_exceptions import (
     _INVALID_FINGERPRINT_MSG,
+    DataQualityReviewConflictError,
     DataQualityStorageError,
     _evidence_refs_payload,
     append_review,
@@ -697,7 +698,7 @@ class TestAppendReviewCollision:
                              review_id="rev-collide", actor_id="admin",
                              reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
                          ))
-        with pytest.raises(DataQualityStorageError, match="review_id collision"):
+        with pytest.raises(DataQualityReviewConflictError):
             append_review(r2)
 
     def test_different_exception_id_raises(self, fs):
@@ -712,7 +713,7 @@ class TestAppendReviewCollision:
                              review_id="rev-collide-2", actor_id="admin",
                              reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
                          ))
-        with pytest.raises(DataQualityStorageError, match="review_id collision"):
+        with pytest.raises(DataQualityReviewConflictError):
             append_review(r2)
 
     def test_different_actor_id_raises(self, fs):
@@ -726,7 +727,7 @@ class TestAppendReviewCollision:
             review_id="rev-collide-3", actor_id="other-admin",
             reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
         ))
-        with pytest.raises(DataQualityStorageError, match="review_id collision"):
+        with pytest.raises(DataQualityReviewConflictError):
             append_review(r2)
 
     def test_different_reviewed_at_raises(self, fs):
@@ -740,7 +741,7 @@ class TestAppendReviewCollision:
             review_id="rev-collide-4", actor_id="admin",
             reviewed_at=datetime(2026, 7, 30, 12, 0, 0),
         ))
-        with pytest.raises(DataQualityStorageError, match="review_id collision"):
+        with pytest.raises(DataQualityReviewConflictError):
             append_review(r2)
 
 
@@ -994,7 +995,7 @@ class TestAppendReviewRace:
         )
         fs._skip_select_once = True
         fs._fail_next_insert = APIError({"code": "23505", "message": "duplicate"})
-        with pytest.raises(DataQualityStorageError, match="review_id collision"):
+        with pytest.raises(DataQualityReviewConflictError):
             append_review(review)
 
     def test_23505_race_no_record_found(self, fs):

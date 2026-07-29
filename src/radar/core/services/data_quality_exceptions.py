@@ -33,6 +33,10 @@ class DataQualityStorageError(Exception):
     """
 
 
+class DataQualityReviewConflictError(DataQualityStorageError):
+    """Colisão material de revisão com o mesmo review_id."""
+
+
 def _configured() -> bool:
     return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY"))
 
@@ -504,8 +508,8 @@ def append_review(review: DataQualityReview) -> bool:
                     review.review.review_id,
                 )
                 return True
-            raise DataQualityStorageError(
-                "append_review failed: review_id collision with "
+            raise DataQualityReviewConflictError(
+                "append_review conflict: review_id already exists with "
                 "different payload"
             )
 
@@ -533,8 +537,8 @@ def append_review(review: DataQualityReview) -> bool:
                 payload = _review_payload(review)
                 if _review_payload_matches(existing_row, payload):
                     return True
-                raise DataQualityStorageError(
-                    "append_review failed: review_id collision with "
+                raise DataQualityReviewConflictError(
+                    "append_review conflict: review_id already exists with "
                     "different payload"
                 )
             except DataQualityStorageError:
@@ -687,6 +691,7 @@ __all__ = [
     "mark_exception_resolved",
     "append_review",
     "get_current_review_projection",
+    "DataQualityReviewConflictError",
     "_evidence_refs_payload",
     "_INVALID_FINGERPRINT_MSG",
     "_review_payload_matches",

@@ -21,9 +21,15 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from postgrest.exceptions import APIError
 
+import radar.core.services.data_quality_reviews as reviews
 from radar.api.routers.data_quality import router
 from radar.core.infra.auth import get_admin_user_id
-from radar.core.services.data_quality_exceptions import DataQualityStorageError
+from radar.core.services.data_quality_exceptions import (
+    DataQualityStorageError,
+    _review_payload,
+)
+from radar.domain.data_quality import DataQualityReview
+from radar.domain.provenance import ReviewInfo
 
 pytestmark = pytest.mark.unit
 
@@ -70,6 +76,9 @@ class _FakeQuery:
             return self._do_insert()
         if self._method == "update":
             return self._do_update()
+        if self._supabase.skip_select_once:
+            self._supabase.skip_select_once = False
+            return _FakeResponse([])
         return self._do_select()
 
     def _match(self, row):
@@ -108,6 +117,10 @@ class _FakeQuery:
         return _FakeResponse([])
 
     def _do_insert(self):
+        if self._supabase.fail_next_insert is not None:
+            err = self._supabase.fail_next_insert
+            self._supabase.fail_next_insert = None
+            raise err
         raw = self._payload
         items = [raw] if isinstance(raw, dict) else list(raw)
         new_rows = []
@@ -176,6 +189,8 @@ class FakeSupabase:
     def __init__(self):
         self._tables: dict[str, dict[str, dict]] = {}
         self.fail_next_exception_resolve = 0
+        self.fail_next_insert: APIError | None = None
+        self.skip_select_once = False
 
     def table(self, name):
         return _FakeTable(name, self)
@@ -229,6 +244,7 @@ def _exception_row(
     field_path: str = "deadline",
     issue_code: str = "temporal_status_without_basis",
     produced_value: str = "ABERTA",
+    input_fingerprint: str = "sha256:" + "c" * 64,
     status: str = "open",
     source: str = "finep",
     source_url: str = "https://secret.example/hidden",
@@ -246,7 +262,7 @@ def _exception_row(
         "evidence_refs": [evidence_ref],
         "bundle_hash": "sha256:" + "b" * 64,
         "producer_version": "temporal_quality:v1",
-        "input_fingerprint": "sha256:" + "c" * 64,
+        "input_fingerprint": input_fingerprint,
         "status": status,
         "detected_at": "2026-07-29T12:00:00+00:00",
         "last_observed_at": "2026-07-29T12:00:00+00:00",
@@ -328,6 +344,58 @@ class TestListAndDetail:
         assert payload["items"][0]["id"] == "exc-1"
         assert payload["items"][0]["source"] == "finep"
         assert payload["items"][0]["state"] == "open"
+
+    def test_pagination_with_26_records_and_filters(self, fake_db):
+        for idx in range(26):
+            fake_db.table("data_quality_exceptions").insert(
+                _exception_row(
+                    exception_id=f"exc-{idx:02d}",
+                    source="finep",
+                    input_fingerprint=f"sha256:{idx:064x}",
+                )
+            ).execute()
+        fake_db.table("data_quality_exceptions").insert(
+            _exception_row(
+                exception_id="exc-nope",
+                source="fapesp",
+            )
+        ).execute()
+        app = _make_app()
+        app.dependency_overrides[get_admin_user_id] = lambda: "admin-1"
+        client = TestClient(app)
+
+        first = client.get(
+            "/data-quality/exceptions",
+            params={
+                "source": "finep",
+                "limit": 25,
+                "offset": 0,
+            },
+        )
+        second = client.get(
+            "/data-quality/exceptions",
+            params={
+                "source": "finep",
+                "limit": 25,
+                "offset": 25,
+            },
+        )
+
+        first_payload = first.json()
+        second_payload = second.json()
+
+        assert first.status_code == 200
+        assert len(first_payload["items"]) == 25
+        assert first_payload["has_more"] is True
+        assert first_payload["next_offset"] == 25
+        assert second.status_code == 200
+        assert len(second_payload["items"]) == 1
+        assert second_payload["has_more"] is False
+        assert second_payload["next_offset"] is None
+        first_ids = {item["id"] for item in first_payload["items"]}
+        second_ids = {item["id"] for item in second_payload["items"]}
+        assert first_ids.isdisjoint(second_ids)
+        assert len(first_ids | second_ids) == 26
 
     def test_detail_existing_and_missing(self, fake_db):
         fake_db.table("data_quality_exceptions").insert(
@@ -431,17 +499,9 @@ class TestReviewFlow:
         assert resp.status_code == 422
 
     def test_retry_is_idempotent(self, fake_db):
-        fake_db.fail_next_exception_resolve = 1
         fake_db.table("data_quality_exceptions").insert(
             _exception_row(exception_id="exc-1")
         ).execute()
-        editorial_row = {
-            "id": "disc-1",
-            "status": "pending",
-            "created_at": "2026-07-29T12:00:00+00:00",
-        }
-        fake_db.table("discovered_opportunities")._store["disc-1"] = editorial_row
-
         app = _make_app()
         app.dependency_overrides[get_admin_user_id] = lambda: "admin-1"
         client = TestClient(app)
@@ -455,9 +515,89 @@ class TestReviewFlow:
         first = client.post("/data-quality/exceptions/exc-1/reviews", json=body)
         second = client.post("/data-quality/exceptions/exc-1/reviews", json=body)
 
-        assert first.status_code == 503
+        assert first.status_code == 201
         assert second.status_code == 201
-        assert fake_db.table("discovered_opportunities")._store["disc-1"] == editorial_row
+        assert len(fake_db._tables["data_quality_reviews"]) == 1
+        assert fake_db._tables["data_quality_reviews"].values()
+
+    def test_same_review_id_different_payload_returns_409(self, fake_db):
+        fake_db.table("data_quality_exceptions").insert(
+            _exception_row(exception_id="exc-1")
+        ).execute()
+        review_store = fake_db.table("data_quality_reviews")._store
+        review_store["review-uuid-1"] = {
+            "schema_version": 1,
+            "review_id": "review-1",
+            "exception_id": "exc-1",
+            "decision": "confirm",
+            "corrected_value": None,
+            "justification": "versao original",
+            "evidence_refs": [_evidence()],
+            "actor_id": "admin-1",
+            "reviewed_at": "2026-07-29T12:00:00+00:00",
+        }
+
+        app = _make_app()
+        app.dependency_overrides[get_admin_user_id] = lambda: "admin-1"
+        client = TestClient(app)
+
+        resp = client.post(
+            "/data-quality/exceptions/exc-1/reviews",
+            json={
+                "review_id": "review-1",
+                "decision": "mark_unknown",
+                "justification": "payload diferente",
+            },
+        )
+
+        assert resp.status_code == 409
+        assert "review_id collision" not in resp.text
+
+    def test_race_23505_collision_returns_409(self, fake_db, monkeypatch):
+        fake_db.skip_select_once = True
+        fake_db.fail_next_insert = APIError({"code": "23505", "message": "duplicate"})
+
+        existing_review = DataQualityReview(
+            exception_ref="exc-1",
+            decision="confirm",
+            corrected_value=None,
+            justification="versao original",
+            evidence_refs=[],
+            review=ReviewInfo(
+                review_id="review-1",
+                actor_id="admin-1",
+                reviewed_at=datetime.fromisoformat("2026-07-29T12:00:00+00:00"),
+            ),
+        )
+        review_store = fake_db.table("data_quality_reviews")._store
+        review_store["review-uuid-1"] = _review_payload(existing_review)
+
+        app = _make_app()
+        app.dependency_overrides[get_admin_user_id] = lambda: "admin-1"
+        monkeypatch.setattr(
+            reviews,
+            "get_exception",
+            lambda _exc_id: _exception_row(exception_id="exc-1"),
+        )
+        monkeypatch.setattr(
+            reviews,
+            "get_current_review_projection",
+            lambda _exc_id: existing_review,
+        )
+        client = TestClient(app)
+
+        resp = client.post(
+            "/data-quality/exceptions/exc-1/reviews",
+            json={
+                "review_id": "review-1",
+                "decision": "mark_unknown",
+                "justification": "payload diferente depois do race",
+            },
+        )
+
+        assert resp.status_code == 409
+        assert "review_id collision" not in resp.text
+        assert "secret raw payload" not in resp.text
 
     def test_storage_failure_is_sanitized(self, monkeypatch):
         app = _make_app()
