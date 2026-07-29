@@ -165,4 +165,4 @@ git diff --check 9b86c3e70..HEAD: (sem saída)
 - ✅ RT05-T02 não iniciada
 - ✅ Sem merge, push, rede, credenciais ou produção
 
-## Auditoria Codex: pendente
+## Auditoria Codex: aprovada em 2026-07-29
