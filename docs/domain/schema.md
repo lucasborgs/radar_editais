@@ -526,7 +526,7 @@ constraint_enums:
 
 ```yaml
 vigencia_rules:
-  vigente: "deadline parseável E deadline > hoje"
+  vigente: "deadline parseável E deadline >= hoje (fim do dia America/Sao_Paulo)"
   historico: "caso contrário"
   deadline_format: "dd/mm/yyyy"
 ```
@@ -537,7 +537,7 @@ Aplicada ao construir o índice, antes de classificar vigência:
 
 ```yaml
 status_normalization:
-  - "SE deadline parseável AND deadline > hoje  → status = ABERTA"
+  - "SE deadline parseável AND deadline >= hoje (fim do dia)  → status = ABERTA"
   - "SENÃO SE raw_status == 'ENCERRADA'         → status = ENCERRADA"
   - "SENÃO                                      → status = raw_status (preserva Desconhecido, RESULTADO_DIVULGADO, etc.)"
 ```
