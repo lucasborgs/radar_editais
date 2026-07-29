@@ -21,15 +21,19 @@ nao entram no Radar ativo. Finep/Eureka permanece nao ativo ate revisao valida.
 
 | Task | Resultado | Commits reais |
 |---|---|---|
-| T01 | contrato temporal, fixture Finep/Eureka e reconciliacao `deadline >= hoje` | `7a6abbe9b`, `fa048494c`, `519f3085f`, `388aae58b`, `6f35e7f53` |
-| T02 | migration 046, repositorio idempotente e revisao append-only | `f38bd1b80`, `c6ee6a435`, `04a2f5031`, `a78566a75`, `4c6c4b558`, `06e8c4900` |
-| T03 | detector temporal em shadow e integracao best-effort no gold | `ac5b43da0`, `263d0f94b`, `e833879d8` |
-| T04 | projecao temporal unica, override humano e fail-closed | `7abc6549e`, `0229b996f` |
+| T01 | contrato temporal, fixture Finep/Eureka e reconciliacao `deadline >= hoje` | `7a6abbe9b`, `fa048494c`, `519f3085f`, `388aae58b`, `7650544ad`, `6f35e7f53`, `89a909935` |
+| T02 | migration 046, repositorio idempotente e revisao append-only | `f38bd1b80`, `c6ee6a435`, `04a2f5031`, `a78566a75`, `4c6c4b558`, `06e8c4900`, `88bf5d190`, `9b130d3c8`, `d877f2aae`, `08a16fd63` |
+| T03 | detector temporal em shadow e integracao best-effort no gold | `ac5b43da0`, `263d0f94b`, `e833879d8`, `2febd97a5` |
+| T04 | projecao temporal unica, override humano e fail-closed | `7abc6549e`, `bd9f9349b`, `0229b996f`, `463b8be41` |
 | T05 | API administrativa autenticada da fila | `f23c6dbfe`, `dbcf450cb`, `d8a22934b`, `b7f436dd9` |
 | T06 | UI administrativa em Descoberta | `2c59ea335`, `f05b0561a`, `6316c1128`, `0e2798d36`, `138ab38cf` |
 | T07 | enforcement temporal e read model em lote | `db9bfa83e`, `768e5d5aa` |
-| T08 | comunicacao de validade em Ecossistema, Radar, Explorar, Escrita e Aplicacoes | `2a3bcdc02`, `f09580fd3` |
-| T09 | metricas locais, reconciliacao documental e fechamento | `9426efc98`, `96e548d53`, este commit |
+| T08 | comunicacao de validade em Ecossistema, Radar, Explorar, Escrita e Aplicacoes | `2a3bcdc02`, `f09580fd3`, `5968136c6` |
+| T09 | metricas locais, reconciliacao documental e fechamento | `9426efc98`, `96e548d53`, `606ecba3d`, `9dabe877a` |
+
+Esta tabela foi reconstruida a partir da historia Git ate `9dabe877a`. A
+correcao documental pos-auditoria deste relatorio fica fora da propria tabela
+para evitar autorreferencia; `Auditoria Codex` permanece pendente.
 
 ## Resultado por task
 
@@ -83,7 +87,8 @@ Formulas:
 - `exceptions_by_source`: contagem por fonte distinta encontrada em
   `evidence_refs`; ausencia observada cai em `unknown`.
 - `exceptions_by_field_path`: contagem por `field_path`.
-- `open_exception_age_days`: para excecoes `open`, `as_of - detected_at`.
+- `open_exception_age_days`: para excecoes `open`, dia civil de `as_of` menos o
+  dia civil de `detected_at` em `America/Sao_Paulo`.
 - `mean_open_exception_age_days`: media simples das idades abertas; sem abertas
   observadas -> `None`.
 - `review_latency_days`: para revisoes observadas, `reviewed_at - detected_at`
@@ -175,6 +180,14 @@ Gate completo:
 - `cd frontend && npx tsc --noEmit` -> aprovado.
 - `cd frontend && npm run lint` -> aprovado com warnings preexistentes.
 - `git diff --check 5968136c6..HEAD` -> aprovado apos remover whitespace.
+
+Correcao pos-auditoria:
+
+- `tests/unit/test_data_quality_metrics.py` -> `5 passed`, incluindo a
+  fronteira `2026-07-29T01:00:00Z`, que pertence a `2026-07-28` no dia civil de
+  `America/Sao_Paulo` e tem idade de um dia em `as_of=2026-07-29`.
+- `ruff check src/radar/core/services/data_quality_metrics.py
+  tests/unit/test_data_quality_metrics.py` -> aprovado.
 
 Suíte diagnostica `provenance`:
 
