@@ -6,7 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from radar.domain.provenance import EvidenceRef, ReviewInfo
+from radar.domain.provenance import EvidenceRef, FactState, ReviewInfo
+from radar.domain.source_bundle import SubjectKind
 
 DATA_QUALITY_SCHEMA_VERSION: Literal[1] = 1
 
@@ -32,6 +33,12 @@ class IssueCode(str, Enum):
     TEMPORAL_STATUS_CONFLICT = "temporal_status_conflict"
 
 
+_OPEN_STATUSES = frozenset({"aberta"})
+_CLOSED_STATUSES = frozenset({
+    "encerrada", "resultado_divulgado", "fechada", "closed", "finished",
+})
+
+
 class TemporalEvaluation(BaseModel):
     model_config = {"extra": "forbid"}
 
@@ -42,14 +49,21 @@ class TemporalEvaluation(BaseModel):
 
     @model_validator(mode="after")
     def _check_issue_consistency(self) -> TemporalEvaluation:
-        if self.issue_code is not None and not self.issue_description:
-            raise ValueError(
-                "issue_description is required when issue_code is set"
-            )
-        if self.issue_code is None and self.issue_description is not None:
-            raise ValueError(
-                "issue_description requires issue_code"
-            )
+        if self.validity_state is ValidityState.NEEDS_REVIEW:
+            if self.issue_code is None:
+                raise ValueError("needs_review requires issue_code")
+            if not self.issue_description:
+                raise ValueError("needs_review requires issue_description")
+        else:
+            if self.issue_code is not None:
+                raise ValueError(
+                    f"active/closed must not have issue_code, "
+                    f"got {self.issue_code}"
+                )
+            if self.issue_description is not None:
+                raise ValueError(
+                    "active/closed must not have issue_description"
+                )
         return self
 
 
@@ -57,11 +71,11 @@ class DataQualityException(BaseModel):
     model_config = {"extra": "forbid"}
 
     schema_version: Literal[1] = DATA_QUALITY_SCHEMA_VERSION
-    subject_kind: str
+    subject_kind: SubjectKind
     subject_id: str
     field_path: str
     issue_code: IssueCode
-    produced_state: str | None = None
+    produced_state: FactState | None = None
     produced_value: str | None = None
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
     bundle_hash: str | None = None
@@ -70,13 +84,6 @@ class DataQualityException(BaseModel):
     status: Literal["open", "resolved", "superseded"] = "open"
     detected_at: datetime | None = None
     last_observed_at: datetime | None = None
-
-    @field_validator("subject_kind")
-    @classmethod
-    def _subject_kind_non_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("subject_kind must be non-empty")
-        return v
 
     @field_validator("subject_id")
     @classmethod
@@ -114,18 +121,40 @@ class DataQualityReview(BaseModel):
             raise ValueError("justification must not exceed 2000 characters")
         return stripped
 
-    @model_validator(mode="after")
-    def _corrected_value_required_for_correct(self) -> DataQualityReview:
-        if self.decision == "correct" and not self.corrected_value:
-            raise ValueError("corrected_value is required when decision=correct")
-        return self
-
     @field_validator("exception_ref")
     @classmethod
     def _exception_ref_non_empty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("exception_ref must be non-empty")
         return v
+
+    @model_validator(mode="after")
+    def _check_review_invariants(self) -> DataQualityReview:
+        if self.decision == "confirm_continuous" and not self.evidence_refs:
+            raise ValueError(
+                "confirm_continuous requires at least one evidence_ref"
+            )
+
+        if self.decision == "correct":
+            if not self.corrected_value:
+                raise ValueError(
+                    "corrected_value is required when decision=correct"
+                )
+            if not self.corrected_value.strip():
+                raise ValueError(
+                    "corrected_value must not be empty or whitespace"
+                )
+            if not self.evidence_refs:
+                raise ValueError(
+                    "correct requires at least one evidence_ref"
+                )
+
+        if self.corrected_value is not None and self.decision != "correct":
+            raise ValueError(
+                f"corrected_value is not allowed for decision={self.decision}"
+            )
+
+        return self
 
 
 def evaluate_temporal(
@@ -134,15 +163,11 @@ def evaluate_temporal(
     status: str | None,
     as_of: date,
     continuous_evidence: EvidenceRef | None = None,
-    closed_status_values: set[str] | None = None,
 ) -> TemporalEvaluation:
-    if closed_status_values is None:
-        closed_status_values = {"encerrada", "resultado_divulgado", "fechada",
-                                "closed", "finished"}
-
     status_lower = (status or "").strip().lower()
-    is_closed_status = bool(status_lower) and status_lower in closed_status_values
-    is_open_status = bool(status_lower) and not is_closed_status
+
+    is_open = status_lower in _OPEN_STATUSES
+    is_closed = status_lower in _CLOSED_STATUSES
 
     deadline_present = deadline is not None
     is_future_deadline = deadline_present and deadline >= as_of
@@ -150,34 +175,27 @@ def evaluate_temporal(
 
     has_continuous_evidence = continuous_evidence is not None
 
-    if deadline_present and is_closed_status:
-        if is_future_deadline:
-            return TemporalEvaluation(
-                temporal_mode=TemporalMode.FIXED,
-                validity_state=ValidityState.NEEDS_REVIEW,
-                issue_code=IssueCode.TEMPORAL_STATUS_CONFLICT,
-                issue_description=(
-                    f"deadline={deadline} is future but status={status} "
-                    "indicates closed"
-                ),
-            )
-        if is_past_deadline:
-            return TemporalEvaluation(
-                temporal_mode=TemporalMode.FIXED,
-                validity_state=ValidityState.CLOSED,
-            )
+    if deadline_present and is_closed and is_future_deadline:
+        return TemporalEvaluation(
+            temporal_mode=TemporalMode.FIXED,
+            validity_state=ValidityState.NEEDS_REVIEW,
+            issue_code=IssueCode.TEMPORAL_STATUS_CONFLICT,
+            issue_description=(
+                f"deadline={deadline} is future but status={status} "
+                "indicates closed"
+            ),
+        )
 
-    if deadline_present and is_open_status:
-        if is_past_deadline:
-            return TemporalEvaluation(
-                temporal_mode=TemporalMode.FIXED,
-                validity_state=ValidityState.NEEDS_REVIEW,
-                issue_code=IssueCode.TEMPORAL_STATUS_CONFLICT,
-                issue_description=(
-                    f"deadline={deadline} is past but status={status} "
-                    "indicates open"
-                ),
-            )
+    if deadline_present and is_open and is_past_deadline:
+        return TemporalEvaluation(
+            temporal_mode=TemporalMode.FIXED,
+            validity_state=ValidityState.NEEDS_REVIEW,
+            issue_code=IssueCode.TEMPORAL_STATUS_CONFLICT,
+            issue_description=(
+                f"deadline={deadline} is past but status={status} "
+                "indicates open"
+            ),
+        )
 
     if deadline_present and is_future_deadline:
         return TemporalEvaluation(
@@ -197,13 +215,13 @@ def evaluate_temporal(
             validity_state=ValidityState.ACTIVE,
         )
 
-    if is_closed_status:
+    if is_closed:
         return TemporalEvaluation(
             temporal_mode=TemporalMode.UNKNOWN,
             validity_state=ValidityState.CLOSED,
         )
 
-    if is_open_status:
+    if is_open:
         return TemporalEvaluation(
             temporal_mode=TemporalMode.UNKNOWN,
             validity_state=ValidityState.NEEDS_REVIEW,
@@ -216,7 +234,7 @@ def evaluate_temporal(
     return TemporalEvaluation(
         temporal_mode=TemporalMode.UNKNOWN,
         validity_state=ValidityState.NEEDS_REVIEW,
-        issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
+        issue_code=IssueCode.CRITICAL_FACT_MISSING,
         issue_description="no deadline, status, or continuous evidence available",
     )
 

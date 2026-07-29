@@ -15,7 +15,8 @@ from radar.domain.data_quality import (
     ValidityState,
     evaluate_temporal,
 )
-from radar.domain.provenance import EvidenceRef, LocatorQuality, ReviewInfo
+from radar.domain.provenance import EvidenceRef, FactState, LocatorQuality, ReviewInfo
+from radar.domain.source_bundle import SubjectKind
 from tests.fixtures.data_quality.finep_eureka import finep_eureka_2024
 
 pytestmark = pytest.mark.unit
@@ -47,44 +48,74 @@ class TestEnumValues:
 
 
 # ---------------------------------------------------------------------------
-# TemporalEvaluation
+# TemporalEvaluation — invariantes
 # ---------------------------------------------------------------------------
 
 
-class TestTemporalEvaluationConstruction:
-    def test_minimal_valid(self):
+class TestTemporalEvaluationInvariants:
+    def test_active_without_issue_valid(self):
         te = TemporalEvaluation(
             temporal_mode=TemporalMode.FIXED,
             validity_state=ValidityState.ACTIVE,
         )
-        assert te.temporal_mode is TemporalMode.FIXED
-        assert te.validity_state is ValidityState.ACTIVE
         assert te.issue_code is None
         assert te.issue_description is None
 
-    def test_with_issue(self):
+    def test_closed_without_issue_valid(self):
+        te = TemporalEvaluation(
+            temporal_mode=TemporalMode.FIXED,
+            validity_state=ValidityState.CLOSED,
+        )
+        assert te.issue_code is None
+
+    def test_needs_review_with_issue_valid(self):
         te = TemporalEvaluation(
             temporal_mode=TemporalMode.UNKNOWN,
             validity_state=ValidityState.NEEDS_REVIEW,
             issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
-            issue_description="status aberto sem prazo nem evidencia",
+            issue_description="status aberto sem prazo",
         )
         assert te.issue_code is IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS
 
-    def test_issue_code_without_description_rejected(self):
-        with pytest.raises(ValidationError, match="issue_description is required"):
+    def test_active_with_issue_code_rejected(self):
+        with pytest.raises(ValidationError, match="must not have issue_code"):
             TemporalEvaluation(
-                temporal_mode=TemporalMode.UNKNOWN,
-                validity_state=ValidityState.NEEDS_REVIEW,
-                issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
+                temporal_mode=TemporalMode.FIXED,
+                validity_state=ValidityState.ACTIVE,
+                issue_code=IssueCode.TEMPORAL_STATUS_CONFLICT,
+                issue_description="conflito",
             )
 
-    def test_description_without_issue_code_rejected(self):
-        with pytest.raises(ValidationError, match="issue_description requires issue_code"):
+    def test_active_with_description_rejected(self):
+        with pytest.raises(ValidationError, match="must not have issue_description"):
             TemporalEvaluation(
                 temporal_mode=TemporalMode.FIXED,
                 validity_state=ValidityState.ACTIVE,
                 issue_description="descricao sem codigo",
+            )
+
+    def test_closed_with_issue_code_rejected(self):
+        with pytest.raises(ValidationError, match="must not have issue_code"):
+            TemporalEvaluation(
+                temporal_mode=TemporalMode.FIXED,
+                validity_state=ValidityState.CLOSED,
+                issue_code=IssueCode.TEMPORAL_STATUS_CONFLICT,
+                issue_description="conflito",
+            )
+
+    def test_needs_review_without_issue_code_rejected(self):
+        with pytest.raises(ValidationError, match="needs_review requires issue_code"):
+            TemporalEvaluation(
+                temporal_mode=TemporalMode.UNKNOWN,
+                validity_state=ValidityState.NEEDS_REVIEW,
+            )
+
+    def test_needs_review_without_description_rejected(self):
+        with pytest.raises(ValidationError, match="needs_review requires issue_description"):
+            TemporalEvaluation(
+                temporal_mode=TemporalMode.UNKNOWN,
+                validity_state=ValidityState.NEEDS_REVIEW,
+                issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
             )
 
     def test_extra_field_rejected(self):
@@ -120,8 +151,6 @@ class TestTemporalEvaluationConstruction:
 
 
 class TestEvaluateTemporal:
-    """Testes determinísticos com as_of injetado; nunca date.today()."""
-
     def test_future_deadline_fixed_active(self):
         result = evaluate_temporal(
             deadline=date(2026, 12, 31),
@@ -133,7 +162,6 @@ class TestEvaluateTemporal:
         assert result.issue_code is None
 
     def test_deadline_today_fixed_active(self):
-        """O dia do encerramento permanece ativo."""
         result = evaluate_temporal(
             deadline=date(2026, 7, 29),
             status="ABERTA",
@@ -143,7 +171,7 @@ class TestEvaluateTemporal:
         assert result.validity_state is ValidityState.ACTIVE
         assert result.issue_code is None
 
-    def test_past_deadline_fixed_closed(self):
+    def test_past_deadline_with_closed_status_fixed_closed(self):
         result = evaluate_temporal(
             deadline=date(2026, 1, 31),
             status="ENCERRADA",
@@ -191,7 +219,6 @@ class TestEvaluateTemporal:
         assert result.validity_state is ValidityState.CLOSED
 
     def test_open_without_deadline_needs_review(self):
-        """Finep/Eureka: ABERTA sem prazo → needs_review."""
         result = evaluate_temporal(
             deadline=None,
             status="ABERTA",
@@ -201,19 +228,18 @@ class TestEvaluateTemporal:
         assert result.validity_state is ValidityState.NEEDS_REVIEW
         assert result.issue_code is IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS
 
-    def test_open_without_deadline_needs_review_via_fixture(self):
+    def test_finep_eureka_fixture(self):
         data = finep_eureka_2024()
         result = evaluate_temporal(
             deadline=data["deadline"],
             status=data["status"],
             as_of=date(2026, 7, 29),
-            closed_status_values=data["closed_status_values"],
         )
         assert result.temporal_mode is TemporalMode.UNKNOWN
         assert result.validity_state is ValidityState.NEEDS_REVIEW
         assert result.issue_code is IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS
 
-    def test_no_status_no_deadline_needs_review(self):
+    def test_no_status_no_deadline_critical_fact_missing(self):
         result = evaluate_temporal(
             deadline=None,
             status=None,
@@ -221,7 +247,91 @@ class TestEvaluateTemporal:
         )
         assert result.temporal_mode is TemporalMode.UNKNOWN
         assert result.validity_state is ValidityState.NEEDS_REVIEW
-        assert result.issue_code is IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS
+        assert result.issue_code is IssueCode.CRITICAL_FACT_MISSING
+
+
+# ---------------------------------------------------------------------------
+# Desconhecido — neutro, não classificado como aberto
+# ---------------------------------------------------------------------------
+
+
+class TestDesconhecido:
+    def test_desconhecido_with_past_deadline_fixed_closed(self):
+        result = evaluate_temporal(
+            deadline=date(2026, 1, 31),
+            status="Desconhecido",
+            as_of=date(2026, 7, 29),
+        )
+        assert result.temporal_mode is TemporalMode.FIXED
+        assert result.validity_state is ValidityState.CLOSED
+        assert result.issue_code is None
+
+    def test_desconhecido_with_future_deadline_fixed_active(self):
+        result = evaluate_temporal(
+            deadline=date(2026, 12, 31),
+            status="Desconhecido",
+            as_of=date(2026, 7, 29),
+        )
+        assert result.temporal_mode is TemporalMode.FIXED
+        assert result.validity_state is ValidityState.ACTIVE
+        assert result.issue_code is None
+
+    def test_desconhecido_without_deadline_critical_fact_missing(self):
+        result = evaluate_temporal(
+            deadline=None,
+            status="Desconhecido",
+            as_of=date(2026, 7, 29),
+        )
+        assert result.temporal_mode is TemporalMode.UNKNOWN
+        assert result.validity_state is ValidityState.NEEDS_REVIEW
+        assert result.issue_code is IssueCode.CRITICAL_FACT_MISSING
+
+
+# ---------------------------------------------------------------------------
+# Valor arbitrário não é classificado como aberto
+# ---------------------------------------------------------------------------
+
+
+class TestArbitraryStatusNotOpen:
+    def test_arbitrary_status_without_deadline_critical_fact_missing(self):
+        result = evaluate_temporal(
+            deadline=None,
+            status="QUALQUER_COISA",
+            as_of=date(2026, 7, 29),
+        )
+        assert result.temporal_mode is TemporalMode.UNKNOWN
+        assert result.validity_state is ValidityState.NEEDS_REVIEW
+        assert result.issue_code is IssueCode.CRITICAL_FACT_MISSING
+
+    def test_arbitrary_status_with_future_deadline_fixed_active(self):
+        result = evaluate_temporal(
+            deadline=date(2026, 12, 31),
+            status="invalido",
+            as_of=date(2026, 7, 29),
+        )
+        assert result.temporal_mode is TemporalMode.FIXED
+        assert result.validity_state is ValidityState.ACTIVE
+        assert result.issue_code is None
+
+    def test_arbitrary_status_with_past_deadline_fixed_closed(self):
+        result = evaluate_temporal(
+            deadline=date(2026, 1, 31),
+            status="invalido",
+            as_of=date(2026, 7, 29),
+        )
+        assert result.temporal_mode is TemporalMode.FIXED
+        assert result.validity_state is ValidityState.CLOSED
+        assert result.issue_code is None
+
+    def test_empty_status_without_deadline_critical_fact_missing(self):
+        result = evaluate_temporal(
+            deadline=None,
+            status="",
+            as_of=date(2026, 7, 29),
+        )
+        assert result.temporal_mode is TemporalMode.UNKNOWN
+        assert result.validity_state is ValidityState.NEEDS_REVIEW
+        assert result.issue_code is IssueCode.CRITICAL_FACT_MISSING
 
 
 # ---------------------------------------------------------------------------
@@ -230,9 +340,7 @@ class TestEvaluateTemporal:
 
 
 class TestConflicts:
-    """Prazo e status incompatíveis → needs_review."""
-
-    def test_future_deadline_with_closed_status_conflict(self):
+    def test_future_deadline_with_closed_status(self):
         result = evaluate_temporal(
             deadline=date(2026, 12, 31),
             status="ENCERRADA",
@@ -242,7 +350,7 @@ class TestConflicts:
         assert result.issue_code is IssueCode.TEMPORAL_STATUS_CONFLICT
         assert result.temporal_mode is TemporalMode.FIXED
 
-    def test_past_deadline_with_open_status_conflict(self):
+    def test_past_deadline_with_open_status(self):
         result = evaluate_temporal(
             deadline=date(2024, 1, 31),
             status="ABERTA",
@@ -260,7 +368,6 @@ class TestConflicts:
 
 class TestContinuousWithoutEvidence:
     def test_no_evidence_is_not_continuous(self):
-        """Ausência de prazo nunca basta para continuous."""
         result = evaluate_temporal(
             deadline=None,
             status="ABERTA",
@@ -279,7 +386,6 @@ class TestContinuousWithoutEvidence:
         assert result.temporal_mode is not TemporalMode.CONTINUOUS
 
     def test_continuity_requires_recoverable_evidence(self):
-        """EvidenceRef válido é necessário para continuous."""
         result = evaluate_temporal(
             deadline=None,
             status="ABERTA",
@@ -290,14 +396,14 @@ class TestContinuousWithoutEvidence:
 
 
 # ---------------------------------------------------------------------------
-# DataQualityException
+# DataQualityException — SubjectKind e FactState
 # ---------------------------------------------------------------------------
 
 
 class TestDataQualityException:
     def test_minimal_valid(self):
         exc = DataQualityException(
-            subject_kind="opportunity",
+            subject_kind=SubjectKind.OPPORTUNITY,
             subject_id="finep:589",
             field_path="deadline",
             issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
@@ -305,11 +411,51 @@ class TestDataQualityException:
         assert exc.schema_version == DATA_QUALITY_SCHEMA_VERSION
         assert exc.status == "open"
 
-    def test_empty_subject_kind_rejected(self):
+    def test_with_optional_fields(self):
+        exc = DataQualityException(
+            subject_kind=SubjectKind.OPPORTUNITY,
+            subject_id="finep:589",
+            field_path="deadline",
+            issue_code=IssueCode.TEMPORAL_STATUS_CONFLICT,
+            produced_state=FactState.CONFLICTING,
+            produced_value="2026-12-31",
+        )
+        assert exc.produced_state is FactState.CONFLICTING
+
+    def test_invalid_subject_kind_rejected(self):
         with pytest.raises(ValidationError):
             DataQualityException(
-                subject_kind="",
-                subject_id="x",
+                subject_kind="invalid",
+                subject_id="finep:589",
+                field_path="deadline",
+                issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
+            )
+
+    def test_all_subject_kinds_accepted(self):
+        for kind in SubjectKind:
+            exc = DataQualityException(
+                subject_kind=kind,
+                subject_id="test:id",
+                field_path="deadline",
+                issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
+            )
+            assert exc.subject_kind is kind
+
+    def test_invalid_fact_state_rejected(self):
+        with pytest.raises(ValidationError):
+            DataQualityException(
+                subject_kind=SubjectKind.OPPORTUNITY,
+                subject_id="finep:589",
+                field_path="deadline",
+                issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
+                produced_state="invalid_state",
+            )
+
+    def test_empty_subject_id_rejected(self):
+        with pytest.raises(ValidationError):
+            DataQualityException(
+                subject_kind=SubjectKind.OPPORTUNITY,
+                subject_id="",
                 field_path="deadline",
                 issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
             )
@@ -317,7 +463,7 @@ class TestDataQualityException:
     def test_empty_field_path_rejected(self):
         with pytest.raises(ValidationError):
             DataQualityException(
-                subject_kind="opportunity",
+                subject_kind=SubjectKind.OPPORTUNITY,
                 subject_id="x",
                 field_path="",
                 issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
@@ -326,7 +472,7 @@ class TestDataQualityException:
     def test_invalid_issue_code_rejected(self):
         with pytest.raises(ValidationError):
             DataQualityException(
-                subject_kind="opportunity",
+                subject_kind=SubjectKind.OPPORTUNITY,
                 subject_id="x",
                 field_path="deadline",
                 issue_code="unknown_code",
@@ -335,7 +481,7 @@ class TestDataQualityException:
     def test_extra_field_rejected(self):
         with pytest.raises(ValidationError):
             DataQualityException(
-                subject_kind="opportunity",
+                subject_kind=SubjectKind.OPPORTUNITY,
                 subject_id="x",
                 field_path="deadline",
                 issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
@@ -344,20 +490,19 @@ class TestDataQualityException:
 
     def test_roundtrip(self):
         exc = DataQualityException(
-            subject_kind="opportunity",
+            subject_kind=SubjectKind.OPPORTUNITY,
             subject_id="finep:589",
             field_path="deadline",
             issue_code=IssueCode.TEMPORAL_STATUS_CONFLICT,
-            produced_state="fixed",
+            produced_state=FactState.CONFLICTING,
             produced_value="2026-12-31",
-            status="open",
         )
         again = DataQualityException.model_validate(exc.model_dump())
         assert again == exc
 
 
 # ---------------------------------------------------------------------------
-# DataQualityReview
+# DataQualityReview — invariantes
 # ---------------------------------------------------------------------------
 
 
@@ -388,12 +533,34 @@ class TestDataQualityReview:
                 ),
             )
 
-    def test_correct_with_value_valid(self):
+    def test_correct_requires_evidence_refs(self):
+        with pytest.raises(ValidationError, match="correct requires at least one evidence_ref"):
+            DataQualityReview(
+                exception_ref="exc-001",
+                decision="correct",
+                corrected_value="2026-12-31",
+                justification="corrigindo prazo",
+                review=ReviewInfo(
+                    review_id="rev-002",
+                    actor_id="admin",
+                    reviewed_at="2026-07-29T12:00:00Z",
+                ),
+            )
+
+    def test_correct_with_value_and_evidence_valid(self):
         review = DataQualityReview(
             exception_ref="exc-001",
             decision="correct",
             corrected_value="2026-12-31",
             justification="prazo correto conforme anexo",
+            evidence_refs=[
+                EvidenceRef(
+                    source="finep",
+                    canonical_content_hash="sha256:" + "c" * 64,
+                    locator_quality=LocatorQuality.DOCUMENT_ONLY,
+                    document="anexo.pdf",
+                ),
+            ],
             review=ReviewInfo(
                 review_id="rev-003",
                 actor_id="admin",
@@ -401,8 +568,44 @@ class TestDataQualityReview:
             ),
         )
         assert review.corrected_value == "2026-12-31"
+        assert len(review.evidence_refs) == 1
 
-    def test_confirm_continuous_valid(self):
+    def test_correct_with_empty_corrected_value_rejected(self):
+        with pytest.raises(ValidationError, match="corrected_value must not be empty"):
+            DataQualityReview(
+                exception_ref="exc-001",
+                decision="correct",
+                corrected_value="   ",
+                justification="corrigindo",
+                evidence_refs=[
+                    EvidenceRef(
+                        source="finep",
+                        canonical_content_hash="sha256:" + "d" * 64,
+                        locator_quality=LocatorQuality.DOCUMENT_ONLY,
+                        document="doc.pdf",
+                    ),
+                ],
+                review=ReviewInfo(
+                    review_id="rev-003",
+                    actor_id="admin",
+                    reviewed_at="2026-07-29T12:00:00Z",
+                ),
+            )
+
+    def test_confirm_continuous_requires_evidence_refs(self):
+        with pytest.raises(ValidationError, match="confirm_continuous requires at least one evidence_ref"):
+            DataQualityReview(
+                exception_ref="exc-002",
+                decision="confirm_continuous",
+                justification="fluxo continuo comprovado",
+                review=ReviewInfo(
+                    review_id="rev-004",
+                    actor_id="admin",
+                    reviewed_at="2026-07-29T12:00:00Z",
+                ),
+            )
+
+    def test_confirm_continuous_with_evidence_valid(self):
         review = DataQualityReview(
             exception_ref="exc-002",
             decision="confirm_continuous",
@@ -435,6 +638,56 @@ class TestDataQualityReview:
             ),
         )
         assert review.decision == "mark_unknown"
+
+    def test_corrected_value_on_confirm_rejected(self):
+        with pytest.raises(ValidationError, match="corrected_value is not allowed"):
+            DataQualityReview(
+                exception_ref="exc-001",
+                decision="confirm",
+                corrected_value="2026-12-31",
+                justification="prazo confirmado",
+                review=ReviewInfo(
+                    review_id="rev-006",
+                    actor_id="admin",
+                    reviewed_at="2026-07-29T12:00:00Z",
+                ),
+            )
+
+    def test_corrected_value_on_mark_unknown_rejected(self):
+        with pytest.raises(ValidationError, match="corrected_value is not allowed"):
+            DataQualityReview(
+                exception_ref="exc-001",
+                decision="mark_unknown",
+                corrected_value="2026-12-31",
+                justification="desconhecido",
+                review=ReviewInfo(
+                    review_id="rev-007",
+                    actor_id="admin",
+                    reviewed_at="2026-07-29T12:00:00Z",
+                ),
+            )
+
+    def test_corrected_value_on_confirm_continuous_rejected(self):
+        with pytest.raises(ValidationError, match="corrected_value is not allowed"):
+            DataQualityReview(
+                exception_ref="exc-001",
+                decision="confirm_continuous",
+                corrected_value="continuo",
+                justification="continuo",
+                evidence_refs=[
+                    EvidenceRef(
+                        source="finep",
+                        canonical_content_hash="sha256:" + "e" * 64,
+                        locator_quality=LocatorQuality.DOCUMENT_ONLY,
+                        document="doc.pdf",
+                    ),
+                ],
+                review=ReviewInfo(
+                    review_id="rev-008",
+                    actor_id="admin",
+                    reviewed_at="2026-07-29T12:00:00Z",
+                ),
+            )
 
     def test_empty_justification_rejected(self):
         with pytest.raises(ValidationError, match="justification must be non-empty"):
@@ -538,14 +791,14 @@ class TestNoScoreOrConfidence:
 
 
 # ---------------------------------------------------------------------------
-# Data Quality schema version não é campo aberto
+# Data Quality schema version fixo
 # ---------------------------------------------------------------------------
 
 
 class TestDataQualitySchemaVersionFixed:
     def test_schema_version_default_and_fixed(self):
         exc = DataQualityException(
-            subject_kind="opportunity",
+            subject_kind=SubjectKind.OPPORTUNITY,
             subject_id="finep:589",
             field_path="deadline",
             issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,
@@ -556,7 +809,7 @@ class TestDataQualitySchemaVersionFixed:
         with pytest.raises(ValidationError):
             DataQualityException(
                 schema_version=2,
-                subject_kind="opportunity",
+                subject_kind=SubjectKind.OPPORTUNITY,
                 subject_id="finep:589",
                 field_path="deadline",
                 issue_code=IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS,

@@ -1,7 +1,5 @@
 from datetime import date
 
-from radar.domain.provenance import EvidenceRef
-
 
 def finep_eureka_2024() -> dict:
     """Fixture sanitizada do caso Finep/Eureka (Chamada pública conjunta
@@ -21,6 +19,4 @@ def finep_eureka_2024() -> dict:
         "status": "ABERTA",
         "deadline": None,
         "continuous_evidence": None,
-        "closed_status_values": {"encerrada", "resultado_divulgado",
-                                 "fechada", "closed", "finished"},
     }
