@@ -8,6 +8,8 @@
 - `c6ee6a435` feat(dq): repository — open_or_observe, review, queries
 - `04a2f5031` test(dq): repository — 39 tests, migration structure, invariants
 - `a78566a75` docs(dq): T01 aprovada (2026-07-29) + T02 report
+- `4c6c4b558` fix(dq): corrige T02 — revisão de implementação
+- `06e8c4900` docs(dq): corrige T02 report — remove alegações falsas, mark pendente
 
 ---
 
@@ -35,11 +37,13 @@ Duas tabelas `public.`:
 Estrutura:
 - `data_quality_exceptions`: chave única
   `(subject_kind, subject_id, field_path, issue_code, input_fingerprint)`;
-  `input_fingerprint text not null default ''`; CHECK para status
+  `input_fingerprint text not null` com CHECK `btrim(...) <> ''`;
+  CHECK para status
 - `data_quality_reviews`: `review_id text not null unique`; FK para
   `data_quality_exceptions(id)` com `on delete restrict`; CHECK para decision
 - Trigger `trg_reviews_append_only` (BEFORE UPDATE OR DELETE) que levanta
-  exceção — garante append-only no banco sem tabela adicional
+  exceção — garante append-only no banco sem tabela adicional;
+  `DROP TRIGGER IF EXISTS` antes de `CREATE TRIGGER` para reexecutabilidade
 - RLS ativado (service-role apenas, sem policies user-facing)
 - Índices: subject_idx, open_idx (exceptions); exception_idx, created_at_idx
   (reviews)
@@ -48,10 +52,10 @@ Estrutura:
 
 | Função | Comportamento |
 |---|---|
-| `open_or_observe_exception` | Rejeita input_fingerprint vazio; reobserva fingerprint existente (update last_observed_at) ou insere novo; **nunca** supersede antes da inserção confirmada; após insert ou reobservação, supersede abertas do mesmo grupo com fingerprint diferente |
+| `open_or_observe_exception` | Rejeita input_fingerprint vazio; reobserva fingerprint existente (update last_observed_at) ou insere novo; **nunca** supersede antes da inserção confirmada; após insert ou reobservação, supersede abertas do mesmo grupo com fingerprint diferente; reobservação de resolved/superseded **não** dispara supersede |
 | `list_exceptions` | Lista com filtros opcionais (subject_kind, subject_id, status) |
 | `get_exception` | Leitura por ID |
-| `append_review` | Idempotente por review_id; rejeita review_id vazio; nunca atualiza registro existente |
+| `append_review` | Idempotente por review_id via `_review_payload_matches`; rejeita review_id vazio; nunca atualiza registro existente; caminho normal e 23505 (race) comparam 8 campos materiais (schema_version, exception_id, decision, corrected_value, justification, evidence_refs, actor_id, reviewed_at) — idêntico → True, qualquer diferença → DataQualityStorageError |
 | `get_current_review_projection` | Última revisão (mais recente created_at) reconstruída como `DataQualityReview` com review_id preservado |
 
 Tratamento de erros:
@@ -62,19 +66,24 @@ Tratamento de erros:
 
 ### 3. Testes — `tests/unit/test_data_quality_exceptions.py`
 
-42 testes em 8 grupos, usando `FakeSupabase` determinístico (sem banco real):
+60 testes em 14 grupos, usando `FakeSupabase` determinístico (sem banco real):
 
 | Grupo | Count | O quê |
 |---|---|---|
 | `TestMigrationStructure` | 9 | SQL tem 2 tables, review_id, FK, trigger, RLS, sem policies |
 | `TestSupabaseAbsent` | 5 | Degradação graciosa: False/None/[] sem credenciais |
 | `TestInputFingerprintRequired` | 3 | Rejeita None/vazio/whitespace |
-| `TestOpenOrObserve` | 8 | Insert, mesma fp, fp nova, supersessão, grupos distintos, órfãos |
+| `TestOpenOrObserve` | 7 | Insert, mesma fp, fp nova, supersessão, grupos distintos, órfãos |
 | `TestInsertFailureNoSupersede` | 2 | Unique violation ok; erro real não supersede anterior |
 | `TestReviewId` | 5 | Preservado, retry idempotente, múltiplos, vazio rejeitado, model valida |
+| `TestReviewPayloadMatches` | 4 | _review_payload_matches: identical, different decision/exception_id/actor_id |
+| `TestAppendReviewCollision` | 4 | Colisão sequencial: decision, exception_id, actor_id, reviewed_at diferentes |
 | `TestSourceUrlRemoved` | 6 | source_url ausente do payload de exception e review, persistido, helper |
 | `TestListExceptions` | 2 | Filtro por subject_kind e status |
 | `TestErrorSemantics` | 3 | Erro sanitizado, categórico, não-bool |
+| `TestReobserveResolvedSuperseded` | 4 | A→B→A mantém B open; resolved/superseded não supersede; last_observed_at atualizado |
+| `TestAppendReviewRace` | 3 | 23505 race: mesmo payload → idempotente; diferente → erro; no record → erro |
+| `TestMigrationExecutability` | 3 | DROP TRIGGER IF EXISTS; CHECK constraint; sem default '' no input_fingerprint |
 
 ### 4. EvidenceRef sanitization
 
@@ -92,7 +101,7 @@ ENVIRONMENT=test PYTHONPATH=src pytest -q \
   tests/unit/test_temporal_exception_contract.py \
   tests/unit/test_provenance.py
 
-  → 181 passed (42 + 75 + 64)
+  → 199 passed (60 + 75 + 64)
 
 ruff check src/radar/core/services/data_quality_exceptions.py  → pass
 ruff check tests/unit/test_data_quality_exceptions.py          → pass
@@ -116,6 +125,13 @@ git diff --check 89a909935..HEAD                               → pass
 3. O trigger de append-only (`reject_review_mutations`) não cobre TRUNCATE.
    TRUNCATE não é esperado no fluxo operacional.
 
+4. O teste de condição de corrida 23505 em `append_review` usa
+   `_skip_select_once` no `FakeSupabase` — um seam de teste que simula a
+   invisibilidade entre transações. Em produção, a atomicidade depende do
+   Postgres (READ COMMITTED + unique constraint). O cenário de "mesmo payload"
+   confirma que a recuperação relê e compara corretamente; o cenário de
+   "payload diferente" confirma que colisão real não é silenciada.
+
 ---
 
 ## Auditoria Codex: pendente
@@ -128,6 +144,17 @@ git diff --check 89a909935..HEAD                               → pass
 - `review_id` textual preservado e idempotente — verificado em 5 testes.
 - Ordem de supersessão: insert → supersede (nunca o inverso) — verificado
   em `TestInsertFailureNoSupersede`.
+- Reobservação de resolved/superseded não dispara supersede — verificado em
+  `TestReobserveResolvedSuperseded` (4 testes: A→B→A, resolved, superseded,
+  last_observed_at).
+- 23505 race em append_review com comparação de payload — verificado em
+  `TestAppendReviewRace` (3 testes: mesmo payload, diferente, no record).
+- Migration reexecutável: DROP TRIGGER IF EXISTS, CHECK constraint,
+  sem default '' — verificado em `TestMigrationExecutability`.
+- Comparador unificado `_review_payload_matches` usado no caminho normal e
+  no race — verificado em `TestReviewPayloadMatches` (4 testes) e
+  `TestAppendReviewCollision` (4 testes: decision, exception_id, actor_id,
+  reviewed_at diferentes disparam DataQualityStorageError).
 
 ---
 
@@ -137,3 +164,5 @@ git diff --check 89a909935..HEAD                               → pass
 - `feat(dq): repository — open_or_observe, review, queries`
 - `test(dq): repository — 39 tests, migration structure, invariants`
 - `docs(dq): T01 aprovada + T02 report`
+- `fix(dq): corrige T02 — revisão de implementação`
+- `docs(dq): corrige T02 report — remove alegações falsas, mark pendente`
