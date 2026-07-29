@@ -1144,3 +1144,134 @@ export interface SourceCoverageResponse {
 
 export const getSourceCoverage = (token: string) =>
   apiFetch<SourceCoverageResponse>("/source-coverage", undefined, token);
+
+// ── Data Quality Exceptions (admin) ────────────────────────
+
+export type DataQualitySubjectKind = "opportunity" | "investor" | "ict" | "program" | "agency";
+
+export type DataQualityIssueCode =
+  | "fact_conflict"
+  | "critical_fact_missing"
+  | "validation_failed"
+  | "evidence_unresolved"
+  | "temporal_status_without_basis"
+  | "temporal_status_conflict";
+
+export type DataQualityExceptionState = "open" | "resolved" | "superseded";
+
+export type DataQualityReviewDecision =
+  | "confirm"
+  | "correct"
+  | "mark_unknown"
+  | "confirm_continuous";
+
+export type DataQualityLocatorQuality = "exact" | "document_only" | "unresolved";
+
+export interface DataQualityEvidenceRef {
+  schema_version: 1;
+  source: string;
+  native_id?: string | null;
+  edital_id?: string | null;
+  document?: string | null;
+  page?: number | null;
+  block_idx?: number | null;
+  section_path: string[];
+  quote?: string | null;
+  canonical_content_hash?: string | null;
+  silver_source_hash?: string | null;
+  bundle_hash?: string | null;
+  content_hash?: string | null;
+  collected_at?: string | null;
+  locator_quality: DataQualityLocatorQuality;
+}
+
+export interface DataQualityReviewIn {
+  review_id: string;
+  decision: DataQualityReviewDecision;
+  justification: string;
+  corrected_value?: string | null;
+  evidence_refs?: DataQualityEvidenceRef[];
+}
+
+export interface DataQualityReviewOut {
+  review_id: string;
+  decision: DataQualityReviewDecision;
+  corrected_value?: string | null;
+  reviewed_at: string;
+  evidence_refs: DataQualityEvidenceRef[];
+}
+
+export interface DataQualityExceptionOut {
+  id: string;
+  subject_kind: DataQualitySubjectKind;
+  subject_id: string;
+  source?: string | null;
+  field_path: string;
+  issue_code: DataQualityIssueCode;
+  safe_value?: string | null;
+  evidence_refs: DataQualityEvidenceRef[];
+  impact: string;
+  state: DataQualityExceptionState;
+  bundle_hash?: string | null;
+  producer_version?: string | null;
+  detected_at?: string | null;
+  last_observed_at?: string | null;
+  current_review?: DataQualityReviewOut | null;
+}
+
+export interface DataQualityExceptionListResponse {
+  items: DataQualityExceptionOut[];
+  limit: number;
+  offset: number;
+  has_more: boolean;
+  next_offset?: number | null;
+}
+
+export interface DataQualityExceptionFilters {
+  status?: DataQualityExceptionState;
+  code?: DataQualityIssueCode;
+  source?: string;
+  field?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export const getDataQualityExceptions = (
+  token: string,
+  filters?: DataQualityExceptionFilters,
+) => {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.code) params.set("code", filters.code);
+  if (filters?.source) params.set("source", filters.source);
+  if (filters?.field) params.set("field", filters.field);
+  if (typeof filters?.limit === "number") params.set("limit", String(filters.limit));
+  if (typeof filters?.offset === "number") params.set("offset", String(filters.offset));
+  const qs = params.toString();
+  return apiFetch<DataQualityExceptionListResponse>(
+    `/data-quality/exceptions${qs ? `?${qs}` : ""}`,
+    undefined,
+    token,
+  );
+};
+
+export const getDataQualityException = (exceptionId: string, token: string) =>
+  apiFetch<DataQualityExceptionOut>(
+    `/data-quality/exceptions/${encodeURIComponent(exceptionId)}`,
+    undefined,
+    token,
+  );
+
+export const reviewDataQualityException = (
+  exceptionId: string,
+  body: DataQualityReviewIn,
+  token: string,
+) =>
+  apiFetch<DataQualityExceptionOut>(
+    `/data-quality/exceptions/${encodeURIComponent(exceptionId)}/reviews`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    token,
+  );
