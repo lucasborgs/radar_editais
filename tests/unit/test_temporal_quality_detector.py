@@ -8,6 +8,8 @@ import pytest
 from radar.core.services.temporal_quality import (
     DETECTOR_PRODUCER_VERSION,
     _build_temporal_fingerprint,
+    _collect_ref_identities,
+    _today_brasilia,
     check_edital_temporal_quality,
     detect_temporal_exception,
 )
@@ -123,10 +125,7 @@ class _FakeQueryBuilder:
                         break
                 else:
                     if match:
-                        raise APIError({
-                            "code": "23505",
-                            "message": "duplicate key",
-                        })
+                        raise APIError({"code": "23505", "message": "duplicate key"})
 
         now = datetime.now().isoformat()
         new_items = []
@@ -213,14 +212,75 @@ def _mock_supabase(fs, monkeypatch):
     monkeypatch.setattr(radar.core.infra.db, "get_supabase_service", lambda: fs)
 
 
-def make_ref(hash_suffix: str = "a") -> EvidenceRef:
-    return EvidenceRef(
+def make_ref(hash_suffix: str = "a", **overrides) -> EvidenceRef:
+    kwargs = dict(
         source="finep",
         canonical_content_hash=f"sha256:{hash_suffix * 64}",
         locator_quality=LocatorQuality.DOCUMENT_ONLY,
         document="pagina_oficial.html",
-        quote="fluxo continuo: inscricoes permanentes",
     )
+    kwargs.update(overrides)
+    return EvidenceRef(**kwargs)
+
+
+def make_silver_ref(hash_suffix: str = "s") -> EvidenceRef:
+    return EvidenceRef(
+        source="finep",
+        silver_source_hash=f"md5:{hash_suffix * 32}",
+        locator_quality=LocatorQuality.DOCUMENT_ONLY,
+        document="silver_doc.json",
+    )
+
+
+# ===========================================================================
+# today_brasilia
+# ===========================================================================
+
+
+class TestTodayBrasilia:
+    def test_returns_date(self):
+        d = _today_brasilia()
+        assert isinstance(d, date)
+
+    def test_uses_america_sao_paulo(self):
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo("America/Sao_Paulo")
+        expected = datetime.now(tz).date()
+        assert _today_brasilia() == expected
+
+
+# ===========================================================================
+# collect_ref_identities
+# ===========================================================================
+
+
+class TestCollectRefIdentities:
+    def test_canonical_hash(self):
+        ref = make_ref("a")
+        ids = _collect_ref_identities([ref])
+        assert ref.canonical_content_hash in ids
+
+    def test_silver_source_hash(self):
+        ref = make_silver_ref("s")
+        ids = _collect_ref_identities([ref])
+        assert ref.silver_source_hash in ids
+
+    def test_bundle_and_content_hash(self):
+        ref = make_ref("b", bundle_hash="sha256:" + "b" * 64, content_hash="sha256:" + "c" * 64)
+        ids = _collect_ref_identities([ref])
+        assert ref.bundle_hash in ids
+        assert ref.content_hash in ids
+
+    def test_empty_when_no_hashes(self):
+        assert _collect_ref_identities([]) == []
+
+    def test_multiple_refs(self):
+        r1 = make_ref("a")
+        r2 = make_silver_ref("b")
+        ids = _collect_ref_identities([r1, r2])
+        assert len(ids) == 2
+        assert r1.canonical_content_hash in ids
+        assert r2.silver_source_hash in ids
 
 
 # ===========================================================================
@@ -234,7 +294,7 @@ class TestFingerprint:
         fp2 = _build_temporal_fingerprint(deadline=date(2026, 12, 31), status="aberta")
         assert fp1 == fp2
         assert fp1.startswith("sha256:")
-        assert len(fp1) == 64 + 7  # sha256: + 64 hex chars
+        assert len(fp1) == 64 + 7
 
     def test_differs_by_deadline(self):
         fp1 = _build_temporal_fingerprint(deadline=date(2026, 12, 31), status="aberta")
@@ -246,49 +306,56 @@ class TestFingerprint:
         fp2 = _build_temporal_fingerprint(deadline=None, status="encerrada")
         assert fp1 != fp2
 
+    def test_equivalent_aberta_normalization(self):
+        """ABERTA, aberta and  aberta  all produce same fingerprint."""
+        fp1 = _build_temporal_fingerprint(None, "ABERTA")
+        fp2 = _build_temporal_fingerprint(None, "aberta")
+        fp3 = _build_temporal_fingerprint(None, "  aberta  ")
+        assert fp1 == fp2 == fp3
+
     def test_includes_evidence_hashes(self):
-        fp1 = _build_temporal_fingerprint(
-            deadline=None, status="aberta",
-            evidence_hashes=["sha256:" + "a" * 64],
-        )
-        fp2 = _build_temporal_fingerprint(
-            deadline=None, status="aberta",
-            evidence_hashes=["sha256:" + "b" * 64],
-        )
+        fp1 = _build_temporal_fingerprint(None, None, evidence_hashes=["sha256:" + "a" * 64])
+        fp2 = _build_temporal_fingerprint(None, None, evidence_hashes=["sha256:" + "b" * 64])
         assert fp1 != fp2
 
     def test_includes_bundle_hash(self):
-        fp1 = _build_temporal_fingerprint(deadline=None, status="aberta", bundle_hash="sha256:" + "a" * 64)
-        fp2 = _build_temporal_fingerprint(deadline=None, status="aberta", bundle_hash=None)
+        fp1 = _build_temporal_fingerprint(None, None, bundle_hash="sha256:" + "a" * 64)
+        fp2 = _build_temporal_fingerprint(None, None, bundle_hash=None)
+        assert fp1 != fp2
+
+    def test_silver_source_hash_in_fingerprint(self):
+        """Evidence based on silver_source_hash participates in fingerprint."""
+        fp1 = _build_temporal_fingerprint(None, None, evidence_hashes=["md5:" + "a" * 32])
+        fp2 = _build_temporal_fingerprint(None, None, evidence_hashes=["md5:" + "b" * 32])
         assert fp1 != fp2
 
     def test_producer_version_fixed(self):
-        fp = _build_temporal_fingerprint(deadline=None, status="aberta")
+        import hashlib
         import json
         material = {
-            "producer_version": DETECTOR_PRODUCER_VERSION,
-            "deadline": None,
-            "status": "aberta",
-            "evidence_hashes": [],
-            "bundle_hash": None,
+            "producer_version": "temporal_quality:v1",
+            "deadline": None, "status": None,
+            "evidence_hashes": [], "bundle_hash": None,
         }
-        import hashlib
         expected = "sha256:" + hashlib.sha256(
-            json.dumps(material, sort_keys=True, ensure_ascii=False).encode("utf-8")
+            json.dumps(material, sort_keys=True, ensure_ascii=False).encode()
         ).hexdigest()
-        assert fp == expected
-
-    def test_not_python_hash(self):
-        fp = _build_temporal_fingerprint(deadline=None, status="aberta")
-        # Ensure we never used hash() (non-deterministic across runs)
-        assert isinstance(fp, str) and fp.startswith("sha256:")
+        assert _build_temporal_fingerprint(None, None) == expected
 
     def test_sorted_evidence_hashes(self):
         h1 = "sha256:" + "a" * 64
         h2 = "sha256:" + "b" * 64
-        fp_a = _build_temporal_fingerprint(None, "aberta", evidence_hashes=[h2, h1])
-        fp_b = _build_temporal_fingerprint(None, "aberta", evidence_hashes=[h1, h2])
-        assert fp_a == fp_b  # order-independent
+        fp_a = _build_temporal_fingerprint(None, None, evidence_hashes=[h2, h1])
+        fp_b = _build_temporal_fingerprint(None, None, evidence_hashes=[h1, h2])
+        assert fp_a == fp_b
+
+    def test_normalized_status_none_for_empty(self):
+        fp = _build_temporal_fingerprint(None, "")
+        assert fp == _build_temporal_fingerprint(None, None)
+
+    def test_normalized_status_none_for_whitespace(self):
+        fp = _build_temporal_fingerprint(None, "   ")
+        assert fp == _build_temporal_fingerprint(None, None)
 
 
 # ===========================================================================
@@ -301,229 +368,156 @@ class TestFinepEureka:
         exc = detect_temporal_exception(
             subject_id="finep:589",
             deadline=None,
-            status="aberta",
+            status="ABERTA",
             as_of=_AS_OF,
         )
         assert exc is not None
         assert exc.issue_code is IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS
         assert exc.subject_id == "finep:589"
-        assert exc.input_fingerprint is not None
         assert exc.input_fingerprint.startswith("sha256:")
 
     def test_rerun_identical_does_not_duplicate(self, fs):
-        """Same fingerprint reobserves, doesn't create new exception."""
         from radar.core.services.data_quality_exceptions import list_exceptions
 
         check_edital_temporal_quality(
-            subject_id="finep:589",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:589", deadline=None, status="ABERTA", as_of=_AS_OF,
         )
-        rows1 = list_exceptions()
-        assert len(rows1) == 1
+        assert len(list_exceptions()) == 1
 
         check_edital_temporal_quality(
-            subject_id="finep:589",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:589", deadline=None, status="ABERTA", as_of=_AS_OF,
         )
-        rows2 = list_exceptions()
-        assert len(rows2) == 1
+        assert len(list_exceptions()) == 1
 
     def test_new_fingerprint_supersedes_old(self, fs):
         from radar.core.services.data_quality_exceptions import list_exceptions
 
         check_edital_temporal_quality(
-            subject_id="finep:589",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:589", deadline=None, status="ABERTA", as_of=_AS_OF,
         )
-        # Same inputs but different bundle_hash → different fingerprint
         check_edital_temporal_quality(
-            subject_id="finep:589",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:589", deadline=None, status="ABERTA", as_of=_AS_OF,
             bundle_hash="sha256:" + "b" * 64,
         )
         rows = list_exceptions()
         open_rows = [r for r in rows if r["status"] == "open"]
         superseded = [r for r in rows if r["status"] == "superseded"]
-
         assert len(open_rows) == 1
         assert len(superseded) == 1
         assert open_rows[0]["input_fingerprint"] != superseded[0]["input_fingerprint"]
-        assert open_rows[0]["input_fingerprint"].startswith("sha256:")
-        assert superseded[0]["input_fingerprint"].startswith("sha256:")
 
 
 # ===========================================================================
-# Futuro coerente: não abre exceção
+# Futuro coerente
 # ===========================================================================
 
 
 class TestFutureDeadline:
     def test_future_deadline_no_exception(self):
-        exc = detect_temporal_exception(
-            subject_id="finep:601",
-            deadline=date(2026, 12, 31),
-            status="aberta",
-            as_of=_AS_OF,
-        )
-        assert exc is None
+        assert detect_temporal_exception(
+            subject_id="finep:601", deadline=date(2026, 12, 31), status="aberta", as_of=_AS_OF,
+        ) is None
 
     def test_deadline_today_no_exception(self):
-        exc = detect_temporal_exception(
-            subject_id="finep:602",
-            deadline=_AS_OF,
-            status="aberta",
-            as_of=_AS_OF,
-        )
-        assert exc is None
+        assert detect_temporal_exception(
+            subject_id="finep:602", deadline=_AS_OF, status="aberta", as_of=_AS_OF,
+        ) is None
 
     def test_check_does_not_persist(self, fs):
         from radar.core.services.data_quality_exceptions import list_exceptions
 
         check_edital_temporal_quality(
-            subject_id="finep:601",
-            deadline=date(2026, 12, 31),
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:601", deadline=date(2026, 12, 31), status="aberta", as_of=_AS_OF,
         )
-        rows = list_exceptions()
-        assert len(rows) == 0
+        assert list_exceptions() == []
 
 
 # ===========================================================================
-# Encerrado coerente: não abre exceção
+# Encerrado coerente
 # ===========================================================================
 
 
 class TestClosedDeadline:
     def test_past_deadline_closed_no_exception(self):
-        exc = detect_temporal_exception(
-            subject_id="finep:700",
-            deadline=date(2026, 1, 31),
-            status="encerrada",
-            as_of=_AS_OF,
-        )
-        assert exc is None
+        assert detect_temporal_exception(
+            subject_id="finep:700", deadline=date(2026, 1, 31), status="encerrada", as_of=_AS_OF,
+        ) is None
 
     def test_closed_without_deadline_no_exception(self):
-        exc = detect_temporal_exception(
-            subject_id="finep:701",
-            deadline=None,
-            status="encerrada",
-            as_of=_AS_OF,
-        )
-        assert exc is None
+        assert detect_temporal_exception(
+            subject_id="finep:701", deadline=None, status="encerrada", as_of=_AS_OF,
+        ) is None
 
     def test_check_does_not_persist(self, fs):
         from radar.core.services.data_quality_exceptions import list_exceptions
 
         check_edital_temporal_quality(
-            subject_id="finep:700",
-            deadline=date(2026, 1, 31),
-            status="encerrada",
-            as_of=_AS_OF,
+            subject_id="finep:700", deadline=date(2026, 1, 31), status="encerrada", as_of=_AS_OF,
         )
-        rows = list_exceptions()
-        assert len(rows) == 0
+        assert list_exceptions() == []
 
 
 # ===========================================================================
-# Contínuo com EvidenceRef recuperável: não abre exceção
+# Contínuo — EvidenceRef genérico não vira continuidade
 # ===========================================================================
 
 
-class TestContinuousWithEvidence:
-    def test_continuous_with_evidence_no_exception(self):
+class TestContinuous:
+    def test_continuous_with_explicit_evidence_no_exception(self):
+        """Explicit continuous_evidence allows continuous mode (active)."""
+        assert detect_temporal_exception(
+            subject_id="finep:800", deadline=None, status="aberta", as_of=_AS_OF,
+            continuous_evidence=make_ref("a"),
+        ) is None
+
+    def test_generic_evidence_ref_not_continuous(self):
+        """Generic evidence_refs are NOT passed to evaluate_temporal as continuous."""
         exc = detect_temporal_exception(
-            subject_id="finep:800",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
-            evidence_refs=[make_ref("a")],
-        )
-        assert exc is None
-
-    def test_check_does_not_persist(self, fs):
-        from radar.core.services.data_quality_exceptions import list_exceptions
-
-        check_edital_temporal_quality(
-            subject_id="finep:800",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:801", deadline=None, status="aberta", as_of=_AS_OF,
             evidence_refs=[make_ref("b")],
         )
-        rows = list_exceptions()
-        assert len(rows) == 0
+        assert exc is not None
+        assert exc.issue_code is IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS
 
-
-# ===========================================================================
-# Contínuo sem evidência: permanece needs_review
-# ===========================================================================
-
-
-class TestContinuousWithoutEvidence:
-    def test_no_evidence_opens_exception(self):
+    def test_continuous_without_evidence_opens_exception(self):
         exc = detect_temporal_exception(
-            subject_id="finep:900",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:802", deadline=None, status="aberta", as_of=_AS_OF,
         )
         assert exc is not None
         assert exc.issue_code is IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS
 
     def test_status_fluxo_continuo_alone_not_evidence(self):
         exc = detect_temporal_exception(
-            subject_id="finep:901",
-            deadline=None,
-            status="fluxo_continuo",
-            as_of=_AS_OF,
+            subject_id="finep:803", deadline=None, status="fluxo_continuo", as_of=_AS_OF,
         )
         assert exc is not None
         assert exc.issue_code is IssueCode.CRITICAL_FACT_MISSING
 
 
 # ===========================================================================
-# Conflito: abre exceção
+# Conflito
 # ===========================================================================
 
 
 class TestConflict:
     def test_future_deadline_with_closed_status(self):
         exc = detect_temporal_exception(
-            subject_id="finep:500",
-            deadline=date(2026, 12, 31),
-            status="encerrada",
-            as_of=_AS_OF,
+            subject_id="finep:500", deadline=date(2026, 12, 31), status="encerrada", as_of=_AS_OF,
         )
         assert exc is not None
         assert exc.issue_code is IssueCode.TEMPORAL_STATUS_CONFLICT
 
     def test_past_deadline_with_open_status(self):
         exc = detect_temporal_exception(
-            subject_id="finep:501",
-            deadline=date(2024, 1, 31),
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:501", deadline=date(2024, 1, 31), status="aberta", as_of=_AS_OF,
         )
         assert exc is not None
         assert exc.issue_code is IssueCode.TEMPORAL_STATUS_CONFLICT
 
     def test_continuous_evidence_with_deadline(self):
         exc = detect_temporal_exception(
-            subject_id="finep:502",
-            deadline=date(2026, 12, 31),
-            status="aberta",
-            as_of=_AS_OF,
-            evidence_refs=[make_ref("c")],
+            subject_id="finep:502", deadline=date(2026, 12, 31), status="aberta", as_of=_AS_OF,
+            continuous_evidence=make_ref("c"),
         )
         assert exc is not None
         assert exc.issue_code is IssueCode.TEMPORAL_STATUS_CONFLICT
@@ -532,10 +526,7 @@ class TestConflict:
         from radar.core.services.data_quality_exceptions import list_exceptions
 
         check_edital_temporal_quality(
-            subject_id="finep:500",
-            deadline=date(2026, 12, 31),
-            status="encerrada",
-            as_of=_AS_OF,
+            subject_id="finep:500", deadline=date(2026, 12, 31), status="encerrada", as_of=_AS_OF,
         )
         rows = list_exceptions()
         assert len(rows) == 1
@@ -548,98 +539,91 @@ class TestConflict:
 
 
 class TestEvidenceNotFabricated:
-    def test_no_evidence_refs_when_not_passed(self):
+    def test_no_refs_when_not_passed(self):
         exc = detect_temporal_exception(
-            subject_id="finep:1000",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:1000", deadline=None, status="aberta", as_of=_AS_OF,
         )
         assert exc is not None
         assert exc.evidence_refs == []
 
-    def test_no_evidence_refs_when_none_passed(self):
+    def test_no_refs_when_none_passed(self):
         exc = detect_temporal_exception(
-            subject_id="finep:1001",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
-            evidence_refs=None,
+            subject_id="finep:1001", deadline=None, status="aberta", as_of=_AS_OF,
+            evidence_refs=None, continuous_evidence=None,
         )
         assert exc is not None
         assert exc.evidence_refs == []
 
-    def test_passed_evidence_preserved(self):
+    def test_continuous_evidence_included_in_exception(self):
         ref = make_ref("d")
         exc = detect_temporal_exception(
-            subject_id="finep:1002",
-            deadline=date(2026, 12, 31),
-            status="aberta",
-            as_of=_AS_OF,
-            evidence_refs=[ref],
+            subject_id="finep:1002", deadline=date(2026, 12, 31), status="aberta", as_of=_AS_OF,
+            continuous_evidence=ref,
         )
-        assert exc is not None  # conflict
+        assert exc is not None
         assert len(exc.evidence_refs) == 1
         assert exc.evidence_refs[0].canonical_content_hash == ref.canonical_content_hash
 
+    def test_evidence_refs_preserved(self):
+        ref = make_ref("e")
+        exc = detect_temporal_exception(
+            subject_id="finep:1003", deadline=None, status="aberta", as_of=_AS_OF,
+            evidence_refs=[ref],
+        )
+        assert exc is not None
+        assert len(exc.evidence_refs) == 1
+        assert exc.evidence_refs[0].canonical_content_hash == ref.canonical_content_hash
+
+    def test_continuous_and_evidence_refs_both_preserved(self):
+        ce = make_ref("f", document="continuous.html")
+        er = make_ref("g", document="generic.html")
+        exc = detect_temporal_exception(
+            subject_id="finep:1004", deadline=date(2026, 12, 31), status="aberta", as_of=_AS_OF,
+            continuous_evidence=ce, evidence_refs=[er],
+        )
+        assert exc is not None
+        assert len(exc.evidence_refs) == 2
+        docs = {r.document for r in exc.evidence_refs}
+        assert docs == {"continuous.html", "generic.html"}
+
     def test_no_bundle_hash_when_not_passed(self):
         exc = detect_temporal_exception(
-            subject_id="finep:1003",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:1005", deadline=None, status="aberta", as_of=_AS_OF,
         )
         assert exc is not None
         assert exc.bundle_hash is None
 
-    def test_no_document_quote_url_fabricated(self):
+    def test_no_duplicate_refs(self):
+        ref = make_ref("h")
         exc = detect_temporal_exception(
-            subject_id="finep:1004",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:1006", deadline=date(2026, 12, 31), status="aberta", as_of=_AS_OF,
+            continuous_evidence=ref, evidence_refs=[ref],
         )
         assert exc is not None
-        assert exc.evidence_refs == []
+        assert len(exc.evidence_refs) == 1
 
 
 # ===========================================================================
-# Storage falhando: não derruba ingestão, não vaza mensagem bruta
+# Storage falhando
 # ===========================================================================
 
 
 class TestStorageFailure:
     def test_storage_error_does_not_raise(self, fs):
-
         fs._fail_next_insert = type("APIError", (Exception,), {
-            "code": "PGRST116",
-            "args": ("syntax error",),
+            "code": "PGRST116", "args": ("syntax error",),
         })()
-
-        # Should not raise
         check_edital_temporal_quality(
-            subject_id="finep:2000",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:2000", deadline=None, status="ABERTA", as_of=_AS_OF,
         )
 
     def test_storage_error_does_not_crash_ingest(self, fs, monkeypatch):
-        # Make open_or_observe_exception always raise
         import radar.core.services.data_quality_exceptions as dq
         from radar.core.services.data_quality_exceptions import DataQualityStorageError
 
-        def _crash(*args, **kwargs):
-            raise DataQualityStorageError("simulated failure")
-
-        monkeypatch.setattr(dq, "open_or_observe_exception", _crash)
-
-        # Should not raise
+        monkeypatch.setattr(dq, "open_or_observe_exception", lambda *a, **kw: (_ for _ in ()).throw(DataQualityStorageError("simulated")))
         check_edital_temporal_quality(
-            subject_id="finep:2001",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:2001", deadline=None, status="ABERTA", as_of=_AS_OF,
         )
 
     def test_exception_does_not_leak_raw_message(self, fs):
@@ -653,67 +637,47 @@ class TestStorageFailure:
         logger.setLevel(logging.WARNING)
 
         fs._fail_next_insert = type("APIError", (Exception,), {
-            "code": "PGRST116",
-            "args": ("syntax error",),
+            "code": "PGRST116", "args": ("syntax error",),
         })()
-
         check_edital_temporal_quality(
-            subject_id="finep:2002",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:2002", deadline=None, status="ABERTA", as_of=_AS_OF,
         )
-
         logger.removeHandler(handler)
         log_text = stream.getvalue()
-        # Should have categorical message, not raw error details
         assert "category=" in log_text
         assert "subject=finep:2002" in log_text
-        # Raw details should not leak
         assert "syntax error" not in log_text
         assert "PGRST116" not in log_text
 
     def test_gold_status_deadline_unchanged_with_detector_failing(self, fs, monkeypatch):
-        """Detector failing does not alter gold output."""
         import radar.core.services.temporal_quality as tq
+        from radar.core.kg import gold
         from tests.helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
 
-        def _instrumented(**kwargs):
-            # Capture that it was called, but don't crash
-            pass
-
-        monkeypatch.setattr(tq, "check_edital_temporal_quality", _instrumented)
-
-        from radar.core.kg import gold
+        monkeypatch.setattr(tq, "check_edital_temporal_quality", lambda **kw: None)
         harness = GoldCaptureHarness()
         harness.apply_patches(monkeypatch, DEFAULT_FIXTURES_DIR)
         gold.ingest_all(skip_unchanged=True, sources=["edital"])
-
-        finep_key = "edital|finep|finep:602"
-        entity = harness.projection.entities.get(finep_key)
+        entity = harness.projection.entities.get("edital|finep|finep:602")
         assert entity is not None
-        # Gold data unchanged: fixture has ABERTA + deadline=None
         assert entity.get("status") == "aberta"
         assert entity.get("deadline") is None
 
     def test_detector_enabled_output_unchanged(self, fs, monkeypatch):
-        """Gold output identical with detector enabled."""
         from radar.core.kg import gold
         from tests.helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
+
         harness = GoldCaptureHarness()
         harness.apply_patches(monkeypatch, DEFAULT_FIXTURES_DIR)
         gold.ingest_all(skip_unchanged=True, sources=["edital"])
-
-        finep_key = "edital|finep|finep:602"
-        entity = harness.projection.entities.get(finep_key)
+        entity = harness.projection.entities.get("edital|finep|finep:602")
         assert entity is not None
-        # Gold unchanged: fixture has ABERTA + deadline=None
         assert entity.get("status") == "aberta"
         assert entity.get("deadline") is None
 
 
 # ===========================================================================
-# Supabase ausente: no-op seguro
+# Supabase ausente
 # ===========================================================================
 
 
@@ -721,27 +685,20 @@ class TestSupabaseAbsent:
     def test_noop_when_supabase_not_configured(self, monkeypatch):
         monkeypatch.delenv("SUPABASE_URL", raising=False)
         monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
-
         check_edital_temporal_quality(
-            subject_id="finep:3000",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:3000", deadline=None, status="ABERTA", as_of=_AS_OF,
         )
 
     def test_detector_still_returns_exception(self):
         exc = detect_temporal_exception(
-            subject_id="finep:3001",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:3001", deadline=None, status="aberta", as_of=_AS_OF,
         )
         assert exc is not None
         assert exc.issue_code is IssueCode.TEMPORAL_STATUS_WITHOUT_BASIS
 
 
 # ===========================================================================
-# Detector não altera match/Stage 0 (shadow)
+# Shadow invariant
 # ===========================================================================
 
 
@@ -749,41 +706,14 @@ class TestShadowInvariant:
     def test_no_side_effects_on_gold_data(self, fs, monkeypatch):
         from radar.core.kg import gold
         from tests.helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
+
         harness = GoldCaptureHarness()
         harness.apply_patches(monkeypatch, DEFAULT_FIXTURES_DIR)
         gold.ingest_all(skip_unchanged=True, sources=["edital"])
-
-        finep_key = "edital|finep|finep:602"
-        entity = harness.projection.entities.get(finep_key)
+        entity = harness.projection.entities.get("edital|finep|finep:602")
         assert entity is not None
         assert entity.get("status") == "aberta"
         assert entity.get("deadline") is None
-
-
-# ===========================================================================
-# Fingerprint uniqueness for different inputs
-# ===========================================================================
-
-
-class TestFingerprintUniqueness:
-    def test_finep_eureka_fingerprint(self):
-        exc = detect_temporal_exception(
-            subject_id="finep:unique-1",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
-        )
-        fp1 = exc.input_fingerprint
-
-        exc2 = detect_temporal_exception(
-            subject_id="finep:unique-1",
-            deadline=date(2026, 12, 31),
-            status="aberta",
-            as_of=_AS_OF,
-        )
-        # second one returns None (future deadline, no exception)
-        assert exc2 is None
-        assert fp1 is not None
 
 
 # ===========================================================================
@@ -793,33 +723,24 @@ class TestFingerprintUniqueness:
 
 class TestGoldIntegration:
     def test_detector_called_during_ingest(self, monkeypatch, fs):
-        """Prove that _check_temporal is called during ingest.
-
-        We cannot use inspect.getsource. Instead, we monkeypatch
-        check_edital_temporal_quality to capture the call.
-        """
         from radar.core.services import temporal_quality as tq_module
         captured = []
 
-        def _capture(**kwargs):
-            captured.append(kwargs)
+        def _capture(**kw):
+            captured.append(kw)
 
         monkeypatch.setattr(tq_module, "check_edital_temporal_quality", _capture)
-
         from radar.core.kg import gold
         from tests.helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
 
         harness = GoldCaptureHarness()
         harness.apply_patches(monkeypatch, DEFAULT_FIXTURES_DIR)
         gold.ingest_all(skip_unchanged=True, sources=["edital"])
-
         assert len(captured) > 0
-        # Should be called for finep:602
         finep_calls = [c for c in captured if "finep:602" in c.get("subject_id", "")]
         assert len(finep_calls) >= 1
 
     def test_detector_called_after_entity_commit(self, monkeypatch, fs):
-        """Integration point is after entity upsert and transaction commit."""
         from radar.core.kg import gold
         from radar.core.services import temporal_quality as tq_module
         from tests.helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
@@ -828,75 +749,129 @@ class TestGoldIntegration:
         harness.apply_patches(monkeypatch, DEFAULT_FIXTURES_DIR)
 
         call_order = []
-
         stub_upsert = gold._upsert_entity
 
         def _track_upsert(cur, **f):
             call_order.append(f"upsert:{f.get('native_id')}")
             return stub_upsert(cur, **f)
 
-        def _track_temporal(**kwargs):
-            call_order.append(f"temporal:{kwargs.get('subject_id')}")
-
         monkeypatch.setattr(gold, "_upsert_entity", _track_upsert)
-        monkeypatch.setattr(tq_module, "check_edital_temporal_quality", _track_temporal)
+        monkeypatch.setattr(tq_module, "check_edital_temporal_quality", lambda **kw: call_order.append(f"temporal:{kw.get('subject_id')}"))
 
         gold.ingest_all(skip_unchanged=True, sources=["edital"])
-
-        temporal_calls = [c for c in call_order if c.startswith("temporal:")]
-        assert len(temporal_calls) > 0
-        for tc in temporal_calls:
+        for tc in [c for c in call_order if c.startswith("temporal:")]:
             native_id = tc.replace("temporal:", "")
-            upsert_idx = None
-            for j, prior in enumerate(call_order):
-                if prior == f"upsert:{native_id}":
-                    upsert_idx = j
-                    break
-            assert upsert_idx is not None, (
-                f"temporal call for {native_id} found before upsert"
-            )
+            assert any(c == f"upsert:{native_id}" for c in call_order[:call_order.index(tc)]), f"temporal call for {native_id} before upsert"
+
+    def test_detector_receives_raw_status(self, monkeypatch, fs):
+        """Prove that raw_status is passed to detector, not normalized status."""
+        from radar.core.services import temporal_quality as tq_module
+        captured = []
+
+        def _capture(**kw):
+            captured.append(kw)
+
+        monkeypatch.setattr(tq_module, "check_edital_temporal_quality", _capture)
+        from radar.core.kg import gold
+        from tests.helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
+
+        harness = GoldCaptureHarness()
+        harness.apply_patches(monkeypatch, DEFAULT_FIXTURES_DIR)
+        gold.ingest_all(skip_unchanged=True, sources=["edital"])
+        finep_call = next(c for c in captured if c["subject_id"] == "finep:602")
+        assert finep_call["status"] == "ABERTA"
 
 
 # ===========================================================================
-# Valor de produced_value
+# Raw conflict through gold pipeline
+# ===========================================================================
+
+
+class TestRawConflictGoldIntegration:
+    def _ingest_finep_602(self, monkeypatch, bronze_record):
+        from radar.core.kg import gold
+        from tests.helpers.gold_projection import DEFAULT_FIXTURES_DIR, GoldCaptureHarness
+
+        harness = GoldCaptureHarness()
+        harness.apply_patches(monkeypatch, DEFAULT_FIXTURES_DIR)
+        orig_bronze = gold._bronze_record
+
+        def _patched_bronze(src, st):
+            if src == "finep" and st == "602":
+                return bronze_record
+            return orig_bronze(src, st)
+
+        monkeypatch.setattr(gold, "_bronze_record", _patched_bronze)
+        gold.ingest_all(skip_unchanged=True, sources=["edital"])
+        return harness.projection.entities["edital|finep|finep:602"]
+
+    def test_raw_aberta_past_deadline_opens_conflict(self, fs, monkeypatch):
+        """raw ABERTA + prazo passado → temporal_status_conflict."""
+        from radar.core.services.data_quality_exceptions import list_exceptions
+
+        bronze_rec = {
+            "chamada_id": "602",
+            "status": "ABERTA",
+            "prazo_envio": "01/01/2024",
+            "titulo": "Edital ABERTA com prazo passado",
+        }
+        entity = self._ingest_finep_602(monkeypatch, bronze_rec)
+        assert entity["status"] == "encerrada"
+        assert entity["deadline"] == "2024-01-01"
+        assert "raw_status" not in entity
+        assert "raw_status" not in entity["metadata"]
+
+        rows = [r for r in list_exceptions() if r["subject_id"] == "finep:602"]
+        assert len(rows) == 1
+        assert rows[0]["issue_code"] == "temporal_status_conflict"
+
+    def test_raw_encerrada_future_deadline_opens_conflict(self, fs, monkeypatch):
+        """raw ENCERRADA + prazo futuro → temporal_status_conflict."""
+        from radar.core.services.data_quality_exceptions import list_exceptions
+
+        bronze_rec = {
+            "chamada_id": "602",
+            "status": "ENCERRADA",
+            "prazo_envio": "31/12/2099",
+            "titulo": "Edital ENCERRADA com prazo futuro",
+        }
+        entity = self._ingest_finep_602(monkeypatch, bronze_rec)
+        assert entity["status"] == "aberta"
+        assert entity["deadline"] == "2099-12-31"
+        assert "raw_status" not in entity
+        assert "raw_status" not in entity["metadata"]
+
+        rows = [r for r in list_exceptions() if r["subject_id"] == "finep:602"]
+        assert len(rows) == 1
+        assert rows[0]["issue_code"] == "temporal_status_conflict"
+
+
+# ===========================================================================
+# Produced value & producer version
 # ===========================================================================
 
 
 class TestProducedValue:
     def test_produced_value_is_deadline_when_present(self):
         exc = detect_temporal_exception(
-            subject_id="finep:4000",
-            deadline=date(2024, 1, 31),
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:4000", deadline=date(2024, 1, 31), status="aberta", as_of=_AS_OF,
         )
         assert exc is not None
         assert exc.produced_value == "2024-01-31"
 
     def test_produced_value_is_status_when_no_deadline(self):
         exc = detect_temporal_exception(
-            subject_id="finep:4001",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:4001", deadline=None, status="aberta", as_of=_AS_OF,
         )
         assert exc is not None
         assert exc.produced_value == "aberta"
 
     def test_produced_value_unknown_when_neither(self):
         exc = detect_temporal_exception(
-            subject_id="finep:4002",
-            deadline=None,
-            status=None,
-            as_of=_AS_OF,
+            subject_id="finep:4002", deadline=None, status=None, as_of=_AS_OF,
         )
         assert exc is not None
         assert exc.produced_value == "unknown"
-
-
-# ===========================================================================
-# Producer version constante
-# ===========================================================================
 
 
 class TestProducerVersion:
@@ -905,59 +880,71 @@ class TestProducerVersion:
 
     def test_exception_has_producer_version(self):
         exc = detect_temporal_exception(
-            subject_id="finep:5000",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:5000", deadline=None, status="aberta", as_of=_AS_OF,
         )
         assert exc is not None
         assert exc.producer_version == "temporal_quality:v1"
 
 
 # ===========================================================================
-# Fingerprint em detect_temporal_exception
+# Fingerprint in exception
 # ===========================================================================
 
 
 class TestFingerprintInException:
     def test_fingerprint_present(self):
         exc = detect_temporal_exception(
-            subject_id="finep:6000",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:6000", deadline=None, status="aberta", as_of=_AS_OF,
         )
         assert exc is not None
-        assert exc.input_fingerprint is not None
         assert exc.input_fingerprint.startswith("sha256:")
 
     def test_fingerprint_deterministic(self):
         exc1 = detect_temporal_exception(
-            subject_id="finep:6001",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:6001", deadline=None, status="aberta", as_of=_AS_OF,
         )
         exc2 = detect_temporal_exception(
-            subject_id="finep:6001",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:6001", deadline=None, status="aberta", as_of=_AS_OF,
         )
         assert exc1.input_fingerprint == exc2.input_fingerprint
 
     def test_fingerprint_changes_with_deadline(self):
         exc1 = detect_temporal_exception(
-            subject_id="finep:6002",
-            deadline=None,
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:6002", deadline=None, status="aberta", as_of=_AS_OF,
         )
         exc2 = detect_temporal_exception(
-            subject_id="finep:6002",
-            deadline=date(2024, 1, 31),
-            status="aberta",
-            as_of=_AS_OF,
+            subject_id="finep:6002", deadline=date(2024, 1, 31), status="aberta", as_of=_AS_OF,
         )
-        # exc2 has past_deadline + aberta → conflict, but fingerprint differs from exc1
         assert exc1.input_fingerprint != exc2.input_fingerprint
+
+    def test_aberta_and_aberta_same_fingerprint(self):
+        exc1 = detect_temporal_exception(
+            subject_id="finep:6003", deadline=None, status="aberta", as_of=_AS_OF,
+        )
+        exc2 = detect_temporal_exception(
+            subject_id="finep:6003", deadline=None, status="ABERTA", as_of=_AS_OF,
+        )
+        assert exc1.input_fingerprint == exc2.input_fingerprint
+
+
+# ===========================================================================
+# as_of default
+# ===========================================================================
+
+
+class TestAsOfDefault:
+    def test_check_uses_brasilia_default(self, monkeypatch):
+        from radar.core.services import temporal_quality as tq
+        captured = {}
+
+        def _capture(**kw):
+            captured.update(kw)
+            return None
+
+        monkeypatch.setattr(tq, "detect_temporal_exception", _capture)
+
+        check_edital_temporal_quality(
+            subject_id="finep:7000", deadline=None, status="aberta",
+        )
+        assert "as_of" in captured
+        assert isinstance(captured["as_of"], date)

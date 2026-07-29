@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from radar.core.services.data_quality_exceptions import (
     DataQualityStorageError,
@@ -22,6 +23,24 @@ logger = logging.getLogger(__name__)
 DETECTOR_PRODUCER_VERSION = "temporal_quality:v1"
 
 
+def _today_brasilia() -> date:
+    return datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+
+
+def _collect_ref_identities(refs: list[EvidenceRef]) -> list[str]:
+    out = []
+    for ref in refs:
+        if ref.canonical_content_hash:
+            out.append(ref.canonical_content_hash)
+        if ref.silver_source_hash:
+            out.append(ref.silver_source_hash)
+        if ref.bundle_hash:
+            out.append(ref.bundle_hash)
+        if ref.content_hash:
+            out.append(ref.content_hash)
+    return out
+
+
 def _build_temporal_fingerprint(
     deadline: date | None,
     status: str | None,
@@ -31,7 +50,7 @@ def _build_temporal_fingerprint(
     material = {
         "producer_version": DETECTOR_PRODUCER_VERSION,
         "deadline": deadline.isoformat() if deadline else None,
-        "status": status,
+        "status": (status or "").strip().lower() or None,
         "evidence_hashes": sorted(set(evidence_hashes or [])),
         "bundle_hash": bundle_hash,
     }
@@ -45,6 +64,7 @@ def detect_temporal_exception(
     deadline: date | None,
     status: str | None,
     as_of: date,
+    continuous_evidence: EvidenceRef | None = None,
     evidence_refs: list[EvidenceRef] | None = None,
     bundle_hash: str | None = None,
 ) -> DataQualityException | None:
@@ -52,18 +72,22 @@ def detect_temporal_exception(
         deadline=deadline,
         status=status,
         as_of=as_of,
-        continuous_evidence=evidence_refs[0] if evidence_refs else None,
+        continuous_evidence=continuous_evidence,
     )
     if evaluation.validity_state is not ValidityState.NEEDS_REVIEW:
         return None
 
-    refs = evidence_refs or []
+    all_refs = list(evidence_refs or [])
+    if continuous_evidence is not None and continuous_evidence not in all_refs:
+        all_refs.append(continuous_evidence)
+
+    evidence_identities = _collect_ref_identities(all_refs)
+    norm_status = (status or "").strip().lower() or None
+
     fingerprint = _build_temporal_fingerprint(
         deadline=deadline,
-        status=status,
-        evidence_hashes=[
-            r.canonical_content_hash for r in refs if r.canonical_content_hash
-        ],
+        status=norm_status,
+        evidence_hashes=evidence_identities,
         bundle_hash=bundle_hash,
     )
     produced = (
@@ -77,7 +101,7 @@ def detect_temporal_exception(
         issue_code=evaluation.issue_code,
         produced_state=FactState.INFERRED,
         produced_value=produced,
-        evidence_refs=refs,
+        evidence_refs=all_refs,
         bundle_hash=bundle_hash,
         producer_version=DETECTOR_PRODUCER_VERSION,
         input_fingerprint=fingerprint,
@@ -91,11 +115,12 @@ def check_edital_temporal_quality(
     deadline: date | None,
     status: str | None,
     as_of: date | None = None,
+    continuous_evidence: EvidenceRef | None = None,
     evidence_refs: list[EvidenceRef] | None = None,
     bundle_hash: str | None = None,
 ) -> None:
     if as_of is None:
-        as_of = date.today()
+        as_of = _today_brasilia()
 
     try:
         exception = detect_temporal_exception(
@@ -103,6 +128,7 @@ def check_edital_temporal_quality(
             deadline=deadline,
             status=status,
             as_of=as_of,
+            continuous_evidence=continuous_evidence,
             evidence_refs=evidence_refs,
             bundle_hash=bundle_hash,
         )
@@ -129,6 +155,8 @@ def check_edital_temporal_quality(
 
 __all__ = [
     "DETECTOR_PRODUCER_VERSION",
+    "_today_brasilia",
+    "_collect_ref_identities",
     "_build_temporal_fingerprint",
     "detect_temporal_exception",
     "check_edital_temporal_quality",

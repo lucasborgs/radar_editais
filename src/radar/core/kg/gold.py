@@ -468,6 +468,7 @@ def _edital_metadata(source: str, stem: str, blocks: list[dict]) -> dict:
         "uf": _SOURCE_UF.get(source),
         "descricao_bronze": _ws(rec.get("descricao") or ""),
         "metadata": {k: v for k, v in meta.items() if v},
+        "raw_status": rec.get("status"),
     }
 
 
@@ -1227,7 +1228,7 @@ def _ingest_editais(
             _check_temporal(
                 subject_id=native_id,
                 deadline=md["deadline"],
-                status=md["status"],
+                status=md.get("raw_status", md["status"]),
             )
         except Exception as e:  # noqa: BLE001 — 1 edital não derruba o batch
             logger.warning("edital %s falhou: %s", native_id, e)
