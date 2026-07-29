@@ -1,8 +1,13 @@
 # RT05-T02 — Persistência e Repositório da Fila de Exceções
 
-**Data:** 2026-07-29  
-**Branch:** `codex/radar-data-trust-05-t02`  
+**Data:** 2026-07-29
+**Branch:** `codex/radar-data-trust-05-t02`
 **Base:** `89a909935` (tip of T01)
+**Commits:**
+- `f38bd1b80` feat(dq): migration 046 — data_quality_exceptions + reviews
+- `c6ee6a435` feat(dq): repository — open_or_observe, review, queries
+- `04a2f5031` test(dq): repository — 39 tests, migration structure, invariants
+- `a78566a75` docs(dq): T01 aprovada (2026-07-29) + T02 report
 
 ---
 
@@ -25,73 +30,110 @@ Duas tabelas `public.`:
 | Tabela | Propósito |
 |---|---|
 | `data_quality_exceptions` | Exceção de qualidade (idempotente por fingerprint) |
-| `data_quality_reviews` | Revisão append-only vinculada à exceção |
+| `data_quality_reviews` | Decisão humanas append-only, com review_id textual único |
 
-Destaques:
-- Chave única: `(subject_kind, subject_id, field_path, issue_code, input_fingerprint)` — idempotência garantida pela constraint
-- FK `exception_id → data_quality_exceptions(id)` nas reviews
-- `CHECK` constraints para `status` e `decision`
+Estrutura:
+- `data_quality_exceptions`: chave única
+  `(subject_kind, subject_id, field_path, issue_code, input_fingerprint)`;
+  `input_fingerprint text not null default ''`; CHECK para status
+- `data_quality_reviews`: `review_id text not null unique`; FK para
+  `data_quality_exceptions(id)` com `on delete restrict`; CHECK para decision
+- Trigger `trg_reviews_append_only` (BEFORE UPDATE OR DELETE) que levanta
+  exceção — garante append-only no banco sem tabela adicional
 - RLS ativado (service-role apenas, sem policies user-facing)
-- `is_immutable` na review + `temporal_interval()` para janela de correção
+- Índices: subject_idx, open_idx (exceptions); exception_idx, created_at_idx
+  (reviews)
 
 ### 2. Repositório — `src/radar/core/services/data_quality_exceptions.py`
 
 | Função | Comportamento |
 |---|---|
-| `open_or_observe_exception` | UPSERT semântico: mesma fingerprint → `last_observed_at`; fingerprint nova → supersede abertas anteriores e insere |
-| `list_exceptions` | Lista com filtros opcionais (`subject_kind`, `subject_id`, `status`) |
+| `open_or_observe_exception` | Rejeita input_fingerprint vazio; reobserva fingerprint existente (update last_observed_at) ou insere novo; **nunca** supersede antes da inserção confirmada; após insert ou reobservação, supersede abertas do mesmo grupo com fingerprint diferente |
+| `list_exceptions` | Lista com filtros opcionais (subject_kind, subject_id, status) |
 | `get_exception` | Leitura por ID |
-| `append_review` | Revisão append-only (FK para exceção) |
-| `get_current_review_projection` | Última revisão (mais recente `created_at`) reconstruída como `DataQualityReview` |
+| `append_review` | Idempotente por review_id; rejeita review_id vazio; nunca atualiza registro existente |
+| `get_current_review_projection` | Última revisão (mais recente created_at) reconstruída como `DataQualityReview` com review_id preservado |
 
 Tratamento de erros:
 - `DataQualityStorageError` — exceção sanitizada (sem traceback, URL, password, secret)
+- `ValueError` para input_fingerprint ou review_id inválidos
 - Supabase ausente → degradação graciosa (False / None / [])
-- `23505` (unique violation) tratado como idempotente
+- 23505 (unique violation) tratado como idempotente na exceção
 
 ### 3. Testes — `tests/unit/test_data_quality_exceptions.py`
 
-39 testes em 7 grupos:
+42 testes em 8 grupos, usando `FakeSupabase` determinístico (sem banco real):
 
-| Grupo | Testes | O quê |
+| Grupo | Count | O quê |
 |---|---|---|
-| `TestMigrationStructure` | 9 | SQL tem 2 tables, RLS, FK, CHECK, sem policies |
-| `TestPayloadBuilding` | 6 | Serialização Pydantic consistente |
-| `TestExceptionModelInvariants` | 7 | Domain rejects invalid states |
-| `TestReviewModelInvariants` | 7 | Review invariants (correct sem value, etc.) |
-| `TestIdempotencyLogic` | 5 | Fingerprint match, supersessão, append-only |
-| `TestLegitimateAbsence` | 2 | Ausência não fabrica registros |
-| `TestErrorHandling` | 3 | Erro sanitizado, categórico, sem leak |
+| `TestMigrationStructure` | 9 | SQL tem 2 tables, review_id, FK, trigger, RLS, sem policies |
+| `TestSupabaseAbsent` | 5 | Degradação graciosa: False/None/[] sem credenciais |
+| `TestInputFingerprintRequired` | 3 | Rejeita None/vazio/whitespace |
+| `TestOpenOrObserve` | 8 | Insert, mesma fp, fp nova, supersessão, grupos distintos, órfãos |
+| `TestInsertFailureNoSupersede` | 2 | Unique violation ok; erro real não supersede anterior |
+| `TestReviewId` | 5 | Preservado, retry idempotente, múltiplos, vazio rejeitado, model valida |
+| `TestSourceUrlRemoved` | 6 | source_url ausente do payload de exception e review, persistido, helper |
+| `TestListExceptions` | 2 | Filtro por subject_kind e status |
+| `TestErrorSemantics` | 3 | Erro sanitizado, categórico, não-bool |
+
+### 4. EvidenceRef sanitization
+
+`_evidence_refs_payload()` serializa `EvidenceRef.model_dump(mode="json")` e remove
+a chave `source_url` antes de persistir. Round-trip: `source_url` é None na
+leitura.
 
 ---
 
 ## Validação
 
 ```
-pytest tests/unit/test_data_quality_exceptions.py  → 39 passed
-pytest tests/unit/test_temporal_exception_contract.py  → 75 passed
+ENVIRONMENT=test PYTHONPATH=src pytest -q \
+  tests/unit/test_data_quality_exceptions.py \
+  tests/unit/test_temporal_exception_contract.py \
+  tests/unit/test_provenance.py
+
+  → 181 passed (42 + 75 + 64)
+
 ruff check src/radar/core/services/data_quality_exceptions.py  → pass
-ruff check tests/unit/test_data_quality_exceptions.py  → pass
+ruff check tests/unit/test_data_quality_exceptions.py          → pass
+git diff --check 89a909935..HEAD                               → pass
 ```
 
 ---
 
-## Pendências e Riscos
+## Pendências e Limitações
 
-Nenhum. T02 completo e independente.
+1. O `FakeSupabase` não implementa transações — o teste de "insert sem
+   supersede" simula erro via flag imperativa. Em produção, a atomicidade
+   depende do Postgres (insert + update não são atômicos na mesma conexão
+   sem transação explícita). O contrato de consistência eventual é aceito
+   por design.
+
+2. A remoção de `source_url` é feita no Python, não no banco — uma inserção
+   direta no Postgres (fora do repositório) pode conter o campo. A migration
+   não tem trigger de sanitização.
+
+3. O trigger de append-only (`reject_review_mutations`) não cobre TRUNCATE.
+   TRUNCATE não é esperado no fluxo operacional.
 
 ---
 
-## Auditoria Codex
+## Auditoria Codex: pendente
 
-**aprovada em 2026-07-29** — dados legados sem exceção continuam
-representados por ausência (sem fabricação). Erros sanitizados sem leak.
+- Dados legados sem exceção continuam representados por ausência (sem
+  fabricação) — verificado em `TestSupabaseAbsent` (degradação graciosa) e
+  método `get_exception` retorna None para missing.
+- Erros sanitizados sem leak — verificado em `TestErrorSemantics`.
+- Round-trip de `source_url` confirmado: None após reconstrução.
+- `review_id` textual preservado e idempotente — verificado em 5 testes.
+- Ordem de supersessão: insert → supersede (nunca o inverso) — verificado
+  em `TestInsertFailureNoSupersede`.
 
 ---
 
-## Histórico de Commits
+## Histórico de Commits (rebase)
 
-- `feat(dq): migration 046 — data_quality_exceptions + reviews` (migration SQL)
-- `feat(dq): repository service — open_or_observe, review, queries` (service)
-- `test(dq): repository service — 39 tests, migration structure, invariants` (tests)
-- `docs(dq): T01 aprovada + T02 report` (reports)
+- `feat(dq): migration 046 — data_quality_exceptions + reviews`
+- `feat(dq): repository — open_or_observe, review, queries`
+- `test(dq): repository — 39 tests, migration structure, invariants`
+- `docs(dq): T01 aprovada + T02 report`
