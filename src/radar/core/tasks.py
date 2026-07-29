@@ -44,6 +44,7 @@ from radar.core.retrieval.chunker import CHUNKER_VERSION, chunk_from_blocks  # n
 from radar.core.retrieval.embedder import EMBEDDING_MODEL, embed_texts  # noqa: E402
 from radar.core.retrieval.retriever import RETRIEVAL_EMBEDDING_COLUMN  # noqa: E402
 from radar.core.services.content_library import enrich_content  # noqa: E402
+from radar.core.services.cron_operations import finish_cron, safe_error, start_cron  # noqa: E402
 from radar.pipeline.adapters.base import get_adapter  # noqa: E402
 
 if TYPE_CHECKING:  # noqa: E402
@@ -877,19 +878,35 @@ async def run_daily_etl_task(timestamp: int) -> None:
     O argumento `timestamp` vem do procrastinate periodic e representa o
     instante agendado da execução (UNIX epoch).
     """
+    db = None
+    run_id = None
     try:
-        await _run_daily_etl(timestamp)
+        db = get_supabase_service()
+        run_id = start_cron(db, task="run_daily_etl", scheduled_at=timestamp)
+    except Exception:
+        logger.warning("run_daily_etl: cron ledger unavailable", exc_info=False)
+    try:
+        summary = await _run_daily_etl(timestamp)
     except Exception as e:
         # send_alert nunca levanta (contrato de core/notify) — o alerta não
         # pode mascarar nem substituir a falha original.
         send_alert(
             "[radar] run_daily_etl: falha total do cron",
-            f"run_daily_etl (timestamp={timestamp}) abortou com exceção:\n\n{e!r}",
+            f"run_daily_etl (timestamp={timestamp}) falhou: {safe_error(e)}",
         )
+        if db is not None and run_id:
+            finish_cron(db, run_id=run_id, status="failed", last_step="etl", error=e)
         raise
+    else:
+        if db is not None and run_id:
+            finish_cron(
+                db, run_id=run_id, status=summary["status"],
+                last_step=summary["last_step"], counters=summary["counters"],
+                error=summary.get("error"),
+            )
 
 
-async def _run_daily_etl(timestamp: int) -> None:
+async def _run_daily_etl(timestamp: int) -> dict[str, object]:
     """Corpo do ETL diário (ver run_daily_etl_task para o contrato de alerta).
 
     Para cada fonte em radar.pipeline.extractors.SCRAPER_REGISTRY:
@@ -909,6 +926,13 @@ async def _run_daily_etl(timestamp: int) -> None:
         log_pipeline_error,
     )
 
+    async def record_pipeline_error(*args, **kwargs) -> None:
+        """Telemetry is best-effort and must not replace the source failure."""
+        try:
+            await asyncio.to_thread(log_pipeline_error, *args, **kwargs)
+        except Exception:
+            logger.warning("run_daily_etl: telemetry de erro indisponível", exc_info=True)
+
     logger.info("run_daily_etl_task: iniciando (timestamp=%s)", timestamp)
 
     # Import tardio para evitar custo no boot do worker
@@ -927,6 +951,8 @@ async def _run_daily_etl(timestamp: int) -> None:
     # Falhas parciais da run (scraper por fonte + etapas pós-scraping).
     # Não derrubam a run; viram 1 e-mail AGREGADO ao final.
     step_errors: list[str] = []
+    last_step = "start"
+    n_silver = n_gold = n_docs = 0
 
     total_new = 0
     for source_key, cfg in SCRAPER_REGISTRY.items():
@@ -955,6 +981,7 @@ async def _run_daily_etl(timestamp: int) -> None:
                 )
 
         try:
+            last_step = f"scraper:{source_key}"
             scraper = cls(**cfg.get("kwargs", {}))
             results = await asyncio.to_thread(scraper.extract)
             new_count = len(results) if results else 0
@@ -984,8 +1011,7 @@ async def _run_daily_etl(timestamp: int) -> None:
             # ensure/prefetch quando o usuário engaja um edital.
 
         except PipelineError as e:
-            await asyncio.to_thread(
-                log_pipeline_error,
+            await record_pipeline_error(
                 source=source, error=e,
                 context={"stage": "scraper"},
             )
@@ -1014,8 +1040,7 @@ async def _run_daily_etl(timestamp: int) -> None:
         except Exception as raw_err:
             # Genérico: tenta classificar (HTTPError → ParseError/Timeout, etc.)
             typed = classify_requests_error(raw_err)
-            await asyncio.to_thread(
-                log_pipeline_error,
+            await record_pipeline_error(
                 source=source, error=typed,
                 context={"stage": "scraper", "original_exception": type(raw_err).__name__},
             )
@@ -1057,6 +1082,7 @@ async def _run_daily_etl(timestamp: int) -> None:
     #    materializa data/silver/structured_docs/*.jsonl. É a ENTRADA
     #    do ingest_all (gold) e do RAG de escrita. Sem LLM.
     try:
+        last_step = "silver"
         n_silver = await asyncio.to_thread(_build_all_silver)
         logger.info("run_daily_etl_task: silver materializado p/ %d editais", n_silver)
     except Exception as e:
@@ -1070,8 +1096,10 @@ async def _run_daily_etl(timestamp: int) -> None:
     #    OPENAI_API_KEY (tagger/constraints/embeddings) e DATABASE_URL (gold._dsn).
     if os.getenv("OPENAI_API_KEY") and os.getenv("DATABASE_URL"):
         try:
+            last_step = "gold"
             from radar.core.kg.gold import ingest_all  # noqa: PLC0415
             counts = await asyncio.to_thread(ingest_all)
+            n_gold = sum(v for v in counts.values() if isinstance(v, int)) if isinstance(counts, dict) else 0
             logger.info("run_daily_etl_task: gold — %s", counts)
         except Exception as e:
             logger.error("run_daily_etl_task: falha ao ingerir gold: %s", e)
@@ -1085,6 +1113,7 @@ async def _run_daily_etl(timestamp: int) -> None:
     #    catálogo mas não foram enumerados pelo bronze da run. O caminho normal
     #    já persistiu conteúdo fresco em (1).
     try:
+        last_step = "source_docs"
         from radar.core.kg.source_docs import persist_all_current  # noqa: PLC0415
         n_docs = await asyncio.to_thread(persist_all_current)
         logger.info("run_daily_etl_task: %d documentos-fonte persistidos (durável)", n_docs)
@@ -1096,6 +1125,7 @@ async def _run_daily_etl(timestamp: int) -> None:
     #    entity_relationships). Uso pessoal (Graph View); sem consumidor no app.
     #    `scripts` é importável como namespace package a partir da raiz.
     try:
+        last_step = "obsidian"
         from radar.core.config import OBSIDIAN_VAULT_DIR  # noqa: PLC0415
         from scripts.export_to_obsidian import run as export_obsidian  # noqa: PLC0415
         OBSIDIAN_VAULT_DIR.mkdir(parents=True, exist_ok=True)
@@ -1118,6 +1148,18 @@ async def _run_daily_etl(timestamp: int) -> None:
             f"(timestamp={timestamp}, {total_new} editais novos):\n\n"
             + "\n".join(f"- {err}" for err in step_errors),
         )
+    return {
+        "status": "partial" if step_errors else "succeeded",
+        "last_step": last_step,
+        "counters": {
+            "records_new": total_new,
+            "silver": n_silver,
+            "gold": n_gold,
+            "source_docs": n_docs,
+            "step_errors": len(step_errors),
+        },
+        "error": step_errors[0] if step_errors else None,
+    }
 
 
 @app.task(name="ingest_promoted_edital", queue="etl")
@@ -1225,6 +1267,13 @@ async def discover_opportunities_task(timestamp: int) -> None:
     """
     from radar.core.ingestion.opportunity_discovery import discover_opportunities  # noqa: PLC0415
 
+    db = None
+    run_id = None
+    try:
+        db = get_supabase_service()
+        run_id = start_cron(db, task="discover_opportunities", scheduled_at=timestamp)
+    except Exception:
+        logger.warning("discover_opportunities: cron ledger unavailable", exc_info=False)
     logger.info("discover_opportunities_task: iniciando (timestamp=%s)", timestamp)
 
     try:
@@ -1234,9 +1283,10 @@ async def discover_opportunities_task(timestamp: int) -> None:
         # pode mascarar nem substituir a falha original.
         send_alert(
             "[radar] discover_opportunities: falha total do cron",
-            f"discover_opportunities (timestamp={timestamp}) abortou com "
-            f"exceção:\n\n{e!r}",
+            f"discover_opportunities (timestamp={timestamp}) falhou: {safe_error(e)}",
         )
+        if db is not None and run_id:
+            finish_cron(db, run_id=run_id, status="failed", last_step="discovery", error=e)
         raise
     logger.info(
         "discover_opportunities_task: %d oportunidades → staging (aguardam gate humano)",
@@ -1244,6 +1294,8 @@ async def discover_opportunities_task(timestamp: int) -> None:
     )
 
     logger.info("discover_opportunities_task: concluído")
+    if db is not None and run_id:
+        finish_cron(db, run_id=run_id, status="succeeded", last_step="staging", counters={"records_staged": len(records)})
 
 
 # ============================================================================
@@ -1269,19 +1321,34 @@ async def warm_edital_chunks_task(timestamp: int) -> None:
     """
     from radar.core.kg.entity_catalog import list_editais  # noqa: PLC0415
 
-    cards = list_editais(limit=1000)
-    queued = 0
-    for card in cards:
-        try:
-            await app.configure_task("chunk_edital").defer_async(
-                edital_id=card["id"],
-            )
-            queued += 1
-        except Exception as e:
-            logger.warning(
-                "warm_edital_chunks: falha ao enfileirar %s: %s", card.get("id"), e,
-            )
-    logger.info(
-        "warm_edital_chunks: %d/%d editais enfileirados (timestamp=%s)",
-        queued, len(cards), timestamp,
-    )
+    db = None
+    run_id = None
+    try:
+        db = get_supabase_service()
+        run_id = start_cron(db, task="warm_edital_chunks", scheduled_at=timestamp)
+    except Exception:
+        logger.warning("warm_edital_chunks: cron ledger unavailable", exc_info=False)
+    try:
+        cards = list_editais(limit=1000)
+        queued = 0
+        for card in cards:
+            try:
+                await app.configure_task("chunk_edital").defer_async(
+                    edital_id=card["id"],
+                )
+                queued += 1
+            except Exception as e:
+                logger.warning(
+                    "warm_edital_chunks: falha ao enfileirar %s: %s", card.get("id"), e,
+                )
+        logger.info(
+            "warm_edital_chunks: %d/%d editais enfileirados (timestamp=%s)",
+            queued, len(cards), timestamp,
+        )
+        if db is not None and run_id:
+            finish_cron(db, run_id=run_id, status="succeeded" if queued == len(cards) else "partial",
+                        last_step="enqueue_chunk_edital", counters={"editais": len(cards), "queued": queued})
+    except Exception as e:
+        if db is not None and run_id:
+            finish_cron(db, run_id=run_id, status="failed", last_step="list_editais", error=e)
+        raise

@@ -11,15 +11,38 @@ correlacionar logs de uma mesma request (ver middleware em backend/api.py).
 import json
 import logging
 import os
+import re
 import sys
 from contextvars import ContextVar
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 
 
+_SENSITIVE = re.compile(r"(?i)(api[_-]?key|token|password|secret|cnpj|cpf|prompt|args?)\s*([:=])\s*[^,;}\s]+")
+
+
+def _redact(value: str) -> str:
+    value = re.sub(r"(?i)\b(args?|prompt)\s*[:=].*", r"\1=[redacted]", value)
+    value = _SENSITIVE.sub(r"\1\2[redacted]", value)
+    return re.sub(r"\b\d{14}\b", "[cnpj]", value)
+
+
 class _RequestIdFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = request_id_var.get()
+        return True
+
+
+class _RedactionFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Redact before any formatter/exporter sees the record, including the
+        # default text formatter and test handlers.
+        try:
+            record.msg = _redact(record.getMessage())
+            record.args = ()
+        except Exception:
+            record.msg = "[redacted log message]"
+            record.args = ()
         return True
 
 
@@ -29,7 +52,7 @@ class _JsonFormatter(logging.Formatter):
             "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
             "level": record.levelname,
             "logger": record.name,
-            "msg": record.getMessage(),
+            "msg": _redact(record.getMessage()),
             "request_id": getattr(record, "request_id", "-"),
         }
         if record.exc_info:
@@ -46,6 +69,7 @@ def setup_logging() -> None:
 
     handler = logging.StreamHandler(sys.stdout)
     handler.addFilter(_RequestIdFilter())
+    handler.addFilter(_RedactionFilter())
     handler.setFormatter(_JsonFormatter() if use_json else logging.Formatter(_TEXT_FMT))
 
     root = logging.getLogger()

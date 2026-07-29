@@ -35,6 +35,7 @@ from radar.api.rate_limit import limiter
 from radar.api.routers.applications import router as applications_router
 from radar.api.routers.catalog import router as catalog_router
 from radar.api.routers.conversations import router as conversations_router
+from radar.api.routers.cron_operations import router as cron_operations_router
 from radar.api.routers.data_quality import router as data_quality_router
 from radar.api.routers.discovered import router as discovered_router
 from radar.api.routers.explore import router as explore_router
@@ -213,6 +214,7 @@ app.include_router(applications_router)
 app.include_router(workspace_router)
 app.include_router(writing_router)
 app.include_router(conversations_router)
+app.include_router(cron_operations_router)
 app.include_router(profile_router)
 app.include_router(radar_router)
 app.include_router(research_router)

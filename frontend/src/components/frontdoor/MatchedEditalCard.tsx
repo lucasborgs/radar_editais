@@ -10,7 +10,7 @@ import { VerdictBlock } from "./VerdictBlock";
 
 function ScoreRing({ score }: { score: number }) {
   const color = score >= 0.7 ? "#1DB954" : score >= 0.55 ? "#f59e0b" : "#f97316";
-  const pct = Math.round(score * 100);
+  const pct = Math.min(100, Math.max(0, Math.round(score * 100)));
   return (
     <div className="relative flex items-center justify-center shrink-0" title={`${pct}%`}>
       <svg className="h-10 w-10 -rotate-90" viewBox="0 0 36 36">
@@ -30,10 +30,12 @@ export function ExcerptRow({ excerpt }: { excerpt: MatchedExcerpt }) {
   return (
     <div
       className="rounded-lg bg-primary/5 px-2.5 py-1.5 text-[11px] leading-snug font-sans"
-      title={`cosseno ${excerpt.score.toFixed(2)}`}
+      title="Evidência usada para calcular a afinidade"
     >
       <p className="text-content-secondary line-clamp-2">
-        <span className="font-medium text-content-primary">Você:</span> {excerpt.company_text}
+        <span className="font-medium text-content-primary">
+          {excerpt.origin === "library_doc" ? "Da sua biblioteca:" : "Seu perfil:"}
+        </span> {excerpt.company_text}
       </p>
       <p className="text-content-secondary line-clamp-2 mt-0.5">
         <span className="font-medium text-content-primary">
@@ -81,7 +83,7 @@ export function MatchedEditalCard({
   return (
     <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm font-sans">
       <div className="flex items-start gap-3">
-        <ScoreRing score={edital.score} />
+        <ScoreRing score={edital.affinity} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-0.5">
             <span className="text-[11px] font-medium text-content-secondary">
@@ -91,6 +93,7 @@ export function MatchedEditalCard({
           <p className="text-sm font-medium text-content-primary leading-snug line-clamp-2">
             {edital.name}
           </p>
+          <p className="text-[11px] text-content-secondary mt-0.5">Afinidade de escopo · não é probabilidade de aprovação</p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-content-secondary">
             {badge.tone === "review" ? (
               <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
@@ -138,6 +141,11 @@ export function MatchedEditalCard({
             <ExcerptRow key={i} excerpt={x} />
           ))}
         </div>
+      )}
+      {edital.matched_excerpts.length === 0 && (
+        <p className="mt-2 pt-2 border-t border-border text-[11px] text-content-secondary">
+          Resultado exploratório: ainda não há evidência textual real para explicar este match.
+        </p>
       )}
 
       <div className="mt-2 flex gap-2">

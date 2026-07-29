@@ -86,12 +86,16 @@ def radar_matches(
 
     profile = req.profile.model_dump()
     workspace_id = get_workspace_id(db, user_id) if user_id and db else None
+    prepared_company = match_v3.prepare_company_side(
+        profile, workspace_id=workspace_id, db=db if workspace_id else None,
+    )
     opps = match_v3.find_matching_opportunities(
         profile,
         workspace_id=workspace_id,
         db=db if workspace_id else None,
         kinds=frozenset({"edital", "programa"}),
         top_k=8,
+        prepared_company=prepared_company,
     )
     editais = [item.to_dict() for item in opps if item.kind == "edital"]
     programas = [item.to_dict() for item in opps if item.kind == "programa"]
@@ -102,6 +106,7 @@ def radar_matches(
             workspace_id=workspace_id,
             db=db if workspace_id else None,
             top_k=5,
+            prepared_company=prepared_company,
         )
     ]
 

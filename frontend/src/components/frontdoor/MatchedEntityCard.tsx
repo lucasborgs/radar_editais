@@ -18,7 +18,7 @@ function ticketLabel(t: InvestmentOffer["ticket_range"]): string | null {
 
 function ScoreRing({ score }: { score: number }) {
   const color = score >= 0.7 ? "#1DB954" : score >= 0.55 ? "#f59e0b" : "#f97316";
-  const pct = Math.round(score * 100);
+  const pct = Math.min(100, Math.max(0, Math.round(score * 100)));
   return (
     <div className="relative flex items-center justify-center shrink-0" title={`${pct}%`}>
       <svg className="h-10 w-10 -rotate-90" viewBox="0 0 36 36">
@@ -70,7 +70,7 @@ export function MatchedEntityCard({
   return (
     <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm font-sans">
       <div className="flex items-start gap-3">
-        <ScoreRing score={entity.score} />
+        <ScoreRing score={entity.affinity} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-0.5">
             <KindBadge kind={entity.kind} />
@@ -92,6 +92,7 @@ export function MatchedEntityCard({
               {entity.name}
             </p>
           )}
+          <p className="text-[11px] text-content-secondary mt-0.5">Afinidade de escopo · não é probabilidade de aprovação</p>
           {entity.description && (
             <p className="text-xs text-content-secondary mt-1 line-clamp-2">
               {entity.description}
@@ -129,6 +130,11 @@ export function MatchedEntityCard({
             <ExcerptRow key={i} excerpt={x} />
           ))}
         </div>
+      )}
+      {entity.matched_excerpts.length === 0 && (
+        <p className="mt-2 pt-2 border-t border-border text-[11px] text-content-secondary">
+          Resultado exploratório: ainda não há evidência textual real para explicar este match.
+        </p>
       )}
 
       {/* Veredito LLM (Estágio 3) quando existir */}

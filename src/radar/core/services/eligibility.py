@@ -158,22 +158,23 @@ def _as_number(v: Any) -> float | None:
 
 
 def _reason(tipo: str, op: str, valor: Any) -> str:
-    """Texto curto e humano do constraint (p/ o card / veredito)."""
-    label = {
-        "porte": "porte", "sede_uf": "sede (UF)", "faturamento": "faturamento anual",
-        "trl": "TRL", "forma_juridica": "natureza jurídica", "parceria": "parceria",
-    }.get(tipo, tipo)
+    """Texto curto e humano; campos internos nunca atravessam esta fronteira."""
+    if tipo == "parceria" or op == "exige":
+        return "É necessário ter parceria com uma ICT." if "ict" in str(valor).lower() else "É necessário comprovar a parceria exigida pelo edital."
+    if tipo == "sede_uf":
+        return "Informe a UF da sede para confirmar a elegibilidade."
+    if tipo == "porte":
+        return "Informe o porte da empresa para verificar este requisito."
+    label = {"faturamento": "faturamento anual", "trl": "nível de maturidade tecnológica", "forma_juridica": "natureza jurídica"}.get(tipo, "este requisito")
     if op == "in":
-        return f"{label} deve ser um de {valor}"
+        return f"A empresa precisa informar {label} para verificar este requisito."
     if op == "not_in":
-        return f"{label} não pode ser {valor}"
+        return f"O {label} informado não atende ao requisito do edital."
     if op == "lte":
-        return f"{label} deve ser ≤ {valor}"
+        return f"O {label} precisa estar dentro do limite do edital."
     if op == "gte":
-        return f"{label} deve ser ≥ {valor}"
-    if op == "exige":
-        return f"exige {label} com {valor}"
-    return f"{label} {op} {valor}"
+        return f"O {label} precisa atingir o mínimo do edital."
+    return "Complete o perfil para verificar este requisito."
 
 
 def evaluate_constraint(constraint: dict, profile: Any) -> tuple[str, str]:

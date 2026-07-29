@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 
 from radar.core.services import match_v3
+from radar.core.services.company_chunks import ephemeral_company_chunks
 from radar.core.services.match_v3 import (
     InvestorMatch,
     OpportunityMatch,
@@ -93,8 +94,8 @@ def test_score_entity_sum_of_max_nao_max_global():
     )
     del a1
 
-    aff_a, best_a, _ = score_entity(company, ["c1", "c2"], ent_a)
-    aff_b, best_b, _ = score_entity(company, ["c1", "c2"], ent_b)
+    aff_a, best_a, _ = score_entity(company, ["c1", "c2"], ent_a, ["profile", "profile"])
+    aff_b, best_b, _ = score_entity(company, ["c1", "c2"], ent_b, ["profile", "profile"])
     # max global: B (0.9) > A (0.707); sum-of-max (média): A (0.707) > B (0.45)
     assert best_b > best_a
     assert aff_a > aff_b
@@ -107,7 +108,7 @@ def test_score_entity_excerpts_sao_os_pares_do_score():
         sections=[["Temas", "Agro"], ["Temas", "Saúde"]],
         emb=np.stack([_unit([1, 0.1, 0]), _unit([0.1, 1, 0])]),
     )
-    aff, best, excerpts = score_entity(company, ["empresa agro", "empresa saude"], ent)
+    aff, best, excerpts = score_entity(company, ["empresa agro", "empresa saude"], ent, ["profile", "profile"])
     assert len(excerpts) == 2  # 1 melhor par por chunk da empresa, dedup por chunk-edital
     assert excerpts[0]["score"] >= excerpts[1]["score"]
     pares = {(x["company_text"], x["edital_text"]) for x in excerpts}
@@ -117,11 +118,46 @@ def test_score_entity_excerpts_sao_os_pares_do_score():
     assert 0.0 <= aff <= 1.0 and 0.0 <= best <= 1.0
 
 
+def test_anonymous_thin_onboarding_hyde_is_never_exposed(monkeypatch):
+    monkeypatch.setattr("radar.core.retrieval.embedder.embed_texts", lambda texts: [[1.0, 0.0] for _ in texts])
+    monkeypatch.setattr("radar.core.retrieval.hyde.generate_hyde_doc", lambda _query: "pseudo documento HyDE")
+    profile = {"nome": "ACME", "one_liner": "software para saúde"}
+    texts, embeddings, origins = ephemeral_company_chunks(profile, use_hyde=True)
+    assert "hyde" in origins
+    entity = _EntityChunks(texts=["edital"], sections=[[]], emb=np.array([[1.0, 0.0]], dtype=np.float32))
+    _, _, excerpts = score_entity(embeddings, texts, entity, origins)
+    assert excerpts
+    assert all(e["origin"] != "hyde" for e in excerpts)
+    assert all(e["company_text"] != "pseudo documento HyDE" for e in excerpts)
+
+
+def test_origins_are_fail_closed_for_workspace_profile_library_and_hyde():
+    company = np.stack([_unit([1, 0]), _unit([1, 0]), _unit([1, 0])])
+    entity = _EntityChunks(texts=["edital"], sections=[[]], emb=np.array([[1.0, 0.0]], dtype=np.float32))
+    _, _, excerpts = score_entity(company, ["perfil", "biblioteca", "pseudo"], entity,
+                                  ["profile", "library_doc", "hyde"])
+    assert {e["origin"] for e in excerpts} <= {"profile", "library_doc"}
+
+
+def test_company_chunks_are_loaded_once_and_reused_for_investors(monkeypatch):
+    calls = []
+    monkeypatch.setattr(match_v3, "ensure_company_chunks", lambda *args, **kwargs: None)
+    monkeypatch.setattr(match_v3, "load_company_chunks", lambda *args, **kwargs: (
+        calls.append(kwargs.get("include_origins")) or (["perfil"], np.array([[1.0, 0.0]]), ["profile"])
+    ))
+    prepared = match_v3.prepare_company_side({"nome": "ACME"}, workspace_id="workspace")
+    assert calls == [True]
+    snap = _Snapshot(probe=("fake",), opportunities=[], chunks={}, investors=[])
+    monkeypatch.setattr(match_v3, "_get_snapshot", lambda: snap)
+    match_v3.find_matching_investors({"nome": "ACME"}, workspace_id="workspace", prepared_company=prepared)
+    assert calls == [True]
+
+
 def test_score_entity_excerpts_dedup_e_top3():
     """4 chunks da empresa casando todos no MESMO chunk do edital → 1 excerpt."""
     company = np.stack([_unit([1, 0.1 * i, 0]) for i in range(4)])
     ent = _EntityChunks(texts=["unico"], sections=[[]], emb=np.stack([_unit([1, 0, 0])]))
-    _, _, excerpts = score_entity(company, [f"c{i}" for i in range(4)], ent)
+    _, _, excerpts = score_entity(company, [f"c{i}" for i in range(4)], ent, ["profile"] * 4)
     assert len(excerpts) == 1
     assert excerpts[0]["edital_text"] == "unico"
 

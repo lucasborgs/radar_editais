@@ -188,6 +188,7 @@ export interface MatchedExcerpt {
   edital_text: string;
   section?: string | null;
   score: number;
+  origin?: "profile" | "library_doc";
 }
 
 // Elegibilidade dura (Stage 1 do funil v3). `inelegivel` nunca chega ao
@@ -216,8 +217,9 @@ export interface MatchedEdital {
   entity_id: string;          // native_id ("finep:589")
   name: string;
   description: string;
-  score: number;              // melhor par (cosseno 0..1) — ring
+  score: number;              // afinidade de escopo (métrica canônica; ring)
   affinity: number;           // média dos máximos (0..1) — ranking
+  technical_score?: number | null;
   setores: string[];
   matched_excerpts: MatchedExcerpt[];
   status: string | null;

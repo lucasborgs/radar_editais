@@ -22,10 +22,17 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import smtplib
 from email.message import EmailMessage
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_alert_text(value: str) -> str:
+    value = re.sub(r"(?i)(api[_-]?key|token|password|secret|cnpj|cpf)\s*[:=]\s*[^,;\s]+", r"\1=[redacted]", value or "")
+    value = re.sub(r"\b\d{14}\b", "[cnpj]", value)
+    return value[:4000]
 
 # Warning de "não configurado" só uma vez por processo — o worker chama
 # send_alert a cada run de cron; sem isto o log diário viraria ruído.
@@ -60,6 +67,8 @@ def send_alert(subject: str, body: str) -> bool:
     password = os.getenv("ALERT_SMTP_PASSWORD") or ""
     sender = (os.getenv("ALERT_EMAIL_FROM") or "").strip() or user
 
+    subject = _safe_alert_text(subject)
+    body = _safe_alert_text(body)
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = sender
