@@ -13,19 +13,22 @@
 
 | Tipo | Hash | Descrição |
 |---|---|---|
-| **Funcional** | `7a6abbe9b` | `feat(rt05-t01): temporal exception contract, fixture, and tests` |
+| **Funcional (original)** | `7a6abbe9b` | `feat(rt05-t01): temporal exception contract, fixture, and tests` |
 | **Documental** | `fa048494c` | `docs(schema): reconcile deadline rule to >= hoje (RT05-T01)` |
+| **Relatório** | `519f3085f` | `docs(rt05-t01): implementation report` |
+| **Funcional (corretivo)** | `388aae58b` | `fix(rt05-t01): corrige classificacao de status, invariantes e reuso de tipos` |
 
-## Arquivos alterados/criados
+## Arquivos alterados/criados (total)
 
 | Arquivo | Ação | Linhas |
 |---|---|---|
-| `src/radar/domain/data_quality.py` | criado | ~150 |
+| `src/radar/domain/data_quality.py` | criado | ~160 |
 | `src/radar/domain/__init__.py` | modificado | +18 |
 | `tests/fixtures/data_quality/__init__.py` | criado | 0 |
-| `tests/fixtures/data_quality/finep_eureka.py` | criado | ~30 |
-| `tests/unit/test_temporal_exception_contract.py` | criado | ~470 |
+| `tests/fixtures/data_quality/finep_eureka.py` | criado | ~20 |
+| `tests/unit/test_temporal_exception_contract.py` | criado | ~610 |
 | `docs/domain/schema.md` | modificado | +2/-2 |
+| `docs/execution/radar-data-trust/reports/05-exception-review/RT05-T01-report.md` | criado | este |
 
 ## Contrato implementado
 
@@ -42,57 +45,95 @@
   - status aberto sem prazo e sem evidência → unknown/needs_review (`temporal_status_without_basis`)
   - conflito prazo/status → needs_review (`temporal_status_conflict`)
   - dia do encerramento (`deadline == as_of`) permanece ativo
-- **Reutiliza:** `EvidenceRef`, `ReviewInfo` dos contratos RT01/RT04
+  - status ausente/Desconhecido/arbitrário sem prazo → unknown/needs_review (`critical_fact_missing`)
+- **Reutiliza:** `EvidenceRef`, `ReviewInfo`, `SubjectKind`, `FactState` dos contratos RT01/RT04
 - **Sem:** score, confiança, taxonomia aberta, `date.today()`, banco, API, frontend
+
+## Correções aplicadas (commit `388aae58b`)
+
+### 1. Classificação explícita de status
+
+- Removido `closed_status_values` da API pública de `evaluate_temporal()`
+- Conjuntos canônicos internos: `_OPEN_STATUSES = {"aberta"}`, `_CLOSED_STATUSES = {"encerrada", "resultado_divulgado", "fechada", "closed", "finished"}`
+- Status ausente/vazio, `Desconhecido` ou qualquer valor arbitrário não é classificado nem como aberto nem como fechado
+- Sem prazo e sem status aberto/fechado → `unknown/needs_review` + `CRITICAL_FACT_MISSING`
+- `ABERTA` sem prazo permanece `unknown/needs_review` + `TEMPORAL_STATUS_WITHOUT_BASIS`
+- Prazo presente com status neutro → segue regra do prazo sem conflito
+- Fixture `finep_eureka` atualizada (removido `closed_status_values`)
+
+### 2. Invariantes de `TemporalEvaluation`
+
+- `active` ou `closed` com `issue_code` → rejeitado
+- `active` ou `closed` com `issue_description` → rejeitado
+- `needs_review` sem `issue_code` → rejeitado
+- `needs_review` sem `issue_description` → rejeitado
+- `issue_code` sem descrição e vice-versa → coberto pelos acima
+
+### 3. Invariantes de `DataQualityReview`
+
+- `confirm_continuous` sem `evidence_refs` → rejeitado
+- `correct` sem `corrected_value` → rejeitado
+- `correct` sem `evidence_refs` → rejeitado
+- `corrected_value` vazio ou whitespace → rejeitado
+- `corrected_value` em `confirm`, `mark_unknown` ou `confirm_continuous` → rejeitado
+
+### 4. Reuso de contratos
+
+- `DataQualityException.subject_kind` agora é `SubjectKind` (enum canônico)
+- `DataQualityException.produced_state` agora é `FactState` (enum canônico)
+- Valores inválidos em ambos são rejeitados pelo Pydantic
 
 ## Testes
 
-**47 testes** em `tests/unit/test_temporal_exception_contract.py`:
+**~68 testes** em `tests/unit/test_temporal_exception_contract.py`:
 
 | Grupo | Testes | Cobertura |
 |---|---|---|
-| EnumValues | 3 | Valores canônicos de TemporalMode, ValidityState, IssueCode |
-| TemporalEvaluation | 5 | Construção, round-trip, invariantes (issue_code + description) |
-| EvaluateTemporal | 9 | Prazo futuro, hoje, vencido; contínuo comprovado; fechado sem prazo; Finep/Eureka; sem status |
-| Conflicts | 2 | Conflito deadline futuro + status fechado; deadline passado + status aberto |
-| ContinuousWithoutEvidence | 3 | Rejeição de continuidade sem evidência |
-| DataQualityException | 8 | Construção, validações, campos vazios, extra=forbid |
-| DataQualityReview | 10 | Decisões, corrected_value obrigatório, justificativa, extra=forbid |
-| SchemaVersion | 2 | Constante fixa em 1 |
+| EnumValues | 3 | Valores canônicos |
+| TemporalEvaluationInvariants | 11 | active/closed sem issue; needs_review com issue; extra=forbid; roundtrip |
+| EvaluateTemporal | 9 | Prazo futuro, hoje, vencido; contínuo; fechado sem prazo; Finep/Eureka; sem status → CRITICAL |
+| Desconhecido | 3 | Neutro: +prazo passado, +prazo futuro, sem prazo → CRITICAL |
+| ArbitraryStatusNotOpen | 4 | Valor arbitrário não classificado como aberto |
+| Conflicts | 2 | deadline futuro + fechado; deadline passado + aberto |
+| ContinuousWithoutEvidence | 3 | Ausência de evidência não produz continuous |
+| DataQualityException | 9 | SubjectKind, FactState, inválidos, roundtrip |
+| DataQualityReview | 14 | Todas as decisões; corrected_value obrigatório/vedado; evidence obrigatória |
+| SchemaVersion | 1 | Constante fixa em 1 |
 | NoScoreOrConfidence | 3 | Nenhum modelo expõe confidence/score |
 | DataQualitySchemaVersionFixed | 3 | schema_version Literal[1] |
 
-**Resultados:** `183 passed in 0.31s` (47 novos + 136 existentes de provenance/source_bundles)
+**Resultados:** `204 passed in 0.34s` (68 novos + 136 existentes)
 
-## Linting
+## Validação
 
 ```
-ruff check → All checks passed! (3 arquivos)
-git diff --check → (sem saída = sem whitespace errors)
+pytest:   204 passed in 0.34s
+ruff:     All checks passed! (3 arquivos)
+git diff --check 9b86c3e70..HEAD: (sem saída)
 ```
 
 ## Fixture Finep/Eureka
 
 `tests/fixtures/data_quality/finep_eureka.py` — fixture sanitizada:
-- publicação 31/01/2024
-- `status=ABERTA`, `deadline=None`, `continuous_evidence=None`
+- publicação 31/01/2024, `status=ABERTA`, `deadline=None`, sem evidência contínua
 - sem HTML integral, sem rede
-- **resultado esperado:** `unknown/needs_review/temporal_status_without_basis`
-- Teste `test_open_without_deadline_needs_review_via_fixture` confirma
+- **resultado:** `unknown/needs_review/temporal_status_without_basis`
+- Teste `test_finep_eureka_fixture` confirma
 
 ## Decisões de implementação
 
-1. **Conflito tem precedência:** implementado como early-return antes das regras simples
+1. **Conflito tem precedência:** early-return antes das regras simples
 2. **deadline == as_of:** tratado como `is_future_deadline` (>=), garantindo dia ativo
 3. **Continuidade:** exige `EvidenceRef` não-None; ausência nunca basta
-4. **Closed status values:** conjunto default fechado (`encerrada`, `resultado_divulgado`, `fechada`, `closed`, `finished`), mas sobrescritível via parâmetro
-5. **validators:** `model_validator(mode="after")` para validações cross-campo (Pydantic v2)
+4. **Status canônico interno:** apenas `aberta` é aberto; `Desconhecido`/arbitrário é neutro
+5. **Validators:** `model_validator(mode="after")` para validações cross-campo (Pydantic v2)
+6. **Reuso:** `SubjectKind` e `FactState` em `DataQualityException` — sem enum paralelo
 
 ## Limitações
 
-1. `_eod_sao_paulo` foi removida (não utilizada) — a comparação `deadline >= as_of` com `date` já trata o dia ativo sem precisar de timezone; timezone seria necessário se o prazo tiver horário explícito (fora do escopo T01)
-2. O contrato `DataQualityException` e `DataQualityReview` são modelos de domínio puros; `input_fingerprint`, `detected_at`, `last_observed_at` permanecem opcionais até T02 (persistência)
-3. `DataQualityReview.decision` usa Literal, não um enum — mantendo simplicidade; pode migrar para enum se T02 precisar
+1. `_eod_sao_paulo` removida (não utilizada) — `deadline >= as_of` com `date` já trata o dia ativo
+2. `DataQualityReview.decision` usa Literal, não um enum — pode migrar se T02 precisar
+3. A validação de que a evidência da revisão pertence à exceção é de T04 (escopo)
 
 ## Não implementado (RT05-T02 em diante)
 
@@ -106,8 +147,9 @@ git diff --check → (sem saída = sem whitespace errors)
 
 ## Verificação de invariantes
 
-- ✅ `FactProvenance`, `EvidenceRef`, `ReviewInfo` reutilizados; não criados contratos paralelos
-- ✅ `gold.py`, `match_v3.py`, consumidores não alterados
+- ✅ `FactProvenance`, `EvidenceRef`, `ReviewInfo`, `SubjectKind`, `FactState` reutilizados
+- ✅ Nenhum enum paralelo ou taxonomia alternativa criada
+- ✅ `gold.py`, `match_v3.py`, `writing.py` e consumidores não alterados
 - ✅ Sem migration, banco, API, frontend, fila, detector integrado, LLM, OCR, visão, rede, `.env`, produção ou backfill
 - ✅ RT05-T02 não iniciada
 - ✅ Sem merge, push, rede, credenciais ou produção
