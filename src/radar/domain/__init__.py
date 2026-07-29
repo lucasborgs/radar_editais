@@ -1,3 +1,13 @@
+from radar.domain.data_quality import (
+    DATA_QUALITY_SCHEMA_VERSION,
+    DataQualityException,
+    DataQualityReview,
+    IssueCode,
+    TemporalEvaluation,
+    TemporalMode,
+    ValidityState,
+    evaluate_temporal,
+)
 from radar.domain.provenance import (
     PROVENANCE_SCHEMA_VERSION,
     DerivationInfo,
@@ -53,6 +63,7 @@ from radar.domain.source_bundle import (
 
 __all__ = [
     "CLASSIFIER_VERSION",
+    "DATA_QUALITY_SCHEMA_VERSION",
     "PROVENANCE_SCHEMA_VERSION",
     "SOURCE_BUNDLE_SCHEMA_VERSION",
     "SubjectKind",
@@ -62,6 +73,13 @@ __all__ = [
     "DocumentMetadata",
     "SourceBundle",
     "compute_content_hash",
+    "DataQualityException",
+    "DataQualityReview",
+    "evaluate_temporal",
+    "IssueCode",
+    "TemporalEvaluation",
+    "TemporalMode",
+    "ValidityState",
     "ActorEvidence",
     "ActorVerdict",
     "ActorVerdictUnion",
