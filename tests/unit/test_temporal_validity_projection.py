@@ -9,7 +9,11 @@ from radar.core.services.data_quality_exceptions import DataQualityStorageError
 from radar.domain.data_quality import DataQualityReview, TemporalMode, ValidityState
 from radar.domain.provenance import (
     EvidenceRef,
+    FactProvenance,
+    FactState,
     LocatorQuality,
+    ProducerInfo,
+    ProducerKind,
     ReviewInfo,
 )
 
@@ -24,7 +28,19 @@ def evidence() -> EvidenceRef:
         source="finep",
         silver_source_hash="md5:" + "a" * 32,
         document="finep-602.json",
+        quote="Inscrições em fluxo contínuo",
         locator_quality=LocatorQuality.DOCUMENT_ONLY,
+    )
+
+
+def original_provenance() -> FactProvenance:
+    return FactProvenance(
+        state=FactState.INFERRED,
+        producer=ProducerInfo(
+            kind=ProducerKind.DETERMINISTIC,
+            name="gold",
+            version="gold:v1",
+        ),
     )
 
 
@@ -98,6 +114,46 @@ class TestDeterministicProjection:
         assert projection.exception_id is None
         assert projection.review_id is None
 
+    def test_preserves_original_provenance_by_identity(self):
+        original = original_provenance()
+        snapshot = original.model_copy(deep=True)
+
+        projection = reviews.project_temporal_validity(
+            deadline=date(2026, 12, 31),
+            status="aberta",
+            input_fingerprint=FINGERPRINT,
+            original_provenance=original,
+            as_of=AS_OF,
+        )
+
+        assert projection.provenance is original
+        assert projection.provenance == snapshot
+        assert original == snapshot
+
+    def test_conservative_path_preserves_original_provenance(self):
+        original = original_provenance()
+
+        projection = reviews.project_temporal_validity(
+            deadline=None,
+            status="ABERTA",
+            input_fingerprint=FINGERPRINT,
+            original_provenance=original,
+            as_of=AS_OF,
+        )
+
+        assert projection.validity_state is ValidityState.NEEDS_REVIEW
+        assert projection.provenance is original
+
+    def test_absent_original_provenance_remains_none(self):
+        projection = reviews.project_temporal_validity(
+            deadline=date(2026, 12, 31),
+            status="aberta",
+            input_fingerprint=FINGERPRINT,
+            as_of=AS_OF,
+        )
+
+        assert projection.provenance is None
+
     def test_coherent_past_deadline_is_closed(self):
         projection = reviews.project_temporal_validity(
             deadline=date(2026, 1, 1),
@@ -149,6 +205,8 @@ class TestExceptionProjection:
         )
         entity = {"deadline": "2026-12-31", "status": "aberta"}
         original = dict(entity)
+        source_provenance = original_provenance()
+        provenance_snapshot = source_provenance.model_copy(deep=True)
         install_reads(
             monkeypatch,
             row,
@@ -164,11 +222,15 @@ class TestExceptionProjection:
             status="aberta",
             input_fingerprint=FINGERPRINT,
             exception_id="exc-1",
+            original_provenance=source_provenance,
             as_of=AS_OF,
         )
 
         assert projection.value == "2026-08-31"
         assert projection.validity_state is ValidityState.ACTIVE
+        assert projection.provenance is not source_provenance
+        assert projection.provenance.producer.kind is ProducerKind.HUMAN
+        assert source_provenance == provenance_snapshot
         assert entity == original
 
     def test_confirm_continuous_is_active(self, monkeypatch):

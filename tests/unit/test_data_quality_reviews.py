@@ -21,11 +21,16 @@ AS_OF = date(2026, 7, 29)
 REVIEWED_AT = datetime.fromisoformat("2026-07-29T10:00:00-03:00")
 
 
-def evidence(suffix: str = "a") -> EvidenceRef:
+def evidence(
+    suffix: str = "a",
+    *,
+    quote: str | None = None,
+) -> EvidenceRef:
     return EvidenceRef(
         source="finep",
         canonical_content_hash=f"sha256:{suffix * 64}",
         document="edital.html",
+        quote=quote,
         locator_quality=LocatorQuality.DOCUMENT_ONLY,
     )
 
@@ -155,7 +160,7 @@ class TestValidDecisions:
         assert repo.review.review.overridden is True
 
     def test_confirm_continuous(self, install_repo):
-        ref = evidence()
+        ref = evidence(quote="Inscrições em fluxo contínuo")
         install_repo(
             FakeReviewRepository(
                 exception_row(produced_value="ABERTA", refs=[ref])
@@ -257,6 +262,61 @@ class TestDecisionValidation:
                 corrected_value="2026-08-31",
                 evidence_refs=[unlinked],
             )
+
+    @pytest.mark.parametrize("quote", [None, "", "   "])
+    def test_confirm_continuous_requires_non_empty_quote(
+        self,
+        install_repo,
+        quote,
+    ):
+        ref = evidence(quote=quote)
+        install_repo(
+            FakeReviewRepository(
+                exception_row(produced_value="ABERTA", refs=[ref])
+            )
+        )
+
+        with pytest.raises(
+            reviews.ReviewValidationError,
+            match="non-empty quote",
+        ):
+            submit(
+                decision="confirm_continuous",
+                evidence_refs=[ref],
+            )
+
+    def test_linked_quote_allows_confirm_continuous(self, install_repo):
+        ref = evidence(quote="Inscrições em fluxo contínuo")
+        install_repo(
+            FakeReviewRepository(
+                exception_row(produced_value="ABERTA", refs=[ref])
+            )
+        )
+
+        projection = submit(
+            decision="confirm_continuous",
+            evidence_refs=[ref],
+        )
+
+        assert projection.temporal_mode is TemporalMode.CONTINUOUS
+        assert projection.validity_state is ValidityState.ACTIVE
+
+    def test_generic_evidence_does_not_prove_continuity(
+        self,
+        install_repo,
+    ):
+        ref = evidence()
+        install_repo(
+            FakeReviewRepository(
+                exception_row(produced_value="ABERTA", refs=[ref])
+            )
+        )
+
+        with pytest.raises(
+            reviews.ReviewValidationError,
+            match="cannot be confirmed",
+        ):
+            submit(decision="confirm", evidence_refs=[ref])
 
     @pytest.mark.parametrize(
         "corrected_value",

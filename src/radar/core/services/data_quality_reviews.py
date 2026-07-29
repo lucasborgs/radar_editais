@@ -66,7 +66,7 @@ class TemporalValidityProjection(BaseModel):
     input_fingerprint: str
     exception_id: str | None = None
     review_id: str | None = None
-    provenance: FactProvenance
+    provenance: FactProvenance | None = None
 
 
 def _today_sao_paulo() -> date:
@@ -170,6 +170,10 @@ def _validate_decision(
         linked = _validate_linked_evidence(
             evidence_refs, available, required=True
         )
+        if any(not ref.quote or not ref.quote.strip() for ref in linked):
+            raise ReviewValidationError(
+                "confirm_continuous requires linked evidence with a non-empty quote"
+            )
         return None, linked
 
     if decision == "correct":
@@ -353,6 +357,7 @@ def _conservative_projection(
     value: str | None,
     input_fingerprint: str,
     exception_id: str | None,
+    original_provenance: FactProvenance | None,
 ) -> TemporalValidityProjection:
     return TemporalValidityProjection(
         temporal_mode=TemporalMode.UNKNOWN,
@@ -360,14 +365,7 @@ def _conservative_projection(
         value=value,
         input_fingerprint=input_fingerprint,
         exception_id=exception_id,
-        provenance=FactProvenance(
-            state=FactState.UNKNOWN,
-            producer=ProducerInfo(
-                kind=ProducerKind.DETERMINISTIC,
-                name="temporal_validity_projection",
-                version=REVIEW_PRODUCER_VERSION,
-            ),
-        ),
+        provenance=original_provenance,
     )
 
 
@@ -377,6 +375,7 @@ def project_temporal_validity(
     status: str | None,
     input_fingerprint: str,
     exception_id: str | None = None,
+    original_provenance: FactProvenance | None = None,
     as_of: date | None = None,
 ) -> TemporalValidityProjection:
     """Projeta validade temporal sem conceder ``active`` em falha de leitura."""
@@ -397,20 +396,14 @@ def project_temporal_validity(
                 value=value,
                 input_fingerprint=input_fingerprint,
                 exception_id=None,
+                original_provenance=original_provenance,
             )
         return TemporalValidityProjection(
             temporal_mode=evaluation.temporal_mode,
             validity_state=evaluation.validity_state,
             value=value,
             input_fingerprint=input_fingerprint,
-            provenance=FactProvenance(
-                state=FactState.INFERRED,
-                producer=ProducerInfo(
-                    kind=ProducerKind.DETERMINISTIC,
-                    name="temporal_validity_projection",
-                    version=REVIEW_PRODUCER_VERSION,
-                ),
-            ),
+            provenance=original_provenance,
         )
 
     try:
@@ -420,6 +413,7 @@ def project_temporal_validity(
                 value=value,
                 input_fingerprint=input_fingerprint,
                 exception_id=exception_id,
+                original_provenance=original_provenance,
             )
         _validate_exception(row, exception_id)
         if row["input_fingerprint"] != input_fingerprint:
@@ -427,12 +421,14 @@ def project_temporal_validity(
                 value=value,
                 input_fingerprint=input_fingerprint,
                 exception_id=exception_id,
+                original_provenance=original_provenance,
             )
         if row["status"] != "resolved":
             return _conservative_projection(
                 value=value,
                 input_fingerprint=input_fingerprint,
                 exception_id=exception_id,
+                original_provenance=original_provenance,
             )
 
         review = get_current_review_projection(exception_id)
@@ -441,6 +437,7 @@ def project_temporal_validity(
                 value=value,
                 input_fingerprint=input_fingerprint,
                 exception_id=exception_id,
+                original_provenance=original_provenance,
             )
         _validate_review_link(row, review)
         _validate_decision(
@@ -465,6 +462,7 @@ def project_temporal_validity(
             value=value,
             input_fingerprint=input_fingerprint,
             exception_id=exception_id,
+            original_provenance=original_provenance,
         )
 
 
