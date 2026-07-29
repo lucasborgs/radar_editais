@@ -187,6 +187,7 @@ export default function OportunidadeDetailPage() {
   }
 
   const kindLabel = KIND_LABEL[detail.kind] ?? detail.kind;
+  const isEdital = detail.kind === "edital";
   const badge = temporalBadge(detail);
   const temporalDeadline = temporalDeadlineText(detail);
   const verificationNote = temporalVerificationNote(detail);

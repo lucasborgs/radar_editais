@@ -5,6 +5,8 @@
 **Branch:** `codex/radar-data-trust-05-t08`
 **Worktree:** `/private/tmp/radar-editais-rt05-t08`
 **Commit funcional:** `2a3bcdc02`
+**Correção de validação:** restaurado o derivado `isEdital` da CTA da ficha;
+commit corretivo registra esta atualização documental.
 Auditoria Codex: pendente
 
 ## Superfícies alteradas
@@ -89,6 +91,13 @@ Auditoria Codex: pendente
   → `88 passed, 5 skipped`
 - `/Users/lucasborges/radar_editais/.venv/bin/ruff check ...`
   → aprovado
+- `cd frontend && npx tsc --noEmit`
+  → aprovado, reproduzido com o `node_modules` já instalado no checkout
+  principal, exposto temporariamente ao worktree por symlink removido ao fim.
+- `cd frontend && npm run lint`
+  → aprovado, nas mesmas dependências já instaladas e sem instalação ou rede.
+- `git diff --check 768e5d5aa..HEAD`
+  → aprovado
 
 Contratos cobertos:
 
@@ -103,17 +112,18 @@ Contratos cobertos:
 
 ## Warnings preexistentes
 
-- O worktree não contém `frontend/node_modules`.
-- `cd frontend && npx tsc --noEmit` não ficou executável localmente sem as
-  dependências instaladas.
-- `cd frontend && npm run lint` falha com `sh: next: command not found`.
-
-Esses warnings são de ambiente local do worktree, não de uma alteração da T08.
+- O worktree não contém `frontend/node_modules` próprio. Para a validação, foi
+  usado somente um symlink temporário para as dependências já instaladas no
+  checkout principal; ele foi removido ao fim.
+- `npm run lint` reporta cinco warnings preexistentes de dependências de hooks
+  em `src/app/page.tsx`, `src/app/workspace/[sessionId]/page.tsx` e
+  `src/lib/auth.tsx`; o comando concluiu com sucesso e esses arquivos não fazem
+  parte da T08.
 
 ## Limitações e QA manual
 
-- Sem `node_modules`, a validação do frontend ficou restrita à revisão do diff e
-  à tipagem estrutural dos payloads alterados.
+- A validação estática do frontend foi reproduzida com sucesso; permanece
+  recomendado o QA manual das jornadas visuais.
 - QA manual sugerido após instalar dependências: conferir `/oportunidades`,
   `/oportunidades/{id}`, `/radar` e a sessão de escrita para um caso
   `needs_review`, um `continuous/active` confirmado e um investidor.
