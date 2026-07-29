@@ -55,7 +55,7 @@ Estrutura:
 | `open_or_observe_exception` | Rejeita input_fingerprint vazio; reobserva fingerprint existente (update last_observed_at) ou insere novo; **nunca** supersede antes da inserção confirmada; após insert ou reobservação, supersede abertas do mesmo grupo com fingerprint diferente; reobservação de resolved/superseded **não** dispara supersede |
 | `list_exceptions` | Lista com filtros opcionais (subject_kind, subject_id, status) |
 | `get_exception` | Leitura por ID |
-| `append_review` | Idempotente por review_id via `_review_payload_matches`; rejeita review_id vazio; nunca atualiza registro existente; caminho normal e 23505 (race) comparam 8 campos materiais (schema_version, exception_id, decision, corrected_value, justification, evidence_refs, actor_id, reviewed_at) — idêntico → True, qualquer diferença → DataQualityStorageError |
+| `append_review` | Idempotente por review_id via `_review_payload_matches`; rejeita review_id vazio; nunca atualiza registro existente; caminho normal e 23505 (race) comparam 8 campos materiais (schema_version, exception_id, decision, corrected_value, justification, evidence_refs, actor_id, reviewed_at) — `reviewed_at` normalizado por `_normalize_ts` (parse ISO, naive→UTC, aware→UTC, Z aceito, inválido→diferente) — idêntico → True, qualquer diferença → DataQualityStorageError |
 | `get_current_review_projection` | Última revisão (mais recente created_at) reconstruída como `DataQualityReview` com review_id preservado |
 
 Tratamento de erros:
@@ -66,7 +66,7 @@ Tratamento de erros:
 
 ### 3. Testes — `tests/unit/test_data_quality_exceptions.py`
 
-60 testes em 14 grupos, usando `FakeSupabase` determinístico (sem banco real):
+64 testes em 14 grupos, usando `FakeSupabase` determinístico (sem banco real):
 
 | Grupo | Count | O quê |
 |---|---|---|
@@ -76,7 +76,7 @@ Tratamento de erros:
 | `TestOpenOrObserve` | 7 | Insert, mesma fp, fp nova, supersessão, grupos distintos, órfãos |
 | `TestInsertFailureNoSupersede` | 2 | Unique violation ok; erro real não supersede anterior |
 | `TestReviewId` | 5 | Preservado, retry idempotente, múltiplos, vazio rejeitado, model valida |
-| `TestReviewPayloadMatches` | 4 | _review_payload_matches: identical, different decision/exception_id/actor_id |
+| `TestReviewPayloadMatches` | 8 | _review_payload_matches: identical, different decision/exception_id/actor_id; normalização timestamps: naive vs aware, offset vs Z, instantes diferentes, inválido |
 | `TestAppendReviewCollision` | 4 | Colisão sequencial: decision, exception_id, actor_id, reviewed_at diferentes |
 | `TestSourceUrlRemoved` | 6 | source_url ausente do payload de exception e review, persistido, helper |
 | `TestListExceptions` | 2 | Filtro por subject_kind e status |
@@ -101,7 +101,7 @@ ENVIRONMENT=test PYTHONPATH=src pytest -q \
   tests/unit/test_temporal_exception_contract.py \
   tests/unit/test_provenance.py
 
-  → 199 passed (60 + 75 + 64)
+  → 203 passed (64 + 75 + 64)
 
 ruff check src/radar/core/services/data_quality_exceptions.py  → pass
 ruff check tests/unit/test_data_quality_exceptions.py          → pass
@@ -152,9 +152,12 @@ git diff --check 89a909935..HEAD                               → pass
 - Migration reexecutável: DROP TRIGGER IF EXISTS, CHECK constraint,
   sem default '' — verificado em `TestMigrationExecutability`.
 - Comparador unificado `_review_payload_matches` usado no caminho normal e
-  no race — verificado em `TestReviewPayloadMatches` (4 testes) e
+  no race — verificado em `TestReviewPayloadMatches` (8 testes) e
   `TestAppendReviewCollision` (4 testes: decision, exception_id, actor_id,
   reviewed_at diferentes disparam DataQualityStorageError).
+- `reviewed_at` normalizado por `_normalize_ts`: naive→UTC, aware→UTC,
+  Z sufixo aceito, timestamp inválido → `False` (payload diferente) — sem
+  exceção bruta. Verificado em 4 testes de normalização.
 
 ---
 
