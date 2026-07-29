@@ -65,7 +65,7 @@ def observe_incident(conn, *, kind: str, detail: str, active: bool, message: str
                 return False
             cur.execute("""
                 insert into public.operational_incidents(fingerprint,kind,status,last_seen_at,details)
-                values (%s,%s,'open',%s,jsonb_build_object('message',%s))
+                values (%s,%s,'open',%s,jsonb_build_object('message',%s::text))
                 on conflict (fingerprint) do update set status='open', last_seen_at=excluded.last_seen_at,
                     recovered_at=null, details=excluded.details
             """, (fingerprint, kind, now, safe_text(message)))
