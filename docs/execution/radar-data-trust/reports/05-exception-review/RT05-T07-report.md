@@ -5,7 +5,7 @@
 **Branch:** `codex/radar-data-trust-05-t07`
 **Worktree:** `/private/tmp/radar-editais-rt05-t07`
 **Commit funcional:** `db9bfa83e`
-Auditoria Codex: pendente
+Auditoria Codex: aprovada em 2026-07-29
 
 ## Resultado
 
