@@ -366,6 +366,57 @@ def get_exception(exception_id: str) -> dict | None:
         ) from None
 
 
+def mark_exception_resolved(exception_id: str) -> bool:
+    """Resolve idempotentemente uma exceção aberta.
+
+    A transição aceita apenas ``open -> resolved``. Um registro já resolvido
+    conta como sucesso idempotente; ``superseded`` e ausente retornam False.
+    """
+    if not exception_id or not exception_id.strip():
+        raise ValueError("exception_id must be non-empty")
+    if not _configured():
+        return False
+
+    try:
+        from radar.core.infra.db import get_supabase_service
+
+        svc = get_supabase_service()
+        svc.table(_TABLE_EXCEPTIONS).update({
+            "status": "resolved",
+        }).eq("id", exception_id).eq("status", "open").execute()
+
+        current = (
+            svc.table(_TABLE_EXCEPTIONS)
+            .select("id, status")
+            .eq("id", exception_id)
+            .limit(1)
+            .execute()
+        )
+        rows = current.data or []
+        return bool(rows and rows[0].get("status") == "resolved")
+    except APIError as exc:
+        logger.warning(
+            "data_quality_exceptions.mark_resolved: "
+            "falha de persistencia id=%s code=%s type=%s",
+            exception_id,
+            exc.code,
+            type(exc).__name__,
+        )
+        raise DataQualityStorageError(
+            f"mark_exception_resolved failed: code={exc.code}"
+        ) from None
+    except Exception as exc:
+        logger.warning(
+            "data_quality_exceptions.mark_resolved: "
+            "falha inesperada id=%s type=%s",
+            exception_id,
+            type(exc).__name__,
+        )
+        raise DataQualityStorageError(
+            f"mark_exception_resolved failed: type={type(exc).__name__}"
+        ) from None
+
+
 # ---------------------------------------------------------------------------
 # Review persistence
 # ---------------------------------------------------------------------------
@@ -595,6 +646,7 @@ __all__ = [
     "open_or_observe_exception",
     "list_exceptions",
     "get_exception",
+    "mark_exception_resolved",
     "append_review",
     "get_current_review_projection",
     "_evidence_refs_payload",
