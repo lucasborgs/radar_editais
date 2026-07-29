@@ -75,6 +75,9 @@ class _FakeQueryBuilder:
             return self._do_insert()
         if self._method == "update":
             return self._do_update()
+        if self._supabase and self._supabase._skip_select_once:
+            self._supabase._skip_select_once = False
+            return _FakeResponse([])
         return self._do_select()
 
     def _match(self, row):
@@ -203,6 +206,7 @@ class FakeSupabase:
     def __init__(self):
         self._tables: dict[str, dict[str, dict]] = {}
         self._fail_next_insert: APIError | None = None
+        self._skip_select_once: bool = False
 
     def table(self, name):
         self._tables.setdefault(name, {})
@@ -571,6 +575,132 @@ class TestReviewId:
 
 
 # ---------------------------------------------------------------------------
+# _review_payload_matches — comparação material
+# ---------------------------------------------------------------------------
+
+
+class TestReviewPayloadMatches:
+    def test_identical_payloads(self):
+        from radar.core.services.data_quality_exceptions import (
+            _review_payload,
+            _review_payload_matches,
+        )
+        review = make_review()
+        payload = _review_payload(review)
+        assert _review_payload_matches(payload, payload) is True
+
+    def test_different_decision(self):
+        from radar.core.services.data_quality_exceptions import (
+            _review_payload,
+            _review_payload_matches,
+        )
+        r1 = make_review(decision="confirm")
+        r2 = make_review(decision="mark_unknown", justification="unknown")
+        assert _review_payload_matches(
+            _review_payload(r1), _review_payload(r2)
+        ) is False
+
+    def test_different_exception_id(self):
+        from radar.core.services.data_quality_exceptions import (
+            _review_payload,
+            _review_payload_matches,
+        )
+        r1 = make_review(exception_ref="uuid-a")
+        r2 = make_review(exception_ref="uuid-b")
+        assert _review_payload_matches(
+            _review_payload(r1), _review_payload(r2)
+        ) is False
+
+    def test_different_actor_id(self):
+        from radar.core.services.data_quality_exceptions import (
+            _review_payload,
+            _review_payload_matches,
+        )
+        r1 = make_review(review=ReviewInfo(
+            review_id="r", actor_id="admin",
+            reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
+        ))
+        r2 = make_review(review=ReviewInfo(
+            review_id="r", actor_id="other",
+            reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
+        ))
+        assert _review_payload_matches(
+            _review_payload(r1), _review_payload(r2)
+        ) is False
+
+
+# ---------------------------------------------------------------------------
+# append_review — colisão sequencial (mesmo review_id, payload diferente)
+# ---------------------------------------------------------------------------
+
+
+class TestAppendReviewCollision:
+    def _setup(self, fs):
+        exc = make_exception()
+        open_or_observe_exception(exc)
+        return list_exceptions()[0]["id"]
+
+    def test_different_decision_raises(self, fs):
+        exc_id = self._setup(fs)
+        r1 = make_review(exception_ref=exc_id, review=ReviewInfo(
+            review_id="rev-collide", actor_id="admin",
+            reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
+        ))
+        assert append_review(r1) is True
+        r2 = make_review(exception_ref=exc_id, decision="mark_unknown",
+                         justification="unknown now",
+                         review=ReviewInfo(
+                             review_id="rev-collide", actor_id="admin",
+                             reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
+                         ))
+        with pytest.raises(DataQualityStorageError, match="review_id collision"):
+            append_review(r2)
+
+    def test_different_exception_id_raises(self, fs):
+        exc_id = self._setup(fs)
+        r1 = make_review(exception_ref=exc_id, review=ReviewInfo(
+            review_id="rev-collide-2", actor_id="admin",
+            reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
+        ))
+        assert append_review(r1) is True
+        r2 = make_review(exception_ref="00000000-0000-0000-0000-000000000000",
+                         review=ReviewInfo(
+                             review_id="rev-collide-2", actor_id="admin",
+                             reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
+                         ))
+        with pytest.raises(DataQualityStorageError, match="review_id collision"):
+            append_review(r2)
+
+    def test_different_actor_id_raises(self, fs):
+        exc_id = self._setup(fs)
+        r1 = make_review(exception_ref=exc_id, review=ReviewInfo(
+            review_id="rev-collide-3", actor_id="admin",
+            reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
+        ))
+        assert append_review(r1) is True
+        r2 = make_review(exception_ref=exc_id, review=ReviewInfo(
+            review_id="rev-collide-3", actor_id="other-admin",
+            reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
+        ))
+        with pytest.raises(DataQualityStorageError, match="review_id collision"):
+            append_review(r2)
+
+    def test_different_reviewed_at_raises(self, fs):
+        exc_id = self._setup(fs)
+        r1 = make_review(exception_ref=exc_id, review=ReviewInfo(
+            review_id="rev-collide-4", actor_id="admin",
+            reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
+        ))
+        assert append_review(r1) is True
+        r2 = make_review(exception_ref=exc_id, review=ReviewInfo(
+            review_id="rev-collide-4", actor_id="admin",
+            reviewed_at=datetime(2026, 7, 30, 12, 0, 0),
+        ))
+        with pytest.raises(DataQualityStorageError, match="review_id collision"):
+            append_review(r2)
+
+
+# ---------------------------------------------------------------------------
 # source_url removido
 # ---------------------------------------------------------------------------
 
@@ -683,3 +813,166 @@ class TestErrorSemantics:
     def test_storage_error_not_bool(self):
         err = DataQualityStorageError("any msg")
         assert not isinstance(err, bool)
+
+
+# ---------------------------------------------------------------------------
+# Reobservação de resolved/superseded
+# ---------------------------------------------------------------------------
+
+
+class TestReobserveResolvedSuperseded:
+    def test_a_b_a_reobserve_keeps_b_open(self, fs):
+        """A→B→A: B stays open, A stays superseded on reobserve."""
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v1")) is True
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v2")) is True
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v1")) is True
+        rows = list_exceptions()
+        open_rows = [r for r in rows if r["status"] == "open"]
+        superseded = [r for r in rows if r["status"] == "superseded"]
+        assert len(open_rows) == 1
+        assert len(superseded) == 1
+        assert open_rows[0]["input_fingerprint"] == "fp-v2"
+        assert superseded[0]["input_fingerprint"] == "fp-v1"
+
+    def test_reobserve_resolved_does_not_supersede(self, fs):
+        """Reobservar fingerprint resolvido: não supersede outros."""
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v1")) is True
+        store = fs._tables["data_quality_exceptions"]
+        rid = next(iter(store))
+        store[rid]["status"] = "resolved"
+        # Insert another open record that could be superseded
+        extra = dict(
+            subject_kind="opportunity",
+            subject_id="finep:589",
+            field_path="deadline",
+            issue_code="temporal_status_without_basis",
+            input_fingerprint="fp-orphan",
+            status="open",
+        )
+        fs._tables["data_quality_exceptions"][str(uuid.uuid4())] = extra
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v1")) is True
+        rows = list_exceptions()
+        # Both should still exist: resolved stays resolved, orphan stays open
+        resolved = [r for r in rows if r["status"] == "resolved"]
+        open_orphans = [r for r in rows if r["status"] == "open" and r["input_fingerprint"] == "fp-orphan"]
+        assert len(resolved) == 1
+        assert len(open_orphans) == 1
+        assert resolved[0]["last_observed_at"] == _FAST_NOW
+
+    def test_reobserve_superseded_does_not_supersede(self, fs):
+        """Reobservar fingerprint superseded: não supersede outros."""
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v1")) is True
+        store = fs._tables["data_quality_exceptions"]
+        rid = next(iter(store))
+        store[rid]["status"] = "superseded"
+        extra = dict(
+            subject_kind="opportunity",
+            subject_id="finep:589",
+            field_path="deadline",
+            issue_code="temporal_status_without_basis",
+            input_fingerprint="fp-orphan",
+            status="open",
+        )
+        fs._tables["data_quality_exceptions"][str(uuid.uuid4())] = extra
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v1")) is True
+        rows = list_exceptions()
+        superseded = [r for r in rows if r["status"] == "superseded" and r["input_fingerprint"] == "fp-v1"]
+        open_orphans = [r for r in rows if r["status"] == "open"]
+        assert len(superseded) == 1
+        assert len(open_orphans) == 1
+        assert superseded[0]["last_observed_at"] == _FAST_NOW
+
+    def test_reobserve_keeps_last_observed_at_updated(self, fs):
+        """Reobservar resolved/superseded ainda atualiza last_observed_at."""
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v1")) is True
+        store = fs._tables["data_quality_exceptions"]
+        rid = next(iter(store))
+        store[rid]["status"] = "resolved"
+        store[rid]["last_observed_at"] = "2026-01-01T00:00:00"
+        assert open_or_observe_exception(make_exception(input_fingerprint="fp-v1")) is True
+        rows = list_exceptions()
+        assert rows[0]["last_observed_at"] == _FAST_NOW
+        assert rows[0]["status"] == "resolved"
+
+
+# ---------------------------------------------------------------------------
+# append_review — violação 23505 (condição de corrida)
+# ---------------------------------------------------------------------------
+
+
+class TestAppendReviewRace:
+    def test_23505_same_payload_idempotent(self, fs):
+        """23505 race com mesmo payload → idempotente."""
+        exc = make_exception()
+        open_or_observe_exception(exc)
+        exc_id = list_exceptions()[0]["id"]
+        # Ensure reviews table dict is initialized
+        fs.table("data_quality_reviews")
+        rid = str(uuid.uuid4())
+        review = make_review(exception_ref=exc_id)
+        from radar.core.services.data_quality_exceptions import _review_payload
+        payload = _review_payload(review)
+        fs._tables["data_quality_reviews"][rid] = payload
+        fs._skip_select_once = True
+        fs._fail_next_insert = APIError({"code": "23505", "message": "duplicate"})
+        assert append_review(review) is True
+
+    def test_23505_different_payload_raises(self, fs):
+        """23505 race com payload diferente → DataQualityStorageError."""
+        exc = make_exception()
+        open_or_observe_exception(exc)
+        exc_id = list_exceptions()[0]["id"]
+        fs.table("data_quality_reviews")
+        rid = str(uuid.uuid4())
+        from radar.core.services.data_quality_exceptions import _review_payload
+        confirm_review = make_review(
+            exception_ref=exc_id,
+            decision="confirm",
+            justification="different justification",
+            review=ReviewInfo(
+                review_id="rev-race-002",
+                actor_id="admin",
+                reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
+            ),
+        )
+        fs._tables["data_quality_reviews"][rid] = _review_payload(confirm_review)
+        review = make_review(
+            exception_ref=exc_id,
+            decision="correct",
+            corrected_value="2026-12-31",
+            justification="corrected date",
+            evidence_refs=[ref()],
+            review=ReviewInfo(
+                review_id="rev-race-002",
+                actor_id="admin",
+                reviewed_at=datetime(2026, 7, 29, 12, 0, 0),
+            ),
+        )
+        fs._skip_select_once = True
+        fs._fail_next_insert = APIError({"code": "23505", "message": "duplicate"})
+        with pytest.raises(DataQualityStorageError, match="review_id collision"):
+            append_review(review)
+
+    def test_23505_race_no_record_found(self, fs):
+        """23505 race mas registro sumiu entre violação e recuperação."""
+        review = make_review(exception_ref="no-such-exc")
+        fs._fail_next_insert = APIError({"code": "23505", "message": "duplicate"})
+        with pytest.raises(DataQualityStorageError, match="23505 race but no record found"):
+            append_review(review)
+
+
+# ---------------------------------------------------------------------------
+# Migration — reexecutabilidade e constraints
+# ---------------------------------------------------------------------------
+
+
+class TestMigrationExecutability:
+    def test_drop_trigger_if_exists(self):
+        assert "drop trigger if exists trg_reviews_append_only" in _migration_sql()
+
+    def test_input_fingerprint_check_constraint(self):
+        assert "check (btrim(input_fingerprint) <> '')" in _migration_sql()
+
+    def test_no_default_on_input_fingerprint(self):
+        sql = _migration_sql()
+        assert "default ''" not in sql

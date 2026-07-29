@@ -25,7 +25,8 @@ create table if not exists public.data_quality_exceptions (
     evidence_refs       jsonb       not null default '[]'::jsonb,
     bundle_hash         text,
     producer_version    text,
-    input_fingerprint   text        not null default '',
+    input_fingerprint   text        not null
+                        check (btrim(input_fingerprint) <> ''),
     status              text        not null default 'open'
                         check (status in ('open', 'resolved', 'superseded')),
     detected_at         timestamptz not null default now(),
@@ -189,6 +190,8 @@ begin
     raise exception 'data_quality_reviews is append-only: updates and deletes are not allowed';
 end;
 $$ language plpgsql;
+
+drop trigger if exists trg_reviews_append_only on public.data_quality_reviews;
 
 create trigger trg_reviews_append_only
     before update or delete on public.data_quality_reviews

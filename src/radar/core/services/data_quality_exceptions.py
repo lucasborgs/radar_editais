@@ -58,6 +58,37 @@ def _evidence_refs_payload(refs: list[EvidenceRef]) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Comparacao de payload material de revisao
+# ---------------------------------------------------------------------------
+
+_REVIEW_MATERIAL_KEYS = (
+    "schema_version",
+    "exception_id",
+    "decision",
+    "corrected_value",
+    "justification",
+    "evidence_refs",
+    "actor_id",
+    "reviewed_at",
+)
+
+
+def _review_payload_matches(stored: dict, incoming: dict) -> bool:
+    """True se o payload material de duas revisoes for identico.
+
+    Compara todos os campos semânticos ignorando metadados internos
+    (id, created_at, review_id). Normaliza ``reviewed_at`` antes da
+    comparacao.
+    """
+    for k in _REVIEW_MATERIAL_KEYS:
+        a = stored.get(k)
+        b = incoming.get(k)
+        if a != b:
+            return False
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Exception persistence
 # ---------------------------------------------------------------------------
 
@@ -135,8 +166,9 @@ def open_or_observe_exception(
                     "open_or_observe: reobservacao nao retornou registros "
                     "(%s/%s/%s)", kind, sid, fingerprint
                 )
-            # Depois de confirmar a reobservacao, supersede outras abertas
-            _supersede_other_open(svc, kind, sid, field, code, fingerprint)
+            # Só supersede se o registro atual ainda está open
+            if row["status"] == "open":
+                _supersede_other_open(svc, kind, sid, field, code, fingerprint)
             return True
 
         # 2. Inserir — se falhar (exceto 23505), nao supersede nada
@@ -182,7 +214,7 @@ def _reobserve_and_supersede(svc, kind, sid, field, code, fingerprint):
     """Reobserva fingerprint (apos race/violacao) + supersede."""
     existing = (
         svc.table(_TABLE_EXCEPTIONS)
-        .select("id")
+        .select("id, status")
         .eq("subject_kind", kind)
         .eq("subject_id", sid)
         .eq("field_path", field)
@@ -195,7 +227,8 @@ def _reobserve_and_supersede(svc, kind, sid, field, code, fingerprint):
         svc.table(_TABLE_EXCEPTIONS).update({
             "last_observed_at": _now(),
         }).eq("id", existing.data[0]["id"]).execute()
-    _supersede_other_open(svc, kind, sid, field, code, fingerprint)
+        if existing.data[0]["status"] == "open":
+            _supersede_other_open(svc, kind, sid, field, code, fingerprint)
 
 
 def _supersede_other_open(svc, kind, sid, field, code, fingerprint):
@@ -348,26 +381,77 @@ def append_review(review: DataQualityReview) -> bool:
         # Idempotencia por review_id
         existing = (
             svc.table(_TABLE_REVIEWS)
-            .select("id")
+            .select("*")
             .eq("review_id", review.review.review_id)
             .limit(1)
             .execute()
         )
         if existing.data:
-            logger.info(
-                "append_review: review_id=%s ja existe — idempotente",
-                review.review.review_id,
+            payload = _review_payload(review)
+            if _review_payload_matches(existing.data[0], payload):
+                logger.info(
+                    "append_review: review_id=%s ja existe — idempotente",
+                    review.review.review_id,
+                )
+                return True
+            raise DataQualityStorageError(
+                "append_review failed: review_id collision with "
+                "different payload"
             )
-            return True
 
         payload = _review_payload(review)
         svc.table(_TABLE_REVIEWS).insert(payload).execute()
         return True
 
+    except APIError as e:
+        if e.code == _PG_UNIQUE_VIOLATION:
+            # Race: outro processo inseriu o mesmo review_id
+            # Verificar se o payload é idêntico
+            try:
+                existing = (
+                    svc.table(_TABLE_REVIEWS)
+                    .select("*")
+                    .eq("review_id", review.review.review_id)
+                    .limit(1)
+                    .execute()
+                )
+                if not existing.data:
+                    raise DataQualityStorageError(
+                        "append_review failed: 23505 race but no record found"
+                    )
+                existing_row = existing.data[0]
+                payload = _review_payload(review)
+                if _review_payload_matches(existing_row, payload):
+                    return True
+                raise DataQualityStorageError(
+                    "append_review failed: review_id collision with "
+                    "different payload"
+                )
+            except DataQualityStorageError:
+                raise
+            except Exception as exc2:
+                logger.warning(
+                    "data_quality_reviews.append_review: "
+                    "erro ao recuperar race: type=%s",
+                    type(exc2).__name__,
+                )
+                raise DataQualityStorageError(
+                    "append_review failed: race recovery error"
+                ) from None
+        logger.warning(
+            "data_quality_reviews.append_review: "
+            "erro de persistência: code=%s type=%s",
+            e.code, type(e).__name__,
+        )
+        raise DataQualityStorageError(
+            f"append_review failed: code={e.code}"
+        ) from None
+    except DataQualityStorageError:
+        raise
     except Exception as exc:
         logger.warning(
             "data_quality_reviews.append_review: "
-            "erro de persistência: type=%s",
+            "erro inesperado: type=%s",
             type(exc).__name__,
         )
         raise DataQualityStorageError(
@@ -494,4 +578,5 @@ __all__ = [
     "get_current_review_projection",
     "_evidence_refs_payload",
     "_INVALID_FINGERPRINT_MSG",
+    "_review_payload_matches",
 ]
