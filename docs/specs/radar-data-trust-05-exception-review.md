@@ -1,8 +1,8 @@
 # Radar Data Trust 05 — Revisão humana de exceções
 
-**Status:** vigente · concluída em 2026-07-29 · **Data:** 2026-07-29  
-**Spec-mãe:** [`radar-data-trust.md`](radar-data-trust.md)  
-**Contratos anteriores:** [`radar-data-trust-01-provenance.md`](radar-data-trust-01-provenance.md), [`radar-data-trust-02-quality-gates.md`](radar-data-trust-02-quality-gates.md), [`radar-data-trust-04-source-bundles.md`](radar-data-trust-04-source-bundles.md)  
+**Status:** vigente · concluída em 2026-07-29 · **Data:** 2026-07-29
+**Spec-mãe:** [`radar-data-trust.md`](radar-data-trust.md)
+**Contratos anteriores:** [`radar-data-trust-01-provenance.md`](radar-data-trust-01-provenance.md), [`radar-data-trust-02-quality-gates.md`](radar-data-trust-02-quality-gates.md), [`radar-data-trust-04-source-bundles.md`](radar-data-trust-04-source-bundles.md)
 **Ordem:** 05 · **Impacto:** médio; confiança operacional e vigência
 
 ---
