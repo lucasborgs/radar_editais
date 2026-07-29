@@ -5,6 +5,7 @@
 **Base:** `b7f436dd9`
 **Commit de frontend:** `0e2798d36`
 **Worktree:** `/private/tmp/radar-editais-rt05-t06`
+Auditoria Codex: aprovada em 2026-07-29.
 
 ---
 
