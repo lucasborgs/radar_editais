@@ -5,7 +5,7 @@
 **Base:** `2febd97a5`
 **Commit de implementação:** `7abc6549e`
 **Commit de correções da auditoria:** `0229b996f`
-**Auditoria Codex: pendente**
+**Auditoria Codex: aprovada em 2026-07-29**
 
 ---
 

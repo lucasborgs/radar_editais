@@ -276,6 +276,11 @@ def list_exceptions(
     subject_kind: str | None = None,
     subject_id: str | None = None,
     status: str | None = None,
+    issue_code: str | None = None,
+    field_path: str | None = None,
+    source: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[dict]:
     """Lista exceções com filtros opcionais.
 
@@ -283,6 +288,11 @@ def list_exceptions(
         subject_kind: Filtrar por tipo de sujeito.
         subject_id: Filtrar por ID do sujeito.
         status: Filtrar por status (open, resolved, superseded).
+        issue_code: Filtrar por código de exceção.
+        field_path: Filtrar por caminho de campo.
+        source: Filtrar por source dos EvidenceRef associados.
+        limit: Limite opcional do recorte retornado.
+        offset: Deslocamento opcional antes do recorte.
 
     Returns:
         Lista de dicionários com dados brutos das exceções.
@@ -310,9 +320,25 @@ def list_exceptions(
             query = query.eq("subject_id", subject_id)
         if status is not None:
             query = query.eq("status", status)
+        if issue_code is not None:
+            query = query.eq("issue_code", issue_code)
+        if field_path is not None:
+            query = query.eq("field_path", field_path)
 
         resp = query.execute()
-        return resp.data or []
+        rows = resp.data or []
+        if source is not None:
+            normalized_source = source.strip().lower()
+            rows = [
+                row
+                for row in rows
+                if _row_matches_source(row, normalized_source)
+            ]
+        if offset:
+            rows = rows[offset:]
+        if limit is not None:
+            rows = rows[:limit]
+        return rows
 
     except Exception as exc:
         logger.warning(
@@ -323,6 +349,18 @@ def list_exceptions(
         raise DataQualityStorageError(
             f"list_exceptions failed: type={type(exc).__name__}"
         ) from None
+
+
+def _row_matches_source(row: dict, normalized_source: str) -> bool:
+    refs = row.get("evidence_refs") or []
+    for ref in refs:
+        if isinstance(ref, dict):
+            row_source = ref.get("source")
+        else:
+            row_source = getattr(ref, "source", None)
+        if isinstance(row_source, str) and row_source.strip().lower() == normalized_source:
+            return True
+    return False
 
 
 def get_exception(exception_id: str) -> dict | None:
