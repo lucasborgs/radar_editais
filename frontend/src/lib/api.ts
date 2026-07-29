@@ -403,6 +403,7 @@ export async function writingTurnStream(
   profile: Partial<CompanyProfile> | null,
   callbacks: WritingStreamCallbacks,
   signal?: AbortSignal,
+  idempotencyKey?: string,
 ): Promise<void> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -411,16 +412,19 @@ export async function writingTurnStream(
   const token = await getAccessToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
+  const body: Record<string, unknown> = {
+    session_id: sessionId,
+    user_message: message,
+    section_hint: sectionHint ?? null,
+    profile: profile?.nome ? profile : null,
+    library_item_ids: libraryItemIds,
+  };
+  if (idempotencyKey) body.idempotency_key = idempotencyKey;
+
   const res = await fetch(`${API_BASE_URL}/writing/turn/stream`, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      session_id: sessionId,
-      user_message: message,
-      section_hint: sectionHint ?? null,
-      profile: profile?.nome ? profile : null,
-      library_item_ids: libraryItemIds,
-    }),
+    body: JSON.stringify(body),
     signal,
   });
   if (!res.ok) throw await buildApiError(res);
@@ -527,17 +531,21 @@ export const sendWritingTurn = (
   sessionId: string,
   userMessage: string,
   sectionHint?: string,
-  modelTier?: ModelTier
-) =>
-  apiFetch<WritingTurnResponse>("/writing/turn", {
+  modelTier?: ModelTier,
+  idempotencyKey?: string,
+): Promise<WritingTurnResponse> => {
+  const body: Record<string, unknown> = {
+    session_id: sessionId,
+    user_message: userMessage,
+    section_hint: sectionHint,
+    model_tier: modelTier,
+  };
+  if (idempotencyKey) body.idempotency_key = idempotencyKey;
+  return apiFetch<WritingTurnResponse>("/writing/turn", {
     method: "POST",
-    body: JSON.stringify({
-      session_id: sessionId,
-      user_message: userMessage,
-      section_hint: sectionHint,
-      model_tier: modelTier,
-    }),
+    body: JSON.stringify(body),
   });
+};
 
 export const cancelWritingTurn = (sessionId: string) =>
   apiFetch<{ ok: boolean }>(`/writing/${sessionId}/cancel`, {

@@ -40,11 +40,15 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
   streamingText?: string | null;
   agentTrace?: AgentTraceStep[];
   onStop?: () => void;
+  // H2 — retry on turn error
+  turnError?: string | null;
+  onRetry?: () => void;
 }>(function WorkspaceChat(
   {
     messages, input, onInput, onSend, working, pending,
     onAnswerPending, onUndoSection, token, fullWidth,
     streamingText, agentTrace, onStop,
+    turnError, onRetry,
   },
   ref,
 ) {
@@ -143,6 +147,21 @@ export const WorkspaceChat = forwardRef<WorkspaceChatHandle, {
             <span>agente trabalhando…</span>
           </div>
         )}
+
+        {turnError && !working && (
+          <div className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 px-3 py-2 text-xs text-red-800 dark:text-red-300 flex items-center justify-between gap-2 font-sans">
+            <span>{turnError}</span>
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="shrink-0 px-2 py-1 rounded-md bg-red-200 dark:bg-red-800 text-red-900 dark:text-red-200 font-semibold hover:bg-red-300 dark:hover:bg-red-700 transition-colors"
+              >
+                ↻ Tentar novamente
+              </button>
+            )}
+          </div>
+        )}
+
         <div ref={bottomRef} />
       </div>
 

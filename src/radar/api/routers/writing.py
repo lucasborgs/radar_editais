@@ -70,6 +70,10 @@ class WritingTurnRequest(BaseModel):
     profile: CompanyProfileSchema | None = None
     library_item_ids: list[str] = []
     model_tier: str | None = None  # Fase 4 #24: 'fast' | 'auto' | 'pro'
+    # H2: idempotency_key — UUID v4 gerado pelo frontend por tentativa distinta
+    # de turno. Retentativas reusam a mesma chave. Backend cacheia a resposta
+    # completa e a reentrega sem processar o LLM novamente.
+    idempotency_key: str | None = None
 
 
 # Sprint 2 do Cenário B: response do /writing/turn passa a carregar 2 campos
@@ -156,9 +160,28 @@ def _sse(event: str, data: dict) -> bytes:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
 
 
-# =============================================================================
-# ENDPOINTS
-# =============================================================================
+def _check_idempotency(db: DbClient, key: str | None, session_id: str) -> dict | None:
+    if not key:
+        return None
+    row = db.table("writing_turn_idempotency").select("response_json").eq(
+        "idempotency_key", key,
+    ).maybe_single().execute()
+    if row.data:
+        return row.data["response_json"]
+    return None
+
+
+def _record_idempotency(db: DbClient, key: str | None, session_id: str, response: dict) -> None:
+    if not key:
+        return
+    try:
+        db.table("writing_turn_idempotency").insert({
+            "idempotency_key": key,
+            "session_id": session_id,
+            "response_json": response,
+        }).execute()
+    except Exception as e:
+        logger.warning("failed to record idempotency key %s: %s", key, e)
 
 
 @router.post("/writing/start", summary="Inicia sessão de escrita de proposta")
@@ -281,10 +304,18 @@ async def writing_turn(
 
     # PR3 (four-phase-workflow): compliance integrado ao Critic (executado dentro
     # de save_draft). Removeu o ComplianceMonitor paralelo.
+
+    # H2: idempotency check
+    cached = _check_idempotency(db, req.idempotency_key, req.session_id)
+    if cached:
+        return cached
+
     turn_result = await asyncio.to_thread(session.turn, req.user_message, req.section_hint)
     sections_done = turn_result.get("sections_done", [])
-    return {**turn_result, "compliance_flags": [],
+    response = {**turn_result, "compliance_flags": [],
             "draft_ready": bool(sections_done)}
+    _record_idempotency(db, req.idempotency_key, req.session_id, response)
+    return response
 
 
 @router.post(
@@ -363,6 +394,14 @@ async def writing_turn_stream(
     thread.start()
 
     async def gen():
+        # H2: idempotency check — replay cached response as single done event
+        # before starting the stream.
+        cached = _check_idempotency(db, req.idempotency_key, req.session_id)
+        if cached:
+            logger.info("idempotency hit for key %s, replaying cached stream", req.idempotency_key)
+            yield _sse("done", cached)
+            return
+
         try:
             was_tool_or_token = False
             while True:
@@ -378,6 +417,7 @@ async def writing_turn_stream(
                     yield _sse("tool", {"name": item.get("name", ""), "phase": "end"})
                 elif kind == "final":
                     payload = {k: v for k, v in item.items() if k != "kind"}
+                    _record_idempotency(db, req.idempotency_key, req.session_id, payload)
                     yield _sse("done", payload)
                     break
         except Exception as e:
@@ -387,6 +427,9 @@ async def writing_turn_stream(
                 try:
                     result = await asyncio.to_thread(
                         session.turn, req.user_message, req.section_hint,
+                    )
+                    _record_idempotency(db, req.idempotency_key, req.session_id, result)
+                    yield _sse("done", result)
                     )
                     yield _sse("done", result)
                 except Exception as e2:

@@ -106,7 +106,11 @@ export default function WorkspacePage() {
   // Sprint 1 — streaming + tool trace + stop
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [streamingTrace, setStreamingTrace] = useState<Array<{ name: string }>>([]);
+  const [turnError, setTurnError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const idempotencyKeyRef = useRef<string | null>(null);
+  const lastTurnRef = useRef<{ text: string; sectionHint?: string } | null>(null);
+  const lastRetryRef = useRef<number>(0);
 
   const chatRef = useRef<WorkspaceChatHandle>(null);
   const scrollToSectionRef = useRef<(title: string) => void>(() => {});
@@ -357,11 +361,16 @@ export default function WorkspacePage() {
       setInput("");
       setPending(null);
       setWorking(true);
+      setTurnError(null);
       setStreamingText("");
       setStreamingTrace([]);
 
+      lastTurnRef.current = { text: message || content, sectionHint };
       const ac = new AbortController();
       abortRef.current = ac;
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current = crypto.randomUUID();
+      }
 
       let streamOk = false;
       const tryStream = async (): Promise<Record<string, unknown> | null> => {
@@ -379,6 +388,7 @@ export default function WorkspacePage() {
               onError: (msg) => { resolve({ error: msg }); },
             },
             ac.signal,
+            idempotencyKeyRef.current ?? undefined,
           ).catch((err: unknown) => { resolve({ error: err instanceof Error ? err.message : "Stream error" }); });
         });
       };
@@ -446,7 +456,7 @@ export default function WorkspacePage() {
       } else {
         // Fallback batch
         try {
-          const res = await sendWritingTurn(sessionId, message || content, sectionHint);
+          const res = await sendWritingTurn(sessionId, message || content, sectionHint, undefined, idempotencyKeyRef.current ?? undefined);
 
           if (res.plan_pending && res.plan) {
             setPlanPending(res.plan);
@@ -505,10 +515,12 @@ export default function WorkspacePage() {
           }
           if (res.pending_user_input) setPending(res.pending_user_input);
         } catch (e) {
+          setTurnError(e instanceof Error ? e.message : "Erro ao enviar mensagem ao agente.");
           toast.error(e instanceof Error ? e.message : "Erro ao enviar mensagem ao agente.");
         }
       }
 
+      idempotencyKeyRef.current = null;
       setStreamingText(null);
       setStreamingTrace([]);
       abortRef.current = null;
@@ -789,6 +801,17 @@ export default function WorkspacePage() {
               abortRef.current?.abort();
               abortRef.current = null;
               cancelWritingTurn(sessionId).catch(() => {});
+            }}
+            turnError={turnError}
+            onRetry={() => {
+              const now = Date.now();
+              if (now - lastRetryRef.current < 2000) return;
+              lastRetryRef.current = now;
+              const last = lastTurnRef.current;
+              if (last) {
+                setTurnError(null);
+                void runTurn(last.text, last.sectionHint);
+              }
             }}
           />
         </div>
