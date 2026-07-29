@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from postgrest.exceptions import APIError
 
@@ -73,16 +73,37 @@ _REVIEW_MATERIAL_KEYS = (
 )
 
 
+def _normalize_ts(raw: object) -> datetime | None:
+    """Converte string ISO para datetime UTC, tratando naive como UTC.
+
+    Retorna None se o valor for inválido (payloads diferentes).
+    """
+    if not isinstance(raw, str):
+        return None
+    try:
+        dt = datetime.fromisoformat(raw)
+    except (ValueError, TypeError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def _review_payload_matches(stored: dict, incoming: dict) -> bool:
     """True se o payload material de duas revisoes for identico.
 
     Compara todos os campos semânticos ignorando metadados internos
     (id, created_at, review_id). Normaliza ``reviewed_at`` antes da
     comparacao.
+
+    Timestamps invalidos resultam em ``False`` (payload diferente).
     """
     for k in _REVIEW_MATERIAL_KEYS:
         a = stored.get(k)
         b = incoming.get(k)
+        if k == "reviewed_at":
+            a = _normalize_ts(a)
+            b = _normalize_ts(b)
         if a != b:
             return False
     return True
@@ -579,4 +600,5 @@ __all__ = [
     "_evidence_refs_payload",
     "_INVALID_FINGERPRINT_MSG",
     "_review_payload_matches",
+    "_normalize_ts",
 ]

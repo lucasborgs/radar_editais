@@ -628,6 +628,50 @@ class TestReviewPayloadMatches:
             _review_payload(r1), _review_payload(r2)
         ) is False
 
+    def _base_payload(self, reviewed_at: str) -> dict:
+        return dict(
+            schema_version=1,
+            exception_id="exc-uuid",
+            decision="confirm",
+            corrected_value=None,
+            justification="test",
+            evidence_refs=[],
+            actor_id="admin",
+            reviewed_at=reviewed_at,
+        )
+
+    def test_naive_vs_aware_utc_equal(self):
+        from radar.core.services.data_quality_exceptions import (
+            _review_payload_matches,
+        )
+        a = self._base_payload("2026-07-29T12:00:00")
+        b = self._base_payload("2026-07-29T12:00:00+00:00")
+        assert _review_payload_matches(a, b) is True
+
+    def test_offset_vs_z_equal(self):
+        from radar.core.services.data_quality_exceptions import (
+            _review_payload_matches,
+        )
+        a = self._base_payload("2026-07-29T09:00:00-03:00")
+        b = self._base_payload("2026-07-29T12:00:00Z")
+        assert _review_payload_matches(a, b) is True
+
+    def test_truly_different_instants(self):
+        from radar.core.services.data_quality_exceptions import (
+            _review_payload_matches,
+        )
+        a = self._base_payload("2026-07-29T12:00:00Z")
+        b = self._base_payload("2026-07-30T12:00:00Z")
+        assert _review_payload_matches(a, b) is False
+
+    def test_invalid_timestamp_is_different(self):
+        from radar.core.services.data_quality_exceptions import (
+            _review_payload_matches,
+        )
+        a = self._base_payload("not-a-timestamp")
+        b = self._base_payload("2026-07-29T12:00:00Z")
+        assert _review_payload_matches(a, b) is False
+
 
 # ---------------------------------------------------------------------------
 # append_review — colisão sequencial (mesmo review_id, payload diferente)
