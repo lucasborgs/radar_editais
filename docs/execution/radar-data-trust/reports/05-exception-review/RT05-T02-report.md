@@ -134,7 +134,7 @@ git diff --check 89a909935..HEAD                               → pass
 
 ---
 
-## Auditoria Codex: pendente
+## Auditoria Codex: aprovada em 2026-07-29
 
 - Dados legados sem exceção continuam representados por ausência (sem
   fabricação) — verificado em `TestSupabaseAbsent` (degradação graciosa) e
