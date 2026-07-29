@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataTable, Modal, Skeleton } from "@/components/ui";
 import type { Column } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -201,7 +201,36 @@ export function AdminDataQualityExceptions({ token }: { token: string | null }) 
   const [refreshTick, setRefreshTick] = useState(0);
   const listRequestId = useRef(0);
   const detailRequestId = useRef(0);
+  const submitRequestId = useRef(0);
   const selectedExceptionId = selectedException?.id ?? null;
+  const tokenRef = useRef<string | null>(token);
+
+  const clearAdministrativeState = useCallback((forbiddenState: boolean) => {
+    listRequestId.current += 1;
+    detailRequestId.current += 1;
+    submitRequestId.current += 1;
+    setRows([]);
+    setHasMore(false);
+    setNextOffset(null);
+    setLoading(false);
+    setLoadError(null);
+    setForbidden(forbiddenState);
+    setSelectedException(null);
+    setDetailOpen(false);
+    setDetailLoading(false);
+    setDetailError(null);
+    setForm(null);
+    setFormExceptionId(null);
+    setSubmitError(null);
+    setSubmitting(false);
+  }, []);
+
+  useEffect(() => {
+    tokenRef.current = token;
+    if (!token) {
+      clearAdministrativeState(false);
+    }
+  }, [token, clearAdministrativeState]);
 
   useEffect(() => {
     if (!token) return;
@@ -226,10 +255,7 @@ export function AdminDataQualityExceptions({ token }: { token: string | null }) 
       .catch((err: unknown) => {
         if (requestId !== listRequestId.current) return;
         if (err instanceof ApiError && err.status === 403) {
-          setForbidden(true);
-          setRows([]);
-          setHasMore(false);
-          setNextOffset(null);
+          clearAdministrativeState(true);
           return;
         }
         const message =
@@ -251,7 +277,7 @@ export function AdminDataQualityExceptions({ token }: { token: string | null }) 
     return () => {
       listRequestId.current += 1;
     };
-  }, [token, statusFilter, codeFilter, sourceFilter, fieldFilter, offset, refreshTick]);
+  }, [token, statusFilter, codeFilter, sourceFilter, fieldFilter, offset, refreshTick, clearAdministrativeState]);
 
   useEffect(() => {
     if (!detailOpen || !selectedExceptionId || !token) {
@@ -264,6 +290,11 @@ export function AdminDataQualityExceptions({ token }: { token: string | null }) 
       .then((response) => {
         if (requestId !== detailRequestId.current) return;
         setSelectedException(response);
+        if (response.current_review) {
+          setForm(null);
+          setFormExceptionId(null);
+          setSubmitError(null);
+        }
       })
       .catch((err: unknown) => {
         if (requestId !== detailRequestId.current) return;
@@ -288,11 +319,14 @@ export function AdminDataQualityExceptions({ token }: { token: string | null }) 
   }, [detailOpen, selectedExceptionId, token]);
 
   function openException(exception: DataQualityExceptionOut) {
+    submitRequestId.current += 1;
+    detailRequestId.current += 1;
     setSelectedException(exception);
     setDetailOpen(true);
     setDetailError(null);
     setSubmitError(null);
-    setFormExceptionId(exception.id);
+    setSubmitting(false);
+    setFormExceptionId(exception.current_review ? null : exception.id);
     if (exception.current_review) {
       setForm(null);
       return;
@@ -307,13 +341,15 @@ export function AdminDataQualityExceptions({ token }: { token: string | null }) 
   }
 
   function closeDetail() {
+    submitRequestId.current += 1;
+    detailRequestId.current += 1;
     setDetailOpen(false);
     setSelectedException(null);
     setDetailError(null);
     setSubmitError(null);
+    setSubmitting(false);
     setForm(null);
     setFormExceptionId(null);
-    detailRequestId.current += 1;
   }
 
   function refreshList() {
@@ -352,13 +388,17 @@ export function AdminDataQualityExceptions({ token }: { token: string | null }) 
 
   async function submitReview() {
     if (!token || !selectedException || !form || formValidationError) return;
+    const requestId = ++submitRequestId.current;
+    const exceptionId = selectedException.id;
+    const reviewId = form.reviewId;
+    const tokenSnapshot = token;
     setSubmitting(true);
     setSubmitError(null);
     try {
       const response = await reviewDataQualityException(
-        selectedException.id,
+        exceptionId,
         {
-          review_id: form.reviewId,
+          review_id: reviewId,
           decision: form.decision,
           justification: form.justification.trim(),
           corrected_value: form.decision === "correct" ? form.correctedValue.trim() : undefined,
@@ -371,9 +411,31 @@ export function AdminDataQualityExceptions({ token }: { token: string | null }) 
         },
         token,
       );
+      if (
+        submitRequestId.current !== requestId ||
+        tokenRef.current !== tokenSnapshot ||
+        selectedExceptionId !== exceptionId ||
+        formExceptionId !== exceptionId ||
+        form.reviewId !== reviewId
+      ) {
+        return;
+      }
+      detailRequestId.current += 1;
       setSelectedException(response);
+      setForm(null);
+      setFormExceptionId(null);
+      setSubmitError(null);
       refreshList();
     } catch (err: unknown) {
+      if (
+        submitRequestId.current !== requestId ||
+        tokenRef.current !== tokenSnapshot ||
+        selectedExceptionId !== exceptionId ||
+        formExceptionId !== exceptionId ||
+        form.reviewId !== reviewId
+      ) {
+        return;
+      }
       const message =
         err instanceof ApiError
           ? err.message
@@ -382,7 +444,9 @@ export function AdminDataQualityExceptions({ token }: { token: string | null }) 
             : "Falha ao registrar a revisão.";
       setSubmitError(message);
     } finally {
-      setSubmitting(false);
+      if (submitRequestId.current === requestId) {
+        setSubmitting(false);
+      }
     }
   }
 
