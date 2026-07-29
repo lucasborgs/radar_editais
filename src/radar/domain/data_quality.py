@@ -175,6 +175,26 @@ def evaluate_temporal(
 
     has_continuous_evidence = continuous_evidence is not None
 
+    if deadline_present and has_continuous_evidence:
+        return TemporalEvaluation(
+            temporal_mode=TemporalMode.UNKNOWN,
+            validity_state=ValidityState.NEEDS_REVIEW,
+            issue_code=IssueCode.TEMPORAL_STATUS_CONFLICT,
+            issue_description=(
+                f"deadline={deadline} conflicts with continuous evidence"
+            ),
+        )
+
+    if is_closed and has_continuous_evidence:
+        return TemporalEvaluation(
+            temporal_mode=TemporalMode.UNKNOWN,
+            validity_state=ValidityState.NEEDS_REVIEW,
+            issue_code=IssueCode.TEMPORAL_STATUS_CONFLICT,
+            issue_description=(
+                f"status={status} conflicts with continuous evidence"
+            ),
+        )
+
     if deadline_present and is_closed and is_future_deadline:
         return TemporalEvaluation(
             temporal_mode=TemporalMode.FIXED,

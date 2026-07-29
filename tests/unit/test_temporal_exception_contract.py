@@ -251,6 +251,102 @@ class TestEvaluateTemporal:
 
 
 # ---------------------------------------------------------------------------
+# Continuous- evidence conflicts (precedência sobre deadline/status)
+# ---------------------------------------------------------------------------
+
+
+class TestContinuousEvidenceConflicts:
+    """CONTINUOUS/ACTIVE só é válido com deadline=None,
+    status não fechado e continuous_evidence válida."""
+
+    def _make_evidence(self, suffix: str = "a") -> EvidenceRef:
+        return EvidenceRef(
+            source="finep",
+            canonical_content_hash=f"sha256:{suffix * 64}",
+            locator_quality=LocatorQuality.DOCUMENT_ONLY,
+            document="pagina_oficial.html",
+            quote="fluxo continuo: inscricoes permanentes",
+        )
+
+    def test_future_deadline_with_continuous_evidence_conflict(self):
+        result = evaluate_temporal(
+            deadline=date(2027, 1, 31),
+            status="ABERTA",
+            as_of=date(2026, 7, 29),
+            continuous_evidence=self._make_evidence("b"),
+        )
+        assert result.temporal_mode is TemporalMode.UNKNOWN
+        assert result.validity_state is ValidityState.NEEDS_REVIEW
+        assert result.issue_code is IssueCode.TEMPORAL_STATUS_CONFLICT
+
+    def test_past_deadline_with_continuous_evidence_conflict(self):
+        result = evaluate_temporal(
+            deadline=date(2024, 1, 31),
+            status="ABERTA",
+            as_of=date(2026, 7, 29),
+            continuous_evidence=self._make_evidence("c"),
+        )
+        assert result.temporal_mode is TemporalMode.UNKNOWN
+        assert result.validity_state is ValidityState.NEEDS_REVIEW
+        assert result.issue_code is IssueCode.TEMPORAL_STATUS_CONFLICT
+
+    def test_closed_status_without_deadline_with_continuous_evidence_conflict(self):
+        result = evaluate_temporal(
+            deadline=None,
+            status="ENCERRADA",
+            as_of=date(2026, 7, 29),
+            continuous_evidence=self._make_evidence("d"),
+        )
+        assert result.temporal_mode is TemporalMode.UNKNOWN
+        assert result.validity_state is ValidityState.NEEDS_REVIEW
+        assert result.issue_code is IssueCode.TEMPORAL_STATUS_CONFLICT
+
+    def test_resultado_divulgado_with_continuous_evidence_conflict(self):
+        result = evaluate_temporal(
+            deadline=None,
+            status="RESULTADO_DIVULGADO",
+            as_of=date(2026, 7, 29),
+            continuous_evidence=self._make_evidence("e"),
+        )
+        assert result.temporal_mode is TemporalMode.UNKNOWN
+        assert result.validity_state is ValidityState.NEEDS_REVIEW
+        assert result.issue_code is IssueCode.TEMPORAL_STATUS_CONFLICT
+
+    def test_no_deadline_open_status_with_continuous_active(self):
+        result = evaluate_temporal(
+            deadline=None,
+            status="ABERTA",
+            as_of=date(2026, 7, 29),
+            continuous_evidence=self._make_evidence("f"),
+        )
+        assert result.temporal_mode is TemporalMode.CONTINUOUS
+        assert result.validity_state is ValidityState.ACTIVE
+        assert result.issue_code is None
+
+    def test_no_deadline_neutral_status_with_continuous_active(self):
+        result = evaluate_temporal(
+            deadline=None,
+            status="Desconhecido",
+            as_of=date(2026, 7, 29),
+            continuous_evidence=self._make_evidence("g"),
+        )
+        assert result.temporal_mode is TemporalMode.CONTINUOUS
+        assert result.validity_state is ValidityState.ACTIVE
+        assert result.issue_code is None
+
+    def test_no_deadline_no_status_with_continuous_active(self):
+        result = evaluate_temporal(
+            deadline=None,
+            status=None,
+            as_of=date(2026, 7, 29),
+            continuous_evidence=self._make_evidence("h"),
+        )
+        assert result.temporal_mode is TemporalMode.CONTINUOUS
+        assert result.validity_state is ValidityState.ACTIVE
+        assert result.issue_code is None
+
+
+# ---------------------------------------------------------------------------
 # Desconhecido — neutro, não classificado como aberto
 # ---------------------------------------------------------------------------
 
