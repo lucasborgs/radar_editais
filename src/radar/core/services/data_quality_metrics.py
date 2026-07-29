@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 
 
 @dataclass(frozen=True)
@@ -203,7 +204,10 @@ def _open_exception_age_days(rows: list[dict], as_of: date) -> dict[str, int]:
         detected_at = _parse_datetime(row.get("detected_at"))
         if not isinstance(exception_id, str) or detected_at is None:
             continue
-        age = max(0, (as_of - detected_at.date()).days)
+        detected_local_date = detected_at.astimezone(
+            ZoneInfo("America/Sao_Paulo")
+        ).date()
+        age = max(0, (as_of - detected_local_date).days)
         ages[exception_id] = age
     return dict(sorted(ages.items()))
 

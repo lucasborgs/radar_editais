@@ -133,6 +133,24 @@ def test_fixture_baseline_measures_status_source_field_and_open_age():
     assert diagnostics.review_decisions is None
 
 
+def test_open_exception_age_uses_sao_paulo_civil_day():
+    diagnostics = compute_data_quality_diagnostics(
+        [
+            _exception_row(
+                exception_id="exc-timezone-boundary",
+                subject_id="finep:timezone-boundary",
+                issue_code="temporal_status_without_basis",
+                produced_value="ABERTA",
+                status="open",
+                detected_at="2026-07-29T01:00:00Z",
+            ),
+        ],
+        as_of=date(2026, 7, 29),
+    )
+
+    assert diagnostics.open_exception_age_days == {"exc-timezone-boundary": 1}
+
+
 def test_review_denominator_is_null_only_when_reviews_are_not_observed():
     exception = _exception_row(
         exception_id="exc-1",
