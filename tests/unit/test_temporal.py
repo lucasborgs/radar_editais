@@ -95,7 +95,9 @@ def test_needs_review_without_deadline_has_no_transition_prompt(monkeypatch):
         "validity_state": "needs_review", "temporal_value": None,
     })
 
-    assert temporal.render_temporal_block("finep:review") == ""
+    block = temporal.render_temporal_block("finep:review")
+    assert "validade do edital finep:review está a confirmar" in block.lower()
+    assert "não afirme que ele está aberto" in block.lower()
 
 
 def test_closed_without_deadline_has_no_transition_prompt(monkeypatch):
@@ -104,7 +106,9 @@ def test_closed_without_deadline_has_no_transition_prompt(monkeypatch):
         "validity_state": "closed", "temporal_value": None,
     })
 
-    assert temporal.render_temporal_block("finep:closed") == ""
+    block = temporal.render_temporal_block("finep:closed")
+    assert "deve ser tratado como encerrado" in block.lower()
+    assert "não o descreva como aberto" in block.lower()
 
 
 def test_temporal_block_never_renders_none_deadline(monkeypatch):

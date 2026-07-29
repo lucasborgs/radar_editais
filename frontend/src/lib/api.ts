@@ -226,6 +226,11 @@ export interface MatchedEdital {
   url?: string | null;
   elegibilidade?: Elegibilidade | null;
   verdict?: MatchVerdict | null;
+  temporal_mode?: string | null;
+  validity_state?: string | null;
+  temporal_value?: string | null;
+  decision_source?: string | null;
+  last_verified_at?: string | null;
 }
 
 // Facetas do card de investidor (site/ticket/estágio da tese).

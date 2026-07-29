@@ -1,7 +1,8 @@
 """Serialização do pipeline (GET /applications).
 
 Foca na lógica pura de junção/serialização (sem rede/HTTP):
-  - days_left derivado do prazo do card (futuro → +, passado → -, ausente → None);
+  - days_left derivado do prazo do card com o dia civil de São Paulo
+    (futuro → +, passado → -, ausente → None);
   - progress_pct a partir da writing_session (preenchidas/total);
   - edital_title cai para None quando o card não existe.
 
@@ -146,3 +147,15 @@ def test_build_pipeline_items_maps_card_and_session(monkeypatch):
     assert items[1]["days_left"] is None
     assert items[1]["progress_pct"] == 0
     assert calls == [["finep:1", "finep:2"]]
+
+
+def test_days_left_uses_sao_paulo_day_helper(monkeypatch):
+    monkeypatch.setattr(api, "today_sao_paulo", lambda: date(2030, 1, 1))
+
+    item = api._serialize_application(
+        _row(),
+        {"title": "Edital SP", "deadline": "02/01/2030"},
+        None,
+    )
+
+    assert item["days_left"] == 1

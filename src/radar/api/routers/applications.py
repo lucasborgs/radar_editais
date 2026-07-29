@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -11,6 +10,7 @@ from pydantic import BaseModel
 from radar.core.infra.auth import CurrentUserId, DbClient
 from radar.core.kg import entity_catalog
 from radar.core.kg.schema import parse_deadline
+from radar.core.services.temporal_read_model import today_sao_paulo
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ def _serialize_application(row: dict, card: dict | None, session: dict | None) -
     """
     deadline = (card or {}).get("deadline") or None
     parsed = parse_deadline(deadline)
-    days_left = (parsed - date.today()).days if parsed else None
+    days_left = (parsed - today_sao_paulo()).days if parsed else None
     return {
         "application_id": row.get("id"),
         "edital_id": row.get("edital_id"),

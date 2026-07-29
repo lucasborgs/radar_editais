@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime
-from zoneinfo import ZoneInfo
+from datetime import date
 
 from radar.core.kg import entity_catalog
 from radar.core.kg.schema import parse_deadline
+from radar.core.services.temporal_read_model import today_sao_paulo
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ def temporal_context(edital_id: str) -> TemporalContext | None:
     if entry is None and status is None and deadline_raw is None:
         return None
 
-    today = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+    today = today_sao_paulo()
     deadline = parse_deadline(deadline_raw)
     days_remaining = (deadline - today).days if deadline is not None else None
     expired = deadline is not None and deadline < today
@@ -94,9 +94,17 @@ def render_temporal_block(edital_id: str) -> str:
     today_s = ctx.today.isoformat()
 
     if ctx.validity_state == "needs_review":
-        return ""
+        return (
+            f"[CONTEXTO TEMPORAL: hoje é {today_s}. A validade do edital "
+            f"{ctx.edital_id} está a confirmar. Não afirme que ele está aberto, "
+            f"não invente prazo e não trate ausência de data como fluxo contínuo.]"
+        )
     if ctx.validity_state == "closed" and ctx.deadline is None:
-        return ""
+        return (
+            f"[CONTEXTO TEMPORAL: hoje é {today_s}. O edital {ctx.edital_id} "
+            f"deve ser tratado como encerrado. Não o descreva como aberto e não "
+            f"invente uma nova data de encerramento.]"
+        )
     if ctx.temporal_mode == "continuous" and ctx.validity_state == "active":
         prazo = (
             f"O edital {ctx.edital_id} não tem prazo de submissão fixo "
@@ -132,7 +140,7 @@ def render_match_temporal_block() -> str:
     Não é específico de um edital — afirma a data de hoje e instrui o LLM a
     copiar `status`/`deadline` verbatim do catálogo recebido, nunca estimar.
     """
-    today_s = datetime.now(ZoneInfo("America/Sao_Paulo")).date().isoformat()
+    today_s = today_sao_paulo().isoformat()
     return (
         f"[CONTEXTO TEMPORAL: hoje é {today_s}. Os editais listados já foram "
         f"filtrados por vigência. Ao comentar prazos, copie `status` e "

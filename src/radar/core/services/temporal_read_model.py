@@ -52,7 +52,7 @@ class TemporalReadModel(BaseModel):
         return self.model_dump(mode="json")
 
 
-def _today_sao_paulo() -> date:
+def today_sao_paulo() -> date:
     return datetime.now(ZoneInfo("America/Sao_Paulo")).date()
 
 
@@ -132,7 +132,7 @@ def resolve_temporal_read_models(
     unique = {subject.subject_id: subject for subject in subjects if subject.subject_id}
     if not unique:
         return {}
-    effective_as_of = as_of or _today_sao_paulo()
+    effective_as_of = as_of or today_sao_paulo()
     ordered = list(unique.values())
     fingerprints = {subject.subject_id: _fingerprint(subject) for subject in ordered}
     try:
@@ -193,4 +193,5 @@ __all__ = [
     "TemporalSubject",
     "resolve_temporal_read_models",
     "subjects_from_rows",
+    "today_sao_paulo",
 ]

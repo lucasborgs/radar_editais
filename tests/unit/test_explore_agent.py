@@ -335,13 +335,21 @@ def test_explore_opportunity_is_cross_dimensional(monkeypatch):
     retorno — robusto mesmo se alguma dimensão estiver vazia."""
     from radar.core.kg import entity_catalog
     monkeypatch.setattr(entity_catalog, "list_editais",
-                        lambda **kw: [{"id": "finep:1", "title": "E", "status": "ABERTA", "deadline": ""}])
+                        lambda **kw: [{
+                            "id": "finep:1",
+                            "title": "E",
+                            "status": "Desconhecido",
+                            "deadline": "",
+                            "validity_state": "needs_review",
+                            "temporal_mode": "unknown",
+                        }])
     monkeypatch.setattr(entity_catalog, "list_entity_catalog",
                         lambda ck, **kw: [{"id": f"{ck}:x", "name": "N", "themes": [], "description": ""}])
     tools = {t.name: t for t in build_explore_tools()}
     out = tools["explore_opportunity"].invoke({"tema": "agro"})
     assert isinstance(out, str)
     assert "Editais" in out and "ICTs" in out and "Investidores" in out
+    assert "Validade a confirmar" in out
 
 
 # ---------------------------------------------------------------------------
@@ -373,11 +381,43 @@ def test_theme_match_rejects_unrelated():
 def test_list_editais_tool_returns_string_with_results(monkeypatch):
     from radar.core.kg import entity_catalog
     monkeypatch.setattr(entity_catalog, "list_editais",
-                        lambda **kw: [{"id": "finep:1", "title": "Edital X", "status": "ABERTA", "deadline": "", "themes": []}])
+                        lambda **kw: [{
+                            "id": "finep:1",
+                            "title": "Edital X",
+                            "status": "Desconhecido",
+                            "deadline": "",
+                            "themes": [],
+                            "validity_state": "needs_review",
+                            "temporal_mode": "unknown",
+                        }])
     t = next(x for x in build_explore_tools() if x.name == "list_editais")
     out = t.invoke({"limit": 3})
     assert isinstance(out, str)
     assert "Encontrados" in out
+    assert "Validade a confirmar" in out
+
+
+def test_get_edital_tool_exposes_conservative_temporal_note(monkeypatch):
+    from radar.core.kg import entity_catalog
+
+    monkeypatch.setattr(entity_catalog, "get_edital", lambda _eid: {
+        "id": "finep:1",
+        "title": "Edital X",
+        "status": "Desconhecido",
+        "deadline": "",
+        "objective": "Objetivo",
+        "themes": [],
+        "validity_state": "needs_review",
+        "temporal_mode": "unknown",
+        "decision_source": "legacy",
+        "last_verified_at": "2026-07-29T12:00:00+00:00",
+    })
+
+    t = next(x for x in build_explore_tools() if x.name == "get_edital")
+    out = t.invoke({"edital_id": "finep:1"})
+
+    assert "Status: Validade a confirmar" in out
+    assert "Prazo: Validade a confirmar" in out
 
 
 def test_list_editais_caps_limit(monkeypatch):

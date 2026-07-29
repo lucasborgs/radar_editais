@@ -84,8 +84,17 @@ def _format_edital_context(edital_id: str | None) -> str:
         f"Título: {card.get('title', '')}",
         f"Objetivo: {card.get('objective', '')}",
         f"Mecanismo: {card.get('mechanism', '')}",
-        f"Status: {card.get('status', '')}  |  Prazo: {card.get('deadline', '')}",
     ]
+    validity_state = str(card.get("validity_state") or "").strip().lower()
+    temporal_mode = str(card.get("temporal_mode") or "").strip().lower()
+    if validity_state == "needs_review":
+        lines.append("Validade: a confirmar — não tratar como edital aberto.")
+    elif validity_state == "closed":
+        lines.append(f"Status: {card.get('status', '')}  |  Prazo: {card.get('deadline', '')}")
+    elif temporal_mode == "continuous" and validity_state == "active":
+        lines.append("Status: ABERTA  |  Prazo: fluxo contínuo confirmado")
+    else:
+        lines.append(f"Status: {card.get('status', '')}  |  Prazo: {card.get('deadline', '')}")
     if card.get("themes"):
         lines.append("Temas: " + ", ".join(card["themes"]))
     if card.get("technologies"):

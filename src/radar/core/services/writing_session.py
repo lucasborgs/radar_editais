@@ -1031,6 +1031,21 @@ class WritingSession:
             return ""
 
         lines = ["CARD DA FONTE:"]
+        validity_state = str(card.get("validity_state") or "").strip().lower()
+        temporal_mode = str(card.get("temporal_mode") or "").strip().lower()
+        if validity_state == "needs_review":
+            lines.append(
+                "Validade: a confirmar — não trate esta oportunidade como aberta "
+                "nem invente prazo ou fluxo contínuo."
+            )
+        elif validity_state == "closed":
+            if card.get("deadline"):
+                lines.append(f"Prazo: {card['deadline']}")
+            lines.append("Validade: encerrada.")
+        elif temporal_mode == "continuous" and validity_state == "active":
+            lines.append("Prazo: fluxo contínuo confirmado.")
+        elif card.get("deadline"):
+            lines.append(f"Prazo: {card['deadline']}")
         if card.get("objective"):
             lines.append(f"Objetivo: {card['objective']}")
         if card.get("mechanism"):
