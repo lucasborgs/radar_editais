@@ -1,9 +1,9 @@
 # RT05-T05 — API administrativa de exceções
 
-**Data:** 2026-07-29  
-**Branch:** `codex/radar-data-trust-05-t05`  
-**Base:** `463b8be41`  
-**Commit de implementação:** `f23c6dbfe`  
+**Data:** 2026-07-29
+**Branch:** `codex/radar-data-trust-05-t05`
+**Base:** `463b8be41`
+**Commit de correção:** `d8a22934b`
 **Worktree:** `/private/tmp/radar-editais-rt05-t05`
 
 ---
@@ -14,7 +14,7 @@ Entreguei a API administrativa autenticada para a fila única de exceções de
 qualidade de dados, com leitura por lista/detalhe e criação de revisão
 temporal via `AdminUserId`.
 
-A implementação ficou fail-closed, sem frontend, sem migration, sem workflow
+A implementação segue fail-closed, sem frontend, sem migration, sem workflow
 novo e sem mudança em promover/rejeitar. O router só orquestra os serviços de
 RT05-T02 a T04.
 
@@ -67,8 +67,8 @@ Ampliei a listagem para suportar os filtros do contrato administrativo:
 - `source` via `evidence_refs.source`
 - `limit` e `offset`
 
-Isso mantém a camada HTTP sem workaround e preserva o repositório como
-autoridade de leitura.
+Também adicionei uma exceção tipada específica para conflito de revisão:
+`DataQualityReviewConflictError`.
 
 ### 4. Wiring de auth
 
@@ -86,7 +86,7 @@ Arquivo atualizado:
 
 Marcação solicitada:
 
-- `Auditoria Codex: aprovada em 2026-07-29`
+- `Auditoria Codex: pendente`
 
 ---
 
@@ -146,7 +146,9 @@ Regras observadas:
 - `actor_id` não é aceito no payload;
 - `confirm_continuous` e `correct` exigem evidência;
 - a revisão não aciona promote/reject editorial;
-- retry com o mesmo `review_id` permanece idempotente no serviço.
+- retry com o mesmo `review_id` permanece idempotente no serviço;
+- colisão material de `review_id` devolve `409` via exceção tipada;
+- falha real de storage continua devolvendo `503`.
 
 ---
 
@@ -154,11 +156,13 @@ Regras observadas:
 
 - Falhas de storage retornam erro categórico `503`, sem payload bruto,
   traceback, URL sensível ou segredo.
-- Erros de validação de revisão retornam `404`, `409` ou `422` categóricos,
-  sem expor texto interno bruto.
+- Colisões de revisão retornam `409` categórico sem interpretar texto de
+  storage.
+- Erros de validação de revisão retornam `404` ou `422` categóricos, sem
+  expor texto interno bruto.
 - `source_url` é descartado da serialização segura de evidências.
-- O gate é fail-closed: sem autenticação ou sem permissão administrativa,
-  a rota não responde a fila.
+- O gate é fail-closed: sem autenticação ou sem permissão administrativa, a
+  rota não responde a fila.
 
 ---
 
@@ -177,17 +181,19 @@ ENVIRONMENT=test PYTHONPATH=src /Users/lucasborges/radar_editais/.venv/bin/pytes
 /Users/lucasborges/radar_editais/.venv/bin/ruff check \
   src/radar/api/routers/data_quality.py \
   src/radar/api/app.py \
+  src/radar/core/services/data_quality_exceptions.py \
+  src/radar/core/services/data_quality_reviews.py \
   tests/unit/test_data_quality_api.py \
   tests/unit/test_admin_gate.py
 
-git diff --check
+git diff --check 463b8be41..HEAD
 ```
 
-Resultado:
+Resultado final:
 
-- `128 passed`
-- `ruff check` aprovado
-- `git diff --check` aprovado
+- `pytest` na bateria pedida: `131 passed`
+- `ruff check` na lista solicitada: aprovado
+- `git diff --check 463b8be41..HEAD`: aprovado
 
 ---
 
