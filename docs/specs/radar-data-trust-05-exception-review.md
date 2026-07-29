@@ -1,11 +1,18 @@
 # Radar Data Trust 05 — Revisão humana de exceções
 
-**Status:** aprovada; implementação não iniciada · **Data:** 2026-07-29  
+**Status:** vigente · concluída em 2026-07-29 · **Data:** 2026-07-29  
 **Spec-mãe:** [`radar-data-trust.md`](radar-data-trust.md)  
 **Contratos anteriores:** [`radar-data-trust-01-provenance.md`](radar-data-trust-01-provenance.md), [`radar-data-trust-02-quality-gates.md`](radar-data-trust-02-quality-gates.md), [`radar-data-trust-04-source-bundles.md`](radar-data-trust-04-source-bundles.md)  
 **Ordem:** 05 · **Impacto:** médio; confiança operacional e vigência
 
 ---
+
+> **Nota de reconciliação (RT05-T09, 2026-07-29):** a implementação entregou
+> detector temporal em shadow, fila `data_quality_exceptions` /
+> `data_quality_reviews`, revisão append-only, read model temporal único, API e
+> UI administrativas, e comunicação conservadora em Ecossistema, Radar,
+> Explorar, Escrita e Aplicações. `continuous` exige evidência explícita;
+> `needs_review` e `closed` não entram no Radar ativo.
 
 ## 1. Problema comprovado
 

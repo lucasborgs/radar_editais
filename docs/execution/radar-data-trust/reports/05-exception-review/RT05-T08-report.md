@@ -7,7 +7,7 @@
 **Commit funcional:** `2a3bcdc02`
 **Correção de validação:** restaurado o derivado `isEdital` da CTA da ficha;
 commit corretivo registra esta atualização documental.
-Auditoria Codex: pendente
+Auditoria Codex: aprovada em 2026-07-29
 
 ## Superfícies alteradas
 

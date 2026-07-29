@@ -544,6 +544,23 @@ status_normalization:
 
 Motivação: status bruto do portal nem sempre é confiável; prazo futuro é evidência forte de abertura.
 
+### 7.3 Projeção temporal canônica
+
+```yaml
+temporal_review_contract:
+  temporal_mode: [fixed, continuous, unknown]
+  validity_state: [active, closed, needs_review]
+  continuous: "somente com evidencia oficial explicita e recuperavel"
+  open_without_deadline: "status aberto sem prazo e sem evidencia -> unknown/needs_review"
+  radar_active: "somente validity_state=active entra no Radar ativo"
+  public_payload:
+    [temporal_mode, validity_state, temporal_value, decision_source, last_verified_at]
+```
+
+O payload acima e o read model temporal correspondente valem para oportunidades
+e programas. Investidores permanecem fora dessas regras temporais e nao recebem
+esses campos.
+
 ---
 
 ## 8. Histórico do workflow de síntese
