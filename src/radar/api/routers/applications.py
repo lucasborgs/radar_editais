@@ -136,12 +136,15 @@ def _serialize_application(row: dict, card: dict | None, session: dict | None) -
 def _build_pipeline_items(rows: list[dict], sessions_by_id: dict[str, dict]) -> list[dict]:
     """Serializa as linhas de application_log em itens do radar.pipeline.
 
-    Resolve o card do edital (file-based, cacheado em processo) por linha e
-    mapeia a writing_session pré-carregada (batch) por session_id.
+    Resolve os cards temporais em lote e mapeia a writing_session
+    pré-carregada (batch) por session_id.
     """
+    cards_by_id = entity_catalog.get_opportunity_cards_by_native_ids([
+        row.get("edital_id") for row in rows if row.get("edital_id")
+    ])
     items = []
     for row in rows:
-        card = entity_catalog.get_edital(row.get("edital_id"))
+        card = cards_by_id.get(row.get("edital_id"))
         session = sessions_by_id.get(row.get("session_id")) if row.get("session_id") else None
         items.append(_serialize_application(row, card, session))
     return items

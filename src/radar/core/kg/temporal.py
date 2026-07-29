@@ -2,9 +2,8 @@
 core/temporal.py — Consciência temporal canônica para prompts (Front 3).
 
 Fonte única do bloco `[CONTEXTO TEMPORAL: ...]` injetado nos prompts de
-match, escrita, brief e critic. Lê `deadline`/`status` do catálogo SQL
-(entities, via entity_catalog), calcula dias restantes contra `date.today()`,
-e renderiza um bloco de texto pronto para prompt.
+match, escrita, brief e critic. Lê o payload do read model temporal canônico
+via ``entity_catalog`` e nunca deduz fluxo contínuo de prazo ausente.
 
 Função pura de leitura: sem escrita.
 """
@@ -12,7 +11,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from radar.core.kg import entity_catalog
 from radar.core.kg.schema import parse_deadline
@@ -29,8 +29,8 @@ def _index_entry(edital_id: str) -> dict | None:
 class TemporalContext:
     """Estado temporal de um edital relativo a hoje.
 
-    `deadline` None = fluxo contínuo (sem prazo fixo) — espelha o tratamento
-    do build/runtime, onde deadline ausente NÃO é considerado expirado.
+    ``deadline`` vazio só é contínuo quando o read model o afirma
+    explicitamente; no restante é validade a confirmar.
     """
     edital_id: str
     today: date
@@ -39,6 +39,11 @@ class TemporalContext:
     status: str | None
     days_remaining: int | None  # None se sem deadline
     expired: bool
+    temporal_mode: str
+    validity_state: str
+    temporal_value: str | None
+    decision_source: str | None
+    last_verified_at: str | None
 
 
 def temporal_context(edital_id: str) -> TemporalContext | None:
@@ -55,7 +60,7 @@ def temporal_context(edital_id: str) -> TemporalContext | None:
     if entry is None and status is None and deadline_raw is None:
         return None
 
-    today = date.today()
+    today = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
     deadline = parse_deadline(deadline_raw)
     days_remaining = (deadline - today).days if deadline is not None else None
     expired = deadline is not None and deadline < today
@@ -68,6 +73,11 @@ def temporal_context(edital_id: str) -> TemporalContext | None:
         status=status,
         days_remaining=days_remaining,
         expired=expired,
+        temporal_mode=entry.get("temporal_mode") or "unknown",
+        validity_state=entry.get("validity_state") or "needs_review",
+        temporal_value=entry.get("temporal_value"),
+        decision_source=entry.get("decision_source"),
+        last_verified_at=entry.get("last_verified_at"),
     )
 
 
@@ -83,11 +93,17 @@ def render_temporal_block(edital_id: str) -> str:
 
     today_s = ctx.today.isoformat()
 
-    if ctx.deadline is None:
+    if ctx.validity_state == "needs_review":
+        return ""
+    if ctx.validity_state == "closed" and ctx.deadline is None:
+        return ""
+    if ctx.temporal_mode == "continuous" and ctx.validity_state == "active":
         prazo = (
             f"O edital {ctx.edital_id} não tem prazo de submissão fixo "
             f"(fluxo contínuo); não invente uma data de encerramento."
         )
+    elif ctx.deadline is None:
+        return ""
     elif ctx.expired:
         atraso = abs(ctx.days_remaining or 0)
         prazo = (
@@ -116,7 +132,7 @@ def render_match_temporal_block() -> str:
     Não é específico de um edital — afirma a data de hoje e instrui o LLM a
     copiar `status`/`deadline` verbatim do catálogo recebido, nunca estimar.
     """
-    today_s = date.today().isoformat()
+    today_s = datetime.now(ZoneInfo("America/Sao_Paulo")).date().isoformat()
     return (
         f"[CONTEXTO TEMPORAL: hoje é {today_s}. Os editais listados já foram "
         f"filtrados por vigência. Ao comentar prazos, copie `status` e "

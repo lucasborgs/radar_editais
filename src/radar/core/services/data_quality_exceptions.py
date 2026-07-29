@@ -408,6 +408,43 @@ def get_exception(exception_id: str) -> dict | None:
         ) from None
 
 
+def load_temporal_exceptions(subject_ids: list[str]) -> list[dict]:
+    """Carrega em lote as exceções temporais correntes de oportunidades.
+
+    Este é o único leitor de fila usado pelo read model produtivo.  O recorte
+    deliberadamente não traz notas, URLs ou payloads administrativos: apenas
+    os campos que a projeção T04 precisa para validar uma revisão.
+    """
+    ids = sorted({sid for sid in subject_ids if isinstance(sid, str) and sid})
+    if not ids or not _configured():
+        return []
+    try:
+        from radar.core.infra.db import get_supabase_service
+
+        response = (
+            get_supabase_service()
+            .table(_TABLE_EXCEPTIONS)
+            .select(
+                "id,subject_id,field_path,issue_code,produced_value,"
+                "evidence_refs,input_fingerprint,status,last_observed_at"
+            )
+            .eq("subject_kind", "opportunity")
+            .eq("field_path", "deadline")
+            .in_("subject_id", ids)
+            .execute()
+        )
+        return response.data or []
+    except Exception as exc:
+        logger.warning(
+            "data_quality_exceptions.load_temporal_exceptions: "
+            "falha de leitura em lote type=%s count=%d",
+            type(exc).__name__, len(ids),
+        )
+        raise DataQualityStorageError(
+            f"load_temporal_exceptions failed: type={type(exc).__name__}"
+        ) from None
+
+
 def mark_exception_resolved(exception_id: str) -> bool:
     """Resolve idempotentemente uma exceção aberta.
 
@@ -637,6 +674,60 @@ def get_current_review_projection(
         ) from None
 
 
+def load_current_temporal_reviews(exception_ids: list[str]) -> dict[str, DataQualityReview]:
+    """Última revisão por exceção, em uma única leitura em lote.
+
+    Revisões são append-only; por isso a ordenação permite reter a primeira
+    linha de cada exceção sem uma consulta por oportunidade.
+    """
+    ids = sorted({eid for eid in exception_ids if isinstance(eid, str) and eid})
+    if not ids or not _configured():
+        return {}
+    try:
+        from radar.core.infra.db import get_supabase_service
+
+        response = (
+            get_supabase_service()
+            .table(_TABLE_REVIEWS)
+            .select(
+                "exception_id,review_id,decision,corrected_value,"
+                "justification,evidence_refs,actor_id,reviewed_at,created_at"
+            )
+            .in_("exception_id", ids)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        out: dict[str, DataQualityReview] = {}
+        for row in response.data or []:
+            exception_id = row.get("exception_id")
+            if not exception_id or exception_id in out:
+                continue
+            out[exception_id] = DataQualityReview(
+                schema_version=row.get("schema_version", DATA_QUALITY_SCHEMA_VERSION),
+                exception_ref=exception_id,
+                decision=row["decision"],
+                corrected_value=row.get("corrected_value"),
+                justification=row["justification"],
+                evidence_refs=[EvidenceRef(**ref) for ref in (row.get("evidence_refs") or [])],
+                review=ReviewInfo(
+                    review_id=row["review_id"],
+                    actor_id=row["actor_id"],
+                    reviewed_at=row["reviewed_at"],
+                    overridden=row["decision"] == "correct",
+                ),
+            )
+        return out
+    except Exception as exc:
+        logger.warning(
+            "data_quality_exceptions.load_current_temporal_reviews: "
+            "falha de leitura em lote type=%s count=%d",
+            type(exc).__name__, len(ids),
+        )
+        raise DataQualityStorageError(
+            f"load_current_temporal_reviews failed: type={type(exc).__name__}"
+        ) from None
+
+
 # ---------------------------------------------------------------------------
 # Payload builders
 # ---------------------------------------------------------------------------
@@ -688,9 +779,11 @@ __all__ = [
     "open_or_observe_exception",
     "list_exceptions",
     "get_exception",
+    "load_temporal_exceptions",
     "mark_exception_resolved",
     "append_review",
     "get_current_review_projection",
+    "load_current_temporal_reviews",
     "DataQualityReviewConflictError",
     "_evidence_refs_payload",
     "_INVALID_FINGERPRINT_MSG",

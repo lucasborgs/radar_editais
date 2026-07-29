@@ -18,10 +18,21 @@ pytestmark = pytest.mark.unit
 
 def _patch_hypergraph(monkeypatch, editais: list[dict]):
     """Stub de entity_catalog.get_entity_temporal (fonte SQL de deadline/status)."""
-    by_id = {
-        e.get("id", ""): {"deadline": e.get("deadline"), "status": e.get("status")}
-        for e in editais
-    }
+    by_id = {}
+    for e in editais:
+        deadline = e.get("deadline")
+        parsed = temporal.parse_deadline(deadline)
+        if parsed is not None:
+            state = "active" if parsed >= date.today() else "closed"
+            mode, value = "fixed", parsed.isoformat()
+        else:
+            state, mode, value = "active", "continuous", None
+        by_id[e.get("id", "")] = {
+            "deadline": deadline, "status": e.get("status"),
+            "temporal_mode": mode, "validity_state": state,
+            "temporal_value": value, "decision_source": "source",
+            "last_verified_at": None,
+        }
     monkeypatch.setattr(entity_catalog, "get_entity_temporal", lambda eid: by_id.get(eid))
 
 
@@ -76,6 +87,36 @@ def test_continuous_flow_no_deadline(monkeypatch):
     assert ctx.expired is False
     block = temporal.render_temporal_block("finep:4")
     assert "fluxo contínuo" in block
+
+
+def test_needs_review_without_deadline_has_no_transition_prompt(monkeypatch):
+    monkeypatch.setattr(entity_catalog, "get_entity_temporal", lambda _: {
+        "deadline": None, "status": "ABERTA", "temporal_mode": "unknown",
+        "validity_state": "needs_review", "temporal_value": None,
+    })
+
+    assert temporal.render_temporal_block("finep:review") == ""
+
+
+def test_closed_without_deadline_has_no_transition_prompt(monkeypatch):
+    monkeypatch.setattr(entity_catalog, "get_entity_temporal", lambda _: {
+        "deadline": None, "status": "ENCERRADA", "temporal_mode": "unknown",
+        "validity_state": "closed", "temporal_value": None,
+    })
+
+    assert temporal.render_temporal_block("finep:closed") == ""
+
+
+def test_temporal_block_never_renders_none_deadline(monkeypatch):
+    monkeypatch.setattr(entity_catalog, "get_entity_temporal", lambda _: {
+        "deadline": None, "status": "?", "temporal_mode": "unknown",
+        "validity_state": "active", "temporal_value": None,
+    })
+
+    block = temporal.render_temporal_block("finep:invalid")
+    assert block == ""
+    assert "None dia" not in block
+    assert "encerra em None" not in block
 
 
 def test_unknown_edital_returns_empty_block(monkeypatch):

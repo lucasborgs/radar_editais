@@ -2,8 +2,7 @@
 snapshot e lado empresa injetados por monkeypatch (sem DB/rede/embeddings).
 
 Cobre os invariantes do gate:
-  Stage 0 — guardas de NULL (deadline NULL = fluxo contínuo PASSA; deadline
-            manda sobre status congelado; as_of parametrizável)
+  Stage 0 — somente a projeção temporal canônica ``active`` passa.
   Stage 1 — unsat ELIMINA; unknown NUNCA elimina (flag no card)
   Stage 2 — sum-of-max por chunk da empresa (nunca max global), boost de
             setores, piso, excerpts (pares reais, dedup, top-3)
@@ -25,6 +24,8 @@ from radar.core.services.match_v3 import (
     score_entity,
     stage0_alive,
 )
+from radar.core.services.temporal_read_model import TemporalReadModel
+from radar.domain.data_quality import TemporalMode, ValidityState
 
 pytestmark = pytest.mark.unit
 
@@ -35,30 +36,38 @@ TODAY = datetime.date(2026, 7, 10)
 # Stage 0 — vivo
 # ---------------------------------------------------------------------------
 
-def test_stage0_deadline_null_fluxo_continuo_passa():
-    assert stage0_alive({"deadline": None, "status": None}, TODAY) is True
-    assert stage0_alive({"deadline": None, "status": "aberta"}, TODAY) is True
-    assert stage0_alive({"deadline": None, "status": "ativa"}, TODAY) is True
+def _temporal(mode, state):
+    return TemporalReadModel(
+        temporal_mode=mode, validity_state=state, temporal_value=None,
+        decision_source="source",
+    )
 
 
-def test_stage0_deadline_null_status_encerrada_morre():
-    assert stage0_alive({"deadline": None, "status": "encerrada"}, TODAY) is False
-    assert stage0_alive({"deadline": None, "status": "inativa"}, TODAY) is False
+def test_stage0_only_canonical_active_passes():
+    assert stage0_alive(_temporal(TemporalMode.CONTINUOUS, ValidityState.ACTIVE)) is True
+    assert stage0_alive(_temporal(TemporalMode.UNKNOWN, ValidityState.NEEDS_REVIEW)) is False
+    assert stage0_alive(_temporal(TemporalMode.FIXED, ValidityState.CLOSED)) is False
 
 
-def test_stage0_deadline_manda_sobre_status_congelado():
-    """Status congelado no ingest ('encerrada') nunca mata deadline futuro —
-    e status 'aberta' stale não ressuscita deadline vencido."""
-    fut = {"deadline": TODAY + datetime.timedelta(days=5), "status": "encerrada"}
-    past = {"deadline": TODAY - datetime.timedelta(days=5), "status": "aberta"}
-    assert stage0_alive(fut, TODAY) is True
-    assert stage0_alive(past, TODAY) is False
+def test_match_default_uses_sao_paulo_day_and_explicit_as_of_wins(fake_funnel, monkeypatch):
+    """Simula a fronteira UTC já em 11/07 enquanto São Paulo ainda é 10/07."""
+    fake_funnel.opportunities[0]["deadline"] = TODAY
+    monkeypatch.setattr(match_v3, "_today_sao_paulo", lambda: TODAY)
 
+    default_ids = {
+        item.entity_id for item in match_v3.find_matching_opportunities(
+            None, top_k=10, min_affinity=0.0, boost=False,
+        )
+    }
+    explicit_ids = {
+        item.entity_id for item in match_v3.find_matching_opportunities(
+            None, as_of=TODAY + datetime.timedelta(days=1), top_k=10,
+            min_affinity=0.0, boost=False,
+        )
+    }
 
-def test_stage0_as_of_parametrizavel():
-    e = {"deadline": datetime.date(2026, 7, 7), "status": "encerrada"}
-    assert stage0_alive(e, datetime.date(2026, 7, 5)) is True   # vivo na data pinada
-    assert stage0_alive(e, datetime.date(2026, 7, 10)) is False  # morto hoje
+    assert "finep:bom" in default_ids
+    assert "finep:bom" not in explicit_ids
 
 
 # ---------------------------------------------------------------------------
@@ -152,7 +161,7 @@ def fake_funnel(monkeypatch):
         _opp("finep:inelegivel", deadline=fut,
              constraints=[{"tipo": "porte", "op": "in", "valor": ["mei", "me"]}]),
         _opp("finep:morto", deadline=TODAY - datetime.timedelta(days=1)),
-        _opp("programa:centelha", kind="programa", status="ativa"),
+        _opp("programa:centelha", kind="programa", deadline=fut, status="ativa"),
     ]
     chunks = {
         "id-finep:bom": _chunks_for([[1, 0.15, 0]], ["texto do edital bom"]),

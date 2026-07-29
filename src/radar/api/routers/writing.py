@@ -430,8 +430,6 @@ async def writing_turn_stream(
                     )
                     _record_idempotency(db, req.idempotency_key, req.session_id, result)
                     yield _sse("done", result)
-                    )
-                    yield _sse("done", result)
                 except Exception as e2:
                     logger.error("writing_turn_stream[%s]: fallback error: %s", session.session_id, e2)
                     yield _sse("error", {"message": str(e2)})
@@ -541,24 +539,11 @@ def _attach_target_titles(sessions: list[dict]) -> None:
         return
 
     ids = {s["edital_id"] for s in sessions if s.get("edital_id")}
-    titles: dict[str, str] = {}
-
-    investor_ids = {i for i in ids if i.startswith("investidor:")}
-    for iid in investor_ids:
-        try:
-            fund = entity_catalog.get_investidor(iid)
-            if fund and fund.get("name"):
-                titles[iid] = fund["name"]
-        except Exception:
-            pass  # sem título de fundo — front cai no id
-
-    for eid in ids - investor_ids:
-        try:
-            card = entity_catalog.get_edital(eid)
-            if card and card.get("title"):
-                titles[eid] = card["title"]
-        except Exception:
-            pass
+    try:
+        # A lista precisa só de título: não consulta cartões nem temporalidade.
+        titles = entity_catalog.get_opportunity_titles(list(ids))
+    except Exception:
+        titles = {}  # falha graciosa — front cai no id
 
     for s in sessions:
         s["edital_title"] = titles.get(s.get("edital_id"))

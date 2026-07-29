@@ -41,7 +41,8 @@ CARD_KEYS = {
     "aperture", "macro_temas", "kind", "objective", "mecanismo", "mechanism",
     "eligible_entities", "key_requirements", "exclusoes", "value",
     "icts", "investidores", "constraints", "document_urls", "collected_at",
-    "provenance",
+    "provenance", "temporal_mode", "validity_state", "temporal_value",
+    "decision_source", "last_verified_at",
 }
 
 
@@ -114,9 +115,9 @@ class TestCardMapping:
         assert card["fonte_recurso"] == ["FINEP"]
 
     def test_status_from_deadline_and_value_display(self):
-        assert entity_catalog._row_to_card(_edital_row(), programs={}, icts={}, agencies={})["status"] == "ABERTA"
+        assert entity_catalog._row_to_card(_edital_row(), programs={}, icts={}, agencies={})["status"] == "Desconhecido"
         past = entity_catalog._row_to_card(_edital_row(deadline="2000-01-01"), programs={}, icts={}, agencies={})
-        assert past["status"] == "ENCERRADA"
+        assert past["status"] == "Desconhecido"
         assert entity_catalog._row_to_card(_edital_row(), programs={}, icts={}, agencies={})["value"] == "R$ 100,000 – R$ 1,000,000"
 
     def test_metadata_non_list_publico_alvo_coerced(self):
@@ -140,7 +141,7 @@ class TestCardMapping:
         }
         card = entity_catalog._curated_card(row, agencies={"uuid-p": ["FINEP"]})
         assert card["kind"] == "programa"
-        assert card["status"] == "ABERTA"           # ativa → ABERTA
+        assert card["status"] == "ABERTA"             # helper legado sem read model
         assert card["publico_alvo"] == ["startups"]
         assert card["exclusoes"] == ["pessoa física"]
         assert card["official_url"] == "https://c.org"

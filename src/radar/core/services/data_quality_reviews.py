@@ -382,21 +382,69 @@ def project_temporal_validity(
     if not input_fingerprint or not input_fingerprint.strip():
         raise ValueError("input_fingerprint must be non-empty")
 
-    effective_as_of = as_of or _today_sao_paulo()
-    value = deadline.isoformat() if deadline else (status.strip() if status else None)
-    evaluation = evaluate_temporal(
+    try:
+        row = get_exception(exception_id) if exception_id is not None else None
+        review = (
+            get_current_review_projection(exception_id)
+            if exception_id is not None and row is not None and row.get("status") == "resolved"
+            else None
+        )
+    except Exception as exc:  # noqa: BLE001 — the single-reader path also fails closed
+        logger.warning(
+            "temporal_validity_projection: read failure category=%s exception_id=%s",
+            type(exc).__name__, exception_id,
+        )
+        return _conservative_projection(
+            value=deadline.isoformat() if deadline else (status.strip() if status else None),
+            input_fingerprint=input_fingerprint,
+            exception_id=exception_id,
+            original_provenance=original_provenance,
+        )
+    return project_loaded_temporal_validity(
         deadline=deadline,
         status=status,
-        as_of=effective_as_of,
+        input_fingerprint=input_fingerprint,
+        exception_row=row,
+        expected_exception_id=exception_id,
+        review=review,
+        original_provenance=original_provenance,
+        as_of=as_of,
     )
 
-    if exception_id is None:
+
+def project_loaded_temporal_validity(
+    *,
+    deadline: date | None,
+    status: str | None,
+    input_fingerprint: str,
+    exception_row: dict | None,
+    expected_exception_id: str | None = None,
+    review: DataQualityReview | None,
+    original_provenance: FactProvenance | None = None,
+    as_of: date | None = None,
+) -> TemporalValidityProjection:
+    """Projeção T04 sobre registros já carregados pelo leitor em lote.
+
+    Não acessa armazenamento.  Qualquer linha ausente, incompatível ou inválida
+    conserva ``needs_review`` para que consumidores não concedam atividade.
+    """
+    if not input_fingerprint or not input_fingerprint.strip():
+        raise ValueError("input_fingerprint must be non-empty")
+    effective_as_of = as_of or _today_sao_paulo()
+    value = deadline.isoformat() if deadline else (status.strip() if status else None)
+    evaluation = evaluate_temporal(deadline=deadline, status=status, as_of=effective_as_of)
+    exception_id = exception_row.get("id") if exception_row else None
+
+    if exception_row is None:
+        if expected_exception_id is not None:
+            return _conservative_projection(
+                value=value, input_fingerprint=input_fingerprint,
+                exception_id=expected_exception_id, original_provenance=original_provenance,
+            )
         if evaluation.validity_state is ValidityState.NEEDS_REVIEW:
             return _conservative_projection(
-                value=value,
-                input_fingerprint=input_fingerprint,
-                exception_id=None,
-                original_provenance=original_provenance,
+                value=value, input_fingerprint=input_fingerprint,
+                exception_id=None, original_provenance=original_provenance,
             )
         return TemporalValidityProjection(
             temporal_mode=evaluation.temporal_mode,
@@ -407,62 +455,31 @@ def project_temporal_validity(
         )
 
     try:
-        row = get_exception(exception_id)
-        if row is None:
-            return _conservative_projection(
-                value=value,
-                input_fingerprint=input_fingerprint,
-                exception_id=exception_id,
-                original_provenance=original_provenance,
-            )
-        _validate_exception(row, exception_id)
-        if row["input_fingerprint"] != input_fingerprint:
-            return _conservative_projection(
-                value=value,
-                input_fingerprint=input_fingerprint,
-                exception_id=exception_id,
-                original_provenance=original_provenance,
-            )
-        if row["status"] != "resolved":
-            return _conservative_projection(
-                value=value,
-                input_fingerprint=input_fingerprint,
-                exception_id=exception_id,
-                original_provenance=original_provenance,
-            )
-
-        review = get_current_review_projection(exception_id)
-        if review is None:
-            return _conservative_projection(
-                value=value,
-                input_fingerprint=input_fingerprint,
-                exception_id=exception_id,
-                original_provenance=original_provenance,
-            )
-        _validate_review_link(row, review)
+        if not exception_id:
+            raise ReviewValidationError("loaded exception requires id")
+        _validate_exception(exception_row, exception_id)
+        if exception_row["input_fingerprint"] != input_fingerprint:
+            raise ReviewValidationError("loaded exception has a stale fingerprint")
+        if exception_row["status"] != "resolved" or review is None:
+            raise ReviewValidationError("exception has no resolved review")
+        _validate_review_link(exception_row, review)
         _validate_decision(
-            row=row,
+            row=exception_row,
             decision=review.decision,
             corrected_value=review.corrected_value,
             evidence_refs=review.evidence_refs,
         )
         return _projection_from_review(
-            row=row,
-            review=review,
-            as_of=effective_as_of,
+            row=exception_row, review=review, as_of=effective_as_of,
         )
     except Exception as exc:  # noqa: BLE001 — read model must fail closed
         logger.warning(
-            "temporal_validity_projection: read failure "
-            "category=%s exception_id=%s",
-            type(exc).__name__,
-            exception_id,
+            "temporal_validity_projection: loaded read failure category=%s exception_id=%s",
+            type(exc).__name__, exception_id,
         )
         return _conservative_projection(
-            value=value,
-            input_fingerprint=input_fingerprint,
-            exception_id=exception_id,
-            original_provenance=original_provenance,
+            value=value, input_fingerprint=input_fingerprint,
+            exception_id=exception_id, original_provenance=original_provenance,
         )
 
 
@@ -472,4 +489,5 @@ __all__ = [
     "TemporalValidityProjection",
     "review_temporal_exception",
     "project_temporal_validity",
+    "project_loaded_temporal_validity",
 ]
