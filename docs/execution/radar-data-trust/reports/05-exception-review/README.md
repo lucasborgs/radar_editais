@@ -228,4 +228,4 @@ Limitacoes assumidas:
 - Nao houve leitura de `.env` nem uso de credenciais reais.
 - O symlink temporario de `frontend/node_modules` foi criado apenas para validar
   `tsc`/`lint` e removido ao final.
-- Auditoria Codex: pendente.
+- Auditoria Codex: aprovada em 2026-07-29.
