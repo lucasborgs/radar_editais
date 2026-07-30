@@ -45,7 +45,7 @@ class _FakeSpan:
 
 
 def _openai_response(
-    prompt=100, completion=20, cached=None, reasoning=None
+    prompt=100, completion=20, cached=None, cache_write=None, reasoning=None
 ):
     """Resposta OpenAI-shape: usage.prompt_tokens / completion_tokens."""
     usage_kwargs = {
@@ -54,7 +54,7 @@ def _openai_response(
     }
     if cached is not None:
         usage_kwargs["prompt_tokens_details"] = SimpleNamespace(
-            cached_tokens=cached
+            cached_tokens=cached, **({"cache_write_tokens": cache_write} if cache_write is not None else {})
         )
     if reasoning is not None:
         usage_kwargs["completion_tokens_details"] = SimpleNamespace(
@@ -101,13 +101,24 @@ def test_openai_shape_with_cached_and_reasoning():
     }
 
 
-def test_openai_zero_cached_omitted():
-    """cached/reasoning zerados não viram keys (ruído)."""
+def test_openai_shape_with_cache_write():
+    span = _FakeSpan()
+    telemetry.record_usage(
+        span, _openai_response(prompt=100, completion=20, cached=40, cache_write=12)
+    )
+    assert span.last_usage["cache_read"] == 40
+    assert span.last_usage["cache_write"] == 12
+
+
+def test_openai_zero_cached_is_preserved():
+    """Zero reportado é diferente de campo ausente."""
     span = _FakeSpan()
     telemetry.record_usage(
         span, _openai_response(prompt=10, completion=5, cached=0, reasoning=0)
     )
-    assert span.last_usage == {"input": 10, "output": 5}
+    assert span.last_usage == {
+        "input": 10, "output": 5, "cache_read": 0,
+    }
 
 
 # ============================================================================

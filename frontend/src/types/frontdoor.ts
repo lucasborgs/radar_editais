@@ -195,6 +195,8 @@ export function entriesFromServer(entries: ConversationEntry[]): TranscriptEntry
 export function toApiHistory(
   entries: TranscriptEntry[],
 ): { role: ChatRole; content: string }[] {
+  // O request envia a mensagem atual no campo `message`; history é somente o
+  // transcript anterior.
   return entries
     .filter((e): e is MsgEntry => e.kind === "msg")
     .map((e) => ({ role: e.role, content: e.content }));

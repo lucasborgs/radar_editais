@@ -15,6 +15,7 @@ cada assunto; não substitui os documentos indicados.
 | mudanças propostas ou contratos vigentes | [`specs/`](specs/) | specs correntes |
 | planos e relatórios de implementação ativos | [`execution/`](execution/) | execução das specs, sem redefinir seus contratos |
 | operação e subsistemas atuais | [`reference/`](reference/) | referência derivada |
+| métricas de usage e prompt cache | [`llm-usage-observability.md`](reference/llm-usage-observability.md) | runbook operacional |
 | decisões e arquiteturas anteriores | [`historical/`](historical/) | registro sem autoridade atual |
 | contrato visual do frontend | [`DESIGN_SYSTEM.md`](../frontend/DESIGN_SYSTEM.md) | design system implementado |
 
@@ -67,6 +68,7 @@ cada assunto; não substitui os documentos indicados.
 | [`explore-factual-rag.md`](specs/explore-factual-rag.md) | implementada em pré-produção local; promoção pendente | autoridade de versões, RAG factual e síntese enumerativa no Explorar |
 | [`environment-parity-isolation.md`](specs/environment-parity-isolation.md) | pré-produção local implementada; staging Cloud adiado | paridade, credenciais e isolamento de local/test/staging/produção |
 | [`environment-promotion.md`](runbooks/environment-promotion.md) | vigente | bootstrap, staging e promoção segura entre ambientes |
+| [`cron-operations.md`](runbooks/cron-operations.md) | vigente | ledger, dead-man e recuperação segura dos CRONs P0 |
 
 ## Regras de autoridade
 

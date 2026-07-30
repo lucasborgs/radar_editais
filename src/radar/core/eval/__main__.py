@@ -13,6 +13,7 @@ suíte classificada como gate e nunca aceita subconjunto. A sintaxe histórica
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from radar.core.environment import load_environment_profile
@@ -32,6 +33,18 @@ def _parser() -> argparse.ArgumentParser:
     gate = subparsers.add_parser("gate", help="executa decisão completa e bloqueante")
     gate.add_argument("suite", choices=list(SUITES))
     gate.add_argument("--publish", action="store_true", help="publica a rodada no Langfuse")
+
+    smoke = subparsers.add_parser(
+        "smoke-cache",
+        help="smoke remoto opt-in de prompt cache (duas chamadas sync + streaming)",
+    )
+    smoke.add_argument(
+        "--allow-remote",
+        action="store_true",
+        help="confirma quatro chamadas remotas sintéticas e de custo mínimo",
+    )
+    smoke.add_argument("--model", help="sobrescreve OPENAI_MODEL apenas para o smoke")
+    smoke.add_argument("--prefix-tokens", type=int, default=1280)
     return parser
 
 
@@ -54,6 +67,19 @@ def _normalize_legacy_args(argv: list[str]) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     load_environment_profile()  # CLI standalone: perfil antes dos consumidores
     args = _parser().parse_args(_normalize_legacy_args(list(argv or sys.argv[1:])))
+    if args.intent == "smoke-cache":
+        if not args.allow_remote:
+            print("recusado: smoke-cache exige --allow-remote (quatro chamadas pagas mínimas).")
+            return 2
+        from radar.core.eval.prompt_cache_smoke import DEFAULT_MODEL, report, run
+
+        selected_model = args.model or os.getenv("OPENAI_MODEL", DEFAULT_MODEL)
+        try:
+            print(report(run(model=args.model, prefix_tokens=args.prefix_tokens), model=selected_model))
+        except (RuntimeError, ValueError) as exc:
+            print(f"smoke-cache não executado: {exc}", file=sys.stderr)
+            return 2
+        return 0
     names = list(SUITES) if args.suite == "all" else [args.suite]
     statuses = []
     for name in names:

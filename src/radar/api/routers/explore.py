@@ -34,12 +34,25 @@ router = APIRouter(tags=["explore"])
 class ExploreRequest(BaseModel):
     # Caps (PR1.2 hardening-pre-beta): endpoint aceita anônimo — cap agressivo.
     message: str = Field(max_length=4_000)
+    # Contrato: somente mensagens anteriores; a mensagem atual vai em `message`.
+    # O backend remove a duplicata final para compatibilidade com clientes antigos.
     history: list[dict] = Field(default_factory=list, max_length=50)
     profile: CompanyProfileSchema | None = None
     edital_ids: list[str] = []
     node_id: str | None = None
     node_type: str | None = None
     session_id: str | None = None
+
+
+def _history_without_current(history: list[dict], message: str) -> list[dict]:
+    """``history`` contém apenas o transcript anterior.
+
+    Tolera clientes legados que repetiam a mensagem atual como último item.
+    """
+    items = list(history or [])
+    if items and items[-1].get("role") == "user" and items[-1].get("content") == message:
+        items.pop()
+    return items
 
 
 def _profile_context_block(profile: CompanyProfileSchema | None) -> str:
@@ -119,16 +132,20 @@ def explore(
         raise HTTPException(status_code=422, detail="Mensagem vazia.")
 
     ctx = _profile_context_block(req.profile)
+    history = _history_without_current(req.history, message)
     explore_message = f"{ctx}\n\n{message}" if ctx else message
     current = req.profile.model_dump() if req.profile is not None else {}
+    workspace_id = get_workspace_id(db, user_id) if user_id and db is not None else None
 
     answer, explore_meta = explore_agent.explore_with_meta(
-        explore_message, req.history, req.edital_ids, req.node_id,
+        explore_message, history, req.edital_ids, req.node_id,
         req.node_type, has_profile=req.profile is not None,
         profile_text=ctx or None,
         # Estágio 0 (PR5/PR4.1): perfil estruturado p/ o filtro de elegibilidade
         # DENTRO da tool do agente (não só no match direto do router abaixo).
         profile=current or None,
+        workspace_id=workspace_id,
+        db=db,
     )
 
     return _post_process(message, req, ctx, current, answer, explore_meta, user_id, db)
@@ -225,6 +242,7 @@ async def explore_stream_endpoint(
         raise HTTPException(status_code=422, detail="Mensagem vazia.")
 
     ctx = _profile_context_block(req.profile)
+    history = _history_without_current(req.history, message)
     explore_message = f"{ctx}\n\n{message}" if ctx else message
     current = req.profile.model_dump() if req.profile is not None else {}
 
@@ -233,11 +251,12 @@ async def explore_stream_endpoint(
     # stateless (caminho de hoje). Passa-se o thread_id PRONTO (não workspace_id) p/
     # manter o wiring de tools do streaming byte-idêntico (ortogonalidade da T3).
     thread_id = None
-    if user_id and db is not None and req.session_id:
+    workspace_id = None
+    if user_id and db is not None:
         try:
-            ws = get_workspace_id(db, user_id)
-            if ws:
-                thread_id = f"{ws}:{req.session_id}"
+            workspace_id = get_workspace_id(db, user_id)
+            if workspace_id and req.session_id:
+                thread_id = f"{workspace_id}:{req.session_id}"
         except Exception as e:  # noqa: BLE001 — degrada para stateless
             logger.warning("explore/stream: thread_id não resolvido (%s) — stateless", e)
 
@@ -246,10 +265,12 @@ async def explore_stream_endpoint(
             answer = ""
             explore_meta: dict = {}
             async for event in explore_agent.explore_stream(
-                explore_message, req.history, req.edital_ids, req.node_id,
+                explore_message, history, req.edital_ids, req.node_id,
                 req.node_type, has_profile=req.profile is not None,
                 profile_text=ctx or None,
                 profile=current or None,
+                workspace_id=workspace_id,
+                db=db,
                 thread_id=thread_id,
             ):
                 if event.kind == "token":

@@ -109,10 +109,16 @@ def contextualize_chunks(chunks: list[dict]) -> list[str]:
             out = list(ex.map(_ctx, texts))
         if span is not None:
             try:
-                span.update(usage_details={
-                    "input": sum(getattr(u, "prompt_tokens", 0) or 0 for u in usages),
-                    "output": sum(getattr(u, "completion_tokens", 0) or 0 for u in usages),
-                })
+                from radar.core.llm.usage import aggregate_usage, normalize_usage
+                usage = aggregate_usage([normalize_usage(u) for u in usages])
+                details = {"input": usage["input_tokens"]} if "input_tokens" in usage else {}
+                if "output_tokens" in usage:
+                    details["output"] = usage["output_tokens"]
+                if "cache_read_tokens" in usage:
+                    details["cache_read"] = usage["cache_read_tokens"]
+                if "cache_write_tokens" in usage:
+                    details["cache_write"] = usage["cache_write_tokens"]
+                span.update(usage_details=details)
             except Exception as e:  # noqa: BLE001 — telemetria nunca quebra o ingest
                 logger.debug("contextual_retrieval: usage span falhou (%s)", e)
     return out
