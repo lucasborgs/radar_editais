@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { JourneyNavigation } from "@/components/layout/JourneyNavigation";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Skeleton } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { listWritingSessions, type WritingSessionSummary } from "@/lib/api";
@@ -65,8 +65,7 @@ export default function ProjectsPage() {
   );
 
   return (
-    <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:py-10">
-      <JourneyNavigation active="projects" />
+    <DashboardLayout title="Projetos">
       <div className="space-y-6">
         <div>
           <p className="text-sm font-semibold text-primary">Projetos</p>
@@ -128,6 +127,6 @@ export default function ProjectsPage() {
           </div>
         )}
       </div>
-    </main>
+    </DashboardLayout>
   );
 }

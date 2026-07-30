@@ -59,15 +59,6 @@ export function FrontDoorHeader({
         </Link>
 
         <div className="flex items-center gap-1">
-          <Link href="/" className="rounded-lg px-3 py-1.5 text-sm font-sans text-content-primary hover:bg-app-bg transition-colors">
-            Explorar
-          </Link>
-          <Link href="/radar" className="rounded-lg px-3 py-1.5 text-sm font-sans text-content-primary hover:bg-app-bg transition-colors">
-            Radar
-          </Link>
-          <Link href="/projects" className="rounded-lg px-3 py-1.5 text-sm font-sans text-content-primary hover:bg-app-bg transition-colors">
-            Projetos
-          </Link>
           {!isAuthed && (
             <Link
               href="/login"
@@ -100,6 +91,16 @@ export function FrontDoorHeader({
                 role="menu"
                 className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-border bg-surface py-1 shadow-lg"
               >
+                <Link href="/" role="menuitem" onClick={() => setMenuOpen(false)} className={itemCls}>
+                  Explorar
+                </Link>
+                <Link href="/radar" role="menuitem" onClick={() => setMenuOpen(false)} className={itemCls}>
+                  Radar
+                </Link>
+                <Link href="/projects" role="menuitem" onClick={() => setMenuOpen(false)} className={itemCls}>
+                  Projetos
+                </Link>
+                <div className="my-1 border-t border-border" />
                 {isAuthed &&
                   links.map((l) => (
                     <Link

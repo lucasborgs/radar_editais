@@ -52,7 +52,12 @@ export function temporalBadge(payload: TemporalConsumerPayload): {
   const state = normalize(payload.validity_state);
   if (state === "active") return { label: "Aberta", tone: "active" };
   if (state === "closed") return { label: "Encerrada", tone: "closed" };
-  if (state === "needs_review") return { label: "Validade a confirmar", tone: "review" };
+  if (state === "needs_review") {
+    // Confia no status scraped quando a validade temporal é incerta —
+    // a maioria dos editais FAPESP não expõe deadline no site.
+    if (normalize(payload.status) === "aberta") return { label: "Aberta", tone: "review" };
+    return { label: "Validade a confirmar", tone: "review" };
+  }
   return normalize(payload.status) === "encerrada"
     ? { label: "Encerrada", tone: "closed" }
     : { label: "Validade a confirmar", tone: "review" };
@@ -60,7 +65,7 @@ export function temporalBadge(payload: TemporalConsumerPayload): {
 
 export function temporalDeadlineText(payload: TemporalConsumerPayload): string | null {
   const state = normalize(payload.validity_state);
-  if (state === "needs_review") return "Validade a confirmar";
+  if (state === "needs_review") return null;
   if (isContinuousConfirmed(payload)) return "Fluxo contínuo";
 
   const fixed = formatIsoDate(payload.temporal_value);

@@ -217,8 +217,12 @@ def ensure_company_chunks(workspace_id: str, profile, *, db=None, conn=None) -> 
             conn.close()
 
 
-def load_company_chunks(workspace_id: str, *, conn=None) -> tuple[list[str], np.ndarray]:
-    """(texts, embeddings float32 [n,d]) do workspace — o insumo do Stage 2."""
+def load_company_chunks(workspace_id: str, *, conn=None, include_origins: bool = False):
+    """Lê textos, embeddings e origins em uma única query.
+
+    ``include_origins=False`` preserva o contrato legado de dois retornos;
+    matching usa ``True`` para carregar toda a proveniência em uma leitura.
+    """
     import psycopg
 
     own = conn is None
@@ -227,7 +231,7 @@ def load_company_chunks(workspace_id: str, *, conn=None) -> tuple[list[str], np.
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "select text, embedding from public.company_chunks "
+                "select text, embedding, origin from public.company_chunks "
                 "where workspace_id = %s order by origin, doc_id, id",
                 (workspace_id,),
             )
@@ -235,9 +239,11 @@ def load_company_chunks(workspace_id: str, *, conn=None) -> tuple[list[str], np.
     finally:
         if own:
             conn.close()
-    texts = [t for t, _ in rows]
-    embs = (np.stack([parse_vec(e) for _, e in rows])
+    texts = [t for t, _, _ in rows]
+    embs = (np.stack([parse_vec(e) for _, e, _ in rows])
             if rows else np.empty((0, 0), dtype=np.float32))
+    if include_origins:
+        return texts, embs, [str(origin) for _, _, origin in rows]
     return texts, embs
 
 
@@ -245,13 +251,13 @@ def load_company_chunks(workspace_id: str, *, conn=None) -> tuple[list[str], np.
 # Caminho anônimo/efêmero (explore público, eval) — sem tabela
 # ---------------------------------------------------------------------------
 
-_EPHEMERAL_CACHE: dict[str, tuple[list[str], np.ndarray]] = {}
+_EPHEMERAL_CACHE: dict[str, tuple[list[str], np.ndarray, list[str]]] = {}
 _EPHEMERAL_CACHE_MAX = 128
 
 
 def ephemeral_company_chunks(
     profile, *, use_hyde: bool = True,
-) -> tuple[list[str], np.ndarray]:
+) -> tuple[list[str], np.ndarray, list[str]]:
     """(texts, embeddings) direto do perfil, sem tocar `company_chunks` — o
     caminho do explore anônimo e da eval. Cache in-process por hash dos textos
     (mesma postura do _NODES_CACHE que substitui). `use_hyde=False` torna o
@@ -259,13 +265,15 @@ def ephemeral_company_chunks(
     from radar.core.retrieval.embedder import embed_texts
 
     texts = profile_chunk_texts(profile)
+    origins = ["profile"] * len(texts)
     if use_hyde and sum(len(t) for t in texts) < _COLD_START_CHARS and _hyde_query(profile):
         from radar.core.retrieval.hyde import generate_hyde_doc
         doc = generate_hyde_doc(_hyde_query(profile))
         if doc:
             texts = texts + [doc]
+            origins = origins + ["hyde"]
     if not texts:
-        return [], np.empty((0, 0), dtype=np.float32)
+        return [], np.empty((0, 0), dtype=np.float32), []
 
     h = hashlib.sha256(("\n".join(texts) + f"|hyde={use_hyde}").encode("utf-8")).hexdigest()
     hit = _EPHEMERAL_CACHE.get(h)
@@ -274,5 +282,5 @@ def ephemeral_company_chunks(
     embs = np.asarray(embed_texts(texts), dtype=np.float32)
     if len(_EPHEMERAL_CACHE) >= _EPHEMERAL_CACHE_MAX:
         _EPHEMERAL_CACHE.pop(next(iter(_EPHEMERAL_CACHE)))
-    _EPHEMERAL_CACHE[h] = (texts, embs)
-    return texts, embs
+    _EPHEMERAL_CACHE[h] = (texts, embs, origins)
+    return texts, embs, origins

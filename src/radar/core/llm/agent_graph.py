@@ -56,6 +56,7 @@ from radar.core.llm.agent_runtime import (
     TraceStep,
     _cap,
 )
+from radar.core.llm.usage import aggregate_usage, normalize_usage
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +255,7 @@ def _msg_text(m: AIMessage) -> str:
 def _messages_to_agent_result(messages: list[AnyMessage], stop_reason: StopReason) -> AgentResult:
     steps: list[TraceStep] = []
     call_inputs: dict[str, dict] = {}
-    total_in = total_out = 0
+    usages: list[dict[str, int]] = []
     last_text = ""
 
     for m in messages:
@@ -265,13 +266,8 @@ def _messages_to_agent_result(messages: list[AnyMessage], stop_reason: StopReaso
             ]
             for tu in tool_uses:
                 call_inputs[tu["id"]] = tu["input"]
-            um = m.usage_metadata or {}
-            usage = {
-                "input_tokens": um.get("input_tokens", 0),
-                "output_tokens": um.get("output_tokens", 0),
-            }
-            total_in += usage["input_tokens"]
-            total_out += usage["output_tokens"]
+            usage = normalize_usage(m.usage_metadata)
+            usages.append(usage)
             text = _msg_text(m)
             steps.append(TraceStep(kind="llm", text=text, tool_uses=tool_uses, usage=usage))
             last_text = text
@@ -289,7 +285,7 @@ def _messages_to_agent_result(messages: list[AnyMessage], stop_reason: StopReaso
         final_text=last_text,
         steps=steps,
         stop_reason=stop_reason,
-        usage={"input_tokens": total_in, "output_tokens": total_out},
+        usage=aggregate_usage(usages),
     )
 
 
@@ -428,7 +424,7 @@ async def run_agent_graph_async(
     result: AgentResult
     with telemetry.agent_run(
         name=span_name or f"agent.{provider}.{model}",
-        input={"system": system, "initial_messages": initial_messages},
+        input=None,
         metadata={
             "provider": provider, "model": model,
             "max_steps": max_steps, "runtime": "langgraph",
@@ -466,15 +462,11 @@ async def run_agent_graph_async(
             mode, stop, final.get("llm_calls", 0), max_steps,
         )
 
-        if agent_span is not None:
-            agent_span.update(
-                output={"final_text": result.final_text, "stop_reason": result.stop_reason},
-                metadata={
-                    "stop_reason": result.stop_reason,
-                    "n_steps": len(result.steps),
-                    "usage": result.usage,
-                },
-            )
+        telemetry.record_agent_turn(
+            agent_span, provider=provider, model=model, mode=mode,
+            llm_calls=sum(s.kind == "llm" for s in result.steps),
+            stop_reason=result.stop_reason, runtime="langgraph", usage=result.usage,
+        )
 
     if on_step:
         for s in result.steps:
@@ -589,7 +581,7 @@ async def run_agent_graph_streaming(
 
     with telemetry.agent_run(
         name=span_name or f"agent.{provider}.{model}",
-        input={"system": system, "initial_messages": initial_messages},
+        input=None,
         metadata={
             "provider": provider, "model": model,
             "max_steps": max_steps, "runtime": "langgraph-streaming",
@@ -662,15 +654,12 @@ async def run_agent_graph_streaming(
             mode, stop, final_state.get("llm_calls", 0), max_steps,
         )
 
-        if agent_span is not None:
-            agent_span.update(
-                output={"final_text": result.final_text, "stop_reason": result.stop_reason},
-                metadata={
-                    "stop_reason": result.stop_reason,
-                    "n_steps": len(result.steps),
-                    "usage": result.usage,
-                },
-            )
+        telemetry.record_agent_turn(
+            agent_span, provider=provider, model=model, mode=mode,
+            llm_calls=sum(s.kind == "llm" for s in result.steps),
+            stop_reason=result.stop_reason,
+            runtime="langgraph-streaming", usage=result.usage,
+        )
 
     if on_step:
         for s in result.steps:
@@ -1355,7 +1344,7 @@ async def _writing_turn_async(
 
     with telemetry.agent_run(
         name=span_name or f"agent.{provider}.{model}",
-        input={"system": system, "resume": resume is not None},
+        input=None,
         metadata={
             "provider": provider, "model": model, "max_steps": max_steps,
             "runtime": "langgraph", "thread_id": thread_id,
@@ -1409,12 +1398,11 @@ async def _writing_turn_async(
             mode, stop, final.get("llm_calls", 0), max_steps,
         )
 
-        if agent_span is not None:
-            agent_span.update(
-                output={"final_text": result.final_text, "interrupted": bool(intr_payload)},
-                metadata={"stop_reason": result.stop_reason, "n_steps": len(result.steps),
-                          "usage": result.usage},
-            )
+        telemetry.record_agent_turn(
+            agent_span, provider=provider, model=model, mode=mode,
+            llm_calls=sum(s.kind == "llm" for s in result.steps),
+            stop_reason=result.stop_reason, runtime="langgraph", usage=result.usage,
+        )
 
     return WritingTurnOutcome(result, intr_payload, len(msgs))
 
@@ -1473,7 +1461,7 @@ async def _writing_turn_streaming_async(
 
     with telemetry.agent_run(
         name=span_name or f"agent.{provider}.{model}",
-        input={"system": system, "resume": resume is not None},
+        input=None,
         metadata={
             "provider": provider, "model": model, "max_steps": max_steps,
             "runtime": "langgraph-streaming", "thread_id": thread_id,
@@ -1538,12 +1526,12 @@ async def _writing_turn_streaming_async(
 
         result = _messages_to_agent_result(delta, stop)
 
-        if agent_span is not None:
-            agent_span.update(
-                output={"final_text": result.final_text, "interrupted": bool(intr_payload)},
-                metadata={"stop_reason": result.stop_reason, "n_steps": len(result.steps),
-                          "usage": result.usage},
-            )
+        telemetry.record_agent_turn(
+            agent_span, provider=provider, model=model, mode=mode,
+            llm_calls=sum(s.kind == "llm" for s in result.steps),
+            stop_reason=result.stop_reason,
+            runtime="langgraph-streaming", usage=result.usage,
+        )
 
     outcome = WritingTurnOutcome(result, intr_payload, len(msgs))
     yield StreamDelta(kind="done", result=outcome)
@@ -1830,7 +1818,7 @@ async def _generation_turn_async(
 
     with telemetry.agent_run(
         name=span_name or f"generation.{provider}.{model}",
-        input={"sections": sections},
+        input=None,
         metadata={
             "provider": provider, "model": model, "runtime": "langgraph",
             "mode": "generation", "thread_id": thread_id,
@@ -1862,15 +1850,18 @@ async def _generation_turn_async(
         # Partição na ordem de entrada (a ordem de término é não-determinística).
         done = [s for s in sections if status.get(s)]
         failed = [s for s in sections if not status.get(s)]
-        usage = {
-            "input_tokens": sum(r.usage.get("input_tokens", 0) for r in results),
-            "output_tokens": sum(r.usage.get("output_tokens", 0) for r in results),
-        }
+        usage = aggregate_usage([r.usage for r in results])
         if agent_span is not None:
             agent_span.update(
-                output={"sections_done": done, "failed_sections": failed},
-                metadata={"usage": usage, "n_done": len(done), "n_failed": len(failed)},
+                output={"n_done": len(done), "n_failed": len(failed)},
+                metadata={"n_done": len(done), "n_failed": len(failed)},
             )
+        telemetry.record_agent_turn(
+            agent_span, provider=provider, model=model, mode="generation",
+            llm_calls=sum(sum(s.kind == "llm" for s in r.steps) for r in results),
+            stop_reason="end_turn" if not failed else "other",
+            runtime="langgraph-batch", usage=usage,
+        )
 
     return GenerationOutcome(
         sections_done=done, failed_sections=failed, results=results, usage=usage,

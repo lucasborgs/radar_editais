@@ -367,27 +367,30 @@ def _read_silver_hash(source: str, stem: str) -> str | None:
 
 @lru_cache(maxsize=8)
 def _load_bronze(source: str) -> list[dict]:
-    """Bronze cru da fonte (snapshot mais recente; web é aditivo por url_hash)."""
+    """Bronze cru da fonte.
+
+    Para todas as fontes, mergeia snapshots disponíveis: registros mais
+    recentes substituem os antigos (identificados por `_native_of`). Isso
+    garante que editais removidos do site (bronze rotacionou) ainda sejam
+    encontráveis por `_bronze_record`, evitando fallback heurístico em
+    `_edital_metadata`.
+    """
     bdir = BRONZE_DIR / f"{source}_raw"
     if not bdir.exists():
         return []
     files = sorted(bdir.glob("*.json"))
     if not files:
         return []
-    if source == "web":
-        by_hash: dict[str, dict] = {}
-        for f in files:
-            try:
-                for it in json.loads(f.read_text(encoding="utf-8")):
-                    if it.get("url_hash"):
-                        by_hash[it["url_hash"]] = it
-            except Exception:  # noqa: BLE001
-                continue
-        return list(by_hash.values())
-    try:
-        return json.loads(files[-1].read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001
-        return []
+
+    by_key: dict[str, dict] = {}
+    for f in files:
+        try:
+            for it in json.loads(f.read_text(encoding="utf-8")):
+                key = _native_of(source, it) or str(id(it))
+                by_key[key] = it
+        except Exception:  # noqa: BLE001
+            continue
+    return list(by_key.values())
 
 
 _FAPESP_ID_RE = re.compile(r"/(\d+)(?:/|$)")

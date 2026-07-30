@@ -40,22 +40,19 @@ function TypeBadge({ type }: { type: string }) {
 
 const COLUMNS: Column<OpportunityEntry>[] = [
   {
-    key: "id",
-    header: "ID",
-    numeric: true,
-    render: (v) => (
-      <span className="font-data text-xs text-content-secondary">{String(v)}</span>
-    ),
-  },
-  {
     key: "title",
     header: "Título",
     render: (v, row) => {
       const title = String(v);
+      // Defesa: se o título parece cabeçalho de seção (ex: "2. Áreas do
+      // conhecimento"), usa o ID como fallback visual.
+      const display = /^\d+[\.\)]\s/.test(title)
+        ? `[${row.id.split(":").pop()}]`
+        : truncate(title, 45);
       const disambiguator = (row as unknown as Record<string, unknown>)._disambiguator as string | undefined;
       return (
         <span className="font-medium">
-          {truncate(title, 45)}
+          {display}
           {disambiguator && (
             <span className="ml-1.5 text-[11px] text-content-secondary font-normal">
               {disambiguator}
@@ -142,8 +139,9 @@ export default function OportunidadesPage() {
       );
     }
 
-    // Disambiguate duplicate titles (Fix 2): detect collisions, annotate
-    // entry with _disambiguator from macro_temas[0] → themes[0] → id suffix
+    // Disambiguate duplicate titles: detect collisions, annotate entry
+    // with _disambiguator from macro_temas[0] → themes[0] → fonte_recurso[0]
+    // → source prefix → id suffix
     const titleCounts = new Map<string, number>();
     for (const o of items) {
       titleCounts.set(o.title, (titleCounts.get(o.title) ?? 0) + 1);
@@ -151,7 +149,8 @@ export default function OportunidadesPage() {
     return items.map((o) => {
       if ((titleCounts.get(o.title) ?? 0) <= 1) return o;
       const mt = (o as unknown as Record<string, unknown>).macro_temas as string[] | undefined;
-      const pick = mt?.[0] ?? o.themes[0] ?? o.id.split(":").pop() ?? "";
+      const idParts = o.id.split(":");
+      const pick = mt?.[0] ?? o.themes[0] ?? o.fonte_recurso?.[0] ?? idParts[0] ?? idParts.pop() ?? "";
       return { ...o, _disambiguator: pick };
     });
   }, [opportunities, typeFilter, themeQuery]);

@@ -8,9 +8,9 @@ Magic link e verificação de token são tratados diretamente pelo Supabase Auth
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 
 from radar.core.infra.auth import CurrentUserId, DbClient, get_current_user, is_admin_payload
+from radar.domain.profile_schema import CompanyProfilePayload
 
 router = APIRouter(prefix="", tags=["auth"])
 
@@ -19,23 +19,7 @@ router = APIRouter(prefix="", tags=["auth"])
 # SCHEMAS
 # =============================================================================
 
-class ProfilePayload(BaseModel):
-    nome: str = ""
-    cnpj: str = ""
-    url_site: str = ""
-    tipo_entidade: str = "empresa"
-    one_liner: str = ""
-    solution_summary: str = ""
-    descricao_atividades: str = ""
-    portfolio_projetos: str = ""
-    tamanho_empresa: str = ""
-    capital_social: float | None = None
-    uf: str = ""
-    faturamento_anual: float | None = None
-    ano_fundacao: int | None = None
-    equipe_resumo: str = ""
-    trl: int | None = None
-    tipos_financiamento_interesse: list[str] = []
+ProfilePayload = CompanyProfilePayload
 
 
 # =============================================================================
@@ -84,10 +68,14 @@ def get_me(
 @router.put("/me/profile", summary="Salva perfil da empresa no workspace")
 def update_profile(payload: ProfilePayload, user_id: CurrentUserId, db: DbClient):
     workspace = _ensure_workspace(user_id, db)
+    # PUT recebe o contrato completo. Chaves desconhecidas já persistidas
+    # são legadas: preservá-las evita perda silenciosa, mas não permite que
+    # novas chaves desconhecidas entrem pelo contrato HTTP.
+    profile = {**(workspace.get("profile") or {}), **payload.model_dump()}
 
     result = (
         db.table("workspaces")
-        .update({"profile": payload.model_dump()})
+        .update({"profile": profile})
         .eq("id", workspace["id"])
         .execute()
     )

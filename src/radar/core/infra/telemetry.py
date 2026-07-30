@@ -224,42 +224,61 @@ def record_usage(span: Any, response: Any) -> None:
         if usage is None:
             return
 
-        details: dict[str, int] = {}
-
-        # Shape OpenAI: prompt_tokens / completion_tokens
-        prompt = getattr(usage, "prompt_tokens", None)
-        completion = getattr(usage, "completion_tokens", None)
-        # Shape Anthropic: input_tokens / output_tokens
-        in_tok = getattr(usage, "input_tokens", None)
-        out_tok = getattr(usage, "output_tokens", None)
-
-        if prompt is not None or completion is not None:
-            details["input"] = prompt or 0
-            details["output"] = completion or 0
-            prompt_details = getattr(usage, "prompt_tokens_details", None)
-            cached = getattr(prompt_details, "cached_tokens", None)
-            if cached:
-                details["cache_read"] = cached
-            completion_details = getattr(usage, "completion_tokens_details", None)
-            reasoning = getattr(completion_details, "reasoning_tokens", None)
-            if reasoning:
-                details["reasoning"] = reasoning
-        elif in_tok is not None or out_tok is not None:
-            details["input"] = in_tok or 0
-            details["output"] = out_tok or 0
-            cache_read = getattr(usage, "cache_read_input_tokens", None)
-            if cache_read:
-                details["cache_read"] = cache_read
-            cache_creation = getattr(usage, "cache_creation_input_tokens", None)
-            if cache_creation:
-                details["cache_write"] = cache_creation
-        else:
-            # Sem nenhum dos shapes conhecidos — nada a registrar.
+        from radar.core.llm.usage import normalize_usage
+        canonical = normalize_usage(usage)
+        if not canonical:
             return
-
+        details: dict[str, int] = {}
+        for source, target in (
+            ("input_tokens", "input"),
+            ("output_tokens", "output"),
+            ("cache_read_tokens", "cache_read"),
+            ("cache_write_tokens", "cache_write"),
+        ):
+            if source in canonical:
+                details[target] = canonical[source]
+        # Preserve the existing Langfuse reasoning detail; it is orthogonal to
+        # the four canonical cache/usage metrics.
+        reasoning_details = getattr(usage, "completion_tokens_details", None)
+        reasoning = getattr(reasoning_details, "reasoning_tokens", None)
+        if isinstance(reasoning, int) and not isinstance(reasoning, bool) and reasoning:
+            details["reasoning"] = reasoning
         span.update(usage_details=details)
     except Exception as e:  # pragma: no cover - guard defensivo
         logger.debug("record_usage falhou (ignorado): %s", e)
+
+
+def record_agent_turn(
+    span: Any,
+    *,
+    provider: str,
+    model: str,
+    mode: str | None,
+    llm_calls: int,
+    stop_reason: str,
+    runtime: str,
+    usage: dict[str, int],
+) -> None:
+    """Record an aggregate turn without prompt, tool, or response content."""
+    payload = {
+        "provider": provider,
+        "model": model,
+        "mode": mode,
+        "runtime": runtime,
+        "llm_calls": llm_calls,
+        "stop_reason": stop_reason,
+        "usage": usage,
+    }
+    logger.info("llm_turn_metrics %s", payload)
+    if span is None:
+        return
+    try:
+        # Keep aggregate metrics in structured metadata. Native Langfuse child
+        # generations remain the source of cost details; this avoids duplicating
+        # costs on the root agent span and avoids relying on root usage_details.
+        span.update(metadata={"turn_metrics": payload})
+    except Exception as e:  # pragma: no cover - telemetry must never fail a turn
+        logger.debug("record_agent_turn falhou (ignorado): %s", e)
 
 
 def flush() -> None:

@@ -78,3 +78,36 @@ def test_run_daily_etl_skips_gold_without_database_url(monkeypatch, tmp_path):
     asyncio.run(tasks._run_daily_etl(0))
 
     assert ingest_calls == [], "sem DATABASE_URL, a ingestão gold é pulada"
+
+
+def test_run_daily_etl_returns_partial_summary_when_step_fails(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    from radar.core import config
+    monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
+    _stub_etl(monkeypatch, [])
+    monkeypatch.setattr(tasks, "_build_all_silver", lambda: (_ for _ in ()).throw(RuntimeError("silver indisponível")))
+
+    summary = asyncio.run(tasks._run_daily_etl(0))
+
+    assert summary["status"] == "partial"
+    assert summary["counters"]["step_errors"] == 1
+    assert summary["last_step"] == "obsidian"
+
+
+def test_warm_edital_chunks_marks_failed_when_listing_raises(monkeypatch):
+    import radar.core.kg.entity_catalog as entity_catalog
+
+    finished = []
+    monkeypatch.setattr(tasks, "get_supabase_service", lambda: object())
+    monkeypatch.setattr(tasks, "start_cron", lambda *args, **kwargs: "run-1")
+    monkeypatch.setattr(tasks, "finish_cron", lambda *args, **kwargs: finished.append(kwargs))
+    monkeypatch.setattr(entity_catalog, "list_editais", lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("catalog indisponível")))
+
+    with pytest.raises(RuntimeError, match="catalog indisponível"):
+        asyncio.run(tasks.warm_edital_chunks_task.func(timestamp=0))
+
+    assert finished[0]["run_id"] == "run-1"
+    assert finished[0]["status"] == "failed"
+    assert finished[0]["last_step"] == "list_editais"
+    assert isinstance(finished[0]["error"], RuntimeError)

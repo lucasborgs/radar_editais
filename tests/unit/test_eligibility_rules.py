@@ -101,7 +101,7 @@ def test_evaluate_opportunity_aggregates():
     profile = {"tamanho_empresa": "me", "uf": "RJ"}
     result = evaluate_opportunity(constraints, profile)
     assert result["status"] == "inelegivel"
-    assert any("SP" in r for r in result["unsat"])
+    assert any("UF da sede" in r for r in result["unsat"])
 
 
 def test_unknown_constraint_type_is_safe():

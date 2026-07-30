@@ -415,7 +415,7 @@ export default function FrontDoorPage() {
           setStreamingText("");
           await exploreStream(
             trimmed,
-            toApiHistory(withUser),
+            toApiHistory(entries),
             profile.nome ? profile : null,
             sessionId,
             {
@@ -443,7 +443,7 @@ export default function FrontDoorPage() {
           // Fallback: stream não chegou a começar — caminho antigo intacto.
           const payload = await frontdoorTurn(
             trimmed,
-            toApiHistory(withUser),
+            toApiHistory(entries),
             profile.nome ? profile : null,
             sessionId,
           );
@@ -789,16 +789,20 @@ export default function FrontDoorPage() {
           </div>
         )}
 
-        <div className="mx-auto flex w-full max-w-2xl items-center justify-between px-1 pb-1.5">
-          <div />
-          <button
-            type="button"
-            onClick={() => router.push("/radar")}
-            className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
-          >
-            Ver matches no Radar →
-          </button>
-        </div>
+        {entries.some(
+          (e) => e.kind === "radar" && e.matchedEditais.length + e.matchedEntities.length > 0,
+        ) && (
+          <div className="mx-auto flex w-full max-w-2xl items-center justify-between px-1 pb-1.5">
+            <div />
+            <button
+              type="button"
+              onClick={() => router.push("/radar")}
+              className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+            >
+              Ver matches no Radar →
+            </button>
+          </div>
+        )}
 
         <Composer
           value={input}

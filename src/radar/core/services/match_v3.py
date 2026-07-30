@@ -231,6 +231,7 @@ def _clip(s: str) -> str:
 
 def score_entity(
     company_emb: np.ndarray, company_texts: list[str], ec: _EntityChunks,
+    company_origins: list[str] | None = None,
 ) -> tuple[float, float, list[dict]]:
     """(affinity_mean, best_score, matched_excerpts) de UMA entidade.
 
@@ -245,9 +246,13 @@ def score_entity(
     order = np.argsort(-best_v)
     excerpts: list[dict] = []
     seen: set[int] = set()
+    origins = company_origins if company_origins is not None else []
     for i in order:
         j = int(best_j[i])
         if j in seen:
+            continue
+        origin = origins[int(i)] if int(i) < len(origins) else "profile"
+        if origin not in {"profile", "library_doc"}:
             continue
         seen.add(j)
         section = ec.sections[j]
@@ -256,6 +261,7 @@ def score_entity(
             "edital_text": _clip(ec.texts[j]),
             "section": section[-1] if section else None,
             "score": round(float(best_v[i]), 3),
+            "origin": origin,
         })
         if len(excerpts) >= TOP_EXCERPTS:
             break
@@ -276,7 +282,7 @@ class OpportunityMatch:
     entity_id: str          # native_id completo (ex. "finep:589" / "programa:centelha")
     name: str
     description: str
-    score: float            # melhor par (cosseno 0..1) — display do ring
+    score: float            # métrica canônica: afinidade de escopo (0..1)
     affinity: float         # média dos máximos (0..1, com boost) — chave de RANKING
     setores: list[str]
     matched_excerpts: list[dict]
@@ -290,6 +296,7 @@ class OpportunityMatch:
     temporal_value: str | None = None
     decision_source: str | None = None
     last_verified_at: str | None = None
+    technical_score: float | None = None  # melhor par; detalhe técnico, não ranking
 
     def to_dict(self) -> dict:
         return {
@@ -301,6 +308,7 @@ class OpportunityMatch:
             "description": self.description,
             "score": round(self.score, 3),
             "affinity": round(self.affinity, 3),
+            "technical_score": round(self.technical_score, 3) if self.technical_score is not None else None,
             "setores": self.setores,
             "matched_excerpts": self.matched_excerpts,
             "status": self.status,
@@ -393,19 +401,30 @@ def _as_profile_dict(profile) -> dict | None:
 
 def _company_side(
     profile, *, workspace_id: str | None, db=None, use_hyde: bool = True,
-) -> tuple[list[str], np.ndarray]:
+) -> tuple[list[str], np.ndarray, list[str]]:
     """(texts, emb normalizado). Workspace autenticado → company_chunks
     (refresh on-demand); anônimo/eval → efêmero do perfil."""
     if workspace_id:
         try:
             ensure_company_chunks(workspace_id, profile, db=db)
-            texts, embs = load_company_chunks(workspace_id)
+            texts, embs, origins = load_company_chunks(workspace_id, include_origins=True)
             if len(texts):
-                return texts, _normalize(embs)
+                return texts, _normalize(embs), origins
         except Exception as e:  # noqa: BLE001 — cai no efêmero, não derruba o match
             logger.warning("match_v3: company_chunks falhou (%s) — caminho efêmero", e)
-    texts, embs = ephemeral_company_chunks(profile, use_hyde=use_hyde)
-    return texts, _normalize(embs)
+    texts, embs, origins = ephemeral_company_chunks(profile, use_hyde=use_hyde)
+    return texts, _normalize(embs), origins
+
+
+def prepare_company_side(profile, *, workspace_id: str | None, db=None, use_hyde: bool = True):
+    return _company_side(profile, workspace_id=workspace_id, db=db, use_hyde=use_hyde)
+
+
+def _unpack_company_side(side):
+    if len(side) == 3:
+        return side
+    texts, embs = side
+    return texts, embs, ["profile"] * len(texts)
 
 
 # ===========================================================================
@@ -424,6 +443,7 @@ def find_matching_opportunities(
     boost: bool = True,
     use_hyde: bool = True,
     rerank: bool | None = None,
+    prepared_company=None,
 ) -> list[OpportunityMatch]:
     """Funil completo §7 sobre editais/programas. `profile` (dict, pydantic ou
     CompanyProfile) alimenta o lado empresa (chunks) E o Stage 1 (constraints).
@@ -435,8 +455,8 @@ def find_matching_opportunities(
     floor = MIN_AFFINITY if min_affinity is None else min_affinity
     prof = _as_profile_dict(profile)
 
-    company_texts, company_emb = _company_side(
-        prof, workspace_id=workspace_id, db=db, use_hyde=use_hyde,
+    company_texts, company_emb, company_origins = _unpack_company_side(
+        prepared_company or _company_side(prof, workspace_id=workspace_id, db=db, use_hyde=use_hyde)
     )
     if not company_texts:
         logger.info("match_v3: perfil sem texto — nenhum match")
@@ -469,7 +489,7 @@ def find_matching_opportunities(
         ec = snap.chunks.get(e["id"])
         if ec is None or ec.emb.size == 0:
             continue
-        affinity, best, excerpts = score_entity(company_emb, company_texts, ec)
+        affinity, best, excerpts = score_entity(company_emb, company_texts, ec, company_origins)
         if boost and company_setores & set(e.get("setores") or []):
             affinity *= BOOST_SETORES
         if affinity < floor:
@@ -479,7 +499,7 @@ def find_matching_opportunities(
             kind=e["kind"], source=src or e.get("source", ""), edital_id=local,
             entity_id=e["native_id"], name=e.get("name") or "",
             description=(e.get("description") or "")[:240],
-            score=best, affinity=affinity,
+            score=affinity, affinity=affinity, technical_score=best,
             setores=list(e.get("setores") or []), matched_excerpts=excerpts,
             status=_status_from_temporal(temporal),
             prazo=_prazo_display(temporal), valor=_valor_display(e),
@@ -539,6 +559,7 @@ def find_matching_investors(
     top_k: int = 5,
     min_score: float | None = None,
     use_hyde: bool = True,
+    prepared_company=None,
 ) -> list[InvestorMatch]:
     """Cosseno perfil-agregado × tese (entities.embedding, kind=investidor,
     fund_status ativo) + gates determinísticos de metadata: estágio e setores
@@ -547,8 +568,8 @@ def find_matching_investors(
     floor = MIN_INVESTOR_SCORE if min_score is None else min_score
     prof = _as_profile_dict(profile)
 
-    company_texts, company_emb = _company_side(
-        prof, workspace_id=workspace_id, db=db, use_hyde=use_hyde,
+    company_texts, company_emb, inv_origins = _unpack_company_side(
+        prepared_company or _company_side(prof, workspace_id=workspace_id, db=db, use_hyde=use_hyde)
     )
     if not company_texts:
         return []
@@ -583,16 +604,29 @@ def find_matching_investors(
         # Excerpt: melhor chunk da empresa contra a tese (justificativa do card).
         sims = company_emb @ v["_emb"]
         bi = int(np.argmax(sims))
+        origin = inv_origins[bi] if bi < len(inv_origins) else None
+        if origin not in {"profile", "library_doc"}:
+            real = [i for i, origin in enumerate(inv_origins) if origin in {"profile", "library_doc"}]
+            if not real:
+                excerpt = []
+            else:
+                bi = max(real, key=lambda i: float(sims[i]))
+                excerpt = [{
+                    "company_text": _clip(company_texts[bi]),
+                    "edital_text": _clip(v.get("description") or ""),
+                    "section": "tese", "score": round(float(sims[bi]), 3), "origin": inv_origins[bi],
+                }]
+        else:
+            excerpt = [{
+                "company_text": _clip(company_texts[bi]),
+                "edital_text": _clip(v.get("description") or ""),
+                "section": "tese", "score": round(float(sims[bi]), 3), "origin": inv_origins[bi],
+            }]
         out.append(InvestorMatch(
             entity_id=v["native_id"], name=v.get("name") or "",
             description=v.get("description") or "", score=score,
             setores=sorted(inv_setores), estagio_alvo=list(meta.get("estagio_alvo") or []),
-            matched_excerpts=[{
-                "company_text": _clip(company_texts[bi]),
-                "edital_text": _clip(v.get("description") or ""),
-                "section": "tese",
-                "score": round(float(sims[bi]), 3),
-            }],
+            matched_excerpts=excerpt,
             offer={
                 "offer_name": v.get("name") or "",
                 "official_url": meta.get("site") or "",

@@ -19,6 +19,14 @@ from typing import Literal
 logger = logging.getLogger(__name__)
 
 
+def _history_without_current(history: list[dict] | None, message: str) -> list[dict]:
+    """Normaliza a fronteira: ``history`` só contém mensagens anteriores."""
+    items = list(history or [])
+    if items and items[-1].get("role") == "user" and items[-1].get("content") == message:
+        items.pop()
+    return items
+
+
 @dataclass
 class ExploreStreamEvent:
     """Evento do canal streaming de `ExploreAgent.explore_stream` (item 1,
@@ -326,14 +334,23 @@ class ExploreAgent:
                 keep_ids=(EXPLORE_SYSTEM_MSG_ID,),
             )
             prior_n_msgs = await aget_thread_message_count(saver, thread_id)
-            # NÃO re-seeda o histórico — o checkpointer replaya. O hint é contexto
-            # episódico do alvo (edital/nó): dobrado na msg atual (evita acumular
-            # hints stale de turnos anteriores na thread durável).
+            # Uma thread vazia pode surgir no segundo turno, depois que o
+            # primeiro par só existiu no transcript do cliente. Semeie-o junto
+            # com o turno atual; o delta começa depois desse prefixo.
+            if prior_n_msgs == 0:
+                for turn in _history_without_current(history, message)[-8:]:
+                    role = turn.get("role")
+                    content = turn.get("content")
+                    if role in ("user", "assistant") and content:
+                        messages.append({"role": role, "content": content})
+                prior_n_msgs = 1 + len(messages)
+            # O hint é contexto episódico do alvo e vai apenas na mensagem
+            # atual, sem acumular na thread durável.
             content = f"{hint}\n\n{message}" if hint else message
             messages.append({"role": "user", "content": content, "cache_hint": True})
         else:
             # Stateless (anônimo/sem sessão): caminho de hoje, byte-idêntico.
-            for turn in (history or [])[-8:]:
+            for turn in _history_without_current(history, message)[-8:]:
                 role = turn.get("role")
                 content = turn.get("content")
                 if role in ("user", "assistant") and content:
@@ -534,7 +551,7 @@ class ExploreAgent:
         # produto — só o CONTEXTO do agente perde aquele turno, não o histórico do
         # usuário. Fechar o gap = unificar as cópias (TASK 6).
         messages: list[dict] = []
-        for turn in (history or [])[-8:]:
+        for turn in _history_without_current(history, message)[-8:]:
             role = turn.get("role")
             content = turn.get("content")
             if role in ("user", "assistant") and content:

@@ -81,8 +81,8 @@ def test_serialize_inclui_ficha_completa():
     assert "prazo: 01/08/2026" in s
     assert "setores: Defesa, TIC" in s
     assert "ticket: R$ 500.000 – R$ 2.000.000" in s
-    assert "porte deve ser um de" in s          # constraint renderizada como frase
-    assert "exige parceria com ict" in s
+    assert "Informe o porte da empresa" in s
+    assert "É necessário ter parceria com uma ICT." in s
     assert "Plano de trabalho conforme Anexo I." in s
 
 

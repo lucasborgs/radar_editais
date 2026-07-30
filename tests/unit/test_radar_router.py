@@ -56,6 +56,7 @@ def test_profile_minimo_e_obrigatorio():
 
 def test_anonimo_usa_chunks_efemeros_e_separa_trilhas(monkeypatch):
     seen: dict = {}
+    monkeypatch.setattr(radar.match_v3, "prepare_company_side", lambda *args, **kwargs: None)
 
     def opportunities(profile, **kwargs):
         seen["opps"] = kwargs
@@ -82,6 +83,7 @@ def test_anonimo_usa_chunks_efemeros_e_separa_trilhas(monkeypatch):
 def test_autenticado_encaminha_workspace_e_enfileira_so_misses(monkeypatch):
     db = object()
     seen: dict = {}
+    monkeypatch.setattr(radar.match_v3, "prepare_company_side", lambda *args, **kwargs: None)
     monkeypatch.setattr(radar, "get_workspace_id", lambda got_db, uid: "workspace-1")
 
     def opportunities(profile, **kwargs):
