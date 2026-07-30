@@ -75,16 +75,19 @@ def eval_tool_contract(*, output, expected_output, **_) -> Evaluation | None:
     if not isinstance(output, dict) or "answer" not in output:
         return None
     route = (expected_output or {}).get("route")
-    expected_tool = (
-        "search_edital_factual"
-        if route in {"EDITAL_FACT", "EDITAL_FACT_ENUMERATIVE"}
-        else "get_investidor" if route == "ENTITY_FACT" else None
-    )
     called = output.get("called_tools") or []
-    passed = expected_tool is None or expected_tool in called
+    if route in {"EDITAL_FACT", "EDITAL_FACT_ENUMERATIVE"}:
+        expected = "get_edital or search_entities"
+        acceptable = {"get_edital", "search_entities"}
+    elif route == "ENTITY_FACT":
+        expected = "get_investidor or list_investidores"
+        acceptable = {"get_investidor", "list_investidores"}
+    else:
+        return None
+    passed = bool(acceptable & set(called))
     return {
         "name": "tool_contract", "value": 1.0 if passed else 0.0,
-        "comment": f"expected={expected_tool}, called={called}",
+        "comment": f"expected={expected}, called={called}",
     }
 
 

@@ -356,7 +356,6 @@ def _dispatch_explorer(
         has_profile=profile is not None,
         profile_text=profile_text,
         profile=profile,
-        route_decision=decision,
     )
     return answer
 

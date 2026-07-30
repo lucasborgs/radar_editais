@@ -167,11 +167,9 @@ def _post_process(
     a página /radar. Compartilhado por `/explore` (sync) e
     `/explore/stream` — a mesma pipeline roda depois do `done` do
     streaming, via `asyncio.to_thread`."""
-    # PR1 (four-phase-workflow): detecta se pergunta pede planejamento.
     result: dict = {
         "answer": answer,
         "truncated": explore_meta["truncated"],
-        "route_decision": explore_meta.get("route_decision"),
         "called_tools": explore_meta.get("called_tools", []),
     }
     if is_complex_proposal(message, answer, len(req.history)):

@@ -81,15 +81,12 @@ def build_match_tools(
 
     @tool
     def find_matching_editais(top_k: int = 8) -> str:
-        """Encontra editais e programas de fomento que casam com o PERFIL DA
-        EMPRESA por afinidade de conteúdo (trechos do edital × perfil/documentos
-        da empresa) — funil com filtro de elegibilidade embutido.
+        """[MATCH COM PERFIL] Encontra editais que COMBINAM COM O PERFIL DA EMPRESA.
 
-        Use quando o usuário com perfil quer descobrir oportunidades ("quais
-        editais servem para mim?", "o que tem para a minha empresa?"). Cada match
-        traz os trechos reais que casaram + prazo/status/valor. É AFINIDADE
-        temática com filtro duro só do que é COMPROVADAMENTE incompatível —
-        apresente como ponto de partida, não veredito.
+        USE SOMENTE quando o usuário TEM perfil preenchido e pergunta "quais editais
+        servem para mim?", "o que tem para a minha empresa?". Retorna matches
+        ranqueados por afinidade. NÃO USE para listar catálogo — use list_editais
+        para isso.
 
         Args:
             top_k: máximo de resultados (default 8).
@@ -110,14 +107,12 @@ def build_match_tools(
 
     @tool
     def find_matching_entities(kind: str = "", top_k: int = 8) -> str:
-        """Encontra INVESTIDORES (fundos, por tese) e PROGRAMAS de fomento que
-        casam com o PERFIL DA EMPRESA — trilha paralela ao match de editais.
+        """[MATCH COM PERFIL] Encontra investidores e programas que COMBINAM COM O PERFIL DA EMPRESA.
 
-        Use quando o usuário quer PARCERIA, CAPITAL ou PROGRAMAS, não editais
-        ("que fundos investiriam na gente?", "tem programa de aceleração para
-        nós?"). Investidores passam por gate de estágio/setor da tese. É
-        afinidade temática (capital/programa em potencial), não elegibilidade
-        dura — apresente como ponto de partida.
+        USE SOMENTE quando o usuário TEM perfil preenchido e pergunta "que fundos
+        combinam conosco?", "o que serve para minha empresa?". Retorna entidades
+        ranqueadas por afinidade com o perfil. NÃO USE para listar catálogo —
+        use list_investidores ou list_editais para isso.
 
         Args:
             kind: filtra o tipo — "investidor" (fundos), "programa" ou "" (ambos).

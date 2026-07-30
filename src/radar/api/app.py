@@ -149,6 +149,7 @@ class RequestIdMiddleware:
 def _allowed_origins() -> list[str]:
     # localhost sempre liberado para dev; FRONTEND_URL (CSV) adiciona origens de prod.
     defaults = ["http://localhost:3000", "http://127.0.0.1:3000",
+                 "http://localhost:3001", "http://127.0.0.1:3001",
                  "http://localhost:3003", "http://127.0.0.1:3003"]
     extra = [o.strip() for o in os.getenv("FRONTEND_URL", "").split(",") if o.strip()]
     return list(dict.fromkeys(defaults + extra))

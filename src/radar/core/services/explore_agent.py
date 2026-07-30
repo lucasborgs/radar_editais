@@ -38,8 +38,7 @@ class ExploreStreamEvent:
     kind == "tool_end": uma tool terminou (`name`) — sinal leve p/ "pensando".
     kind == "final":    fim do turno — `answer` e `meta` têm o MESMO shape
                         que `explore_with_meta` retorna (`stop_reason`,
-                        `truncated`, `called_match`, `route_decision`,
-                        `called_tools`).
+                        `truncated`, `called_match`, `called_tools`).
     """
     kind: Literal["token", "tool_end", "final"]
     text: str = ""
@@ -70,15 +69,9 @@ MATCH COM O PERFIL (find_matching_editais / find_matching_entities)
   gente?", "programa de aceleração?" — chame find_matching_entities
   (investidores/programas por afinidade). Para ICTs (parceria de P&D), use as
   tools de catálogo (list_icts / oportunidades_por_tema), não o match.
-- CRÍTICO: depois de chamar as tools, a interface JÁ mostra os resultados como
-  cards visuais (nome, status, prazo, valor, justificativa) logo abaixo da sua
-  mensagem — o usuário vai ver tudo isso de qualquer forma, sem você escrever
-  cada detalhe. Sua resposta em texto tem NO MÁXIMO 2 frases, SEM listar nome/
-  status/prazo/valor/justificativa de nenhum item individualmente (nem em bullets
-  numerados).
-  Errado: "1. Edital X (aberto, prazo Y, R$ Z) — porque...". Certo: "Encontrei
-  3 editais e 2 investidores com boa afinidade, principalmente em bioeconomia —
-  dá uma olhada nos cards abaixo. Quer que eu detalhe algum deles?"
+- Depois de chamar as tools, resuma os principais resultados encontrados em 2-3
+  frases, destacando os mais relevantes. Mencione o que entrou e por quê — o foco
+  é o panorama e os destaques, não uma lista exaustiva.
 - Em ambos é afinidade temática (conteúdo), NÃO elegibilidade dura: apresente como
   ponto de partida e deixe a decisão com o usuário. Use get_edital ou
   get_node_neighborhood para aprofundar um match."""
@@ -95,8 +88,7 @@ ferramentas para consultar o grafo estruturado.
 
 DIRETRIZES
 - Responda de forma direta e útil, em português.
-- Cite editais/ICTs/investidores pelo nome e ID quando relevante (ex.: "FINEP
-  Mais Inovação (ID finep:773)").
+- Cite editais/ICTs/investidores pelo nome quando relevante.
 - Quando a mensagem trouxer um bloco de perfil da empresa, pondere a
   ELEGIBILIDADE ao recomendar: se o público-alvo do edital não inclui o tipo
   da empresa (ex.: edital só para Cooperativas e a empresa é uma startup),
@@ -180,14 +172,11 @@ class ExploreAgent:
         workspace_id: str | None = None,
         db=None,
         profile: dict | None = None,
-        route_decision=None,
     ) -> str:
-        """Roteia todo pedido para o agente multi-step (rota única pós-Sprint 3)."""
         answer, _meta = self.explore_with_meta(
             message, history, edital_ids, node_id, node_type,
             has_profile=has_profile, profile_text=profile_text,
             workspace_id=workspace_id, db=db, profile=profile,
-            route_decision=route_decision,
         )
         return answer
 
@@ -203,27 +192,12 @@ class ExploreAgent:
         workspace_id: str | None = None,
         db=None,
         profile: dict | None = None,
-        route_decision=None,
     ) -> tuple[str, dict]:
         """Como `explore`, mas devolve também metadados do run: `stop_reason` e
-        `truncated` (= cortado no teto de passos, PR6.2/F10) — o router expõe
-        `truncated` no response para o front avisar o usuário."""
-        if route_decision is None:
-            from radar.core.services.explore_routing import (
-                RouteContext,
-                classify_ambiguous_route,
-                route_message,
-            )
-            target_type = node_type or ("edital" if edital_ids else None)
-            target_id = node_id or (edital_ids[0] if edital_ids else None)
-            route_decision = route_message(RouteContext(
-                message=message, target_type=target_type, target_id=target_id,
-                has_profile=has_profile, workspace_id=workspace_id,
-            ), ambiguous_classifier=classify_ambiguous_route)
+        `truncated` (= cortado no teto de passos, PR6.2/F10)."""
         return self._explore_agent(
             message, history, edital_ids, node_id, node_type,
             profile_text=profile_text, workspace_id=workspace_id, db=db, profile=profile,
-            route_decision=route_decision,
         )
 
     async def explore_stream(
@@ -242,62 +216,20 @@ class ExploreAgent:
     ) -> AsyncIterator[ExploreStreamEvent]:
         """Variação streaming de `explore_with_meta` (item 1, TASK 3).
 
-        Mesma resolução de rota e mesmo shape de `(answer, meta)` no final —
+        Mesmo shape de `(answer, meta)` no final —
         só o transporte muda: tokens chegam ao vivo via `ExploreStreamEvent`
         em vez de um retorno único. Deliberadamente DUPLICA o corpo de
-        `_explore_agent` (system/tools/route) em vez de extrair um helper
+        `_explore_agent` (system/tools) em vez de extrair um helper
         compartilhado — menor toque da TASK 3: `_explore_agent`/`explore_with_meta`
         ficam byte-idênticos, zero risco de regressão no caminho síncrono de
         produção. Custo aceito: as duas cópias podem divergir com o tempo — se
         isso incomodar, é candidato a refatoração numa task futura, não aqui.
 
         ATENÇÃO — cópia espelhada de `_explore_agent` (linha ~428): qualquer
-        mudança de system/tools/rota lá (ou aqui) tem que ser replicada
+        mudança de system/tools lá (ou aqui) tem que ser replicada
         manualmente no outro lado, ou o streaming e o sync divergem em
         comportamento (não só em transporte). Unificação prevista pra TASK 6.
         """
-        from radar.core.services.explore_routing import (
-            RouteContext,
-            classify_ambiguous_route,
-            route_message,
-        )
-        target_type = node_type or ("edital" if edital_ids else None)
-        target_id = node_id or (edital_ids[0] if edital_ids else None)
-        route_decision = route_message(RouteContext(
-            message=message, target_type=target_type, target_id=target_id,
-            has_profile=has_profile, workspace_id=workspace_id,
-        ), ambiguous_classifier=classify_ambiguous_route)
-
-        if (
-            route_decision.intent.value == "EDITAL_FACT_ENUMERATIVE"
-            and route_decision.target_id
-            and os.getenv("EXPLORE_FACTUAL_RAG_ENABLED", "true").lower() == "true"
-        ):
-            try:
-                from radar.core.services.factual_synthesis import synthesize_enumerative_answer
-
-                answer = synthesize_enumerative_answer(route_decision.target_id, message)
-                meta = {
-                    "stop_reason": "end_turn",
-                    "truncated": False,
-                    "called_match": False,
-                    "route_decision": route_decision.to_dict(),
-                    "called_tools": ["search_edital_factual"],
-                }
-                # Síntese factual não é um loop de tokens do LLM streamado (é
-                # uma chamada única que já devolve o texto pronto) — emite o
-                # texto inteiro como um único delta pra manter o contrato SSE
-                # uniforme (o front sempre recebe ≥1 "token" antes do "final").
-                if answer:
-                    yield ExploreStreamEvent(kind="token", text=answer)
-                yield ExploreStreamEvent(kind="final", answer=answer, meta=meta)
-                return
-            except Exception as exc:  # degrada para o agente/tool já existente
-                logger.warning(
-                    "síntese factual enumerativa falhou (%s): %s; usando ReAct",
-                    route_decision.target_id, exc,
-                )
-
         from radar.core.llm.agent_runtime import resolve_agent_provider, run_agent_streaming_async
 
         # Item 3 (TASK 3) — thread-por-sessão do explore. `thread_id` chega PRONTO do
@@ -361,37 +293,6 @@ class ExploreAgent:
 
         tools = self._explore_tools()
         system = EXPLORE_AGENT_SYSTEM
-        route_payload = route_decision.to_dict()
-        system += (
-            "\n\nROTA DETERMINADA PELA POLÍTICA (não reclassifique e não "
-            f"emita redirect): {route_payload}. Use somente ferramentas "
-            "compatíveis com essa rota."
-        )
-        if (
-            route_decision.intent.value in {"EDITAL_FACT", "EDITAL_FACT_ENUMERATIVE"}
-            and route_decision.target_id
-            and os.getenv("EXPLORE_FACTUAL_RAG_ENABLED", "true").lower() == "true"
-        ):
-            from radar.core.llm.agent_tools.factual_tools import build_factual_tools
-            tools += build_factual_tools(
-                route_decision.target_id, route_decision.retrieval_profile,
-            )
-            system += (
-                " Para esta rota, chame search_edital_factual antes de responder. "
-                "Não use get_edital como substituto e não use editais análogos. "
-                "Em listas, cubra todas as subseções recuperadas. Cite documento, "
-                "versão/data, seção e página; declare ausência de autoridade."
-            )
-        elif (
-            route_decision.intent.value == "ENTITY_FACT"
-            and route_decision.target_type == "investidor"
-            and route_decision.target_id
-        ):
-            tools = [tool for tool in tools if tool.name == "get_investidor"]
-            system += (
-                " Para esta rota, chame obrigatoriamente get_investidor com "
-                f"investidor_id={route_decision.target_id!r} antes de responder."
-            )
 
         if profile_text and profile:
             from radar.core.llm.agent_tools.match_tools import build_match_tools
@@ -465,7 +366,6 @@ class ExploreAgent:
             "stop_reason": result.stop_reason,
             "truncated": result.stop_reason == "max_steps",
             "called_match": called_match,
-            "route_decision": route_decision.to_dict(),
             "called_tools": called_tools,
         }
 
@@ -499,41 +399,15 @@ class ExploreAgent:
         workspace_id: str | None = None,
         db=None,
         profile: dict | None = None,
-        route_decision=None,
     ) -> tuple[str, dict]:
         """Pipeline agente: run_agent + tools de leitura do catálogo gold,
         planejamento e (gated) deep_research — montadas em `_explore_tools`.
         Retorna `(answer, meta)`; meta carrega stop_reason/truncated.
 
         ATENÇÃO — `explore_stream` (linha ~218) duplica este setup (system/
-        tools/rota) pro caminho streaming. Mudança aqui tem que ser replicada
+        tools) pro caminho streaming. Mudança aqui tem que ser replicada
         lá também, ou os dois caminhos divergem em comportamento (não só
         transporte). Unificação prevista pra TASK 6."""
-        if (
-            route_decision is not None
-            and route_decision.intent.value == "EDITAL_FACT_ENUMERATIVE"
-            and route_decision.target_id
-            and os.getenv("EXPLORE_FACTUAL_RAG_ENABLED", "true").lower() == "true"
-        ):
-            try:
-                from radar.core.services.factual_synthesis import synthesize_enumerative_answer
-
-                answer = synthesize_enumerative_answer(
-                    route_decision.target_id, message,
-                )
-                return answer, {
-                    "stop_reason": "end_turn",
-                    "truncated": False,
-                    "called_match": False,
-                    "route_decision": route_decision.to_dict(),
-                    "called_tools": ["search_edital_factual"],
-                }
-            except Exception as exc:  # degrada para o agente/tool já existente
-                logger.warning(
-                    "síntese factual enumerativa falhou (%s): %s; usando ReAct",
-                    route_decision.target_id, exc,
-                )
-
         from radar.core.llm.agent_runtime import resolve_agent_provider, run_agent
 
         # Item 3 (TASK 3): a promoção thread-por-sessão é do caminho VIVO (streaming,
@@ -572,42 +446,6 @@ class ExploreAgent:
 
         tools = self._explore_tools()
         system = EXPLORE_AGENT_SYSTEM
-        if route_decision is not None:
-            route_payload = route_decision.to_dict()
-            system += (
-                "\n\nROTA DETERMINADA PELA POLÍTICA (não reclassifique e não "
-                f"emita redirect): {route_payload}. Use somente ferramentas "
-                "compatíveis com essa rota."
-            )
-            if (
-                route_decision.intent.value in {"EDITAL_FACT", "EDITAL_FACT_ENUMERATIVE"}
-                and route_decision.target_id
-                and os.getenv("EXPLORE_FACTUAL_RAG_ENABLED", "true").lower() == "true"
-            ):
-                from radar.core.llm.agent_tools.factual_tools import build_factual_tools
-                tools += build_factual_tools(
-                    route_decision.target_id, route_decision.retrieval_profile,
-                )
-                system += (
-                    " Para esta rota, chame search_edital_factual antes de responder. "
-                    "Não use get_edital como substituto e não use editais análogos. "
-                    "Em listas, cubra todas as subseções recuperadas. Cite documento, "
-                    "versão/data, seção e página; declare ausência de autoridade."
-                )
-            elif (
-                route_decision.intent.value == "ENTITY_FACT"
-                and route_decision.target_type == "investidor"
-                and route_decision.target_id
-            ):
-                # A rota já resolveu tipo e ID; deixar tools genéricas no set
-                # permite ao LLM ignorar o contrato e chamar vizinhança/busca.
-                # Para fato de fundo nomeado, a única fonte compatível é a
-                # ficha estruturada completa.
-                tools = [tool for tool in tools if tool.name == "get_investidor"]
-                system += (
-                    " Para esta rota, chame obrigatoriamente get_investidor com "
-                    f"investidor_id={route_decision.target_id!r} antes de responder."
-                )
 
         # Match v3: só quando há PERFIL. COM workspace autenticado, o lado
         # empresa vem de company_chunks (perfil + library, refresh on-demand);
@@ -659,10 +497,8 @@ class ExploreAgent:
             "stop_reason": result.stop_reason,
             "truncated": result.stop_reason == "max_steps",
             "called_match": called_match,
+            "called_tools": called_tools,
         }
-        if route_decision is not None:
-            meta["route_decision"] = route_decision.to_dict()
-            meta["called_tools"] = called_tools
         if result.stop_reason == "error":
             logger.error("explore agent: stop_reason=error após %d steps", len(result.steps))
             return (

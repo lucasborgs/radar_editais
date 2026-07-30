@@ -100,11 +100,12 @@ def build_explore_tools() -> list[BaseTool]:
 
     @tool
     def list_editais(status: str = "", tema: str = "", limit: int = 20) -> str:
-        """Lista editais do catálogo filtrando por status e/ou tema.
+        """[CATÁLOGO] Lista editais do catálogo filtrando por status e/ou tema.
 
         Use quando o usuário pergunta quais editais estão abertos, quais tocam um
         tema, ou quer um panorama. Cada item vem com id, título, status, prazo e
         temas — use get_edital depois para detalhes (objetivo, requisitos, valores).
+        NÃO USE para match contra perfil — use find_matching_editais para isso.
 
         Args:
             status: "ABERTA" | "ENCERRADA" | "" (vazio = todos)
@@ -209,10 +210,11 @@ def build_explore_tools() -> list[BaseTool]:
 
     @tool
     def list_investidores(tema: str = "", limit: int = 20) -> str:
-        """Lista investidores (fundos/anjos) cuja tese cobre um tema/setor.
+        """[CATÁLOGO] Lista TODOS os investidores do catálogo por tema, INDEPENDENTE de perfil da empresa.
 
-        Use quando o usuário pergunta sobre captação privada, quem investe num
-        setor, ou equity num tema. Devolve nome e temas da tese.
+        USE quando o usuário pergunta "quais são os investidores?", "quem investe
+        em [tema]?", "liste os fundos mapeados". NÃO USE para match contra perfil
+        da empresa — use find_matching_entities para isso.
 
         Args:
             tema: palavra-chave/tema; "" = todos
@@ -340,6 +342,8 @@ def build_explore_tools() -> list[BaseTool]:
         Use quando a pergunta é sobre CAPACIDADE/ATUAÇÃO ("quais atores atuam em
         visão computacional?", "quem trabalha com hidrogênio verde?") ou quando os
         filtros de tema não bastam. Filtre por `kind` para restringir o tipo.
+        NÃO USE como substituto para list_investidores, list_editais ou list_icts —
+        prefira as tools de catálogo para listagens completas.
 
         Args:
             query: descrição em linguagem natural do que procura.
