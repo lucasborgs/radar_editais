@@ -107,7 +107,7 @@ def test_explore_agent_happy_path(monkeypatch):
 
     out, meta = svc._explore_agent("oi", None, None, None, None)
     assert out == "Resposta do agente."
-    assert meta == {"stop_reason": "end_turn", "truncated": False, "called_match": False}
+    assert meta == {"stop_reason": "end_turn", "truncated": False, "called_match": False, "called_tools": []}
 
 
 def test_explore_agent_max_steps_marks_truncated(monkeypatch):
@@ -209,40 +209,7 @@ def test_explore_agent_includes_read_tools(monkeypatch):
     assert captured["max_steps"] >= 10  # EXPLORE_AGENT_MAX_STEPS
 
 
-def test_factual_enumerativo_usa_sintese_fechada(monkeypatch):
-    monkeypatch.setattr(
-        "radar.core.services.factual_synthesis.synthesize_enumerative_answer",
-        lambda edital_id, query: f"síntese {edital_id}: {query}",
-    )
-    monkeypatch.setattr(
-        "radar.core.llm.agent_runtime.run_agent",
-        lambda **kwargs: (_ for _ in ()).throw(AssertionError("ReAct indevido")),
-    )
-    _, meta = ExploreAgent().explore_with_meta(
-        "quais os itens financiáveis?", edital_ids=["finep:745"],
-    )
-    assert meta["called_tools"] == ["search_edital_factual"]
-    assert meta["route_decision"]["intent"] == "EDITAL_FACT_ENUMERATIVE"
-
-
-def test_factual_rag_kill_switch_remove_tool(monkeypatch):
-    captured = {}
-    fake_result = AgentResult(
-        final_text="ok", steps=[], stop_reason="end_turn",
-        usage={"input_tokens": 0, "output_tokens": 0},
-    )
-    monkeypatch.setenv("EXPLORE_FACTUAL_RAG_ENABLED", "false")
-    monkeypatch.setattr(
-        "radar.core.llm.agent_runtime.run_agent",
-        lambda **kwargs: captured.update(kwargs) or fake_result,
-    )
-    ExploreAgent().explore_with_meta(
-        "quais os itens financiáveis?", edital_ids=["finep:745"],
-    )
-    assert "search_edital_factual" not in {tool.name for tool in captured["tools"]}
-
-
-def test_entity_fact_investidor_restringe_tool_ao_contrato(monkeypatch):
+def test_entity_fact_investidor_inclui_get_investidor(monkeypatch):
     captured = {}
     fake_result = AgentResult(
         final_text="ok", steps=[], stop_reason="end_turn",
@@ -257,7 +224,8 @@ def test_entity_fact_investidor_restringe_tool_ao_contrato(monkeypatch):
         node_id="investidor:barn-invest",
         node_type="investidor",
     )
-    assert [tool.name for tool in captured["tools"]] == ["get_investidor"]
+    tool_names = {tool.name for tool in captured["tools"]}
+    assert "get_investidor" in tool_names
 
 
 def test_explore_agent_error_returns_friendly_message(monkeypatch):

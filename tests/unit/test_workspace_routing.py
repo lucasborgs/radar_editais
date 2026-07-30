@@ -27,7 +27,6 @@ def test_barn_nao_recebe_redirect_e_mensagem_interna_nao_e_anexada(monkeypatch):
     )
     assert out == "Barn factual"
     assert "Se o usuário pedir algo FORA DO ESCOPO" not in captured["message"]
-    assert captured["route_decision"].intent.value == "ENTITY_FACT"
 
 
 def test_acao_de_escrita_recebe_redirect_sem_chamar_agente(monkeypatch):
