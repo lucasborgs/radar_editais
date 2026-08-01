@@ -33,11 +33,12 @@ def test_build_all_silver_enumerates_from_bronze(monkeypatch):
     monkeypatch.setattr(adapters_base, "get_adapter", lambda source: _FakeAdapter())
     built = []
     monkeypatch.setattr(tasks, "build_or_load_structured_doc",
-                        lambda s, n, d: built.append((s, n)) or [{"section_path": [], "text": "t"}])
+                        lambda s, n, d, **_kw: built.append((s, n)) or [{"section_path": [], "text": "t"}])
 
-    n = tasks._build_all_silver()
+    result = tasks._build_all_silver()
 
-    assert n == 2
+    assert result["silver_built"] == 2
+    assert result["changed_ids"] == ["finep:1", "web:abc"]
     assert built == [("finep", "1"), ("web", "abc")]
 
 

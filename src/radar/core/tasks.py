@@ -39,6 +39,7 @@ from pydantic import ValidationError  # noqa: E402
 from radar.core.infra.db import get_supabase_service  # noqa: E402
 from radar.core.infra.logging_config import setup_logging  # noqa: E402
 from radar.core.infra.notify import send_alert  # noqa: E402
+from radar.core.ingestion import early_dedup  # noqa: E402
 from radar.core.ingestion.structurer import build_or_load_structured_doc  # noqa: E402
 from radar.core.retrieval.chunker import CHUNKER_VERSION, chunk_from_blocks  # noqa: E402
 from radar.core.retrieval.embedder import EMBEDDING_MODEL, embed_texts  # noqa: E402
@@ -835,7 +836,7 @@ _PIPELINE_CATEGORY_TO_REASON: dict[str, str] = {
 }
 
 
-def _build_all_silver() -> int:
+def _build_all_silver() -> dict[str, object]:
     """Persiste o canônico fresco e materializa Silver dos editais scraped.
 
     Passo EXPLÍCITO do pipeline v3 (spec docs/specs/v3-unified.md §10): bronze →
@@ -846,21 +847,76 @@ def _build_all_silver() -> int:
     from radar.core.kg import gold, source_docs  # noqa: PLC0415
     from radar.pipeline.adapters.base import get_adapter  # noqa: PLC0415
 
-    n = 0
+    result: dict[str, object] = {
+        "changed_ids": [],
+        "by_source": {},
+        "unchanged": 0,
+        "changed": 0,
+        "silver_built": 0,
+        "silver_skipped": 0,
+        "step_errors": 0,
+    }
+    changed_ids = result["changed_ids"]
+    by_source = result["by_source"]
     for source, native in gold.iter_bronze_editais():
         eid = f"{source}:{native}"
+        source_stats = by_source.setdefault(source, {
+            "unchanged": 0, "changed": 0, "silver_built": 0,
+            "silver_skipped": 0, "step_errors": 0,
+        })
         try:
+            fingerprint = early_dedup.input_fingerprint(source, native)
+            if fingerprint and early_dedup.can_skip_silver(source, native, fingerprint):
+                result["unchanged"] += 1
+                result["silver_skipped"] += 1
+                source_stats["unchanged"] += 1
+                source_stats["silver_skipped"] += 1
+                logger.info("early dedup: %s unchanged; silver/gold skipped", eid)
+                continue
+
+            result["changed"] += 1
+            source_stats["changed"] += 1
             fresh = get_adapter(source).to_documents(native)
             if fresh:
                 _save_fapesc_bundle_if_available(source, native)
                 source_docs.save(eid, source, fresh)
             docs = fresh or source_docs.load(eid)
             active = source_docs.active_documents(docs or [])
-            if active and build_or_load_structured_doc(source, native, active):
-                n += 1
+            blocks = (
+                build_or_load_structured_doc(source, native, active, force=True)
+                if active else []
+            )
+            if active and blocks:
+                result["silver_built"] += 1
+                source_stats["silver_built"] += 1
+                changed_ids.append(eid)
+                if fresh and fingerprint and not early_dedup.persist_fingerprint(source, native, fingerprint):
+                    result["step_errors"] += 1
+                    source_stats["step_errors"] += 1
+            # Empty/absent input is not a materialization error by itself.  We
+            # deliberately leave the fingerprint absent so the next run fails
+            # open and gets another chance to materialize it.
         except Exception:
+            result["step_errors"] += 1
+            source_stats["step_errors"] += 1
             logger.warning("_build_all_silver: falha em %s", eid, exc_info=True)
-    return n
+    return result
+
+
+def _normalize_silver_result(value: object) -> dict[str, object]:
+    """Keep the ETL boundary tolerant of legacy/test Silver producers."""
+    if isinstance(value, dict):
+        return value
+    built = value if isinstance(value, int) and value >= 0 else 0
+    return {
+        "changed_ids": [],
+        "by_source": {},
+        "unchanged": 0,
+        "changed": built,
+        "silver_built": built,
+        "silver_skipped": 0,
+        "step_errors": 0,
+    }
 
 
 @app.periodic(cron="0 3 * * *")
@@ -952,7 +1008,18 @@ async def _run_daily_etl(timestamp: int) -> dict[str, object]:
     # Não derrubam a run; viram 1 e-mail AGREGADO ao final.
     step_errors: list[str] = []
     last_step = "start"
-    n_silver = n_gold = n_docs = 0
+    silver_result: dict[str, object] = {
+        "changed_ids": [],
+        "by_source": {},
+        "unchanged": 0,
+        "changed": 0,
+        "silver_built": 0,
+        "silver_skipped": 0,
+        "step_errors": 0,
+    }
+    n_gold = n_docs = 0
+    gold_counts: dict[str, int] = {}
+    pending_source_runs: list[tuple[str, int, str]] = []
 
     total_new = 0
     for source_key, cfg in SCRAPER_REGISTRY.items():
@@ -990,21 +1057,10 @@ async def _run_daily_etl(timestamp: int) -> dict[str, object]:
                 "run_daily_etl_task: %s — %d resultados", display_name, new_count,
             )
 
-            # Telemetria: finalizar run com sucesso (best-effort).
+            # Finalizamos depois do silver para registrar também os contadores
+            # do gate antecipado no mesmo source_run.
             if run_id:
-                try:
-                    await asyncio.to_thread(
-                        finish_run, db,
-                        run_id=run_id,
-                        status="succeeded",
-                        records_observed=new_count,
-                        error_count=0,
-                    )
-                except Exception:
-                    logger.warning(
-                        "run_daily_etl: finish_run falhou (best-effort) source=%s",
-                        source_key, exc_info=True,
-                    )
+                pending_source_runs.append((run_id, new_count, coverage_info[0]))
 
             # O cron das 03:00 não produz edital_chunks. O corpus de escrita é
             # aquecido pelo cron dedicado das 05:00 e também garantido por
@@ -1083,11 +1139,41 @@ async def _run_daily_etl(timestamp: int) -> dict[str, object]:
     #    do ingest_all (gold) e do RAG de escrita. Sem LLM.
     try:
         last_step = "silver"
-        n_silver = await asyncio.to_thread(_build_all_silver)
-        logger.info("run_daily_etl_task: silver materializado p/ %d editais", n_silver)
+        silver_result = _normalize_silver_result(
+            await asyncio.to_thread(_build_all_silver)
+        )
+        logger.info(
+            "run_daily_etl_task: silver — changed=%d unchanged=%d built=%d skipped=%d",
+            silver_result["changed"], silver_result["unchanged"],
+            silver_result["silver_built"], silver_result["silver_skipped"],
+        )
     except Exception as e:
         logger.error("run_daily_etl_task: falha ao materializar silver: %s", e)
         step_errors.append(f"materialização do silver: {e}")
+    if silver_result["step_errors"]:
+        step_errors.append(
+            f"gate/materialização silver: {silver_result['step_errors']} erro(s)"
+        )
+
+    # Source runs ficam terminais somente agora, para que o ledger contenha o
+    # resultado do scraper e do gate Silver da mesma rodada.
+    for source_run_id, observed, source in pending_source_runs:
+        metrics = silver_result["by_source"].get(source, {
+            "unchanged": 0, "changed": 0, "silver_built": 0,
+            "silver_skipped": 0, "step_errors": 0,
+        })
+        try:
+            await asyncio.to_thread(
+                finish_run, db,
+                run_id=source_run_id,
+                status="succeeded",
+                records_observed=observed,
+                error_count=0,
+                metrics=metrics,
+            )
+        except Exception:
+            logger.warning("run_daily_etl: finish_run falhou (best-effort) source=%s",
+                           source, exc_info=True)
 
     # 2) Gold INCREMENTAL: ingest_all() popula entities/match_chunks a partir do
     #    silver de (1) + catálogos versionados (data/silver/{investidores,
@@ -1098,9 +1184,22 @@ async def _run_daily_etl(timestamp: int) -> dict[str, object]:
         try:
             last_step = "gold"
             from radar.core.kg.gold import ingest_all  # noqa: PLC0415
-            counts = await asyncio.to_thread(ingest_all)
-            n_gold = sum(v for v in counts.values() if isinstance(v, int)) if isinstance(counts, dict) else 0
-            logger.info("run_daily_etl_task: gold — %s", counts)
+            changed_ids = list(silver_result["changed_ids"])
+            gold_sources = ["investidor", "programa", "ict"]
+            if changed_ids:
+                gold_sources.append("edital")
+            counts = await asyncio.to_thread(
+                ingest_all, sources=gold_sources, edital_ids=changed_ids,
+            )
+            gold_counts = {
+                key: int(value) for key, value in counts.items()
+                if isinstance(value, int)
+            }
+            n_gold = gold_counts.get("edital", 0)
+            logger.info(
+                "run_daily_etl_task: gold — edital_ids=%d processed=%d skipped=%d counts=%s",
+                len(changed_ids), n_gold, gold_counts.get("skipped", 0), counts,
+            )
         except Exception as e:
             logger.error("run_daily_etl_task: falha ao ingerir gold: %s", e)
             step_errors.append(f"ingestão gold (ingest_all): {e}")
@@ -1152,8 +1251,15 @@ async def _run_daily_etl(timestamp: int) -> dict[str, object]:
         "status": "partial" if step_errors else "succeeded",
         "last_step": last_step,
         "counters": {
+            "records_observed": total_new,
             "records_new": total_new,
-            "silver": n_silver,
+            "unchanged": silver_result["unchanged"],
+            "changed": silver_result["changed"],
+            "silver_built": silver_result["silver_built"],
+            "silver_skipped": silver_result["silver_skipped"],
+            "gold_processed": n_gold,
+            "gold_skipped": gold_counts.get("skipped", 0),
+            "silver": silver_result["silver_built"],
             "gold": n_gold,
             "source_docs": n_docs,
             "step_errors": len(step_errors),
