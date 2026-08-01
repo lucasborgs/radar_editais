@@ -137,7 +137,9 @@ def start_run(
             .maybe_single()
             .execute()
         )
-        if existing.data:
+        # Supabase clients return either an API response or None for an empty
+        # maybe_single() result, depending on the installed client version.
+        if existing is not None and existing.data:
             return str(existing.data["id"])
 
         run_id = str(uuid.uuid4())
