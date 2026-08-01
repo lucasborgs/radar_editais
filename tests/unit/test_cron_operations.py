@@ -56,6 +56,15 @@ def test_start_cron_uses_atomic_upsert_and_returns_persisted_id():
     assert db.upserts[0][1:] == ("task,scheduled_at", True)
 
 
+def test_start_cron_records_deployed_image_version(monkeypatch):
+    from radar.core.services.cron_operations import start_cron
+
+    monkeypatch.setenv("IMAGE_VERSION", "7f30f26c5")
+    db = _LedgerDB()
+    assert start_cron(db, task="run_daily_etl", scheduled_at=1) == "persisted"
+    assert db.upserts[0][0]["image_version"] == "7f30f26c5"
+
+
 def test_safe_error_and_counters_redact_sensitive_values():
     assert "123456780001" not in safe_error("cnpj=12345678000199")
     assert safe_counters({"ok": 2, "bad-key": 4, "secret": "x"}) == {"ok": 2}

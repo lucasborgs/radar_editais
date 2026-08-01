@@ -53,6 +53,28 @@ def send_alert(subject: str, body: str) -> bool:
         return False
 
 
+def _record_alert_delivery_failure(conn, subject: str, now: datetime) -> None:
+    """Keep alert transport failures visible without leaking SMTP details."""
+    fingerprint = _fingerprint("alert_delivery_failed", safe_text(subject))
+    with conn.cursor() as cur:
+        cur.execute("""
+            insert into public.operational_incidents(fingerprint,kind,status,last_seen_at,details)
+            values (%s,'alert_delivery_failed','open',%s,jsonb_build_object('subject',%s::text))
+            on conflict (fingerprint) do update set status='open', last_seen_at=excluded.last_seen_at,
+                recovered_at=null, details=excluded.details
+        """, (fingerprint, now, safe_text(subject)))
+
+
+def _deliver_alert(conn, subject: str, body: str, now: datetime) -> bool:
+    delivered = send_alert(subject, body)
+    if not delivered:
+        # A monitor that silently drops an alert is itself an operational
+        # incident.  If this ledger write fails, the exception is intentional:
+        # the workflow must finish red instead of reporting a false green.
+        _record_alert_delivery_failure(conn, subject, now)
+    return delivered
+
+
 def observe_incident(conn, *, kind: str, detail: str, active: bool, message: str) -> bool:
     fingerprint = _fingerprint(kind, detail)
     now = datetime.now(timezone.utc)
@@ -72,8 +94,27 @@ def observe_incident(conn, *, kind: str, detail: str, active: bool, message: str
             return True
         if row and row[1] == "open":
             cur.execute("update public.operational_incidents set status='recovered', recovered_at=%s, last_seen_at=%s where id=%s", (now, now, row[0]))
-            send_alert(f"[radar] recuperação: {kind}", f"O incidente {kind} foi recuperado.")
     return False
+
+
+def _reconcile_inactive_incidents(conn, *, kind: str, active_fingerprints: set[str], now: datetime) -> int:
+    """Recover open incidents whose fingerprint is absent from this run."""
+    rows = _rows(conn, """
+        select id,fingerprint from public.operational_incidents
+        where kind=%s and status='open'
+    """, (kind,))
+    recovered = 0
+    for row in rows:
+        if row["fingerprint"] in active_fingerprints:
+            continue
+        with conn.cursor() as cur:
+            cur.execute(
+                "update public.operational_incidents set status='recovered', recovered_at=%s, last_seen_at=%s where id=%s and status='open'",
+                (now, now, row["id"]),
+            )
+        recovered += 1
+        _deliver_alert(conn, f"[radar] recuperação: {kind}", f"O incidente {kind} foi recuperado.", now)
+    return recovered
 
 
 def run(conn, now: datetime | None = None) -> dict[str, int]:
@@ -89,14 +130,18 @@ def run(conn, now: datetime | None = None) -> dict[str, int]:
     workers = _rows(conn, "select id,last_heartbeat from public.procrastinate_workers")
     heartbeats = {w["id"]: w.get("last_heartbeat") for w in workers}
     alerts = 0
+    alert_failures = 0
+    recovered = 0
     for task in CRON_TASKS:
         successes = [r for r in runs if r["task"] == task and r["status"] in ("succeeded", "partial") and r.get("completed_at")]
         latest = max(successes, key=lambda r: r["completed_at"], default=None)
         late = not latest or now - latest["completed_at"] > timedelta(minutes=SLA_MINUTES[task])
         if observe_incident(conn, kind=f"cron_late:{task}", detail=task, active=late, message=f"sem sucesso recente: {task}"):
             alerts += 1
-            send_alert(f"[radar] CRON atrasado: {task}", f"Não houve sucesso de {task} dentro do SLA.")
+            if not _deliver_alert(conn, f"[radar] CRON atrasado: {task}", f"Não houve sucesso de {task} dentro do SLA.", now):
+                alert_failures += 1
     cutoff = now - timedelta(minutes=STUCK_MINUTES)
+    active_fingerprints = {"job_stuck": set(), "task_retries_exhausted": set()}
     for job in jobs:
         started = job.get("started_at")
         if job["status"] == "failed" and (job.get("attempts") or 0) >= 3:
@@ -106,16 +151,23 @@ def run(conn, now: datetime | None = None) -> dict[str, int]:
             active, kind, detail = not heartbeat or heartbeat < cutoff, "job_stuck", str(job["id"])
         else:
             continue
+        if active:
+            active_fingerprints[kind].add(_fingerprint(kind, detail))
         if observe_incident(conn, kind=kind, detail=detail, active=active, message=f"incidente {kind}"):
             alerts += 1
-            send_alert(f"[radar] incidente operacional: {kind}", safe_text(f"job {job['id']}"))
+            if not _deliver_alert(conn, f"[radar] incidente operacional: {kind}", safe_text(f"job {job['id']}"), now):
+                alert_failures += 1
+    for kind, fingerprints in active_fingerprints.items():
+        recovered += _reconcile_inactive_incidents(conn, kind=kind, active_fingerprints=fingerprints, now=now)
     stale = [w for w in workers if not w.get("last_heartbeat") or w["last_heartbeat"] < cutoff]
     if not workers:
         stale = [{"id": "none"}]
     if observe_incident(conn, kind="worker_heartbeat_stale", detail="worker", active=bool(stale), message="heartbeat ausente"):
         alerts += 1
-        send_alert("[radar] heartbeat do worker ausente", "O heartbeat do worker está atrasado.")
-    return {"alerts": alerts, "jobs_checked": len(jobs), "workers_stale": len(stale)}
+        if not _deliver_alert(conn, "[radar] heartbeat do worker ausente", "O heartbeat do worker está atrasado.", now):
+            alert_failures += 1
+    return {"alerts": alerts, "alert_failures": alert_failures, "recovered": recovered,
+            "jobs_checked": len(jobs), "workers_stale": len(stale)}
 
 
 def main() -> int:

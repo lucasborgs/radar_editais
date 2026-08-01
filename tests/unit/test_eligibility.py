@@ -112,3 +112,24 @@ def test_aggregate_elegivel_when_all_sat_or_empty():
     # sem constraints → elegível
     assert el.evaluate_opportunity([], {"tamanho_empresa": "GRANDE"})["status"] == el.ELEGIVEL
     assert el.evaluate_opportunity(None, {})["status"] == el.ELEGIVEL
+
+
+def test_reasons_are_generic_and_deduplicated_preserving_order():
+    constraints = [
+        {"tipo": "faturamento", "op": "gte", "valor": 100},
+        {"tipo": "faturamento", "op": "gte", "valor": 200},
+        {"tipo": "faturamento", "op": "gte", "valor": 300},
+    ]
+    out = el.evaluate_opportunity(constraints, {"faturamento_anual": 1})
+    assert out["status"] == el.INELEGIVEL
+    assert out["unsat"] == ["O faturamento anual precisa atingir o mínimo do edital."]
+    assert "O este requisito" not in str(out)
+
+
+def test_not_in_reason_uses_natural_grammar():
+    verdict, reason = el.evaluate_constraint(
+        {"tipo": "forma_juridica", "op": "not_in", "valor": ["ict"]},
+        {"tipo_entidade": "ict"},
+    )
+    assert verdict == el.UNSAT
+    assert reason == "A empresa não atende ao requisito de natureza jurídica."
