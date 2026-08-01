@@ -643,7 +643,9 @@ structured_doc_schema:
     silver_version:           "str — versão do schema do bloco (bump = re-roda A e B)"
     structurer_prompt_version: "str — versão do prompt §11.3"
     structurer_model:         "str — modelo usado"
-    source_hash:              "str — hash do texto dos PDFs de origem"
+    source_hash:              "str — hash do Documento Canônico consumido pelo silver"
+    early_input_fingerprint:  "str — fingerprint determinístico dos artefatos bronze que alimentam o adapter"
+    early_fingerprint_version: "str — versão do fingerprint + produtores; aditivo e ignorável por versões antigas"
 ```
 
 `kind=boilerplate|signature` permite ao Ramo A descartar ruído (rodapé,
@@ -721,7 +723,8 @@ Três chaves de invalidação independentes — é o que mantém A e B desacopla
 
 | Camada | Chave de cache | Re-roda quando |
 |---|---|---|
-| Silver | `hash(pdf_text + prompt_version + model)` | PDF muda OU structurer versiona |
+| Early ETL gate | `fingerprint(artefatos bronze + documentos + produtores)` | input relevante, adapter, schema ou structurer muda |
+| Silver | `hash(canonical_doc + prompt_version + model)` | Documento Canônico muda OU structurer versiona |
 | Ramo A | `hash(silver_id + silver_version + wiki_prompt + metadata)` | schema da wiki (§4) muda |
 | Ramo B | `hash(silver_id + silver_version + chunk_policy + embed_model)` | política de chunk muda |
 
@@ -731,6 +734,31 @@ Consequência: mexer no schema da wiki re-roda **só a Knowledge gold**
 structurer re-roda ambas (esperado — é a raiz compartilhada). Sem conteúdo ou
 falha LLM: silver vazio → Knowledge cai no `_save_minimal_wiki_page`,
 Retrieval não indexa (comportamento atual preservado).
+
+### 11.5 Gate antecipado do ETL
+
+Antes de chamar o Source Adapter, `_build_all_silver` calcula um fingerprint
+determinístico por edital a partir do conteúdo dos artefatos bronze relevantes,
+do conjunto completo de documentos e de sua ordem normalizada. O fingerprint
+também inclui a versão efetiva do módulo do adapter, dos helpers de extração,
+do structurer e do schema. Mtime, caminho absoluto e timestamps de coleta não
+entram no cálculo.
+
+O fingerprint é persistido no sidecar do silver, de modo aditivo. Quando o
+fingerprint coincide e o JSONL/sidecar do silver está íntegro, o ETL encerra
+cedo o edital: não chama adapter, não persiste Documento Canônico e não roda o
+structurer. Em qualquer ausência, corrupção ou dúvida, o caminho é fail-open:
+adapter → Documento Canônico → silver.
+
+Após uma materialização bem-sucedida, a atualização do fingerprint é atômica.
+O Gold recebe somente os IDs que atravessaram o gate como `changed`; se nenhum
+edital mudou, o ingest de editais não é executado. O `source_hash` do Gold
+permanece como segunda proteção idempotente.
+
+O ledger registra, por execução e por canal, `records_observed`, `unchanged`,
+`changed`, `silver_built`, `silver_skipped`, `gold_processed`, `gold_skipped` e
+`step_errors`. Esses valores são contadores sem payload, URL ou conteúdo de
+documento.
 
 > Nomenclatura: "Ramo A" = **Knowledge gold** (§12, L3a); "Ramo B" =
 > **Retrieval gold** (§12, L3b). Ver §12 para o stack completo.
