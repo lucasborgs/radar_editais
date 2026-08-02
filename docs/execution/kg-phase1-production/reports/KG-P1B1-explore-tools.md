@@ -2,7 +2,7 @@
 
 > **Task:** KG-P1B-1 — integrar a Fase 1 (grafo `kg_phase1`) ao ExploreAgent,
 > read-only, atrás da flag `KG_PHASE1_EXPLORE_ENABLED=false`.
-> **Status:** concluída (sem deploy, sem merge, sem push). Auditoria Codex: pendente.
+> **Status:** concluída (sem deploy, sem merge, sem push). Auditoria Codex: aprovada em 2026-08-02.
 
 ## Identificação
 
@@ -253,5 +253,11 @@ git diff --check 32a25af5a..HEAD
 
 ## Auditoria Codex
 
-**Pendente.** Sem merge, sem push e sem deploy; a task termina aqui (não inicia
-a KG-P1B-2).
+**Aprovada em 2026-08-02.** Revalidação independente: 95 testes unitários e de
+regressão passaram; Ruff e `git diff --check` ficaram limpos; os 8 testes de
+integração passaram contra o PostgreSQL/Supabase local, incluindo
+`load_snapshot()` com conexão própria. Os quatro achados foram encerrados:
+timeout compatível com PostgreSQL real, busca sem corte do universo de atores,
+teto real de 12.000 bytes UTF-8 e tipos de aresta restritos à comunidade.
+
+Sem merge, sem push e sem deploy; a task termina aqui e não inicia a KG-P1B-2.
