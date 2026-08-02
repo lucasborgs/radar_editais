@@ -141,7 +141,11 @@ async def test_explore_thread_seeds_only_empty_checkpoint(monkeypatch, stored_co
         return stored_count
     monkeypatch.setattr("radar.core.llm.agent_graph.aget_thread_message_count", fake_count)
     monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent_streaming_async", fake_stream)
-    monkeypatch.setattr(ExploreAgent, "_explore_tools", lambda self: [])
+    monkeypatch.setattr(
+        ExploreAgent,
+        "_explore_tools",
+        lambda self, profile=None: [],
+    )
 
     async for _event in ExploreAgent().explore_stream(
         "segunda",
