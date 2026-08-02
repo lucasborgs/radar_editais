@@ -10,7 +10,8 @@
 | Base | `a068c8d0d` (`main` local) |
 | Worktree | `/private/tmp/radar-editais-kg-phase1c` |
 | Commit funcional | `6ca374f9f` — `fix(kg): complete strategic route evidence` |
-| Commit documental | `a criar` — `docs(kg): finalize KG-P1C audit corrections` |
+| Commit documental | `5de5e652e` — `docs(kg): finalize KG-P1C audit corrections` |
+| Commit de aprovação | registrado neste commit — `docs(kg): approve KG-P1C audit` |
 
 ## O que mudou
 
@@ -138,4 +139,4 @@ migrations ou Fase 2.
 
 ## Auditoria
 
-Auditoria Codex: pendente.
+Auditoria Codex: aprovada em 2026-08-02.
