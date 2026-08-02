@@ -9,8 +9,8 @@
 | Branch | `codex/kg-phase1-production-c` |
 | Base | `a068c8d0d` (`main` local) |
 | Worktree | `/private/tmp/radar-editais-kg-phase1c` |
-| Commit funcional | `5bb817c6a` — `fix(kg): correct profile-first graph strategy contract` |
-| Commit documental | `a criar` — `docs(kg): update KG-P1C audit corrections` |
+| Commit funcional | `6ca374f9f` — `fix(kg): complete strategic route evidence` |
+| Commit documental | `a criar` — `docs(kg): finalize KG-P1C audit corrections` |
 
 ## O que mudou
 
@@ -40,6 +40,23 @@ investidores. Para cada candidato, todos os vínculos diretos com âncoras de
 qualidade são agregados e deduplicados; o ranking ordena por quantidade de sinais
 compartilhados, depois distância e ID canônico. Um único caminho determinístico
 é preservado para explicação.
+
+## Afinidade herdada por rota
+
+Para cada candidato, a estratégia agrega os sinais das âncoras ligadas ao alvo
+e das entidades de catálogo efetivamente presentes no caminho explicativo. Assim,
+um programa ou agência alcançado por `perfil → qualidade → edital → programa/
+agência` herda os sinais do edital intermediário, mas não de outro componente do
+grafo. Cada característica traz `via_entity_id`; a deduplicação usa
+`(node_id, via_entity_id)`, e o ranking usa a quantidade total desses sinais.
+
+## Direção factual e direção de travessia
+
+O caminho preserva duas direções: `traversal_from`/`traversal_to` indicam como a
+BFS navegou, enquanto `source`/`target` preservam a direção persistida. Fatos de
+suporte usam sempre `source`/`target` reais. Por exemplo, navegar de
+`setor:agro` para `edital:e:1` não transforma a aresta factual
+`edital:e:1 → tem_setor → setor:agro` em uma relação invertida.
 
 ## Fatos, atributos e derivações
 
@@ -109,8 +126,8 @@ que uma ingestão autorizada os materialize; a P1C não cria ontologia, migratio
 
 ## Validação
 
-- `ENVIRONMENT=test PYTHONPATH=src /Users/lucasborges/radar_editais/.venv/bin/pytest -q tests/unit/test_kg_phase1_explore_tools.py tests/unit/test_explore_agent.py tests/unit/test_phase1_lifecycle.py tests/unit/test_explore_golden_cases.py tests/unit/test_explore_routing.py` — **80 passed, 2 skipped**.
-- `ENVIRONMENT=test PYTHONPATH=src /Users/lucasborges/radar_editais/.venv/bin/pytest -q tests/unit` — **2185 passed, 2 skipped**.
+- `ENVIRONMENT=test PYTHONPATH=src /Users/lucasborges/radar_editais/.venv/bin/pytest -q tests/unit/test_kg_phase1_explore_tools.py tests/unit/test_explore_agent.py tests/unit/test_phase1_lifecycle.py tests/unit/test_explore_golden_cases.py tests/unit/test_explore_routing.py` — **85 passed, 2 skipped**.
+- `ENVIRONMENT=test PYTHONPATH=src /Users/lucasborges/radar_editais/.venv/bin/pytest -q tests/unit` — **2189 passed, 2 skipped**.
 - `/Users/lucasborges/radar_editais/.venv/bin/ruff check $(git ls-files '*.py')` — **All checks passed**.
 - `git diff --check a068c8d0d..HEAD` — **limpo**.
 - `git diff --check` — limpo.
