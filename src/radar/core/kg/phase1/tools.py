@@ -52,7 +52,6 @@ MAX_PATHS = 3                # poucos caminhos (perfil e atores)
 MAX_PAYLOAD_BYTES = 12_000   # teto do payload serializado
 MAX_NAMES_PER_KIND = 12      # nomes por tipo no graph_community
 MAX_SHARED_QUALITIES = 8     # características compartilhadas no graph_community
-MAX_ACTOR_SEARCH = 10        # atores candidatos a percorrer no graph_reason
 
 # Predicados de QUALIDADE (fatos determinísticos do gold) — usados pelo
 # graph_community para achar características compartilhadas.
@@ -98,7 +97,7 @@ def graph_tools_enabled() -> bool:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Serialização compacta
+# Serialização compacta (KG-P1B-1 achado 3)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def dump(payload: dict[str, Any]) -> str:
@@ -106,25 +105,119 @@ def dump(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+def _utf8(payload: Any) -> int:
+    """Bytes UTF-8 do payload serializado — o teto REAL do contrato."""
+    return len(dump(payload).encode("utf-8"))
+
+
+def _clip_utf8(value: str, max_bytes: int) -> str:
+    """Corta uma string em BYTES UTF-8, SEM cortar no meio de um caractere
+    multibyte (decodifica com `errors="ignore"` → JSON sempre válido)."""
+    if max_bytes < 0:
+        max_bytes = 0
+    raw = value.encode("utf-8")
+    if len(raw) <= max_bytes:
+        return value
+    return raw[:max_bytes].decode("utf-8", errors="ignore")
+
+
+def _clone(value: Any) -> Any:
+    """Cópia profunda simples (dicts/listas de dicts/listas de str)."""
+    if isinstance(value, dict):
+        return {k: _clone(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_clone(v) for v in value]
+    return value
+
+
+def _shrink_targets(root: Any) -> list[tuple[int, tuple, list | dict | None, Any, str]]:
+    """Enumera TODOS os encolhimentos possíveis como
+    `(economia_em_bytes, caminho_lexicográfico, container, chave, tipo)`.
+
+    - listas: descarta o ÚLTIMO elemento (a cauda é a menos estrutural);
+    - dicts: descarta a ÚLTIMA chave (ordem do build — as primeiras são as
+      mais estruturais: center/entity/community_id primeiro);
+    - strings: corta pela METADE (bytes UTF-8, sem partir caractere).
+    Determinístico: a economia é o critério, e o caminho desempata.
+    Para strings, `container` é o pai (dict ou lista) e `chave` é a posição;
+    para uma string raiz solta, container=None e chave é a própria string."""
+    targets: list[tuple[int, tuple, list | dict | None, Any, str]] = []
+
+    def walk(value: Any, path: tuple, container: list | dict | None, key: Any) -> None:
+        if isinstance(value, list):
+            if value:
+                last = value[-1]
+                savings = _utf8(last) + 1  # + vírgula
+                targets.append((savings, path + ("pop_list",), value, -1, "list"))
+            for i, item in enumerate(value):
+                walk(item, path + (i,), value, i)
+        elif isinstance(value, dict):
+            if len(value) > 1:
+                last_key = list(value)[-1]
+                last_val = value[last_key]
+                if isinstance(last_val, (dict, list, str)):
+                    savings = _utf8(last_val) + len(last_key) + 4
+                    targets.append((savings, path + ("pop_key",), value, last_key, "dict"))
+            for k, item in value.items():
+                walk(item, path + (k,), value, k)
+        elif isinstance(value, str) and _utf8(value) > 16:
+            targets.append((_utf8(value) // 2, path + ("clip",), container, key, "str"))
+
+    walk(root, (), None, None)
+    return targets
+
+
+def _minimal_envelope(max_bytes: int) -> dict[str, Any]:
+    """Envelope categórico MÍNIMO e válido — usado quando nem o payload mais
+    enxuto cabe no teto. `{"truncated": true}` sempre cabe em MAX_PAYLOAD_BYTES."""
+    env: dict[str, Any] = {"truncated": True}
+    if _utf8(env) <= max_bytes:
+        return env
+    return {}
+
+
 def _trim_payload(payload: dict[str, Any], max_bytes: int) -> dict[str, Any]:
-    """Limita o payload serializado ao teto, removendo itens das listas maiores
-    (determinístico: sempre da cauda). Devolve o payload ajustado."""
-    if len(dump(payload)) <= max_bytes:
+    """Limita QUALQUER payload ao teto de BYTES UTF-8 (`_utf8 <= max_bytes`),
+    mantendo JSON válido e preservando a estrutura mais importante primeiro.
+
+    - mede bytes UTF-8 (não caracteres);
+    - limita listas, dicts (members_by_kind), nomes, ids/candidatos, centro,
+      entidade, comunidades e mensagens/notas;
+    - marca o corte com `"truncated": true`;
+    - se nem o envelope mínimo couber, devolve envelope categórico mínimo.
+
+    Algoritmo: cópia profunda + encolhimento guloso e determinístico (sempre o
+    alvo de MAIOR economia de bytes; o caminho desempata). Cada candidato é
+    verificado pela serialização real, então o teto é garantido por construção."""
+    if _utf8(payload) <= max_bytes:
         return payload
+    work = _clone(payload)
     guard = 0
-    while len(dump(payload)) > max_bytes and guard < 1000:
+    while _utf8(work) > max_bytes and guard < 10_000:
         guard += 1
-        for key in (
-            "paths_to_actors", "paths_to_profile", "edges", "nodes",
-            "shared_characteristics",
-        ):
-            lst = payload.get(key)
-            if isinstance(lst, list) and lst:
-                lst.pop()
-                break
-        else:
+        targets = _shrink_targets(work)
+        if not targets:
             break
-    return payload
+        targets.sort(key=lambda t: (-t[0], t[1]))
+        _, _, container, where, kind = targets[0]
+        if kind == "list":
+            container.pop()
+        elif kind == "dict":
+            container.pop(where)
+        else:
+            old = container[where] if container is not None else where
+            half = max(0, _utf8(old) // 2)
+            clipped = _clip_utf8(old, half)
+            if container is None:
+                work = clipped
+            else:
+                container[where] = clipped
+    if _utf8(work) > max_bytes:
+        return _minimal_envelope(max_bytes)
+    if not isinstance(work, dict):
+        return {"truncated": True}
+    work["truncated"] = True
+    return work
 
 
 def _props_of(edge: dict[str, Any]) -> dict[str, Any]:
@@ -375,14 +468,9 @@ def reason_payload(
         paths_to_profile = [_path_entry(p, edge_index) for p in raw[:max_paths]]
 
     actors = sorted(n["id"] for n in snapshot.nodes if n["kind"] in ("ict", "agencia"))
-    internal_raw: list[list[tuple[str, str, str]]] = []
-    for goal in actors[:MAX_ACTOR_SEARCH]:
-        found = traverse.find_paths(
-            edges, seed, goal, max_depth=max_depth, limit=2, min_weight=min_weight,
-        )
-        internal_raw.extend(found)
-        if len(internal_raw) >= max_paths:
-            break
+    internal_raw = traverse.find_paths_to_goals(
+        edges, seed, actors, max_depth=max_depth, limit=max_paths, min_weight=min_weight,
+    )
     paths_to_actors = [_path_entry(p, edge_index) for p in internal_raw[:max_paths]]
 
     idx = _node_index(snapshot)
@@ -471,9 +559,7 @@ def community_payload(
         e for e in snapshot.edges
         if e["source_id"] in member_set and e["target_id"] in member_set
     ]
-    edge_types = sorted({
-        e["type"] for e in snapshot.edges if e["source_id"] in member_set
-    })
+    edge_types = sorted({e["type"] for e in internal})
 
     shared_counts: dict[str, int] = {}
     for e in internal:
@@ -581,7 +667,9 @@ def _run(tool_name: str, fn) -> str:
         duration_ms=_elapsed(started), n_nodes=result.n_nodes, n_edges=result.n_edges,
         n_paths=result.n_paths, fallback=result.outcome != "hit",
     )
-    return dump(result.payload)
+    # Garantia FINAL do contrato de bytes (KG-P1B-1 achado 3): mesmo payloads
+    # categóricos (not_found/ambiguous/available_sample) nunca excedem o teto.
+    return dump(_trim_payload(result.payload, MAX_PAYLOAD_BYTES))
 
 
 def _elapsed(started: float) -> float:

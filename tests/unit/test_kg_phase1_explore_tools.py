@@ -487,7 +487,7 @@ def test_trim_payload_enforces_byte_cap():
         ]
     }
     trimmed = tools._trim_payload(big, 12_000)
-    assert len(tools.dump(trimmed)) <= 12_000
+    assert len(tools.dump(trimmed).encode("utf-8")) <= 12_000
     assert len(trimmed["edges"]) < 500
 
 
@@ -495,7 +495,7 @@ def test_tool_output_respects_payload_cap(monkeypatch):
     _snap_mock(monkeypatch, _snapshot())
     t = _tools(monkeypatch, profile=None)
     out = t["graph_explore"].invoke({"entity_ref": "edital:finep:589", "depth": 2})
-    assert len(out) <= 2 * 12_000 + 512  # utf-8 multibyte + folga
+    assert len(out.encode("utf-8")) <= tools.MAX_PAYLOAD_BYTES
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -651,7 +651,10 @@ def test_community_resolves_and_groups_by_kind(monkeypatch):
     assert set(out["members_by_kind"]) >= {"edital", "ict", "agencia"}
     assert "shared_characteristics" in out
     assert "edge_types" in out
-    assert "tem_setor" in out["edge_types"]
+    # KG-P1B-1 achado 4: edge_types vem SÓ de arestas internas (membro↔membro).
+    # tem_setor liga membros a NÓS EXTERNOS (qualidades) — NÃO pode aparecer.
+    assert "tem_setor" not in out["edge_types"]
+    assert "operado_por" in out["edge_types"]
 
 
 def test_community_variants_and_not_found(monkeypatch):
@@ -664,3 +667,208 @@ def test_community_variants_and_not_found(monkeypatch):
     miss = json.loads(t["graph_community"].invoke({"community_ref": "com_999"}))
     assert miss["status"] == "not_found"
     assert miss["available_sample"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Correção da auditoria KG-P1B-1
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_actor_after_tenth_alphabetical_is_found(monkeypatch):
+    """(achado 2) MAIS de 10 atores, com o ÚNICO alcançável DEPOIS da décima
+    posição alfabética — ele deve aparecer em paths_to_actors (o corte
+    `actors[:MAX_ACTOR_SEARCH]` foi removido)."""
+    nodes = [
+        {"id": "edital:seed", "kind": "edital", "native_id": "s:1",
+         "name": "Seed", "description": ""},
+    ]
+    # 10 ICTs irrealcançáveis (alfabeticamente ANTES do ator-alvo) + 1 alvo
+    nodes += [
+        {"id": f"ict:bloqueada:{i:02d}", "kind": "ict", "native_id": f"b:{i}",
+         "name": f"ICT bloqueada {i}", "description": ""}
+        for i in range(10)
+    ]
+    nodes.append(
+        {"id": "agencia:zeta", "kind": "agencia", "native_id": "z:1",
+         "name": "AGENCIA ZETA", "description": ""},
+    )
+    edges = [
+        _edge("edital:seed", "agencia:zeta", "operado_por", origin="phase1_structural"),
+        # uma aresta por ICT bloqueada que NÃO liga ao seed (falso-alvo)
+        *[
+            _edge(f"ict:bloqueada:{i:02d}", f"uf:sc:{i}", "tem_uf",
+                  origin="phase1_deterministic")
+            for i in range(10)
+        ],
+    ]
+    snap = Snapshot(
+        generation_id=3, nodes=nodes, quality_nodes=[], edges=edges, communities={},
+    )
+    out = tools.reason_payload("edital:seed", snap, max_depth=2)
+    actor_ids = {p[0]["to"] for p in out.payload["paths_to_actors"]}
+    assert "agencia:zeta" in actor_ids, (
+        "ator alcançável fora dos 10 primeiros alfabéticos deve aparecer"
+    )
+
+
+def test_community_edge_types_only_internal(monkeypatch):
+    """(achado 4) fixture com aresta entre DOIS membros e aresta de membro para
+    NÓ EXTERNO: n_internal_edges conta só a interna; edge_types não inclui o
+    predicado da externa; características compartilhadas permanecem corretas."""
+    nodes = [
+        {"id": "edital:src:1", "kind": "edital", "native_id": "s:1",
+         "name": "Edital A", "description": ""},
+        {"id": "ict:src:1", "kind": "ict", "native_id": "i:1",
+         "name": "ICT B", "description": ""},
+    ]
+    quality = [
+        {"id": "setor:agro", "family": "setor", "value": "Agro"},
+        {"id": "setor:saude", "family": "setor", "value": "Saúde"},
+    ]
+    edges = [
+        _edge("edital:src:1", "ict:src:1", "potencial_parceria",
+              origin="phase1_tech_bridge", weight=0.5),
+        _edge("edital:src:1", "setor:agro", "tem_setor", origin="phase1_deterministic"),
+        _edge("edital:src:1", "setor:saude", "tem_setor", origin="phase1_deterministic"),
+    ]
+    communities = {"com_0": ["edital:src:1", "ict:src:1"]}
+    snap = Snapshot(generation_id=4, nodes=nodes, quality_nodes=quality,
+                    edges=edges, communities=communities)
+    _snap_mock(monkeypatch, snap)
+    t = _tools(monkeypatch, profile=None)
+    out = json.loads(t["graph_community"].invoke({"community_ref": "com_0"}))
+    # 1 aresta INTERNA (potencial_parceria); as tem_setor são externas
+    assert out["n_internal_edges"] == 1
+    assert "potencial_parceria" in out["edge_types"]
+    assert "tem_setor" not in out["edge_types"]
+    # características compartilhadas = qualidades compartilhadas entre membros
+    # (nenhuma aqui: cada tem_setor liga a QUALIDADE EXTERNA, não é interna)
+    assert out["shared_characteristics"] == []
+
+
+def _assert_payload_within_cap(raw: str) -> dict:
+    data = json.loads(raw)
+    assert len(raw.encode("utf-8")) <= tools.MAX_PAYLOAD_BYTES
+    return data
+
+
+def test_payload_cap_multibyte_long_names(monkeypatch):
+    """(achado 3) nomes multibyte muito longos em graph_explore."""
+    huge = "éáíóúçãñ" * 5_000  # 60k chars multibyte (bem acima do teto)
+    nodes = [
+        {"id": "edital:finep:589", "kind": "edital", "native_id": "finep:589",
+         "name": huge, "description": ""},
+        {"id": "agencia:finep", "kind": "agencia", "native_id": "finep",
+         "name": "FINEP", "description": ""},
+    ]
+    snap = Snapshot(
+        generation_id=9, nodes=nodes, quality_nodes=[],
+        edges=[_edge("edital:finep:589", "agencia:finep", "operado_por",
+                     origin="phase1_structural")],
+        communities={},
+    )
+    _snap_mock(monkeypatch, snap)
+    t = _tools(monkeypatch, profile=None)
+    data = _assert_payload_within_cap(t["graph_explore"].invoke(
+        {"entity_ref": "edital:finep:589"}))
+    assert data.get("truncated") is True
+
+
+def test_payload_cap_community_many_kinds(monkeypatch):
+    """(achado 3) comunidade com MUITOS kinds e nomes em graph_community."""
+    nodes = []
+    edges = []
+    members = []
+    for i in range(60):
+        nid = f"ict:multi:{i}"
+        # nomes MUITO longos e multibyte — cada nome sozinho já estoura o teto
+        nodes.append({"id": nid, "kind": "ict", "native_id": f"m:{i}",
+                      "name": f"Nome ICT {i} " + "éíóúáçñ" * 1_000, "description": ""})
+        members.append(nid)
+    communities = {"com_0": members}
+    snap = Snapshot(generation_id=10, nodes=nodes, quality_nodes=[],
+                    edges=edges, communities=communities)
+    _snap_mock(monkeypatch, snap)
+    t = _tools(monkeypatch, profile=None)
+    data = _assert_payload_within_cap(t["graph_community"].invoke(
+        {"community_ref": "com_0"}))
+    assert data.get("truncated") is True
+
+
+def test_payload_cap_long_ids_and_candidates(monkeypatch):
+    """(achado 3) ids/candidatos longos — payload not_found/ambiguous com
+    candidatos longos ainda respeita o teto (aqui via graph_explore ambíguo)."""
+    long_id_a = "edital:srcA:" + "a" * 9_000
+    long_id_b = "edital:srcB:" + "b" * 9_000
+    nodes = [
+        {"id": long_id_a, "kind": "edital", "native_id": "dup:x",
+         "name": "Projeto Alfa", "description": ""},
+        {"id": long_id_b, "kind": "edital", "native_id": "dup:x",
+         "name": "Projeto Beta", "description": ""},
+    ]
+    snap = Snapshot(generation_id=11, nodes=nodes, quality_nodes=[], edges=[], communities={})
+    _snap_mock(monkeypatch, snap)
+    t = _tools(monkeypatch, profile=None)
+    data = _assert_payload_within_cap(t["graph_explore"].invoke({"entity_ref": "dup:x"}))
+    assert data["status"] == "ambiguous"
+    assert data.get("truncated") is True
+    # community not_found (available_sample) também dentro do teto
+    _snap_mock(monkeypatch, _snapshot())
+    t2 = _tools(monkeypatch, profile=None)
+    miss = _assert_payload_within_cap(t2["graph_community"].invoke(
+        {"community_ref": "x" * 30_000}))
+    assert miss["status"] == "not_found"
+
+
+def test_payload_cap_reason_long_entity(monkeypatch):
+    """(achado 3) entidade/centro muito longos em graph_reason."""
+    huge = "Empresa Incrível de Tecnologia " + "z" * 50_000
+    nodes = [
+        {"id": "edital:finep:589", "kind": "edital", "native_id": "finep:589",
+         "name": huge, "description": ""},
+    ]
+    snap = Snapshot(
+        generation_id=12, nodes=nodes, quality_nodes=[],
+        edges=[], communities={},
+    )
+    _snap_mock(monkeypatch, snap)
+    t = _tools(monkeypatch, profile=None)
+    data = _assert_payload_within_cap(t["graph_reason"].invoke(
+        {"entity_ref": "edital:finep:589"}))
+    assert data.get("truncated") is True
+    assert json.loads(json.dumps(data))  # JSON válido
+
+
+def test_payload_cap_all_three_tools_adversarial(monkeypatch):
+    """(achado 3) payloads de graph_explore, graph_reason e graph_community
+    sempre dentro do teto de bytes UTF-8."""
+    huge = "é" * 40_000
+    nodes = [
+        {"id": "edital:finep:589", "kind": "edital", "native_id": "finep:589",
+         "name": huge, "description": ""},
+        {"id": "ict:embrapii:ia", "kind": "ict", "native_id": "embrapii:ia",
+         "name": huge, "description": ""},
+        {"id": "agencia:finep", "kind": "agencia", "native_id": "finep",
+         "name": "FINEP", "description": ""},
+    ]
+    edges = [
+        _edge("edital:finep:589", "ict:embrapii:ia", "potencial_parceria",
+              origin="phase1_tech_bridge", weight=0.5),
+        _edge("edital:finep:589", "agencia:finep", "operado_por",
+              origin="phase1_structural"),
+        _edge("ict:embrapii:ia", "agencia:finep", "operado_por",
+              origin="phase1_structural"),
+    ]
+    snap = Snapshot(
+        generation_id=13, nodes=nodes, quality_nodes=[],
+        edges=edges, communities={"com_0": ["edital:finep:589", "ict:embrapii:ia"]},
+    )
+    _snap_mock(monkeypatch, snap)
+    t = _tools(monkeypatch, profile=None)
+    for name, args in (
+        ("graph_explore", {"entity_ref": "edital:finep:589", "depth": 2}),
+        ("graph_reason", {"entity_ref": "edital:finep:589", "max_depth": 4}),
+        ("graph_community", {"community_ref": "com_0"}),
+    ):
+        out = t[name].invoke(args)
+        data = _assert_payload_within_cap(out)
+        assert data.get("truncated") is True

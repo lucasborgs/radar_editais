@@ -119,6 +119,70 @@ def reachable_within(
     return visited
 
 
+def find_paths_to_goals(
+    edges: list[dict[str, Any]],
+    start: str,
+    goals: list[str],
+    *,
+    max_depth: int = 4,
+    limit: int = 5,
+    min_weight: float = 0.0,
+) -> list[list[tuple[str, str, str]]]:
+    """Caminho MAIS CURTO de `start` até cada alvo alcançável em `goals`,
+    com UMA única BFS (não-direcionada, cycle-safe, limitada a `max_depth`
+    níveis — nunca percorre o componente inteiro).
+
+    - nunca corta o universo de alvos por ordem alfabética: TODOS os alcançáveis
+      são considerados (KG-P1B-1 achado 2);
+    - prefere MENOR distância (primeira visita do BFS = caminho mínimo em saltos);
+    - desempate determinístico por id do alvo;
+    - `limit` limita apenas a quantidade de caminhos DEVOLVIDOS;
+    - `min_weight`, profundidade e ausência de repetição de nós preservadas."""
+    depth = max(1, int(max_depth))
+    adj = _adjacency_refs(edges, min_weight=min_weight)
+    if start not in adj or not goals:
+        return []
+
+    goal_set = set(goals)
+    # parent[node] = (nó anterior, tipo da aresta) do caminho mínimo (BFS por
+    # largura garante o menor nº de saltos na primeira visita).
+    parent: dict[str, tuple[str | None, str]] = {start: (None, "")}
+    frontier = {start}
+    for _ in range(depth):
+        nxt: set[str] = set()
+        for node in frontier:
+            for e in adj.get(node, []):
+                other = e["target_id"] if e["source_id"] == node else e["source_id"]
+                if other in parent:
+                    continue
+                parent[other] = (node, e["type"])
+                nxt.add(other)
+        frontier = nxt
+        if not frontier:
+            break
+
+    def _reconstruct(goal: str) -> list[tuple[str, str, str]]:
+        path: list[tuple[str, str, str]] = []
+        cur = goal
+        while parent[cur][0] is not None:
+            prev, type_ = parent[cur]
+            path.append((prev, type_, cur))
+            cur = prev
+        return list(reversed(path))
+
+    candidates: list[tuple[int, str, list[tuple[str, str, str]]]] = []
+    for goal in goal_set:
+        if goal == start or goal not in parent:
+            continue
+        path = _reconstruct(goal)
+        if len(path) > depth:
+            continue
+        candidates.append((len(path), goal, path))
+
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    return [path for _, _, path in candidates[:limit]]
+
+
 def filter_predicate(edges: list[dict[str, Any]], predicate: str) -> list[dict[str, Any]]:
     """Filtra arestas por tipo. `predicate` exato."""
     return [e for e in edges if e["type"] == predicate]

@@ -206,6 +206,30 @@ class TestKgPhase1ProjectionLocal:
         assert old_nodes == nodes
         assert store.current_generation(conn=kg_db)["id"] != first["generation"]
 
+    def test_load_snapshot_real_pg_no_syntax_error(self, kg_db):
+        """(KG-P1B-1 achado 1) `load_snapshot()` SEM injetar conexão, contra o
+        Postgres REAL: a geração corrente e TODOS os componentes carregam e o
+        timeout não causa erro de sintaxe (set_config parametrizado)."""
+        out = ingest.build(run_communities=True)
+        snap = store.load_snapshot()
+        assert snap is not None
+        assert snap.generation_id == out["generation"]
+        assert snap.nodes, "nós devem carregar"
+        assert snap.quality_nodes, "quality nodes devem carregar"
+        assert snap.edges, "arestas devem carregar"
+        assert snap.communities, "comunidades devem carregar"
+        # os ids lidos pertencem à geração corrente (nunca mistura gerações)
+        with kg_db.cursor() as cur:
+            cur.execute(
+                "select id, kind, native_id, name from kg_phase1.nodes "
+                "where generation_id = %s order by id",
+                (snap.generation_id,),
+            )
+            expected = [dict(zip(("id", "kind", "native_id", "name"), r, strict=True))
+                        for r in cur.fetchall()]
+        assert len(snap.nodes) == len(expected)
+        assert all(n["id"] in {e["id"] for e in expected} for n in snap.nodes)
+
     def test_failure_rolls_back_and_keeps_previous_healthy(self, kg_db, monkeypatch):
         """(7)+(8)+(9) falha após iniciar a nova geração → rollback, saudável
         anterior corrente, ledger `failed` categórico e sanitizado."""

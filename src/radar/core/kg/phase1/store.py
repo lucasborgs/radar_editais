@@ -329,9 +329,13 @@ def load_snapshot(
         with conn.transaction():
             with conn.cursor() as cur:
                 if own:
+                    # PostgreSQL não aceita parâmetro em `SET LOCAL`. Usamos
+                    # set_config(setting, value, is_local) — valor NUMÉRICO
+                    # gerado por nós (nunca conteúdo não confiável) e escopo
+                    # só desta transação (equivalente ao SET LOCAL).
                     cur.execute(
-                        "set local statement_timeout = %s",
-                        (max(1, int(timeout * 1000)),),
+                        "select set_config('statement_timeout', %s, true)",
+                        (str(max(1, int(timeout * 1000))),),
                     )
                 cur.execute(
                     f"select id from {SCHEMA}.generations "
