@@ -50,6 +50,11 @@ dev = [
     "mypy>=1.10,<2",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    # CI instala `.[dev]` e executa o teste REAL de comunidades (Louvain) da
+    # projeção kg_phase1. É também extra funcional `[graph]` (proibido movê-lo
+    # para as dependências principais: o worker já o recebe via
+    # requirements.worker.lock.txt, e prod não deve carregar grafo pesado).
+    "networkx>=3.2",
 ]
 # Reranker local do RAG de escrita (Front 4). Opcional: dep pesada (torch).
 # Sem ela, RERANK_BACKEND=cross-encoder degrada para RRF puro; use

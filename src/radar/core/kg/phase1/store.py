@@ -217,7 +217,7 @@ def load_communities(
         with conn.cursor() as cur:
             cur.execute(
                 f"select community_id, node_id from {SCHEMA}.communities "
-                f"where generation_id = %s",
+                f"where generation_id = %s order by community_id, node_id",
                 (gen,),
             )
             out: dict[str, list[str]] = {}

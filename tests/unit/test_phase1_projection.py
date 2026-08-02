@@ -19,9 +19,11 @@ from __future__ import annotations
 
 import ast
 import copy
+import logging
 from collections import defaultdict
 from pathlib import Path
 
+import psycopg
 import pytest
 
 from radar.core.config import ROOT
@@ -374,13 +376,184 @@ def test_detect_communities_deterministic_and_empty():
     assert features.node_stats([]) == {}
 
 
-def test_sanitize_error_redacts_dsn():
-    msg = ingest._sanitize_error(
-        RuntimeError("não conectou em postgresql://user:pass@host:5432/db")
+def test_communities_ids_stable_across_edge_order():
+    """IDs com_<idx> estáveis: embaralhar a ordem das arestas não muda nem a
+    composição nem o ID de cada comunidade (ordenação por membros antes do ID)."""
+    import random
+
+    _, _, edges = ingest._build_rows(_fixture_entities(), _fixture_rels())
+    base = features.detect_communities(edges)
+    rnd = random.Random(3)
+    for _ in range(4):
+        shuffled = list(edges)
+        rnd.shuffle(shuffled)
+        assert features.detect_communities(shuffled) == base
+
+
+def test_communities_degrade_cleanly_without_networkx(monkeypatch):
+    """Sem networkx (extra [graph]/[dev] ausente), o build NÃO quebra:
+    comunidades = [], node_stats = {} — degradação explícita, não erro."""
+    import builtins
+
+    real_import = builtins.__import__
+
+    def _no_networkx(name, *args, **kwargs):
+        if name == "networkx" or name.startswith("networkx."):
+            raise ImportError("No module named 'networkx'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _no_networkx)
+    _, _, edges = ingest._build_rows(_fixture_entities(), _fixture_rels())
+    assert features.detect_communities(edges) == []
+    assert features.node_stats(edges) == {}
+
+
+def test_determinism_independent_of_input_order():
+    """Entradas EMBARALHADAS/revertidas produzem EXATAMENTE os mesmos nós,
+    nós de qualidade, arestas (na mesma ordem), source_hash e comunidades."""
+    import random
+
+    entities, rels = _fixture_entities(), _fixture_rels()
+    base_nodes, base_quality, base_edges = ingest._build_rows(entities, rels)
+    base_hash = ingest._source_hash(entities, rels)
+    base_communities = features.detect_communities(base_edges)
+
+    rnd = random.Random(7)
+    for _ in range(5):
+        ents = list(entities)
+        rnd.shuffle(ents)
+        rls = list(rels)
+        rnd.shuffle(rls)
+        nodes, quality, edges = ingest._build_rows(ents, rls)
+        assert nodes == base_nodes
+        assert quality == base_quality
+        assert edges == base_edges
+        assert ingest._source_hash(ents, rls) == base_hash
+        assert features.detect_communities(edges) == base_communities
+
+    nodes, quality, edges = ingest._build_rows(
+        list(reversed(entities)), list(reversed(rels))
     )
-    assert "postgresql://" not in msg
-    assert "<redacted>" in msg
-    assert ingest._sanitize_error(RuntimeError("")) == "RuntimeError"
+    assert (nodes, quality, edges) == (base_nodes, base_quality, base_edges)
+    assert ingest._source_hash(
+        list(reversed(entities)), list(reversed(rels))
+    ) == base_hash
+
+
+# Probe executado em subprocess com PYTHONHASHSEED controlado (mesmo fixture).
+_HASHSEED_PROBE = r"""
+import json
+from radar.core.kg.phase1 import ingest, features
+from tests.unit.test_phase1_projection import _fixture_entities, _fixture_rels
+
+entities, rels = _fixture_entities(), _fixture_rels()
+nodes, quality, edges = ingest._build_rows(entities, rels)
+print(json.dumps({
+    "source_hash": ingest._source_hash(entities, rels),
+    "nodes": [x["id"] for x in nodes],
+    "quality": [x["id"] for x in quality],
+    "edges": [[x["source_id"], x["target_id"], x["type"]] for x in edges],
+    "communities": [[cid, members] for cid, members in features.detect_communities(edges)],
+}, sort_keys=True, separators=(",", ":")))
+"""
+
+
+def test_determinism_across_pythonhashseed():
+    """Prova simples (sem infraestrutura própria) de que a projeção — hash,
+    nós, qualidade, arestas e comunidades — é idêntica sob PYTHONHASHSEED
+    diferentes. O subprocess roda o MESMO probe com seeds 0, 1 e 2."""
+    import os
+    import subprocess
+    import sys
+
+    src = str(Path(ingest.__file__).resolve().parents[4])
+    root = str(Path.cwd())
+    py_path = os.pathsep.join([src, root])
+    outputs: dict[str, str] = {}
+    for seed in ("0", "1", "2"):
+        env = {**os.environ, "PYTHONHASHSEED": seed, "PYTHONPATH": py_path}
+        outputs[seed] = subprocess.check_output(
+            [sys.executable, "-c", _HASHSEED_PROBE], cwd=root, env=env, text=True,
+        )
+    assert outputs["0"] == outputs["1"] == outputs["2"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sanitização de falhas: categorias canônicas; NUNCA str(exc)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_ADVERSARIAL_MSG = (
+    "postgresql://user:pass@db.internal:5432/radar SEGREDO_BRUTO "
+    "https://admin.example.com/secret SELECT * FROM entities WHERE 1=1 "
+    "texto do edital confidencial"
+)
+
+
+def test_error_category_mapping():
+    assert ingest._category_of(ImportError("no networkx")) == "dependency_error"
+    assert ingest._category_of(ModuleNotFoundError("x")) == "dependency_error"
+    assert ingest._category_of(ValueError("bad")) == "contract_error"
+    assert ingest._category_of(KeyError("k")) == "contract_error"
+    assert ingest._category_of(TypeError("t")) == "contract_error"
+    assert ingest._category_of(psycopg.OperationalError("db down")) == "database_error"
+    assert ingest._category_of(RuntimeError("boom")) == "unexpected_error"
+    assert ingest._error_field(psycopg.OperationalError("x")) == "database_error:OperationalError"
+    assert ingest._error_field(RuntimeError("x")) == "unexpected_error:RuntimeError"
+    assert ingest._error_field(ValueError("x")) == "contract_error:ValueError"
+
+
+def test_record_failure_persists_only_category_and_type(monkeypatch):
+    """`_record_failure` grava `category:Type` — NUNCA a mensagem bruta."""
+    conn = _FailureRecordConn()
+    monkeypatch.setattr(psycopg, "connect", lambda *a, **k: conn)
+    monkeypatch.setattr(ingest.store, "get_dsn", lambda: "postgresql://dummy")
+    ingest._record_failure(RuntimeError(_ADVERSARIAL_MSG))
+    assert conn.cur.params == ("kg-phase1-v1", "unexpected_error:RuntimeError")
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        RuntimeError(_ADVERSARIAL_MSG),
+        psycopg.OperationalError(_ADVERSARIAL_MSG),
+        ValueError(_ADVERSARIAL_MSG),
+    ],
+)
+def test_adversarial_error_never_leaks_to_ledger_or_log(caplog, monkeypatch, exc):
+    """Nem o ledger nem os logs contêm DSN/URL/SQL/trecho/segredo da mensagem."""
+    caplog.set_level(logging.ERROR, logger="radar.core.kg.phase1.ingest")
+    conn = _FailureRecordConn()
+    monkeypatch.setattr(psycopg, "connect", lambda *a, **k: conn)
+    monkeypatch.setattr(ingest.store, "get_dsn", lambda: "postgresql://dummy")
+    ingest._record_failure(exc)
+
+    field = conn.cur.params[1]
+    assert field == f"{ingest._category_of(exc)}:{type(exc).__name__}"
+    assert _ADVERSARIAL_MSG not in field
+    for marker in ("postgresql://", "user:pass", "SEGREDO_BRUTO", "https://",
+                   "admin.example.com", "SELECT", "confidencial"):
+        assert marker not in field
+
+    assert "Traceback" not in caplog.text
+    for marker in ("postgresql://", "user:pass", "SEGREDO_BRUTO", "https://",
+                   "admin.example.com", "SELECT", "confidencial"):
+        assert marker not in caplog.text
+
+
+def test_record_failure_fallback_logs_only_category(monkeypatch, caplog):
+    """Se o próprio registro `failed` falhar, loga categoria+tipo do fallback —
+    sem `logger.exception`, sem traceback, sem mensagem."""
+    caplog.set_level(logging.WARNING, logger="radar.core.kg.phase1.ingest")
+    monkeypatch.setattr(ingest.store, "get_dsn", lambda: "postgresql://dummy")
+    monkeypatch.setattr(psycopg, "connect", lambda *a, **k: (_ for _ in ()).throw(
+        psycopg.OperationalError(_ADVERSARIAL_MSG)
+    ))
+    ingest._record_failure(RuntimeError("boom"))
+    assert "Traceback" not in caplog.text
+    for marker in ("postgresql://", "SEGREDO_BRUTO", "SELECT"):
+        assert marker not in caplog.text
+    assert "categoria=database_error" in caplog.text
+    assert "tipo=OperationalError" in caplog.text
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -500,6 +673,39 @@ class _StoreConn:
 class _DummyConn:
     def cursor(self):
         return _StoreCur(None)
+
+    def close(self):
+        pass
+
+
+class _FailureRecordCur:
+    """Cursor fake que captura o INSERT do ledger `failed` (sem banco)."""
+
+    def __init__(self):
+        self.params = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def execute(self, sql, params=None):
+        self.params = params
+
+
+class _FailureRecordConn:
+    def __init__(self):
+        self.cur = _FailureRecordCur()
+
+    def cursor(self):
+        return self.cur
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
 
     def close(self):
         pass

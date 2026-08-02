@@ -51,7 +51,12 @@ def detect_communities(
     if g.number_of_edges() == 0:
         return []
     communities = nx.algorithms.community.louvain_communities(g, seed=seed)
-    return [(f"com_{idx}", sorted(members)) for idx, members in enumerate(communities)]
+    # ID DETERMINÍSTICO: ordena as comunidades pelo conjunto ORDENADO de
+    # membros ANTES de atribuir com_0/com_1/... — a ordem incidental devolvida
+    # pelo algoritmo (que depende da iteração dos sets internos do networkx)
+    # nunca decide o ID. Membros dentro de cada comunidade também ordenados.
+    ordered = sorted(communities, key=lambda members: tuple(sorted(members)))
+    return [(f"com_{idx}", sorted(members)) for idx, members in enumerate(ordered)]
 
 
 def node_stats(edges: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -68,7 +73,7 @@ def node_stats(edges: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     centrality = nx.degree_centrality(g)
     return {
         node: {"degree": degree[node], "centrality": round(centrality[node], 4)}
-        for node in g.nodes()
+        for node in sorted(g.nodes())
     }
 
 

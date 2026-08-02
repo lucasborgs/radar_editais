@@ -17,6 +17,18 @@ pula (`--no-skip` força). Origens preservadas em `edges.origin` (CHECK fechado)
 phase1_deterministic | phase1_structural | phase1_similarity | phase1_tech_bridge
 (similar_a e potencial_parceria são DERIVADAS — nunca fato documental).
 
+DETERMINISMO TOTAL: a mesma entrada produz exatamente os mesmos nós, arestas
+(na mesma ordem), comunidades (mesmos IDs) e `source_hash`, independente da
+ordem devolvida pelo Postgres, da ordem das listas de entrada, da iteração de
+`set` e do `PYTHONHASHSEED` — tudo é ordenado de forma CANÔNICA (nós/qualidade
+por id; arestas por JSON canônico; comunidades ordenadas pelos membros antes
+do `com_<idx>`; JSON com sort_keys + separadores estáveis).
+
+FALHA SEGURA: o ledger e os logs registram APENAS categoria canônica + tipo
+(`database_error`, `dependency_error`, `contract_error`, `unexpected_error`) —
+NUNCA a mensagem da exceção. DSN, URL, SQL, trecho documental ou segredo
+presentes na mensagem não chegam à persistência nem ao log.
+
 Uso (sempre com ambiente local — o .env aponta pro remoto):
     DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \\
     python -m radar.core.kg.phase1.ingest [--no-skip] [--no-communities]
@@ -27,7 +39,6 @@ import argparse
 import hashlib
 import json
 import logging
-import re
 import unicodedata
 from typing import Any
 
@@ -63,6 +74,15 @@ _HUB_WEIGHT = 0.1
 
 def _deburr(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(c))
+
+
+def _json(value: Any) -> str:
+    """JSON CANÔNICO — base de hash e de ordenação total.
+
+    Chaves ordenadas recursivamente + separadores estáveis (`","`/`":"`) →
+    a mesma entrada produz exatamente os mesmos bytes, sem depender da ordem
+    de inserção dos dicts. Use também para ordenar listas de dicts."""
+    return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
 
 def _node_id(kind: str, native_id: str) -> str:
@@ -133,12 +153,15 @@ def _edge(source_id: str, target_id: str, type_: str, *,
 
 
 def _node_rows(entities: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        {"id": _node_id(e["kind"], e["native_id"]), "kind": e["kind"],
-         "native_id": e["native_id"], "name": e.get("name") or "",
-         "description": e.get("description") or "", "embedding": e.get("embedding")}
-        for e in entities
-    ]
+    return sorted(
+        (
+            {"id": _node_id(e["kind"], e["native_id"]), "kind": e["kind"],
+             "native_id": e["native_id"], "name": e.get("name") or "",
+             "description": e.get("description") or "", "embedding": e.get("embedding")}
+            for e in entities
+        ),
+        key=lambda n: n["id"],  # ordem canônica total (independente da leitura)
+    )
 
 
 def _quality_rows(entities: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -166,7 +189,10 @@ def _quality_rows(entities: list[dict[str, Any]]) -> list[dict[str, Any]]:
         for fid in _trl_faixa_id(*e["trl_range"]):
             label = fid.split(":")[1]
             rows.setdefault(fid, ("faixa_trl", label))
-    return [{"id": vid, "family": fam, "value": val} for vid, (fam, val) in rows.items()]
+    return sorted(
+        ({"id": vid, "family": fam, "value": val} for vid, (fam, val) in rows.items()),
+        key=lambda q: q["id"],  # ordem canônica total
+    )
 
 
 def _quality_edges(entities: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -226,6 +252,7 @@ def _similarity_edges(entities: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if vec is None or not vec.size:
             continue
         entries.append((_node_id(e["kind"], e["native_id"]), vec.astype(np.float32)))
+    entries.sort(key=lambda x: x[0])  # iteração canônica (por id do nó)
 
     edges: list[dict[str, Any]] = []
     for i, (nid, vec) in enumerate(entries):
@@ -267,9 +294,10 @@ def _partnership_edges(entities: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return []
 
     edges: list[dict[str, Any]] = []
-    for eid in editais:
+    # Iteração ORDENADA por id — conjuntos (`set`) têm ordem dependente de hash.
+    for eid in sorted(editais):
         et = tech_by_id[eid]
-        for iid in icts:
+        for iid in sorted(icts):
             shared = et & tech_by_id[iid]
             if not shared:
                 continue
@@ -284,10 +312,14 @@ def _partnership_edges(entities: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _dedup_edges(edges: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Dedup por (source, target, type) mantendo a 1ª ocorrência — espelha o
-    `on conflict ... do nothing` do INSERT (contagens determinísticas)."""
+    `on conflict ... do nothing` do INSERT (contagens determinísticas).
+
+    A entrada é ORDENADA por JSON canônico ANTES do dedup: para o mesmo gold,
+    a 1ª ocorrência (e a ordem final) é sempre a mesma, independente da ordem
+    das listas de entrada ou do Postgres. Empates são idênticos em conteúdo."""
     seen: set[tuple[str, str, str]] = set()
     out: list[dict[str, Any]] = []
-    for e in edges:
+    for e in sorted(edges, key=_json):
         key = (e["source_id"], e["target_id"], e["type"])
         if key in seen:
             continue
@@ -327,14 +359,14 @@ def _source_hash(entities: list[dict[str, Any]], rels: list[tuple[str, str, str]
 
     for e in sorted(entities, key=lambda x: (x["kind"], x["native_id"])):
         h.update(_u(f"{e['kind']}|{e['native_id']}|{e['name']}|{e['description']}"))
-        h.update(_u(json.dumps(sorted(e.get("setores") or []), ensure_ascii=False)))
-        h.update(_u(json.dumps(sorted(e.get("tecnologias_tags") or []), ensure_ascii=False)))
+        h.update(_u(_json(sorted(e.get("setores") or []))))
+        h.update(_u(_json(sorted(e.get("tecnologias_tags") or []))))
         meta = e.get("metadata") or {}
-        h.update(_u(json.dumps(sorted(meta.get("estagio_alvo") or []), ensure_ascii=False)))
+        h.update(_u(_json(sorted(meta.get("estagio_alvo") or []))))
         h.update(_u(str(e.get("uf") or "")))
         h.update(_u(str(e.get("mecanismo") or "")))
-        h.update(_u(json.dumps(e.get("constraints") or [], ensure_ascii=False)))
-        h.update(_u(json.dumps(e.get("trl_range") or [])))
+        h.update(_u(_json(e.get("constraints") or [])))
+        h.update(_u(_json(e.get("trl_range") or [])))
         vec = _parse_vec(e.get("embedding"))
         if vec is not None and vec.size:
             h.update(np.asarray(vec, dtype=np.float32).tobytes())
@@ -363,6 +395,7 @@ _ENTITY_SQL = """
 select id, kind, source, native_id, name, description, setores, tecnologias_tags,
        uf, mecanismo, constraints, metadata, embedding
 from public.entities
+order by kind, native_id
 """
 
 
@@ -375,7 +408,10 @@ def _load_gold(cur) -> tuple[list[dict[str, Any]], list[tuple[str, str, str]]]:
         row["id"] = str(row["id"])
         row["trl_range"] = _trl_range_from_constraints(row.get("constraints"))
         entities.append(row)
-    cur.execute("select source_id, target_id, type from public.entity_relationships")
+    cur.execute(
+        "select source_id, target_id, type from public.entity_relationships "
+        "order by source_id, target_id, type"
+    )
     rels = [(str(s), str(t), ty) for s, t, ty in cur.fetchall()]
     return entities, rels
 
@@ -477,33 +513,58 @@ def _build_tx(
 # Orquestração + falha segura
 # ─────────────────────────────────────────────────────────────────────────────
 
-_DSN_RE = re.compile(r"(postgres(?:ql)?://[^\s]+)", re.IGNORECASE)
+def _category_of(exc: BaseException) -> str:
+    """Categoria CANÔNICA do erro — o ÚNICO conteúdo persistido no ledger
+    (nunca a mensagem). Garante que DSN, URL, SQL, trecho documental ou segredo
+    presentes na mensagem da exceção NÃO vazem para a persistência ou o log."""
+    if isinstance(exc, ImportError):
+        return "dependency_error"
+    if isinstance(exc, (ValueError, KeyError, TypeError)):
+        return "contract_error"
+    try:
+        from radar.core.environment import DatabaseTargetError
+
+        if isinstance(exc, DatabaseTargetError):
+            return "contract_error"
+    except ImportError:
+        pass
+    if isinstance(exc, psycopg.Error):
+        return "database_error"
+    if type(exc).__module__.startswith(("psycopg", "psycopg_pool")):
+        return "database_error"
+    return "unexpected_error"
 
 
-def _sanitize_error(exc: Exception) -> str:
-    """Mensagem SANITIZADA para o ledger — sem conteúdo de documentos, URLs
-    sensíveis (DSNs) ou payloads de query."""
-    msg = str(exc).strip()
-    if not msg:
-        return type(exc).__name__
-    msg = _DSN_RE.sub("<redacted>", msg).replace("\n", " ")[:300]
-    return f"{type(exc).__name__}: {msg}"
+def _error_field(exc: BaseException) -> str:
+    """Campo `generations.error` — SÓ categoria + nome seguro do tipo.
+
+    Nenhuma parte da mensagem é usada: `str(exc)` nunca é persistido nem
+    registrado (verificável por testes adversariais)."""
+    return f"{_category_of(exc)}:{type(exc).__name__}"
 
 
-def _record_failure(exc: Exception) -> None:
+def _record_failure(exc: BaseException) -> None:
     """Registro best-effort (fora da transação do build) de uma geração `failed`.
-    A última saudável permanece corrente — a transação que falhou rolou."""
+
+    Persiste apenas `_error_field` (categoria + tipo). A última saudável
+    permanece corrente — a transação que falhou rolou. Se o próprio registro
+    falhar, loga a categoria do fallback SEM traceback e SEM mensagem."""
+    field = _error_field(exc)
     try:
         with psycopg.connect(store.get_dsn(), autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     f"insert into {SCHEMA}.generations (status, build_version, error, finished_at) "
                     f"values ('failed', %s, %s, now())",
-                    (BUILD_VERSION, _sanitize_error(exc)),
+                    (BUILD_VERSION, field),
                 )
-    except Exception:
-        logger.exception("kg_phase1: não foi possível registrar geração 'failed'")
-    logger.error("kg_phase1: build falhou (%s)", type(exc).__name__)
+    except Exception as fallback_exc:  # noqa: BLE001
+        logger.warning(
+            "kg_phase1: não foi possível registrar geração 'failed' "
+            "(categoria=%s, tipo=%s)",
+            _category_of(fallback_exc), type(fallback_exc).__name__,
+        )
+    logger.error("kg_phase1: build falhou (categoria=%s, tipo=%s)", _category_of(exc), type(exc).__name__)
 
 
 def build(*, skip_unchanged: bool = True, run_communities: bool = True) -> dict[str, Any]:
