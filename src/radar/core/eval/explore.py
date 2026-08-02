@@ -3,6 +3,12 @@
 Default hermético valida rota. Com ``EVAL_EXPLORE_CONNECTED=true`` executa o
 pipeline real (retrieval, síntese/agente e catálogo) e julga conteúdo contra o
 golden semântico do NotebookLM, com a adaptação temporal da FINEP.
+
+KG-P1B-2 (aditivo, diagnóstico): quando conectado e ``KG_PHASE1_EXPLORE_ENABLED``
+ligada, o resultado ganha o bloco estrutural ``phase1`` e a suíte emite
+``graph_tool_usage`` (por caso), ``graph_fallback_rate`` e ``graph_latency_ms``
+(agregadas da rodada) — sinais estruturais, sem gate/threshold. O
+``answer_contract`` é preservado: as graph tools são read-only e aditivas.
 """
 from __future__ import annotations
 
@@ -15,8 +21,13 @@ from radar.core.eval.harness import Evaluation, Suite, get_input
 
 GOLDEN = ROOT / "data" / "evaluation" / "golden" / "explore.json"
 
+GRAPH_TOOL_NAMES = frozenset({"graph_explore", "graph_reason", "graph_community"})
+
 
 def load_data() -> list[dict]:
+    from radar.core.kg.phase1.tools import reset_run_stats
+
+    reset_run_stats()
     if not GOLDEN.exists():
         return []
     payload = json.loads(GOLDEN.read_text(encoding="utf-8"))
@@ -56,11 +67,21 @@ def task(*, item: Any, **_) -> dict:
         else {"node_id": target["id"], "node_type": target["type"]}
     )
     answer, meta = ExploreAgent().explore_with_meta(inp["query"], **kwargs)
+    called = meta.get("called_tools", [])
     output.update({
         "answer": answer,
         "route": (meta.get("route_decision") or {}).get("intent", output["route"]),
-        "called_tools": meta.get("called_tools", []),
+        "called_tools": called,
     })
+    # KG-P1B-2: sinal estrutural ADITIVO do grafo da Fase 1 (só quando habilitado
+    # e conectado) — nunca conteúdo; informa quais graph tools o agente usou.
+    from radar.core.kg.phase1.tools import graph_tools_enabled
+
+    if graph_tools_enabled():
+        output["phase1"] = {
+            "enabled": True,
+            "tools_called": [t for t in called if t in GRAPH_TOOL_NAMES],
+        }
     return output
 
 
@@ -76,12 +97,15 @@ def eval_tool_contract(*, output, expected_output, **_) -> Evaluation | None:
         return None
     route = (expected_output or {}).get("route")
     called = output.get("called_tools") or []
+    # As graph tools da Fase 1 (KG-P1B-2) são ADITIVAS e válidas para rotas de
+    # fato — o agente pode preferi-las às do catálogo quando a flag está ligada.
+    graph_ok = set(GRAPH_TOOL_NAMES)
     if route in {"EDITAL_FACT", "EDITAL_FACT_ENUMERATIVE"}:
         expected = "get_edital or search_entities"
-        acceptable = {"get_edital", "search_entities"}
+        acceptable = {"get_edital", "search_entities"} | graph_ok
     elif route == "ENTITY_FACT":
         expected = "get_investidor or list_investidores"
-        acceptable = {"get_investidor", "list_investidores"}
+        acceptable = {"get_investidor", "list_investidores"} | graph_ok
     else:
         return None
     passed = bool(acceptable & set(called))
@@ -134,6 +158,62 @@ def eval_answer_contract(*, output, expected_output, metadata, **_) -> Evaluatio
     }
 
 
+def eval_graph_tool_usage(*, output, expected_output, **_) -> Evaluation | None:
+    """KG-P1B-2 — sinal por caso: as graph tools da Fase 1 foram usadas?
+
+    Hermético (sem `answer`) ou grafo desligado → None (não pontua). Só faz
+    sentido no modo conectado com `KG_PHASE1_EXPLORE_ENABLED=true`."""
+    if not isinstance(output, dict) or not output.get("answer"):
+        return None
+    from radar.core.kg.phase1.tools import graph_tools_enabled
+
+    if not graph_tools_enabled():
+        return None
+    called = output.get("called_tools") or []
+    used = [t for t in called if t in GRAPH_TOOL_NAMES]
+    return {
+        "name": "graph_tool_usage", "value": 1.0 if used else 0.0,
+        "comment": f"graph_tools_called={used}",
+    }
+
+
+def eval_graph_fallback_rate(*, item_results, **_) -> Evaluation | None:
+    """KG-P1B-2 — taxa agregada de fallback das graph tools na rodada
+    (calls que degradaram: unavailable/error) sobre o total de calls.
+
+    Diagnóstico estrutural; sem threshold. Sem calls → None (não pontua)."""
+    from radar.core.kg.phase1.tools import run_stats
+
+    stats = run_stats()
+    calls = sum(int(s.get("calls", 0)) for s in stats.values())
+    if not calls:
+        return None
+    fallbacks = sum(int(s.get("fallbacks", 0)) for s in stats.values())
+    return {
+        "name": "graph_fallback_rate",
+        "value": round(fallbacks / calls, 4),
+        "comment": f"fallbacks={fallbacks} calls={calls} tools={sorted(stats)}",
+    }
+
+
+def eval_graph_latency_ms(*, item_results, **_) -> Evaluation | None:
+    """KG-P1B-2 — latência média (ms) das graph tools na rodada.
+
+    Diagnóstico estrutural; sem threshold. Sem calls → None (não pontua)."""
+    from radar.core.kg.phase1.tools import run_stats
+
+    stats = run_stats()
+    calls = sum(int(s.get("calls", 0)) for s in stats.values())
+    if not calls:
+        return None
+    total_ms = sum(float(s.get("duration_ms", 0)) for s in stats.values())
+    return {
+        "name": "graph_latency_ms",
+        "value": round(total_ms / calls, 2),
+        "comment": f"calls={calls} tools={sorted(stats)}",
+    }
+
+
 def _prereqs() -> str | None:
     if not GOLDEN.exists():
         return f"golden ausente: {GOLDEN}"
@@ -149,10 +229,11 @@ SUITE = Suite(
     description="Rota hermética ou E2E conectado dos quatro casos factuais golden.",
     load_data=load_data,
     task=task,
-    evaluators=[eval_route, eval_tool_contract, eval_answer_contract],
+    evaluators=[eval_route, eval_tool_contract, eval_answer_contract, eval_graph_tool_usage],
+    run_evaluators=[eval_graph_fallback_rate, eval_graph_latency_ms],
     prereqs=_prereqs,
     classification="diagnostic",
-    version="2",
+    version="3",
     dataset_paths=[GOLDEN],
     expected_cases=4,
     expected_case_ids=[
@@ -161,5 +242,10 @@ SUITE = Suite(
         "barn-verticais",
         "barn-tese",
     ],
-    manifest_env=["EVAL_EXPLORE_CONNECTED", "EVAL_EXPLORE_JUDGE_MODEL"],
+    manifest_env=[
+        "EVAL_EXPLORE_CONNECTED",
+        "EVAL_EXPLORE_JUDGE_MODEL",
+        "KG_PHASE1_EXPLORE_ENABLED",
+        "KG_PHASE1_AUTO_REFRESH_ENABLED",
+    ],
 )

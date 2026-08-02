@@ -24,6 +24,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 import unicodedata
 from dataclasses import dataclass, field
@@ -38,6 +39,26 @@ logger = logging.getLogger(__name__)
 
 # Flag única de ativação (default OFF).
 ENABLED_FLAG = "KG_PHASE1_EXPLORE_ENABLED"
+
+# Acumulador em processo (KG-P1B-2): contagens/duração POR tool da rodada —
+# SÓ estrutura (ints/floats), nunca conteúdo. Alimenta os diagnósticos da
+# suíte `explore` (graph_fallback_rate, graph_latency_ms). `reset_run_stats`
+# é chamado no início de cada run do harness de eval.
+_LOCK = threading.Lock()
+_RUN_STATS: dict[str, dict[str, float]] = {}
+
+
+def reset_run_stats() -> None:
+    """Zera o acumulador estrutural da rodada (harness de eval, KG-P1B-2)."""
+    with _LOCK:
+        _RUN_STATS.clear()
+
+
+def run_stats() -> dict[str, dict[str, float]]:
+    """Snapshot sanitizado (só tool → calls/fallbacks/duration_ms) da rodada."""
+    with _LOCK:
+        return {name: dict(stats) for name, stats in _RUN_STATS.items()}
+
 
 # Arestas com peso abaixo do corte não expandem a vizinhança — o hub
 # `setor:multissetorial` recebe weight=0.1 no build (SPEC §7 opção 4).
@@ -622,6 +643,14 @@ def _observe(
     """Métrica/log ESTRUTURAL — NUNCA conteúdo. Não registra: pergunta do
     usuário, `entity_ref`, perfil, nomes/descrições, payload, mensagem bruta
     de exceção, DSN ou URL."""
+    with _LOCK:
+        stats = _RUN_STATS.setdefault(
+            tool_name, {"calls": 0.0, "fallbacks": 0.0, "duration_ms": 0.0},
+        )
+        stats["calls"] += 1.0
+        stats["duration_ms"] += float(duration_ms)
+        if fallback:
+            stats["fallbacks"] += 1.0
     logger.info(
         "kg_phase1_explore tool=%s outcome=%s generation_id=%s duration_ms=%.1f "
         "nodes=%d edges=%d paths=%d fallback=%s category=%s",

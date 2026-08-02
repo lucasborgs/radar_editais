@@ -1180,6 +1180,8 @@ async def _run_daily_etl(timestamp: int) -> dict[str, object]:
     #    programas}.json + bronze EMBRAPII). Diff por source_hash: só re-processa
     #    edital alterado (2 chamadas LLM leves/edital + embeddings). Precisa de
     #    OPENAI_API_KEY (tagger/constraints/embeddings) e DATABASE_URL (gold._dsn).
+    phase1_refresh: dict | None = None
+    gold_ok = False
     if os.getenv("OPENAI_API_KEY") and os.getenv("DATABASE_URL"):
         try:
             last_step = "gold"
@@ -1191,6 +1193,7 @@ async def _run_daily_etl(timestamp: int) -> dict[str, object]:
             counts = await asyncio.to_thread(
                 ingest_all, sources=gold_sources, edital_ids=changed_ids,
             )
+            gold_ok = True
             gold_counts = {
                 key: int(value) for key, value in counts.items()
                 if isinstance(value, int)
@@ -1207,6 +1210,26 @@ async def _run_daily_etl(timestamp: int) -> dict[str, object]:
         logger.warning(
             "run_daily_etl_task: sem OPENAI_API_KEY/DATABASE_URL — ingestão gold pulada",
         )
+
+    # 2.5) KG Phase1 (KG-P1B-2): projeção determinística do grafo após o COMMIT
+    #      do gold — best-effort, idempotente por source_hash. Só roda quando o
+    #      gold desta run de fato comitou; falha NUNCA afeta status/last_step do
+    #      ETL (o produtor registra a geração 'failed' no ledger). Flag off =
+    #      no-op (sem conexão). Zero LLM.
+    if gold_ok:
+        from radar.core.kg.phase1 import lifecycle  # noqa: PLC0415
+        try:
+            phase1_refresh = await asyncio.to_thread(
+                lifecycle.refresh_after_gold, trigger="daily_etl",
+            )
+            logger.info(
+                "run_daily_etl_task: kg_phase1 refresh — %s", phase1_refresh,
+            )
+        except Exception as refresh_exc:
+            logger.warning(
+                "run_daily_etl_task: refresh kg_phase1 falhou: %s",
+                safe_error(refresh_exc),
+            )
 
     # 3) Rede de segurança: persiste documentos de editais que já existiam no
     #    catálogo mas não foram enumerados pelo bronze da run. O caminho normal
@@ -1262,9 +1285,14 @@ async def _run_daily_etl(timestamp: int) -> dict[str, object]:
             "silver": silver_result["silver_built"],
             "gold": n_gold,
             "source_docs": n_docs,
+            "kg_phase1_refresh": (
+                1 if phase1_refresh and phase1_refresh.get("outcome") in {"built", "skipped"}
+                else 0
+            ),
             "step_errors": len(step_errors),
         },
         "error": step_errors[0] if step_errors else None,
+        "phase1_refresh": phase1_refresh,
     }
 
 
@@ -1305,6 +1333,20 @@ async def ingest_promoted_edital_task(edital_id: str) -> None:
         return
     counts = await asyncio.to_thread(gold.ingest_all, sources=["edital"])
     logger.info("ingest_promoted_edital: %s ingerido no gold — %s", edital_id, counts)
+    # KG-P1B-2: projeção da Fase 1 após o commit do gold — best-effort e
+    # idempotente (source_hash). Falha não falha a promoção: o produtor já
+    # registra a geração 'failed' no ledger. Flag off = no-op (sem conexão).
+    from radar.core.kg.phase1 import lifecycle  # noqa: PLC0415
+    try:
+        refresh = await asyncio.to_thread(
+            lifecycle.refresh_after_gold, trigger="promoted_edital",
+        )
+        logger.info("ingest_promoted_edital: kg_phase1 refresh — %s", refresh)
+    except Exception as refresh_exc:
+        logger.warning(
+            "ingest_promoted_edital: refresh kg_phase1 falhou: %s",
+            safe_error(refresh_exc),
+        )
     from radar.core.services.discovery_promotion import mark_by_edital  # noqa: PLC0415
     mark_by_edital(edital_id, "silver_ready", "ready")
     mark_by_edital(edital_id, "radar_ready", "ready")

@@ -96,6 +96,88 @@ def test_run_daily_etl_returns_partial_summary_when_step_fails(monkeypatch, tmp_
     assert summary["last_step"] == "obsidian"
 
 
+def test_run_daily_etl_refreshes_phase1_after_gold_when_enabled(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
+    monkeypatch.setenv("KG_PHASE1_AUTO_REFRESH_ENABLED", "true")
+    from radar.core import config
+    monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
+    ingest_calls: list = []
+    _stub_etl(monkeypatch, ingest_calls)
+    refreshes: list = []
+    import radar.core.kg.phase1.lifecycle as lifecycle
+    monkeypatch.setattr(
+        lifecycle, "refresh_after_gold",
+        lambda **k: refreshes.append(k) or {"trigger": k["trigger"], "outcome": "built"},
+    )
+
+    summary = asyncio.run(tasks._run_daily_etl(0))
+
+    assert refreshes == [{"trigger": "daily_etl"}]
+    assert summary["phase1_refresh"]["outcome"] == "built"
+    assert summary["counters"]["kg_phase1_refresh"] == 1
+    assert summary["status"] == "succeeded"
+
+
+def test_run_daily_etl_skips_refresh_when_flag_off(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
+    monkeypatch.delenv("KG_PHASE1_AUTO_REFRESH_ENABLED", raising=False)
+    from radar.core import config
+    monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
+    ingest_calls: list = []
+    _stub_etl(monkeypatch, ingest_calls)
+    from radar.core.kg.phase1 import ingest
+    monkeypatch.setattr(
+        ingest, "build",
+        lambda **k: (_ for _ in ()).throw(AssertionError("flag off → build não roda")),
+    )
+
+    summary = asyncio.run(tasks._run_daily_etl(0))
+
+    assert summary["phase1_refresh"] == {"trigger": "daily_etl", "outcome": "disabled"}
+    assert summary["counters"]["kg_phase1_refresh"] == 0
+
+
+def test_run_daily_etl_skips_refresh_when_gold_fails(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
+    monkeypatch.setenv("KG_PHASE1_AUTO_REFRESH_ENABLED", "true")
+    from radar.core import config
+    monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
+    _stub_etl(monkeypatch, [])
+    monkeypatch.setattr(gold, "ingest_all",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("gold down")))
+    refreshes: list = []
+    import radar.core.kg.phase1.lifecycle as lifecycle
+    monkeypatch.setattr(lifecycle, "refresh_after_gold",
+                        lambda **k: refreshes.append(k) or {"outcome": "built"})
+
+    summary = asyncio.run(tasks._run_daily_etl(0))
+
+    assert refreshes == [], "gold falhou → refresh não roda"
+    assert summary["status"] == "partial"
+    assert summary["counters"]["kg_phase1_refresh"] == 0
+
+
+def test_run_daily_etl_refresh_failure_is_best_effort(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
+    monkeypatch.setenv("KG_PHASE1_AUTO_REFRESH_ENABLED", "true")
+    from radar.core import config
+    monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
+    _stub_etl(monkeypatch, [])
+    import radar.core.kg.phase1.lifecycle as lifecycle
+    monkeypatch.setattr(lifecycle, "refresh_after_gold",
+                        lambda **k: (_ for _ in ()).throw(RuntimeError("boom")))
+
+    summary = asyncio.run(tasks._run_daily_etl(0))
+
+    assert summary["status"] == "succeeded", "falha do refresh não quebra o ETL"
+    assert summary["phase1_refresh"] is None
+    assert summary["counters"]["kg_phase1_refresh"] == 0
+
+
 def test_warm_edital_chunks_marks_failed_when_listing_raises(monkeypatch):
     import radar.core.kg.entity_catalog as entity_catalog
 

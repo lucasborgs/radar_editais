@@ -59,6 +59,43 @@ def test_ingest_promoted_edital_task_builds_silver_and_ingests(monkeypatch):
     assert calls == [{"sources": ["edital"]}]
 
 
+def test_ingest_promoted_edital_refreshes_phase1_after_gold(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
+    monkeypatch.setenv("KG_PHASE1_AUTO_REFRESH_ENABLED", "true")
+    monkeypatch.setattr(source_docs, "load", lambda eid: [{"doc_name": "d", "units": ["t"]}])
+    monkeypatch.setattr(tasks, "build_or_load_structured_doc",
+                        lambda s, n, d: [{"section_path": [], "text": "t"}])
+    calls: list = []
+    monkeypatch.setattr(gold, "ingest_all", lambda *a, **k: calls.append(k) or {"edital": 1})
+    refreshes: list = []
+    import radar.core.kg.phase1.lifecycle as lifecycle
+    monkeypatch.setattr(
+        lifecycle, "refresh_after_gold",
+        lambda **k: refreshes.append(k) or {"trigger": k["trigger"], "outcome": "built"},
+    )
+
+    asyncio.run(tasks.ingest_promoted_edital_task.func(edital_id="web:abc123"))
+
+    assert calls == [{"sources": ["edital"]}]
+    assert refreshes == [{"trigger": "promoted_edital"}]
+
+
+def test_ingest_promoted_edital_refresh_failure_is_best_effort(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
+    monkeypatch.setenv("KG_PHASE1_AUTO_REFRESH_ENABLED", "true")
+    monkeypatch.setattr(source_docs, "load", lambda eid: [{"doc_name": "d", "units": ["t"]}])
+    monkeypatch.setattr(tasks, "build_or_load_structured_doc",
+                        lambda s, n, d: [{"section_path": [], "text": "t"}])
+    monkeypatch.setattr(gold, "ingest_all", lambda *a, **k: {"edital": 1})
+    import radar.core.kg.phase1.lifecycle as lifecycle
+    monkeypatch.setattr(lifecycle, "refresh_after_gold",
+                        lambda **k: (_ for _ in ()).throw(RuntimeError("boom")))
+
+    asyncio.run(tasks.ingest_promoted_edital_task.func(edital_id="web:abc123"))
+
+
 def test_ingest_promoted_edital_task_skips_when_silver_empty(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
