@@ -35,3 +35,8 @@ Cada iniciativa usa:
 
 - [`radar-data-trust/`](radar-data-trust/) — cobertura, proveniência e confiança
   do plano de dados.
+- [`kg-phase1-production/`](kg-phase1-production/) — projeção de produção da
+  Fase 1 do grafo (KG-P1A/KG-P1B): relatórios em
+  [`reports/KG-P1A-projection.md`](kg-phase1-production/reports/KG-P1A-projection.md),
+  [`reports/KG-P1B1-explore-tools.md`](kg-phase1-production/reports/KG-P1B1-explore-tools.md)
+  e [`reports/KG-P1B2-lifecycle-eval.md`](kg-phase1-production/reports/KG-P1B2-lifecycle-eval.md).

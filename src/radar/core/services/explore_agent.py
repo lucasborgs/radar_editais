@@ -57,6 +57,24 @@ MEMÓRIA ENTRE SESSÕES (log_exploration_decision)
 - Revisitar o mesmo edital atualiza a decisão (a última prevalece); pode rechamar."""
 
 
+KG_PHASE1_GRAPH_INSTRUCTION = """
+
+GRAFO DA FASE 1 (graph_explore / graph_reason / graph_community)
+- Use as tools de grafo para RELAÇÕES ESTRUTURAIS, caminhos, atores,
+  comunidades e análise de ESTRATÉGIA: graph_explore (vizinhança estrutural),
+  graph_reason (caminhos entre o perfil da empresa, entidades e atores),
+  graph_community (membros e características compartilhadas de um cluster).
+- Para DETALHES factuais e evidências documentais, continue com as ferramentas
+  do catálogo (get_edital, get_investidor, get_node_neighborhood,
+  search_entities).
+- Distinga RELAÇÕES ESTRUTURAIS (origin phase1_deterministic/phase1_structural:
+  fatos do catálogo) de RELAÇÕES DERIVADAS (similar_a, potencial_parceria:
+  heurística de embeddings/tecnologia, marcadas "derived"). NUNCA apresente uma
+  aresta derivada como fato confirmado.
+- Não é obrigatório consultar o grafo em toda pergunta — use-o quando a relação,
+  o caminho ou o ator importam para a resposta."""
+
+
 EXPLORE_MATCH_INSTRUCTION = """
 
 MATCH COM O PERFIL (find_matching_editais / find_matching_entities)
@@ -291,8 +309,8 @@ class ExploreAgent:
                 messages.append({"role": "user", "content": hint})
             messages.append({"role": "user", "content": message, "cache_hint": True})
 
-        tools = self._explore_tools()
-        system = EXPLORE_AGENT_SYSTEM
+        tools = self._explore_tools(profile=profile)
+        system = self._maybe_append_graph_instructions(EXPLORE_AGENT_SYSTEM)
 
         if profile_text and profile:
             from radar.core.llm.agent_tools.match_tools import build_match_tools
@@ -377,16 +395,30 @@ class ExploreAgent:
 
         yield ExploreStreamEvent(kind="final", answer=answer, meta=meta)
 
-    def _explore_tools(self) -> list:
-        """Tools do agente de explore: leitura do catálogo gold e
-        opcionalmente deep_research (subagente web)."""
+    def _explore_tools(self, profile: dict | None = None) -> list:
+        """Tools do agente de explore: leitura do catálogo gold, opcionalmente
+        deep_research (subagente web) e — gated por `KG_PHASE1_EXPLORE_ENABLED` —
+        as tools read-only do grafo da Fase 1 (ADITIVAS; `profile` vai na
+        closure de graph_reason). Flag off = ferramentas exatamente como antes."""
         from radar.core.llm.agent_tools import build_explore_tools
 
         tools = build_explore_tools()
         if os.getenv("EXPLORE_DEEP_RESEARCH_ENABLED", "false").lower() == "true":
             from radar.core.llm.agent_tools.research_tools import build_research_tools
             tools = tools + build_research_tools()
+        from radar.core.kg.phase1.tools import build_graph_tools, graph_tools_enabled
+        if graph_tools_enabled():
+            tools = tools + build_graph_tools(profile=profile)
         return tools
+
+    @staticmethod
+    def _maybe_append_graph_instructions(system: str) -> str:
+        """Anexa as instruções do grafo da Fase 1 quando a flag está ligada —
+        flag off devolve `system` byte a byte (regressão zero)."""
+        from radar.core.kg.phase1.tools import graph_tools_enabled
+        if graph_tools_enabled():
+            return system + KG_PHASE1_GRAPH_INSTRUCTION
+        return system
 
     def _explore_agent(
         self,
@@ -444,8 +476,8 @@ class ExploreAgent:
         # provider == "anthropic"; nos demais é ignorada (no-op).
         messages.append({"role": "user", "content": message, "cache_hint": True})
 
-        tools = self._explore_tools()
-        system = EXPLORE_AGENT_SYSTEM
+        tools = self._explore_tools(profile=profile)
+        system = self._maybe_append_graph_instructions(EXPLORE_AGENT_SYSTEM)
 
         # Match v3: só quando há PERFIL. COM workspace autenticado, o lado
         # empresa vem de company_chunks (perfil + library, refresh on-demand);
