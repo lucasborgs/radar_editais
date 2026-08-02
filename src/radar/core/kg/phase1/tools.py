@@ -295,11 +295,17 @@ def _step_entry(
 ) -> dict[str, Any]:
     edge = edge_index.get((from_, predicate, to)) or edge_index.get((to, predicate, from_))
     if edge is None:
-        return {"from": from_, "to": to, "predicate": predicate, "origin": "unknown", "derived": False}
+        return {
+            "traversal_from": from_, "traversal_to": to,
+            "source": from_, "target": to, "predicate": predicate,
+            "origin": "unknown", "derived": False,
+        }
     props = _props_of(edge)
     return {
-        "from": from_,
-        "to": to,
+        "traversal_from": from_,
+        "traversal_to": to,
+        "source": edge["source_id"],
+        "target": edge["target_id"],
         "predicate": predicate,
         "weight": float(edge.get("weight") or 1.0),
         "origin": edge.get("origin", ""),
@@ -565,22 +571,70 @@ def _profile_strategy_anchors(
     return list(unique.values()), virtual, profile_view, unresolved
 
 
-def _strategy_evidence(path: list[dict[str, Any]]) -> dict[str, Any]:
+def _fact_from_step(step: dict[str, Any], *, via_entity_id: str | None = None) -> dict[str, Any]:
+    return {
+        "source": step["source"], "target": step["target"],
+        "predicate": step["predicate"], "weight": step.get("weight", 1.0),
+        "origin": step.get("origin", ""), "derived": step.get("derived", False),
+        "via_entity_id": via_entity_id,
+        "classification": (
+            "catalog_structural_fact" if step.get("origin") == "phase1_structural"
+            else "cataloged_attribute"
+        ),
+        "confirmed": True,
+    }
+
+
+def _edge_entry_for_fact(edge: dict[str, Any]) -> dict[str, Any]:
+    props = _props_of(edge)
+    return {
+        "source": edge["source_id"], "target": edge["target_id"],
+        "predicate": edge["type"], "weight": float(edge.get("weight") or 1.0),
+        "origin": edge.get("origin", ""), "derived": bool(props.get("derived")),
+    }
+
+
+def _strategy_evidence(
+    path: list[dict[str, Any]],
+    shared: list[dict[str, Any]],
+    snapshot: Any,
+) -> dict[str, Any]:
     """Separa a rota derivada das evidências que a sustentam."""
     supporting: list[dict[str, Any]] = []
     derived: list[dict[str, Any]] = []
+    seen_facts: set[tuple[str, str, str, str]] = set()
+
+    def add_fact(step: dict[str, Any], *, via_entity_id: str | None = None) -> None:
+        key = (step["source"], step["target"], step["predicate"], step.get("origin", ""))
+        if key not in seen_facts:
+            seen_facts.add(key)
+            supporting.append(_fact_from_step(step, via_entity_id=via_entity_id))
+
+    entity_ids = {node["id"] for node in snapshot.nodes}
     for step in path:
         origin = step.get("origin")
         if origin in {"phase1_deterministic", "phase1_structural"}:
-            supporting.append({**step, "classification": (
-                "catalog_structural_fact" if origin == "phase1_structural" else "cataloged_attribute"
-            ), "confirmed": True})
+            via = step["source"] if step["source"] in entity_ids else (
+                step["target"] if step["target"] in entity_ids else None
+            )
+            add_fact(step, via_entity_id=via)
         elif origin in {"phase1_similarity", "phase1_tech_bridge"}:
             derived.append({**step, "classification": "derived_graph_step", "confirmed": False})
         elif origin == "profile_ephemeral":
             derived.append({**step, "classification": "profile_affinity_anchor", "confirmed": False})
         else:
             derived.append({**step, "classification": "insufficient_information", "confirmed": False})
+
+    # The selected shortest route can use only one of several shared qualities.
+    # Explain every advertised signal using its real catalog edge.
+    for item in shared:
+        for edge in snapshot.edges:
+            endpoints = {edge["source_id"], edge["target_id"]}
+            if item["node_id"] not in endpoints or item["via_entity_id"] not in endpoints:
+                continue
+            if edge["origin"] not in {"phase1_deterministic", "phase1_structural"}:
+                continue
+            add_fact(_edge_entry_for_fact(edge), via_entity_id=item["via_entity_id"])
     return {
         "route_relation": {"classification": "derived_profile_route", "confirmed": False},
         "supporting_facts": supporting,
@@ -638,10 +692,17 @@ def strategy_payload(
                 other = edge["source_id"]
             if other is None or not any(n["id"] == other for n in snapshot.nodes):
                 continue
-            shared_by_entity.setdefault(other, []).append(item)
+            shared_by_entity.setdefault(other, []).append({
+                **item, "via_entity_id": other,
+            })
     for entity_id in shared_by_entity:
-        unique_shared = {item["node_id"]: item for item in shared_by_entity[entity_id]}
-        shared_by_entity[entity_id] = [unique_shared[key] for key in sorted(unique_shared)]
+        unique_shared = {
+            (item["node_id"], item["via_entity_id"]): item
+            for item in shared_by_entity[entity_id]
+        }
+        shared_by_entity[entity_id] = [
+            unique_shared[key] for key in sorted(unique_shared)
+        ]
 
     for kind in kinds:
         goals = sorted(n["id"] for n in snapshot.nodes if n["kind"] == kind)
@@ -653,7 +714,16 @@ def strategy_payload(
         for raw_path in raw_paths:
             path = _path_entry(raw_path, edge_index)
             target = raw_path[-1][2] if raw_path else ""
-            shared = shared_by_entity.get(target, [])
+            path_entity_ids = {
+                node_id for step in raw_path for node_id in (step[0], step[2])
+                if node_id in {node["id"] for node in snapshot.nodes}
+            }
+            shared_map = {
+                (item["node_id"], item["via_entity_id"]): item
+                for entity_id in path_entity_ids
+                for item in shared_by_entity.get(entity_id, [])
+            }
+            shared = [shared_map[key] for key in sorted(shared_map)]
             candidates.append((len(path), -len(shared), target, path, shared))
         candidates.sort(key=lambda item: (item[1], item[0], item[2]))
         total = len(candidates)
@@ -667,8 +737,9 @@ def strategy_payload(
                 "shared_characteristics": [{
                     "field": item.get("field", item.get("source_field")),
                     "value": item.get("value"), "node_id": item["node_id"],
+                    "via_entity_id": item["via_entity_id"],
                 } for item in shared],
-                "evidence": _strategy_evidence(path),
+                "evidence": _strategy_evidence(path, shared, snapshot),
             })
         payload["results_by_type"][kind] = results
         coverage = payload["coverage"][kind]

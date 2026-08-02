@@ -67,11 +67,11 @@ GRAFO DA FASE 1 — MODO EXCLUSIVO PROFILE-FIRST
   investidores. Cubra todos os tipos pedidos e use o campo coverage para saber
   o que foi consultado; não transforme ausência no recorte em inexistência no
   mercado.
-- Explique cada recomendação com o path e shared_characteristics. Classifique
-  catalog_structural_fact e cataloged_attribute como fatos sustentados pelo
-  catálogo; derived_relation como relação derivada por similaridade/ponte
-  tecnológica; insufficient_information como informação insuficiente. Nunca
-  chame uma relação derivada de confirmada.
+- Explique cada recomendação com o path e shared_characteristics. Em cada passo,
+  `source`/`target` são a direção factual autoritativa da aresta persistida;
+  `traversal_from`/`traversal_to` descrevem somente como a BFS navegou. Use
+  supporting_facts para fatos catalogados e derived_steps para afinidades.
+  route_relation é sempre derivada quando parte do perfil; nunca a confirme.
 - Respeite profile.unresolved e limitations: textos livres não viram âncoras
   por aproximação silenciosa. Se o snapshot estiver indisponível, comunique a
   limitação e não use ferramentas de busca ou Match como fallback."""

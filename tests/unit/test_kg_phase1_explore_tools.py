@@ -39,8 +39,10 @@ def edge(source, target, type_, origin="phase1_deterministic", weight=1.0, props
 def canonical_snapshot() -> Snapshot:
     nodes = [
         {"id": "edital:e:1", "kind": "edital", "native_id": "e:1", "name": "Edital Agro", "description": ""},
+        {"id": "edital:e:2", "kind": "edital", "native_id": "e:2", "name": "Edital Parcial", "description": ""},
         {"id": "programa:p:1", "kind": "programa", "native_id": "p:1", "name": "Programa Verde", "description": ""},
         {"id": "agencia:a:1", "kind": "agencia", "native_id": "a:1", "name": "Agência A", "description": ""},
+        {"id": "agencia:a:2", "kind": "agencia", "native_id": "a:2", "name": "Agência Parcial", "description": ""},
         {"id": "ict:i:1", "kind": "ict", "native_id": "ICT Floresta Completa", "description": "", "name": "ICT Floresta Completa"},
         {"id": "ict:i:2", "kind": "ict", "native_id": "i:2", "name": "ICT Agro Parcial", "description": ""},
         {"id": "investidor:v:1", "kind": "investidor", "native_id": "v:1", "name": "Fundo Verde", "description": ""},
@@ -58,6 +60,8 @@ def canonical_snapshot() -> Snapshot:
         edge("edital:e:1", "uf:sc", "tem_uf"),
         edge("edital:e:1", "programa:p:1", "subordinado_a", "phase1_structural"),
         edge("edital:e:1", "agencia:a:1", "operado_por", "phase1_structural"),
+        edge("edital:e:2", "setor:agro", "tem_setor"),
+        edge("edital:e:2", "agencia:a:2", "operado_por", "phase1_structural"),
         edge("ict:i:1", "setor:agro", "tem_setor"),
         edge("ict:i:1", "tecnologia:ia", "tem_tecnologia"),
         edge("ict:i:1", "uf:sc", "tem_uf"),
@@ -120,6 +124,28 @@ def test_three_shared_signals_are_aggregated_even_when_path_uses_one(monkeypatch
     assert {item["node_id"] for item in ict["shared_characteristics"]} >= {
         "setor:agro", "tecnologia:ia", "uf:sc",
     }
+    facts = ict["evidence"]["supporting_facts"]
+    assert {fact["predicate"] for fact in facts} >= {"tem_setor", "tem_tecnologia", "tem_uf"}
+    assert all(fact["via_entity_id"] == "ict:i:1" for fact in facts)
+
+
+def test_structural_candidates_inherit_signals_from_intermediate_opportunity(monkeypatch):
+    out = invoke(monkeypatch, CANONICAL_PROFILE, requested=["programa", "agencia"])
+    program = out["results_by_type"]["programa"][0]
+    agency = out["results_by_type"]["agencia"][0]
+    for result in (program, agency):
+        assert {item["node_id"] for item in result["shared_characteristics"]} >= {
+            "setor:agro", "tecnologia:ia", "uf:sc",
+        }
+        assert all(item["via_entity_id"] == "edital:e:1"
+                   for item in result["shared_characteristics"])
+
+
+def test_agency_with_inherited_three_signals_ranks_above_partial_agency(monkeypatch):
+    out = invoke(monkeypatch, CANONICAL_PROFILE, requested=["agencia"])
+    assert [result["id"] for result in out["results_by_type"]["agencia"]][:2] == [
+        "agencia:a:1", "agencia:a:2",
+    ]
 
 
 def test_more_shared_signals_rank_before_one_signal(monkeypatch):
@@ -144,6 +170,26 @@ def test_profile_to_opportunity_to_agency_keeps_structural_supporting_fact(monke
     fact = next(f for f in agency["evidence"]["supporting_facts"] if f["predicate"] == "operado_por")
     assert fact["origin"] == "phase1_structural"
     assert fact["confirmed"] is True
+
+
+def test_inverse_traversal_preserves_factual_edge_direction():
+    snap = canonical_snapshot()
+    edge_index = tools._edge_index(snap.edges)
+    step = tools._path_entry(
+        [("setor:agro", "tem_setor", "edital:e:1")], edge_index,
+    )[0]
+    assert step["traversal_from"] == "setor:agro"
+    assert step["traversal_to"] == "edital:e:1"
+    assert step["source"] == "edital:e:1"
+    assert step["target"] == "setor:agro"
+
+
+def test_no_quality_fact_is_emitted_in_traversal_direction(monkeypatch):
+    out = invoke(monkeypatch, CANONICAL_PROFILE, requested=["programa"])
+    for fact in out["results_by_type"]["programa"][0]["evidence"]["supporting_facts"]:
+        if fact["predicate"] == "tem_setor":
+            assert fact["source"] == "edital:e:1"
+            assert fact["target"] == "setor:agro"
 
 
 def test_derived_graph_step_is_never_confirmed(monkeypatch):
@@ -231,9 +277,30 @@ def test_hub_weight_does_not_expand_strategy(monkeypatch):
 
 def test_flag_off_preserves_previous_tools_and_system(monkeypatch):
     monkeypatch.delenv("KG_PHASE1_EXPLORE_ENABLED", raising=False)
-    before = {tool.name for tool in ExploreAgent()._explore_tools(profile={})}
-    assert "graph_strategy" not in before
-    assert ExploreAgent._maybe_append_graph_instructions("base") == "base"
+    monkeypatch.delenv("EXPLORE_DEEP_RESEARCH_ENABLED", raising=False)
+    from radar.core.llm.agent_tools import build_explore_tools
+    from radar.core.services.explore_agent import (
+        EXPLORE_AGENT_SYSTEM,
+        EXPLORE_LOG_INSTRUCTION,
+        EXPLORE_MATCH_INSTRUCTION,
+    )
+
+    captured = {}
+    monkeypatch.setattr(
+        "radar.core.llm.agent_tools.explore_tools.load_recent_exploration_decisions",
+        lambda db, workspace_id: "",
+    )
+    monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent",
+                        lambda **kw: captured.update(kw) or AgentResult("ok", [], "end_turn", {}))
+    ExploreAgent().explore_with_meta(
+        "quais caminhos?", profile_text="perfil", profile=CANONICAL_PROFILE,
+        workspace_id="workspace", db=object(),
+    )
+    expected = {tool.name for tool in build_explore_tools()}
+    expected |= {"find_matching_editais", "find_matching_entities", "log_exploration_decision"}
+    assert {tool.name for tool in captured["tools"]} == expected
+    assert captured["system"] == EXPLORE_AGENT_SYSTEM + EXPLORE_MATCH_INSTRUCTION + EXPLORE_LOG_INSTRUCTION
+    assert "graph_strategy" not in expected
 
 
 def test_flag_on_is_exclusive(monkeypatch):
