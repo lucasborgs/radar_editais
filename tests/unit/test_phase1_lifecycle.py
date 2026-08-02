@@ -14,6 +14,14 @@ suíte `explore`:
   7. diagnósticos do eval `explore`: graph_tool_usage, graph_fallback_rate,
      graph_latency_ms e preservação do tool_contract/answer_contract.
 
+Correção da auditoria KG-P1B-2 (aditiva):
+  8. `response_latency_ms`: métrica por caso da resposta conectada INTEIRA,
+     hermético → None, presente com grafo off e on, comentário fixo sem
+     conteúdo da pergunta/resposta;
+  9. `tool_contract` NÃO enfraquecido: `graph_community` sozinha não satisfaz
+     rotas factuais; só `graph_explore`/`graph_reason` (factuais) somam às
+     tools legadas; `graph_community` pode coexistir com uma tool factual.
+
 Hermético: nenhum teste toca banco/LLM — `ingest.build` e `store` são
 monkeypatched.
 """
@@ -287,8 +295,166 @@ def test_explore_suite_wires_diagnostics():
     suite = explore_eval.SUITE
     names = {getattr(ev, "__name__", None) for ev in suite.evaluators}
     assert {"eval_route", "eval_tool_contract", "eval_answer_contract",
-            "eval_graph_tool_usage"} <= names
+            "eval_graph_tool_usage", "eval_response_latency_ms"} <= names
     run_names = {getattr(rev, "__name__", None) for rev in suite.run_evaluators}
     assert run_names == {"eval_graph_fallback_rate", "eval_graph_latency_ms"}
+    assert suite.version == "4"
     assert "KG_PHASE1_EXPLORE_ENABLED" in suite.manifest_env
     assert "KG_PHASE1_AUTO_REFRESH_ENABLED" in suite.manifest_env
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. Correção da auditoria KG-P1B-2 — response_latency_ms
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_response_latency_hermetic_returns_none(monkeypatch):
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
+    from radar.core.eval import explore as explore_eval
+
+    out = explore_eval.eval_response_latency_ms(
+        output={"route": "EDITAL_FACT"}, expected_output={}
+    )
+    assert out is None, "sem answer (hermético) → não mede latência de resposta conectada"
+
+
+def test_response_latency_connected_non_negative(monkeypatch):
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
+    from radar.core.eval import explore as explore_eval
+
+    out = explore_eval.eval_response_latency_ms(
+        output=_eval_output(response_latency_ms=12.345), expected_output={}
+    )
+    assert out["name"] == "response_latency_ms"
+    assert out["value"] == 12.35
+    assert out["value"] >= 0.0
+
+
+def test_response_latency_exists_with_graph_off_and_on(monkeypatch):
+    for flag in ("false", "true"):
+        monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", flag)
+        from radar.core.eval import explore as explore_eval
+
+        out = explore_eval.eval_response_latency_ms(
+            output=_eval_output(called_tools=["graph_explore"], response_latency_ms=3.0),
+            expected_output={},
+        )
+        assert out is not None, f"grafo {flag} → métrica segue presente"
+        assert out["value"] == 3.0
+
+
+def test_response_latency_rejects_non_number(monkeypatch):
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
+    from radar.core.eval import explore as explore_eval
+
+    for bad in (True, "rápido", None):
+        out = explore_eval.eval_response_latency_ms(
+            output=_eval_output(response_latency_ms=bad), expected_output={}
+        )
+        assert out is None, f"valor não numérico {bad!r} → não pontua"
+
+
+def test_response_latency_comment_is_fixed_and_content_free(monkeypatch):
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
+    from radar.core.eval import explore as explore_eval
+
+    pergunta_sigilosa = "qual o token de acesso do sistema interno?"
+    resposta_sigilosa = "o token é SEU-SEGREDO-BRUTO-123"
+    out = explore_eval.eval_response_latency_ms(
+        output=_eval_output(
+            answer=resposta_sigilosa,
+            query=pergunta_sigilosa,
+            response_latency_ms=42.0,
+        ),
+        expected_output={},
+    )
+    assert out["comment"] == "duracao_total_da_resposta_conectada_em_ms"
+    assert pergunta_sigilosa not in out["comment"]
+    assert resposta_sigilosa not in out["comment"]
+
+
+def test_task_connected_emits_response_latency(monkeypatch):
+    monkeypatch.setenv("EVAL_EXPLORE_CONNECTED", "true")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
+
+    import radar.core.services.explore_agent as explore_agent_mod
+
+    class _FakeExploreAgent:
+        def explore_with_meta(self, *args, **kwargs):
+            return (
+                "resposta conectada fake",
+                {"route": "EDITAL_FACT", "called_tools": ["graph_explore"]},
+            )
+
+    monkeypatch.setattr(explore_agent_mod, "ExploreAgent", _FakeExploreAgent)
+
+    from radar.core.eval import explore as explore_eval
+
+    item = {
+        "input": {
+            "query": "pergunta fake",
+            "target": {"type": "edital", "id": "finep:abc"},
+            "workspace": {"id": "ws-test", "profile": {"nome": "x"}},
+        }
+    }
+    for flag in ("false", "true"):
+        monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", flag)
+        out = explore_eval.task(item=item)
+        assert "response_latency_ms" in out, f"grafo {flag} → task conectada emite latência"
+        assert out["response_latency_ms"] >= 0.0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. Correção da auditoria KG-P1B-2 — tool_contract NÃO enfraquecido
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_tool_contract_graph_community_alone_fails(monkeypatch):
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
+    from radar.core.eval import explore as explore_eval
+
+    for route in ("EDITAL_FACT", "EDITAL_FACT_ENUMERATIVE", "ENTITY_FACT"):
+        out = explore_eval.eval_tool_contract(
+            output=_eval_output(called_tools=["graph_community"]),
+            expected_output={"route": route},
+        )
+        assert out["value"] == 0.0, f"graph_community sozinha não satisfaz {route}"
+
+
+def test_tool_contract_factual_graph_tools_pass(monkeypatch):
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
+    from radar.core.eval import explore as explore_eval
+
+    for tool in ("graph_explore", "graph_reason"):
+        for route in ("EDITAL_FACT", "ENTITY_FACT"):
+            out = explore_eval.eval_tool_contract(
+                output=_eval_output(called_tools=[tool]),
+                expected_output={"route": route},
+            )
+            assert out["value"] == 1.0, f"{tool} satisfaz {route}"
+
+
+def test_tool_contract_graph_community_coexists_with_factual(monkeypatch):
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
+    from radar.core.eval import explore as explore_eval
+
+    out = explore_eval.eval_tool_contract(
+        output=_eval_output(called_tools=["graph_community", "graph_explore"]),
+        expected_output={"route": "EDITAL_FACT"},
+    )
+    assert out["value"] == 1.0
+
+
+def test_tool_contract_legacy_tools_still_pass(monkeypatch):
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
+    from radar.core.eval import explore as explore_eval
+
+    out = explore_eval.eval_tool_contract(
+        output=_eval_output(called_tools=["get_edital"]),
+        expected_output={"route": "EDITAL_FACT"},
+    )
+    assert out["value"] == 1.0
+    out = explore_eval.eval_tool_contract(
+        output=_eval_output(called_tools=["get_investidor"]),
+        expected_output={"route": "ENTITY_FACT"},
+    )
+    assert out["value"] == 1.0

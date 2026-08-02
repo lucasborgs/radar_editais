@@ -1226,9 +1226,12 @@ async def _run_daily_etl(timestamp: int) -> dict[str, object]:
                 "run_daily_etl_task: kg_phase1 refresh — %s", phase1_refresh,
             )
         except Exception as refresh_exc:
+            # Auditoria KG-P1B-2: o refresh nunca deve levantar; se um defeito
+            # escapar, o catch DEFENSIVO loga apenas categoria FIXA + nome do
+            # tipo — nunca safe_error/str(exc), que poderia vazar DSN/URL/SQL.
             logger.warning(
-                "run_daily_etl_task: refresh kg_phase1 falhou: %s",
-                safe_error(refresh_exc),
+                "run_daily_etl_task: refresh kg_phase1 falhou (categoria=unexpected, tipo=%s)",
+                type(refresh_exc).__name__,
             )
 
     # 3) Rede de segurança: persiste documentos de editais que já existiam no
@@ -1343,9 +1346,11 @@ async def ingest_promoted_edital_task(edital_id: str) -> None:
         )
         logger.info("ingest_promoted_edital: kg_phase1 refresh — %s", refresh)
     except Exception as refresh_exc:
+        # Auditoria KG-P1B-2: catch DEFENSIVO sanitizado — categoria fixa +
+        # nome do tipo apenas; nunca safe_error/str(exc) (evita vazar DSN/URL/SQL).
         logger.warning(
-            "ingest_promoted_edital: refresh kg_phase1 falhou: %s",
-            safe_error(refresh_exc),
+            "ingest_promoted_edital: refresh kg_phase1 falhou (categoria=unexpected, tipo=%s)",
+            type(refresh_exc).__name__,
         )
     from radar.core.services.discovery_promotion import mark_by_edital  # noqa: PLC0415
     mark_by_edital(edital_id, "silver_ready", "ready")

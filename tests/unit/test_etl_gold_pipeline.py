@@ -178,6 +178,56 @@ def test_run_daily_etl_refresh_failure_is_best_effort(monkeypatch, tmp_path):
     assert summary["counters"]["kg_phase1_refresh"] == 0
 
 
+_SENSITIVE_FRAGMENTS = [
+    "postgresql://",
+    "usuario:senha",
+    "SEGREDO_BRUTO",
+    "interno.exemplo",
+    "dado_sensivel",
+    "SELECT",
+    "senha",
+    "token",
+]
+
+
+def _raise_runtimeerror_with_secrets(message: str):
+    def _boom(**_kwargs):
+        raise RuntimeError(message)
+    return _boom
+
+
+def test_run_daily_etl_refresh_catch_is_sanitized(monkeypatch, tmp_path, caplog):
+    """Auditoria KG-P1B-2: o catch defensivo do refresh NUNCA loga o conteúdo
+    da exceção (str(exc)/safe_error) — só categoria fixa + tipo. Um defeito que
+    carregue DSN/URL/SQL não pode vazar nos logs."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
+    monkeypatch.setenv("KG_PHASE1_AUTO_REFRESH_ENABLED", "true")
+    from radar.core import config
+    monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
+    _stub_etl(monkeypatch, [])
+    import logging
+
+    import radar.core.kg.phase1.lifecycle as lifecycle
+    mensagem = (
+        "refresh: conexão 'postgresql://usuario:senha@host/db' falhou com "
+        "https://interno.exemplo/path?token=SEGREDO_BRUTO ao rodar "
+        "SELECT dado_sensivel FROM tabela"
+    )
+    monkeypatch.setattr(
+        lifecycle, "refresh_after_gold", _raise_runtimeerror_with_secrets(mensagem),
+    )
+
+    with caplog.at_level(logging.WARNING, logger="radar.core.tasks"):
+        summary = asyncio.run(tasks._run_daily_etl(0))
+
+    assert summary["status"] == "succeeded"
+    assert "categoria=unexpected" in caplog.text
+    assert "tipo=RuntimeError" in caplog.text
+    for fragment in _SENSITIVE_FRAGMENTS:
+        assert fragment not in caplog.text, f"fragmento sensível vazou: {fragment}"
+
+
 def test_warm_edital_chunks_marks_failed_when_listing_raises(monkeypatch):
     import radar.core.kg.entity_catalog as entity_catalog
 

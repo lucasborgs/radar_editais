@@ -9,11 +9,16 @@ ligada, o resultado ganha o bloco estrutural ``phase1`` e a suíte emite
 ``graph_tool_usage`` (por caso), ``graph_fallback_rate`` e ``graph_latency_ms``
 (agregadas da rodada) — sinais estruturais, sem gate/threshold. O
 ``answer_contract`` é preservado: as graph tools são read-only e aditivas.
+
+Correção da auditoria KG-P1B-2: ``response_latency_ms`` (por caso) mede com
+``time.perf_counter()`` a chamada conectada INTEIRA (retrieval+síntese/agente),
+independente do grafo — não apenas as graph tools. Hermético → None.
 """
 from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Any
 
 from radar.core.config import ROOT
@@ -22,6 +27,9 @@ from radar.core.eval.harness import Evaluation, Suite, get_input
 GOLDEN = ROOT / "data" / "evaluation" / "golden" / "explore.json"
 
 GRAPH_TOOL_NAMES = frozenset({"graph_explore", "graph_reason", "graph_community"})
+# Graph tools semanticamente adequadas a consulta FACTUAL sobre edital/entidade.
+# `graph_community` (cluster) fica FORA: sozinha não responde fato de edital/entidade.
+FACTUAL_GRAPH_TOOLS = frozenset({"graph_explore", "graph_reason"})
 
 
 def load_data() -> list[dict]:
@@ -66,12 +74,17 @@ def task(*, item: Any, **_) -> dict:
         if target["type"] == "edital"
         else {"node_id": target["id"], "node_type": target["type"]}
     )
+    # Auditoria KG-P1B-2: latência da resposta conectada INTEIRA — o timer
+    # envolve exclusivamente `explore_with_meta` (não apenas as graph tools).
+    started = time.perf_counter()
     answer, meta = ExploreAgent().explore_with_meta(inp["query"], **kwargs)
+    response_latency_ms = round((time.perf_counter() - started) * 1000, 2)
     called = meta.get("called_tools", [])
     output.update({
         "answer": answer,
         "route": (meta.get("route_decision") or {}).get("intent", output["route"]),
         "called_tools": called,
+        "response_latency_ms": response_latency_ms,
     })
     # KG-P1B-2: sinal estrutural ADITIVO do grafo da Fase 1 (só quando habilitado
     # e conectado) — nunca conteúdo; informa quais graph tools o agente usou.
@@ -97,15 +110,16 @@ def eval_tool_contract(*, output, expected_output, **_) -> Evaluation | None:
         return None
     route = (expected_output or {}).get("route")
     called = output.get("called_tools") or []
-    # As graph tools da Fase 1 (KG-P1B-2) são ADITIVAS e válidas para rotas de
-    # fato — o agente pode preferi-las às do catálogo quando a flag está ligada.
-    graph_ok = set(GRAPH_TOOL_NAMES)
+    # Auditoria KG-P1B-2: NÃO enfraquecer o contrato. As graph tools factuais da
+    # Fase 1 (graph_explore / graph_reason) são aditivas às do catálogo, mas
+    # `graph_community` (cluster) SOZINHA não responde fato sobre edital/entidade
+    # — ela pode coexistir com uma tool factual, nunca substituí-la sozinha.
     if route in {"EDITAL_FACT", "EDITAL_FACT_ENUMERATIVE"}:
         expected = "get_edital or search_entities"
-        acceptable = {"get_edital", "search_entities"} | graph_ok
+        acceptable = {"get_edital", "search_entities"} | set(FACTUAL_GRAPH_TOOLS)
     elif route == "ENTITY_FACT":
         expected = "get_investidor or list_investidores"
-        acceptable = {"get_investidor", "list_investidores"} | graph_ok
+        acceptable = {"get_investidor", "list_investidores"} | set(FACTUAL_GRAPH_TOOLS)
     else:
         return None
     passed = bool(acceptable & set(called))
@@ -155,6 +169,26 @@ def eval_answer_contract(*, output, expected_output, metadata, **_) -> Evaluatio
     return {
         "name": "answer_contract", "value": 1.0 if passed else 0.0,
         "comment": json.dumps(verdict, ensure_ascii=False),
+    }
+
+
+def eval_response_latency_ms(*, output, expected_output, **_) -> Evaluation | None:
+    """KG-P1B-2 (auditoria) — latência completa da resposta, por caso.
+
+    Mede a chamada conectada INTEIRA (retrieval + síntese/agente), não apenas as
+    graph tools — permite comparar a latência total entre duas execuções.
+    Hermético (sem `answer`) → None. Numérico, sem threshold/gate. O comentário
+    é uma string FIXA: nunca carrega a pergunta, a resposta ou qualquer
+    conteúdo do caso."""
+    if not isinstance(output, dict) or not output.get("answer"):
+        return None
+    value = output.get("response_latency_ms")
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    return {
+        "name": "response_latency_ms",
+        "value": round(float(value), 2),
+        "comment": "duracao_total_da_resposta_conectada_em_ms",
     }
 
 
@@ -229,11 +263,12 @@ SUITE = Suite(
     description="Rota hermética ou E2E conectado dos quatro casos factuais golden.",
     load_data=load_data,
     task=task,
-    evaluators=[eval_route, eval_tool_contract, eval_answer_contract, eval_graph_tool_usage],
+    evaluators=[eval_route, eval_tool_contract, eval_answer_contract,
+                eval_response_latency_ms, eval_graph_tool_usage],
     run_evaluators=[eval_graph_fallback_rate, eval_graph_latency_ms],
     prereqs=_prereqs,
     classification="diagnostic",
-    version="3",
+    version="4",
     dataset_paths=[GOLDEN],
     expected_cases=4,
     expected_case_ids=[
