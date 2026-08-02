@@ -11,8 +11,86 @@
 | Branch | `codex/kg-phase1-production-a` |
 | Base | `eb0a4e46b` (origin/main, `Merge pull request #76`) |
 | Worktree | `/private/tmp/radar-editais-kg-phase1a` |
-| Commit funcional | `5dd7182bf` (`feat(kg): projeção de produção da Fase 1 do grafo (KG-P1A)`) |
-| Commit documental | este commit (tip da branch — contém migration/relatório/documento de autoridade) |
+| Commit funcional (v1) | `5dd7182bf` (`feat(kg): projeção de produção da Fase 1 do grafo (KG-P1A)`) |
+| Commit funcional corretivo | `12c3f3dbc` (`fix(kg): determinismo total, falha segura por categoria e prova real local`) |
+| Commit documental | este commit (tip da branch — contém este relatório) |
+
+## Correção KG-P1A (determinismo, sanitização, dependência, prova local)
+
+### 1. Determinismo real
+
+Garantia: a mesma entrada produz EXATAMENTE os mesmos nós, arestas (na mesma
+ordem), comunidades (mesmos IDs) e `source_hash` — independente da ordem do
+Postgres, da ordem das listas de entrada, da iteração de `set` e do
+`PYTHONHASHSEED`.
+
+Correções mínimas aplicadas em `src/radar/core/kg/phase1/`:
+
+- **leitura ordenada** — `_load_gold` com `order by kind, native_id`
+  (`public.entities`) e `order by source_id, target_id, type`
+  (`entity_relationships`);
+- **ordem canônica total** — `_node_rows`/`_quality_rows` ordenados por `id`;
+  arestas ordenadas por **JSON canônico** (`sort_keys=True`, separadores
+  `","`/`":"` via `_json`) **antes** do dedup (1ª ocorrência), em `_dedup_edges`;
+- **iteração determinística** — `_similarity_edges` ordena as entradas por id e
+  usa o id como desempate do score; `_partnership_edges` itera
+  `sorted(editais)` × `sorted(icts)` (nunca `set` cru);
+- **JSON canônico no hash** — `_source_hash` usa `_json` em toda
+  lista/dict (setores, tecnologias, estagio_alvo, constraints, trl_range);
+- **comunidades** — IDs `com_<idx>` atribuídos APÓS ordenar as comunidades pelo
+  conjunto ORDENADO de membros (`features.detect_communities`); membros de cada
+  comunidade ordenados; a ordem incidental devolvida pelo Louvain nunca decide
+  o ID;
+- **leitores** — `store.load_communities` com `order by community_id, node_id`.
+
+Semântica final: empates NUNCA são resolvidos por nome/ordem incidental — só por
+chave canônica determinística.
+
+### 2. Sanitização de falhas (categorias canônicas)
+
+Nem o ledger nem os logs contêm `str(exc)`. Persiste-se apenas
+`<categoria>:<TipoSeguro>` em `generations.error`:
+
+| Categoria | Exemplos |
+|---|---|
+| `database_error` | `psycopg.*` / `psycopg_pool.*` |
+| `dependency_error` | `ImportError` / `ModuleNotFoundError` |
+| `contract_error` | `ValueError` / `KeyError` / `TypeError` / `DatabaseTargetError` |
+| `unexpected_error` | demais |
+
+- Removidos: regex de DSN (`_DSN_RE`), `_sanitize_error`, `logger.exception` e
+  qualquer traceback no fallback de `_record_failure`;
+- o fallback do registro `failed` loga apenas `categoria` + `tipo` do fallback;
+- testes adversariais (exceção com DSN c/ senha, URL, trecho documental, SQL e
+  marcador `SEGREDO_BRUTO`) confirmam que NENHUM desses vaza para a persistência
+  nem para o `caplog`.
+
+### 3. Dependência `networkx`
+
+- `networkx>=3.2` permanece no extra **funcional** `[graph]`;
+- adicionado também ao extra **`[dev]`** — o CI instala `.[dev]` e executa o
+  teste real de comunidades (Louvain);
+- **não** movido para as dependências principais (prod não carrega grafo pesado);
+- confirmado que o worker JÁ recebe `networkx==3.6.1` pelo lock atual
+  (`requirements.worker.lock.txt`, via `alphashape`) — **locks não regenerados**;
+- degradação explícita testada: sem networkx → `detect_communities()==[]`,
+  `node_stats()=={}`, build segue `healthy` com `counts.communities=0`.
+
+### 4. Validação real com Postgres/Supabase local
+
+Exclusivamente local (nenhuma credencial real, nenhum Supabase remoto, nenhuma
+rede/LLM/Langfuse). Antes de qualquer escrita: `ENVIRONMENT=test`, banco
+`127.0.0.1:54322` (Supabase local), sentinela `public.environment_metadata`
+validada por `assert_database_target`.
+
+- `supabase migration up` aplicou **048_kg_phase1.sql** (única pendente);
+- `tests/integration/test_kg_phase1_projection.py` (marcado `integration`,
+  gated em `INTEGRATION_TARGET=local`) prova com psycopg real os 10 itens:
+  migration executável; primeiro build `healthy`+`is_current`; skip sem mudança;
+  build forçado com nova geração; exatamente UMA corrente; leitores só veem a
+  corrente; falha controlada pós-insert com rollback; saudável anterior
+  corrente; ledger `failed` categórico e sanitizado; e `vector(1536)`/JSONB/FK/
+  índice parcial/swap funcionando. **7 passed**; teardown deixa o banco limpo.
 
 ## Arquivos alterados
 
@@ -25,8 +103,9 @@
 | `src/radar/core/kg/phase1/traverse.py` | BFS multi-salto + caminhos (puro) |
 | `src/radar/core/kg/phase1/features.py` | Louvain/centralidade (networkx opcional) |
 | `src/radar/core/kg/phase1/PROJECTION.md` | autoridade do módulo |
-| `tests/unit/test_phase1_projection.py` | testes essenciais (19 casos, hermético) |
-| `pyproject.toml` | extra opcional `[graph]` (`networkx>=3.2`) |
+| `tests/unit/test_phase1_projection.py` | testes essenciais (28 casos, hermético) |
+| `tests/integration/test_kg_phase1_projection.py` | prova real local (Supabase local) — 7 casos, `integration` |
+| `pyproject.toml` | extras `[graph]` + `[dev]` (`networkx>=3.2`) |
 | `docs/execution/kg-phase1-production/reports/KG-P1A-projection.md` | este relatório |
 | `docs/execution/README.md` | índice de iniciativas ativas |
 
@@ -76,7 +155,10 @@
 
 ## Testes
 
-`tests/unit/test_phase1_projection.py` — 19 casos cobrindo os 10 riscos:
+`tests/unit/test_phase1_projection.py` — **28 casos** cobrindo os 10 riscos
+essenciais + os novos contratos da correção (determinismo sob embaralhamento/
+reversão e `PYTHONHASHSEED`, categorias de erro, adversariais, degradação sem
+networkx):
 
 1. **reconstrução determinística** — `_build_rows` idêntico entre execuções;
 2. **idempotência** — `source_hash` estável/conteúdo-sensível + skip quando corrente já reflete o gold;
@@ -87,15 +169,23 @@
 7. **traversal limitado/sem ciclos** — ciclo `similar_a` reverso não repete; `find_paths`/`reachable_within`;
 8. **ausência de LLM/rede** — scan AST: sem imports de llm/network/spike;
 9. **migration + RLS** — schema, CHECK de `origin`, índice parcial, RLS `authenticated` (padrão 036);
-10. **equivalência com fixture da Fase 1 da spike** — hub, cosseno 0.9759, Jaccard 1/3, estruturais, TRL overlap.
+10. **equivalência com fixture da Fase 1 da spike** — hub, cosseno 0.9759, Jaccard 1/3, estruturais, TRL overlap;
+11. **determinismo independente da ordem de entrada** — embaralhamento/reversão com igualdade exata;
+12. **determinismo sob `PYTHONHASHSEED`** — prova por subprocess (seeds 0/1/2), sem infraestrutura própria;
+13. **IDs de comunidade estáveis** — embaralhar arestas não muda `com_<idx>` nem composição;
+14. **categorias de erro** — `database_error`/`dependency_error`/`contract_error`/`unexpected_error`;
+15. **adversariais** — DSN c/ senha, URL, SQL, trecho documental e `SEGREDO_BRUTO` não vazam p/ ledger nem `caplog`;
+16. **degradação sem networkx** — comunidades `[]`, `node_stats {}`, build saudável.
 
 Execução:
 
 ```bash
-ENVIRONMENT=test PYTHONPATH=src /Users/lucasborges/radar_editais/.venv/bin/pytest -q tests/unit/test_phase1_projection.py   # 19 passed
-ENVIRONMENT=test PYTHONPATH=src /Users/lucasborges/radar_editais/.venv/bin/pytest -q tests/unit                          # 2121 passed, 2 skipped, 0 falhas
-/Users/lucasborges/radar_editais/.venv/bin/ruff check src/radar/core/kg/phase1/ tests/unit/test_phase1_projection.py        # limpo
-git diff --check                                                                                                            # limpo
+ENVIRONMENT=test PYTHONPATH=src /Users/lucasborges/radar_editais/.venv/bin/pytest -q tests/unit/test_phase1_projection.py      # 28 passed
+INTEGRATION_TARGET=local DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+ENVIRONMENT=test PYTHONPATH=src /Users/lucasborges/radar_editais/.venv/bin/pytest -q tests/integration/test_kg_phase1_projection.py  # 7 passed
+ENVIRONMENT=test PYTHONPATH=src /Users/lucasborges/radar_editais/.venv/bin/pytest -q tests/unit                          # 2130 passed, 2 skipped, 0 falhas
+/Users/lucasborges/radar_editais/.venv/bin/ruff check src/radar/core/kg/phase1 tests/unit/test_phase1_projection.py tests/integration/test_kg_phase1_projection.py  # limpo
+git diff --check eb0a4e46b..HEAD                                                                                         # limpo
 ```
 
 Regressões diretamente relacionadas (kg/gold/environment): `test_environment_contract`,
@@ -103,17 +193,20 @@ Regressões diretamente relacionadas (kg/gold/environment): `test_environment_co
 
 ## Limitações
 
-- **Testes sem Postgres real:** a suíte é hermética (mocks/`monkeypatch`); o
-  SQL da transação (`::vector`, `::jsonb`, swap, `returning id`) não foi
-  executado contra um Postgres real nesta task. Recomenda-se validar o build
-  em Supabase local (migration up + `python -m radar.core.kg.phase1.ingest`)
-  antes de consumir a projeção.
-- **Comunidades exigem networkx** (extra `[graph]`); sem ele o build degrada com
-  `counts.communities = 0` (deliberado — enriquecimento, não contrato).
+- **Comunidades exigem networkx** (extra `[graph]`/`[dev]`); sem ele o build
+  degrada com `counts.communities = 0` (deliberado — enriquecimento, não
+  contrato; testado).
+- **Validação real local executada nesta correção** (migration 048 aplicada +
+  prova psycopg via teste `integration`) — não há mais gap de Postgres real.
+  A prova exige `supabase start` ativo; sem ele, o teste é pulado (gated).
 - **Sem endpoint HTTP / sem integração** — a projeção está pronta, mas nenhum
   consumidor (Explorar) foi conectado nesta task.
 - **`source_hash` não é reversível** e não identifica o commit de origem do
   gold (só o conteúdo) — suficiente para idempotência, não para auditoria fina.
+- **Comunidade determinística por construção de topologia**: o Louvain usa
+  `seed=42` e arestas canônicas; o ID `com_<idx>` é ordenado pelos membros.
+  O fixture validado garante estabilidade sob `PYTHONHASHSEED`/embaralhamento;
+  grafos muito maiores (> dezenas de milhares de nós) não foram estressados.
 
 ## Não-alterados (garantia de impacto mínimo)
 
