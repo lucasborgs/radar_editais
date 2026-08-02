@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass, field
 from typing import Any
 
 import psycopg
@@ -19,6 +20,23 @@ import psycopg
 logger = logging.getLogger(__name__)
 
 SCHEMA = "kg_phase1"
+
+# Timeout curto e EXPLÍCITO do snapshot (evita bloquear o Explorar se o Postgres
+# pendurar): statement_timeout + connect_timeout em UMA leitura única.
+SNAPSHOT_TIMEOUT_SECONDS = 2.0
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    """Cópia consistente de UMA geração — nunca mistura duas durante um swap.
+
+    `generation_id` fixado na resolução; nós/qualidade/arestas/comunidades são
+    lidos DA MESMA geração, em UMA conexão, dentro de UMA transação."""
+    generation_id: int
+    nodes: list[dict[str, Any]]
+    quality_nodes: list[dict[str, Any]]
+    edges: list[dict[str, Any]]
+    communities: dict[str, list[str]] = field(default_factory=dict)
 
 
 def get_dsn() -> str:
@@ -224,6 +242,117 @@ def load_communities(
             for cid, nid in cur.fetchall():
                 out.setdefault(cid, []).append(nid)
             return out
+    finally:
+        if own:
+            conn.close()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Snapshot CONSISTENTE (KG-P1B): UMA geração, UMA conexão, UMA transação,
+# timeout explícito. A base dos graph tools read-only do Explorar.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _connect_with_timeout(timeout: float) -> psycopg.Connection:
+    """Conexão com timeouts curtos e explícitos (connect + statement).
+
+    `statement_timeout` na própria conexão garante que uma leitura pendurada
+    (lentidão/lock do Postgres) NÃO bloqueie o Explorar além do teto."""
+    secs = max(1.0, float(timeout))
+    ms = max(1, int(secs * 1000))
+    return psycopg.connect(
+        get_dsn(),
+        connect_timeout=max(1, int(secs)),
+        options=f"-c statement_timeout={ms}",
+    )
+
+
+def _fetch_nodes(cur, generation_id: int) -> list[dict[str, Any]]:
+    cur.execute(
+        f"select id, kind, native_id, name, description from {SCHEMA}.nodes "
+        f"where generation_id = %s order by id",
+        (generation_id,),
+    )
+    return [dict(zip(_cols(cur), r, strict=True)) for r in cur.fetchall()]
+
+
+def _fetch_quality_nodes(cur, generation_id: int) -> list[dict[str, Any]]:
+    cur.execute(
+        f"select id, family, value from {SCHEMA}.quality_nodes "
+        f"where generation_id = %s order by id",
+        (generation_id,),
+    )
+    return [dict(zip(_cols(cur), r, strict=True)) for r in cur.fetchall()]
+
+
+def _fetch_edges(cur, generation_id: int) -> list[dict[str, Any]]:
+    cur.execute(
+        f"select source_id, target_id, type, weight, properties, origin "
+        f"from {SCHEMA}.edges where generation_id = %s "
+        f"order by source_id, target_id, type",
+        (generation_id,),
+    )
+    return [dict(zip(_cols(cur), r, strict=True)) for r in cur.fetchall()]
+
+
+def _fetch_communities(cur, generation_id: int) -> dict[str, list[str]]:
+    cur.execute(
+        f"select community_id, node_id from {SCHEMA}.communities "
+        f"where generation_id = %s order by community_id, node_id",
+        (generation_id,),
+    )
+    out: dict[str, list[str]] = {}
+    for cid, nid in cur.fetchall():
+        out.setdefault(cid, []).append(nid)
+    return out
+
+
+def load_snapshot(
+    *,
+    conn: psycopg.Connection | None = None,
+    timeout: float = SNAPSHOT_TIMEOUT_SECONDS,
+) -> Snapshot | None:
+    """Snapshot CONSISTENTE da geração corrente e saudável.
+
+    - resolve a ÚNICA geração `is_current = true AND status = 'healthy'`;
+    - carrega nós, quality nodes, arestas e comunidades DESSA mesma geração
+      (nunca mistura duas gerações — inclusive durante um swap: o swap só
+      desmarca `is_current`, nunca apaga gerações, então o `generation_id`
+      resolvido permanece íntegro);
+    - UMA conexão e UMA transação (visão consistente);
+    - `None` quando não existe geração saudável (estado pré-primeiro-build) —
+      nunca um dado parcial;
+    - timeout curto e explícito via `statement_timeout`/`connect_timeout`."""
+    own = conn is None
+    if own:
+        conn = _connect_with_timeout(timeout)
+    try:
+        with conn.transaction():
+            with conn.cursor() as cur:
+                if own:
+                    cur.execute(
+                        "set local statement_timeout = %s",
+                        (max(1, int(timeout * 1000)),),
+                    )
+                cur.execute(
+                    f"select id from {SCHEMA}.generations "
+                    f"where is_current = true and status = 'healthy' "
+                    f"order by id desc limit 1"
+                )
+                row = cur.fetchone()
+                if row is None:
+                    return None
+                generation_id = int(row[0])
+                nodes = _fetch_nodes(cur, generation_id)
+                quality_nodes = _fetch_quality_nodes(cur, generation_id)
+                edges = _fetch_edges(cur, generation_id)
+                communities = _fetch_communities(cur, generation_id)
+        return Snapshot(
+            generation_id=generation_id,
+            nodes=nodes,
+            quality_nodes=quality_nodes,
+            edges=edges,
+            communities=communities,
+        )
     finally:
         if own:
             conn.close()
