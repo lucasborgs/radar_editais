@@ -20,6 +20,7 @@ essas categorias não autorizam remoção ou ativação automática.
 |---|---|---|
 | Deep Research na escrita | ativa, degradável | falha de busca/staging não quebra o turno |
 | Deep Research no Explore | opcional | `EXPLORE_DEEP_RESEARCH_ENABLED=true`; fallback para tools do catálogo |
+| tools de grafo da Fase 1 no Explorar | opcional | `KG_PHASE1_EXPLORE_ENABLED=true` (default off, read-only); indisponibilidade do grafo cai para tools do catálogo |
 | RAG factual no Explore | ativa | default on; `EXPLORE_FACTUAL_RAG_ENABLED=false` é kill switch emergencial |
 | Descoberta DOU, hub e Crawl4AI | opcional, operacional | flags do worker; todo achado permanece em staging |
 | reranking | opcional, avaliado | `MATCH_RERANK_ENABLED` + `RERANK_BACKEND`; fallback para ranking base |

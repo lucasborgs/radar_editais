@@ -2,7 +2,7 @@
 
 > **Task:** KG-P1A — projeção de produção da Fase 1 do grafo (aproveitando a
 > spike `kg-structure-aware`).
-> **Status:** concluída (sem deploy, sem merge, sem push). Auditoria Codex: pendente.
+> **Status:** concluída (sem deploy, sem merge, sem push). Auditoria Codex: aprovada em 2026-08-01.
 
 ## Identificação
 
@@ -224,5 +224,5 @@ Confirmado explicitamente para a task KG-P1A:
 
 ## Auditoria Codex
 
-**Pendente.** Esta task não iniciou a integração com o Explorar, não fez merge e
-não fez push.
+**Aprovada em 2026-08-01** (integração read-only KG-P1B-1 validou a projeção).
+Esta task não fez merge e não fez push.
