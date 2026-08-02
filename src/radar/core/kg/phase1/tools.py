@@ -395,21 +395,80 @@ def _quality_index(snapshot: Any) -> dict[tuple[str, str], list[dict[str, Any]]]
     return out
 
 
+def _profile_text(profile: dict[str, Any]) -> dict[str, str]:
+    return {
+        field: str(profile.get(field) or "")
+        for field in ("one_liner", "solution_summary", "descricao_atividades", "portfolio_projetos")
+        if profile.get(field)
+    }
+
+
+def _phrase_in_text(phrase: str, text: str) -> bool:
+    normalized_phrase = _norm(phrase)
+    normalized_text = _norm(text)
+    if not normalized_phrase or not normalized_text:
+        return False
+    return re.search(
+        rf"(?<!\w){re.escape(normalized_phrase)}(?!\w)", normalized_text,
+    ) is not None
+
+
+def _sector_aliases() -> dict[str, str]:
+    """Aliases da taxonomia vigente, sem vocabulário específico da empresa."""
+    from radar.core.kg import schema
+    from radar.core.kg.gold import normalize_setores
+
+    tax = schema.setores_taxonomia()
+    aliases: dict[str, str] = {}
+    for label in tax.get("labels") or []:
+        canonical = normalize_setores([label])
+        if canonical:
+            aliases[_norm(label)] = canonical[0]
+    for raw, mapped in (tax.get("alias_map") or {}).items():
+        values = mapped if isinstance(mapped, list) else [mapped]
+        for value in values:
+            canonical = normalize_setores([value])
+            if canonical:
+                aliases[_norm(raw)] = canonical[0]
+    for raw, mapped in (tax.get("tese_theme_map") or {}).items():
+        values = mapped if isinstance(mapped, list) else [mapped]
+        for value in values:
+            canonical = normalize_setores([value])
+            if canonical:
+                aliases[_norm(raw)] = canonical[0]
+    return aliases
+
+
+def _technology_aliases(node: dict[str, Any]) -> set[str]:
+    """Valor do nó + aliases do normalizador gold para esse valor."""
+    from radar.core.kg import schema
+    from radar.core.kg.gold import normalize_tag
+
+    value = str(node.get("value") or "")
+    canonical = _norm(normalize_tag(value) or value)
+    aliases = {_norm(value), canonical}
+    synonyms = schema.tag_normalization().get("synonyms") or {}
+    for alias, mapped in synonyms.items():
+        if _norm(normalize_tag(str(mapped)) or str(mapped)) == canonical:
+            aliases.add(_norm(alias))
+    return {item for item in aliases if item}
+
+
 def _profile_strategy_anchors(
     profile: dict[str, Any] | None, snapshot: Any,
-) -> tuple[list[dict[str, Any]], str, list[dict[str, Any]], list[dict[str, Any]]]:
-    """Converte apenas atributos declarados em âncoras virtuais exatas.
+) -> tuple[list[dict[str, Any]], str, dict[str, Any], list[dict[str, Any]]]:
+    """Converte o contrato canônico em âncoras virtuais conservadoras.
 
-    O nó virtual existe somente nesta consulta. Descrições livres do perfil não
-    são tokenizadas nem usadas como busca semântica: quando não há dimensão
-    estruturada correspondente, ela permanece em ``unresolved``.
+    Campos estruturados são ``declared``. Setores e tecnologias projetados de
+    texto usam somente a taxonomia/aliases existentes e valores efetivamente
+    presentes no snapshot. Nenhuma lista específica de empresa é criada.
     """
     virtual = "perfil:virtual"
     edges: list[dict[str, Any]] = []
-    recognized: list[dict[str, Any]] = []
+    profile_view: dict[str, Any] = {"declared": [], "projected": [], "unresolved": []}
     unresolved: list[dict[str, Any]] = []
     if not profile:
-        return edges, virtual, recognized, [{"field": "perfil", "reason": "perfil ausente"}]
+        return edges, virtual, profile_view, [{"field": "perfil", "reason": "perfil ausente"}]
 
     index = _quality_index(snapshot)
 
@@ -429,7 +488,7 @@ def _profile_strategy_anchors(
                 })
                 continue
             node = matches[0]
-            recognized.append({"field": field, "value": text, "node_id": node["id"]})
+            profile_view["declared"].append({"field": field, "value": text, "node_id": node["id"]})
             edges.append(_edge(
                 virtual, node["id"], "ancora_perfil", origin="profile_ephemeral",
             ))
@@ -454,58 +513,98 @@ def _profile_strategy_anchors(
         else:
             add_exact("tipos_financiamento_interesse", mecanismo, "mecanismo")
 
-    # Suporta snapshots de perfil já enriquecidos pelo produto, sem ampliar o
-    # schema HTTP. Esses campos são opcionais e continuam exigindo igualdade
-    # exata contra nós de qualidade.
-    for profile_field, family in (("setores", "setor"), ("tecnologias_tags", "tecnologia"),
-                                  ("temas", "tema"), ("tema", "tema")):
-        if profile_field in profile:
-            add_exact(profile_field, profile.get(profile_field), family)
+    text_fields = _profile_text(profile)
+    sector_aliases = _sector_aliases()
+    for text_field, text in text_fields.items():
+        matched_fields: set[tuple[str, str]] = set()
+        for alias, canonical in sector_aliases.items():
+            if not _phrase_in_text(alias, text):
+                continue
+            matches = index.get(("setor", _norm(canonical)), [])
+            if len(matches) == 1:
+                node = matches[0]
+                profile_view["projected"].append({
+                    "source_field": text_field, "dimension": "setor",
+                    "value": node["value"], "node_id": node["id"], "matched_alias": alias,
+                })
+                edges.append(_edge(virtual, node["id"], "ancora_textual",
+                                   origin="profile_ephemeral"))
+                matched_fields.add((text_field, "setor"))
 
-    for text_field in ("one_liner", "solution_summary", "descricao_atividades", "portfolio_projetos"):
-        if profile.get(text_field):
-            unresolved.append({"field": text_field, "reason": "texto_livre_nao_convertido_em_ancora"})
+        for node in snapshot.quality_nodes:
+            if node.get("family") != "tecnologia":
+                continue
+            aliases = sorted(_technology_aliases(node), key=lambda value: (len(value), value), reverse=True)
+            match = next((alias for alias in aliases if _phrase_in_text(alias, text)), None)
+            if match is None:
+                continue
+            profile_view["projected"].append({
+                "source_field": text_field, "dimension": "tecnologia",
+                "value": node["value"], "node_id": node["id"], "matched_alias": match,
+            })
+            edges.append(_edge(virtual, node["id"], "ancora_textual",
+                               origin="profile_ephemeral"))
+            matched_fields.add((text_field, "tecnologia"))
+
+        for dimension in ("setor", "tecnologia"):
+            if (text_field, dimension) not in matched_fields:
+                unresolved.append({"field": text_field, "dimension": dimension,
+                                   "reason": "no_existing_quality_value_or_alias_in_text"})
+
+    # Deduplica projeções e âncoras por qualidade, preservando a origem dos
+    # sinais no payload separado.
+    profile_view["projected"] = list({
+        (item["dimension"], item["node_id"]): item for item in profile_view["projected"]
+    }.values())
+    profile_view["unresolved"].extend(unresolved)
 
     # Evita repetir a mesma âncora quando dois campos chegam ao mesmo nó.
     unique: dict[tuple[str, str], dict[str, Any]] = {}
     for edge in edges:
         unique[(edge["target_id"], edge["type"])] = edge
-    return list(unique.values()), virtual, recognized, unresolved
+    return list(unique.values()), virtual, profile_view, unresolved
 
 
-def _strategy_relation(path: list[dict[str, Any]]) -> dict[str, Any]:
-    """Classifica uma rota somente pela origem real de suas arestas."""
-    origins = {step.get("origin") for step in path if step.get("origin") != "profile_ephemeral"}
-    if not origins or "unknown" in origins:
-        return {"classification": "insufficient_information", "confirmed": False}
-    if origins & {"phase1_similarity", "phase1_tech_bridge"}:
-        return {"classification": "derived_relation", "confirmed": False}
-    if "phase1_structural" in origins:
-        return {"classification": "catalog_structural_fact", "confirmed": True}
-    if origins <= {"phase1_deterministic"}:
-        return {"classification": "cataloged_attribute", "confirmed": True}
-    return {"classification": "insufficient_information", "confirmed": False}
+def _strategy_evidence(path: list[dict[str, Any]]) -> dict[str, Any]:
+    """Separa a rota derivada das evidências que a sustentam."""
+    supporting: list[dict[str, Any]] = []
+    derived: list[dict[str, Any]] = []
+    for step in path:
+        origin = step.get("origin")
+        if origin in {"phase1_deterministic", "phase1_structural"}:
+            supporting.append({**step, "classification": (
+                "catalog_structural_fact" if origin == "phase1_structural" else "cataloged_attribute"
+            ), "confirmed": True})
+        elif origin in {"phase1_similarity", "phase1_tech_bridge"}:
+            derived.append({**step, "classification": "derived_graph_step", "confirmed": False})
+        elif origin == "profile_ephemeral":
+            derived.append({**step, "classification": "profile_affinity_anchor", "confirmed": False})
+        else:
+            derived.append({**step, "classification": "insufficient_information", "confirmed": False})
+    return {
+        "route_relation": {"classification": "derived_profile_route", "confirmed": False},
+        "supporting_facts": supporting,
+        "derived_steps": derived,
+    }
 
 
-def _strategy_requested_kinds(requested_types: str | None) -> tuple[str, ...]:
+def _strategy_requested_kinds(requested_types: list[str] | None) -> tuple[str, ...]:
     if not requested_types:
         return STRATEGY_KINDS
-    aliases = {
-        "oportunidade": "edital", "oportunidades": "edital", "edital": "edital",
-        "programas": "programa", "programa": "programa", "agencias": "agencia",
-        "agência": "agencia", "ict": "ict", "icts": "ict",
-        "investidores": "investidor", "investidor": "investidor",
-    }
-    selected = {aliases.get(part.strip().lower()) for part in requested_types.split(",")}
-    return tuple(kind for kind in STRATEGY_KINDS if kind in selected) or STRATEGY_KINDS
+    selected = tuple(dict.fromkeys(requested_types))
+    invalid = sorted(set(selected) - set(STRATEGY_KINDS))
+    if invalid:
+        raise ValueError("requested_types contém kind não suportado")
+    return tuple(kind for kind in STRATEGY_KINDS if kind in selected)
 
 
 def strategy_payload(
-    profile: dict[str, Any] | None, snapshot: Any, *, requested_types: str | None = None,
+    profile: dict[str, Any] | None, snapshot: Any, *, requested_types: list[str] | None = None,
     max_bytes: int = MAX_PAYLOAD_BYTES,
 ) -> ToolOutcome:
     """Consulta única, determinística e profile-first sobre o snapshot."""
-    profile_edges, virtual, recognized, unresolved = _profile_strategy_anchors(profile, snapshot)
+    profile_edges, virtual, profile_view, unresolved = _profile_strategy_anchors(profile, snapshot)
+    recognized = profile_view["declared"] + profile_view["projected"]
     edges = sorted(
         list(snapshot.edges) + profile_edges,
         key=lambda item: (item["source_id"], item["target_id"], item["type"],
@@ -516,7 +615,7 @@ def strategy_payload(
     payload: dict[str, Any] = {
         "status": "ok" if recognized else "insufficient_profile_anchors",
         "generation_id": snapshot.generation_id,
-        "profile": {"recognized": recognized, "unresolved": unresolved},
+        "profile": profile_view,
         "results_by_type": {},
         "coverage": {kind: {"queried": True, "status": "queried", "total_reachable": 0,
                             "returned": 0, "truncated": False} for kind in STRATEGY_KINDS},
@@ -525,6 +624,24 @@ def strategy_payload(
     }
     if not recognized:
         payload["limitations"].append("Sem âncoras exatas suficientes; o grafo não foi usado para aproximar o perfil.")
+
+    # Um índice direto de qualidade preserva todos os sinais compartilhados,
+    # mesmo quando a rota explicativa escolhida usa somente um deles.
+    shared_by_entity: dict[str, list[dict[str, Any]]] = {}
+    for item in recognized:
+        anchor_id = item["node_id"]
+        for edge in snapshot.edges:
+            other = None
+            if edge["source_id"] == anchor_id:
+                other = edge["target_id"]
+            elif edge["target_id"] == anchor_id:
+                other = edge["source_id"]
+            if other is None or not any(n["id"] == other for n in snapshot.nodes):
+                continue
+            shared_by_entity.setdefault(other, []).append(item)
+    for entity_id in shared_by_entity:
+        unique_shared = {item["node_id"]: item for item in shared_by_entity[entity_id]}
+        shared_by_entity[entity_id] = [unique_shared[key] for key in sorted(unique_shared)]
 
     for kind in kinds:
         goals = sorted(n["id"] for n in snapshot.nodes if n["kind"] == kind)
@@ -536,12 +653,9 @@ def strategy_payload(
         for raw_path in raw_paths:
             path = _path_entry(raw_path, edge_index)
             target = raw_path[-1][2] if raw_path else ""
-            shared = [
-                item for item in recognized
-                if any(step["from"] == item["node_id"] or step["to"] == item["node_id"] for step in path)
-            ]
+            shared = shared_by_entity.get(target, [])
             candidates.append((len(path), -len(shared), target, path, shared))
-        candidates.sort(key=lambda item: (item[0], item[1], item[2]))
+        candidates.sort(key=lambda item: (item[1], item[0], item[2]))
         total = len(candidates)
         selected = candidates[:MAX_STRATEGY_RESULTS]
         results = []
@@ -550,11 +664,11 @@ def strategy_payload(
             results.append({
                 "id": node["id"], "name": node["name"], "kind": node["kind"],
                 "path": path,
-                "shared_characteristics": [
-                    {"field": item["field"], "value": item["value"], "node_id": item["node_id"]}
-                    for item in shared
-                ],
-                "relation": _strategy_relation(path),
+                "shared_characteristics": [{
+                    "field": item.get("field", item.get("source_field")),
+                    "value": item.get("value"), "node_id": item["node_id"],
+                } for item in shared],
+                "evidence": _strategy_evidence(path),
             })
         payload["results_by_type"][kind] = results
         coverage = payload["coverage"][kind]
@@ -910,16 +1024,28 @@ def build_graph_tools(*, profile: dict[str, Any] | None = None) -> list[BaseTool
     error = "Falha ao consultar o grafo da Fase 1; nenhum resultado estratégico foi fabricado."
 
     @tool
-    def graph_strategy(requested_types: str = "") -> str:
+    def graph_strategy(requested_types: list[str] | None = None) -> str:
         """Consulta o grafo exclusivamente a partir do perfil autenticado injetado.
 
         Retorna, em uma única consulta, oportunidades/editais, programas,
         agências, ICTs e investidores, com âncoras reconhecidas, atributos não
         resolvidos, caminhos, características compartilhadas, classificação da
-        relação e cobertura. ``requested_types`` é opcional e aceita uma lista
-        separada por vírgulas; vazio consulta todos os tipos. Nunca informe um
+        relação e cobertura. ``requested_types`` é opcional e aceita apenas a
+        lista fechada ``edital``, ``programa``, ``agencia``, ``ict``,
+        ``investidor``; vazio consulta todos os tipos. Kind inválido é rejeitado.
+        Nunca informe um
         perfil, entity ID ou node ID nesta ferramenta.
         """
+        try:
+            _strategy_requested_kinds(requested_types)
+        except ValueError:
+            return dump({
+                "status": "invalid_request",
+                "message": "requested_types contém kind não suportado; use os kinds canônicos.",
+                "coverage": {kind: {"queried": False, "status": "not_queried"}
+                             for kind in STRATEGY_KINDS},
+                "truncated": False,
+            })
         return _run(
             "graph_strategy",
             lambda snap: strategy_payload(profile, snap, requested_types=requested_types),

@@ -2,15 +2,33 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 
 import pytest
+from pydantic import ValidationError
 
 from radar.core.kg.phase1 import store, tools
 from radar.core.kg.phase1.store import Snapshot
 from radar.core.llm.agent_runtime import AgentResult
 from radar.core.services.explore_agent import ExploreAgent
+from radar.domain.profile_schema import CompanyProfilePayload
 
 pytestmark = pytest.mark.unit
+
+
+CANONICAL_PROFILE = {
+    "nome": "iFlorestal",
+    "tipo_entidade": "empresa",
+    "one_liner": "Soluções para o setor agro com inteligência artificial aplicada à floresta.",
+    "solution_summary": "Monitoramento e restauração florestal com inteligência artificial.",
+    "descricao_atividades": "Desenvolvimento de tecnologia para manejo sustentável e recuperação de áreas.",
+    "uf": "SC",
+    "trl": 5,
+    "estagio": "seed",
+    "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "capital_risco"],
+}
 
 
 def edge(source, target, type_, origin="phase1_deterministic", weight=1.0, props=None):
@@ -18,139 +36,211 @@ def edge(source, target, type_, origin="phase1_deterministic", weight=1.0, props
             "origin": origin, "weight": weight, "properties": props or {}}
 
 
-def snapshot():
+def canonical_snapshot() -> Snapshot:
     nodes = [
         {"id": "edital:e:1", "kind": "edital", "native_id": "e:1", "name": "Edital Agro", "description": ""},
         {"id": "programa:p:1", "kind": "programa", "native_id": "p:1", "name": "Programa Verde", "description": ""},
         {"id": "agencia:a:1", "kind": "agencia", "native_id": "a:1", "name": "Agência A", "description": ""},
-        {"id": "ict:i:1", "kind": "ict", "native_id": "i:1", "name": "ICT Floresta", "description": ""},
+        {"id": "ict:i:1", "kind": "ict", "native_id": "ICT Floresta Completa", "description": "", "name": "ICT Floresta Completa"},
+        {"id": "ict:i:2", "kind": "ict", "native_id": "i:2", "name": "ICT Agro Parcial", "description": ""},
         {"id": "investidor:v:1", "kind": "investidor", "native_id": "v:1", "name": "Fundo Verde", "description": ""},
     ]
     quality = [
         {"id": "setor:agro", "family": "setor", "value": "Agro"},
-        {"id": "tecnologia:ia", "family": "tecnologia", "value": "IA"},
+        {"id": "tecnologia:ia", "family": "tecnologia", "value": "Inteligência Artificial"},
         {"id": "uf:sc", "family": "uf", "value": "SC"},
         {"id": "estagio:seed", "family": "estagio", "value": "seed"},
         {"id": "mecanismo:subvencao", "family": "mecanismo", "value": "Subvenção"},
     ]
     edges = [
-        edge("edital:e:1", "setor:agro", "tem_setor"), edge("edital:e:1", "tecnologia:ia", "tem_tecnologia"),
-        edge("edital:e:1", "uf:sc", "tem_uf"), edge("edital:e:1", "mecanismo:subvencao", "usa_mecanismo"),
-        edge("ict:i:1", "setor:agro", "tem_setor"), edge("ict:i:1", "tecnologia:ia", "tem_tecnologia"),
-        edge("investidor:v:1", "tecnologia:ia", "tem_tecnologia"),
+        edge("edital:e:1", "setor:agro", "tem_setor"),
+        edge("edital:e:1", "tecnologia:ia", "tem_tecnologia"),
+        edge("edital:e:1", "uf:sc", "tem_uf"),
         edge("edital:e:1", "programa:p:1", "subordinado_a", "phase1_structural"),
         edge("edital:e:1", "agencia:a:1", "operado_por", "phase1_structural"),
+        edge("ict:i:1", "setor:agro", "tem_setor"),
+        edge("ict:i:1", "tecnologia:ia", "tem_tecnologia"),
+        edge("ict:i:1", "uf:sc", "tem_uf"),
+        edge("ict:i:2", "setor:agro", "tem_setor"),
+        edge("investidor:v:1", "tecnologia:ia", "tem_tecnologia"),
         edge("edital:e:1", "investidor:v:1", "similar_a", "phase1_similarity", 0.9, {"derived": True}),
     ]
     return Snapshot(7, nodes, quality, edges, {})
 
 
-def tool(monkeypatch, profile=None, snap=None):
+def graph_tool(monkeypatch, profile=None, snap=None):
     monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
-    monkeypatch.setattr(store, "load_snapshot", lambda: snap or snapshot())
+    actual = snap if snap is not None else canonical_snapshot()
+    monkeypatch.setattr(store, "load_snapshot", lambda: actual)
     return tools.build_graph_tools(profile=profile)[0]
 
 
-def invoke(monkeypatch, profile=None, snap=None, requested=""):
-    return json.loads(tool(monkeypatch, profile, snap).invoke({"requested_types": requested}))
+def invoke(monkeypatch, profile=None, snap=None, requested=None):
+    raw = graph_tool(monkeypatch, profile, snap).invoke(
+        {} if requested is None else {"requested_types": requested},
+    )
+    return json.loads(raw)
 
 
-def test_flag_off_is_byte_compatible_and_flag_on_is_exclusive(monkeypatch):
-    monkeypatch.delenv("KG_PHASE1_EXPLORE_ENABLED", raising=False)
-    before = {t.name for t in ExploreAgent()._explore_tools(profile={})}
-    assert "graph_strategy" not in before
-    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
-    after = {t.name for t in ExploreAgent()._explore_tools(profile={})}
-    assert after == {"graph_strategy"}
+def test_golden_profile_is_canonical_and_has_no_extra_fields():
+    validated = CompanyProfilePayload.model_validate(CANONICAL_PROFILE)
+    assert validated.nome == "iFlorestal"
+    with pytest.raises(ValidationError):
+        CompanyProfilePayload.model_validate({**CANONICAL_PROFILE, "setores": ["Agro"]})
 
 
-def test_strategy_profile_is_closure_not_llm_argument(monkeypatch):
-    t = tool(monkeypatch, {"uf": "SC"})
-    assert "profile" not in t.args
-    assert set(t.args) == {"requested_types"}
-
-
-def test_profile_resolves_multiple_quality_anchors_and_no_entity_start(monkeypatch):
-    out = invoke(monkeypatch, {"uf": "SC", "setores": ["Agro"], "tecnologias_tags": ["IA"]})
-    assert {x["node_id"] for x in out["profile"]["recognized"]} == {"uf:sc", "setor:agro", "tecnologia:ia"}
-    assert out["results_by_type"]["edital"]
-    assert out["results_by_type"]["ict"]
-
-
-def test_all_requested_types_are_grouped_and_explainable(monkeypatch):
-    out = invoke(monkeypatch, {"uf": "SC", "setores": ["Agro"], "tecnologias_tags": ["IA"]})
-    assert set(out["results_by_type"]) == {"edital", "programa", "agencia", "ict", "investidor"}
-    for results in out["results_by_type"].values():
-        for result in results:
-            assert result["path"]
-            assert result["relation"]["classification"]
-
-
-def test_routes_are_deterministic_under_input_shuffle(monkeypatch):
-    first = invoke(monkeypatch, {"uf": "SC", "setores": ["Agro"], "tecnologias_tags": ["IA"]})
-    shuffled = snapshot()
-    shuffled = Snapshot(7, list(reversed(shuffled.nodes)), list(reversed(shuffled.quality_nodes)),
-                        list(reversed(shuffled.edges)), {})
-    second = invoke(monkeypatch, {"uf": "SC", "setores": ["Agro"], "tecnologias_tags": ["IA"]}, shuffled)
-    assert first == second
-
-
-def test_facts_attributes_and_derived_relations_are_distinct(monkeypatch):
-    out = invoke(monkeypatch, {"setores": ["Agro"], "tecnologias_tags": ["IA"]})
-    assert out["results_by_type"]["programa"][0]["relation"]["classification"] == "catalog_structural_fact"
-    assert out["results_by_type"]["ict"][0]["relation"]["classification"] == "cataloged_attribute"
-    assert out["results_by_type"]["investidor"][0]["relation"]["classification"] in {
-        "cataloged_attribute", "derived_relation"
+def test_text_projection_uses_existing_sector_and_tag_aliases(monkeypatch):
+    out = invoke(monkeypatch, CANONICAL_PROFILE)
+    projected = out["profile"]["projected"]
+    assert {item["node_id"] for item in projected} >= {"setor:agro", "tecnologia:ia"}
+    assert {item["source_field"] for item in projected} <= {
+        "one_liner", "solution_summary", "descricao_atividades", "portfolio_projetos",
     }
 
 
-def test_unknown_attribute_is_unresolved_and_never_fuzzy_matched(monkeypatch):
-    out = invoke(monkeypatch, {"setores": ["Agroflorestal desconhecido"], "solution_summary": "IA para floresta"})
-    assert any(x["field"] == "setores" for x in out["profile"]["unresolved"])
-    assert any(x["field"] == "solution_summary" for x in out["profile"]["unresolved"])
+def test_text_without_existing_quality_match_remains_unresolved(monkeypatch):
+    profile = CompanyProfilePayload.model_validate({
+        "nome": "Empresa sem taxonomia", "one_liner": "Serviços administrativos gerais.",
+    }).model_dump()
+    out = invoke(monkeypatch, profile)
+    assert out["profile"]["projected"] == []
+    assert any(item["field"] == "one_liner" for item in out["profile"]["unresolved"])
     assert out["status"] == "insufficient_profile_anchors"
-    assert all(not values for values in out["results_by_type"].values())
 
 
-def test_coverage_distinguishes_absence_from_not_queried(monkeypatch):
-    out = invoke(monkeypatch, {"setores": ["Agro"]}, requested="ict,agencias")
-    assert out["coverage"]["ict"]["queried"] is True
-    assert out["coverage"]["programa"]["queried"] is False
-    assert "inexistência" in out["limitations"][0] or any("inexistência" in x for x in out["limitations"])
+def test_declared_and_projected_attributes_are_separate(monkeypatch):
+    out = invoke(monkeypatch, CompanyProfilePayload.model_validate(CANONICAL_PROFILE).model_dump())
+    assert any(item["field"] == "uf" for item in out["profile"]["declared"])
+    assert all("source_field" in item for item in out["profile"]["projected"])
 
 
-def test_unavailable_snapshot_is_honest_and_has_no_legacy_fallback(monkeypatch):
+def test_three_shared_signals_are_aggregated_even_when_path_uses_one(monkeypatch):
+    out = invoke(monkeypatch, CANONICAL_PROFILE)
+    ict = next(item for item in out["results_by_type"]["ict"] if item["id"] == "ict:i:1")
+    assert {item["node_id"] for item in ict["shared_characteristics"]} >= {
+        "setor:agro", "tecnologia:ia", "uf:sc",
+    }
+
+
+def test_more_shared_signals_rank_before_one_signal(monkeypatch):
+    out = invoke(monkeypatch, CANONICAL_PROFILE, requested=["ict"])
+    assert [item["id"] for item in out["results_by_type"]["ict"]][:2] == ["ict:i:1", "ict:i:2"]
+
+
+def test_profile_route_is_derived_but_internal_attributes_are_facts(monkeypatch):
+    out = invoke(monkeypatch, CANONICAL_PROFILE, requested=["ict"])
+    ict = next(item for item in out["results_by_type"]["ict"] if item["id"] == "ict:i:1")
+    assert ict["evidence"]["route_relation"] == {
+        "classification": "derived_profile_route", "confirmed": False,
+    }
+    assert any(fact["origin"] == "phase1_deterministic" and fact["confirmed"]
+               for fact in ict["evidence"]["supporting_facts"])
+
+
+def test_profile_to_opportunity_to_agency_keeps_structural_supporting_fact(monkeypatch):
+    out = invoke(monkeypatch, CANONICAL_PROFILE, requested=["agencia"])
+    agency = out["results_by_type"]["agencia"][0]
+    assert agency["evidence"]["route_relation"]["confirmed"] is False
+    fact = next(f for f in agency["evidence"]["supporting_facts"] if f["predicate"] == "operado_por")
+    assert fact["origin"] == "phase1_structural"
+    assert fact["confirmed"] is True
+
+
+def test_derived_graph_step_is_never_confirmed(monkeypatch):
+    out = invoke(monkeypatch, CANONICAL_PROFILE, requested=["investidor"])
+    investor = out["results_by_type"]["investidor"][0]
+    assert all(not step["confirmed"] for step in investor["evidence"]["derived_steps"])
+
+
+def test_requested_kinds_are_structured_and_invalid_is_rejected(monkeypatch):
+    out = invoke(monkeypatch, CANONICAL_PROFILE, requested=["agencia", "ict"])
+    assert out["coverage"]["agencia"]["queried"] is True
+    assert out["coverage"]["edital"]["queried"] is False
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
+    monkeypatch.setattr(store, "load_snapshot", canonical_snapshot)
+    raw = tools.build_graph_tools(profile=CANONICAL_PROFILE)[0].invoke({"requested_types": ["agências"]})
+    assert "Kind inválido" in raw or "kind não suportado" in raw
+
+
+def test_coverage_never_turns_unqueried_into_negative_claim(monkeypatch):
+    out = invoke(monkeypatch, CANONICAL_PROFILE, requested=["ict"])
+    assert out["coverage"]["programa"]["status"] == "not_queried"
+    assert "inexistência" in " ".join(out["limitations"])
+
+
+def test_routes_are_identical_under_input_shuffle(monkeypatch):
+    first = invoke(monkeypatch, CANONICAL_PROFILE)
+    original = canonical_snapshot()
+    shuffled = Snapshot(original.generation_id, list(reversed(original.nodes)),
+                        list(reversed(original.quality_nodes)), list(reversed(original.edges)), {})
+    assert first == invoke(monkeypatch, CANONICAL_PROFILE, shuffled)
+
+
+def test_routes_are_identical_under_different_pythonhashseeds():
+    code = """
+import json
+from tests.unit.test_kg_phase1_explore_tools import CANONICAL_PROFILE, canonical_snapshot
+from radar.core.kg.phase1.tools import strategy_payload
+print(json.dumps(strategy_payload(CANONICAL_PROFILE, canonical_snapshot()).payload, ensure_ascii=False, sort_keys=True))
+"""
+    outputs = []
+    for seed in ("1", "987654"):
+        env = {**os.environ, "PYTHONHASHSEED": seed, "PYTHONPATH": "src"}
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                                text=True, cwd=os.getcwd(), env=env, check=True)
+        outputs.append(result.stdout)
+    assert outputs[0] == outputs[1]
+
+
+def test_snapshot_unavailable_is_honest_without_legacy_fallback(monkeypatch):
     monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
     monkeypatch.setattr(store, "load_snapshot", lambda: None)
-    out = tools.build_graph_tools(profile={"uf": "SC"})[0].invoke({})
-    assert "indisponível" in out
-    assert "get_edital" not in out and "search_entities" not in out
+    raw = tools.build_graph_tools(profile=CANONICAL_PROFILE)[0].invoke({})
+    assert "indisponível" in raw
+    assert "search_entities" not in raw
 
 
-def test_payload_is_utf8_bounded_and_explicitly_truncated(monkeypatch):
-    snap = snapshot()
+def test_database_failure_is_sanitized(monkeypatch, caplog):
+    import psycopg
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
+    monkeypatch.setattr(store, "load_snapshot", lambda: (_ for _ in ()).throw(
+        psycopg.OperationalError("postgresql://secret SELECT password"),
+    ))
+    raw = tools.build_graph_tools(profile=CANONICAL_PROFILE)[0].invoke({})
+    assert "secret" not in raw
+    assert "postgresql://" not in caplog.text
+
+
+def test_payload_is_valid_utf8_and_bounded(monkeypatch):
+    snap = canonical_snapshot()
     huge = {**snap.nodes[0], "name": "é" * 50_000}
     snap = Snapshot(snap.generation_id, [huge, *snap.nodes[1:]], snap.quality_nodes, snap.edges, {})
-    out = tool(monkeypatch, {"setores": ["Agro"]}, snap).invoke({})
-    assert len(out.encode("utf-8")) <= tools.MAX_PAYLOAD_BYTES
-    assert json.loads(out)
+    raw = graph_tool(monkeypatch, CANONICAL_PROFILE, snap).invoke({})
+    assert len(raw.encode("utf-8")) <= tools.MAX_PAYLOAD_BYTES
+    json.loads(raw)
 
 
-def test_agent_active_mode_does_not_inject_match_or_catalog(monkeypatch):
-    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
+def test_hub_weight_does_not_expand_strategy(monkeypatch):
+    snap = canonical_snapshot()
+    snap = Snapshot(snap.generation_id, snap.nodes,
+                    [*snap.quality_nodes, {"id": "setor:multissetorial", "family": "setor", "value": "Multissetorial"}],
+                    [*snap.edges, edge("ict:i:2", "setor:multissetorial", "tem_setor", weight=0.1)], {})
+    out = invoke(monkeypatch, CANONICAL_PROFILE, snap, ["ict"])
+    assert all(item["id"] != "setor:multissetorial" for item in out["results_by_type"]["ict"])
+
+
+def test_flag_off_preserves_previous_tools_and_system(monkeypatch):
+    monkeypatch.delenv("KG_PHASE1_EXPLORE_ENABLED", raising=False)
+    before = {tool.name for tool in ExploreAgent()._explore_tools(profile={})}
+    assert "graph_strategy" not in before
+    assert ExploreAgent._maybe_append_graph_instructions("base") == "base"
+
+
+def test_flag_on_is_exclusive(monkeypatch):
     captured = {}
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
     monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent",
                         lambda **kw: captured.update(kw) or AgentResult("ok", [], "end_turn", {}))
-    ExploreAgent().explore_with_meta("quais caminhos?", profile_text="perfil", profile={"uf": "SC"})
-    assert [t.name for t in captured["tools"]] == ["graph_strategy"]
-    assert "graph_strategy" in captured["system"]
+    ExploreAgent().explore_with_meta("quais caminhos?", profile_text="perfil", profile=CANONICAL_PROFILE)
+    assert [tool.name for tool in captured["tools"]] == ["graph_strategy"]
     assert "find_matching_editais" not in captured["system"]
-
-
-def test_agent_active_mode_with_missing_profile_does_not_fabricate(monkeypatch):
-    captured = {}
-    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
-    monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent",
-                        lambda **kw: captured.update(kw) or AgentResult("ok", [], "end_turn", {}))
-    ExploreAgent().explore_with_meta("o que existe?", profile=None)
-    assert [t.name for t in captured["tools"]] == ["graph_strategy"]

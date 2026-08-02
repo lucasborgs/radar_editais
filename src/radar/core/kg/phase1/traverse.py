@@ -41,7 +41,7 @@ def bfs_edges(
     collected: list[dict[str, Any]] = []
     for _ in range(depth):
         nxt: set[str] = set()
-        for node in frontier:
+        for node in sorted(frontier):
             for e in adj.get(node, []):
                 pair = (e["source_id"], e["target_id"], e["type"])
                 if pair in seen or (e["target_id"], e["source_id"], e["type"]) in seen:
@@ -107,7 +107,7 @@ def reachable_within(
     frontier = {seed}
     for _ in range(depth):
         nxt: set[str] = set()
-        for node in frontier:
+        for node in sorted(frontier):
             for e in adj.get(node, []):
                 other = e["target_id"] if e["source_id"] == node else e["source_id"]
                 if other not in visited:
@@ -150,7 +150,7 @@ def find_paths_to_goals(
     frontier = {start}
     for _ in range(depth):
         nxt: set[str] = set()
-        for node in frontier:
+        for node in sorted(frontier):
             for e in adj.get(node, []):
                 other = e["target_id"] if e["source_id"] == node else e["source_id"]
                 if other in parent:

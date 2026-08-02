@@ -34,25 +34,31 @@ FACTUAL_GRAPH_TOOLS = frozenset({"graph_explore", "graph_reason"})
 
 def load_data() -> list[dict]:
     from radar.core.kg.phase1.tools import reset_run_stats
+    from radar.domain.profile_schema import CompanyProfilePayload
 
     reset_run_stats()
     if not GOLDEN.exists():
         return []
     payload = json.loads(GOLDEN.read_text(encoding="utf-8"))
-    return [
-        {
-            "input": {"query": c["query"], "target": c.get("target"), "profile": c.get("profile")},
+    cases = []
+    for case in payload["cases"]:
+        profile = case.get("profile")
+        if profile is not None:
+            # Golden profile follows exactly the HTTP contract; enriched
+            # fixture-only fields are rejected here.
+            profile = CompanyProfilePayload.model_validate(profile).model_dump()
+        cases.append({
+            "input": {"query": case["query"], "target": case.get("target"), "profile": profile},
             "expected_output": {
-                "route": c["expected_route"],
-                "reference_answer": c["reference_answer"],
+                "route": case["expected_route"],
+                "reference_answer": case["reference_answer"],
             },
             "metadata": {
-                "case_id": c["id"], "assertions": c["assertions"],
-                "evidence": c["evidence"],
+                "case_id": case["id"], "assertions": case["assertions"],
+                "evidence": case["evidence"],
             },
-        }
-        for c in payload["cases"]
-    ]
+        })
+    return cases
 
 
 def task(*, item: Any, **_) -> dict:

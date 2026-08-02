@@ -73,9 +73,9 @@
         "trl": 5,
         "estagio": "seed",
         "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "capital_risco"],
-        "setores": ["Agrofloresta"],
-        "tecnologias_tags": ["sensoriamento florestal"],
-        "solution_summary": "Monitoramento e inteligência para restauração e manejo florestal."
+        "solution_summary": "Monitoramento e restauração florestal com inteligência artificial.",
+        "one_liner": "Soluções para o setor agro com inteligência artificial aplicada à floresta.",
+        "descricao_atividades": "Desenvolvimento de tecnologia para manejo sustentável e recuperação de áreas."
       },
       "target": {"type": "profile", "id": "profile"},
       "expected_route": "PROFILE_STRATEGY",
