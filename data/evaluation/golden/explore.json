@@ -61,6 +61,31 @@
         "conditional": ["parceria de longo prazo e regulação podem aparecer apenas como contexto"]
       },
       "evidence": ["https://barninvest.com.br/en", "investidor:barn-invest"]
+    },
+    {
+      "id": "iforestal-profile-strategy",
+      "incident": "profile-first",
+      "query": "Considerando meu perfil, quais oportunidades, ICTs, agências, programas e investidores estão conectados e que caminho de atuação você recomenda? Diferencie fatos confirmados de relações derivadas.",
+      "profile": {
+        "nome": "iFlorestal",
+        "tipo_entidade": "empresa",
+        "uf": "SC",
+        "trl": 5,
+        "estagio": "seed",
+        "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "capital_risco"],
+        "setores": ["Agrofloresta"],
+        "tecnologias_tags": ["sensoriamento florestal"],
+        "solution_summary": "Monitoramento e inteligência para restauração e manejo florestal."
+      },
+      "target": {"type": "profile", "id": "profile"},
+      "expected_route": "PROFILE_STRATEGY",
+      "reference_answer": "Uma única consulta deve cobrir oportunidades, programas, agências, ICTs e investidores, separando atributos catalogados, fatos estruturais, relações derivadas e lacunas do snapshot.",
+      "assertions": {
+        "required": ["oportunidades", "programas", "agências", "ICTs", "investidores", "fatos", "relações derivadas"],
+        "forbidden": ["não existem no mercado"],
+        "conditional": ["ausência deve ser limitada ao recorte do grafo"]
+      },
+      "evidence": ["perfil autenticado do produto", "snapshot KG-P1C"]
     }
   ]
 }

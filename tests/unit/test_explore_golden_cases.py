@@ -74,7 +74,7 @@ def test_barn_golden_esta_preservado_no_catalogo_curado():
     assert "america latina" in thesis
 
 
-def test_golden_declara_quatro_casos_sem_compensacao_por_media():
+def test_golden_declara_casos_sem_compensacao_por_media():
     golden = json.loads(
         (ROOT / "data/evaluation/golden/explore.json").read_text(encoding="utf-8")
     )
@@ -83,6 +83,7 @@ def test_golden_declara_quatro_casos_sem_compensacao_por_media():
         "fapesc-31-2026-admissibilidade",
         "barn-verticais",
         "barn-tese",
+        "iforestal-profile-strategy",
     ]
     assert all(c["assertions"]["required"] for c in golden["cases"])
     assert all(c["assertions"]["forbidden"] for c in golden["cases"])

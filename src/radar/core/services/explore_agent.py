@@ -59,20 +59,22 @@ MEMÓRIA ENTRE SESSÕES (log_exploration_decision)
 
 KG_PHASE1_GRAPH_INSTRUCTION = """
 
-GRAFO DA FASE 1 (graph_explore / graph_reason / graph_community)
-- Use as tools de grafo para RELAÇÕES ESTRUTURAIS, caminhos, atores,
-  comunidades e análise de ESTRATÉGIA: graph_explore (vizinhança estrutural),
-  graph_reason (caminhos entre o perfil da empresa, entidades e atores),
-  graph_community (membros e características compartilhadas de um cluster).
-- Para DETALHES factuais e evidências documentais, continue com as ferramentas
-  do catálogo (get_edital, get_investidor, get_node_neighborhood,
-  search_entities).
-- Distinga RELAÇÕES ESTRUTURAIS (origin phase1_deterministic/phase1_structural:
-  fatos do catálogo) de RELAÇÕES DERIVADAS (similar_a, potencial_parceria:
-  heurística de embeddings/tecnologia, marcadas "derived"). NUNCA apresente uma
-  aresta derivada como fato confirmado.
-- Não é obrigatório consultar o grafo em toda pergunta — use-o quando a relação,
-  o caminho ou o ator importam para a resposta."""
+GRAFO DA FASE 1 — MODO EXCLUSIVO PROFILE-FIRST
+- Em perguntas sobre a empresa autenticada, comece por graph_strategy. Ela já
+  recebe o perfil real por injeção do runtime; nunca peça ao usuário, invente ou
+  envie JSON de perfil, edital, entity_ref ou node ID para iniciar a consulta.
+- Uma chamada cobre oportunidades/editais, programas, agências, ICTs e
+  investidores. Cubra todos os tipos pedidos e use o campo coverage para saber
+  o que foi consultado; não transforme ausência no recorte em inexistência no
+  mercado.
+- Explique cada recomendação com o path e shared_characteristics. Classifique
+  catalog_structural_fact e cataloged_attribute como fatos sustentados pelo
+  catálogo; derived_relation como relação derivada por similaridade/ponte
+  tecnológica; insufficient_information como informação insuficiente. Nunca
+  chame uma relação derivada de confirmada.
+- Respeite profile.unresolved e limitations: textos livres não viram âncoras
+  por aproximação silenciosa. Se o snapshot estiver indisponível, comunique a
+  limitação e não use ferramentas de busca ou Match como fallback."""
 
 
 EXPLORE_MATCH_INSTRUCTION = """
@@ -312,7 +314,8 @@ class ExploreAgent:
         tools = self._explore_tools(profile=profile)
         system = self._maybe_append_graph_instructions(EXPLORE_AGENT_SYSTEM)
 
-        if profile_text and profile:
+        from radar.core.kg.phase1.tools import graph_tools_enabled
+        if profile_text and profile and not graph_tools_enabled():
             from radar.core.llm.agent_tools.match_tools import build_match_tools
             tools = tools + build_match_tools(
                 profile_text, profile=profile, workspace_id=workspace_id,
@@ -320,7 +323,7 @@ class ExploreAgent:
             )
             system = system + EXPLORE_MATCH_INSTRUCTION
 
-        if db is not None and workspace_id:
+        if db is not None and workspace_id and not graph_tools_enabled():
             from radar.core.llm.agent_tools.explore_tools import (
                 build_exploration_log_tools,
                 load_recent_exploration_decisions,
@@ -400,15 +403,18 @@ class ExploreAgent:
         deep_research (subagente web) e — gated por `KG_PHASE1_EXPLORE_ENABLED` —
         as tools read-only do grafo da Fase 1 (ADITIVAS; `profile` vai na
         closure de graph_reason). Flag off = ferramentas exatamente como antes."""
+        from radar.core.kg.phase1.tools import build_graph_tools, graph_tools_enabled
+        if graph_tools_enabled():
+            # Modo exclusivo: nenhum catálogo, Match, pesquisa web ou memória é
+            # injetado como rota paralela de descoberta.
+            return build_graph_tools(profile=profile)
+
         from radar.core.llm.agent_tools import build_explore_tools
 
         tools = build_explore_tools()
         if os.getenv("EXPLORE_DEEP_RESEARCH_ENABLED", "false").lower() == "true":
             from radar.core.llm.agent_tools.research_tools import build_research_tools
             tools = tools + build_research_tools()
-        from radar.core.kg.phase1.tools import build_graph_tools, graph_tools_enabled
-        if graph_tools_enabled():
-            tools = tools + build_graph_tools(profile=profile)
         return tools
 
     @staticmethod
@@ -484,7 +490,8 @@ class ExploreAgent:
         # SEM workspace (explore público stateless), o perfil do request vira
         # chunks efêmeros (cache por hash). Em ambos os casos o funil rankeia
         # editais/entidades por afinidade de texto real.
-        if profile_text and profile:
+        from radar.core.kg.phase1.tools import graph_tools_enabled
+        if profile_text and profile and not graph_tools_enabled():
             from radar.core.llm.agent_tools.match_tools import build_match_tools
             tools = tools + build_match_tools(
                 profile_text, profile=profile, workspace_id=workspace_id,
@@ -495,7 +502,7 @@ class ExploreAgent:
         # Memória do ExploreAgent (Fase 3A): só com workspace autenticado + db.
         # O bloco de decisões vai no SYSTEM (prefixo estável, antes do histórico
         # da conversa — D6); a tool de escrita é registrada junto.
-        if db is not None and workspace_id:
+        if db is not None and workspace_id and not graph_tools_enabled():
             from radar.core.llm.agent_tools.explore_tools import (
                 build_exploration_log_tools,
                 load_recent_exploration_decisions,

@@ -41,7 +41,7 @@ def load_data() -> list[dict]:
     payload = json.loads(GOLDEN.read_text(encoding="utf-8"))
     return [
         {
-            "input": {"query": c["query"], "target": c["target"]},
+            "input": {"query": c["query"], "target": c.get("target"), "profile": c.get("profile")},
             "expected_output": {
                 "route": c["expected_route"],
                 "reference_answer": c["reference_answer"],
@@ -59,7 +59,26 @@ def task(*, item: Any, **_) -> dict:
     from radar.core.services.explore_routing import RouteContext, route_message
 
     inp = get_input(item)
-    target = inp["target"]
+    target = inp.get("target") or {"type": "profile", "id": ""}
+    if inp.get("profile"):
+        output = {
+            "route": "PROFILE_STRATEGY",
+            "decision": {"intent": "PROFILE_STRATEGY", "target_type": "profile"},
+        }
+        if os.getenv("EVAL_EXPLORE_CONNECTED", "false").lower() != "true":
+            return output
+        from radar.core.services.explore_agent import ExploreAgent
+
+        started = time.perf_counter()
+        answer, meta = ExploreAgent().explore_with_meta(
+            inp["query"], profile=inp["profile"], profile_text="perfil autenticado",
+        )
+        output.update({
+            "answer": answer,
+            "called_tools": meta.get("called_tools", []),
+            "response_latency_ms": round((time.perf_counter() - started) * 1000, 2),
+        })
+        return output
     decision = route_message(RouteContext(
         message=inp["query"], target_type=target["type"], target_id=target["id"],
     ))
