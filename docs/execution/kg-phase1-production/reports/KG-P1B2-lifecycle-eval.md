@@ -4,7 +4,7 @@
 > projeção `kg_phase1` após o gold (flag `KG_PHASE1_AUTO_REFRESH_ENABLED=false`),
 > métricas/diagnóstico estruturais na suíte `explore` (sem gates) e
 > documentação de operação/ativação/rollback.
-> **Status:** concluída (sem deploy, sem merge, sem push). Auditoria Codex: pendente.
+> **Status:** concluída (sem deploy, sem merge, sem push). Auditoria Codex: aprovada em 2026-08-02.
 >
 > **Correção da auditoria KG-P1B-2 (commit corretivo `fix(kg)`):** os três
 > achados finais da auditoria foram corrigidos nesta sessão — (1) `response_latency_ms`
@@ -214,11 +214,11 @@ git diff --check d401e91b4..HEAD
 
 ## Auditoria Codex
 
-**Pendente.** Revalidação independente: 2203 testes unitários passaram (menos o
-teste m0 pré-existente, comprovado quebrado na base), Ruff e `git diff --check`
-limpos. Os três achados finais da auditoria foram corrigidos nesta sessão
-(ver "Correções da auditoria KG-P1B-2" acima) e cobertos por testes: latência
-total da resposta conectada (`response_latency_ms`, por caso, sem gate),
-catches defensivos sanitizados (nunca `safe_error`/`str(exc)`) com testes
-adversariais `caplog`, e `eval_tool_contract` preservado sem
-`graph_community` sozinha. A task termina aqui e não inicia a KG-P1B-3.
+**Aprovada em 2026-08-02.** Na revalidação independente da auditoria, 165 testes
+focais passaram; Ruff e `git diff --check` ficaram limpos. Os três achados
+finais foram encerrados: latência total da resposta conectada
+(`response_latency_ms`, por caso e sem gate), catches defensivos sanitizados
+com testes adversariais `caplog`, e `eval_tool_contract` preservado sem aceitar
+`graph_community` isoladamente como consulta factual.
+
+A KG-P1B termina aqui. Sem merge, push, deploy ou ativação de flags.
