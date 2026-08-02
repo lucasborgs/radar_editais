@@ -21,9 +21,12 @@ def test_cases_motivadores_seguem_rota_do_golden():
     golden = json.loads(
         (ROOT / "data" / "evaluation" / "golden" / "explore.json").read_text(encoding="utf-8")
     )
-    assert len(golden["cases"]) == 4
+    assert len(golden["cases"]) == 5
     for case in golden["cases"]:
         target = case["target"]
+        if target["type"] == "profile":
+            assert case["expected_route"] == "PROFILE_STRATEGY"
+            continue
         decision = route_message(RouteContext(
             message=case["query"], target_type=target["type"], target_id=target["id"],
         ))

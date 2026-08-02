@@ -34,32 +34,57 @@ FACTUAL_GRAPH_TOOLS = frozenset({"graph_explore", "graph_reason"})
 
 def load_data() -> list[dict]:
     from radar.core.kg.phase1.tools import reset_run_stats
+    from radar.domain.profile_schema import CompanyProfilePayload
 
     reset_run_stats()
     if not GOLDEN.exists():
         return []
     payload = json.loads(GOLDEN.read_text(encoding="utf-8"))
-    return [
-        {
-            "input": {"query": c["query"], "target": c["target"]},
+    cases = []
+    for case in payload["cases"]:
+        profile = case.get("profile")
+        if profile is not None:
+            # Golden profile follows exactly the HTTP contract; enriched
+            # fixture-only fields are rejected here.
+            profile = CompanyProfilePayload.model_validate(profile).model_dump()
+        cases.append({
+            "input": {"query": case["query"], "target": case.get("target"), "profile": profile},
             "expected_output": {
-                "route": c["expected_route"],
-                "reference_answer": c["reference_answer"],
+                "route": case["expected_route"],
+                "reference_answer": case["reference_answer"],
             },
             "metadata": {
-                "case_id": c["id"], "assertions": c["assertions"],
-                "evidence": c["evidence"],
+                "case_id": case["id"], "assertions": case["assertions"],
+                "evidence": case["evidence"],
             },
-        }
-        for c in payload["cases"]
-    ]
+        })
+    return cases
 
 
 def task(*, item: Any, **_) -> dict:
     from radar.core.services.explore_routing import RouteContext, route_message
 
     inp = get_input(item)
-    target = inp["target"]
+    target = inp.get("target") or {"type": "profile", "id": ""}
+    if inp.get("profile"):
+        output = {
+            "route": "PROFILE_STRATEGY",
+            "decision": {"intent": "PROFILE_STRATEGY", "target_type": "profile"},
+        }
+        if os.getenv("EVAL_EXPLORE_CONNECTED", "false").lower() != "true":
+            return output
+        from radar.core.services.explore_agent import ExploreAgent
+
+        started = time.perf_counter()
+        answer, meta = ExploreAgent().explore_with_meta(
+            inp["query"], profile=inp["profile"], profile_text="perfil autenticado",
+        )
+        output.update({
+            "answer": answer,
+            "called_tools": meta.get("called_tools", []),
+            "response_latency_ms": round((time.perf_counter() - started) * 1000, 2),
+        })
+        return output
     decision = route_message(RouteContext(
         message=inp["query"], target_type=target["type"], target_id=target["id"],
     ))

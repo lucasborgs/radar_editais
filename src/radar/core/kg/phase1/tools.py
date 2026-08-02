@@ -1,16 +1,16 @@
-"""core/kg/phase1/tools.py — integração read-only da Fase 1 com o Explorar.
+"""core/kg/phase1/tools.py — exploração profile-first read-only no Explorar.
 
-Três tools (graph_explore, graph_reason, graph_community) sobre o snapshot
-CONSISTENTE da geração corrente (`store.load_snapshot`), atrás da flag única:
+Uma tool (`graph_strategy`) sobre o snapshot CONSISTENTE da geração corrente
+(`store.load_snapshot`), atrás da flag única:
 
     KG_PHASE1_EXPLORE_ENABLED=false     # default OFF
 
 - flag off → `build_graph_tools()` devolve [] — o ExploreAgent fica exatamente
   como antes (regressão zero);
-- flag on → as tools são ADITIVAS às tools atuais do catálogo;
+- flag on → somente `graph_strategy` é injetada; não há busca ou Match paralelo;
 - falha do Postgres, timeout, ausência de geração ou erro interno NÃO derrubam
-  o agente: a tool devolve resultado categórico e sanitizado (`unavailable`/
-  `error`) e o agente segue com as tools legadas.
+  o agente: a tool devolve resultado categórico e sanitizado, sem fallback
+  silencioso para o fluxo anterior.
 
 Observabilidade SÓ estrutural (nunca conteúdo): tool, generation_id, duração,
 nº de nós/arestas/caminhos, outcome (`hit|not_found|ambiguous|unavailable|
@@ -73,6 +73,8 @@ MAX_PATHS = 3                # poucos caminhos (perfil e atores)
 MAX_PAYLOAD_BYTES = 12_000   # teto do payload serializado
 MAX_NAMES_PER_KIND = 12      # nomes por tipo no graph_community
 MAX_SHARED_QUALITIES = 8     # características compartilhadas no graph_community
+MAX_STRATEGY_RESULTS = 5
+STRATEGY_KINDS = ("edital", "programa", "agencia", "ict", "investidor")
 
 # Predicados de QUALIDADE (fatos determinísticos do gold) — usados pelo
 # graph_community para achar características compartilhadas.
@@ -293,11 +295,17 @@ def _step_entry(
 ) -> dict[str, Any]:
     edge = edge_index.get((from_, predicate, to)) or edge_index.get((to, predicate, from_))
     if edge is None:
-        return {"from": from_, "to": to, "predicate": predicate, "origin": "unknown", "derived": False}
+        return {
+            "traversal_from": from_, "traversal_to": to,
+            "source": from_, "target": to, "predicate": predicate,
+            "origin": "unknown", "derived": False,
+        }
     props = _props_of(edge)
     return {
-        "from": from_,
-        "to": to,
+        "traversal_from": from_,
+        "traversal_to": to,
+        "source": edge["source_id"],
+        "target": edge["target_id"],
         "predicate": predicate,
         "weight": float(edge.get("weight") or 1.0),
         "origin": edge.get("origin", ""),
@@ -383,6 +391,374 @@ def _profile_edges(profile: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
             edges.append(_edge(node_id, f"mecanismo:{mecanismo}", "usa_mecanismo", origin="profile_ephemeral"))
 
     return edges, node_id
+
+
+def _quality_index(snapshot: Any) -> dict[tuple[str, str], list[dict[str, Any]]]:
+    """Índice exato de qualidade; não faz busca parcial nem aproximação."""
+    out: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for node in snapshot.quality_nodes:
+        out.setdefault((node["family"], _norm(node["value"])), []).append(node)
+    return out
+
+
+def _profile_text(profile: dict[str, Any]) -> dict[str, str]:
+    return {
+        field: str(profile.get(field) or "")
+        for field in ("one_liner", "solution_summary", "descricao_atividades", "portfolio_projetos")
+        if profile.get(field)
+    }
+
+
+def _phrase_in_text(phrase: str, text: str) -> bool:
+    normalized_phrase = _norm(phrase)
+    normalized_text = _norm(text)
+    if not normalized_phrase or not normalized_text:
+        return False
+    return re.search(
+        rf"(?<!\w){re.escape(normalized_phrase)}(?!\w)", normalized_text,
+    ) is not None
+
+
+def _sector_aliases() -> dict[str, str]:
+    """Aliases da taxonomia vigente, sem vocabulário específico da empresa."""
+    from radar.core.kg import schema
+    from radar.core.kg.gold import normalize_setores
+
+    tax = schema.setores_taxonomia()
+    aliases: dict[str, str] = {}
+    for label in tax.get("labels") or []:
+        canonical = normalize_setores([label])
+        if canonical:
+            aliases[_norm(label)] = canonical[0]
+    for raw, mapped in (tax.get("alias_map") or {}).items():
+        values = mapped if isinstance(mapped, list) else [mapped]
+        for value in values:
+            canonical = normalize_setores([value])
+            if canonical:
+                aliases[_norm(raw)] = canonical[0]
+    for raw, mapped in (tax.get("tese_theme_map") or {}).items():
+        values = mapped if isinstance(mapped, list) else [mapped]
+        for value in values:
+            canonical = normalize_setores([value])
+            if canonical:
+                aliases[_norm(raw)] = canonical[0]
+    return aliases
+
+
+def _technology_aliases(node: dict[str, Any]) -> set[str]:
+    """Valor do nó + aliases do normalizador gold para esse valor."""
+    from radar.core.kg import schema
+    from radar.core.kg.gold import normalize_tag
+
+    value = str(node.get("value") or "")
+    canonical = _norm(normalize_tag(value) or value)
+    aliases = {_norm(value), canonical}
+    synonyms = schema.tag_normalization().get("synonyms") or {}
+    for alias, mapped in synonyms.items():
+        if _norm(normalize_tag(str(mapped)) or str(mapped)) == canonical:
+            aliases.add(_norm(alias))
+    return {item for item in aliases if item}
+
+
+def _profile_strategy_anchors(
+    profile: dict[str, Any] | None, snapshot: Any,
+) -> tuple[list[dict[str, Any]], str, dict[str, Any], list[dict[str, Any]]]:
+    """Converte o contrato canônico em âncoras virtuais conservadoras.
+
+    Campos estruturados são ``declared``. Setores e tecnologias projetados de
+    texto usam somente a taxonomia/aliases existentes e valores efetivamente
+    presentes no snapshot. Nenhuma lista específica de empresa é criada.
+    """
+    virtual = "perfil:virtual"
+    edges: list[dict[str, Any]] = []
+    profile_view: dict[str, Any] = {"declared": [], "projected": [], "unresolved": []}
+    unresolved: list[dict[str, Any]] = []
+    if not profile:
+        return edges, virtual, profile_view, [{"field": "perfil", "reason": "perfil ausente"}]
+
+    index = _quality_index(snapshot)
+
+    def add_exact(field: str, value: Any, family: str) -> None:
+        if value in (None, "", []):
+            return
+        values = value if isinstance(value, list) else [value]
+        for item in values:
+            text = str(item).strip()
+            if not text:
+                continue
+            matches = index.get((family, _norm(text)), [])
+            if len(matches) != 1:
+                unresolved.append({
+                    "field": field, "value": text,
+                    "reason": "no_exact_quality_node" if not matches else "ambiguous_quality_node",
+                })
+                continue
+            node = matches[0]
+            profile_view["declared"].append({"field": field, "value": text, "node_id": node["id"]})
+            edges.append(_edge(
+                virtual, node["id"], "ancora_perfil", origin="profile_ephemeral",
+            ))
+
+    add_exact("uf", profile.get("uf"), "uf")
+    add_exact("estagio", profile.get("estagio"), "estagio")
+
+    trl = profile.get("trl")
+    if trl is not None:
+        faixa_ids = _trl_faixa_for(trl)
+        if not faixa_ids:
+            unresolved.append({"field": "trl", "value": trl, "reason": "fora_da_taxonomia_trl"})
+        else:
+            for faixa_id in faixa_ids:
+                add_exact("trl", faixa_id, "faixa_trl")
+
+    for item in _as_list(profile.get("tipos_financiamento_interesse")):
+        mecanismo = _MECANISMO_MAP.get(_norm(item))
+        if mecanismo is None:
+            unresolved.append({"field": "tipos_financiamento_interesse", "value": item,
+                               "reason": "tipo_de_financiamento_nao_mapeado"})
+        else:
+            add_exact("tipos_financiamento_interesse", mecanismo, "mecanismo")
+
+    text_fields = _profile_text(profile)
+    sector_aliases = _sector_aliases()
+    for text_field, text in text_fields.items():
+        matched_fields: set[tuple[str, str]] = set()
+        for alias, canonical in sector_aliases.items():
+            if not _phrase_in_text(alias, text):
+                continue
+            matches = index.get(("setor", _norm(canonical)), [])
+            if len(matches) == 1:
+                node = matches[0]
+                profile_view["projected"].append({
+                    "source_field": text_field, "dimension": "setor",
+                    "value": node["value"], "node_id": node["id"], "matched_alias": alias,
+                })
+                edges.append(_edge(virtual, node["id"], "ancora_textual",
+                                   origin="profile_ephemeral"))
+                matched_fields.add((text_field, "setor"))
+
+        for node in snapshot.quality_nodes:
+            if node.get("family") != "tecnologia":
+                continue
+            aliases = sorted(_technology_aliases(node), key=lambda value: (len(value), value), reverse=True)
+            match = next((alias for alias in aliases if _phrase_in_text(alias, text)), None)
+            if match is None:
+                continue
+            profile_view["projected"].append({
+                "source_field": text_field, "dimension": "tecnologia",
+                "value": node["value"], "node_id": node["id"], "matched_alias": match,
+            })
+            edges.append(_edge(virtual, node["id"], "ancora_textual",
+                               origin="profile_ephemeral"))
+            matched_fields.add((text_field, "tecnologia"))
+
+        for dimension in ("setor", "tecnologia"):
+            if (text_field, dimension) not in matched_fields:
+                unresolved.append({"field": text_field, "dimension": dimension,
+                                   "reason": "no_existing_quality_value_or_alias_in_text"})
+
+    # Deduplica projeções e âncoras por qualidade, preservando a origem dos
+    # sinais no payload separado.
+    profile_view["projected"] = list({
+        (item["dimension"], item["node_id"]): item for item in profile_view["projected"]
+    }.values())
+    profile_view["unresolved"].extend(unresolved)
+
+    # Evita repetir a mesma âncora quando dois campos chegam ao mesmo nó.
+    unique: dict[tuple[str, str], dict[str, Any]] = {}
+    for edge in edges:
+        unique[(edge["target_id"], edge["type"])] = edge
+    return list(unique.values()), virtual, profile_view, unresolved
+
+
+def _fact_from_step(step: dict[str, Any], *, via_entity_id: str | None = None) -> dict[str, Any]:
+    return {
+        "source": step["source"], "target": step["target"],
+        "predicate": step["predicate"], "weight": step.get("weight", 1.0),
+        "origin": step.get("origin", ""), "derived": step.get("derived", False),
+        "via_entity_id": via_entity_id,
+        "classification": (
+            "catalog_structural_fact" if step.get("origin") == "phase1_structural"
+            else "cataloged_attribute"
+        ),
+        "confirmed": True,
+    }
+
+
+def _edge_entry_for_fact(edge: dict[str, Any]) -> dict[str, Any]:
+    props = _props_of(edge)
+    return {
+        "source": edge["source_id"], "target": edge["target_id"],
+        "predicate": edge["type"], "weight": float(edge.get("weight") or 1.0),
+        "origin": edge.get("origin", ""), "derived": bool(props.get("derived")),
+    }
+
+
+def _strategy_evidence(
+    path: list[dict[str, Any]],
+    shared: list[dict[str, Any]],
+    snapshot: Any,
+) -> dict[str, Any]:
+    """Separa a rota derivada das evidências que a sustentam."""
+    supporting: list[dict[str, Any]] = []
+    derived: list[dict[str, Any]] = []
+    seen_facts: set[tuple[str, str, str, str]] = set()
+
+    def add_fact(step: dict[str, Any], *, via_entity_id: str | None = None) -> None:
+        key = (step["source"], step["target"], step["predicate"], step.get("origin", ""))
+        if key not in seen_facts:
+            seen_facts.add(key)
+            supporting.append(_fact_from_step(step, via_entity_id=via_entity_id))
+
+    entity_ids = {node["id"] for node in snapshot.nodes}
+    for step in path:
+        origin = step.get("origin")
+        if origin in {"phase1_deterministic", "phase1_structural"}:
+            via = step["source"] if step["source"] in entity_ids else (
+                step["target"] if step["target"] in entity_ids else None
+            )
+            add_fact(step, via_entity_id=via)
+        elif origin in {"phase1_similarity", "phase1_tech_bridge"}:
+            derived.append({**step, "classification": "derived_graph_step", "confirmed": False})
+        elif origin == "profile_ephemeral":
+            derived.append({**step, "classification": "profile_affinity_anchor", "confirmed": False})
+        else:
+            derived.append({**step, "classification": "insufficient_information", "confirmed": False})
+
+    # The selected shortest route can use only one of several shared qualities.
+    # Explain every advertised signal using its real catalog edge.
+    for item in shared:
+        for edge in snapshot.edges:
+            endpoints = {edge["source_id"], edge["target_id"]}
+            if item["node_id"] not in endpoints or item["via_entity_id"] not in endpoints:
+                continue
+            if edge["origin"] not in {"phase1_deterministic", "phase1_structural"}:
+                continue
+            add_fact(_edge_entry_for_fact(edge), via_entity_id=item["via_entity_id"])
+    return {
+        "route_relation": {"classification": "derived_profile_route", "confirmed": False},
+        "supporting_facts": supporting,
+        "derived_steps": derived,
+    }
+
+
+def _strategy_requested_kinds(requested_types: list[str] | None) -> tuple[str, ...]:
+    if not requested_types:
+        return STRATEGY_KINDS
+    selected = tuple(dict.fromkeys(requested_types))
+    invalid = sorted(set(selected) - set(STRATEGY_KINDS))
+    if invalid:
+        raise ValueError("requested_types contém kind não suportado")
+    return tuple(kind for kind in STRATEGY_KINDS if kind in selected)
+
+
+def strategy_payload(
+    profile: dict[str, Any] | None, snapshot: Any, *, requested_types: list[str] | None = None,
+    max_bytes: int = MAX_PAYLOAD_BYTES,
+) -> ToolOutcome:
+    """Consulta única, determinística e profile-first sobre o snapshot."""
+    profile_edges, virtual, profile_view, unresolved = _profile_strategy_anchors(profile, snapshot)
+    recognized = profile_view["declared"] + profile_view["projected"]
+    edges = sorted(
+        list(snapshot.edges) + profile_edges,
+        key=lambda item: (item["source_id"], item["target_id"], item["type"],
+                          item.get("origin", ""), float(item.get("weight") or 1.0)),
+    )
+    edge_index = _edge_index(edges)
+    kinds = _strategy_requested_kinds(requested_types)
+    payload: dict[str, Any] = {
+        "status": "ok" if recognized else "insufficient_profile_anchors",
+        "generation_id": snapshot.generation_id,
+        "profile": profile_view,
+        "results_by_type": {},
+        "coverage": {kind: {"queried": True, "status": "queried", "total_reachable": 0,
+                            "returned": 0, "truncated": False} for kind in STRATEGY_KINDS},
+        "truncated": False,
+        "limitations": [],
+    }
+    if not recognized:
+        payload["limitations"].append("Sem âncoras exatas suficientes; o grafo não foi usado para aproximar o perfil.")
+
+    # Um índice direto de qualidade preserva todos os sinais compartilhados,
+    # mesmo quando a rota explicativa escolhida usa somente um deles.
+    shared_by_entity: dict[str, list[dict[str, Any]]] = {}
+    for item in recognized:
+        anchor_id = item["node_id"]
+        for edge in snapshot.edges:
+            other = None
+            if edge["source_id"] == anchor_id:
+                other = edge["target_id"]
+            elif edge["target_id"] == anchor_id:
+                other = edge["source_id"]
+            if other is None or not any(n["id"] == other for n in snapshot.nodes):
+                continue
+            shared_by_entity.setdefault(other, []).append({
+                **item, "via_entity_id": other,
+            })
+    for entity_id in shared_by_entity:
+        unique_shared = {
+            (item["node_id"], item["via_entity_id"]): item
+            for item in shared_by_entity[entity_id]
+        }
+        shared_by_entity[entity_id] = [
+            unique_shared[key] for key in sorted(unique_shared)
+        ]
+
+    for kind in kinds:
+        goals = sorted(n["id"] for n in snapshot.nodes if n["kind"] == kind)
+        raw_paths = traverse.find_paths_to_goals(
+            edges, virtual, goals, max_depth=4,
+            limit=max(len(goals), MAX_STRATEGY_RESULTS), min_weight=MIN_WEIGHT,
+        )
+        candidates: list[tuple[int, int, str, list[dict[str, Any]], list[dict[str, Any]]]] = []
+        for raw_path in raw_paths:
+            path = _path_entry(raw_path, edge_index)
+            target = raw_path[-1][2] if raw_path else ""
+            path_entity_ids = {
+                node_id for step in raw_path for node_id in (step[0], step[2])
+                if node_id in {node["id"] for node in snapshot.nodes}
+            }
+            shared_map = {
+                (item["node_id"], item["via_entity_id"]): item
+                for entity_id in path_entity_ids
+                for item in shared_by_entity.get(entity_id, [])
+            }
+            shared = [shared_map[key] for key in sorted(shared_map)]
+            candidates.append((len(path), -len(shared), target, path, shared))
+        candidates.sort(key=lambda item: (item[1], item[0], item[2]))
+        total = len(candidates)
+        selected = candidates[:MAX_STRATEGY_RESULTS]
+        results = []
+        for _, _, target, path, shared in selected:
+            node = next(n for n in snapshot.nodes if n["id"] == target)
+            results.append({
+                "id": node["id"], "name": node["name"], "kind": node["kind"],
+                "path": path,
+                "shared_characteristics": [{
+                    "field": item.get("field", item.get("source_field")),
+                    "value": item.get("value"), "node_id": item["node_id"],
+                    "via_entity_id": item["via_entity_id"],
+                } for item in shared],
+                "evidence": _strategy_evidence(path, shared, snapshot),
+            })
+        payload["results_by_type"][kind] = results
+        coverage = payload["coverage"][kind]
+        coverage["total_reachable"] = total
+        coverage["returned"] = len(results)
+        coverage["truncated"] = total > len(results)
+        if coverage["truncated"]:
+            payload["truncated"] = True
+    for kind in STRATEGY_KINDS:
+        if kind not in kinds:
+            payload["coverage"][kind] = {"queried": False, "status": "not_queried",
+                                          "total_reachable": None, "returned": 0, "truncated": False}
+    payload["limitations"].append("Ausência significa ausência no recorte atualmente representado pelo grafo, não inexistência no mercado.")
+    result = _trim_payload(payload, max_bytes)
+    result_groups = result.get("results_by_type", {})
+    return ToolOutcome("hit", snapshot.generation_id,
+                       n_nodes=sum(len(v) for v in result_groups.values()),
+                       n_paths=sum(len(v) for v in result_groups.values()),
+                       payload=result)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -659,7 +1035,8 @@ def _observe(
     )
 
 
-def _run(tool_name: str, fn) -> str:
+def _run(tool_name: str, fn, *, unavailable_msg: str = _UNAVAILABLE_MSG,
+         error_msg: str = _ERROR_MSG) -> str:
     """Executa uma graph tool com snapshot; degrada SEMPRE com resultado
     categórico e sanitizado (o agente segue com as tools legadas)."""
     started = time.perf_counter()
@@ -673,14 +1050,14 @@ def _run(tool_name: str, fn) -> str:
             tool_name, outcome=outcome, generation_id=None,
             duration_ms=_elapsed(started), fallback=True, category=category,
         )
-        return _UNAVAILABLE_MSG if outcome == "unavailable" else _ERROR_MSG
+        return unavailable_msg if outcome == "unavailable" else error_msg
 
     if snapshot is None:
         _observe(
             tool_name, outcome="unavailable", generation_id=None,
             duration_ms=_elapsed(started), fallback=True,
         )
-        return _UNAVAILABLE_MSG
+        return unavailable_msg
 
     try:
         result = fn(snapshot)
@@ -689,7 +1066,7 @@ def _run(tool_name: str, fn) -> str:
             tool_name, outcome="error", generation_id=snapshot.generation_id,
             duration_ms=_elapsed(started), fallback=True, category=_category_of(exc),
         )
-        return _ERROR_MSG
+        return error_msg
 
     _observe(
         tool_name, outcome=result.outcome, generation_id=result.generation_id,
@@ -706,44 +1083,44 @@ def _elapsed(started: float) -> float:
 
 
 def build_graph_tools(*, profile: dict[str, Any] | None = None) -> list[BaseTool]:
-    """Tools read-only do grafo da Fase 1 (ADITIVAS às do catálogo).
+    """Consulta profile-first read-only do grafo da Fase 1.
 
-    Flag off → lista vazia (comportamento do ExploreAgent intocado). `profile`
-    (dict do CompanyProfilePayload) é capturado por CLOSURE — graph_reason NUNCA
-    recebe o perfil como argumento preenchível pela LLM."""
+    Flag off → lista vazia (comportamento do ExploreAgent intocado). Quando
+    ligada, somente ``graph_strategy`` é exposta; o perfil é capturado por
+    CLOSURE e nunca é argumento preenchível pela LLM."""
     if not graph_tools_enabled():
         return []
 
-    @tool
-    def graph_explore(entity_ref: str, depth: int = 1) -> str:
-        """Vizinhança ESTRUTURAL de uma entidade no grafo da Fase 1 (JSON: centro, nós, arestas com direção/predicado/peso/origem/derivada e comunidades relacionadas). Use para RELAÇÕES estruturais: quem opera, credencia, subordina; atores ligados a um nó.
-
-        Args:
-            entity_ref: id exato (ex.: "edital:finep:589"), native_id, nome ou valor de qualidade.
-            depth: 1 = vizinhos diretos (default); 2 = vizinhos-dos-vizinhos. Máximo 2.
-        """
-        return _run("graph_explore", lambda snap: explore_payload(entity_ref, snap, depth=depth))
+    unavailable = "Grafo da Fase 1 indisponível; não foi possível consultar o recorte do perfil."
+    error = "Falha ao consultar o grafo da Fase 1; nenhum resultado estratégico foi fabricado."
 
     @tool
-    def graph_reason(entity_ref: str, max_depth: int = 3) -> str:
-        """Caminhos LIMITADOS no grafo conectando o PERFIL da empresa, a entidade e atores (ICTs/agências) — JSON com saltos preservados (direção, predicado, origem, derivada). Use para ESTRATÉGIA e dedução (ex.: como a empresa se conecta a uma ICT/agência). O perfil é INJETADO automaticamente — não é argumento.
+    def graph_strategy(requested_types: list[str] | None = None) -> str:
+        """Consulta o grafo exclusivamente a partir do perfil autenticado injetado.
 
-        Args:
-            entity_ref: id exato, native_id, nome ou valor de qualidade da entidade-alvo.
-            max_depth: profundidade máxima do caminho (máximo 4).
+        Retorna, em uma única consulta, oportunidades/editais, programas,
+        agências, ICTs e investidores, com âncoras reconhecidas, atributos não
+        resolvidos, caminhos, características compartilhadas, classificação da
+        relação e cobertura. ``requested_types`` é opcional e aceita apenas a
+        lista fechada ``edital``, ``programa``, ``agencia``, ``ict``,
+        ``investidor``; vazio consulta todos os tipos. Kind inválido é rejeitado.
+        Nunca informe um
+        perfil, entity ID ou node ID nesta ferramenta.
         """
+        try:
+            _strategy_requested_kinds(requested_types)
+        except ValueError:
+            return dump({
+                "status": "invalid_request",
+                "message": "requested_types contém kind não suportado; use os kinds canônicos.",
+                "coverage": {kind: {"queried": False, "status": "not_queried"}
+                             for kind in STRATEGY_KINDS},
+                "truncated": False,
+            })
         return _run(
-            "graph_reason",
-            lambda snap: reason_payload(entity_ref, snap, profile, max_depth=max_depth),
+            "graph_strategy",
+            lambda snap: strategy_payload(profile, snap, requested_types=requested_types),
+            unavailable_msg=unavailable, error_msg=error,
         )
 
-    @tool
-    def graph_community(community_ref: str) -> str:
-        """Membros (agrupados por tipo) e características COMPARTILHADAS de uma COMUNIDADE (cluster Louvain) do grafo. Use quando o usuário citar uma comunidade ("com_3", "comunidade 3") ou quiser entender o que agrupa um conjunto de entidades.
-
-        Args:
-            community_ref: id da comunidade (ex.: "com_3") ou rótulo ("3", "comunidade 3").
-        """
-        return _run("graph_community", lambda snap: community_payload(community_ref, snap))
-
-    return [graph_explore, graph_reason, graph_community]
+    return [graph_strategy]
