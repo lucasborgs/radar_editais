@@ -943,10 +943,11 @@ def community_payload(
     for member in members:
         entry = _node_entry(idx, member)
         kind = entry["kind"] or "desconhecido"
-        bucket = grouped.setdefault(kind, {"count": 0, "names": []})
+        bucket = grouped.setdefault(kind, {"count": 0, "names": [], "ids": []})
         bucket["count"] += 1
         if len(bucket["names"]) < max_names_per_kind:
             bucket["names"].append(entry["name"])
+            bucket["ids"].append(entry["id"])
     grouped = {k: grouped[k] for k in sorted(grouped)}
 
     internal = [

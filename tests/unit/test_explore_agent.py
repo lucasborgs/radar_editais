@@ -21,9 +21,21 @@ sys.path.insert(0, str(ROOT))
 
 from radar.core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
 from radar.core.llm.agent_tools import build_explore_tools  # noqa: E402
+from radar.core.services import grounded_strategy  # noqa: E402
 from radar.core.services.explore_agent import ExploreAgent  # noqa: E402
 
 pytestmark = pytest.mark.unit
+
+
+@pytest.fixture(autouse=True)
+def mock_grounding_judge(monkeypatch):
+    monkeypatch.setattr(
+        grounded_strategy,
+        "judge_grounding",
+        lambda *args, **kwargs: {
+            "requires_graph": bool(args[2]), "grounded": True, "unsupported_claims": [],
+        },
+    )
 
 # ============================================================================
 # _build_explore_hint
@@ -204,11 +216,12 @@ def test_explore_agent_includes_read_tools(monkeypatch):
         captured["max_steps"] = kw["max_steps"]
         return fake_result
 
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
     monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", fake_run_agent)
     svc._explore_agent("oi", None, None, None, None)
 
     names = {t.name for t in captured["tools"]}
-    assert {"list_editais", "explore_opportunity", "list_icts", "get_node_neighborhood"} <= names
+    assert names == {"graph_strategy", "graph_explore", "graph_reason", "graph_community"}
     assert captured["max_steps"] >= 10  # EXPLORE_AGENT_MAX_STEPS
 
 
@@ -218,6 +231,7 @@ def test_entity_fact_investidor_inclui_get_investidor(monkeypatch):
         final_text="ok", steps=[], stop_reason="end_turn",
         usage={"input_tokens": 0, "output_tokens": 0},
     )
+    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
     monkeypatch.setattr(
         "radar.core.llm.agent_runtime.run_agent",
         lambda **kwargs: captured.update(kwargs) or fake_result,
@@ -228,7 +242,7 @@ def test_entity_fact_investidor_inclui_get_investidor(monkeypatch):
         node_type="investidor",
     )
     tool_names = {tool.name for tool in captured["tools"]}
-    assert "get_investidor" in tool_names
+    assert tool_names == {"graph_strategy", "graph_explore", "graph_reason", "graph_community"}
 
 
 def test_explore_agent_error_returns_friendly_message(monkeypatch):
@@ -292,13 +306,10 @@ def test_explore_tools_deep_research_gated(monkeypatch):
     (explore é endpoint público; o crawl web é vetor de custo)."""
     svc = ExploreAgent()
 
-    monkeypatch.delenv("EXPLORE_DEEP_RESEARCH_ENABLED", raising=False)
-    off = {t.name for t in svc._explore_tools()}
-    assert "deep_research" not in off
-
+    monkeypatch.delenv("KG_PHASE1_EXPLORE_ENABLED", raising=False)
+    assert svc._explore_tools() == []
     monkeypatch.setenv("EXPLORE_DEEP_RESEARCH_ENABLED", "true")
-    on = {t.name for t in svc._explore_tools()}
-    assert "deep_research" in on
+    assert svc._explore_tools() == []
 
 
 def test_explore_opportunity_is_cross_dimensional(monkeypatch):

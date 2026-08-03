@@ -278,29 +278,16 @@ def test_hub_weight_does_not_expand_strategy(monkeypatch):
 def test_flag_off_preserves_previous_tools_and_system(monkeypatch):
     monkeypatch.delenv("KG_PHASE1_EXPLORE_ENABLED", raising=False)
     monkeypatch.delenv("EXPLORE_DEEP_RESEARCH_ENABLED", raising=False)
-    from radar.core.llm.agent_tools import build_explore_tools
-    from radar.core.services.explore_agent import (
-        EXPLORE_AGENT_SYSTEM,
-        EXPLORE_LOG_INSTRUCTION,
-        EXPLORE_MATCH_INSTRUCTION,
-    )
-
     captured = {}
-    monkeypatch.setattr(
-        "radar.core.llm.agent_tools.explore_tools.load_recent_exploration_decisions",
-        lambda db, workspace_id: "",
-    )
     monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent",
                         lambda **kw: captured.update(kw) or AgentResult("ok", [], "end_turn", {}))
     ExploreAgent().explore_with_meta(
         "quais caminhos?", profile_text="perfil", profile=CANONICAL_PROFILE,
         workspace_id="workspace", db=object(),
     )
-    expected = {tool.name for tool in build_explore_tools()}
-    expected |= {"find_matching_editais", "find_matching_entities", "log_exploration_decision"}
-    assert {tool.name for tool in captured["tools"]} == expected
-    assert captured["system"] == EXPLORE_AGENT_SYSTEM + EXPLORE_MATCH_INSTRUCTION + EXPLORE_LOG_INSTRUCTION
-    assert "graph_strategy" not in expected
+    assert captured["tools"] == []
+    assert "find_matching_editais" not in captured["system"]
+    assert "graph_strategy" not in captured["tools"]
 
 
 def test_flag_on_is_exclusive(monkeypatch):

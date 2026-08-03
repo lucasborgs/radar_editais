@@ -317,24 +317,8 @@ class ExploreAgent:
         system = self._maybe_append_graph_instructions(EXPLORE_AGENT_SYSTEM)
 
         from radar.core.kg.phase1.tools import graph_tools_enabled
-        if profile_text and profile and not graph_tools_enabled():
-            from radar.core.llm.agent_tools.match_tools import build_match_tools
-            tools = tools + build_match_tools(
-                profile_text, profile=profile, workspace_id=workspace_id,
-                db=db, brief=True,
-            )
-            system = system + EXPLORE_MATCH_INSTRUCTION
-
-        if db is not None and workspace_id and not graph_tools_enabled():
-            from radar.core.llm.agent_tools.explore_tools import (
-                build_exploration_log_tools,
-                load_recent_exploration_decisions,
-            )
-            tools = tools + build_exploration_log_tools(db, workspace_id)
-            system = system + EXPLORE_LOG_INSTRUCTION
-            prior = load_recent_exploration_decisions(db, workspace_id)
-            if prior:
-                system = f"{system}\n\n{prior}"
+        if not graph_tools_enabled():
+            system += "\n\nO grafo está desligado. Para perguntas factuais sobre o ecossistema, informe indisponibilidade segura; não fabrique fatos."
 
         provider, model = resolve_agent_provider(
             "anthropic", ANTHROPIC_MODEL_AGENT_EXPLORE,
@@ -382,7 +366,9 @@ class ExploreAgent:
 
         if result is not None and not result.final_text:
             result.final_text = streamed_text
-        answer, repaired = self._validate_agent_answer(message, result, system=system)
+        answer, repaired = self._validate_agent_answer(
+            message, result, system=system, provider=provider, model=model,
+        )
         called_match = any(
             s.kind == "tool"
             and s.name in ("find_matching_editais", "find_matching_entities")
@@ -433,13 +419,7 @@ class ExploreAgent:
             # Modo exclusivo: nenhuma tool de catálogo, Match, web ou memória.
             return wrapped
 
-        from radar.core.llm.agent_tools import build_explore_tools
-
-        tools = build_explore_tools()
-        if os.getenv("EXPLORE_DEEP_RESEARCH_ENABLED", "false").lower() == "true":
-            from radar.core.llm.agent_tools.research_tools import build_research_tools
-            tools = tools + build_research_tools()
-        return tools
+        return []
 
     @staticmethod
     def _maybe_append_graph_instructions(system: str) -> str:
@@ -515,27 +495,8 @@ class ExploreAgent:
         # chunks efêmeros (cache por hash). Em ambos os casos o funil rankeia
         # editais/entidades por afinidade de texto real.
         from radar.core.kg.phase1.tools import graph_tools_enabled
-        if profile_text and profile and not graph_tools_enabled():
-            from radar.core.llm.agent_tools.match_tools import build_match_tools
-            tools = tools + build_match_tools(
-                profile_text, profile=profile, workspace_id=workspace_id,
-                db=db, brief=True,
-            )
-            system = system + EXPLORE_MATCH_INSTRUCTION
-
-        # Memória do ExploreAgent (Fase 3A): só com workspace autenticado + db.
-        # O bloco de decisões vai no SYSTEM (prefixo estável, antes do histórico
-        # da conversa — D6); a tool de escrita é registrada junto.
-        if db is not None and workspace_id and not graph_tools_enabled():
-            from radar.core.llm.agent_tools.explore_tools import (
-                build_exploration_log_tools,
-                load_recent_exploration_decisions,
-            )
-            tools = tools + build_exploration_log_tools(db, workspace_id)
-            system = system + EXPLORE_LOG_INSTRUCTION
-            prior = load_recent_exploration_decisions(db, workspace_id)
-            if prior:
-                system = f"{system}\n\n{prior}"
+        if not graph_tools_enabled():
+            system += "\n\nO grafo está desligado. Para perguntas factuais sobre o ecossistema, informe indisponibilidade segura; não fabrique fatos."
 
         provider, model = resolve_agent_provider(
             "anthropic", ANTHROPIC_MODEL_AGENT_EXPLORE,
@@ -550,7 +511,9 @@ class ExploreAgent:
             mode="explore",
         )
 
-        answer, repaired = self._validate_agent_answer(message, result, system=system)
+        answer, repaired = self._validate_agent_answer(
+            message, result, system=system, provider=provider, model=model,
+        )
         called_match = any(
             s.kind == "tool"
             and s.name in ("find_matching_editais", "find_matching_entities")
@@ -575,16 +538,27 @@ class ExploreAgent:
         return answer or "Não consegui formular uma resposta agora.", meta
 
     @staticmethod
-    def _validate_agent_answer(message: str, result, *, system: str) -> tuple[str, bool]:
-        from radar.core.services.grounded_strategy import validate_agent_answer
+    def _validate_agent_answer(
+        message: str, result, *, system: str, provider: str, model: str,
+    ) -> tuple[str, bool]:
+        from radar.core.services.grounded_strategy import judge_grounding, unknown_cited_ids
+
+        def safe_judge(answer: str, outputs: list[str]):
+            try:
+                return judge_grounding(
+                    message, answer, outputs, provider=provider, model=model,
+                )
+            except Exception as exc:  # noqa: BLE001 — fail closed, no content logged
+                logger.info("explore grounding judge unavailable category=%s", type(exc).__name__)
+                return None
 
         outputs = [step.output for step in result.steps if step.kind == "tool" and step.output]
         answer = result.final_text or ""
-        valid, _unknown = validate_agent_answer(answer, message, outputs)
-        if valid:
+        unknown = unknown_cited_ids(answer, outputs)
+        judgment = None if unknown else safe_judge(answer, outputs)
+        if not unknown and judgment and judgment["grounded"] and not judgment["unsupported_claims"]:
             return answer, False
-        from radar.core.llm.agent_runtime import resolve_agent_provider, run_agent
-        provider, model = resolve_agent_provider("anthropic", ANTHROPIC_MODEL_AGENT_EXPLORE)
+        from radar.core.llm.agent_runtime import run_agent
         repair_context = "\n\n".join(outputs)
         repaired = run_agent(
             system=(system + "\n\nREPARO CONTROLADO: use somente os payloads abaixo; "
@@ -594,8 +568,12 @@ class ExploreAgent:
         )
         repaired_outputs = [step.output for step in repaired.steps if step.kind == "tool" and step.output]
         repaired_answer = repaired.final_text or ""
-        valid, _unknown = validate_agent_answer(repaired_answer, message, outputs + repaired_outputs)
-        if valid:
+        repaired_unknown = unknown_cited_ids(repaired_answer, outputs + repaired_outputs)
+        repaired_judgment = None if repaired_unknown else safe_judge(
+            repaired_answer, outputs + repaired_outputs,
+        )
+        if (not repaired_unknown and repaired_judgment and repaired_judgment["grounded"]
+                and not repaired_judgment["unsupported_claims"]):
             return repaired_answer, True
         return "Não foi possível validar uma resposta factual com o grafo atual.", True
 

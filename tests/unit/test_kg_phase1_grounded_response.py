@@ -14,6 +14,17 @@ from radar.core.services.explore_agent import ExploreAgent
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def mock_grounding_judge(monkeypatch):
+    monkeypatch.setattr(
+        grounded_strategy,
+        "judge_grounding",
+        lambda *args, **kwargs: {
+            "requires_graph": bool(args[2]), "grounded": True, "unsupported_claims": [],
+        },
+    )
+
+
 def _payload(*, name: str = "Edital Atual", kind: str = "edital") -> dict:
     return {
         "status": "ok",
@@ -109,6 +120,76 @@ def test_temporal_states_render_active_review_and_exclude_closed(monkeypatch):
     assert "validade a confirmar" in answer
     assert "Edital Atual" in answer
     assert "Edital Encerrado" not in answer
+
+
+def test_id_fast_fail_and_judge_name_id_mismatch_repair_once(monkeypatch):
+    payload = json.dumps({"id": "ict:embrapii:senai-cimatec", "name": "ICT Atual"})
+    calls = {"repair": 0}
+    monkeypatch.setattr(grounded_strategy, "judge_grounding", lambda *args, **kwargs: {
+        "requires_graph": True, "grounded": False, "unsupported_claims": ["nome não corresponde ao ID"],
+    })
+    def repair(**kwargs):
+        calls["repair"] += 1
+        return AgentResult("UFSC [ict:embrapii:senai-cimatec]", [], "end_turn", {})
+    monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", repair)
+    result = AgentResult(
+        "UFSC [ict:embrapii:senai-cimatec]",
+        [TraceStep(kind="tool", name="graph_explore", output=payload)], "end_turn", {},
+    )
+    answer, repaired = ExploreAgent._validate_agent_answer(
+        "quais ICTs?", result, system="", provider="openai", model="test",
+    )
+    assert repaired is True and calls["repair"] == 1
+    assert "Não foi possível validar" in answer
+
+
+def test_correct_name_and_id_pass_judge(monkeypatch):
+    monkeypatch.setattr(grounded_strategy, "judge_grounding", lambda *args, **kwargs: {
+        "requires_graph": True, "grounded": True, "unsupported_claims": [],
+    })
+    result = AgentResult(
+        "ICT Atual [ict:senai-cimatec]",
+        [TraceStep(kind="tool", name="graph_explore",
+                   output=json.dumps({"id": "ict:senai-cimatec", "name": "ICT Atual"}))],
+        "end_turn", {},
+    )
+    answer, repaired = ExploreAgent._validate_agent_answer(
+        "quais ICTs?", result, system="", provider="openai", model="test",
+    )
+    assert answer == "ICT Atual [ict:senai-cimatec]"
+    assert repaired is False
+
+
+def test_temporal_filter_applies_to_structural_graph_payloads(monkeypatch):
+    monkeypatch.setattr(grounded_strategy, "resolve_temporal", lambda payload, db=None: ({
+        "edital:finep:closed": grounded_strategy.ValidityState.CLOSED,
+        "edital:finep:review": grounded_strategy.ValidityState.NEEDS_REVIEW,
+    }, {}))
+    raw = json.dumps({
+        "nodes": [
+            {"id": "edital:finep:closed", "kind": "edital"},
+            {"id": "edital:finep:review", "kind": "edital"},
+        ],
+        "edges": [{"source": "edital:finep:closed", "target": "ict:x"}],
+    })
+    out = json.loads(grounded_strategy.temporalize_tool_payload(raw))
+    assert [node["id"] for node in out["nodes"]] == ["edital:finep:review"]
+    assert out["nodes"][0]["temporal_note"] == "validade a confirmar"
+    assert out["edges"] == []
+
+
+def test_flag_off_factual_question_falls_back_without_legacy_tools(monkeypatch):
+    monkeypatch.delenv("KG_PHASE1_EXPLORE_ENABLED", raising=False)
+    monkeypatch.setattr(grounded_strategy, "judge_grounding", lambda *args, **kwargs: {
+        "requires_graph": True, "grounded": False, "unsupported_claims": ["sem graph tool"],
+    })
+    monkeypatch.setattr(
+        "radar.core.llm.agent_runtime.run_agent",
+        lambda **kwargs: AgentResult("Há oportunidades atuais.", [], "end_turn", {}),
+    )
+    answer, meta = ExploreAgent().explore_with_meta("quais ICTs existem?", profile={"nome": "iFlorestal"})
+    assert "Não foi possível validar" in answer
+    assert meta["called_tools"] == []
 
 
 def test_conceptual_and_greeting_never_call_graph(monkeypatch):
