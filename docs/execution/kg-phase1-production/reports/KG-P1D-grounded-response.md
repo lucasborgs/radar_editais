@@ -31,6 +31,12 @@ factual sem consulta aciona no máximo um reparo com os payloads atuais; falha
 produz indisponibilidade segura. O histórico permanece contexto, nunca fonte de
 nomes, IDs ou relações.
 
+O juiz de aterramento roda pelo `agent_runtime`, sem tools, com `max_steps=1` e
+temperatura zero. Ele reutiliza exatamente o provider e o modelo já resolvidos
+para o turno, lê `AgentResult.final_text` e aceita somente o JSON estrito com
+`requires_graph`, `grounded` e `unsupported_claims`; qualquer saída inválida
+falha fechada.
+
 ## Temporalidade
 
 Para editais candidatos, os campos atuais são carregados em lote e passam por
@@ -43,7 +49,9 @@ contínuo.
 ## Resultados reais
 
 - Testes focados KG-P1D, KG-P1C, Explore, roteamento, golden e temporal:
-  `98 passed, 2 skipped`.
+  `101 passed, 2 skipped`.
+- Os testes do juiz confirmaram o repasse intacto de provider/modelo para
+  Anthropic/Claude e OpenAI-compatible, além do fail-closed para JSON inválido.
 - Ruff nos arquivos alterados: `All checks passed!`.
 - O golden `iforestal-profile-strategy` passou a proibir os nomes inventados do
   incidente (UFSC, INCT, IPMet, Embrapa, INPE, BNDES, ANP, CNPq e aceleradora
@@ -62,5 +70,5 @@ limitada à geração corrente e às evidências efetivamente presentes nela.
 
 Auditoria Codex: pendente
 
-Commit de correção: f298dac0b
+Commit de correção: 21dc741da
 Commit documental: f914d8d1a
