@@ -43,7 +43,7 @@ contínuo.
 ## Resultados reais
 
 - Testes focados KG-P1D, KG-P1C, Explore, roteamento, golden e temporal:
-  `94 passed, 2 skipped`.
+  `98 passed, 2 skipped`.
 - Ruff nos arquivos alterados: `All checks passed!`.
 - O golden `iforestal-profile-strategy` passou a proibir os nomes inventados do
   incidente (UFSC, INCT, IPMet, Embrapa, INPE, BNDES, ANP, CNPq e aceleradora
@@ -62,5 +62,5 @@ limitada à geração corrente e às evidências efetivamente presentes nela.
 
 Auditoria Codex: pendente
 
-Commit de correção: 0bd459faa
-Commit documental: b14ba5f7d
+Commit de correção: f298dac0b
+Commit documental: f914d8d1a
