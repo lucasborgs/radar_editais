@@ -15,20 +15,21 @@ deterministicamente a decisão de executar a estratégia nem a fronteira entre o
 payload autoritativo e a síntese final. Histórico e saída livre do agente podiam
 ser tratados como contexto factual.
 
-## Contrato de aterramento
+## Contrato de aterramento — abordagem agentic
 
-O roteamento agora é uma função pura: saudações e perguntas conceituais não
-consultam o KG; pedidos estratégicos só entram na rota profile-first com perfil
-presente; sem perfil, a resposta é uma orientação honesta. Na rota ativa, o
-backend executa exatamente uma `graph_strategy`, sem catálogo, Match, memória ou
-pesquisa como fallback.
+O primeiro desenho determinístico de roteamento por palavras-chave, seleção de
+tipos e renderer por templates foi abandonado. O runtime ativo voltou ao fluxo
+agentic comprovado pela spike: a LLM recebe apenas as quatro tools da Fase 1,
+decide quando consultá-las e interpreta as conexões. Saudações e conceitos podem
+ser respondidos diretamente pela LLM; perguntas estratégicas devem consultar o
+grafo. Catálogo, Match, web e memória não são alcançáveis nessa rota.
 
-O payload corrente é validado por um contrato Pydantic fechado. Cada seleção
-precisa ter ID, kind, ação e referências de fatos existentes no payload; relações
-derivadas não podem ser usadas como fatos. A resposta é renderizada por templates
-determinísticos, usando apenas nomes e sinais atuais, e ausência é descrita como
-limitação do recorte, nunca como inexistência no mercado. O histórico não é fonte
-de nomes, IDs ou relações.
+O payload corrente continua sendo a única autoridade. Após a resposta, são
+validados apenas IDs citados e a existência de consulta factual; criatividade,
+estilo e recomendação não são avaliados por regex. ID desconhecido ou resposta
+factual sem consulta aciona no máximo um reparo com os payloads atuais; falha
+produz indisponibilidade segura. O histórico permanece contexto, nunca fonte de
+nomes, IDs ou relações.
 
 ## Temporalidade
 
@@ -42,14 +43,13 @@ contínuo.
 ## Resultados reais
 
 - Testes focados KG-P1D, KG-P1C, Explore, roteamento, golden e temporal:
-  `67 passed` nesta correção; o gate obrigatório da fase registrou `85 passed, 2 skipped`.
-- Suíte unitária completa: `2201 passed, 2 skipped`.
+  `94 passed, 2 skipped`.
 - Ruff nos arquivos alterados: `All checks passed!`.
 - O golden `iforestal-profile-strategy` passou a proibir os nomes inventados do
   incidente (UFSC, INCT, IPMet, Embrapa, INPE, BNDES, ANP, CNPq e aceleradora
   2025), além da afirmação de inexistência de mercado.
 - Sync e streaming usam o mesmo resultado validado; o streaming só emite o
-  bloco final seguro na rota estratégica.
+  texto após a validação do resultado do agente.
 - Frontend: `npm run lint` não iniciou porque `next` não está instalado nesta
   worktree; `npx tsc --noEmit` não concluiu sem resolução de dependências. Não
   houve instalação nem acesso de rede.
@@ -62,5 +62,5 @@ limitada à geração corrente e às evidências efetivamente presentes nela.
 
 Auditoria Codex: pendente
 
-Commit de correção: 60f9dc0f7
-Commit documental: 60f9dc0f7
+Commit de correção: 0bd459faa
+Commit documental: b14ba5f7d
