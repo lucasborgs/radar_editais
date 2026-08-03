@@ -304,11 +304,18 @@ def test_flag_off_preserves_previous_tools_and_system(monkeypatch):
 
 
 def test_flag_on_is_exclusive(monkeypatch):
+    captured = {}
     monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
+    def fake_run(**kw):
+        captured.setdefault("agent", kw)
+        return AgentResult("ok", [], "end_turn", {})
+    monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", fake_run)
     answer, meta = ExploreAgent().explore_with_meta(
         "quais oportunidades existem?", profile_text="perfil", profile=CANONICAL_PROFILE,
     )
-    assert meta["called_tools"] == ["graph_strategy"]
-    assert meta["graph_strategy_executed"] is True
+    assert {tool.name for tool in captured["agent"]["tools"]} == {
+        "graph_strategy", "graph_explore", "graph_reason", "graph_community",
+    }
+    assert meta["repair_triggered"] is True
     assert "find_matching_editais" not in meta["called_tools"]
     assert answer

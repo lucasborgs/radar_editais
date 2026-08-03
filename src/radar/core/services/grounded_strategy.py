@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import unicodedata
 from enum import Enum
 from typing import Any
@@ -22,6 +23,7 @@ STRATEGY_KINDS = ("edital", "programa", "agencia", "ict", "investidor")
 STRATEGY_STATUS = frozenset({
     "ok", "insufficient_profile_anchors", "empty", "unavailable", "error", "invalid_request",
 })
+_CANONICAL_ID = re.compile(r"\b(?:edital|programa|agencia|ict|investidor|setor|tecnologia|uf|empresa):[A-Za-z0-9_.:-]+")
 
 
 def _fold(value: str) -> str:
@@ -29,47 +31,64 @@ def _fold(value: str) -> str:
     return "".join(char for char in decomposed if not unicodedata.combining(char)).casefold()
 
 
-def classify_requested_types(message: str) -> list[str]:
-    """Classifica o recorte solicitado sem classificador ou efeitos colaterais."""
-    text = _fold(message)
-    mentions = {
-        "edital": any(term in text for term in ("edital", "oportunidade", "chamada", "fomento")),
-        "ict": any(term in text for term in ("ict", "instituto", "institutos")),
-        "agencia": any(term in text for term in ("agencia", "agencias")),
-        "programa": any(term in text for term in ("programa", "programas")),
-        "investidor": any(term in text for term in ("investidor", "investidores", "fundo", "fundos")),
-    }
-    selected = [kind for kind in STRATEGY_KINDS if mentions[kind]]
-    broad = any(term in text for term in (
-        "mapa estrategico", "mapa do ecossistema", "mapa completo", "caminho estrategico",
-        "caminhos estrategicos", "panorama completo", "todos os atores", "ecossistema completo",
+def _payload_ids(value: Any) -> set[str]:
+    found: set[str] = set()
+    if isinstance(value, dict):
+        for item in value.values():
+            found |= _payload_ids(item)
+    elif isinstance(value, list):
+        for item in value:
+            found |= _payload_ids(item)
+    elif isinstance(value, str):
+        found |= set(_CANONICAL_ID.findall(value))
+    return found
+
+
+def validate_agent_answer(answer: str, message: str, tool_outputs: list[str]) -> tuple[bool, bool]:
+    """Valida somente autoridade de IDs e consulta factual, nunca estilo/criatividade."""
+    payloads: list[dict[str, Any]] = []
+    for output in tool_outputs:
+        try:
+            value = json.loads(output)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(value, dict):
+            payloads.append(value)
+    available = set().union(*(_payload_ids(payload) for payload in payloads)) if payloads else set()
+    cited = set(_CANONICAL_ID.findall(answer or ""))
+    unknown = bool(cited - available)
+    needs_graph = any(term in _fold(message) for term in (
+        "oportunidade", "edital", "ict", "instituto", "investidor", "fundo",
+        "programa", "agencia", "caminho estrategico", "ecossistema",
     ))
-    return list(STRATEGY_KINDS) if broad else selected or (["edital"] if mentions["edital"] else [])
+    graph_called = bool(payloads)
+    return not unknown and (not needs_graph or graph_called), unknown
 
 
-def conceptual_answer(message: str) -> str:
-    """Explicação curta e fechada, sem catálogo, Match ou atores atuais."""
-    text = _fold(message)
-    if "subvencao" in text:
-        return (
-            "Subvenção econômica é um recurso público não reembolsável destinado a apoiar "
-            "atividades de inovação. Em geral, a empresa aplica o recurso conforme um plano "
-            "aprovado e presta contas; regras de elegibilidade, despesas e contrapartida "
-            "dependem do instrumento específico."
-        )
-    if "capital de risco" in text or "investimento" in text:
-        return (
-            "Capital de risco é investimento em participação ou instrumento conversível, "
-            "assumindo risco em busca de retorno futuro. Não é subvenção e normalmente envolve "
-            "negociação de participação, governança e critérios de saída."
-        )
-    if "ict" in text or "instituto" in text:
-        return (
-            "Uma ICT é uma instituição de ciência, tecnologia e inovação que realiza pesquisa "
-            "e desenvolvimento. Ela pode participar de projetos de inovação conforme sua "
-            "capacidade, regras institucionais e instrumentos jurídicos aplicáveis."
-        )
-    return "Esse conceito pode ser explicado a partir de sua definição, finalidade, regras e exemplos gerais; a pergunta não consultou oportunidades ou atores atuais."
+def temporalize_tool_payload(payload_text: str, db: Any = None) -> str:
+    """Remove editais encerrados e marca revisão antes do payload chegar à LLM."""
+    try:
+        payload = json.loads(payload_text)
+    except (TypeError, ValueError):
+        return payload_text
+    if not isinstance(payload, dict) or not isinstance(payload.get("results_by_type"), dict):
+        return payload_text
+    temporal, _counts = resolve_temporal(payload, db)
+    editais = payload["results_by_type"].get("edital", [])
+    kept = []
+    for item in editais:
+        if not isinstance(item, dict):
+            continue
+        state = temporal.get(str(item.get("id")), ValidityState.NEEDS_REVIEW)
+        if state is ValidityState.CLOSED:
+            continue
+        copy = dict(item)
+        copy["temporal_state"] = state.value
+        if state is ValidityState.NEEDS_REVIEW:
+            copy["temporal_note"] = "validade a confirmar"
+        kept.append(copy)
+    payload["results_by_type"]["edital"] = kept
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 class StrategyAction(str, Enum):
@@ -330,7 +349,6 @@ def grounded_response(payload_text: str, *, db: Any = None) -> tuple[str, dict[s
 
 __all__ = [
     "StrategyAction", "StrategySynthesis", "SynthesisSelection", "fact_ref",
-    "classify_requested_types", "conceptual_answer",
     "grounded_response", "load_edital_temporal_rows", "resolve_temporal",
     "render_grounded_response", "validate_synthesis",
 ]

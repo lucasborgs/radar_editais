@@ -107,7 +107,10 @@ def test_explore_agent_happy_path(monkeypatch):
 
     out, meta = svc._explore_agent("oi", None, None, None, None)
     assert out == "Resposta do agente."
-    assert meta == {"stop_reason": "end_turn", "truncated": False, "called_match": False, "called_tools": []}
+    assert meta["stop_reason"] == "end_turn"
+    assert meta["truncated"] is False
+    assert meta["called_tools"] == []
+    assert meta["repair_triggered"] is False
 
 
 def test_explore_agent_max_steps_marks_truncated(monkeypatch):

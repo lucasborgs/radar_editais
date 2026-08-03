@@ -1123,4 +1123,31 @@ def build_graph_tools(*, profile: dict[str, Any] | None = None) -> list[BaseTool
             unavailable_msg=unavailable, error_msg=error,
         )
 
-    return [graph_strategy]
+    @tool
+    def graph_explore(ref: str, depth: int = 1) -> str:
+        """Explora a vizinhança estrutural de uma entidade do snapshot atual."""
+        return _run(
+            "graph_explore",
+            lambda snap: explore_payload(ref, snap, depth=depth),
+            unavailable_msg=unavailable, error_msg=error,
+        )
+
+    @tool
+    def graph_reason(ref: str, max_depth: int = 3) -> str:
+        """Explica caminhos entre o perfil injetado e uma entidade atual."""
+        return _run(
+            "graph_reason",
+            lambda snap: reason_payload(ref, snap, profile=profile, max_depth=max_depth),
+            unavailable_msg=unavailable, error_msg=error,
+        )
+
+    @tool
+    def graph_community(ref: str) -> str:
+        """Consulta uma comunidade existente e suas características compartilhadas."""
+        return _run(
+            "graph_community",
+            lambda snap: community_payload(ref, snap),
+            unavailable_msg=unavailable, error_msg=error,
+        )
+
+    return [graph_strategy, graph_explore, graph_reason, graph_community]

@@ -59,26 +59,24 @@ MEMÓRIA ENTRE SESSÕES (log_exploration_decision)
 
 KG_PHASE1_GRAPH_INSTRUCTION = """
 
-GRAFO DA FASE 1 — RESPOSTA PROFILE-FIRST ATERRADA
-- O backend decide deterministicamente se a pergunta é estratégica. Em uma
-  pergunta estratégica autenticada, ele executa exatamente uma graph_strategy;
-  não escolha outra ferramenta nem responda antes da validação do payload.
-- graph_strategy recebe o perfil real por injeção do runtime; nunca peça ao
-  usuário, invente ou envie JSON de perfil, edital, entity_ref ou node ID.
-- Uma chamada cobre oportunidades/editais, programas, agências, ICTs e
-  investidores. Cubra todos os tipos pedidos e use o campo coverage para saber
-  o que foi consultado; não transforme ausência no recorte em inexistência no
-  mercado.
-- Explique cada recomendação com o path e shared_characteristics. Em cada passo,
-  `source`/`target` são a direção factual autoritativa da aresta persistida;
-  `traversal_from`/`traversal_to` descrevem somente como a BFS navegou. Use
-  supporting_facts para fatos catalogados e derived_steps para afinidades.
-  route_relation é sempre derivada quando parte do perfil; nunca a confirme.
-- Respeite profile.unresolved e limitations: textos livres não viram âncoras
-  por aproximação silenciosa. Se o snapshot estiver indisponível, comunique a
-  limitação. Não use catálogo, Match, memória ou pesquisa como fallback.
-- O histórico é contexto conversacional, nunca autoridade factual; nomes, IDs e
-  relações da resposta devem existir no payload corrente validado."""
+GRAFO DA FASE 1 — ÚNICA AUTORIDADE FACTUAL DO EXPLORAR
+- Você controla a conversa e decide quando consultar as ferramentas da Fase 1.
+  Uma saudação recebe apenas uma saudação; perguntas conceituais podem ser
+  respondidas diretamente, sem tools.
+- Perguntas sobre oportunidades, ICTs, investidores, programas, agências ou
+  caminhos estratégicos devem consultar o grafo. Use apenas graph_strategy,
+  graph_explore, graph_reason e graph_community. Não há catálogo, Match, web ou
+  memória factual disponíveis nesta rota.
+- O perfil autenticado é injetado pelo backend nas closures. Nunca peça, fabrique
+  ou substitua o perfil e nunca envie perfil, entity_ref ou node ID inventado.
+- Nomes, IDs, relações, prazos e fatos atuais só podem vir dos resultados das
+  tools executadas neste turno. O histórico é contexto conversacional, nunca
+  autoridade factual. Ao mencionar uma entidade atual, cite seu ID canônico.
+- Diferencie fatos catalogados (`supporting_facts`), relações derivadas
+  (`derived_steps`, similaridade ou ponte tecnológica) e recomendações. Preserve
+  source/target como direção factual e traversal_from/traversal_to como navegação.
+- Ausência significa ausência no recorte atual, não inexistência no mercado.
+  Respeite limitações e perfil não resolvido; não aproxime texto livre em silêncio."""
 
 
 EXPLORE_MATCH_INSTRUCTION = """
@@ -254,20 +252,6 @@ class ExploreAgent:
         manualmente no outro lado, ou o streaming e o sync divergem em
         comportamento (não só em transporte). Unificação prevista pra TASK 6.
         """
-        from radar.core.kg.phase1.tools import graph_tools_enabled
-        if graph_tools_enabled():
-            route = self._profile_strategy_route(message, profile)
-            if route == "profile_strategy":
-                answer, meta = self._grounded_profile_response(message, profile, db)
-            elif route == "greeting":
-                answer, meta = self._short_greeting()
-            elif route == "no_profile_orientation":
-                answer, meta = self._no_profile_orientation()
-            else:
-                answer, meta = self._conceptual_without_graph(message)
-            yield ExploreStreamEvent(kind="final", answer=answer, meta=meta)
-            return
-
         from radar.core.llm.agent_runtime import resolve_agent_provider, run_agent_streaming_async
 
         # Item 3 (TASK 3) — thread-por-sessão do explore. `thread_id` chega PRONTO do
@@ -329,7 +313,7 @@ class ExploreAgent:
                 messages.append({"role": "user", "content": hint})
             messages.append({"role": "user", "content": message, "cache_hint": True})
 
-        tools = self._explore_tools(profile=profile)
+        tools = self._explore_tools(profile=profile, db=db)
         system = self._maybe_append_graph_instructions(EXPLORE_AGENT_SYSTEM)
 
         from radar.core.kg.phase1.tools import graph_tools_enabled
@@ -357,6 +341,7 @@ class ExploreAgent:
         )
 
         result = None
+        streamed_text = ""
         async for delta in run_agent_streaming_async(
             system=system,
             initial_messages=messages,
@@ -372,7 +357,7 @@ class ExploreAgent:
         ):
             if delta.kind == "token":
                 if delta.text:
-                    yield ExploreStreamEvent(kind="token", text=delta.text)
+                    streamed_text += delta.text
             elif delta.kind == "tool_end":
                 yield ExploreStreamEvent(kind="tool_end", name=delta.name)
             elif delta.kind == "done":
@@ -395,6 +380,9 @@ class ExploreAgent:
             )
             return
 
+        if result is not None and not result.final_text:
+            result.final_text = streamed_text
+        answer, repaired = self._validate_agent_answer(message, result, system=system)
         called_match = any(
             s.kind == "tool"
             and s.name in ("find_matching_editais", "find_matching_entities")
@@ -406,26 +394,44 @@ class ExploreAgent:
             "truncated": result.stop_reason == "max_steps",
             "called_match": called_match,
             "called_tools": called_tools,
+            "repair_triggered": repaired,
+            "fallback": answer.startswith("Não foi possível validar"),
         }
 
         if result.stop_reason == "error":
             logger.error("explore agent (stream): stop_reason=error após %d steps", len(result.steps))
             answer = "Desculpe, não consegui processar agora. Tente novamente em instantes."
         else:
-            answer = result.final_text or "Não consegui formular uma resposta agora."
+            answer = answer or "Não consegui formular uma resposta agora."
 
+        if answer:
+            yield ExploreStreamEvent(kind="token", text=answer)
         yield ExploreStreamEvent(kind="final", answer=answer, meta=meta)
 
-    def _explore_tools(self, profile: dict | None = None) -> list:
+    def _explore_tools(self, profile: dict | None = None, db=None) -> list:
         """Tools do agente de explore: leitura do catálogo gold, opcionalmente
         deep_research (subagente web) e — gated por `KG_PHASE1_EXPLORE_ENABLED` —
         as tools read-only do grafo da Fase 1 (ADITIVAS; `profile` vai na
         closure de graph_reason). Flag off = ferramentas exatamente como antes."""
         from radar.core.kg.phase1.tools import build_graph_tools, graph_tools_enabled
         if graph_tools_enabled():
-            # Modo exclusivo: nenhum catálogo, Match, pesquisa web ou memória é
-            # injetado como rota paralela de descoberta.
-            return build_graph_tools(profile=profile)
+            from langchain_core.tools import StructuredTool
+
+            from radar.core.services.grounded_strategy import temporalize_tool_payload
+
+            wrapped = []
+            for graph_tool in build_graph_tools(profile=profile):
+                def invoke_graph(_tool=graph_tool, **kwargs):
+                    return temporalize_tool_payload(_tool.invoke(kwargs), db=db)
+
+                wrapped.append(StructuredTool.from_function(
+                    invoke_graph,
+                    name=graph_tool.name,
+                    description=getattr(graph_tool, "description", graph_tool.name),
+                    args_schema=getattr(graph_tool, "args_schema", None),
+                ))
+            # Modo exclusivo: nenhuma tool de catálogo, Match, web ou memória.
+            return wrapped
 
         from radar.core.llm.agent_tools import build_explore_tools
 
@@ -464,17 +470,6 @@ class ExploreAgent:
         tools) pro caminho streaming. Mudança aqui tem que ser replicada
         lá também, ou os dois caminhos divergem em comportamento (não só
         transporte). Unificação prevista pra TASK 6."""
-        from radar.core.kg.phase1.tools import graph_tools_enabled
-        if graph_tools_enabled():
-            route = self._profile_strategy_route(message, profile)
-            if route == "profile_strategy":
-                return self._grounded_profile_response(message, profile, db)
-            if route == "greeting":
-                return self._short_greeting()
-            if route == "no_profile_orientation":
-                return self._no_profile_orientation()
-            return self._conceptual_without_graph(message)
-
         from radar.core.llm.agent_runtime import resolve_agent_provider, run_agent
 
         # Item 3 (TASK 3): a promoção thread-por-sessão é do caminho VIVO (streaming,
@@ -511,7 +506,7 @@ class ExploreAgent:
         # provider == "anthropic"; nos demais é ignorada (no-op).
         messages.append({"role": "user", "content": message, "cache_hint": True})
 
-        tools = self._explore_tools(profile=profile)
+        tools = self._explore_tools(profile=profile, db=db)
         system = self._maybe_append_graph_instructions(EXPLORE_AGENT_SYSTEM)
 
         # Match v3: só quando há PERFIL. COM workspace autenticado, o lado
@@ -555,6 +550,7 @@ class ExploreAgent:
             mode="explore",
         )
 
+        answer, repaired = self._validate_agent_answer(message, result, system=system)
         called_match = any(
             s.kind == "tool"
             and s.name in ("find_matching_editais", "find_matching_entities")
@@ -566,6 +562,8 @@ class ExploreAgent:
             "truncated": result.stop_reason == "max_steps",
             "called_match": called_match,
             "called_tools": called_tools,
+            "repair_triggered": repaired,
+            "fallback": answer.startswith("Não foi possível validar"),
         }
         if result.stop_reason == "error":
             logger.error("explore agent: stop_reason=error após %d steps", len(result.steps))
@@ -574,57 +572,32 @@ class ExploreAgent:
                 meta,
             )
 
-        return result.final_text or "Não consegui formular uma resposta agora.", meta
+        return answer or "Não consegui formular uma resposta agora.", meta
 
     @staticmethod
-    def _profile_strategy_route(message: str, profile: dict | None) -> str:
-        from radar.core.services.explore_routing import profile_strategy_route
-        return profile_strategy_route(message, has_profile=bool(profile)).value
+    def _validate_agent_answer(message: str, result, *, system: str) -> tuple[str, bool]:
+        from radar.core.services.grounded_strategy import validate_agent_answer
 
-    @staticmethod
-    def _grounded_profile_response(message: str, profile: dict | None, db=None) -> tuple[str, dict]:
-        from radar.core.kg.phase1.tools import build_graph_tools
-        from radar.core.services.grounded_strategy import (
-            classify_requested_types,
-            grounded_response,
+        outputs = [step.output for step in result.steps if step.kind == "tool" and step.output]
+        answer = result.final_text or ""
+        valid, _unknown = validate_agent_answer(answer, message, outputs)
+        if valid:
+            return answer, False
+        from radar.core.llm.agent_runtime import resolve_agent_provider, run_agent
+        provider, model = resolve_agent_provider("anthropic", ANTHROPIC_MODEL_AGENT_EXPLORE)
+        repair_context = "\n\n".join(outputs)
+        repaired = run_agent(
+            system=(system + "\n\nREPARO CONTROLADO: use somente os payloads abaixo; "
+                    "não invente IDs nem fatos e responda de forma segura.\n" + repair_context),
+            initial_messages=[{"role": "user", "content": message}],
+            tools=[], model=model, provider=provider, max_steps=2, mode="explore",
         )
-        tools = build_graph_tools(profile=profile)
-        if not tools:
-            return ExploreAgent._short_greeting()[0], {
-                "stop_reason": "grounded_response", "truncated": False,
-                "called_match": False, "called_tools": [], "graph_strategy_executed": False,
-                "intent": "profile_strategy", "counts_by_kind": {}, "rejected_ids": [],
-                "deterministic_fallback": True, "temporal_counts": {},
-            }
-        requested_types = classify_requested_types(message)
-        if not requested_types:
-            return ExploreAgent._no_profile_orientation()
-        return grounded_response(tools[0].invoke({"requested_types": requested_types}), db=db)
-
-    @staticmethod
-    def _route_meta(intent: str) -> dict:
-        return {
-            "stop_reason": "deterministic_route", "truncated": False,
-            "called_match": False, "called_tools": [], "graph_strategy_executed": False,
-            "intent": intent, "counts_by_kind": {}, "rejected_ids": [],
-            "deterministic_fallback": False, "temporal_counts": {},
-        }
-
-    @staticmethod
-    def _short_greeting() -> tuple[str, dict]:
-        return ("Olá! Posso ajudar a explorar oportunidades, programas, agências, ICTs e investidores.",
-                ExploreAgent._route_meta("greeting"))
-
-    @staticmethod
-    def _no_profile_orientation() -> tuple[str, dict]:
-        return ("Posso orientar a exploração, mas preciso de um perfil mínimo da empresa para calcular afinidade estratégica com o grafo.",
-                ExploreAgent._route_meta("no_profile_orientation"))
-
-    @staticmethod
-    def _conceptual_without_graph(message: str) -> tuple[str, dict]:
-        from radar.core.services.grounded_strategy import conceptual_answer
-        return (conceptual_answer(message),
-                ExploreAgent._route_meta("conceptual"))
+        repaired_outputs = [step.output for step in repaired.steps if step.kind == "tool" and step.output]
+        repaired_answer = repaired.final_text or ""
+        valid, _unknown = validate_agent_answer(repaired_answer, message, outputs + repaired_outputs)
+        if valid:
+            return repaired_answer, True
+        return "Não foi possível validar uma resposta factual com o grafo atual.", True
 
     @staticmethod
     def _build_explore_hint(
