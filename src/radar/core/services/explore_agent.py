@@ -59,10 +59,12 @@ MEMÓRIA ENTRE SESSÕES (log_exploration_decision)
 
 KG_PHASE1_GRAPH_INSTRUCTION = """
 
-GRAFO DA FASE 1 — MODO EXCLUSIVO PROFILE-FIRST
-- Em perguntas sobre a empresa autenticada, comece por graph_strategy. Ela já
-  recebe o perfil real por injeção do runtime; nunca peça ao usuário, invente ou
-  envie JSON de perfil, edital, entity_ref ou node ID para iniciar a consulta.
+GRAFO DA FASE 1 — RESPOSTA PROFILE-FIRST ATERRADA
+- O backend decide deterministicamente se a pergunta é estratégica. Em uma
+  pergunta estratégica autenticada, ele executa exatamente uma graph_strategy;
+  não escolha outra ferramenta nem responda antes da validação do payload.
+- graph_strategy recebe o perfil real por injeção do runtime; nunca peça ao
+  usuário, invente ou envie JSON de perfil, edital, entity_ref ou node ID.
 - Uma chamada cobre oportunidades/editais, programas, agências, ICTs e
   investidores. Cubra todos os tipos pedidos e use o campo coverage para saber
   o que foi consultado; não transforme ausência no recorte em inexistência no
@@ -74,7 +76,9 @@ GRAFO DA FASE 1 — MODO EXCLUSIVO PROFILE-FIRST
   route_relation é sempre derivada quando parte do perfil; nunca a confirme.
 - Respeite profile.unresolved e limitations: textos livres não viram âncoras
   por aproximação silenciosa. Se o snapshot estiver indisponível, comunique a
-  limitação e não use ferramentas de busca ou Match como fallback."""
+  limitação. Não use catálogo, Match, memória ou pesquisa como fallback.
+- O histórico é contexto conversacional, nunca autoridade factual; nomes, IDs e
+  relações da resposta devem existir no payload corrente validado."""
 
 
 EXPLORE_MATCH_INSTRUCTION = """
@@ -250,6 +254,20 @@ class ExploreAgent:
         manualmente no outro lado, ou o streaming e o sync divergem em
         comportamento (não só em transporte). Unificação prevista pra TASK 6.
         """
+        from radar.core.kg.phase1.tools import graph_tools_enabled
+        if graph_tools_enabled():
+            route = self._profile_strategy_route(message, profile)
+            if route == "profile_strategy":
+                answer, meta = self._grounded_profile_response(profile, db)
+            elif route == "greeting":
+                answer, meta = self._short_greeting()
+            elif route == "no_profile_orientation":
+                answer, meta = self._no_profile_orientation()
+            else:
+                answer, meta = self._conceptual_without_graph()
+            yield ExploreStreamEvent(kind="final", answer=answer, meta=meta)
+            return
+
         from radar.core.llm.agent_runtime import resolve_agent_provider, run_agent_streaming_async
 
         # Item 3 (TASK 3) — thread-por-sessão do explore. `thread_id` chega PRONTO do
@@ -446,6 +464,17 @@ class ExploreAgent:
         tools) pro caminho streaming. Mudança aqui tem que ser replicada
         lá também, ou os dois caminhos divergem em comportamento (não só
         transporte). Unificação prevista pra TASK 6."""
+        from radar.core.kg.phase1.tools import graph_tools_enabled
+        if graph_tools_enabled():
+            route = self._profile_strategy_route(message, profile)
+            if route == "profile_strategy":
+                return self._grounded_profile_response(profile, db)
+            if route == "greeting":
+                return self._short_greeting()
+            if route == "no_profile_orientation":
+                return self._no_profile_orientation()
+            return self._conceptual_without_graph()
+
         from radar.core.llm.agent_runtime import resolve_agent_provider, run_agent
 
         # Item 3 (TASK 3): a promoção thread-por-sessão é do caminho VIVO (streaming,
@@ -546,6 +575,49 @@ class ExploreAgent:
             )
 
         return result.final_text or "Não consegui formular uma resposta agora.", meta
+
+    @staticmethod
+    def _profile_strategy_route(message: str, profile: dict | None) -> str:
+        from radar.core.services.explore_routing import profile_strategy_route
+        return profile_strategy_route(message, has_profile=bool(profile)).value
+
+    @staticmethod
+    def _grounded_profile_response(profile: dict | None, db=None) -> tuple[str, dict]:
+        from radar.core.kg.phase1.tools import build_graph_tools
+        from radar.core.services.grounded_strategy import grounded_response
+        tools = build_graph_tools(profile=profile)
+        if not tools:
+            return ExploreAgent._short_greeting()[0], {
+                "stop_reason": "grounded_response", "truncated": False,
+                "called_match": False, "called_tools": [], "graph_strategy_executed": False,
+                "intent": "profile_strategy", "counts_by_kind": {}, "rejected_ids": [],
+                "deterministic_fallback": True, "temporal_counts": {},
+            }
+        return grounded_response(tools[0].invoke({}), db=db)
+
+    @staticmethod
+    def _route_meta(intent: str) -> dict:
+        return {
+            "stop_reason": "deterministic_route", "truncated": False,
+            "called_match": False, "called_tools": [], "graph_strategy_executed": False,
+            "intent": intent, "counts_by_kind": {}, "rejected_ids": [],
+            "deterministic_fallback": False, "temporal_counts": {},
+        }
+
+    @staticmethod
+    def _short_greeting() -> tuple[str, dict]:
+        return ("Olá! Posso ajudar a explorar oportunidades, programas, agências, ICTs e investidores.",
+                ExploreAgent._route_meta("greeting"))
+
+    @staticmethod
+    def _no_profile_orientation() -> tuple[str, dict]:
+        return ("Posso orientar a exploração, mas preciso de um perfil mínimo da empresa para calcular afinidade estratégica com o grafo.",
+                ExploreAgent._route_meta("no_profile_orientation"))
+
+    @staticmethod
+    def _conceptual_without_graph() -> tuple[str, dict]:
+        return ("Posso explicar conceitos e orientar próximos passos. Para uma resposta estratégica aterrada, peça uma descoberta com um perfil de empresa.",
+                ExploreAgent._route_meta("conceptual"))
 
     @staticmethod
     def _build_explore_hint(

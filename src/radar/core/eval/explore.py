@@ -26,7 +26,7 @@ from radar.core.eval.harness import Evaluation, Suite, get_input
 
 GOLDEN = ROOT / "data" / "evaluation" / "golden" / "explore.json"
 
-GRAPH_TOOL_NAMES = frozenset({"graph_explore", "graph_reason", "graph_community"})
+GRAPH_TOOL_NAMES = frozenset({"graph_strategy"})
 # Graph tools semanticamente adequadas a consulta FACTUAL sobre edital/entidade.
 # `graph_community` (cluster) fica FORA: sozinha não responde fato de edital/entidade.
 FACTUAL_GRAPH_TOOLS = frozenset({"graph_explore", "graph_reason"})
@@ -62,13 +62,18 @@ def load_data() -> list[dict]:
 
 
 def task(*, item: Any, **_) -> dict:
-    from radar.core.services.explore_routing import RouteContext, route_message
+    from radar.core.services.explore_routing import (
+        RouteContext,
+        profile_strategy_route,
+        route_message,
+    )
 
     inp = get_input(item)
     target = inp.get("target") or {"type": "profile", "id": ""}
     if inp.get("profile"):
+        route = profile_strategy_route(inp["query"], has_profile=True)
         output = {
-            "route": "PROFILE_STRATEGY",
+            "route": "PROFILE_STRATEGY" if route.value == "profile_strategy" else route.value,
             "decision": {"intent": "PROFILE_STRATEGY", "target_type": "profile"},
         }
         if os.getenv("EVAL_EXPLORE_CONNECTED", "false").lower() != "true":

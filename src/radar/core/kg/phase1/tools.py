@@ -104,14 +104,8 @@ _MECANISMO_MAP = {
     "parceria_pd": "parceria_pd",
 }
 
-_UNAVAILABLE_MSG = (
-    "Grafo da Fase 1 indisponível no momento. Use as ferramentas do catálogo "
-    "(get_edital, search_entities, get_node_neighborhood)."
-)
-_ERROR_MSG = (
-    "Falha ao consultar o grafo da Fase 1. Use as ferramentas do catálogo "
-    "(get_edital, search_entities, get_node_neighborhood)."
-)
+_UNAVAILABLE_MSG = "Grafo da Fase 1 indisponível no momento; o recorte não foi consultado."
+_ERROR_MSG = "Falha ao consultar o grafo da Fase 1; nenhum resultado estratégico foi fabricado."
 
 
 def graph_tools_enabled() -> bool:
