@@ -91,7 +91,9 @@ _PLAN_ACTIONS = (
 )
 _PROFILE_STRATEGY_TERMS = (
     "considerando meu perfil", "com meu perfil", "conectados", "afinidade",
-    "caminho de atuacao", "caminho de atuação", "o que serve para minha empresa",
+    "caminho de atuacao", "caminho de atuação", "caminho estrategico", "caminho estratégico",
+    "mapa completo", "mapa do ecossistema", "panorama completo", "todos os atores",
+    "ecossistema completo", "o que serve para minha empresa",
 )
 _GREETINGS = frozenset({
     "oi", "ola", "olá", "bom dia", "boa tarde", "boa noite", "hey", "hi",

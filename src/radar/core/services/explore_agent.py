@@ -258,13 +258,13 @@ class ExploreAgent:
         if graph_tools_enabled():
             route = self._profile_strategy_route(message, profile)
             if route == "profile_strategy":
-                answer, meta = self._grounded_profile_response(profile, db)
+                answer, meta = self._grounded_profile_response(message, profile, db)
             elif route == "greeting":
                 answer, meta = self._short_greeting()
             elif route == "no_profile_orientation":
                 answer, meta = self._no_profile_orientation()
             else:
-                answer, meta = self._conceptual_without_graph()
+                answer, meta = self._conceptual_without_graph(message)
             yield ExploreStreamEvent(kind="final", answer=answer, meta=meta)
             return
 
@@ -468,12 +468,12 @@ class ExploreAgent:
         if graph_tools_enabled():
             route = self._profile_strategy_route(message, profile)
             if route == "profile_strategy":
-                return self._grounded_profile_response(profile, db)
+                return self._grounded_profile_response(message, profile, db)
             if route == "greeting":
                 return self._short_greeting()
             if route == "no_profile_orientation":
                 return self._no_profile_orientation()
-            return self._conceptual_without_graph()
+            return self._conceptual_without_graph(message)
 
         from radar.core.llm.agent_runtime import resolve_agent_provider, run_agent
 
@@ -582,9 +582,12 @@ class ExploreAgent:
         return profile_strategy_route(message, has_profile=bool(profile)).value
 
     @staticmethod
-    def _grounded_profile_response(profile: dict | None, db=None) -> tuple[str, dict]:
+    def _grounded_profile_response(message: str, profile: dict | None, db=None) -> tuple[str, dict]:
         from radar.core.kg.phase1.tools import build_graph_tools
-        from radar.core.services.grounded_strategy import grounded_response
+        from radar.core.services.grounded_strategy import (
+            classify_requested_types,
+            grounded_response,
+        )
         tools = build_graph_tools(profile=profile)
         if not tools:
             return ExploreAgent._short_greeting()[0], {
@@ -593,7 +596,10 @@ class ExploreAgent:
                 "intent": "profile_strategy", "counts_by_kind": {}, "rejected_ids": [],
                 "deterministic_fallback": True, "temporal_counts": {},
             }
-        return grounded_response(tools[0].invoke({}), db=db)
+        requested_types = classify_requested_types(message)
+        if not requested_types:
+            return ExploreAgent._no_profile_orientation()
+        return grounded_response(tools[0].invoke({"requested_types": requested_types}), db=db)
 
     @staticmethod
     def _route_meta(intent: str) -> dict:
@@ -615,8 +621,9 @@ class ExploreAgent:
                 ExploreAgent._route_meta("no_profile_orientation"))
 
     @staticmethod
-    def _conceptual_without_graph() -> tuple[str, dict]:
-        return ("Posso explicar conceitos e orientar próximos passos. Para uma resposta estratégica aterrada, peça uma descoberta com um perfil de empresa.",
+    def _conceptual_without_graph(message: str) -> tuple[str, dict]:
+        from radar.core.services.grounded_strategy import conceptual_answer
+        return (conceptual_answer(message),
                 ExploreAgent._route_meta("conceptual"))
 
     @staticmethod

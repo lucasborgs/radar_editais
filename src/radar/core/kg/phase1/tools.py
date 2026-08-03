@@ -663,6 +663,7 @@ def strategy_payload(
     payload: dict[str, Any] = {
         "status": "ok" if recognized else "insufficient_profile_anchors",
         "generation_id": snapshot.generation_id,
+        "requested_types": list(kinds),
         "profile": profile_view,
         "results_by_type": {},
         "coverage": {kind: {"queried": True, "status": "queried", "total_reachable": 0,
@@ -746,6 +747,8 @@ def strategy_payload(
         if kind not in kinds:
             payload["coverage"][kind] = {"queried": False, "status": "not_queried",
                                           "total_reachable": None, "returned": 0, "truncated": False}
+    if recognized and not any(payload["results_by_type"].get(kind) for kind in kinds):
+        payload["status"] = "empty"
     payload["limitations"].append("Ausência significa ausência no recorte atualmente representado pelo grafo, não inexistência no mercado.")
     result = _trim_payload(payload, max_bytes)
     result_groups = result.get("results_by_type", {})
@@ -1044,14 +1047,16 @@ def _run(tool_name: str, fn, *, unavailable_msg: str = _UNAVAILABLE_MSG,
             tool_name, outcome=outcome, generation_id=None,
             duration_ms=_elapsed(started), fallback=True, category=category,
         )
-        return unavailable_msg if outcome == "unavailable" else error_msg
+        return dump({"status": outcome, "message": unavailable_msg if outcome == "unavailable" else error_msg,
+                     "results_by_type": {}, "coverage": {}, "truncated": False})
 
     if snapshot is None:
         _observe(
             tool_name, outcome="unavailable", generation_id=None,
             duration_ms=_elapsed(started), fallback=True,
         )
-        return unavailable_msg
+        return dump({"status": "unavailable", "message": unavailable_msg,
+                     "results_by_type": {}, "coverage": {}, "truncated": False})
 
     try:
         result = fn(snapshot)
@@ -1060,7 +1065,8 @@ def _run(tool_name: str, fn, *, unavailable_msg: str = _UNAVAILABLE_MSG,
             tool_name, outcome="error", generation_id=snapshot.generation_id,
             duration_ms=_elapsed(started), fallback=True, category=_category_of(exc),
         )
-        return error_msg
+        return dump({"status": "error", "message": error_msg,
+                     "results_by_type": {}, "coverage": {}, "truncated": False})
 
     _observe(
         tool_name, outcome=result.outcome, generation_id=result.generation_id,

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import unicodedata
 from enum import Enum
 from typing import Any
 
@@ -16,6 +17,59 @@ from radar.core.services import temporal_read_model
 from radar.domain.data_quality import ValidityState
 
 logger = logging.getLogger(__name__)
+
+STRATEGY_KINDS = ("edital", "programa", "agencia", "ict", "investidor")
+STRATEGY_STATUS = frozenset({
+    "ok", "insufficient_profile_anchors", "empty", "unavailable", "error", "invalid_request",
+})
+
+
+def _fold(value: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", value or "")
+    return "".join(char for char in decomposed if not unicodedata.combining(char)).casefold()
+
+
+def classify_requested_types(message: str) -> list[str]:
+    """Classifica o recorte solicitado sem classificador ou efeitos colaterais."""
+    text = _fold(message)
+    mentions = {
+        "edital": any(term in text for term in ("edital", "oportunidade", "chamada", "fomento")),
+        "ict": any(term in text for term in ("ict", "instituto", "institutos")),
+        "agencia": any(term in text for term in ("agencia", "agencias")),
+        "programa": any(term in text for term in ("programa", "programas")),
+        "investidor": any(term in text for term in ("investidor", "investidores", "fundo", "fundos")),
+    }
+    selected = [kind for kind in STRATEGY_KINDS if mentions[kind]]
+    broad = any(term in text for term in (
+        "mapa estrategico", "mapa do ecossistema", "mapa completo", "caminho estrategico",
+        "caminhos estrategicos", "panorama completo", "todos os atores", "ecossistema completo",
+    ))
+    return list(STRATEGY_KINDS) if broad else selected or (["edital"] if mentions["edital"] else [])
+
+
+def conceptual_answer(message: str) -> str:
+    """Explicação curta e fechada, sem catálogo, Match ou atores atuais."""
+    text = _fold(message)
+    if "subvencao" in text:
+        return (
+            "Subvenção econômica é um recurso público não reembolsável destinado a apoiar "
+            "atividades de inovação. Em geral, a empresa aplica o recurso conforme um plano "
+            "aprovado e presta contas; regras de elegibilidade, despesas e contrapartida "
+            "dependem do instrumento específico."
+        )
+    if "capital de risco" in text or "investimento" in text:
+        return (
+            "Capital de risco é investimento em participação ou instrumento conversível, "
+            "assumindo risco em busca de retorno futuro. Não é subvenção e normalmente envolve "
+            "negociação de participação, governança e critérios de saída."
+        )
+    if "ict" in text or "instituto" in text:
+        return (
+            "Uma ICT é uma instituição de ciência, tecnologia e inovação que realiza pesquisa "
+            "e desenvolvimento. Ela pode participar de projetos de inovação conforme sua "
+            "capacidade, regras institucionais e instrumentos jurídicos aplicáveis."
+        )
+    return "Esse conceito pode ser explicado a partir de sua definição, finalidade, regras e exemplos gerais; a pergunta não consultou oportunidades ou atores atuais."
 
 
 class StrategyAction(str, Enum):
@@ -98,7 +152,9 @@ def _deterministic_synthesis(
             fact_ref(fact) for fact in item.get("evidence", {}).get("supporting_facts", [])
             if isinstance(fact, dict)
         ]
-        if not refs:
+        shared = item.get("shared_characteristics", [])
+        derived = item.get("evidence", {}).get("derived_steps", [])
+        if not refs and not shared and not derived:
             continue
         action = {
             "programa": StrategyAction.ASSESS_PROGRAM,
@@ -176,29 +232,68 @@ def render_grounded_response(
     except (ValidationError, ValueError, TypeError):
         fallback = True
         synthesis = StrategySynthesis(selections=[])
+    status = payload.get("status")
+    status_messages = {
+        "insufficient_profile_anchors": "O perfil não produziu âncoras suficientes na taxonomia atual; não foi fabricada afinidade aproximada.",
+        "unavailable": "O grafo está indisponível; não foi possível consultar o recorte solicitado.",
+        "error": "Falha ao consultar o grafo; não foi possível produzir uma resposta estratégica.",
+        "invalid_request": "O recorte solicitado é inválido; nenhum tipo foi consultado.",
+    }
+    if status in status_messages:
+        return status_messages[status], synthesis, fallback
     by_id = {str(item.get("id")): item for item in _results(payload)}
-    lines = [
-        "Recorte estratégico atual do grafo:",
-        "A consulta cobre oportunidades, programas, agências, ICTs e investidores; "
-        "fatos catalogados e relações derivadas são mantidos separados.",
-    ]
+    lines = ["Recorte estratégico atual do grafo:"]
     if not synthesis.selections:
-        lines.append("Não há resultados explicáveis neste recorte; isso não indica inexistência no mercado.")
+        lines.append(
+            "Nenhuma entidade foi encontrada no recorte solicitado."
+            if status == "empty" else "Não há resultados explicáveis no payload atual."
+        )
         return "\n".join(lines), synthesis, fallback
+    closed_count = 0
+    review_lines: list[str] = []
     for selection in synthesis.selections:
         item = by_id[selection.id]
         state = temporal.get(selection.id)
         if selection.kind == "edital" and state is ValidityState.CLOSED:
+            closed_count += 1
             continue
         label = item.get("name") or selection.id
-        suffix = " (validade a confirmar)" if state is ValidityState.NEEDS_REVIEW else ""
-        lines.append(f"- {label}: {_ACTION_TEXT[selection.action]}{suffix}.")
+        lines.extend([f"\n### {label} ({selection.id})", "Afinidade derivada:"])
         shared = item.get("shared_characteristics", [])
         signals = sorted({str(entry.get("value")) for entry in shared if entry.get("value")})
         if signals:
-            lines.append(f"  Sinais compartilhados: {', '.join(signals)}.")
-    if len(lines) == 2:
-        lines.append("Não há oportunidades ativas explicáveis neste recorte; isso não indica inexistência no mercado.")
+            lines.append(f"- sinais compartilhados: {', '.join(signals)}")
+        for step in item.get("evidence", {}).get("derived_steps", []):
+            if isinstance(step, dict):
+                lines.append(
+                    f"- relação derivada: {step.get('source', '')} -[{step.get('predicate', '')}]-> {step.get('target', '')}"
+                )
+        lines.append("Fatos confirmados:")
+        facts = item.get("evidence", {}).get("supporting_facts", [])
+        for fact in facts:
+            if isinstance(fact, dict):
+                lines.append(
+                    f"- {fact.get('source', '')} -[{fact.get('predicate', '')}]-> {fact.get('target', '')} "
+                    f"(origem: {fact.get('origin', '')})"
+                )
+        if not facts:
+            lines.append("- nenhum fato confirmado no payload atual")
+        lines.append("Caminho justificativo:")
+        for step in item.get("path", []):
+            if isinstance(step, dict):
+                lines.append(
+                    f"- {step.get('source', '')} -[{step.get('predicate', '')}]-> {step.get('target', '')}"
+                )
+        action_line = f"Ação recomendada: {_ACTION_TEXT[selection.action]}."
+        if state is ValidityState.NEEDS_REVIEW:
+            review_lines.append(f"- {label} ({selection.id}): validade a confirmar; {action_line}")
+        else:
+            lines.append(action_line)
+    if review_lines:
+        lines.append("\n## Validade a confirmar")
+        lines.extend(review_lines)
+    if closed_count:
+        lines.append(f"\n{closed_count} edital(is) encerrado(s) foram excluído(s) das recomendações.")
     return "\n".join(lines), synthesis, fallback
 
 
@@ -209,7 +304,9 @@ def grounded_response(payload_text: str, *, db: Any = None) -> tuple[str, dict[s
         if not isinstance(payload, dict):
             raise ValueError("payload must be object")
     except (json.JSONDecodeError, TypeError, ValueError):
-        payload = {"results_by_type": {}, "coverage": {}}
+        payload = {"status": "error", "results_by_type": {}, "coverage": {}}
+    if payload.get("status") not in STRATEGY_STATUS:
+        payload["status"] = "error"
     temporal, temporal_counts = resolve_temporal(payload, db)
     answer, _synthesis, fallback = render_grounded_response(payload, temporal)
     groups = payload.get("results_by_type", {})
@@ -225,12 +322,15 @@ def grounded_response(payload_text: str, *, db: Any = None) -> tuple[str, dict[s
         "rejected_ids": [],
         "deterministic_fallback": fallback or not bool(payload.get("results_by_type")),
         "temporal_counts": temporal_counts,
+        "status": payload.get("status"),
+        "requested_types": payload.get("requested_types", []),
     }
     return answer, meta
 
 
 __all__ = [
     "StrategyAction", "StrategySynthesis", "SynthesisSelection", "fact_ref",
+    "classify_requested_types", "conceptual_answer",
     "grounded_response", "load_edital_temporal_rows", "resolve_temporal",
     "render_grounded_response", "validate_synthesis",
 ]
