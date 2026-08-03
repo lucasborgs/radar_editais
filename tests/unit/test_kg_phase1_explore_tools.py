@@ -303,6 +303,8 @@ def test_flag_on_is_exclusive(monkeypatch):
     assert {tool.name for tool in captured["agent"]["tools"]} == {
         "graph_strategy", "graph_explore", "graph_reason", "graph_community",
     }
-    assert meta["repair_triggered"] is True
+    assert captured["agent"]["system"] == ExploreAgent._explore_system()
+    assert "explore_opportunity" not in captured["agent"]["system"]
+    assert "supporting_facts" in captured["agent"]["system"]
     assert "find_matching_editais" not in meta["called_tools"]
     assert answer

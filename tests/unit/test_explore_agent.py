@@ -21,21 +21,9 @@ sys.path.insert(0, str(ROOT))
 
 from radar.core.llm.agent_runtime import AgentResult, TraceStep  # noqa: E402
 from radar.core.llm.agent_tools import build_explore_tools  # noqa: E402
-from radar.core.services import grounded_strategy  # noqa: E402
 from radar.core.services.explore_agent import ExploreAgent  # noqa: E402
 
 pytestmark = pytest.mark.unit
-
-
-@pytest.fixture(autouse=True)
-def mock_grounding_judge(monkeypatch):
-    monkeypatch.setattr(
-        grounded_strategy,
-        "judge_grounding",
-        lambda *args, **kwargs: {
-            "requires_graph": bool(args[2]), "grounded": True, "unsupported_claims": [],
-        },
-    )
 
 # ============================================================================
 # _build_explore_hint
