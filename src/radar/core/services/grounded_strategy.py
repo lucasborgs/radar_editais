@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 from enum import Enum
 from typing import Any
@@ -58,36 +57,35 @@ def judge_grounding(
     message: str, answer: str, tool_outputs: list[str], *, provider: str, model: str,
 ) -> dict[str, Any] | None:
     """Juiz fechado: decide aterramento, não estilo nem criatividade."""
-    from radar.core.llm.llm_client import make_client
+    from radar.core.llm.agent_runtime import run_agent
 
-    client = make_client(
-        api_key=(os.getenv("OPENAI_API_KEY") if provider == "openai"
-                 else os.getenv("ANTHROPIC_API_KEY")),
-    )
-    response = client.chat.completions.create(
+    result = run_agent(
+        system=(
+            "Você é um juiz fechado de aterramento factual. Compare pergunta, resposta "
+            "e payloads atuais. Retorne JSON puro com exatamente três campos: "
+            "requires_graph (boolean), grounded (boolean), unsupported_claims (lista de strings). "
+            "Verifique nomes, IDs, correspondência nome-ID, fatos, relações e temporalidade. "
+            "Conceitos e saudações podem grounded=true sem graph tool. Pergunta factual "
+            "sobre o ecossistema sem payload de graph tool deve grounded=false. "
+            "Não avalie estilo, criatividade ou qualidade da recomendação."
+        ),
+        initial_messages=[{"role": "user", "content": json.dumps({
+            "question": message, "answer": answer, "graph_tool_payloads": tool_outputs,
+        }, ensure_ascii=False)}],
+        tools=[],
         model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Você é um juiz fechado de aterramento factual. Compare pergunta, resposta "
-                    "e payloads atuais. Retorne JSON estrito com exatamente: requires_graph "
-                    "(boolean), grounded (boolean), unsupported_claims (lista de strings). "
-                    "Verifique nomes, IDs, correspondência nome-ID, fatos, relações e temporalidade. "
-                    "Conceitos e saudações podem grounded=true sem graph tool. Pergunta factual "
-                    "sobre o ecossistema sem payload de graph tool deve grounded=false. "
-                    "Não avalie estilo, criatividade ou qualidade da recomendação."
-                ),
-            },
-            {"role": "user", "content": json.dumps({
-                "question": message, "answer": answer, "graph_tool_payloads": tool_outputs,
-            }, ensure_ascii=False)},
-        ],
+        provider=provider,
+        max_steps=1,
         temperature=0,
-        response_format={"type": "json_object"},
+        mode="grounding_judge",
     )
-    raw = json.loads(response.choices[0].message.content or "{}")
-    if set(raw) != {"requires_graph", "grounded", "unsupported_claims"}:
+    try:
+        raw = json.loads(result.final_text or "{}")
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(raw, dict) or set(raw) != {
+        "requires_graph", "grounded", "unsupported_claims",
+    }:
         return None
     if not isinstance(raw["requires_graph"], bool) or not isinstance(raw["grounded"], bool):
         return None
