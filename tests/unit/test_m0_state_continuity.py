@@ -103,7 +103,7 @@ def test_explore_history_contains_only_previous_messages_and_defends_legacy_clie
     assert _history_without_current(history[:-1], "atual") == history[:-1]
 
 
-def test_exploration_log_tools_are_auth_scoped(monkeypatch):
+def test_legacy_exploration_log_tools_are_never_injected(monkeypatch):
     captured = []
 
     def fake_run_agent(**kwargs):
@@ -111,9 +111,15 @@ def test_exploration_log_tools_are_auth_scoped(monkeypatch):
         return AgentResult(final_text="ok", steps=[], stop_reason="end_turn", usage={})
 
     monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr(
+        "radar.core.services.grounded_strategy.judge_grounding",
+        lambda *args, **kwargs: {
+            "requires_graph": False, "grounded": True, "unsupported_claims": [],
+        },
+    )
     svc = ExploreAgent()
     svc._explore_agent("pergunta", [], None, None, None, workspace_id="ws-1", db=object())
-    assert "log_exploration_decision" in {tool.name for tool in captured[-1]}
+    assert "log_exploration_decision" not in {tool.name for tool in captured[-1]}
 
     svc._explore_agent("pergunta", [], None, None, None)
     assert "log_exploration_decision" not in {tool.name for tool in captured[-1]}
@@ -142,9 +148,15 @@ async def test_explore_thread_seeds_only_empty_checkpoint(monkeypatch, stored_co
     monkeypatch.setattr("radar.core.llm.agent_graph.aget_thread_message_count", fake_count)
     monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent_streaming_async", fake_stream)
     monkeypatch.setattr(
+        "radar.core.services.grounded_strategy.judge_grounding",
+        lambda *args, **kwargs: {
+            "requires_graph": False, "grounded": True, "unsupported_claims": [],
+        },
+    )
+    monkeypatch.setattr(
         ExploreAgent,
         "_explore_tools",
-        lambda self, profile=None: [],
+        lambda self, profile=None, db=None: [],
     )
 
     async for _event in ExploreAgent().explore_stream(

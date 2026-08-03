@@ -1,6 +1,6 @@
 """Consciência temporal canônica (Front 3) — core/temporal.
 
-Cobre o cálculo de dias restantes / expiração contra date.today() e a
+Cobre o cálculo de dias restantes / expiração contra o dia civil de São Paulo e a
 renderização do bloco `[CONTEXTO TEMPORAL: ...]` para os casos de fronteira:
 prazo futuro, prazo curto (urgência), prazo vencido, fluxo contínuo (sem
 deadline) e edital inexistente.
@@ -12,6 +12,7 @@ from datetime import date, timedelta
 import pytest
 
 from radar.core.kg import entity_catalog, temporal
+from radar.core.services.temporal_read_model import today_sao_paulo
 
 pytestmark = pytest.mark.unit
 
@@ -23,7 +24,7 @@ def _patch_hypergraph(monkeypatch, editais: list[dict]):
         deadline = e.get("deadline")
         parsed = temporal.parse_deadline(deadline)
         if parsed is not None:
-            state = "active" if parsed >= date.today() else "closed"
+            state = "active" if parsed >= today_sao_paulo() else "closed"
             mode, value = "fixed", parsed.isoformat()
         else:
             state, mode, value = "active", "continuous", None
@@ -41,7 +42,7 @@ def _fmt(d: date) -> str:
 
 
 def test_future_deadline_has_positive_days(monkeypatch):
-    futuro = date.today() + timedelta(days=40)
+    futuro = today_sao_paulo() + timedelta(days=40)
     _patch_hypergraph(monkeypatch, [
         {"id": "finep:1", "status": "ABERTA", "deadline": _fmt(futuro)},
     ])
@@ -55,7 +56,7 @@ def test_future_deadline_has_positive_days(monkeypatch):
 
 
 def test_short_deadline_flags_urgency(monkeypatch):
-    curto = date.today() + timedelta(days=5)
+    curto = today_sao_paulo() + timedelta(days=5)
     _patch_hypergraph(monkeypatch, [
         {"id": "finep:2", "status": "ABERTA", "deadline": _fmt(curto)},
     ])
@@ -65,7 +66,7 @@ def test_short_deadline_flags_urgency(monkeypatch):
 
 
 def test_expired_deadline_warns(monkeypatch):
-    passado = date.today() - timedelta(days=3)
+    passado = today_sao_paulo() - timedelta(days=3)
     _patch_hypergraph(monkeypatch, [
         {"id": "finep:3", "status": "ABERTA", "deadline": _fmt(passado)},
     ])
@@ -129,17 +130,17 @@ def test_unknown_edital_returns_empty_block(monkeypatch):
     assert temporal.render_temporal_block("finep:404") == ""
 
 
-def test_today_is_actual_today_not_reference_date(monkeypatch):
-    """"hoje" é date.today(), não uma data fixa do índice."""
-    futuro = date.today() + timedelta(days=10)
+def test_today_is_sao_paulo_day_not_reference_date(monkeypatch):
+    """"hoje" é o dia civil de São Paulo, não uma data fixa do índice."""
+    futuro = today_sao_paulo() + timedelta(days=10)
     _patch_hypergraph(monkeypatch, [
         {"id": "finep:5", "status": "ABERTA", "deadline": _fmt(futuro)},
     ])
     block = temporal.render_temporal_block("finep:5")
-    assert f"hoje é {date.today().isoformat()}" in block
+    assert f"hoje é {today_sao_paulo().isoformat()}" in block
 
 
 def test_match_block_states_today(monkeypatch):
     block = temporal.render_match_temporal_block()
-    assert f"hoje é {date.today().isoformat()}" in block
+    assert f"hoje é {today_sao_paulo().isoformat()}" in block
     assert "verbatim" in block

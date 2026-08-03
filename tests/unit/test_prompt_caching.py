@@ -197,6 +197,12 @@ def test_explore_marks_current_user_message(monkeypatch):
                            usage={"input_tokens": 0, "output_tokens": 0})
 
     monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", fake_run_agent)
+    monkeypatch.setattr(
+        "radar.core.services.grounded_strategy.judge_grounding",
+        lambda *args, **kwargs: {
+            "requires_graph": False, "grounded": True, "unsupported_claims": [],
+        },
+    )
 
     svc = ExploreAgent()
     svc._explore_agent("qual o prazo?", history=[{"role": "user", "content": "antes"}],
