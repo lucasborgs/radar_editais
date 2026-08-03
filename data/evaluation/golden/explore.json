@@ -82,7 +82,7 @@
       "reference_answer": "Uma única consulta deve cobrir oportunidades, programas, agências, ICTs e investidores, separando atributos catalogados, fatos estruturais, relações derivadas e lacunas do snapshot.",
       "assertions": {
         "required": ["oportunidades", "programas", "agências", "ICTs", "investidores", "fatos", "relações derivadas"],
-        "forbidden": ["não existem no mercado"],
+        "forbidden": ["não existem no mercado", "UFSC", "INCT", "IPMet", "Embrapa", "INPE", "BNDES", "ANP", "CNPq", "aceleradora 2025"],
         "conditional": ["ausência deve ser limitada ao recorte do grafo"]
       },
       "evidence": ["perfil autenticado do produto", "snapshot KG-P1C"]

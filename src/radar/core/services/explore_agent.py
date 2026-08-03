@@ -59,22 +59,24 @@ MEMÓRIA ENTRE SESSÕES (log_exploration_decision)
 
 KG_PHASE1_GRAPH_INSTRUCTION = """
 
-GRAFO DA FASE 1 — MODO EXCLUSIVO PROFILE-FIRST
-- Em perguntas sobre a empresa autenticada, comece por graph_strategy. Ela já
-  recebe o perfil real por injeção do runtime; nunca peça ao usuário, invente ou
-  envie JSON de perfil, edital, entity_ref ou node ID para iniciar a consulta.
-- Uma chamada cobre oportunidades/editais, programas, agências, ICTs e
-  investidores. Cubra todos os tipos pedidos e use o campo coverage para saber
-  o que foi consultado; não transforme ausência no recorte em inexistência no
-  mercado.
-- Explique cada recomendação com o path e shared_characteristics. Em cada passo,
-  `source`/`target` são a direção factual autoritativa da aresta persistida;
-  `traversal_from`/`traversal_to` descrevem somente como a BFS navegou. Use
-  supporting_facts para fatos catalogados e derived_steps para afinidades.
-  route_relation é sempre derivada quando parte do perfil; nunca a confirme.
-- Respeite profile.unresolved e limitations: textos livres não viram âncoras
-  por aproximação silenciosa. Se o snapshot estiver indisponível, comunique a
-  limitação e não use ferramentas de busca ou Match como fallback."""
+GRAFO DA FASE 1 — ÚNICA AUTORIDADE FACTUAL DO EXPLORAR
+- Você controla a conversa e decide quando consultar as ferramentas da Fase 1.
+  Uma saudação recebe apenas uma saudação; perguntas conceituais podem ser
+  respondidas diretamente, sem tools.
+- Perguntas sobre oportunidades, ICTs, investidores, programas, agências ou
+  caminhos estratégicos devem consultar o grafo. Use apenas graph_strategy,
+  graph_explore, graph_reason e graph_community. Não há catálogo, Match, web ou
+  memória factual disponíveis nesta rota.
+- O perfil autenticado é injetado pelo backend nas closures. Nunca peça, fabrique
+  ou substitua o perfil e nunca envie perfil, entity_ref ou node ID inventado.
+- Nomes, IDs, relações, prazos e fatos atuais só podem vir dos resultados das
+  tools executadas neste turno. O histórico é contexto conversacional, nunca
+  autoridade factual. Ao mencionar uma entidade atual, cite seu ID canônico.
+- Diferencie fatos catalogados (`supporting_facts`), relações derivadas
+  (`derived_steps`, similaridade ou ponte tecnológica) e recomendações. Preserve
+  source/target como direção factual e traversal_from/traversal_to como navegação.
+- Ausência significa ausência no recorte atual, não inexistência no mercado.
+  Respeite limitações e perfil não resolvido; não aproxime texto livre em silêncio."""
 
 
 EXPLORE_MATCH_INSTRUCTION = """
@@ -311,34 +313,19 @@ class ExploreAgent:
                 messages.append({"role": "user", "content": hint})
             messages.append({"role": "user", "content": message, "cache_hint": True})
 
-        tools = self._explore_tools(profile=profile)
+        tools = self._explore_tools(profile=profile, db=db)
         system = self._maybe_append_graph_instructions(EXPLORE_AGENT_SYSTEM)
 
         from radar.core.kg.phase1.tools import graph_tools_enabled
-        if profile_text and profile and not graph_tools_enabled():
-            from radar.core.llm.agent_tools.match_tools import build_match_tools
-            tools = tools + build_match_tools(
-                profile_text, profile=profile, workspace_id=workspace_id,
-                db=db, brief=True,
-            )
-            system = system + EXPLORE_MATCH_INSTRUCTION
-
-        if db is not None and workspace_id and not graph_tools_enabled():
-            from radar.core.llm.agent_tools.explore_tools import (
-                build_exploration_log_tools,
-                load_recent_exploration_decisions,
-            )
-            tools = tools + build_exploration_log_tools(db, workspace_id)
-            system = system + EXPLORE_LOG_INSTRUCTION
-            prior = load_recent_exploration_decisions(db, workspace_id)
-            if prior:
-                system = f"{system}\n\n{prior}"
+        if not graph_tools_enabled():
+            system += "\n\nO grafo está desligado. Para perguntas factuais sobre o ecossistema, informe indisponibilidade segura; não fabrique fatos."
 
         provider, model = resolve_agent_provider(
             "anthropic", ANTHROPIC_MODEL_AGENT_EXPLORE,
         )
 
         result = None
+        streamed_text = ""
         async for delta in run_agent_streaming_async(
             system=system,
             initial_messages=messages,
@@ -354,7 +341,7 @@ class ExploreAgent:
         ):
             if delta.kind == "token":
                 if delta.text:
-                    yield ExploreStreamEvent(kind="token", text=delta.text)
+                    streamed_text += delta.text
             elif delta.kind == "tool_end":
                 yield ExploreStreamEvent(kind="tool_end", name=delta.name)
             elif delta.kind == "done":
@@ -377,6 +364,11 @@ class ExploreAgent:
             )
             return
 
+        if result is not None and not result.final_text:
+            result.final_text = streamed_text
+        answer, repaired = self._validate_agent_answer(
+            message, result, system=system, provider=provider, model=model,
+        )
         called_match = any(
             s.kind == "tool"
             and s.name in ("find_matching_editais", "find_matching_entities")
@@ -388,34 +380,46 @@ class ExploreAgent:
             "truncated": result.stop_reason == "max_steps",
             "called_match": called_match,
             "called_tools": called_tools,
+            "repair_triggered": repaired,
+            "fallback": answer.startswith("Não foi possível validar"),
         }
 
         if result.stop_reason == "error":
             logger.error("explore agent (stream): stop_reason=error após %d steps", len(result.steps))
             answer = "Desculpe, não consegui processar agora. Tente novamente em instantes."
         else:
-            answer = result.final_text or "Não consegui formular uma resposta agora."
+            answer = answer or "Não consegui formular uma resposta agora."
 
+        if answer:
+            yield ExploreStreamEvent(kind="token", text=answer)
         yield ExploreStreamEvent(kind="final", answer=answer, meta=meta)
 
-    def _explore_tools(self, profile: dict | None = None) -> list:
+    def _explore_tools(self, profile: dict | None = None, db=None) -> list:
         """Tools do agente de explore: leitura do catálogo gold, opcionalmente
         deep_research (subagente web) e — gated por `KG_PHASE1_EXPLORE_ENABLED` —
         as tools read-only do grafo da Fase 1 (ADITIVAS; `profile` vai na
         closure de graph_reason). Flag off = ferramentas exatamente como antes."""
         from radar.core.kg.phase1.tools import build_graph_tools, graph_tools_enabled
         if graph_tools_enabled():
-            # Modo exclusivo: nenhum catálogo, Match, pesquisa web ou memória é
-            # injetado como rota paralela de descoberta.
-            return build_graph_tools(profile=profile)
+            from langchain_core.tools import StructuredTool
 
-        from radar.core.llm.agent_tools import build_explore_tools
+            from radar.core.services.grounded_strategy import temporalize_tool_payload
 
-        tools = build_explore_tools()
-        if os.getenv("EXPLORE_DEEP_RESEARCH_ENABLED", "false").lower() == "true":
-            from radar.core.llm.agent_tools.research_tools import build_research_tools
-            tools = tools + build_research_tools()
-        return tools
+            wrapped = []
+            for graph_tool in build_graph_tools(profile=profile):
+                def invoke_graph(_tool=graph_tool, **kwargs):
+                    return temporalize_tool_payload(_tool.invoke(kwargs), db=db)
+
+                wrapped.append(StructuredTool.from_function(
+                    invoke_graph,
+                    name=graph_tool.name,
+                    description=getattr(graph_tool, "description", graph_tool.name),
+                    args_schema=getattr(graph_tool, "args_schema", None),
+                ))
+            # Modo exclusivo: nenhuma tool de catálogo, Match, web ou memória.
+            return wrapped
+
+        return []
 
     @staticmethod
     def _maybe_append_graph_instructions(system: str) -> str:
@@ -482,7 +486,7 @@ class ExploreAgent:
         # provider == "anthropic"; nos demais é ignorada (no-op).
         messages.append({"role": "user", "content": message, "cache_hint": True})
 
-        tools = self._explore_tools(profile=profile)
+        tools = self._explore_tools(profile=profile, db=db)
         system = self._maybe_append_graph_instructions(EXPLORE_AGENT_SYSTEM)
 
         # Match v3: só quando há PERFIL. COM workspace autenticado, o lado
@@ -491,27 +495,8 @@ class ExploreAgent:
         # chunks efêmeros (cache por hash). Em ambos os casos o funil rankeia
         # editais/entidades por afinidade de texto real.
         from radar.core.kg.phase1.tools import graph_tools_enabled
-        if profile_text and profile and not graph_tools_enabled():
-            from radar.core.llm.agent_tools.match_tools import build_match_tools
-            tools = tools + build_match_tools(
-                profile_text, profile=profile, workspace_id=workspace_id,
-                db=db, brief=True,
-            )
-            system = system + EXPLORE_MATCH_INSTRUCTION
-
-        # Memória do ExploreAgent (Fase 3A): só com workspace autenticado + db.
-        # O bloco de decisões vai no SYSTEM (prefixo estável, antes do histórico
-        # da conversa — D6); a tool de escrita é registrada junto.
-        if db is not None and workspace_id and not graph_tools_enabled():
-            from radar.core.llm.agent_tools.explore_tools import (
-                build_exploration_log_tools,
-                load_recent_exploration_decisions,
-            )
-            tools = tools + build_exploration_log_tools(db, workspace_id)
-            system = system + EXPLORE_LOG_INSTRUCTION
-            prior = load_recent_exploration_decisions(db, workspace_id)
-            if prior:
-                system = f"{system}\n\n{prior}"
+        if not graph_tools_enabled():
+            system += "\n\nO grafo está desligado. Para perguntas factuais sobre o ecossistema, informe indisponibilidade segura; não fabrique fatos."
 
         provider, model = resolve_agent_provider(
             "anthropic", ANTHROPIC_MODEL_AGENT_EXPLORE,
@@ -526,6 +511,9 @@ class ExploreAgent:
             mode="explore",
         )
 
+        answer, repaired = self._validate_agent_answer(
+            message, result, system=system, provider=provider, model=model,
+        )
         called_match = any(
             s.kind == "tool"
             and s.name in ("find_matching_editais", "find_matching_entities")
@@ -537,6 +525,8 @@ class ExploreAgent:
             "truncated": result.stop_reason == "max_steps",
             "called_match": called_match,
             "called_tools": called_tools,
+            "repair_triggered": repaired,
+            "fallback": answer.startswith("Não foi possível validar"),
         }
         if result.stop_reason == "error":
             logger.error("explore agent: stop_reason=error após %d steps", len(result.steps))
@@ -545,7 +535,47 @@ class ExploreAgent:
                 meta,
             )
 
-        return result.final_text or "Não consegui formular uma resposta agora.", meta
+        return answer or "Não consegui formular uma resposta agora.", meta
+
+    @staticmethod
+    def _validate_agent_answer(
+        message: str, result, *, system: str, provider: str, model: str,
+    ) -> tuple[str, bool]:
+        from radar.core.services.grounded_strategy import judge_grounding, unknown_cited_ids
+
+        def safe_judge(answer: str, outputs: list[str]):
+            try:
+                return judge_grounding(
+                    message, answer, outputs, provider=provider, model=model,
+                )
+            except Exception as exc:  # noqa: BLE001 — fail closed, no content logged
+                logger.info("explore grounding judge unavailable category=%s", type(exc).__name__)
+                return None
+
+        outputs = [step.output for step in result.steps if step.kind == "tool" and step.output]
+        answer = result.final_text or ""
+        unknown = unknown_cited_ids(answer, outputs)
+        judgment = None if unknown else safe_judge(answer, outputs)
+        if not unknown and judgment and judgment["grounded"] and not judgment["unsupported_claims"]:
+            return answer, False
+        from radar.core.llm.agent_runtime import run_agent
+        repair_context = "\n\n".join(outputs)
+        repaired = run_agent(
+            system=(system + "\n\nREPARO CONTROLADO: use somente os payloads abaixo; "
+                    "não invente IDs nem fatos e responda de forma segura.\n" + repair_context),
+            initial_messages=[{"role": "user", "content": message}],
+            tools=[], model=model, provider=provider, max_steps=2, mode="explore",
+        )
+        repaired_outputs = [step.output for step in repaired.steps if step.kind == "tool" and step.output]
+        repaired_answer = repaired.final_text or ""
+        repaired_unknown = unknown_cited_ids(repaired_answer, outputs + repaired_outputs)
+        repaired_judgment = None if repaired_unknown else safe_judge(
+            repaired_answer, outputs + repaired_outputs,
+        )
+        if (not repaired_unknown and repaired_judgment and repaired_judgment["grounded"]
+                and not repaired_judgment["unsupported_claims"]):
+            return repaired_answer, True
+        return "Não foi possível validar uma resposta factual com o grafo atual.", True
 
     @staticmethod
     def _build_explore_hint(

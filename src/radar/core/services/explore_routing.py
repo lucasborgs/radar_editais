@@ -29,6 +29,13 @@ class Intent(str, Enum):
     WRITING_ACTION = "WRITING_ACTION"
 
 
+class ProfileStrategyRoute(str, Enum):
+    GREETING = "greeting"
+    PROFILE_STRATEGY = "profile_strategy"
+    NO_PROFILE_ORIENTATION = "no_profile_orientation"
+    CONCEPTUAL = "conceptual"
+
+
 @dataclass(frozen=True)
 class RouteContext:
     mode: str = "explorer"
@@ -82,6 +89,15 @@ _PLAN_ACTIONS = (
     "crie um plano", "gere um plano", "planeje a proposta", "ajuste o plano",
     "modifique o plano", "estruture a proposta",
 )
+_PROFILE_STRATEGY_TERMS = (
+    "considerando meu perfil", "com meu perfil", "conectados", "afinidade",
+    "caminho de atuacao", "caminho de atuação", "caminho estrategico", "caminho estratégico",
+    "mapa completo", "mapa do ecossistema", "panorama completo", "todos os atores",
+    "ecossistema completo", "o que serve para minha empresa",
+)
+_GREETINGS = frozenset({
+    "oi", "ola", "olá", "bom dia", "boa tarde", "boa noite", "hey", "hi",
+})
 
 
 def _fold(value: str) -> str:
@@ -91,6 +107,29 @@ def _fold(value: str) -> str:
 
 def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
     return any(term in text for term in terms)
+
+
+def is_greeting(message: str) -> bool:
+    text = _fold(message).strip()
+    if "\n\n" in text:
+        text = text.rsplit("\n\n", 1)[1].strip()
+    return text.strip("!?. ,") in {_fold(item) for item in _GREETINGS}
+
+
+def profile_strategy_route(message: str, *, has_profile: bool) -> ProfileStrategyRoute:
+    """Decisão pura: saudações/conceitos nunca consultam o grafo."""
+    if is_greeting(message):
+        return ProfileStrategyRoute.GREETING
+    folded = _fold(message)
+    if has_profile and _contains_any(folded, _PROFILE_STRATEGY_TERMS):
+        return ProfileStrategyRoute.PROFILE_STRATEGY
+    decision = route_message(RouteContext(message=message, has_profile=has_profile))
+    strategic = decision.intent in {Intent.DISCOVERY, Intent.MATCH_PROFILE, Intent.ENTITY_FACT}
+    if strategic and has_profile:
+        return ProfileStrategyRoute.PROFILE_STRATEGY
+    if strategic:
+        return ProfileStrategyRoute.NO_PROFILE_ORIENTATION
+    return ProfileStrategyRoute.CONCEPTUAL
 
 
 def _profile_for(intent: Intent) -> str:

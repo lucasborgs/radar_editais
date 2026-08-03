@@ -225,7 +225,7 @@ def test_graph_tool_usage_when_graph_called(monkeypatch):
     from radar.core.eval import explore as explore_eval
 
     out = explore_eval.eval_graph_tool_usage(
-        output=_eval_output(called_tools=["search_entities", "graph_explore"]),
+        output=_eval_output(called_tools=["graph_strategy"]),
         expected_output={},
     )
     assert out["name"] == "graph_tool_usage"

@@ -104,14 +104,8 @@ _MECANISMO_MAP = {
     "parceria_pd": "parceria_pd",
 }
 
-_UNAVAILABLE_MSG = (
-    "Grafo da Fase 1 indisponível no momento. Use as ferramentas do catálogo "
-    "(get_edital, search_entities, get_node_neighborhood)."
-)
-_ERROR_MSG = (
-    "Falha ao consultar o grafo da Fase 1. Use as ferramentas do catálogo "
-    "(get_edital, search_entities, get_node_neighborhood)."
-)
+_UNAVAILABLE_MSG = "Grafo da Fase 1 indisponível no momento; o recorte não foi consultado."
+_ERROR_MSG = "Falha ao consultar o grafo da Fase 1; nenhum resultado estratégico foi fabricado."
 
 
 def graph_tools_enabled() -> bool:
@@ -669,6 +663,7 @@ def strategy_payload(
     payload: dict[str, Any] = {
         "status": "ok" if recognized else "insufficient_profile_anchors",
         "generation_id": snapshot.generation_id,
+        "requested_types": list(kinds),
         "profile": profile_view,
         "results_by_type": {},
         "coverage": {kind: {"queried": True, "status": "queried", "total_reachable": 0,
@@ -752,6 +747,8 @@ def strategy_payload(
         if kind not in kinds:
             payload["coverage"][kind] = {"queried": False, "status": "not_queried",
                                           "total_reachable": None, "returned": 0, "truncated": False}
+    if recognized and not any(payload["results_by_type"].get(kind) for kind in kinds):
+        payload["status"] = "empty"
     payload["limitations"].append("Ausência significa ausência no recorte atualmente representado pelo grafo, não inexistência no mercado.")
     result = _trim_payload(payload, max_bytes)
     result_groups = result.get("results_by_type", {})
@@ -946,10 +943,11 @@ def community_payload(
     for member in members:
         entry = _node_entry(idx, member)
         kind = entry["kind"] or "desconhecido"
-        bucket = grouped.setdefault(kind, {"count": 0, "names": []})
+        bucket = grouped.setdefault(kind, {"count": 0, "names": [], "ids": []})
         bucket["count"] += 1
         if len(bucket["names"]) < max_names_per_kind:
             bucket["names"].append(entry["name"])
+            bucket["ids"].append(entry["id"])
     grouped = {k: grouped[k] for k in sorted(grouped)}
 
     internal = [
@@ -1050,14 +1048,16 @@ def _run(tool_name: str, fn, *, unavailable_msg: str = _UNAVAILABLE_MSG,
             tool_name, outcome=outcome, generation_id=None,
             duration_ms=_elapsed(started), fallback=True, category=category,
         )
-        return unavailable_msg if outcome == "unavailable" else error_msg
+        return dump({"status": outcome, "message": unavailable_msg if outcome == "unavailable" else error_msg,
+                     "results_by_type": {}, "coverage": {}, "truncated": False})
 
     if snapshot is None:
         _observe(
             tool_name, outcome="unavailable", generation_id=None,
             duration_ms=_elapsed(started), fallback=True,
         )
-        return unavailable_msg
+        return dump({"status": "unavailable", "message": unavailable_msg,
+                     "results_by_type": {}, "coverage": {}, "truncated": False})
 
     try:
         result = fn(snapshot)
@@ -1066,7 +1066,8 @@ def _run(tool_name: str, fn, *, unavailable_msg: str = _UNAVAILABLE_MSG,
             tool_name, outcome="error", generation_id=snapshot.generation_id,
             duration_ms=_elapsed(started), fallback=True, category=_category_of(exc),
         )
-        return error_msg
+        return dump({"status": "error", "message": error_msg,
+                     "results_by_type": {}, "coverage": {}, "truncated": False})
 
     _observe(
         tool_name, outcome=result.outcome, generation_id=result.generation_id,
@@ -1123,4 +1124,31 @@ def build_graph_tools(*, profile: dict[str, Any] | None = None) -> list[BaseTool
             unavailable_msg=unavailable, error_msg=error,
         )
 
-    return [graph_strategy]
+    @tool
+    def graph_explore(ref: str, depth: int = 1) -> str:
+        """Explora a vizinhança estrutural de uma entidade do snapshot atual."""
+        return _run(
+            "graph_explore",
+            lambda snap: explore_payload(ref, snap, depth=depth),
+            unavailable_msg=unavailable, error_msg=error,
+        )
+
+    @tool
+    def graph_reason(ref: str, max_depth: int = 3) -> str:
+        """Explica caminhos entre o perfil injetado e uma entidade atual."""
+        return _run(
+            "graph_reason",
+            lambda snap: reason_payload(ref, snap, profile=profile, max_depth=max_depth),
+            unavailable_msg=unavailable, error_msg=error,
+        )
+
+    @tool
+    def graph_community(ref: str) -> str:
+        """Consulta uma comunidade existente e suas características compartilhadas."""
+        return _run(
+            "graph_community",
+            lambda snap: community_payload(ref, snap),
+            unavailable_msg=unavailable, error_msg=error,
+        )
+
+    return [graph_strategy, graph_explore, graph_reason, graph_community]
