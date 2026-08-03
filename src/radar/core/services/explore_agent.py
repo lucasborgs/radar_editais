@@ -366,9 +366,8 @@ class ExploreAgent:
 
         if result is not None and not result.final_text:
             result.final_text = streamed_text
-        answer, repaired = self._validate_agent_answer(
-            message, result, system=system, provider=provider, model=model,
-        )
+        answer = result.final_text or streamed_text
+        repaired = False
         called_match = any(
             s.kind == "tool"
             and s.name in ("find_matching_editais", "find_matching_entities")
@@ -511,9 +510,8 @@ class ExploreAgent:
             mode="explore",
         )
 
-        answer, repaired = self._validate_agent_answer(
-            message, result, system=system, provider=provider, model=model,
-        )
+        answer = result.final_text or ""
+        repaired = False
         called_match = any(
             s.kind == "tool"
             and s.name in ("find_matching_editais", "find_matching_entities")
@@ -536,46 +534,6 @@ class ExploreAgent:
             )
 
         return answer or "Não consegui formular uma resposta agora.", meta
-
-    @staticmethod
-    def _validate_agent_answer(
-        message: str, result, *, system: str, provider: str, model: str,
-    ) -> tuple[str, bool]:
-        from radar.core.services.grounded_strategy import judge_grounding, unknown_cited_ids
-
-        def safe_judge(answer: str, outputs: list[str]):
-            try:
-                return judge_grounding(
-                    message, answer, outputs, provider=provider, model=model,
-                )
-            except Exception as exc:  # noqa: BLE001 — fail closed, no content logged
-                logger.info("explore grounding judge unavailable category=%s", type(exc).__name__)
-                return None
-
-        outputs = [step.output for step in result.steps if step.kind == "tool" and step.output]
-        answer = result.final_text or ""
-        unknown = unknown_cited_ids(answer, outputs)
-        judgment = None if unknown else safe_judge(answer, outputs)
-        if not unknown and judgment and judgment["grounded"] and not judgment["unsupported_claims"]:
-            return answer, False
-        from radar.core.llm.agent_runtime import run_agent
-        repair_context = "\n\n".join(outputs)
-        repaired = run_agent(
-            system=(system + "\n\nREPARO CONTROLADO: use somente os payloads abaixo; "
-                    "não invente IDs nem fatos e responda de forma segura.\n" + repair_context),
-            initial_messages=[{"role": "user", "content": message}],
-            tools=[], model=model, provider=provider, max_steps=2, mode="explore",
-        )
-        repaired_outputs = [step.output for step in repaired.steps if step.kind == "tool" and step.output]
-        repaired_answer = repaired.final_text or ""
-        repaired_unknown = unknown_cited_ids(repaired_answer, outputs + repaired_outputs)
-        repaired_judgment = None if repaired_unknown else safe_judge(
-            repaired_answer, outputs + repaired_outputs,
-        )
-        if (not repaired_unknown and repaired_judgment and repaired_judgment["grounded"]
-                and not repaired_judgment["unsupported_claims"]):
-            return repaired_answer, True
-        return "Não foi possível validar uma resposta factual com o grafo atual.", True
 
     @staticmethod
     def _build_explore_hint(

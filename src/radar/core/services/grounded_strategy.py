@@ -38,64 +38,6 @@ def _payload_ids(value: Any) -> set[str]:
     return found
 
 
-def unknown_cited_ids(answer: str, tool_outputs: list[str]) -> set[str]:
-    """Fast-fail mecânico: só identifica IDs citados que não estão nos payloads."""
-    payloads: list[dict[str, Any]] = []
-    for output in tool_outputs:
-        try:
-            value = json.loads(output)
-        except (TypeError, ValueError):
-            continue
-        if isinstance(value, dict):
-            payloads.append(value)
-    available = set().union(*(_payload_ids(payload) for payload in payloads)) if payloads else set()
-    cited = set(_CANONICAL_ID.findall(answer or ""))
-    return cited - available
-
-
-def judge_grounding(
-    message: str, answer: str, tool_outputs: list[str], *, provider: str, model: str,
-) -> dict[str, Any] | None:
-    """Juiz fechado: decide aterramento, não estilo nem criatividade."""
-    from radar.core.llm.agent_runtime import run_agent
-
-    result = run_agent(
-        system=(
-            "Você é um juiz fechado de aterramento factual. Compare pergunta, resposta "
-            "e payloads atuais. Retorne JSON puro com exatamente três campos: "
-            "requires_graph (boolean), grounded (boolean), unsupported_claims (lista de strings). "
-            "Verifique nomes, IDs, correspondência nome-ID, fatos, relações e temporalidade. "
-            "Conceitos e saudações podem grounded=true sem graph tool. Pergunta factual "
-            "sobre o ecossistema sem payload de graph tool deve grounded=false. "
-            "Não avalie estilo, criatividade ou qualidade da recomendação."
-        ),
-        initial_messages=[{"role": "user", "content": json.dumps({
-            "question": message, "answer": answer, "graph_tool_payloads": tool_outputs,
-        }, ensure_ascii=False)}],
-        tools=[],
-        model=model,
-        provider=provider,
-        max_steps=1,
-        temperature=0,
-        mode="grounding_judge",
-    )
-    try:
-        raw = json.loads(result.final_text or "{}")
-    except (TypeError, ValueError):
-        return None
-    if not isinstance(raw, dict) or set(raw) != {
-        "requires_graph", "grounded", "unsupported_claims",
-    }:
-        return None
-    if not isinstance(raw["requires_graph"], bool) or not isinstance(raw["grounded"], bool):
-        return None
-    if not isinstance(raw["unsupported_claims"], list) or not all(
-        isinstance(item, str) for item in raw["unsupported_claims"]
-    ):
-        return None
-    return raw
-
-
 def temporalize_tool_payload(payload_text: str, db: Any = None) -> str:
     """Remove editais encerrados e marca revisão antes do payload chegar à LLM."""
     try:
