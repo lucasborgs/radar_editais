@@ -6,6 +6,7 @@ por oportunidade.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -21,6 +22,7 @@ from radar.core.services.data_quality_exceptions import (
 from radar.core.services.data_quality_reviews import project_loaded_temporal_validity
 from radar.core.services.temporal_quality import _build_temporal_fingerprint
 from radar.domain.data_quality import TemporalMode, ValidityState
+from radar.domain.provenance import EvidenceRef
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,7 @@ class TemporalSubject:
     deadline: date | None
     status: str | None
     updated_at: str | None = None
+    continuous_evidence: EvidenceRef | None = None
 
 
 class TemporalReadModel(BaseModel):
@@ -79,8 +82,28 @@ def subjects_from_rows(rows: list[dict]) -> list[TemporalSubject]:
             deadline=_to_date(row.get("deadline")),
             status=row.get("status"),
             updated_at=_safe_timestamp(row.get("updated_at")),
+            continuous_evidence=_continuous_evidence_for(row),
         ))
     return subjects
+
+
+def _continuous_evidence_for(row: dict) -> EvidenceRef | None:
+    """Programas (catálogo gold) são contínuos por natureza: sem deadline, a
+    presença no catálogo com status aberto é a base da atividade. Somente
+    ``kind='programa'`` ganha evidência contínua — editais seguem o modelo
+    estrito baseado em deadline."""
+    if (row.get("kind") or "") != "programa":
+        return None
+    subject_id = str(row.get("native_id") or "")
+    basis = f"{row.get('kind')}|{subject_id}|{row.get('status') or ''}|{row.get('deadline') or ''}"
+    content_hash = "sha256:" + hashlib.sha256(basis.encode("utf-8")).hexdigest()
+    return EvidenceRef(
+        source="gold:entities",
+        native_id=subject_id or None,
+        document=row.get("name"),
+        quote="programa de fluxo contínuo do catálogo gold",
+        silver_source_hash=content_hash,
+    )
 
 
 def _safe_timestamp(value: Any) -> str | None:
@@ -164,6 +187,7 @@ def resolve_temporal_read_models(
             exception_row=row,
             expected_exception_id=row["id"] if row and row.get("id") else None,
             review=reviews.get(row["id"]) if row and row.get("id") else None,
+            continuous_evidence=subject.continuous_evidence,
             as_of=effective_as_of,
         )
         if projection.review_id:

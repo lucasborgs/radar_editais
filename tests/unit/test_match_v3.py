@@ -197,7 +197,7 @@ def fake_funnel(monkeypatch):
         _opp("finep:inelegivel", deadline=fut,
              constraints=[{"tipo": "porte", "op": "in", "valor": ["mei", "me"]}]),
         _opp("finep:morto", deadline=TODAY - datetime.timedelta(days=1)),
-        _opp("programa:centelha", kind="programa", deadline=fut, status="ativa"),
+        _opp("programa:centelha", kind="programa", deadline=None, status="ativa"),
     ]
     chunks = {
         "id-finep:bom": _chunks_for([[1, 0.15, 0]], ["texto do edital bom"]),
