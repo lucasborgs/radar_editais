@@ -86,7 +86,8 @@ def build_match_tools(
         USE SOMENTE quando o usuário TEM perfil preenchido e pergunta "quais editais
         servem para mim?", "o que tem para a minha empresa?". Retorna matches
         ranqueados por afinidade. NÃO USE para listar catálogo — use list_editais
-        para isso.
+        para isso. NUNCA chame proativamente ao abrir a conversa ou em resposta a
+        saudações (a presença do perfil por si só não é um pedido).
 
         Args:
             top_k: máximo de resultados (default 8).
@@ -112,6 +113,8 @@ def build_match_tools(
         USE SOMENTE quando o usuário TEM perfil preenchido e pergunta "o que serve
         para minha empresa?". Retorna programas ranqueados por afinidade com o
         perfil. NÃO USE para listar catálogo — use list_editais para isso.
+        NUNCA chame proativamente ao abrir a conversa ou em resposta a saudações
+        (a presença do perfil por si só não é um pedido).
         Investidores estão fora do escopo e nunca são retornados.
 
         Args:

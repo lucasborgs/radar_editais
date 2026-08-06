@@ -14,7 +14,9 @@
         "max_brl": 130000
       },
       "tese_themes": [],
-      "setores": [],
+      "setores": [
+        "Multissetorial"
+      ],
       "estagio_alvo": [
         "pre-seed"
       ],
@@ -38,7 +40,9 @@
       "beneficio": "Mentorias, trilhas, conexão com mercado, infraestrutura tecnológica e Sebraetec.",
       "ticket_range": null,
       "tese_themes": [],
-      "setores": [],
+      "setores": [
+        "Multissetorial"
+      ],
       "estagio_alvo": [
         "pre-seed",
         "seed"
@@ -63,7 +67,10 @@
       "beneficio": "Aceleração equity-free, mentorias, suporte jurídico/contábil, conexão com ecossistema de impacto.",
       "ticket_range": null,
       "tese_themes": [],
-      "setores": [],
+      "setores": [
+        "Social",
+        "Sustentabilidade"
+      ],
       "estagio_alvo": [
         "pre-seed",
         "seed"
@@ -88,7 +95,9 @@
       "beneficio": "Apoio financeiro não-reembolsável à ICT, com contrapartida e empresa interveniente.",
       "ticket_range": null,
       "tese_themes": [],
-      "setores": [],
+      "setores": [
+        "Multissetorial"
+      ],
       "estagio_alvo": [
         "seed",
         "serie-a",
@@ -114,7 +123,9 @@
       "beneficio": "Capacitação online, mentorias equity-free, treino de pitch e Demoday para investidores.",
       "ticket_range": null,
       "tese_themes": [],
-      "setores": [],
+      "setores": [
+        "Multissetorial"
+      ],
       "estagio_alvo": [
         "pre-seed",
         "seed"
@@ -142,7 +153,9 @@
         "max_brl": 150000
       },
       "tese_themes": [],
-      "setores": [],
+      "setores": [
+        "Multissetorial"
+      ],
       "estagio_alvo": [
         "pre-seed"
       ],
@@ -169,7 +182,9 @@
         "max_brl": 1500000
       },
       "tese_themes": [],
-      "setores": [],
+      "setores": [
+        "Multissetorial"
+      ],
       "estagio_alvo": [
         "pre-seed",
         "seed",
@@ -195,7 +210,9 @@
       "beneficio": "Capacitação para internacionalização, mentorias e conexões internacionais.",
       "ticket_range": null,
       "tese_themes": [],
-      "setores": [],
+      "setores": [
+        "Multissetorial"
+      ],
       "estagio_alvo": [
         "seed",
         "serie-a"
@@ -220,7 +237,9 @@
       "beneficio": "Aporte de capital para crescimento e desenvolvimento tecnológico.",
       "ticket_range": null,
       "tese_themes": [],
-      "setores": [],
+      "setores": [
+        "Multissetorial"
+      ],
       "estagio_alvo": [
         "seed"
       ],
@@ -244,7 +263,9 @@
       "beneficio": "Subvenção econômica não-reembolsável para inovação.",
       "ticket_range": null,
       "tese_themes": [],
-      "setores": [],
+      "setores": [
+        "Multissetorial"
+      ],
       "estagio_alvo": [
         "seed"
       ],
@@ -260,5 +281,5 @@
   ],
   "total_programas": 10,
   "themes_index": {},
-  "last_updated": "2026-06-18"
+  "last_updated": "2026-08-06"
 }

@@ -191,7 +191,7 @@ def _check_idempotency(db: DbClient, key: str | None, session_id: str) -> dict |
     row = db.table("writing_turn_idempotency").select("response_json").eq(
         "idempotency_key", key,
     ).maybe_single().execute()
-    if row.data:
+    if row and row.data:
         return row.data["response_json"]
     return None
 

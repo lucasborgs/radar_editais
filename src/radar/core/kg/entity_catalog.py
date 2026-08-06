@@ -143,9 +143,15 @@ def _theme_tokens(text: str) -> list[str]:
 
 def _theme_match(needle: str, themes: list[str]) -> bool:
     """Vazio casa tudo; senão substring direto OU token bidirecional (≥4 chars).
-    Recall-first: o explore prefere oferecer demais a devolver vazio."""
+    Recall-first: o explore prefere oferecer demais a devolver vazio.
+
+    Entidade exclusivamente 'Multissetorial' casa QUALQUER tema: programas e
+    outras oportunidades setor-agnósticas (fallback do gold quando não há setor
+    curado) alinham com qualquer perfil de empresa."""
     n = (needle or "").strip().lower()
     if not n:
+        return True
+    if themes and all((t or "").strip().lower() in {"multissetorial", "multissetoriais", "transversal"} for t in themes):
         return True
     blob = " ".join(t or "" for t in themes).lower()
     if n in blob:
