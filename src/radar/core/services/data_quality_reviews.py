@@ -421,6 +421,7 @@ def project_loaded_temporal_validity(
     expected_exception_id: str | None = None,
     review: DataQualityReview | None,
     original_provenance: FactProvenance | None = None,
+    continuous_evidence: EvidenceRef | None = None,
     as_of: date | None = None,
 ) -> TemporalValidityProjection:
     """Projeção T04 sobre registros já carregados pelo leitor em lote.
@@ -432,7 +433,12 @@ def project_loaded_temporal_validity(
         raise ValueError("input_fingerprint must be non-empty")
     effective_as_of = as_of or _today_sao_paulo()
     value = deadline.isoformat() if deadline else (status.strip() if status else None)
-    evaluation = evaluate_temporal(deadline=deadline, status=status, as_of=effective_as_of)
+    evaluation = evaluate_temporal(
+        deadline=deadline,
+        status=status,
+        as_of=effective_as_of,
+        continuous_evidence=continuous_evidence,
+    )
     exception_id = exception_row.get("id") if exception_row else None
 
     if exception_row is None:

@@ -101,3 +101,61 @@ def test_open_without_deadline_is_needs_review_without_exception(monkeypatch):
     assert model.temporal_mode is TemporalMode.UNKNOWN
     assert model.validity_state is ValidityState.NEEDS_REVIEW
     assert model.decision_source == "legacy"
+
+
+def test_programa_row_is_continuous_and_active(monkeypatch):
+    """Programa (kind=programa) sem deadline vira ACTIVE(CONTINUOUS) pela
+    evidência contínua do catálogo — desbloqueia o Stage 0 do match."""
+    monkeypatch.setattr(temporal, "load_temporal_exceptions", lambda _: [])
+    monkeypatch.setattr(temporal, "load_current_temporal_reviews", lambda _: {})
+
+    subject = temporal.subjects_from_rows([{
+        "kind": "programa",
+        "native_id": "finep:startup",
+        "name": "Finep Startup",
+        "status": "ativa",
+        "deadline": None,
+        "updated_at": "2026-08-06T10:00:00+00:00",
+    }])[0]
+
+    assert subject.continuous_evidence is not None
+    model = temporal.resolve_temporal_read_models([subject], as_of=date(2026, 8, 6))[subject.subject_id]
+
+    assert model.temporal_mode is TemporalMode.CONTINUOUS
+    assert model.validity_state is ValidityState.ACTIVE
+    assert model.decision_source == "source"
+
+
+def test_programa_closed_is_needs_review(monkeypatch):
+    """Programa com status fechado + evidência contínua conflita → fail closed."""
+    monkeypatch.setattr(temporal, "load_temporal_exceptions", lambda _: [])
+    monkeypatch.setattr(temporal, "load_current_temporal_reviews", lambda _: {})
+
+    subject = temporal.subjects_from_rows([{
+        "kind": "programa",
+        "native_id": "finep:startup",
+        "status": "encerrada",
+        "deadline": None,
+    }])[0]
+
+    model = temporal.resolve_temporal_read_models([subject], as_of=date(2026, 8, 6))[subject.subject_id]
+
+    assert model.validity_state is ValidityState.NEEDS_REVIEW
+
+
+def test_edital_row_keeps_strict_model(monkeypatch):
+    """Edital sem deadline NÃO ganha evidência contínua — continua NEEDS_REVIEW."""
+    monkeypatch.setattr(temporal, "load_temporal_exceptions", lambda _: [])
+    monkeypatch.setattr(temporal, "load_current_temporal_reviews", lambda _: {})
+
+    subject = temporal.subjects_from_rows([{
+        "kind": "edital",
+        "native_id": "finep:774",
+        "status": "aberta",
+        "deadline": None,
+    }])[0]
+
+    assert subject.continuous_evidence is None
+    model = temporal.resolve_temporal_read_models([subject], as_of=date(2026, 8, 6))[subject.subject_id]
+
+    assert model.validity_state is ValidityState.NEEDS_REVIEW
