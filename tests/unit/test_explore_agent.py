@@ -107,10 +107,7 @@ def test_explore_agent_happy_path(monkeypatch):
 
     out, meta = svc._explore_agent("oi", None, None, None, None)
     assert out == "Resposta do agente."
-    assert meta["stop_reason"] == "end_turn"
-    assert meta["truncated"] is False
-    assert meta["called_tools"] == []
-    assert meta["repair_triggered"] is False
+    assert meta == {"stop_reason": "end_turn", "truncated": False, "called_match": False, "called_tools": []}
 
 
 def test_explore_agent_max_steps_marks_truncated(monkeypatch):
@@ -204,33 +201,12 @@ def test_explore_agent_includes_read_tools(monkeypatch):
         captured["max_steps"] = kw["max_steps"]
         return fake_result
 
-    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
     monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", fake_run_agent)
     svc._explore_agent("oi", None, None, None, None)
 
     names = {t.name for t in captured["tools"]}
-    assert names == {"graph_strategy", "graph_explore", "graph_reason", "graph_community"}
+    assert {"list_editais", "explore_opportunity", "list_icts", "get_node_neighborhood"} <= names
     assert captured["max_steps"] >= 10  # EXPLORE_AGENT_MAX_STEPS
-
-
-def test_entity_fact_investidor_inclui_get_investidor(monkeypatch):
-    captured = {}
-    fake_result = AgentResult(
-        final_text="ok", steps=[], stop_reason="end_turn",
-        usage={"input_tokens": 0, "output_tokens": 0},
-    )
-    monkeypatch.setenv("KG_PHASE1_EXPLORE_ENABLED", "true")
-    monkeypatch.setattr(
-        "radar.core.llm.agent_runtime.run_agent",
-        lambda **kwargs: captured.update(kwargs) or fake_result,
-    )
-    ExploreAgent().explore_with_meta(
-        "Em quais verticais a Barn investe?",
-        node_id="investidor:barn-invest",
-        node_type="investidor",
-    )
-    tool_names = {tool.name for tool in captured["tools"]}
-    assert tool_names == {"graph_strategy", "graph_explore", "graph_reason", "graph_community"}
 
 
 def test_explore_agent_error_returns_friendly_message(monkeypatch):
@@ -267,26 +243,8 @@ def test_explore_tools_count_and_names():
     assert set(names) == {
         "list_editais", "get_edital", "explore_opportunity",
         "search_entities", "related_by_tags", "get_node_neighborhood",
-        "list_icts", "list_investidores", "get_investidor",
+        "list_icts",
     }
-
-
-def test_get_investidor_expoe_ficha_completa(monkeypatch):
-    from radar.core.kg import entity_catalog
-
-    monkeypatch.setattr(entity_catalog, "get_investidor", lambda _id: {
-        "id": "investidor:barn-invest", "name": "Barn Invest",
-        "tese": "Greentech para a transição verde na América Latina.",
-        "setores": ["agro", "mobilidade", "indústria limpa", "energia renovável"],
-        "tese_themes": [], "estagio_alvo": ["growth"], "portfolio": [],
-        "ticket_range": {}, "site": "https://barninvest.com.br/en",
-        "verificado_em": "2026-06-09",
-    })
-    tools = {t.name: t for t in build_explore_tools()}
-    out = tools["get_investidor"].invoke({"investidor_id": "investidor:barn-invest"})
-    assert "Greentech" in out
-    assert "agro, mobilidade, indústria limpa, energia renovável" in out
-    assert "Fonte oficial" in out
 
 
 def test_explore_tools_deep_research_gated(monkeypatch):
@@ -294,15 +252,18 @@ def test_explore_tools_deep_research_gated(monkeypatch):
     (explore é endpoint público; o crawl web é vetor de custo)."""
     svc = ExploreAgent()
 
-    monkeypatch.delenv("KG_PHASE1_EXPLORE_ENABLED", raising=False)
-    assert svc._explore_tools() == []
+    monkeypatch.delenv("EXPLORE_DEEP_RESEARCH_ENABLED", raising=False)
+    off = {t.name for t in svc._explore_tools()}
+    assert "deep_research" not in off
+
     monkeypatch.setenv("EXPLORE_DEEP_RESEARCH_ENABLED", "true")
-    assert svc._explore_tools() == []
+    on = {t.name for t in svc._explore_tools()}
+    assert "deep_research" in on
 
 
 def test_explore_opportunity_is_cross_dimensional(monkeypatch):
-    """O panorama cobre as três frentes (eventos + ICTs + investidores) num só
-    retorno — robusto mesmo se alguma dimensão estiver vazia."""
+    """O panorama cobre as frentes ativas (eventos + ICTs + conclusão), robusto
+    mesmo se alguma dimensão estiver vazia."""
     from radar.core.kg import entity_catalog
     monkeypatch.setattr(entity_catalog, "list_editais",
                         lambda **kw: [{
@@ -318,7 +279,7 @@ def test_explore_opportunity_is_cross_dimensional(monkeypatch):
     tools = {t.name: t for t in build_explore_tools()}
     out = tools["explore_opportunity"].invoke({"tema": "agro"})
     assert isinstance(out, str)
-    assert "Editais" in out and "ICTs" in out and "Investidores" in out
+    assert "Editais" in out and "ICTs" in out
     assert "Validade a confirmar" in out
 
 

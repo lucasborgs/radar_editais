@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MatchedEditalCard } from "@/components/frontdoor/MatchedEditalCard";
 import { MatchedEntityCard } from "@/components/frontdoor/MatchedEntityCard";
+import { IctPartnerCard } from "@/components/frontdoor/IctPartnerCard";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getRadarMatches, startWritingSession, type RadarMatchesResponse } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -76,11 +77,17 @@ export default function RadarPage() {
     finally { setLoading(false); }
   }, [profile, ready]);
   useEffect(() => { if (hydrated && ready) void loadRadar(); }, [hydrated, ready, loadRadar]);
-  const hasResults = useMemo(() => Boolean(data && (data.matched_editais.length || data.matched_programas.length || data.matched_investidores.length)), [data]);
-  const setores = useMemo(() => data ? availableSetores(data.matched_editais, data.matched_programas, data.matched_investidores) : [], [data]);
+  const hasResults = useMemo(() => Boolean(data && (data.matched_editais.length || data.matched_programas.length)), [data]);
+  const icts = useMemo(() => data?.matched_icts ?? [], [data]);
+  // Só declaramos ausência quando o backend realmente procurou (autenticado +
+  // projeto definido) — anônimo/sem projeto não vira "nenhuma ICT".
+  const showIctBlock = useMemo(
+    () => Boolean(data && (icts.length > 0 || data.meta.ict_lookup_attempted)),
+    [data, icts],
+  );
+  const setores = useMemo(() => data ? availableSetores(data.matched_editais, data.matched_programas) : [], [data]);
   const visibleEditais = useMemo(() => data ? sortEditais(filterEditais(data.matched_editais, filters), filters.order) : [], [data, filters]);
   const visibleProgramas = useMemo(() => data ? filterEntities(data.matched_programas, filters.setores) : [], [data, filters.setores]);
-  const visibleInvestidores = useMemo(() => data ? filterEntities(data.matched_investidores, filters.setores) : [], [data, filters.setores]);
   const comparedEditais = useMemo(() => data ? data.matched_editais.filter((e) => comparedIds.includes(e.entity_id)) : [], [data, comparedIds]);
   const toggleCompare = useCallback((id: string) => {
     setComparedIds((current) => {
@@ -95,6 +102,19 @@ export default function RadarPage() {
     try { const session = await startWritingSession(id, profile, mode); if (session.session_id) router.push(`/workspace/${session.session_id}`); }
     catch (cause) { toast.error(cause instanceof Error ? cause.message : "Não consegui iniciar agora."); }
   }, [profile, router, user]);
+
+  const ictBlock = (
+    <Trail title="ICTs parceiras" description="Capacidades de P&D que compartilham temas com o seu projeto — parceiros possíveis, não chamadas.">
+      {icts.length > 0 ? (
+        icts.map((partner) => <IctPartnerCard key={partner.id} partner={partner} />)
+      ) : (
+        <div className="rounded-xl border border-border bg-surface p-5 text-sm">
+          <p className="font-medium text-content-primary">Nenhuma ICT com afinidade suficiente no catálogo atual.</p>
+          <p className="mt-1 text-content-secondary">A cobertura do catálogo de ICTs é parcial — não significa ausência no país. Refine o perfil ou valide competências diretamente no ecossistema.</p>
+        </div>
+      )}
+    </Trail>
+  );
 
   let content;
   if (!hydrated || authLoading) {
@@ -124,13 +144,14 @@ export default function RadarPage() {
         {loading && !data && <LoadingCards />}
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"><p>{error}</p><button type="button" onClick={() => void loadRadar()} className="mt-2 font-medium underline">Tentar novamente</button></div>}
         {data && !hasResults && !loading && <div className="rounded-xl border border-border bg-surface p-5 text-sm"><p className="font-medium text-content-primary">Ainda não encontramos oportunidades com afinidade suficiente.</p><p className="mt-1 text-content-secondary">Detalhe atividades, tecnologia, mercado ou projetos no seu perfil para ampliar o sinal.</p><Link href="/" className="mt-3 inline-block text-primary hover:underline">Refinar perfil em Explorar →</Link></div>}
-        {data && hasResults && <><section className="mb-7 rounded-xl border border-border bg-surface p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-sm font-semibold text-content-primary">Filtrar resultados</h2><p className="text-xs text-content-secondary">{visibleEditais.length} editais, {visibleProgramas.length} programas e {visibleInvestidores.length} investidores exibidos.</p></div><button type="button" onClick={() => setFilters(DEFAULT_RADAR_FILTERS)} className="text-xs font-medium text-primary hover:underline">Limpar filtros</button></div><div className="mt-3 flex flex-col gap-3"><div className="flex flex-wrap gap-2"><span className="self-center text-xs text-content-secondary">Trilhas</span>{([{ id: "edital", label: "Editais" }, { id: "programa", label: "Programas" }, { id: "investidor", label: "Capital privado" }] as const).map((trail) => <FilterButton key={trail.id} active={filters.trails.includes(trail.id)} onClick={() => setFilters((current) => ({ ...current, trails: current.trails.includes(trail.id) ? current.trails.filter((item) => item !== trail.id) : [...current.trails, trail.id] }))}>{trail.label}</FilterButton>)}</div><div className="flex flex-wrap gap-2"><span className="self-center text-xs text-content-secondary">Setores</span>{setores.map((setor) => <FilterButton key={setor} active={filters.setores.includes(setor)} onClick={() => setFilters((current) => ({ ...current, setores: current.setores.includes(setor) ? current.setores.filter((item) => item !== setor) : [...current.setores, setor] }))}>{setor}</FilterButton>)}</div><div className="flex flex-wrap gap-2"><span className="self-center text-xs text-content-secondary">Elegibilidade</span>{(["all", "elegivel", "nao_verificada"] as const).map((value) => <FilterButton key={value} active={filters.eligibility === value} onClick={() => setFilters((current) => ({ ...current, eligibility: value }))}>{value === "all" ? "Todos" : value === "elegivel" ? "Elegível" : "Não verificada"}</FilterButton>)}</div><div className="flex flex-wrap gap-2"><span className="self-center text-xs text-content-secondary">Prazo</span>{(["all", "closing", "soon", "continuous"] as const).map((value) => <FilterButton key={value} active={filters.deadline === value} onClick={() => setFilters((current) => ({ ...current, deadline: value }))}>{value === "all" ? "Todos" : value === "closing" ? "Até 7 dias" : value === "soon" ? "Até 30 dias" : "Fluxo contínuo"}</FilterButton>)}</div><div className="flex flex-wrap gap-2"><span className="self-center text-xs text-content-secondary">Ordenar editais</span>{(["affinity", "deadline"] as const).map((value) => <FilterButton key={value} active={filters.order === value} onClick={() => setFilters((current) => ({ ...current, order: value }))}>{value === "affinity" ? "Afinidade" : "Prazo mais próximo"}</FilterButton>)}</div></div></section>
+        {data && !hasResults && !loading && showIctBlock && <div className="mt-6">{ictBlock}</div>}
+        {data && hasResults && <><section className="mb-7 rounded-xl border border-border bg-surface p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-sm font-semibold text-content-primary">Filtrar resultados</h2><p className="text-xs text-content-secondary">{visibleEditais.length} editais e {visibleProgramas.length} programas exibidos.</p></div><button type="button" onClick={() => setFilters(DEFAULT_RADAR_FILTERS)} className="text-xs font-medium text-primary hover:underline">Limpar filtros</button></div><div className="mt-3 flex flex-col gap-3"><div className="flex flex-wrap gap-2"><span className="self-center text-xs text-content-secondary">Trilhas</span>{([{ id: "edital", label: "Editais" }, { id: "programa", label: "Programas" }] as const).map((trail) => <FilterButton key={trail.id} active={filters.trails.includes(trail.id)} onClick={() => setFilters((current) => ({ ...current, trails: current.trails.includes(trail.id) ? current.trails.filter((item) => item !== trail.id) : [...current.trails, trail.id] }))}>{trail.label}</FilterButton>)}</div><div className="flex flex-wrap gap-2"><span className="self-center text-xs text-content-secondary">Setores</span>{setores.map((setor) => <FilterButton key={setor} active={filters.setores.includes(setor)} onClick={() => setFilters((current) => ({ ...current, setores: current.setores.includes(setor) ? current.setores.filter((item) => item !== setor) : [...current.setores, setor] }))}>{setor}</FilterButton>)}</div><div className="flex flex-wrap gap-2"><span className="self-center text-xs text-content-secondary">Elegibilidade</span>{(["all", "elegivel", "nao_verificada"] as const).map((value) => <FilterButton key={value} active={filters.eligibility === value} onClick={() => setFilters((current) => ({ ...current, eligibility: value }))}>{value === "all" ? "Todos" : value === "elegivel" ? "Elegível" : "Não verificada"}</FilterButton>)}</div><div className="flex flex-wrap gap-2"><span className="self-center text-xs text-content-secondary">Prazo</span>{(["all", "closing", "soon", "continuous"] as const).map((value) => <FilterButton key={value} active={filters.deadline === value} onClick={() => setFilters((current) => ({ ...current, deadline: value }))}>{value === "all" ? "Todos" : value === "closing" ? "Até 7 dias" : value === "soon" ? "Até 30 dias" : "Fluxo contínuo"}</FilterButton>)}</div><div className="flex flex-wrap gap-2"><span className="self-center text-xs text-content-secondary">Ordenar editais</span>{(["affinity", "deadline"] as const).map((value) => <FilterButton key={value} active={filters.order === value} onClick={() => setFilters((current) => ({ ...current, order: value }))}>{value === "affinity" ? "Afinidade" : "Prazo mais próximo"}</FilterButton>)}</div></div></section>
           <div className="flex flex-col gap-9">
             {filters.trails.includes("edital") && visibleEditais.length > 0 && <Trail title="Editais" description="Chamadas com prazo e escopo compatíveis.">{visibleEditais.slice(0, 20).map((edital) => <MatchedEditalCard key={edital.entity_id} edital={edital} onCompare={() => toggleCompare(edital.entity_id)} isCompared={comparedIds.includes(edital.entity_id)} onStartWriting={(source, id) => void startWriting(`${source}:${id}`)} />)}</Trail>}
             {filters.trails.includes("programa") && visibleProgramas.length > 0 && <Trail title="Programas" description="Linhas de fomento contínuas ou recorrentes">{visibleProgramas.slice(0, 10).map((programa) => <MatchedEntityCard key={programa.entity_id} entity={programa} onStartWriting={(id, mode) => void startWriting(id, mode)} />)}</Trail>}
-            {filters.trails.includes("investidor") && visibleInvestidores.length > 0 && <Trail title="Capital privado" description="Investidores com tese alinhada ao seu perfil">{visibleInvestidores.slice(0, 10).map((investidor) => <MatchedEntityCard key={investidor.entity_id} entity={investidor} onStartWriting={(id, mode) => void startWriting(id, mode)} />)}</Trail>}
-            {(!filters.trails.includes("edital") || visibleEditais.length === 0) && (!filters.trails.includes("programa") || visibleProgramas.length === 0) && (!filters.trails.includes("investidor") || visibleInvestidores.length === 0) && <div className="rounded-xl border border-border bg-surface p-5 text-sm"><p className="font-medium text-content-primary">Nenhum resultado corresponde aos filtros atuais.</p><button type="button" onClick={() => setFilters(DEFAULT_RADAR_FILTERS)} className="mt-2 text-primary hover:underline">Limpar filtros</button></div>}
+            {(!filters.trails.includes("edital") || visibleEditais.length === 0) && (!filters.trails.includes("programa") || visibleProgramas.length === 0) && <div className="rounded-xl border border-border bg-surface p-5 text-sm"><p className="font-medium text-content-primary">Nenhum resultado corresponde aos filtros atuais.</p><button type="button" onClick={() => setFilters(DEFAULT_RADAR_FILTERS)} className="mt-2 text-primary hover:underline">Limpar filtros</button></div>}
           </div>
+          {showIctBlock && ictBlock}
           <ComparisonPanel editais={comparedEditais} onRemove={toggleCompare} onStartWriting={(edital) => void startWriting(`${edital.source}:${edital.edital_id}`)} />
         </>}
       </div>

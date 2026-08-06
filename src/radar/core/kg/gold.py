@@ -991,70 +991,121 @@ def _ingest_programas(conn, agency_cache: dict, stats: dict) -> None:
     logger.info("programas: %d ok", stats["programa"])
 
 
+#: Fontes de atores ICT lidas por `_ingest_icts` (bronze curado em
+#: `ict_raw/`). `(glob_pat, source, producer_name)`. Fora do SCRAPER_REGISTRY
+#: (não são editais). PNIPE: labs catalogados como capacidades — sem aresta
+#: `credenciada_por` (não há credenciamento EMBRAPII) e `verificado_em` =
+#: `data_extracao` do registro.
+_ICT_SOURCES: tuple[tuple[str, str, str], ...] = (
+    ("embrapii_*.json", "embrapii", "embrapii_scraper"),
+    ("pnipe_*.json", "pnipe", "pnipe_lab_index"),
+)
+
+
+def _ict_description(record: dict, *, source: str) -> str:
+    """Descrição usada no `description`/embedding. Para PNIPE compõe `about`
+    com competências e equipamentos (capacidade fina declarada), para que a
+    busca semântica por competência/projeto encontre o laboratório."""
+    parts = [_ws(record.get("about") or "")]
+    if source == "pnipe":
+        for key in ("competencias", "equipamentos"):
+            vals = record.get(key) or []
+            if isinstance(vals, list):
+                parts.append("; ".join(_ws(str(v)) for v in vals if _ws(str(v))))
+    return _ws(" ".join(p for p in parts if p))
+
+
+def _pnipe_capacity_metadata(record: dict) -> dict:
+    """Metadados de CAPACIDADE do laboratório PNIPE (spec
+    ict-pnipe-capabilities.md §3). `verificado_em` é a data de verificação
+    (`data_extracao`) — a mesma usada no source bundle."""
+    return {
+        "institution": record.get("institution"),
+        "municipio": record.get("municipio"),
+        "competencias": list(record.get("competencias") or []),
+        "equipamentos": list(record.get("equipamentos") or []),
+        "condicoes_acesso": record.get("condicoes_acesso"),
+        "pnipe_kind": record.get("kind"),
+        "verificado_em": record.get("data_extracao"),
+    }
+
+
 def _ingest_icts(conn, agency_cache: dict, stats: dict) -> None:
     from radar.core.kg import provenance_writer
     from radar.core.retrieval.embedder import embed_query
 
-    files = sorted((BRONZE_DIR / "ict_raw").glob("embrapii_*.json"))
-    document = files[-1].name if files else None
-    recs = json.loads(files[-1].read_text(encoding="utf-8")) if files else []
-    for r in recs:
-        try:
-            subject_id = f"ict:embrapii:{r.get('slug') or schema.slugify(r.get('name') or '')}"
-            bundle = _persist_actor_source_bundle_best_effort(
-                subject_kind="ict",
-                subject_id=subject_id,
-                source="embrapii",
-                collected_at_raw=r.get("data_extracao"),
-                document_name=document or "embrapii.json",
-                document_role="official_record",
-                source_url=r.get("url"),
-                record=r,
-            )
-            bundle_document = bundle.documents[0] if bundle is not None else None
-            slug = r.get("slug") or schema.slugify(r.get("name") or "")
-            native_id = f"embrapii:{slug}"
-            desc = _ws(r.get("about") or "")
-            areas = list(r.get("areas_raw") or [])
-            uf = _uf_from_address(r.get("address"))
-            # RT01-T07 (spec §6.4): âncora `document_only` do registro
-            # versionado do scraper — reusada em `name`/`metadata.url`/`uf`/
-            # tags e na aresta `credenciada_por`, sem recomputar o hash.
-            anchor = provenance_writer.build_ict_record_anchor(
-                record=r,
-                document=document,
-                source_url=r.get("url"),
-                native_id=native_id,
-                bundle=bundle,
-                bundle_document=bundle_document,
-            )
-            provenance = provenance_writer.build_ict_fact_provenance(record=r, anchor=anchor, uf=uf)
-            with conn.transaction(), conn.cursor() as cur:
-                eid = _upsert_entity(
-                    cur, kind="ict", source="embrapii", native_id=native_id,
-                    name=r.get("name") or slug, description=desc[:_DESC_CHARS],
-                    setores=normalize_setores(areas),
-                    tecnologias_tags=normalize_tags(areas),
-                    uf=uf, curated=True,
-                    metadata={
-                        "institution_type": r.get("institution_type"), "contact": r.get("contact") or {},
-                        "url": r.get("url"), "address": r.get("address"), "embrapii_kind": r.get("kind"),
-                    },
-                    embedding=embed_query(desc or r.get("name") or slug),
-                    provenance=provenance,
+    for glob_pat, source, producer_name in _ICT_SOURCES:
+        files = sorted((BRONZE_DIR / "ict_raw").glob(glob_pat))
+        document = files[-1].name if files else None
+        recs = json.loads(files[-1].read_text(encoding="utf-8")) if files else []
+        for r in recs:
+            try:
+                slug = r.get("slug") or schema.slugify(r.get("name") or "")
+                subject_id = f"ict:{source}:{slug}"
+                native_id = f"{source}:{slug}"
+                bundle = _persist_actor_source_bundle_best_effort(
+                    subject_kind="ict",
+                    subject_id=subject_id,
+                    source=source,
+                    collected_at_raw=r.get("data_extracao"),
+                    document_name=document or f"{source}.json",
+                    document_role="official_record",
+                    source_url=r.get("url"),
+                    record=r,
                 )
-                aid = _get_agency(cur, agency_cache, "EMBRAPII")
-                if aid:
-                    edge_provenance = provenance_writer.build_ict_credenciada_por_provenance(anchor)
-                    _upsert_rel(
-                        cur, eid, aid, "credenciada_por",
-                        provenance=edge_provenance.model_dump(mode="json"),
+                bundle_document = bundle.documents[0] if bundle is not None else None
+                desc = _ict_description(r, source=source)
+                areas = list(r.get("areas_raw") or [])
+                uf = _uf_from_address(r.get("address"))
+                # RT01-T07 (spec §6.4): âncora `document_only` do registro
+                # versionado do scraper — reusada em `name`/`metadata.url`/
+                # `uf`/tags, na aresta `credenciada_por` (EMBRAPII) e nos
+                # paths de capacidade (PNIPE), sem recomputar o hash.
+                anchor = provenance_writer.build_ict_record_anchor(
+                    record=r,
+                    document=document,
+                    source_url=r.get("url"),
+                    native_id=native_id,
+                    source=source,
+                    bundle=bundle,
+                    bundle_document=bundle_document,
+                )
+                provenance = provenance_writer.build_ict_fact_provenance(
+                    record=r, anchor=anchor, uf=uf, source=source,
+                    producer_name=producer_name,
+                )
+                metadata: dict = {
+                    "institution_type": r.get("institution_type"), "contact": r.get("contact") or {},
+                    "url": r.get("url"), "address": r.get("address"),
+                    "embrapii_kind": r.get("kind") if source == "embrapii" else None,
+                }
+                verificado = _parse_date(r.get("data_extracao")) if source == "pnipe" else None
+                if source == "pnipe":
+                    metadata.update(_pnipe_capacity_metadata(r))
+                with conn.transaction(), conn.cursor() as cur:
+                    eid = _upsert_entity(
+                        cur, kind="ict", source=source, native_id=native_id,
+                        name=r.get("name") or slug, description=desc[:_DESC_CHARS],
+                        setores=normalize_setores(areas),
+                        tecnologias_tags=normalize_tags(areas),
+                        uf=uf, curated=True, verificado_em=verificado,
+                        metadata=metadata,
+                        embedding=embed_query(desc or r.get("name") or slug),
+                        provenance=provenance,
                     )
-                    stats["credenciada_por"] += 1
-            stats["ict"] += 1
-        except Exception as e:  # noqa: BLE001
-            logger.warning("ict %s falhou: %s", r.get("slug"), e)
-            stats["errors"] += 1
+                    if source == "embrapii":
+                        aid = _get_agency(cur, agency_cache, "EMBRAPII")
+                        if aid:
+                            edge_provenance = provenance_writer.build_ict_credenciada_por_provenance(anchor)
+                            _upsert_rel(
+                                cur, eid, aid, "credenciada_por",
+                                provenance=edge_provenance.model_dump(mode="json"),
+                            )
+                            stats["credenciada_por"] += 1
+                stats["ict"] += 1
+            except Exception as e:  # noqa: BLE001
+                logger.warning("ict %s falhou: %s", r.get("slug"), e)
+                stats["errors"] += 1
     logger.info("icts: %d ok", stats["ict"])
 
 

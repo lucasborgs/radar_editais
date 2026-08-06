@@ -339,7 +339,6 @@ export default function OportunidadeDetailPage() {
         <TagCard title="Programas" tags={detail.programs} />
         <TagCard title="Público-alvo" tags={detail.eligible_entities.length ? detail.eligible_entities : detail.publico_alvo} />
         <TagCard title="ICTs relacionadas" tags={detail.icts} />
-        <TagCard title="Investidores" tags={detail.investidores} />
       </div>
 
       {/* Requisitos */}

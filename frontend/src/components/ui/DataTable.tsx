@@ -19,6 +19,8 @@ interface DataTableProps<T extends { id: string }> {
   onRowClick?: (row: T) => void;
   loading?: boolean;
   emptyMessage?: string;
+  /** Exibido no lugar do empty-state quando o carregamento da lista falhou. */
+  errorMessage?: string;
   className?: string;
 }
 
@@ -40,6 +42,7 @@ export function DataTable<T extends { id: string }>({
   onRowClick,
   loading = false,
   emptyMessage = "Nenhum dado encontrado.",
+  errorMessage,
   className,
 }: DataTableProps<T>) {
   function getCellValue(row: T, key: keyof T | string): unknown {
@@ -82,9 +85,14 @@ export function DataTable<T extends { id: string }>({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-12 text-center text-content-secondary font-sans text-sm"
+                  className={cn(
+                    "px-4 py-12 text-center font-sans text-sm",
+                    errorMessage
+                      ? "text-red-600"
+                      : "text-content-secondary"
+                  )}
                 >
-                  {emptyMessage}
+                  {errorMessage || emptyMessage}
                 </td>
               </tr>
             ) : (

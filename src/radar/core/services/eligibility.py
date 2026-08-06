@@ -169,17 +169,12 @@ def _reason(tipo: str, op: str, valor: Any) -> str:
     if op == "in":
         return f"A empresa precisa informar {label} para verificar este requisito."
     if op == "not_in":
-        return f"A empresa não atende ao requisito de {label}."
+        return f"O {label} informado não atende ao requisito do edital."
     if op == "lte":
         return f"O {label} precisa estar dentro do limite do edital."
     if op == "gte":
         return f"O {label} precisa atingir o mínimo do edital."
     return "Complete o perfil para verificar este requisito."
-
-
-def _unique_reasons(reasons: list[str]) -> list[str]:
-    """Remove motivos repetidos sem mudar a ordem dos constraints."""
-    return list(dict.fromkeys(reasons))
 
 
 def evaluate_constraint(constraint: dict, profile: Any) -> tuple[str, str]:
@@ -255,7 +250,7 @@ def evaluate_opportunity(constraints: list[dict] | None, profile: Any) -> dict:
         status = NAO_VERIFICADA
     else:
         status = ELEGIVEL
-    return {"status": status, "unsat": _unique_reasons(unsat), "unknown": _unique_reasons(unknown)}
+    return {"status": status, "unsat": unsat, "unknown": unknown}
 
 
 # ── Regras curadas (KG v2 resíduos PR-E.2, R4) ───────────────────────────────

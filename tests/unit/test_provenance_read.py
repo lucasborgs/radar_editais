@@ -3,10 +3,9 @@
 Cobre:
   - public_provenance: stated+exact, unresolved, inferred, vazio, None,
     malformado, campos operacionais ausentes do output;
-  - entity_catalog: _row_to_card, _curated_card, get_investidor,
-    get_programa com provenance no row;
-  - explore_tools: get_edital e get_investidor incluem dict público
-    no payload textual.
+  - entity_catalog: _row_to_card, _curated_card, get_programa com provenance
+    no row; get_investidor desativado (retorna None);
+  - explore_tools: get_edital inclui dict público no payload textual.
 """
 from __future__ import annotations
 
@@ -333,10 +332,12 @@ def test_curated_card_legado_sem_provenance() -> None:
 
 
 # ===========================================================================
-# entity_catalog — get_investidor com provenance
+# entity_catalog — get_investidor DESATIVADO (não expõe ficha de fundo)
 # ===========================================================================
 
-def test_get_investidor_com_provenance() -> None:
+def test_get_investidor_desativado_devolve_none() -> None:
+    """Spec product-scope-catalog-deactivation.md: fundos privados ficam fora
+    das superfícies ativas; get_investidor não devolve ficha nem provenance."""
     import radar.core.kg.entity_catalog as ec
 
     def _fake_fetch(client, kind: str, native_id: str) -> dict | None:
@@ -346,74 +347,16 @@ def test_get_investidor_com_provenance() -> None:
             "name": "Barn Invest",
             "description": "Greentech",
             "setores": ["agro"],
-            "tecnologias_tags": [],
-            "ticket_min": None,
-            "ticket_max": None,
-            "updated_at": "2026-07-21T00:00:00",
-            "metadata": {
-                "tese_themes": [],
-                "verticais": ["agro", "energia"],
-                "estagio_alvo": ["growth"],
-                "portfolio": [],
-                "co_investidores": [],
-                "site": "https://barn.com",
-                "source_urls": [],
-                "verificado_em": None,
-            },
-            "provenance": {
-                "setores": {
-                    "state": "stated",
-                    "evidence_refs": [{
-                        "schema_version": 1,
-                        "source": "finep",
-                        "document": "site.pdf",
-                        "page": 2,
-                        "quote": "agro e energia",
-                        "canonical_content_hash": "sha256:abc",
-                        "locator_quality": "exact",
-                    }],
-                },
-            },
+            "metadata": {"tese_themes": [], "site": "https://barn.com"},
+            "provenance": {"setores": {"state": "stated", "evidence_refs": []}},
         }
 
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(ec, "_fetch_one", _fake_fetch)
     monkeypatch.setattr(ec, "_client", lambda: None)
     try:
-        card = ec.get_investidor("investidor:barn-invest")
-        assert card is not None
-        assert "provenance" in card
-        assert card["provenance"]["setores"]["state"] == "stated"
-        assert len(card["provenance"]["setores"]["citations"]) == 1
-    finally:
-        monkeypatch.undo()
-
-
-def test_get_investidor_legado_sem_provenance() -> None:
-    import radar.core.kg.entity_catalog as ec
-
-    def _fake_fetch(client, kind: str, native_id: str) -> dict | None:
-        return {
-            "id": "uuid-i2",
-            "native_id": "investidor:legado",
-            "name": "Legado Fund",
-            "description": "",
-            "setores": [],
-            "tecnologias_tags": [],
-            "ticket_min": None,
-            "ticket_max": None,
-            "updated_at": "",
-            "metadata": {},
-        }
-
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(ec, "_fetch_one", _fake_fetch)
-    monkeypatch.setattr(ec, "_client", lambda: None)
-    try:
-        card = ec.get_investidor("investidor:legado")
-        assert card is not None
-        assert "provenance" in card
-        assert card["provenance"] == {}
+        assert ec.get_investidor("investidor:barn-invest") is None
+        assert ec.get_investidor("investidor:legado") is None
     finally:
         monkeypatch.undo()
 
@@ -515,44 +458,5 @@ def test_get_edital_tool_inclui_provenance() -> None:
         assert "state=stated" in out
         assert "Edital.pdf" in out
         assert "prazo: 31/12/2026" in out
-    finally:
-        monkeypatch.undo()
-
-
-def test_get_investidor_tool_inclui_provenance() -> None:
-    from radar.core.kg import entity_catalog
-    from radar.core.llm.agent_tools.explore_tools import build_explore_tools
-
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(entity_catalog, "get_investidor", lambda _id: {
-        "id": "investidor:barn-invest",
-        "name": "Barn Invest",
-        "tese": "Greentech",
-        "setores": ["agro", "energia"],
-        "tese_themes": [],
-        "estagio_alvo": ["growth"],
-        "portfolio": [],
-        "ticket_range": {},
-        "site": "https://barn.com",
-        "verificado_em": None,
-        "provenance": {
-            "setores": {
-                "state": "stated",
-                "citations": [{
-                    "document": "site.pdf",
-                    "page": 2,
-                    "quote": "agro e energia",
-                    "source_url": "https://barn.com",
-                    "collected_at": "2026-07-21T12:00:00Z",
-                }],
-            },
-        },
-    })
-    try:
-        tools = {t.name: t for t in build_explore_tools()}
-        out = tools["get_investidor"].invoke({"investidor_id": "investidor:barn-invest"})
-        assert isinstance(out, str)
-        assert "[PROVENANCE:setores]" in out
-        assert "state=stated" in out
     finally:
         monkeypatch.undo()

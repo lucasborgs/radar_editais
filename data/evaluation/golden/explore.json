@@ -31,61 +31,6 @@
         "conditional": ["requisitos da equipe técnica aplicam-se quando houver equipe"]
       },
       "evidence": ["Seção 4", "itens 4.2 a 4.5"]
-    },
-    {
-      "id": "barn-verticais",
-      "incident": "barn",
-      "query": "Em quais verticais a Barn Invest realiza investimentos?",
-      "target": {"type": "investidor", "id": "investidor:barn-invest"},
-      "expected_route": "ENTITY_FACT",
-      "reference_answer": "Agri & Land Use; Transport & Mobility; Clean Industry & Circular Economy; Renewable Energy & Energy Efficiency.",
-      "adaptation_notes": [],
-      "assertions": {
-        "required": ["agro e uso da terra", "transporte e mobilidade", "indústria limpa e economia circular", "energia renovável e eficiência energética"],
-        "forbidden": ["redirect para escrita", "vertical inventada"],
-        "conditional": ["subtemas somente com fonte ou catálogo que os preserve"]
-      },
-      "evidence": ["https://barninvest.com.br/en", "investidor:barn-invest"]
-    },
-    {
-      "id": "barn-tese",
-      "incident": "barn",
-      "query": "Qual a tese de investimentos da Barn?",
-      "target": {"type": "investidor", "id": "investidor:barn-invest"},
-      "expected_route": "ENTITY_FACT",
-      "reference_answer": "A Barn investe em greentechs para impulsionar a transição verde na América Latina, nas quatro verticais estratégicas.",
-      "adaptation_notes": [],
-      "assertions": {
-        "required": ["greentech", "transição verde", "América Latina", "quatro verticais"],
-        "forbidden": ["redirect para escrita", "regulação pela CVM como vertical"],
-        "conditional": ["parceria de longo prazo e regulação podem aparecer apenas como contexto"]
-      },
-      "evidence": ["https://barninvest.com.br/en", "investidor:barn-invest"]
-    },
-    {
-      "id": "iforestal-profile-strategy",
-      "incident": "profile-first",
-      "query": "Considerando meu perfil, quais oportunidades, ICTs, agências, programas e investidores estão conectados e que caminho de atuação você recomenda? Diferencie fatos confirmados de relações derivadas.",
-      "profile": {
-        "nome": "iFlorestal",
-        "tipo_entidade": "empresa",
-        "uf": "SC",
-        "trl": 5,
-        "estagio": "seed",
-        "tipos_financiamento_interesse": ["subvencao_nao_reembolsavel", "capital_risco"],
-        "solution_summary": "Monitoramento e restauração florestal com inteligência artificial.",
-        "one_liner": "Soluções para o setor agro com inteligência artificial aplicada à floresta.",
-        "descricao_atividades": "Desenvolvimento de tecnologia para manejo sustentável e recuperação de áreas."
-      },
-      "target": {"type": "profile", "id": "profile"},
-      "expected_route": "PROFILE_STRATEGY",
-      "reference_answer": "Uma única consulta deve cobrir oportunidades, programas, agências, ICTs e investidores, separando atributos catalogados, fatos estruturais, relações derivadas e lacunas do snapshot.",
-      "assertions": {
-        "required": ["oportunidades", "programas", "agências", "ICTs", "investidores", "fatos", "relações derivadas"],
-        "forbidden": ["não existem no mercado", "UFSC", "INCT", "IPMet", "Embrapa", "INPE", "BNDES", "ANP", "CNPq", "aceleradora 2025"],
-        "conditional": ["ausência deve ser limitada ao recorte do grafo"]
-      },
-      "evidence": ["perfil autenticado do produto", "snapshot KG-P1C"]
     }
   ]
 }

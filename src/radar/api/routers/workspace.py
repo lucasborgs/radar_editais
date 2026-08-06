@@ -1,8 +1,11 @@
-"""Workspace multi-modo — dispatcher /explorer /escrita + ações one-shot.
+"""Workspace — ações one-shot (/profile, /review).
+
+A Workspace não é mais multi-modo: mensagens normais de chat vão direto ao
+fluxo de escrita (`/writing/turn/stream`). Este endpoint existe apenas para as
+ações one-shot disparadas pelo chat (`/profile`, `/review`).
 
 Endpoints:
-  POST /workspace/{session_id}/mode → troca modo e envia mensagem
-  GET  /workspace/{session_id}/mode → modo atual
+  POST /workspace/{session_id}/mode → executa uma ação one-shot
 """
 from __future__ import annotations
 
@@ -15,12 +18,7 @@ from radar.api.common import profile_from_workspace
 from radar.api.rate_limit import limiter
 from radar.core.infra.auth import CurrentUserId, DbClient
 from radar.core.services.content_library import get_workspace_id, list_items
-from radar.core.services.workspace_service import (
-    VALID_ACTIONS,
-    VALID_MODES,
-    dispatch,
-    mode_welcome,
-)
+from radar.core.services.workspace_service import VALID_ACTIONS, dispatch
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +39,7 @@ class ModeSwitchResponse(BaseModel):
 
 @router.post(
     "/workspace/{session_id}/mode",
-    summary="Troca modo e/ou envia mensagem ao workspace",
+    summary="Executa uma ação one-shot do workspace (/profile, /review)",
 )
 @limiter.limit("20/minute")
 def workspace_mode(
@@ -51,21 +49,17 @@ def workspace_mode(
     user_id: CurrentUserId,
     db: DbClient,
 ) -> ModeSwitchResponse:
-    """Dispatcher: roteia a mensagem ao agente do modo solicitado.
-
-    Se o modo for diferente do atual, o histórico é filtrado para o novo
-    modo e o response inclui uma mensagem de boas-vindas.
-    """
-    if req.mode not in VALID_MODES and req.mode not in VALID_ACTIONS:
+    """Dispatcher de ações one-shot (/profile, /review) da Workspace."""
+    if req.mode not in VALID_ACTIONS:
         raise HTTPException(
             status_code=422,
-            detail=f"Modo inválido: '{req.mode}'. Use: {', '.join(sorted(VALID_MODES))} ou {', '.join(sorted(VALID_ACTIONS))}",
+            detail=f"Ação inválida: '{req.mode}'. Use: {', '.join(sorted(VALID_ACTIONS))}",
         )
 
     workspace_id = get_workspace_id(db, user_id)
     profile = profile_from_workspace(db, workspace_id)
 
-    # Carrega itens da biblioteca para contextualizar o explorer mode
+    # Anexos da biblioteca para contextualizar a ação.
     library_items = list_items(db, workspace_id, include_archived=False)
 
     result = dispatch(
@@ -81,15 +75,9 @@ def workspace_mode(
     if result.get("error"):
         raise HTTPException(status_code=502, detail=result["error"])
 
-    # Se a mensagem estiver vazia (apenas troca de modo), inclui welcome
-    # Ações one-shot nunca disparam welcome.
-    welcome = None
-    if not req.message.strip() and req.mode not in VALID_ACTIONS:
-        welcome = mode_welcome(req.mode)
-
     return ModeSwitchResponse(
         mode=result["mode"],
         response=result["response"],
-        welcome=welcome,
+        welcome=None,
         error=None,
     )

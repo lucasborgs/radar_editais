@@ -7,6 +7,7 @@ import type { MatchedEdital, MatchedExcerpt } from "@/lib/api";
 import { deadlineUrgency, urgencyLabel, type DeadlineUrgency } from "@/lib/radar-utils";
 import { temporalBadge, temporalDeadlineText } from "@/lib/opportunity-temporal";
 import { VerdictBlock } from "./VerdictBlock";
+import { PathBlock } from "./PathBlock";
 
 function ScoreRing({ score }: { score: number }) {
   const color = score >= 0.7 ? "#1DB954" : score >= 0.55 ? "#f59e0b" : "#f97316";
@@ -147,6 +148,8 @@ export function MatchedEditalCard({
           Resultado exploratório: ainda não há evidência textual real para explicar este match.
         </p>
       )}
+
+      <PathBlock path={edital.caminho} explanation={edital.explicacao} />
 
       <div className="mt-2 flex gap-2">
         {onCompare && (

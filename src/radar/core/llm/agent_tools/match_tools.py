@@ -42,11 +42,11 @@ def _format_matches(matches: list, *, brief: bool = False) -> str:
 
 def _format_entity_matches(matches: list[dict], *, brief: bool = False) -> str:
     if not matches:
-        return "Nenhum investidor/programa com afinidade suficiente ao perfil."
+        return "Nenhum programa com afinidade suficiente ao perfil."
     if brief:
         names = "; ".join(f"[{m['kind']}] {m['name'][:50]}" for m in matches)
         return f"{len(matches)} entidades com afinidade ao perfil: {names}.{_BRIEF_HINT}"
-    lines = [f"{len(matches)} entidades (investidor/programa) com afinidade ao perfil:"]
+    lines = [f"{len(matches)} entidades (programa) com afinidade ao perfil:"]
     for m in matches:
         desc = f" — {m['description'][:80]}" if m.get("description") else ""
         lines.append(f"\n• [{m['kind']}] {m['name'][:70]}{desc}")
@@ -54,7 +54,7 @@ def _format_entity_matches(matches: list[dict], *, brief: bool = False) -> str:
             lines.append(
                 f"    porquê: «{x['company_text'][:90]}» ↔ «{x['edital_text'][:90]}» ({x['score']:.2f})"
             )
-    lines.append("\n(Afinidade temática — parceria/capital em potencial, não elegibilidade dura.)")
+    lines.append("\n(Afinidade temática — parceria em potencial, não elegibilidade dura.)")
     return "\n".join(lines)
 
 
@@ -107,38 +107,25 @@ def build_match_tools(
 
     @tool
     def find_matching_entities(kind: str = "", top_k: int = 8) -> str:
-        """[MATCH COM PERFIL] Encontra investidores e programas que COMBINAM COM O PERFIL DA EMPRESA.
+        """[MATCH COM PERFIL] Encontra programas que COMBINAM COM O PERFIL DA EMPRESA.
 
-        USE SOMENTE quando o usuário TEM perfil preenchido e pergunta "que fundos
-        combinam conosco?", "o que serve para minha empresa?". Retorna entidades
-        ranqueadas por afinidade com o perfil. NÃO USE para listar catálogo —
-        use list_investidores ou list_editais para isso.
+        USE SOMENTE quando o usuário TEM perfil preenchido e pergunta "o que serve
+        para minha empresa?". Retorna programas ranqueados por afinidade com o
+        perfil. NÃO USE para listar catálogo — use list_editais para isso.
+        Investidores estão fora do escopo e nunca são retornados.
 
         Args:
-            kind: filtra o tipo — "investidor" (fundos), "programa" ou "" (ambos).
+            kind: filtra o tipo — "programa" ou "" (programas).
             top_k: máximo de entidades a retornar (default 8).
         """
-        kind_map = {
-            "investidor": "investidor", "investidores": "investidor", "investor": "investidor",
-            "fundo": "investidor", "fundos": "investidor",
-            "programa": "programa", "programas": "programa",
-        }
-        k = kind_map.get((kind or "").strip().lower(), "")
         out: list[dict] = []
         try:
-            if k in ("", "programa"):
-                out += [
-                    m.to_dict() for m in match_v3.find_matching_opportunities(
-                        profile, workspace_id=workspace_id, db=db,
-                        kinds=frozenset({"programa"}), top_k=int(top_k),
-                    )
-                ]
-            if k in ("", "investidor"):
-                out += [
-                    m.to_dict() for m in match_v3.find_matching_investors(
-                        profile, workspace_id=workspace_id, db=db, top_k=int(top_k),
-                    )
-                ]
+            out += [
+                m.to_dict() for m in match_v3.find_matching_opportunities(
+                    profile, workspace_id=workspace_id, db=db,
+                    kinds=frozenset({"programa"}), top_k=int(top_k),
+                )
+            ]
         except Exception as e:  # noqa: BLE001
             return f"Erro no match de entidades: {e}."
         out.sort(key=lambda m: m.get("affinity", 0), reverse=True)

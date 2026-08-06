@@ -531,6 +531,11 @@ class WritingSession:
         # de _critic_annotations acima — evita migration).
         self._style_edit_log: list[dict] = []
 
+        # Plano estruturado (F4) — carregado por _load_from_db a partir de
+        # __plan__ no section_drafts; vira __plan__ de novo em _drafts_with_plan.
+        self._plan: dict | None = None
+        self._plan_pending_confirmation: bool = False
+
         if session_id:
             # Retomar sessão existente — carrega tudo do Postgres.
             self.session_id = session_id
@@ -876,13 +881,25 @@ class WritingSession:
             ]
         return merged
 
+    def _drafts_with_plan(self) -> dict:
+        """`section_drafts` pronto para persistir, SEMPRE preservando o plano.
+
+        `_load_from_db` retira `__plan__` de `_doc_sections` (vira `self._plan`),
+        então qualquer regravação bruta de `_doc_sections` apagaria o plano do
+        banco (bug: editar uma seção fazia a página Plano perder o plano).
+        """
+        drafts = dict(self._doc_sections or {})
+        plan = getattr(self, "_plan", None)
+        if plan:
+            drafts["__plan__"] = plan
+        return drafts
+
     def _save_plan(self) -> None:
         """Persiste o plano no JSONB section_drafts sob chave __plan__."""
         if not self._plan:
             return
         try:
-            drafts = dict(self._doc_sections or {})
-            drafts["__plan__"] = self._plan
+            drafts = self._drafts_with_plan()
             self._db.table("writing_sessions").update({
                 "section_drafts": drafts,
             }).eq("id", self.session_id).execute()
@@ -1880,7 +1897,7 @@ class WritingSession:
 
         # Persiste anotações do critic no section_drafts (JSONB, chave _critic_annotations).
         try:
-            drafts = dict(self._doc_sections)
+            drafts = self._drafts_with_plan()
             drafts["_critic_annotations"] = self._generation_critic_annotations
             if self._style_edit_log:
                 drafts["_style_edit_log"] = self._style_edit_log
@@ -2567,7 +2584,7 @@ class WritingSession:
             # Preserva anotações do critic que vivem em _doc_sections só durante
             # geração — a persistência delas é feita explicitamente em
             # generate_full_proposal via chave _critic_annotations no JSONB.
-            drafts = dict(self._doc_sections)
+            drafts = self._drafts_with_plan()
             if citations:
                 section_key = f"_citations_{section_title}"
                 drafts[section_key] = citations

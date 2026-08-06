@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from radar.api.common import CompanyProfileSchema
 from radar.api.rate_limit import get_client_ip, limiter
 from radar.core.infra.auth import OptionalDbClient, OptionalUserId
-from radar.core.services import match_v3, match_verdict
+from radar.core.services import domain_paths, match_v3, match_verdict
 from radar.core.services.content_library import get_workspace_id
 
 logger = logging.getLogger(__name__)
@@ -99,19 +99,22 @@ def radar_matches(
     )
     editais = [item.to_dict() for item in opps if item.kind == "edital"]
     programas = [item.to_dict() for item in opps if item.kind == "programa"]
-    investidores = [
-        item.to_dict()
-        for item in match_v3.find_matching_investors(
-            profile,
-            workspace_id=workspace_id,
-            db=db if workspace_id else None,
-            top_k=5,
-            prepared_company=prepared_company,
-        )
-    ]
+    # Investidores desativados das superfícies ativas (spec
+    # product-scope-catalog-deactivation.md) — o Radar não devolve nem recomenda
+    # fundos. A chave permanece como lista vazia por contrato com o frontend.
+    investidores: list[dict] = []
+
+    # ICTs/laboratórios como CAPACIDADES/PARCEIROS (spec
+    # product-pathways-domain-matching.md): não são "oportunidade" nem entram no
+    # ranking de afinidade. Exigem projeto definido e o caminho autenticado
+    # (workspace) — para o radar público anônimo a chave é lista vazia.
+    # `ict_lookup_attempted` distingue "não procurou" (anônimo/sem projeto) de
+    # "procurou e não achou" — a UI só declara ausência no segundo caso.
+    matched_icts = match_v3.find_ict_partners(profile) if workspace_id else []
+    ict_lookup_attempted = workspace_id is not None and domain_paths.has_project(profile)
 
     if workspace_id and db:
-        items = [*editais, *programas, *investidores]
+        items = [*editais, *programas]
         misses = match_verdict.attach_cached_verdicts(db, workspace_id, items, profile)
         if misses:
             _enqueue_verdicts(workspace_id, misses, profile)
@@ -120,8 +123,10 @@ def radar_matches(
         "matched_editais": editais,
         "matched_programas": programas,
         "matched_investidores": investidores,
+        "matched_icts": matched_icts,
         "meta": {
             "ranking": "affinity",
             "uses_workspace_chunks": workspace_id is not None,
+            "ict_lookup_attempted": ict_lookup_attempted,
         },
     }

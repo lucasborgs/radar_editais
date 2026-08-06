@@ -26,28 +26,6 @@ import {
 import type { ContentItemSummary } from "@/types/api";
 import { CompanyProfile, EMPTY_PROFILE } from "@/types/profile";
 import { fieldSpec, coerceFieldValue } from "@/components/frontdoor/profileFields";
-import { InvestorTrackToggle } from "@/components/frontdoor/InvestorTrackToggle";
-
-// Campos Q3/Q4 (trilha de capital de risco, spec D2). Revelados pelo switch
-// "busca também capital de risco?"; alimentam o match de investidor (always-on
-// no radar — o switch só revela/coleta, não gateia resultados).
-const INVESTOR_FIELDS: ReadonlySet<keyof CompanyProfile> = new Set<keyof CompanyProfile>([
-  "estagio",
-  "mrr_arr",
-  "round_alvo_brl",
-  "cap_table_resumo",
-  "tracao_resumo",
-]);
-
-// Trilha de investidor "ligada" por default se "Capital de risco" está selecionado
-// OU se qualquer campo Q3/Q4 já tem valor (decisão travada D2: flag derivada).
-function deriveInvestorTrack(profile: CompanyProfile): boolean {
-  if (profile.tipos_financiamento_interesse.includes("capital_risco")) return true;
-  return Array.from(INVESTOR_FIELDS).some((f) => {
-    const v = profile[f];
-    return v !== "" && v !== null && v !== undefined;
-  });
-}
 
 // Agrupamento dos campos do CompanyProfile em seções legíveis + rótulos PT-BR.
 // A ordem aqui define a ordem de render; o tipo de input vem de fieldSpec().
@@ -55,8 +33,8 @@ const FIELD_GROUPS: { title: string; fields: (keyof CompanyProfile)[] }[] = [
   { title: "Identidade", fields: ["nome", "cnpj", "url_site", "tipo_entidade", "uf", "ano_fundacao"] },
   { title: "Proposta", fields: ["one_liner", "solution_summary", "descricao_atividades"] },
   { title: "Maturidade", fields: ["tamanho_empresa", "trl", "estagio", "faturamento_anual", "capital_social"] },
-  { title: "Investimento", fields: ["tipos_financiamento_interesse", "mrr_arr", "round_alvo_brl"] },
-  { title: "Narrativas", fields: ["portfolio_projetos", "equipe_resumo", "tracao_resumo", "cap_table_resumo"] },
+  { title: "Investimento", fields: ["tipos_financiamento_interesse"] },
+  { title: "Narrativas", fields: ["portfolio_projetos", "equipe_resumo"] },
   // Craft de escrita (preenchido à mão pelo dono) — só o Redator vê; não entra
   // em matching nem em extração automática (plano playbook-overlays-plan.md).
   { title: "Estilo de escrita", fields: ["estilo_escrita"] },
@@ -78,12 +56,8 @@ const FIELD_LABELS: Partial<Record<keyof CompanyProfile, string>> = {
   faturamento_anual: "Faturamento anual (R$)",
   capital_social: "Capital social (R$)",
   tipos_financiamento_interesse: "Interesse de financiamento",
-  mrr_arr: "MRR/ARR (R$)",
-  round_alvo_brl: "Round alvo (R$)",
   portfolio_projetos: "Portfólio de projetos",
   equipe_resumo: "Equipe",
-  tracao_resumo: "Tração",
-  cap_table_resumo: "Cap table",
   estilo_escrita: "Estilo de escrita",
 };
 
@@ -187,10 +161,6 @@ export default function PerfilPage() {
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  // Trilha de capital de risco (switch D2). Default-on derivado dos campos Q3/Q4
-  // preenchidos no perfil carregado; toggle manual depois. Estado persiste via os
-  // próprios campos Q3/Q4 salvos no perfil (re-derivado no próximo carregamento).
-  const [investorTrack, setInvestorTrack] = useState(false);
 
   // Extração
   const [url, setUrl] = useState("");
@@ -217,7 +187,6 @@ export default function PerfilPage() {
         if (cancelled) return;
         const loaded = { ...EMPTY_PROFILE, ...(me.profile ?? {}) } as CompanyProfile;
         setProfile(loaded);
-        setInvestorTrack(deriveInvestorTrack(loaded));
         setItems(libs ?? []);
       } catch {
         if (!cancelled) toast.error("Não consegui carregar seu perfil.");
@@ -231,18 +200,7 @@ export default function PerfilPage() {
   }, [isAuthed, getToken]);
 
   const setField = useCallback((field: keyof CompanyProfile, raw: unknown) => {
-    setProfile((prev) => {
-      const next = { ...prev, [field]: coerceFieldValue(field, raw) };
-      // Preencheu campo de investidor → auto-adiciona "Capital de risco"
-      if (INVESTOR_FIELDS.has(field)) {
-        const v = next[field];
-        const filled = v !== "" && v !== null && v !== undefined;
-        if (filled && !next.tipos_financiamento_interesse.includes("capital_risco")) {
-          next.tipos_financiamento_interesse = [...next.tipos_financiamento_interesse, "capital_risco"];
-        }
-      }
-      return next;
-    });
+    setProfile((prev) => ({ ...prev, [field]: coerceFieldValue(field, raw) }));
     setDirty(true);
   }, []);
 
@@ -434,13 +392,6 @@ export default function PerfilPage() {
           </div>
         </section>
 
-        {/* Trilha de capital de risco (switch D2) */}
-        {!loading && (
-          <section className="rounded-xl border border-border bg-surface p-5">
-            <InvestorTrackToggle on={investorTrack} onChange={setInvestorTrack} />
-          </section>
-        )}
-
         {/* Form de campos */}
         {loading ? (
           <div className="space-y-3">
@@ -450,18 +401,14 @@ export default function PerfilPage() {
           </div>
         ) : (
           FIELD_GROUPS.map((group) => {
-            // Esconde os campos Q3/Q4 quando a trilha de investidor está desligada.
-            const groupFields = investorTrack
-              ? group.fields
-              : group.fields.filter((f) => !INVESTOR_FIELDS.has(f));
-            if (groupFields.length === 0) return null;
+            if (group.fields.length === 0) return null;
             return (
             <section key={group.title} className="rounded-xl border border-border bg-surface p-5">
               <h2 className="font-heading text-sm font-bold text-content-primary mb-4">
                 {group.title}
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {groupFields.map((field) => {
+                {group.fields.map((field) => {
                   const spec = fieldSpec(field);
                   const wide = spec.kind === "textarea" || spec.kind === "multiselect";
                   return (

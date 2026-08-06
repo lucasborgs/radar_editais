@@ -197,6 +197,7 @@ def test_explore_marks_current_user_message(monkeypatch):
                            usage={"input_tokens": 0, "output_tokens": 0})
 
     monkeypatch.setattr("radar.core.llm.agent_runtime.run_agent", fake_run_agent)
+
     svc = ExploreAgent()
     svc._explore_agent("qual o prazo?", history=[{"role": "user", "content": "antes"}],
                        edital_ids=None, node_id=None, node_type=None)

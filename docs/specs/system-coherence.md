@@ -5,6 +5,12 @@
 specs executáveis de redução de complexidade. Esta spec não autoriza alterações
 de comportamento por si só.
 
+O modelo de negócio vigente e a classificação dos caminhos do ecossistema estão
+na [`spec de estratégia e caminhos do ecossistema`](product-strategy-ecosystem-pathways.md).
+Em caso de divergência sobre escopo de produto, ela prevalece; este documento
+continua autoritativo para coerência sistêmica, invariantes e reconciliação
+técnica.
+
 ---
 
 ## 1. Contexto
@@ -13,9 +19,9 @@ O Radar de Editais nasceu como laboratório de capacitação em RAG e agentes de
 escrita. A partir desse núcleo, tornou-se um produto com três capacidades de
 negócio igualmente relevantes:
 
-1. **Mapeamento:** compreender oportunidades, programas, investidores, ICTs e
-   agências do ecossistema brasileiro de inovação;
-2. **Match/Radar:** cruzar o contexto de uma empresa com oportunidades e atores,
+1. **Mapeamento:** compreender caminhos de financiamento, apoio, desenvolvimento,
+   inovação aberta e parceria tecnológica no ecossistema brasileiro;
+2. **Match/Radar:** cruzar o contexto de uma empresa com caminhos e atores,
    explicando afinidade, elegibilidade e evidências; e
 3. **Escrita:** transformar uma oportunidade escolhida em proposta ou pitch com
    RAG, agentes especializados e decisão humana.
@@ -83,7 +89,7 @@ não uma quarta proposta de valor para o usuário final.
 ```text
 Fontes + Descoberta com gate humano
   → conhecimento confiável e pesquisável
-      ├─ Mapeamento: compreender o ecossistema
+      ├─ Mapeamento: compreender caminhos do ecossistema
       ├─ Match/Radar: avaliar aderência ao contexto da empresa
       └─ Escrita: construir proposta/pitch sobre a oportunidade escolhida
 
@@ -95,7 +101,7 @@ Laboratório técnico
 
 | Capacidade | Pergunta do usuário | Superfícies atuais | Resultado |
 |---|---|---|---|
-| Mapeamento | “O que existe e como este ecossistema se organiza?” | Explorar `/`, Ecossistema `/oportunidades`, fichas | entendimento de oportunidades e atores |
+| Mapeamento | “Quais caminhos, capacidades e atores existem?” | Explorar `/`, Ecossistema `/oportunidades`, fichas | entendimento de caminhos, capacidades e atores |
 | Match/Radar | “O que faz sentido para esta empresa e por quê?” | `/radar`, cards e perfil | conjunto priorizado com evidência e elegibilidade |
 | Escrita | “Como transformar esta escolha em uma proposta defensável?” | Projetos `/projects`, `/workspace/{sessionId}`, library e checklist | rascunho iterável, fundamentado e revisável |
 

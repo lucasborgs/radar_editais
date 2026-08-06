@@ -33,12 +33,11 @@ def test_build_all_silver_enumerates_from_bronze(monkeypatch):
     monkeypatch.setattr(adapters_base, "get_adapter", lambda source: _FakeAdapter())
     built = []
     monkeypatch.setattr(tasks, "build_or_load_structured_doc",
-                        lambda s, n, d, **_kw: built.append((s, n)) or [{"section_path": [], "text": "t"}])
+                        lambda s, n, d: built.append((s, n)) or [{"section_path": [], "text": "t"}])
 
-    result = tasks._build_all_silver()
+    n = tasks._build_all_silver()
 
-    assert result["silver_built"] == 2
-    assert result["changed_ids"] == ["finep:1", "web:abc"]
+    assert n == 2
     assert built == [("finep", "1"), ("web", "abc")]
 
 
@@ -94,138 +93,6 @@ def test_run_daily_etl_returns_partial_summary_when_step_fails(monkeypatch, tmp_
     assert summary["status"] == "partial"
     assert summary["counters"]["step_errors"] == 1
     assert summary["last_step"] == "obsidian"
-
-
-def test_run_daily_etl_refreshes_phase1_after_gold_when_enabled(monkeypatch, tmp_path):
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
-    monkeypatch.setenv("KG_PHASE1_AUTO_REFRESH_ENABLED", "true")
-    from radar.core import config
-    monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
-    ingest_calls: list = []
-    _stub_etl(monkeypatch, ingest_calls)
-    refreshes: list = []
-    import radar.core.kg.phase1.lifecycle as lifecycle
-    monkeypatch.setattr(
-        lifecycle, "refresh_after_gold",
-        lambda **k: refreshes.append(k) or {"trigger": k["trigger"], "outcome": "built"},
-    )
-
-    summary = asyncio.run(tasks._run_daily_etl(0))
-
-    assert refreshes == [{"trigger": "daily_etl"}]
-    assert summary["phase1_refresh"]["outcome"] == "built"
-    assert summary["counters"]["kg_phase1_refresh"] == 1
-    assert summary["status"] == "succeeded"
-
-
-def test_run_daily_etl_skips_refresh_when_flag_off(monkeypatch, tmp_path):
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
-    monkeypatch.delenv("KG_PHASE1_AUTO_REFRESH_ENABLED", raising=False)
-    from radar.core import config
-    monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
-    ingest_calls: list = []
-    _stub_etl(monkeypatch, ingest_calls)
-    from radar.core.kg.phase1 import ingest
-    monkeypatch.setattr(
-        ingest, "build",
-        lambda **k: (_ for _ in ()).throw(AssertionError("flag off → build não roda")),
-    )
-
-    summary = asyncio.run(tasks._run_daily_etl(0))
-
-    assert summary["phase1_refresh"] == {"trigger": "daily_etl", "outcome": "disabled"}
-    assert summary["counters"]["kg_phase1_refresh"] == 0
-
-
-def test_run_daily_etl_skips_refresh_when_gold_fails(monkeypatch, tmp_path):
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
-    monkeypatch.setenv("KG_PHASE1_AUTO_REFRESH_ENABLED", "true")
-    from radar.core import config
-    monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
-    _stub_etl(monkeypatch, [])
-    monkeypatch.setattr(gold, "ingest_all",
-                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("gold down")))
-    refreshes: list = []
-    import radar.core.kg.phase1.lifecycle as lifecycle
-    monkeypatch.setattr(lifecycle, "refresh_after_gold",
-                        lambda **k: refreshes.append(k) or {"outcome": "built"})
-
-    summary = asyncio.run(tasks._run_daily_etl(0))
-
-    assert refreshes == [], "gold falhou → refresh não roda"
-    assert summary["status"] == "partial"
-    assert summary["counters"]["kg_phase1_refresh"] == 0
-
-
-def test_run_daily_etl_refresh_failure_is_best_effort(monkeypatch, tmp_path):
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
-    monkeypatch.setenv("KG_PHASE1_AUTO_REFRESH_ENABLED", "true")
-    from radar.core import config
-    monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
-    _stub_etl(monkeypatch, [])
-    import radar.core.kg.phase1.lifecycle as lifecycle
-    monkeypatch.setattr(lifecycle, "refresh_after_gold",
-                        lambda **k: (_ for _ in ()).throw(RuntimeError("boom")))
-
-    summary = asyncio.run(tasks._run_daily_etl(0))
-
-    assert summary["status"] == "succeeded", "falha do refresh não quebra o ETL"
-    assert summary["phase1_refresh"] is None
-    assert summary["counters"]["kg_phase1_refresh"] == 0
-
-
-_SENSITIVE_FRAGMENTS = [
-    "postgresql://",
-    "usuario:senha",
-    "SEGREDO_BRUTO",
-    "interno.exemplo",
-    "dado_sensivel",
-    "SELECT",
-    "senha",
-    "token",
-]
-
-
-def _raise_runtimeerror_with_secrets(message: str):
-    def _boom(**_kwargs):
-        raise RuntimeError(message)
-    return _boom
-
-
-def test_run_daily_etl_refresh_catch_is_sanitized(monkeypatch, tmp_path, caplog):
-    """Auditoria KG-P1B-2: o catch defensivo do refresh NUNCA loga o conteúdo
-    da exceção (str(exc)/safe_error) — só categoria fixa + tipo. Um defeito que
-    carregue DSN/URL/SQL não pode vazar nos logs."""
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
-    monkeypatch.setenv("KG_PHASE1_AUTO_REFRESH_ENABLED", "true")
-    from radar.core import config
-    monkeypatch.setattr(config, "OBSIDIAN_VAULT_DIR", tmp_path / "vault")
-    _stub_etl(monkeypatch, [])
-    import logging
-
-    import radar.core.kg.phase1.lifecycle as lifecycle
-    mensagem = (
-        "refresh: conexão 'postgresql://usuario:senha@host/db' falhou com "
-        "https://interno.exemplo/path?token=SEGREDO_BRUTO ao rodar "
-        "SELECT dado_sensivel FROM tabela"
-    )
-    monkeypatch.setattr(
-        lifecycle, "refresh_after_gold", _raise_runtimeerror_with_secrets(mensagem),
-    )
-
-    with caplog.at_level(logging.WARNING, logger="radar.core.tasks"):
-        summary = asyncio.run(tasks._run_daily_etl(0))
-
-    assert summary["status"] == "succeeded"
-    assert "categoria=unexpected" in caplog.text
-    assert "tipo=RuntimeError" in caplog.text
-    for fragment in _SENSITIVE_FRAGMENTS:
-        assert fragment not in caplog.text, f"fragmento sensível vazou: {fragment}"
 
 
 def test_warm_edital_chunks_marks_failed_when_listing_raises(monkeypatch):

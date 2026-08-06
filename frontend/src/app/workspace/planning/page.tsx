@@ -52,6 +52,7 @@ function PlanningInner() {
   const [adjustInput, setAdjustInput] = useState("");
   const [adjusting, setAdjusting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [noPlan, setNoPlan] = useState(false);
   const [editalTitle, setEditalTitle] = useState<string>("");
   const isExisting = !!sessionId;
 
@@ -79,9 +80,15 @@ function PlanningInner() {
             }
           }
         } catch (e) {
-          setError(
-            e instanceof Error ? e.message : "Erro ao carregar plano.",
-          );
+          const status = (e as { status?: number }).status;
+          if (status === 404) {
+            // Sessão sem __plan__ persistido: estado informativo, não erro.
+            setNoPlan(true);
+          } else {
+            setError(
+              e instanceof Error ? e.message : "Erro ao carregar plano.",
+            );
+          }
         } finally {
           setLoading(false);
         }
@@ -184,6 +191,25 @@ function PlanningInner() {
           <p className="text-sm text-content-secondary font-sans">
             {generating ? "Estruturando proposta…" : "Carregando…"}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (noPlan) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-app-bg px-6">
+        <div className="text-center max-w-sm">
+          <p className="text-sm text-content-primary font-sans mb-3">
+            Nenhum plano estruturado nesta sessão ainda. Gere um plano pelo chat
+            da proposta ou pelo comando /plan.
+          </p>
+          <button
+            onClick={handleBackToWorkspace}
+            className="text-sm text-primary font-sans hover:underline"
+          >
+            ← Voltar ao workspace
+          </button>
         </div>
       </div>
     );

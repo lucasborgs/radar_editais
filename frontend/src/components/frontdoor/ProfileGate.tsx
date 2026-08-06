@@ -56,8 +56,8 @@ export function ProfileGate({
           Radar de Editais
         </h1>
         <p className="mt-2 text-sm text-content-secondary leading-relaxed">
-          Descubra editais, programas, investidores e ICTs que combinam com
-          sua empresa. Para começar, conte um pouco sobre o negócio.
+          Descubra editais, programas e ICTs que combinam com sua empresa.
+          Para começar, conte um pouco sobre o negócio.
         </p>
 
         <div className="mt-6 space-y-4">

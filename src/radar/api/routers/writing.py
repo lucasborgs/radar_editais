@@ -160,6 +160,31 @@ def _sse(event: str, data: dict) -> bytes:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
 
 
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache, no-transform",
+    "X-Accel-Buffering": "no",
+    "Connection": "keep-alive",
+}
+
+
+def _truncate_key(key: str | None) -> str:
+    """Trunca/anônima a idempotency key para logs (UUID v4 completo é ruído)."""
+    if not key:
+        return "-"
+    if len(key) <= 16:
+        return key
+    return f"{key[:8]}…{key[-4:]}"
+
+
+def _should_cache(response: dict) -> bool:
+    """Decide se a resposta de um turno deve ser guardada para replay.
+
+    Falhas NÃO são cacheadas: um retry com a mesma idempotency key deve
+    re-executar o turno, não receber a falha congelada.
+    """
+    return response.get("success", True) is not False
+
+
 def _check_idempotency(db: DbClient, key: str | None, session_id: str) -> dict | None:
     if not key:
         return None
@@ -174,6 +199,12 @@ def _check_idempotency(db: DbClient, key: str | None, session_id: str) -> dict |
 def _record_idempotency(db: DbClient, key: str | None, session_id: str, response: dict) -> None:
     if not key:
         return
+    if not _should_cache(response):
+        logger.warning(
+            "idempotency[%s] key=%s: resposta de falha NÃO cacheada",
+            session_id, _truncate_key(key),
+        )
+        return
     try:
         db.table("writing_turn_idempotency").insert({
             "idempotency_key": key,
@@ -181,7 +212,7 @@ def _record_idempotency(db: DbClient, key: str | None, session_id: str, response
             "response_json": response,
         }).execute()
     except Exception as e:
-        logger.warning("failed to record idempotency key %s: %s", key, e)
+        logger.warning("failed to record idempotency key %s: %s", _truncate_key(key), e)
 
 
 @router.post("/writing/start", summary="Inicia sessão de escrita de proposta")
@@ -348,6 +379,22 @@ async def writing_turn_stream(
     )
     library_items = load_library_items(db, workspace_id, req.library_item_ids)
 
+    # H2: idempotency ANTES de construir a sessão/iniciar o produtor. Num retry
+    # com a mesma key, não devemos re-executar o LLM nem re-persistir turnos.
+    cached = _check_idempotency(db, req.idempotency_key, req.session_id)
+    if cached:
+        logger.info(
+            "writing_turn_stream[%s] idempotency hit key=%s — replaying",
+            req.session_id, _truncate_key(req.idempotency_key),
+        )
+
+        async def _replay():
+            yield _sse("done", cached)
+
+        return StreamingResponse(
+            _replay(), media_type="text/event-stream", headers=_SSE_HEADERS,
+        )
+
     try:
         session = WritingSession(
             db=db,
@@ -360,7 +407,11 @@ async def writing_turn_stream(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(
+            "writing_turn_stream[%s] session build failed stage=build exc=%s",
+            req.session_id, type(e).__name__,
+        )
+        raise HTTPException(status_code=500, detail="Não foi possível iniciar a sessão.") from e
 
     queue: asyncio.Queue = asyncio.Queue()
     loop = asyncio.get_running_loop()
@@ -378,13 +429,16 @@ async def writing_turn_stream(
                     break
                 loop.call_soon_threadsafe(queue.put_nowait, event)
         except Exception as e:
-            logger.error("writing_turn_stream[%s]: producer error: %s", session_id_val, e)
+            logger.error(
+                "writing_turn_stream[%s] producer error stage=stream exc=%s: %s",
+                session_id_val, type(e).__name__, e,
+            )
             loop.call_soon_threadsafe(queue.put_nowait, {
                 "kind": "final",
                 "session_id": session_id_val,
                 "assistant_message": "",
                 "success": False,
-                "error": f"Erro interno: {e}",
+                "error": "Não foi possível gerar o texto. Tente novamente.",
             })
         finally:
             unregister_cancel_token(session_id_val)
@@ -394,14 +448,6 @@ async def writing_turn_stream(
     thread.start()
 
     async def gen():
-        # H2: idempotency check — replay cached response as single done event
-        # before starting the stream.
-        cached = _check_idempotency(db, req.idempotency_key, req.session_id)
-        if cached:
-            logger.info("idempotency hit for key %s, replaying cached stream", req.idempotency_key)
-            yield _sse("done", cached)
-            return
-
         try:
             was_tool_or_token = False
             while True:
@@ -421,7 +467,10 @@ async def writing_turn_stream(
                     yield _sse("done", payload)
                     break
         except Exception as e:
-            logger.error("writing_turn_stream[%s]: SSE error: %s", session.session_id, e)
+            logger.error(
+                "writing_turn_stream[%s] SSE error stage=stream exc=%s: %s",
+                session.session_id, type(e).__name__, e,
+            )
             if not was_tool_or_token:
                 # Fallback silencioso: stream nunca começou → tenta batch
                 try:
@@ -431,20 +480,19 @@ async def writing_turn_stream(
                     _record_idempotency(db, req.idempotency_key, req.session_id, result)
                     yield _sse("done", result)
                 except Exception as e2:
-                    logger.error("writing_turn_stream[%s]: fallback error: %s", session.session_id, e2)
-                    yield _sse("error", {"message": str(e2)})
+                    logger.error(
+                        "writing_turn_stream[%s] fallback error stage=batch exc=%s: %s",
+                        session.session_id, type(e2).__name__, e2,
+                    )
+                    yield _sse("error", {
+                        "message": "Erro ao processar o turno. Tente novamente.",
+                    })
             else:
-                yield _sse("error", {"message": str(e)})
+                yield _sse("error", {
+                    "message": "Erro ao processar o turno. Tente novamente.",
+                })
 
-    return StreamingResponse(
-        gen(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache, no-transform",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
-    )
+    return StreamingResponse(gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.post(

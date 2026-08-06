@@ -80,4 +80,46 @@ discovery:
   # sempre uma URL cujo conteúdo pode virar relevante; calibrar pela cadência de
   # mudança das fontes (fontes estáveis toleram TTL maior).
   reject_cache_ttl_days: 30
+
+  # Canal Deep Research (spec discovery-deep-research.md §10 do strategy) —
+  # CANAL COMPLEMENTAR aos scrapers determinísticos, gated por
+  # DISCOVERY_DEEP_RESEARCH_ENABLED=1 (padrão dos outros geradores; `enabled`
+  # aqui é documental e descreve a postura default: off). Usa o engine real
+  # `radar.core.deep_research.run_deep_research` (subagente web_search +
+  # fetch_url, sempre COM citação). MIRA o que DOU/scrapers não veem: linhas de
+  # crédito e produtos de inovação sem edital, FAPs/DOEs pouco estruturados,
+  # desafios corporativos, aceleradoras/incubadoras, ICTs/laboratórios (PNIPE)
+  # e novas fontes de fomento. NUNCA publica no catálogo/KG: cada fonte citada
+  # vira 1 candidato no staging `discovered_opportunities` (pending,
+  # discovery_channel='deep_research') e exige gate humano. O pacote de
+  # evidências preserva URL, citações, data, fonte, campos ausentes, conflitos
+  # e confiança (spec §2). Falha do Deep Research degrada o canal (skip) sem
+  # interromper a descoberta determinística (aceite 5).
+  deep_research:
+    enabled: false
+    # Backend do subagente (resolve em radar.core.deep_research.run_deep_research).
+    # Env DISCOVERY_DEEP_RESEARCH_PROVIDER sobrescreve; default: anthropic.
+    provider: anthropic
+    # Teto de candidatos por execução (controle de custo do agente).
+    max_findings: 10
+    # Alvos de pesquisa do piloto. Cada alvo = uma pergunta/brief; `type_hint`
+    # sinaliza o opportunity_type esperado para o revisor (edital|desafio|
+    # programa|ict). Adicionar alvo exige registrar motivo no histórico, como
+    # as famílias de busca.
+    targets:
+      - key: credit_lines
+        brief: "Linhas de crédito e produtos de inovação para empresas de base tecnológica no Brasil abertos atualmente (BNDES, bancos públicos e agentes financeiros): condições, elegibilidade, página oficial e processo de acesso."
+        type_hint: edital
+      - key: corporate_challenges
+        brief: "Desafios corporativos e open innovation abertos no Brasil para startups deep-tech: problema proposto, empresa promotora, formato de participação, inscrição e prazo."
+        type_hint: desafio
+      - key: accelerators_incubators
+        brief: "Programas de aceleração e incubação abertos no Brasil para startups de base tecnológica: estágio aceito, apoio, duração, contrapartida, inscrição e prazo."
+        type_hint: programa
+      - key: ict_labs
+        brief: "ICTs e laboratórios brasileiros (incluindo o PNIPE) com infraestrutura acessível a empresas: competência, equipamento, localização e condições de acesso."
+        type_hint: ict
+      - key: new_sources
+        brief: "Novas fontes de fomento à inovação no Brasil ainda não cobertas por FINEP/FAPESP/FAPESC/DOU (fundações, associações, programas regionais): portais, chamadas abertas, condições e inscrição."
+        type_hint: edital
 ```

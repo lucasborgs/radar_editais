@@ -38,10 +38,6 @@ def _opportunity(kind: str, name: str):
     return SimpleNamespace(kind=kind, to_dict=lambda: {"kind": kind, "name": name})
 
 
-def _investor(name: str):
-    return SimpleNamespace(to_dict=lambda: {"kind": "investidor", "name": name})
-
-
 def test_profile_minimo_e_obrigatorio():
     with pytest.raises(HTTPException) as exc:
         radar.radar_matches(
@@ -62,22 +58,17 @@ def test_anonimo_usa_chunks_efemeros_e_separa_trilhas(monkeypatch):
         seen["opps"] = kwargs
         return [_opportunity("edital", "Edital"), _opportunity("programa", "Programa")]
 
-    def investors(profile, **kwargs):
-        seen["investors"] = kwargs
-        return [_investor("Fundo")]
-
     monkeypatch.setattr(radar.match_v3, "find_matching_opportunities", opportunities)
-    monkeypatch.setattr(radar.match_v3, "find_matching_investors", investors)
     monkeypatch.setattr(radar.match_verdict, "attach_cached_verdicts", lambda *_: pytest.fail("não deveria ler cache"))
 
     result = radar.radar_matches(_http_request(), _request(), None, None)
 
     assert [x["name"] for x in result["matched_editais"]] == ["Edital"]
     assert [x["name"] for x in result["matched_programas"]] == ["Programa"]
-    assert [x["name"] for x in result["matched_investidores"]] == ["Fundo"]
+    # Investidores desativados das superfícies ativas — nunca são devolvidos.
+    assert result["matched_investidores"] == []
     assert result["meta"]["uses_workspace_chunks"] is False
     assert seen["opps"]["workspace_id"] is None
-    assert seen["investors"]["db"] is None
 
 
 def test_autenticado_encaminha_workspace_e_enfileira_so_misses(monkeypatch):
@@ -90,12 +81,7 @@ def test_autenticado_encaminha_workspace_e_enfileira_so_misses(monkeypatch):
         seen["opps"] = kwargs
         return [_opportunity("edital", "Edital")]
 
-    def investors(profile, **kwargs):
-        seen["investors"] = kwargs
-        return [_investor("Fundo")]
-
     monkeypatch.setattr(radar.match_v3, "find_matching_opportunities", opportunities)
-    monkeypatch.setattr(radar.match_v3, "find_matching_investors", investors)
     monkeypatch.setattr(
         radar.match_verdict,
         "attach_cached_verdicts",
@@ -108,5 +94,5 @@ def test_autenticado_encaminha_workspace_e_enfileira_so_misses(monkeypatch):
     assert result["meta"]["uses_workspace_chunks"] is True
     assert seen["opps"]["workspace_id"] == "workspace-1"
     assert seen["opps"]["db"] is db
-    assert seen["investors"]["workspace_id"] == "workspace-1"
+    assert result["matched_investidores"] == []  # investidores desativados
     assert seen["queued"][0] == "workspace-1"

@@ -4,6 +4,15 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 Índice e autoridade da documentação: [docs/README.md](docs/README.md).
 
+## graphify
+
+Este repositório usa graphify (grafo de conhecimento do código). Antes de responder
+perguntas sobre o codebase (arquitetura, fluxos, "como X funciona"), consulte
+`graphify-out/graph.json` via `graphify query "<pergunta>"` (ou percorra o JSON
+diretamente) e responda a partir do grafo quando possível. O grafo é rebuildado
+automaticamente a cada `git commit` (post-commit hook); não é necessário rodar
+`/graphify` manualmente para mantê-lo atualizado.
+
 ## Schema autoritativo
 
 Regras de vocabulários, workflows de ingestão e manutenção vivem em [docs/domain/schema.md](docs/domain/schema.md) (global) e [docs/domain/sources/](docs/domain/sources/)`<fonte>.md` (por fonte). O código lê os blocos YAML via [src/radar/core/kg/schema.py](src/radar/core/kg/schema.py). **Mudanças em regras → edite os docs, não o código.**

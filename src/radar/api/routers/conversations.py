@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from radar.core.infra.auth import CurrentUserId, DbClient
+from radar.core.kg import entity_catalog
 from radar.core.services.content_library import get_workspace_id
 from radar.core.services.writing_session import (
     append_entry,
@@ -39,8 +40,9 @@ class ConversationSummary(BaseModel):
 
     session_id: str
     kind: Literal["frontdoor", "writing"]
-    title: str | None = None  # frontdoor; writing deriva edital_title no front
+    title: str | None = None  # frontdoor usa title; writing deriva edital_title
     edital_id: str | None = None
+    edital_title: str | None = None  # resolvido server-side (batch), p/ writing
     status: Literal["active", "completed", "abandoned"]
     turn_count: int
     created_at: str
@@ -99,11 +101,22 @@ def list_conversations(user_id: CurrentUserId, db: DbClient):
     primeiro. Substitui `GET /writing/sessions` no front (o antigo sobrevive até
     a fase 3 matar os últimos consumidores).
 
-    `title` vem só para frontdoor; writing devolve None e o front deriva o
-    título do edital (lookup client-side, como hoje).
+    `title` vem só para frontdoor; para writing o título do edital é resolvido
+    server-side em batch (`get_opportunity_titles`), evitando N lookups
+    client-side por `getEditalById`.
     """
     workspace_id = get_workspace_id(db, user_id)
     sessions = list_sessions(db, workspace_id)
+
+    # Resolve títulos de edital em batch (mesmo helper do /writing/sessions).
+    # get_opportunity_titles não depende do read model temporal (mais robusto
+    # que get_edital por-id). Falha de resolução é graça — o front cai no ID cru.
+    ids = {s["edital_id"] for s in sessions if s.get("edital_id")}
+    try:
+        titles = entity_catalog.get_opportunity_titles(list(ids)) if ids else {}
+    except Exception:
+        titles = {}
+
     # list_sessions devolve kind/title (migration 020); normalizamos kind para o
     # default 'writing' por robustez contra rows pré-migração.
     conversations = [
@@ -112,6 +125,7 @@ def list_conversations(user_id: CurrentUserId, db: DbClient):
             kind=s.get("kind") or "writing",
             title=s.get("title"),
             edital_id=s.get("edital_id"),
+            edital_title=titles.get(s.get("edital_id")),
             status=s["status"],
             turn_count=s.get("turn_count", 0),
             created_at=s["created_at"],

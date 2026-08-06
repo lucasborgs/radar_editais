@@ -1,0 +1,64 @@
+{
+  "version": "1",
+  "source_of_truth": "SPEC spike/kg-structure-aware §12 — golden sintético que reproduz a topologia real (edital → setor → ICT → agência). Hermético.",
+  "cases": [
+    {
+      "case_id": "kg_spike_topology_1",
+      "input": {
+        "seed": "edital:finep:589",
+        "depth": 1,
+        "nodes": [
+          {"id": "edital:finep:589", "kind": "edital", "name": "Chamada X"},
+          {"id": "ict:embrapii:ceia-ufg", "kind": "ict", "name": "CEIA-UFG"},
+          {"id": "agencia:finep", "kind": "agencia", "name": "FINEP"}
+        ],
+        "quality_nodes": [
+          {"id": "setor:agro", "family": "setor", "value": "Agro"},
+          {"id": "tecnologia:ia", "family": "tecnologia", "value": "IA"}
+        ],
+        "edges": [
+          {"source_id": "edital:finep:589", "target_id": "setor:agro", "type": "tem_setor", "weight": 1.0},
+          {"source_id": "edital:finep:589", "target_id": "tecnologia:ia", "type": "tem_tecnologia", "weight": 1.0},
+          {"source_id": "edital:finep:589", "target_id": "agencia:finep", "type": "operado_por", "weight": 1.0},
+          {"source_id": "edital:finep:589", "target_id": "ict:embrapii:ceia-ufg", "type": "potencial_parceria", "weight": 0.82}
+        ],
+        "communities": [
+          {"community_id": "com_0", "members": ["edital:finep:589", "setor:agro"]}
+        ]
+      },
+      "expected_output": {
+        "expected_edges": [
+          {"source": "edital:finep:589", "target": "setor:agro", "type": "tem_setor", "weight": 1.0},
+          {"source": "edital:finep:589", "target": "ict:embrapii:ceia-ufg", "type": "potencial_parceria", "weight": 0.82}
+        ]
+      },
+      "metadata": {"desc": "subgrafo de profundidade 1 preserva adjacência tipada com peso"}
+    },
+    {
+      "case_id": "kg_spike_deduction_1",
+      "input": {
+        "seed": "edital:finep:589",
+        "depth": 2,
+        "goal": "agencia:finep",
+        "nodes": [
+          {"id": "edital:finep:589", "kind": "edital", "name": "Chamada X"},
+          {"id": "ict:embrapii:ceia-ufg", "kind": "ict", "name": "CEIA-UFG"},
+          {"id": "agencia:finep", "kind": "agencia", "name": "FINEP"}
+        ],
+        "quality_nodes": [
+          {"id": "setor:agro", "family": "setor", "value": "Agro"}
+        ],
+        "edges": [
+          {"source_id": "edital:finep:589", "target_id": "setor:agro", "type": "tem_setor", "weight": 1.0},
+          {"source_id": "setor:agro", "target_id": "ict:embrapii:ceia-ufg", "type": "tem_setor", "weight": 1.0},
+          {"source_id": "edital:finep:589", "target_id": "agencia:finep", "type": "operado_por", "weight": 1.0}
+        ],
+        "communities": []
+      },
+      "expected_output": {
+        "deduction_paths": 1
+      },
+      "metadata": {"desc": "dedução de caminho: edital → agência em 1 salto"}
+    }
+  ]
+}

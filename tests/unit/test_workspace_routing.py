@@ -2,101 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from radar.core.services.workspace_service import (
-    _REDIRECT_BLOCK,
-    VALID_ACTIONS,
-    VALID_MODES,
-    _dispatch_explorer,
-    dispatch,
-)
+from radar.core.services.workspace_service import VALID_ACTIONS, dispatch
 
 pytestmark = pytest.mark.unit
 
 
-def test_barn_nao_recebe_redirect_e_mensagem_interna_nao_e_anexada(monkeypatch):
-    captured = {}
-
-    def fake_explore(self, **kwargs):
-        captured.update(kwargs)
-        return "Barn factual"
-
-    monkeypatch.setattr("radar.core.services.explore_agent.ExploreAgent.explore", fake_explore)
-    out = _dispatch_explorer(
-        "qual a tese de investimentos da Barn?", [], None,
-        edital_ids=None, library_items=None,
-    )
-    assert out == "Barn factual"
-    assert "Se o usuário pedir algo FORA DO ESCOPO" not in captured["message"]
-
-
-def test_acao_de_escrita_recebe_redirect_sem_chamar_agente(monkeypatch):
-    def fail(*_args, **_kwargs):
-        raise AssertionError("agente não deve ser chamado")
-
-    monkeypatch.setattr("radar.core.services.explore_agent.ExploreAgent.explore", fail)
-    out = _dispatch_explorer("escreva a seção de impacto", [], None)
-    assert "/escrita" in out
-
-
-def test_redirect_block_nao_contem_recusa():
-    """_REDIRECT_BLOCK não contém mais instrução de recusa (Task 1)."""
-    assert "recuse" not in _REDIRECT_BLOCK
-    assert "NÃO tente executar" not in _REDIRECT_BLOCK
-    assert "troca de contexto" in _REDIRECT_BLOCK
-    assert "automaticamente" in _REDIRECT_BLOCK
-
-
-def test_dispatch_handoff_explorer_para_escrita(monkeypatch):
-    """dispatch(explorer, 'escreva...') invoca escrita e retorna mode=escrita."""
-    escrita_called = []
-
-    def fake_escrita(db, session_id, workspace_id, profile, message, library_items=None):
-        escrita_called.append(message)
-        return "conteúdo da seção de impacto"
-
-    monkeypatch.setattr("radar.core.services.workspace_service._dispatch_escrita", fake_escrita)
-    monkeypatch.setattr("radar.core.services.workspace_service._load_session_edital_id", lambda db, sid: None)
-    monkeypatch.setattr("radar.core.services.workspace_service._mode_history", lambda db, sid, mode, window=8: [])
-    monkeypatch.setattr("radar.core.services.workspace_service._save_turn", lambda *a, **kw: None)
-
-    result = dispatch(
-        db=object(), session_id="s", workspace_id="w", profile=None,
-        mode="explorer", message="escreva a seção de impacto",
-    )
-
-    assert result["mode"] == "escrita"
-    assert len(escrita_called) == 1
-    assert "escreva a seção de impacto" in escrita_called[0]
-    assert "↪" in result["response"]
-    assert "troquei para /escrita" in result["response"]
-
-
-def test_dispatch_handoff_escrita_para_explorer(monkeypatch):
-    """dispatch(escrita, 'qual o prazo?') invoca explorer e retorna mode=explorer."""
-    explorer_called = []
-
-    def fake_explorer(message, history, profile, edital_ids=None, library_items=None, decision=None):
-        explorer_called.append(message)
-        return "O prazo é 30 dias úteis."
-
-    monkeypatch.setattr("radar.core.services.workspace_service._dispatch_explorer", fake_explorer)
-    monkeypatch.setattr("radar.core.services.workspace_service._load_session_edital_id", lambda db, sid: None)
-    monkeypatch.setattr("radar.core.services.workspace_service._mode_history", lambda db, sid, mode, window=8: [])
-    monkeypatch.setattr("radar.core.services.workspace_service._save_turn", lambda *a, **kw: None)
-
-    result = dispatch(
-        db=object(), session_id="s", workspace_id="w", profile=None,
-        mode="escrita", message="qual o prazo do edital?",
-    )
-
-    assert result["mode"] == "explorer"
-    assert len(explorer_called) == 1
-    assert "qual o prazo" in explorer_called[0]
-    assert "↪" in result["response"]
-    assert "troquei para /explorer" in result["response"]
-
-
-# ── Task 2: /profile ─────────────────────────────────────────────────────────
+# ── /profile ─────────────────────────────────────────────────────────────────
 
 
 def test_dispatch_profile_sem_url_nao_chama_llm(monkeypatch):
@@ -105,7 +16,6 @@ def test_dispatch_profile_sem_url_nao_chama_llm(monkeypatch):
 
     called = []
     monkeypatch.setattr(ProfileExtractor, "extract", lambda *a, **kw: called.append(1))
-    monkeypatch.setattr("radar.core.services.workspace_service._save_turn", lambda *a, **kw: None)
 
     result = dispatch(
         db=object(), session_id="s", workspace_id="w", profile=None,
@@ -145,7 +55,6 @@ def test_dispatch_profile_com_url_chama_extractor(monkeypatch):
         )
 
     monkeypatch.setattr(ProfileExtractor, "extract", fake_extract)
-    monkeypatch.setattr("radar.core.services.workspace_service._save_turn", lambda *a, **kw: None)
 
     result = dispatch(
         db=object(), session_id="s", workspace_id="w", profile=None,
@@ -161,7 +70,7 @@ def test_dispatch_profile_com_url_chama_extractor(monkeypatch):
     assert result["error"] is None
 
 
-# ── Task 3: /review ──────────────────────────────────────────────────────────
+# ── /review ──────────────────────────────────────────────────────────────────
 
 
 def test_dispatch_review_sem_secao_lista_outline(monkeypatch):
@@ -254,7 +163,7 @@ def test_dispatch_review_nao_chama_set_section_content(monkeypatch):
     assert result["error"] is None
 
 
-# ── Validations ──────────────────────────────────────────────────────────────
+# ── Validações ───────────────────────────────────────────────────────────────
 
 
 def test_valid_actions_contem_profile_e_review():
@@ -262,22 +171,12 @@ def test_valid_actions_contem_profile_e_review():
     assert "review" in VALID_ACTIONS
 
 
-def test_valid_modes_nao_contem_actions():
-    """VALID_MODES não inclui ações — são namespaces separados."""
-    assert "profile" not in VALID_MODES
-    assert "review" not in VALID_MODES
-
-
-def test_dispatch_mode_invalido_retorna_erro(monkeypatch):
-    """dispatch com mode inválido retorna erro sem exceção."""
-    monkeypatch.setattr("radar.core.services.workspace_service._load_session_edital_id", lambda db, sid: None)
-    monkeypatch.setattr("radar.core.services.workspace_service._mode_history", lambda db, sid, mode, window=8: [])
-    monkeypatch.setattr("radar.core.services.workspace_service._save_turn", lambda *a, **kw: None)
-
+def test_dispatch_acao_invalida_retorna_erro():
+    """dispatch com mode fora de VALID_ACTIONS retorna erro sem exceção."""
     result = dispatch(
         db=object(), session_id="s", workspace_id="w", profile=None,
         mode="invalid", message="foo",
     )
 
     assert result["error"] is not None
-    assert "inválido" in result["error"].lower()
+    assert "inválida" in result["error"].lower()

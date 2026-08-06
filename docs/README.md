@@ -47,6 +47,12 @@ cada assunto; não substitui os documentos indicados.
 | Spec | Status | Função |
 |---|---|---|
 | [`system-coherence.md`](specs/system-coherence.md) | vigente | propósito, capacidades e invariantes globais |
+| [`product-strategy-ecosystem-pathways.md`](specs/product-strategy-ecosystem-pathways.md) | aprovada | modelo de negócio, domínios ativos, jornadas e desativação de investidores |
+| [`product-scope-catalog-deactivation.md`](specs/product-scope-catalog-deactivation.md) | aprovada | escopo do catálogo e retirada de investidores |
+| [`product-pathways-domain-matching.md`](specs/product-pathways-domain-matching.md) | aprovada | caminhos de inovação e matching por domínio |
+| [`discovery-deep-research.md`](specs/discovery-deep-research.md) | aprovada | descoberta assistida por Deep Research com gate humano |
+| [`ict-pnipe-capabilities.md`](specs/ict-pnipe-capabilities.md) | aprovada | ICTs, laboratórios e capacidades do PNIPE |
+| [`knowledge-graph-ecosystem-v2.md`](specs/knowledge-graph-ecosystem-v2.md) | aprovada | ontologia, KG, workflows, RAG, memória, avaliação e operação da nova versão |
 | [`radar-data-trust.md`](specs/radar-data-trust.md) | vigente (00–05 concluídas) | programa de cobertura, proveniência e qualidade do plano de dados |
 | [`radar-data-trust-00-relevance-contract.md`](specs/radar-data-trust-00-relevance-contract.md) | vigente | relevância de oportunidades e atores para startups e PMEs tecnológicas |
 | [`radar-data-trust-01-provenance.md`](specs/radar-data-trust-01-provenance.md) | vigente | evidência rastreável do documento ao gold e às superfícies do produto |

@@ -156,6 +156,13 @@ def source_adapters() -> dict:
     return load().get("source_adapters", {})
 
 
+def pnipe_schema() -> dict:
+    """Contrato do registro bronze PNIPE (`pnipe_schema` em
+    docs/domain/sources/pnipe.md): campos, required_fields, kinds e notas.
+    Autoritativo — regras vivem no doc, não no código."""
+    return load("pnipe").get("pnipe_schema", {})
+
+
 def setor_vocab() -> list[str]:
     return load().get("setor_vocab", [])
 
@@ -383,6 +390,59 @@ def discovery_queries_flat() -> list[str]:
     """
     structured = discovery_queries()
     return [q["text"] for q in structured]
+
+
+# ---------------------------------------------------------------------------
+# Canal Deep Research (docs/domain/sources/_discovery.md,
+# spec discovery-deep-research.md)
+# ---------------------------------------------------------------------------
+
+def deep_research_config() -> dict:
+    """Config do canal Deep Research (defaults quando ausente).
+
+    Lê do doc autoritativo (não-cacheado): ``_discovery_raw`` relê o YAML.
+    ``provider`` vazio significa resolver no default do engine.
+    """
+    raw = (_discovery_raw().get("deep_research") or {}) or {}
+    if not isinstance(raw, dict):
+        raise TypeError("discovery.deep_research must be a mapping")
+    try:
+        return {
+            "enabled": bool(raw.get("enabled", False)),
+            "provider": str(raw.get("provider") or ""),
+            "max_findings": int(raw.get("max_findings") or 10),
+        }
+    except (TypeError, ValueError) as exc:  # noqa: PERF203
+        raise ValueError("discovery.deep_research config inválida") from exc
+
+
+def deep_research_targets() -> list[dict]:
+    """Alvos de pesquisa do canal Deep Research.
+
+    Cada alvo: ``{'key': str, 'brief': str, 'type_hint': str}``. Sem config ou
+    sem alvos → []. Erro se a estrutura do YAML estiver quebrada (documento é
+    autoritativo; quebrar aqui é melhor que pesquisar lixo).
+    """
+    raw = (_discovery_raw().get("deep_research") or {}) or {}
+    targets = raw.get("targets") or []
+    if not isinstance(targets, list):
+        raise TypeError("discovery.deep_research.targets must be a list")
+    out: list[dict] = []
+    for i, t in enumerate(targets):
+        if not isinstance(t, dict):
+            raise TypeError(f"deep_research target[{i}] must be a mapping")
+        key = t.get("key", "")
+        brief = t.get("brief", "")
+        if not isinstance(key, str) or not key.strip():
+            raise ValueError(f"deep_research target[{i}] missing or empty 'key'")
+        if not isinstance(brief, str) or not brief.strip():
+            raise ValueError(f"deep_research target[{i}] missing or empty 'brief'")
+        out.append({
+            "key": key,
+            "brief": brief,
+            "type_hint": str(t.get("type_hint") or "edital").strip().lower(),
+        })
+    return out
 
 
 # ---------------------------------------------------------------------------

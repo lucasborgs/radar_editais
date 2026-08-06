@@ -286,13 +286,14 @@ def chunk_storage_coords(chunk: dict, silver_source_hash: str | None) -> dict:
 
 
 # ===========================================================================
-# RT01-T07 — ICTs EMBRAPII (spec §3.2/§3.3/§6.4)
+# RT01-T07 — ICTs (EMBRAPII + PNIPE, spec §3.2/§3.3/§6.4)
 # ===========================================================================
 #
-# A evidência legítima desta origem (spec §6.4, linha EMBRAPII) é o REGISTRO
-# versionado do scraper — não um documento paginado. Cada ICT ancora em UM
-# `EvidenceRef` `document_only`: `document` é o nome do arquivo
-# `embrapii_*.json` usado pelo ingest (`gold._ingest_icts` já o conhece via
+# A evidência legítima desta origem (spec §6.4, linha EMBRAPII; linha PNIPE:
+# docs/specs/ict-pnipe-capabilities.md) é o REGISTRO versionado do scraper —
+# não um documento paginado. Cada ICT/laboratório ancora em UM `EvidenceRef`
+# `document_only`: `document` é o nome do arquivo `embrapii_*.json`/
+# `pnipe_*.json` usado pelo ingest (`gold._ingest_icts` já o conhece via
 # `files[-1]`); `canonical_content_hash` é o md5 do JSON canônico do
 # REGISTRO INDIVIDUAL (`json.dumps(record, sort_keys=True,
 # ensure_ascii=False)`), não do arquivo inteiro — cada ICT do mesmo arquivo
@@ -315,6 +316,7 @@ def chunk_storage_coords(chunk: dict, silver_source_hash: str | None) -> dict:
 # ===========================================================================
 
 ICT_SCRAPER_PRODUCER_NAME = "embrapii_scraper"
+PNIPE_INDEX_PRODUCER_NAME = "pnipe_lab_index"
 
 
 def build_ict_record_anchor(
@@ -323,18 +325,21 @@ def build_ict_record_anchor(
     document: str,
     source_url: str | None,
     native_id: str | None = None,
+    source: str = "embrapii",
     bundle=None,
     bundle_document=None,
 ) -> EvidenceRef:
-    """Âncora `document_only` de UM registro EMBRAPII (spec §6.4).
+    """Âncora `document_only` de UM registro ICT (spec §6.4, linha EMBRAPII;
+    extensão PNIPE em docs/domain/sources/pnipe.md).
 
     O hash cobre só o JSON do `record` recebido, não o arquivo inteiro —
-    cada ICT do mesmo `embrapii_*.json` versionado tem hash próprio. Sem
-    `quote`: identidade de um registro estruturado, não citação verbatim."""
+    cada ICT do mesmo `embrapii_*.json`/`pnipe_*.json` versionado tem hash
+    próprio. Sem `quote`: identidade de um registro estruturado, não citação
+    verbatim."""
     canonical = json.dumps(record, sort_keys=True, ensure_ascii=False)
     digest = hashlib.md5(canonical.encode("utf-8")).hexdigest()
     ref = EvidenceRef(
-        source="embrapii",
+        source=source,
         native_id=native_id,
         source_url=source_url,
         document=document,
@@ -348,7 +353,9 @@ def build_ict_record_anchor(
     return ref
 
 
-def build_ict_identity_provenance(anchor: EvidenceRef) -> FactProvenance:
+def build_ict_identity_provenance(
+    anchor: EvidenceRef, *, producer_name: str = ICT_SCRAPER_PRODUCER_NAME,
+) -> FactProvenance:
     """`name`/`metadata.url` — `stated/adapter`: o scraper declara os dois
     diretamente do registro coletado (spec §3.2), não infere nenhum deles.
     Mesma âncora do registro para ambos — não são citações distintas, é o
@@ -356,7 +363,7 @@ def build_ict_identity_provenance(anchor: EvidenceRef) -> FactProvenance:
     return FactProvenance(
         state=FactState.STATED,
         evidence_refs=[anchor],
-        producer=ProducerInfo(kind=ProducerKind.ADAPTER, name=ICT_SCRAPER_PRODUCER_NAME),
+        producer=ProducerInfo(kind=ProducerKind.ADAPTER, name=producer_name),
     )
 
 
@@ -384,7 +391,9 @@ def build_ict_tags_provenance() -> FactProvenance:
     )
 
 
-def build_ict_credenciada_por_provenance(anchor: EvidenceRef) -> FactProvenance:
+def build_ict_credenciada_por_provenance(
+    anchor: EvidenceRef, *, producer_name: str = ICT_SCRAPER_PRODUCER_NAME,
+) -> FactProvenance:
     """Aresta `credenciada_por` — `stated/adapter`: a listagem EMBRAPII É a
     declaração oficial do vínculo (spec §3.3), não uma inferência sobre ele.
     Mesma âncora do registro do lado ICT da aresta — reusada pelo chamador,
@@ -392,28 +401,57 @@ def build_ict_credenciada_por_provenance(anchor: EvidenceRef) -> FactProvenance:
     return FactProvenance(
         state=FactState.STATED,
         evidence_refs=[anchor],
-        producer=ProducerInfo(kind=ProducerKind.ADAPTER, name=ICT_SCRAPER_PRODUCER_NAME),
+        producer=ProducerInfo(kind=ProducerKind.ADAPTER, name=producer_name),
     )
 
 
-def build_ict_fact_provenance(*, record: dict, anchor: EvidenceRef, uf: str | None) -> dict[str, dict]:
+def build_ict_capacity_provenance(
+    anchor: EvidenceRef, *, producer_name: str,
+) -> FactProvenance:
+    """Campos de CAPACIDADE do laboratório PNIPE (`metadata.institution`,
+    `metadata.municipio`, `metadata.competencias`, `metadata.equipamentos`,
+    `metadata.condicoes_acesso`, `metadata.verificado_em`) —
+    `stated/adapter`: o índice do laboratório DECLARA esses campos (spec
+    ict-pnipe-capabilities.md §3); não inferimos disponibilidade atual nem
+    parceria. Mesma âncora `document_only` do registro — a data de
+    verificação é o `data_extracao` do próprio registro."""
+    return FactProvenance(
+        state=FactState.STATED,
+        evidence_refs=[anchor],
+        producer=ProducerInfo(kind=ProducerKind.ADAPTER, name=producer_name),
+    )
+
+
+def build_ict_fact_provenance(
+    *, record: dict, anchor: EvidenceRef, uf: str | None,
+    source: str = "embrapii", producer_name: str = ICT_SCRAPER_PRODUCER_NAME,
+) -> dict[str, dict]:
     """Compõe o dict `path -> FactProvenance.model_dump(mode="json")` de UM
     registro ICT, pronto para `entities.provenance`.
 
     Recebe `anchor` já construído (não o reconstrói) para que o chamador
     reuse a mesma âncora na aresta `credenciada_por` sem hashear o registro
     duas vezes. Campo sem valor no registro não recebe entrada — nada de
-    `unknown` artificial (tabela de fatos da task)."""
+    `unknown` artificial (tabela de fatos da task). Para `source == "pnipe"`
+    adiciona os paths de capacidade (ver `build_ict_capacity_provenance`)."""
     out: dict[str, dict] = {}
+    identity = build_ict_identity_provenance(anchor, producer_name=producer_name)
     if record.get("name"):
-        out["name"] = build_ict_identity_provenance(anchor).model_dump(mode="json")
+        out["name"] = identity.model_dump(mode="json")
     if record.get("url"):
-        out["metadata.url"] = build_ict_identity_provenance(anchor).model_dump(mode="json")
+        out["metadata.url"] = identity.model_dump(mode="json")
     if uf is not None:
         out["uf"] = build_ict_uf_provenance().model_dump(mode="json")
     if record.get("areas_raw"):
         out["setores"] = build_ict_tags_provenance().model_dump(mode="json")
         out["tecnologias_tags"] = build_ict_tags_provenance().model_dump(mode="json")
+    if source == "pnipe":
+        capacity = build_ict_capacity_provenance(anchor, producer_name=producer_name)
+        for key in ("institution", "municipio", "competencias", "equipamentos", "condicoes_acesso"):
+            if record.get(key):
+                out[f"metadata.{key}"] = capacity.model_dump(mode="json")
+        if record.get("data_extracao"):
+            out["metadata.verificado_em"] = capacity.model_dump(mode="json")
     return out
 
 

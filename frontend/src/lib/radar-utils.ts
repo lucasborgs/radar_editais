@@ -9,7 +9,7 @@ export type DeadlineUrgency = "closing" | "soon" | "future" | "continuous" | "co
 export type DeadlineFilter = "all" | "closing" | "soon" | "continuous";
 export type EligibilityFilter = "all" | "elegivel" | "nao_verificada";
 export type EditalOrder = "affinity" | "deadline";
-export type RadarTrail = "edital" | "programa" | "investidor";
+export type RadarTrail = "edital" | "programa";
 
 export interface RadarFilters {
   trails: RadarTrail[];
@@ -20,7 +20,7 @@ export interface RadarFilters {
 }
 
 export const DEFAULT_RADAR_FILTERS: RadarFilters = {
-  trails: ["edital", "programa", "investidor"],
+  trails: ["edital", "programa"],
   setores: [],
   eligibility: "all",
   deadline: "all",
@@ -112,4 +112,23 @@ export function sortEditais(editais: MatchedEdital[], order: EditalOrder): Match
 
 export function availableSetores(...groups: Array<Array<{ setores?: string[] }>>): string[] {
   return Array.from(new Set(groups.flatMap((group) => group.flatMap((item) => item.setores ?? [])))).sort();
+}
+
+// Rótulo de fallback do tipo de caminho — a fonte autoritativa é
+// `explicacao.dominio` (enviada pelo backend via TIPO_LABEL); este mapa só
+// cobre o caso de o card chegar sem explicação.
+const PATH_LABELS: Record<string, string> = {
+  financiamento: "Financiamento público",
+  credito: "Crédito",
+  subvencao: "Subvenção",
+  bolsa: "Bolsa",
+  desafio: "Desafio / inovação aberta",
+  aceleradora: "Aceleradora",
+  incubadora: "Incubadora",
+  ict: "ICT / laboratório",
+};
+
+export function pathTypeLabel(tipo?: string | null): string | undefined {
+  if (!tipo) return undefined;
+  return PATH_LABELS[tipo] ?? tipo;
 }

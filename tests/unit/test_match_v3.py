@@ -18,7 +18,6 @@ import pytest
 from radar.core.services import match_v3
 from radar.core.services.company_chunks import ephemeral_company_chunks
 from radar.core.services.match_v3 import (
-    InvestorMatch,
     OpportunityMatch,
     _EntityChunks,
     _Snapshot,
@@ -139,7 +138,7 @@ def test_origins_are_fail_closed_for_workspace_profile_library_and_hyde():
     assert {e["origin"] for e in excerpts} <= {"profile", "library_doc"}
 
 
-def test_company_chunks_are_loaded_once_and_reused_for_investors(monkeypatch):
+def test_company_chunks_nao_sao_consumidos_por_trilha_desativada(monkeypatch):
     calls = []
     monkeypatch.setattr(match_v3, "ensure_company_chunks", lambda *args, **kwargs: None)
     monkeypatch.setattr(match_v3, "load_company_chunks", lambda *args, **kwargs: (
@@ -147,9 +146,10 @@ def test_company_chunks_are_loaded_once_and_reused_for_investors(monkeypatch):
     ))
     prepared = match_v3.prepare_company_side({"nome": "ACME"}, workspace_id="workspace")
     assert calls == [True]
-    snap = _Snapshot(probe=("fake",), opportunities=[], chunks={}, investors=[])
-    monkeypatch.setattr(match_v3, "_get_snapshot", lambda: snap)
-    match_v3.find_matching_investors({"nome": "ACME"}, workspace_id="workspace", prepared_company=prepared)
+    # Trilha investidor desativada: a chamada não carrega lado-empresa nem devolve fundos.
+    assert match_v3.find_matching_investors(
+        {"nome": "ACME"}, workspace_id="workspace", prepared_company=prepared
+    ) == []
     assert calls == [True]
 
 
@@ -281,6 +281,59 @@ def test_funil_boost_setores(fake_funnel):
     assert aff_com["finep:ruim"] == pytest.approx(aff_sem["finep:ruim"], rel=1e-5)
 
 
+def test_funil_structural_boost_false_off(fake_funnel):
+    """structural_boost=False (default) não altera o funil — célula baseline."""
+    base = {m.entity_id: m.affinity for m in match_v3.find_matching_opportunities(
+        {"nome": "ACME"}, as_of=TODAY, top_k=10, min_affinity=0.0, boost=False,
+    )}
+    com = {m.entity_id: m.affinity for m in match_v3.find_matching_opportunities(
+        {"nome": "ACME"}, as_of=TODAY, top_k=10, min_affinity=0.0, boost=False,
+        structural_boost=False,
+    )}
+    assert com == base
+
+
+def test_funil_structural_boost_similar_a_neighbors(fake_funnel, monkeypatch):
+    """Boost estrutural multiplica a afinidade de vizinhos `similar_a` de um
+    match forte (acima do piso de produção)."""
+    from radar.core.kg.spike import match_boost
+
+    class _Graph:
+        probe = ("fake",)
+        neighbors = {
+            "edital:finep:bom": [("edital:finep:ruim", 0.9)],
+            "edital:finep:ruim": [("edital:finep:bom", 0.9)],
+        }
+
+    monkeypatch.setattr(match_boost, "_get_similar", lambda: _Graph())
+    sem = {m.entity_id: m.affinity for m in match_v3.find_matching_opportunities(
+        {"nome": "ACME"}, as_of=TODAY, top_k=10, min_affinity=0.0, boost=False,
+    )}
+    com = {m.entity_id: m.affinity for m in match_v3.find_matching_opportunities(
+        {"nome": "ACME"}, as_of=TODAY, top_k=10, min_affinity=0.0, boost=False,
+        structural_boost=True,
+    )}
+    assert com["finep:ruim"] == pytest.approx(
+        sem["finep:ruim"] * (1 + match_boost.STRUCTURAL_ALPHA * 0.9), rel=1e-5,
+    )
+    assert com["finep:bom"] == pytest.approx(sem["finep:bom"], rel=1e-5)
+
+
+def test_funil_structural_boost_fail_open(fake_funnel, monkeypatch):
+    """DB indisponível (None) → fator identidade, funil intacto."""
+    from radar.core.kg.spike import match_boost
+
+    monkeypatch.setattr(match_boost, "_get_similar", lambda: None)
+    base = {m.entity_id: m.affinity for m in match_v3.find_matching_opportunities(
+        {"nome": "ACME"}, as_of=TODAY, top_k=10, min_affinity=0.0, boost=False,
+    )}
+    com = {m.entity_id: m.affinity for m in match_v3.find_matching_opportunities(
+        {"nome": "ACME"}, as_of=TODAY, top_k=10, min_affinity=0.0, boost=False,
+        structural_boost=True,
+    )}
+    assert com == base
+
+
 def test_funil_kinds_filtra_programa(fake_funnel):
     so_editais = match_v3.find_matching_opportunities(
         None, as_of=TODAY, top_k=10, min_affinity=0.0, kinds=frozenset({"edital"}),
@@ -306,69 +359,100 @@ def test_payload_shape(fake_funnel):
 
 
 # ---------------------------------------------------------------------------
-# Trilha investidor
+# Trilha investidor — DESATIVADA (spec product-scope-catalog-deactivation.md)
 # ---------------------------------------------------------------------------
 
-def _inv(native_id, *, emb, estagio_alvo=(), setores=(), generalista=False,
-         fund_status="ativo", verificado="2026-06-09"):
-    return {
-        "id": f"id-{native_id}", "native_id": native_id, "name": native_id,
-        "description": f"tese {native_id}", "status": "ativa",
-        "setores": list(setores), "ticket_min": None, "ticket_max": None,
-        "verificado_em": verificado,
-        "metadata": {"estagio_alvo": list(estagio_alvo), "generalista": generalista,
-                     "fund_status": fund_status, "site": "https://x"},
-        "_emb": _unit(emb),
-    }
-
-
-@pytest.fixture
-def fake_investors(monkeypatch):
-    invs = [
-        _inv("investidor:casa", emb=[1, 0.1, 0]),
-        _inv("investidor:estagio-errado", emb=[1, 0, 0], estagio_alvo=["growth"]),
-        _inv("investidor:setor-errado", emb=[1, 0, 0], setores=["Agro"]),
-        _inv("investidor:multissetorial", emb=[1, 0.2, 0], setores=["Multissetorial"]),
-        _inv("investidor:inativo", emb=[1, 0, 0], fund_status="encerrado"),
-        _inv("investidor:longe", emb=[0, 0, 1]),
-    ]
-    snap = _Snapshot(probe=("fake",), opportunities=[], chunks={}, investors=invs)
-    monkeypatch.setattr(match_v3, "_get_snapshot", lambda: snap)
-    monkeypatch.setattr(
-        match_v3, "_company_side",
-        lambda profile, **kw: (["empresa de saúde digital"], np.stack([_unit([1, 0, 0])])),
+def test_investidor_trilha_desativada_devolve_vazio(monkeypatch):
+    """A trilha investidor retorna vazio mesmo com fundos no snapshot: investidores
+    privados estão fora do escopo ativo e nunca são recomendados."""
+    snap = _Snapshot(
+        probe=("fake",), opportunities=[], chunks={}, investors=[
+            {
+                "id": "id-x", "native_id": "investidor:casa", "name": "Fundo",
+                "description": "tese", "status": "ativa", "setores": [],
+                "ticket_min": None, "ticket_max": None, "verificado_em": "2026-06-09",
+                "metadata": {"estagio_alvo": [], "generalista": False, "fund_status": "ativo"},
+                "_emb": _unit([1, 0.1, 0]),
+            },
+        ],
     )
-    return snap
+    monkeypatch.setattr(match_v3, "_get_snapshot", lambda: snap)
+    ms = match_v3.find_matching_investors(
+        {"nome": "ACME", "estagio": "seed", "one_liner": "saúde digital"}, top_k=10
+    )
+    assert ms == []
 
 
-def test_investidores_gates_de_metadata(fake_investors):
-    profile = {"nome": "ACME", "estagio": "seed",
-               "one_liner": "diagnóstico em saúde digital"}
-    ms = match_v3.find_matching_investors(profile, top_k=10)
-    ids = {m.entity_id for m in ms}
-    assert "investidor:casa" in ids
-    assert "investidor:multissetorial" in ids       # Multissetorial nunca gateia
-    assert "investidor:estagio-errado" not in ids   # seed ∉ [growth]
-    assert "investidor:setor-errado" not in ids     # Saúde ∉ [Agro]
-    assert "investidor:inativo" not in ids          # fund_status
-    assert "investidor:longe" not in ids            # piso de cosseno
-    assert all(isinstance(m, InvestorMatch) for m in ms)
+# ---------------------------------------------------------------------------
+# Caminhos de inovação por domínio (spec product-pathways-domain-matching.md)
+# ---------------------------------------------------------------------------
+
+def test_funil_anota_caminho_por_dominio(fake_funnel):
+    """Cada match carrega tipo/caminho/explicação — anotação aditiva, sem
+    alterar ranking. Default dos editais do fixture = financiamento público."""
+    ms = match_v3.find_matching_opportunities(
+        {"nome": "ACME", "one_liner": "projeto de diagnóstico"},
+        as_of=TODAY, top_k=10, min_affinity=0.0, boost=False,
+    )
+    by_id = {m.entity_id: m for m in ms}
+    m = by_id["finep:bom"]
+    assert m.tipo == "financiamento"
+    d = m.to_dict()
+    assert d["tipo"] == "financiamento"
+    assert set(d["caminho"]) == {
+        "tipo", "entidade", "objetivo", "requisitos",
+        "canal_de_acesso", "evidencias", "status", "proximo_passo",
+    }
+    assert d["caminho"]["entidade"] == "finep:bom"
+    assert d["explicacao"]["proximo_passo"]
 
 
-def test_investidores_unknown_nao_gateia(fake_investors):
-    """Perfil sem estágio nem texto de setor → gates não eliminam (unknown)."""
-    ms = match_v3.find_matching_investors({"nome": "ACME"}, top_k=10)
-    ids = {m.entity_id for m in ms}
-    assert {"investidor:casa", "investidor:estagio-errado", "investidor:setor-errado"} <= ids
+def test_funil_caminho_intencao_sem_projeto(fake_funnel):
+    """Aceite 3: intenção sem projeto → status 'possibilidade' e pendência de
+    hipótese de escopo, sem declarar elegibilidade."""
+    ms = match_v3.find_matching_opportunities(
+        {"nome": "ACME"}, as_of=TODAY, top_k=10, min_affinity=0.0, boost=False,
+    )
+    m = next(x for x in ms if x.entity_id == "finep:bom")
+    assert m.caminho["status"] == "possibilidade"
+    assert any("Defina o projeto" in p for p in m.explicacao["pendentes"])
+    assert not m.explicacao["confirmados"]  # nenhum fato de elegibilidade inventado
 
 
-def test_investidor_payload(fake_investors):
-    profile = {"nome": "ACME", "estagio": "seed"}
-    m = match_v3.find_matching_investors(profile, top_k=1)[0].to_dict()
-    assert m["kind"] == "investidor"
-    assert m["affinity"] == m["score"]              # mesma escala 0..1 do funil
-    assert m["offer"]["official_url"] == "https://x"
-    assert m["matched_excerpts"][0]["edital_text"].startswith("tese ")
+def test_find_ict_partners_exige_projeto(monkeypatch):
+    """ICTs são capacidades/parceiros: exigem projeto definido e nunca entram
+    no ranking (não viram OpportunityMatch)."""
+    from radar.core.kg import entity_catalog
+
+    monkeypatch.setattr(
+        entity_catalog, "list_entity_catalog",
+        lambda key, *, tema, limit: [
+            {"id": "ict:labx", "name": "Lab X", "description": "competências em saúde",
+             "themes": ["Saúde"], "type": "Ator"},
+        ],
+    )
+    assert match_v3.find_ict_partners({"nome": "ACME"}) == []
+    partners = match_v3.find_ict_partners(
+        {"nome": "ACME", "one_liner": "diagnóstico em saúde"},
+    )
+    assert len(partners) == 1
+    p = partners[0]
+    assert p["kind"] == "ict"
+    assert p["caminho"]["tipo"] == "ict"
+    assert p["caminho"]["status"] == "possibilidade"
+    assert p["explicacao"]["proximo_passo"]
+
+
+def test_find_ict_partners_fail_open(monkeypatch):
+    from radar.core.kg import entity_catalog
+
+    def boom(*_a, **_k):
+        raise RuntimeError("db fora")
+
+    monkeypatch.setattr(entity_catalog, "list_entity_catalog", boom)
+    assert match_v3.find_ict_partners(
+        {"nome": "ACME", "one_liner": "diagnóstico em saúde"},
+    ) == []
 
 
 # ---------------------------------------------------------------------------

@@ -66,6 +66,7 @@ Cada fonte tem um schema específico em `docs/domain/sources/<fonte>.md` que **e
 | FAPESC | [sources/fapesc.md](sources/fapesc.md) | ativo (v1) |
 | Web | regras globais §12.4 + [sources/_discovery.md](sources/_discovery.md) | ativo, com gate humano + monitoramento de cobertura |
 | EMBRAPII | extractor curado `src/radar/pipeline/extractors/ict_embrapii.py` | ativo para ICTs |
+| PNIPE | [sources/pnipe.md](sources/pnipe.md) — normalizador `src/radar/pipeline/extractors/pnipe.py` | laboratórios como capacidades, entrada curada |
 
 **Artefato operacional da Descoberta — `source_runs`** (migration 043): tabela
 aditiva que registra uma linha por canal observado em cada execução (canal,
@@ -389,11 +390,15 @@ ICTs (Instituições de Ciência e Tecnologia) são **parceiras** que muitos edi
 FINEP/FAPESP exigem para viabilizar a candidatura. **Uma ICT não lança edital** —
 apenas participa de projetos. Logo, a entidade `ict` **não** flui pelo ETL de edital
 (sem PDF, status, mechanism, vigência) e **não** entra no `SCRAPER_REGISTRY`.
-O ingest lê os arquivos curados `data/bronze/ict_raw/embrapii_*.json`, materializa
-`entities(kind=ict)` e a relação `credenciada_por` com a EMBRAPII. Afinidade entre
-edital e ICT é calculada por setores e tecnologias compartilhados; não existe
-relação direta edital↔ICT. Quando um edital exige parceria com uma ICT, essa
-exigência é uma constraint do edital, não uma relação com uma ICT específica.
+O ingest lê os arquivos curados `data/bronze/ict_raw/embrapii_*.json` e
+`data/bronze/ict_raw/pnipe_*.json` (PNIPE: laboratórios catalogados como
+capacidades, ver [sources/pnipe.md](sources/pnipe.md)), materializa
+`entities(kind=ict)` e — apenas para EMBRAPII — a relação `credenciada_por`
+com a agência EMBRAPII. Laboratórios PNIPE não têm essa aresta (não há
+credenciamento). Afinidade entre edital e ICT é calculada por setores e
+tecnologias compartilhados; não existe relação direta edital↔ICT. Quando um
+edital exige parceria com uma ICT, essa exigência é uma constraint do edital,
+não uma relação com uma ICT específica.
 
 A definição legal de "ICT" é ampla; o campo `kind` absorve a variação
 (unidade EMBRAPII, laboratório PNIPE, instituto, universidade) sem exigir
@@ -401,16 +406,17 @@ taxonomia perfeita.
 
 ```yaml
 ict_schema:
-  artifact: "data/bronze/ict_raw/embrapii_*.json"
-  id_format: "<source>:<slug>"          # ex.: embrapii:inteligencia-artificial-ceia-ufg
+  artifact: "data/bronze/ict_raw/{embrapii_,pnipe_}_*.json"
+  id_format: "<source>:<slug>"          # ex.: embrapii:inteligencia-artificial-ceia-ufg; pnipe:lab-ia-robotica
   node_fields: [id, name, kind, source, url, about, address, contact, areas_raw, themes, themes_proposed, summary, brings_cofinancing]
   required_fields: [id, name, kind, source, themes]
   kinds: [embrapii_unit, laboratorio, instituto, universidade]
   sources: [embrapii, pnipe]
   notes:
+    - "PNIPE: laboratórios catalogados como capacidades — contrato próprio em docs/domain/sources/pnipe.md (`pnipe_schema`). Campos de capacidade (institution, municipio, competencias, equipamentos, condicoes_acesso, data_extracao/verificado_em) ficam em metadata.capacidades; data de verificação → entities.verificado_em."
     - "themes: temas CANÔNICOS de edital (mesma representação de edital.themes — rótulos, não slugs) que a ICT cobre. É a ponte: edital.themes ∩ ict.themes."
     - "O ingest normaliza áreas cruas para as taxonomias gold de setores e tecnologias (§13)."
-    - "areas_raw: rótulos de expertise crus da fonte (EMBRAPII: action_lines + tech_skills). Display + matching fino futuro."
+    - "areas_raw: rótulos de expertise crus da fonte (EMBRAPII: action_lines + tech_skills; PNIPE: áreas declaradas). Display + matching fino futuro."
     - "themes_proposed: áreas que não casaram com nenhum tema de edital — candidatas à expansão do vocabulário (não entram em themes nem na ponte)."
     - "brings_cofinancing: bool. ICT cujo ARRANJO aporta recurso não-reembolsável ao projeto (Unidade EMBRAPII: ~1/3 do custo do projeto vem do aporte EMBRAPII). É o que dispara o selo 'pode trazer co-financiamento' no complemento do match. Default false; derivado true para source=='embrapii'. Generaliza além do kind (um lab PNIPE não traz). Opcional (não em required_fields) — ICTs antigas sem o campo seguem válidas."
     - "contact: dict {responsavel, email, telefone, site, ...} (campos opcionais)."
@@ -643,9 +649,7 @@ structured_doc_schema:
     silver_version:           "str — versão do schema do bloco (bump = re-roda A e B)"
     structurer_prompt_version: "str — versão do prompt §11.3"
     structurer_model:         "str — modelo usado"
-    source_hash:              "str — hash do Documento Canônico consumido pelo silver"
-    early_input_fingerprint:  "str — fingerprint determinístico dos artefatos bronze que alimentam o adapter"
-    early_fingerprint_version: "str — versão do fingerprint + produtores; aditivo e ignorável por versões antigas"
+    source_hash:              "str — hash do texto dos PDFs de origem"
 ```
 
 `kind=boilerplate|signature` permite ao Ramo A descartar ruído (rodapé,
@@ -723,8 +727,7 @@ Três chaves de invalidação independentes — é o que mantém A e B desacopla
 
 | Camada | Chave de cache | Re-roda quando |
 |---|---|---|
-| Early ETL gate | `fingerprint(artefatos bronze + documentos + produtores)` | input relevante, adapter, schema ou structurer muda |
-| Silver | `hash(canonical_doc + prompt_version + model)` | Documento Canônico muda OU structurer versiona |
+| Silver | `hash(pdf_text + prompt_version + model)` | PDF muda OU structurer versiona |
 | Ramo A | `hash(silver_id + silver_version + wiki_prompt + metadata)` | schema da wiki (§4) muda |
 | Ramo B | `hash(silver_id + silver_version + chunk_policy + embed_model)` | política de chunk muda |
 
@@ -734,31 +737,6 @@ Consequência: mexer no schema da wiki re-roda **só a Knowledge gold**
 structurer re-roda ambas (esperado — é a raiz compartilhada). Sem conteúdo ou
 falha LLM: silver vazio → Knowledge cai no `_save_minimal_wiki_page`,
 Retrieval não indexa (comportamento atual preservado).
-
-### 11.5 Gate antecipado do ETL
-
-Antes de chamar o Source Adapter, `_build_all_silver` calcula um fingerprint
-determinístico por edital a partir do conteúdo dos artefatos bronze relevantes,
-do conjunto completo de documentos e de sua ordem normalizada. O fingerprint
-também inclui a versão efetiva do módulo do adapter, dos helpers de extração,
-do structurer e do schema. Mtime, caminho absoluto e timestamps de coleta não
-entram no cálculo.
-
-O fingerprint é persistido no sidecar do silver, de modo aditivo. Quando o
-fingerprint coincide e o JSONL/sidecar do silver está íntegro, o ETL encerra
-cedo o edital: não chama adapter, não persiste Documento Canônico e não roda o
-structurer. Em qualquer ausência, corrupção ou dúvida, o caminho é fail-open:
-adapter → Documento Canônico → silver.
-
-Após uma materialização bem-sucedida, a atualização do fingerprint é atômica.
-O Gold recebe somente os IDs que atravessaram o gate como `changed`; se nenhum
-edital mudou, o ingest de editais não é executado. O `source_hash` do Gold
-permanece como segunda proteção idempotente.
-
-O ledger registra, por execução e por canal, `records_observed`, `unchanged`,
-`changed`, `silver_built`, `silver_skipped`, `gold_processed`, `gold_skipped` e
-`step_errors`. Esses valores são contadores sem payload, URL ou conteúdo de
-documento.
 
 > Nomenclatura: "Ramo A" = **Knowledge gold** (§12, L3a); "Ramo B" =
 > **Retrieval gold** (§12, L3b). Ver §12 para o stack completo.

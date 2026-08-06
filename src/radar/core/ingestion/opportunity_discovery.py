@@ -628,6 +628,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
         "dou": _ChannelReport(channel="dou"),
         "open_search": _ChannelReport(channel="open_search"),
         "hub_expansion": _ChannelReport(channel="hub_expansion"),
+        "deep_research": _ChannelReport(channel="deep_research"),
     }
     if not hub_enabled:
         reports["hub_expansion"].skipped = True
@@ -638,6 +639,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
             ("dou", "official_feed"),
             ("open_search", "open_search"),
             ("hub_expansion", "hub"),
+            ("deep_research", "agentic"),
         ):
             try:
                 rid = _start_run(db, batch_id=batch_id, source_key=ch_key, mode=mode)
@@ -683,7 +685,7 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
 
     if not queries:
         logger.warning("descoberta: sem queries em docs/domain/sources/_discovery.md")
-        for ch_key in ("dou", "open_search", "hub_expansion"):
+        for ch_key in ("dou", "open_search", "hub_expansion", "deep_research"):
             reports[ch_key].skipped = True
             reports[ch_key].reason = "empty_result"
         _finish_all()
@@ -882,6 +884,46 @@ def discover_opportunities(*, write: bool = True) -> list[dict]:
 
     logger.info("descoberta: %d triagens puladas pelo cache negativo (TTL %dd)",
                 triage_skipped, reject_ttl_days)
+
+    # Canal Deep Research (spec discovery-deep-research.md): agente de pesquisa
+    # web complementar aos scrapers, gated por DISCOVERY_DEEP_RESEARCH_ENABLED.
+    # Roda DEPOIS dos geradores determinísticos e é fail-open — qualquer falha
+    # degrada o canal sem interromper a descoberta (aceite 5). NUNCA publica no
+    # KG: os achados entram no MESMO staging (pending) com gate humano; a
+    # promoção usa o caminho canônico existente (evidence_package → bronze →
+    # chunk_edital + ingest_promoted_edital).
+    dr_report = reports["deep_research"]
+    dr_enabled = os.getenv("DISCOVERY_DEEP_RESEARCH_ENABLED", "0") == "1"
+    if dr_enabled:
+        try:
+            from radar.core.ingestion.deep_research_discovery import (  # noqa: PLC0415
+                run_deep_research_channel,
+            )
+            from radar.core.kg.schema import deep_research_config as _dr_config  # noqa: PLC0415
+            from radar.core.kg.schema import deep_research_targets as _dr_targets  # noqa: PLC0415
+            dr_max = int(_dr_config().get("max_findings") or 10)
+            dr_findings = run_deep_research_channel(
+                _dr_targets(), max_findings=dr_max, exclude_urls=known | seen_now,
+            )
+            dr_report.returned = len(dr_findings)
+            for rec in dr_findings:
+                rec["discovery_run_id"] = run_ids.get("deep_research")
+                rec["discovery_channel"] = "deep_research"
+                rec["query_family"] = None
+                rec["origin_domain"] = _origin_domain(rec["url"])
+                dr_report.records_produced += 1
+                records.append(rec)
+            if dr_findings:
+                logger.info("descoberta: %d candidatos via Deep Research", len(dr_findings))
+        except Exception as exc:
+            logger.warning(
+                "descoberta: canal Deep Research falhou (%s) — determinístico intacto",
+                exc,
+            )
+            dr_report.error_count += 1
+            dr_report.reason = "provider_error"
+    else:
+        dr_report.skipped = True
 
     if write:
         n = _stage_records(records)

@@ -12,20 +12,18 @@ import { temporalBadge, temporalDeadlineText } from "@/lib/opportunity-temporal"
 import type { DashboardStats, EditalStatus } from "@/types/edital";
 import type { OpportunityEntry } from "@/types/oportunidade";
 
-type TypeFilter = "all" | "edital" | "programa" | "investidor" | "ict";
+type TypeFilter = "all" | "edital" | "programa" | "ict";
 
 const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
   { value: "all", label: "Todos" },
   { value: "edital", label: "Editais" },
   { value: "programa", label: "Programas" },
-  { value: "investidor", label: "Investidores" },
   { value: "ict", label: "ICTs" },
 ];
 
 const TYPE_BADGE: Record<string, { label: string; className: string }> = {
   edital: { label: "Edital", className: "bg-primary/15 text-primary" },
   programa: { label: "Programa", className: "bg-blue-500/15 text-blue-700 dark:text-blue-300" },
-  investidor: { label: "Investidor", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
   ict: { label: "ICT", className: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
 };
 
@@ -155,8 +153,8 @@ export default function OportunidadesPage() {
     });
   }, [opportunities, typeFilter, themeQuery]);
 
-  // D1/PR8: toda oportunidade (edital, programa, investidor) abre a ficha
-  // unificada. ICTs não têm ficha detalhada (são Ator, não Oportunidade).
+  // D1/PR8: toda oportunidade (edital, programa) abre a ficha unificada.
+  // ICTs não têm ficha detalhada (são Ator, não Oportunidade).
   const handleRowClick = (row: OpportunityEntry) => {
     if (row.type === "ict") return;
     router.push(`/oportunidades/${encodeURIComponent(row.id)}`);
@@ -166,11 +164,11 @@ export default function OportunidadesPage() {
     <DashboardLayout title="Ecossistema">
       <div className="space-y-5">
         {/* KPI row */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <MetricCard
             label="Itens no ecossistema"
             value={stats ? stats.total_oportunidades : "—"}
-            subtext="editais + programas + investidores + ICTs"
+            subtext="editais + programas + ICTs"
           />
           <MetricCard
             label="Editais Abertos"
@@ -181,11 +179,6 @@ export default function OportunidadesPage() {
             label="Programas"
             value={stats ? stats.n_programas : "—"}
             subtext="linhas de fomento"
-          />
-          <MetricCard
-            label="Investidores"
-            value={stats ? stats.n_investidores : "—"}
-            subtext="parceiros de capital"
           />
           <MetricCard
             label="ICTs"
@@ -237,7 +230,12 @@ export default function OportunidadesPage() {
           data={filtered}
           columns={COLUMNS}
           loading={loading}
-          emptyMessage="Nenhuma oportunidade corresponde aos filtros selecionados."
+          errorMessage={error ?? undefined}
+          emptyMessage={
+            typeFilter === "all" && !themeQuery.trim()
+              ? "Nenhuma oportunidade encontrada no catálogo."
+              : "Nenhuma oportunidade corresponde aos filtros selecionados."
+          }
           onRowClick={handleRowClick}
         />
       </div>

@@ -19,7 +19,6 @@ import json
 import logging
 import os
 import re
-import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -240,23 +239,6 @@ def _cache_meta() -> dict:
     }
 
 
-def _atomic_write_text(path: Path, content: str) -> None:
-    """Publish one complete Silver artifact, never a partial file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp_name = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent,
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(content)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temp_name, path)
-    finally:
-        if os.path.exists(temp_name):
-            os.unlink(temp_name)
-
-
 def build_or_load_structured_doc(
     source: str, edital_id: str, documents: CanonicalDoc, force: bool = False
 ) -> list[dict]:
@@ -284,16 +266,17 @@ def build_or_load_structured_doc(
         return []
 
     blocks, page_stats = structure_document(documents)
-    _atomic_write_text(
-        jsonl_path,
+    jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+    jsonl_path.write_text(
         "\n".join(json.dumps(b, ensure_ascii=False) for b in blocks),
+        encoding="utf-8",
     )
-    _atomic_write_text(
-        meta_path,
+    meta_path.write_text(
         json.dumps(
             {**want_meta, "n_blocks": len(blocks), **page_stats},
             ensure_ascii=False, indent=2,
         ),
+        encoding="utf-8",
     )
     logger.info(
         "structurer: edital=%s → %d blocos (silver_v%s, %d/%d páginas falharam)",

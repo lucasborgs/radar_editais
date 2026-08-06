@@ -34,6 +34,18 @@ from radar.core.kg.provenance_read import public_provenance
 
 logger = logging.getLogger(__name__)
 
+# Investidores privados (fundos/anjos/corporate venture) estão FORA do escopo
+# ativo do produto (specs product-strategy-ecosystem-pathways.md §6 e
+# product-scope-catalog-deactivation.md). Os dados históricos permanecem em
+# `entities` (kind=investidor) por preservação, mas nenhuma superfície ativa
+# (catálogo público, busca, Explore, Radar, matching ou prompts) deve devolver
+# ou recomendar investidores. Toda leitura abaixo filtra este kind na fronteira.
+_DEACTIVATED_KINDS: frozenset[str] = frozenset({"investidor"})
+
+
+def _is_deactivated(kind: str | None) -> bool:
+    return (kind or "") in _DEACTIVATED_KINDS
+
 
 # ===========================================================================
 # Conexão + utilitários de shape
@@ -347,18 +359,20 @@ def _curated_card(row: dict, *, agencies: dict[str, list[str]], temporal=None) -
 def get_opportunity(opp_id: str) -> dict | None:
     """Ficha unificada (D1): resolve edital OU curado (programa/investidor).
     Superset de `get_edital` — o router /oportunidades/{id} chama esta. ICT não
-    é ficha direta (paridade com o legado)."""
-    if not (opp_id or "").startswith("investidor:"):
-        card = get_edital(opp_id)
-        if card is not None:
-            return card
+    é ficha direta (paridade com o legado).
+
+    Investidores estão desativados das superfícies ativas: a ficha de um
+    investidor não é devolvida (retorna None → 404 no router)."""
+    if (opp_id or "").startswith("investidor:"):
+        return None
+    card = get_edital(opp_id)
+    if card is not None:
+        return card
     client = _client()
-    row = _resolve_native(client, opp_id, ["programa", "investidor"])
+    row = _resolve_native(client, opp_id, ["programa"])
     if row is None:
         return None
     agencies = _rel_names_batch(client, [row["id"]], "operado_por")
-    if row.get("kind") == "investidor":
-        return _curated_card(row, agencies=agencies)
     temporal = _temporal_for_rows([row]).get(row["native_id"])
     if temporal is None:
         return None
@@ -428,17 +442,45 @@ _CATALOG_KIND: dict[str, str] = {
 _KIND_TYPE = {"ict": "Ator", "investidor": "Ator", "programa": "Oportunidade"}
 
 
+def _ict_capacity_payload(row: dict) -> dict:
+    """Payload de CAPACIDADE de um ator ICT (EMBRAPII + PNIPE), exposto ao
+    catálogo/match/explore: fonte, UF e capacidades declaradas pela fonte
+    (competências, equipamentos, condições de acesso, instituição, município,
+    data de verificação). Sempre presente (vazio quando não há valor) — os
+    consumidores não inferem disponibilidade a partir disso."""
+    meta = row.get("metadata") or {}
+    return {
+        "source": row.get("source") or "",
+        "uf": row.get("uf") or "",
+        "url": meta.get("url") or "",
+        "capacidades": {
+            "institution": meta.get("institution") or "",
+            "municipio": meta.get("municipio") or "",
+            "competencias": list(meta.get("competencias") or []),
+            "equipamentos": list(meta.get("equipamentos") or []),
+            "condicoes_acesso": meta.get("condicoes_acesso") or "",
+            "verificado_em": meta.get("verificado_em") or "",
+        },
+    }
+
+
 def list_entity_catalog(
     catalog_key: str, *, tema: str = "", limit: int = 50,
 ) -> list[dict]:
     """Entidades de um catálogo (ict, investidores, programas) filtrando por tema.
     Retorna dicts com `id` (native_id), `name`, `description`, `themes` (setores +
-    tags) e `type` — compat com list_icts/list_investidores."""
+    tags) e `type` — compat com list_icts/list_investidores. Para ict adiciona
+    `source`/`uf`/`url`/`capacidades` (ver `_ict_capacity_payload`)."""
     kind = _CATALOG_KIND.get(catalog_key)
     if kind is None:
         return []
+    if _is_deactivated(kind):
+        # investidores: fora das superfícies ativas — o catálogo não os lista.
+        return []
     client = _client()
     fields = "native_id,name,description,setores,tecnologias_tags"
+    if kind == "ict":
+        fields += ",source,uf,metadata"
     if kind == "programa":
         fields += ",deadline,status,updated_at"
     rows = client.table("entities").select(fields).eq("kind", kind).execute().data or []
@@ -455,6 +497,8 @@ def list_entity_catalog(
             "themes": sorted(set(themes)),
             "type": _KIND_TYPE[kind],
         }
+        if kind == "ict":
+            item.update(_ict_capacity_payload(r))
         if kind == "programa" and r["native_id"] in temporal_by_id:
             item.update(temporal_by_id[r["native_id"]].public_payload())
         out.append(item)
@@ -481,7 +525,6 @@ def get_stats() -> dict:
         themes.update(c["themes"])
         fontes.update(c["fonte_recurso"])
     n_programas = _count(client, "programa")
-    n_investidores = _count(client, "investidor")
     n_icts = _count(client, "ict")
     total = len(editais)
     return {
@@ -491,9 +534,9 @@ def get_stats() -> dict:
         "n_themes": len(themes),
         "n_fontes": len(fontes),
         "n_programas": n_programas,
-        "n_investidores": n_investidores,
+        "n_investidores": 0,  # investidores desativados das superfícies ativas
         "n_icts": n_icts,
-        "total_oportunidades": total + n_programas + n_investidores + n_icts,
+        "total_oportunidades": total + n_programas + n_icts,
     }
 
 
@@ -516,7 +559,6 @@ def list_opportunities(tipo: str | None = None, limit: int = 200) -> list[dict]:
             })
     for want, catalog_key, t in (
         ("programa", "programas", "programa"),
-        ("investidor", "investidores", "investidor"),
         ("ict", "ict", "ict"),
     ):
         if tipo in (None, want):
@@ -551,27 +593,11 @@ def _ticket_dict(row: dict) -> dict:
 
 def get_investidor(native_id: str) -> dict | None:
     """Nó do fundo em shape cru (compat `investidores.json`) para o card de
-    escrita do pitch — reconstruído das colunas + metadata de `entities`."""
-    row = _fetch_one(_client(), "investidor", native_id)
-    if row is None:
-        return None
-    meta = row.get("metadata") or {}
-    return {
-        "id": row["native_id"],
-        "name": row.get("name") or "",
-        "tese": row.get("description") or "",
-        "tese_themes": list(meta.get("tese_themes") or []),
-        "setores": list(meta.get("verticais") or row.get("setores") or []),
-        "estagio_alvo": list(meta.get("estagio_alvo") or []),
-        "ticket_range": _ticket_dict(row),
-        "lead_follow": meta.get("lead_follow") or "",
-        "portfolio": list(meta.get("portfolio") or []),
-        "co_investidores": list(meta.get("co_investidores") or []),
-        "site": meta.get("site") or "",
-        "source_urls": list(meta.get("source_urls") or []),
-        "verificado_em": meta.get("verificado_em"),
-        "provenance": public_provenance(row.get("provenance")),
-    }
+    escrita do pitch — reconstruído das colunas + metadata de `entities`.
+
+    Desativado: investidores privados estão fora do escopo ativo; nenhum
+    dado de fundo é exposto às superfícies (nem ao card de escrita/pitch)."""
+    return None
 
 
 def get_programa(native_id: str) -> dict | None:
@@ -746,6 +772,8 @@ def related_by_tags(entity_ref: str, *, kind: str | None = None, limit: int = 15
     want = set(tags)
     scored: list[tuple[int, dict]] = []
     for r in rows:
+        if _is_deactivated(r.get("kind")):
+            continue  # investidores desativados não aparecem em vizinhança ativa
         if r["native_id"] == center["native_id"]:
             continue
         shared = sorted(want & set(r.get("tecnologias_tags") or []))
@@ -812,13 +840,18 @@ def _get_search_snapshot() -> dict:
 
 def _rank_by_similarity(query_vec, snapshot: dict, kind: str | None, k: int) -> list[dict]:
     """Top-k por cosseno (função pura sobre o snapshot; testável com vetores
-    fabricados). Filtra por `kind` ANTES do top-k."""
+    fabricados). Filtra por `kind` ANTES do top-k. Investidores (desativados)
+    são sempre excluídos da busca ativa."""
     import numpy as np
 
     rows, mat = snapshot["rows"], snapshot["mat"]
     if not rows or mat.size == 0:
         return []
-    idxs = [i for i, r in enumerate(rows) if kind is None or r["kind"] == kind]
+    idxs = [
+        i for i, r in enumerate(rows)
+        if not _is_deactivated(r.get("kind"))
+        and (kind is None or r["kind"] == kind)
+    ]
     if not idxs:
         return []
     q = np.asarray(query_vec, dtype=np.float32)

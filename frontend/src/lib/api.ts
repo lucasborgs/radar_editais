@@ -30,14 +30,18 @@ async function getAccessToken(): Promise<string | undefined> {
 
 // Erro tipado para falhas de API: carrega status, mensagem amigável e o
 // request_id devolvido pelo backend (útil para suporte/correlação de logs).
+export type ApiErrorKind = "connection" | "server" | "request";
+
 export class ApiError extends Error {
   status: number;
   requestId?: string;
-  constructor(message: string, status: number, requestId?: string) {
+  kind: ApiErrorKind;
+  constructor(message: string, status: number, requestId?: string, kind?: ApiErrorKind) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.requestId = requestId;
+    this.kind = kind ?? (status >= 500 ? "server" : "request");
   }
 }
 
@@ -82,10 +86,22 @@ async function apiFetch<T>(
   // Token explícito > sessão Supabase corrente > sem header (rota pública).
   const effectiveToken = token ?? (await getAccessToken());
   if (effectiveToken) headers["Authorization"] = `Bearer ${effectiveToken}`;
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers,
-    ...options,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      headers,
+      ...options,
+    });
+  } catch {
+    // fetch lança apenas para falhas de rede (DNS, TCP, CORS, offline) — nunca
+    // para respostas HTTP. Classificamos como erro de conexão.
+    throw new ApiError(
+      "Falha de conexão com o servidor. Verifique sua internet e tente novamente.",
+      0,
+      undefined,
+      "connection",
+    );
+  }
   if (!res.ok) throw await buildApiError(res);
   // 204 No Content (delete/archive/unarchive da library): corpo vazio —
   // res.json() estouraria SyntaxError mesmo com sucesso.
@@ -210,6 +226,36 @@ export interface MatchVerdict {
   recomendacao: "alta" | "media" | "baixa";
 }
 
+export interface PathEvidence {
+  tipo: "tema" | "trecho";
+  detalhe?: string;
+  empresa?: string;
+  oportunidade?: string;
+}
+
+// Contrato mínimo do caminho de inovação (spec product-pathways-domain-matching.md)
+export interface InnovationPath {
+  tipo: string;                       // financiamento | credito | subvencao | bolsa | desafio | aceleradora | incubadora | ict
+  entidade: string;                   // native_id
+  objetivo: string;
+  requisitos: string[];
+  canal_de_acesso: string;
+  evidencias: PathEvidence[];
+  status: string;                     // possibilidade | lacunas | candidatura_viável
+  proximo_passo: string;
+}
+
+export interface PathExplanation {
+  tipo: string;
+  dominio: string;
+  criterios: string;
+  confirmados: string[];
+  inferidos: string[];
+  pendentes: string[];
+  lacunas: string[];
+  proximo_passo: string;
+}
+
 export interface MatchedEdital {
   kind: "edital";
   source: string;
@@ -233,38 +279,59 @@ export interface MatchedEdital {
   temporal_value?: string | null;
   decision_source?: string | null;
   last_verified_at?: string | null;
-}
-
-// Facetas do card de investidor (site/ticket/estágio da tese).
-export interface InvestmentOffer {
-  offer_name: string;
-  official_url: string;
-  estagio_alvo: string[];
-  ticket_range: { min_brl: number | null; max_brl: number | null } | null;
+  tipo?: string | null;
+  caminho?: InnovationPath | null;
+  explicacao?: PathExplanation | null;
 }
 
 export interface MatchedEntity {
-  kind: "investidor" | "programa";
-  entity_id: string;          // native_id ("investidor:kptl" / "programa:centelha")
+  kind: "programa";
+  entity_id: string;          // native_id ("programa:centelha")
   name: string;
   description: string | null;
   score: number;
   affinity: number;           // mesma escala 0..1 do funil (ranking unificado)
   setores?: string[];
   matched_excerpts: MatchedExcerpt[];
-  estagio_alvo?: string[];
-  offer?: InvestmentOffer;                   // só investidor
-  verificado?: boolean;
   verdict?: MatchVerdict | null;             // veredito, chaveado por entity_id
+  tipo?: string | null;
+  caminho?: InnovationPath | null;
+  explicacao?: PathExplanation | null;
+}
+
+export interface IctCapabilities {
+  institution: string;
+  municipio: string;
+  competencias: string[];
+  equipamentos: string[];
+  condicoes_acesso: string;
+  verificado_em: string;
+}
+
+export interface IctPartner {
+  id: string;                 // native_id ("ict:labx")
+  name: string;
+  description: string;
+  themes: string[];
+  type: string;
+  kind: "ict";
+  source?: string;            // fonte (embrapii | pnipe)
+  uf?: string;
+  url?: string;               // canal de acesso/contato
+  capacidades?: IctCapabilities;
+  caminho?: InnovationPath | null;
+  explicacao?: PathExplanation | null;
 }
 
 export interface RadarMatchesResponse {
   matched_editais: MatchedEdital[];
   matched_programas: MatchedEntity[];
   matched_investidores: MatchedEntity[];
+  matched_icts?: IctPartner[];
   meta: {
     ranking: "affinity";
     uses_workspace_chunks: boolean;
+    ict_lookup_attempted?: boolean;
   };
 }
 
@@ -428,12 +495,22 @@ export async function writingTurnStream(
   };
   if (idempotencyKey) body.idempotency_key = idempotencyKey;
 
-  const res = await fetch(`${API_BASE_URL}/writing/turn/stream`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-    signal,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/writing/turn/stream`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch {
+    throw new ApiError(
+      "Falha de conexão com o servidor. Verifique sua internet e tente novamente.",
+      0,
+      undefined,
+      "connection",
+    );
+  }
   if (!res.ok) throw await buildApiError(res);
   if (!res.body) throw new Error("Streaming não suportado neste navegador.");
 
@@ -442,7 +519,19 @@ export async function writingTurnStream(
   let buffer = "";
 
   while (true) {
-    const { done, value } = await reader.read();
+    let chunk: ReadableStreamReadResult<Uint8Array>;
+    try {
+      chunk = await reader.read();
+    } catch {
+      // Stream interrompido no meio (rede) — erro de conexão, não de geração.
+      throw new ApiError(
+        "A conexão com o servidor foi interrompida durante a geração.",
+        0,
+        undefined,
+        "connection",
+      );
+    }
+    const { done, value } = chunk;
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
 
@@ -812,8 +901,9 @@ export const deleteWritingSession = (sessionId: string, token: string) =>
 export interface ConversationSummary {
   session_id: string;
   kind: "frontdoor" | "writing";
-  title: string | null; // frontdoor; writing deriva do edital no front
+  title: string | null; // frontdoor; writing usa edital_title (server-side)
   edital_id: string | null;
+  edital_title?: string | null; // resolvido server-side em batch para writing
   status: "active" | "completed" | "abandoned";
   turn_count: number;
   created_at: string;

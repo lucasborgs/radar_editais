@@ -98,7 +98,7 @@ def test_source_bundle_attempt_precedes_source_docs_in_silver_path(monkeypatch):
     events: list[str] = []
     monkeypatch.setattr(gold, "iter_bronze_editais", lambda: [("fapesc", "37-2026")])
     monkeypatch.setattr(
-        tasks, "build_or_load_structured_doc", lambda source, native, docs, **_kw: [{"text": "ok"}],
+        tasks, "build_or_load_structured_doc", lambda source, native, docs: [{"text": "ok"}],
     )
     monkeypatch.setattr(source_docs, "active_documents", lambda docs: docs)
     monkeypatch.setattr(source_docs, "load", lambda edital_id: [])
@@ -114,7 +114,7 @@ def test_source_bundle_attempt_precedes_source_docs_in_silver_path(monkeypatch):
         })(),
     )
 
-    assert tasks._build_all_silver()["silver_built"] == 1
+    assert tasks._build_all_silver() == 1
     assert events == ["bundle", "source_docs"]
 
 

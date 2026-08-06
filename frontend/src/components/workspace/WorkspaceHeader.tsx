@@ -4,7 +4,6 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { WritingMode } from "@/types/api";
 import { modeLabel } from "./types";
-import { ModeBadge } from "./ModeBadge";
 
 /**
  * Header fino do projeto: nome do edital/alvo + badge do modo
@@ -15,14 +14,12 @@ export function WorkspaceHeader({
   mode,
   filled,
   total,
-  wsMode,
   sessionId,
 }: {
   title: string;
   mode: WritingMode;
   filled: number;
   total: number;
-  wsMode?: "explorer" | "escrita";
   sessionId?: string;
 }) {
   return (
@@ -34,8 +31,6 @@ export function WorkspaceHeader({
       >
         ← Projetos
       </Link>
-
-      {wsMode && <ModeBadge mode={wsMode} />}
 
       <span
         className={cn(

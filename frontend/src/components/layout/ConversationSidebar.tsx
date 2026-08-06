@@ -20,7 +20,6 @@ import { HISTORY_KEY, SESSION_ID_KEY } from "@/types/frontdoor";
 import {
   listConversations,
   deleteWritingSession,
-  getEditalById,
   type ConversationSummary,
 } from "@/lib/api";
 
@@ -97,7 +96,6 @@ export function ConversationSidebar() {
   const isAdmin = useIsAdmin();
 
   const [sessions, setSessions] = useState<ConversationSummary[]>([]);
-  const [titles, setTitles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -131,27 +129,10 @@ export function ConversationSidebar() {
         }
         const res = await listConversations(token);
         if (cancelled) return;
+        // `edital_title` de conversas de escrita é resolvido server-side em
+        // batch (/conversations); frontdoor já traz `title` próprio do banco.
+        // Não há lookups N× client-side nem estado de título pendente.
         setSessions(res.conversations ?? []);
-
-        // Conversas de escrita: resolve o título via lookup do edital (com
-        // cache em `titles`), mesmo padrão da antiga /sessions. frontdoor já
-        // traz `title` próprio do banco.
-        const missing = (res.conversations ?? []).filter(
-          (s): s is ConversationSummary & { edital_id: string } =>
-            s.kind === "writing" && !!s.edital_id,
-        );
-        await Promise.all(
-          missing.map(async (s) => {
-            try {
-              const card = await getEditalById(s.edital_id);
-              if (!cancelled) {
-                setTitles((prev) => ({ ...prev, [s.edital_id]: card.title }));
-              }
-            } catch {
-              /* ignore — cai no fallback edital_id */
-            }
-          }),
-        );
       } catch {
         // Silencioso: a sidebar não deve gritar erro de listagem (ambiente sem
         // o endpoint, offline, etc.). Fica como "vazia".
@@ -178,14 +159,11 @@ export function ConversationSidebar() {
   }, [menuOpen]);
 
   // Título exibido: frontdoor usa `title` do banco (1ª mensagem truncada);
-  // writing deriva do edital (lookup cacheado → fallback edital_id).
-  const titleFor = useCallback(
-    (s: ConversationSummary) => {
-      if (s.kind === "frontdoor") return s.title || "Conversa";
-      return (s.edital_id && titles[s.edital_id]) || s.edital_id || "Proposta";
-    },
-    [titles],
-  );
+  // writing usa `edital_title` resolvido server-side → fallback no ID cru.
+  const titleFor = useCallback((s: ConversationSummary) => {
+    if (s.kind === "frontdoor") return s.title || "Conversa";
+    return s.edital_title || s.edital_id || "Proposta";
+  }, []);
 
   // Filtro client-side por título + partição por capacidade (via kind).
   // Sempre renderiza as duas seções (mesmo vazias) para os destinos serem
@@ -378,7 +356,13 @@ export function ConversationSidebar() {
                     <div key={s.session_id} className="group relative">
                       <Link
                         href={href}
-                        title={titleFor(s)}
+                        title={
+                          // Com nome disponível, exibe o título; mantemos o ID
+                          // cru como detalhe técnico no tooltip (sem sumir).
+                          s.kind === "writing" && s.edital_title
+                            ? s.edital_id ?? s.edital_title
+                            : titleFor(s)
+                        }
                         onClick={
                           isFrontdoor
                             ? (e) => handleOpenFrontdoor(e, s.session_id)

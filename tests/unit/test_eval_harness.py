@@ -260,10 +260,10 @@ def test_manifest_hashes_dataset_and_ignores_secret_values(tmp_path, monkeypatch
 def test_suites_registered():
     from radar.core.eval.registry import SUITES
     assert set(SUITES) == {
-        "matching", "rag", "writing", "extraction",
+        "matching", "matching_structural", "rag", "writing", "extraction",
         "opportunity_type", "provenance", "triage", "writing_v2",
         "profile_extractor", "reranker", "structurer",
-        "explore", "relevance_shadow", "e2e_health",
+        "explore", "relevance_shadow", "e2e_health", "spike_kg",
     }
 
 

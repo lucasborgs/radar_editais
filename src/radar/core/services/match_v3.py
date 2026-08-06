@@ -44,7 +44,7 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 
-from radar.core.services import eligibility
+from radar.core.services import domain_paths, eligibility
 from radar.core.services.company_chunks import (
     ensure_company_chunks,
     ephemeral_company_chunks,
@@ -137,13 +137,10 @@ def _load_snapshot(conn) -> _Snapshot:
         for eid, _idx, sp, text, emb in cur.fetchall():
             raw.setdefault(str(eid), []).append((sp or [], text, parse_vec(emb)))
 
-        cur.execute(_INV_SQL)
-        cols = [d.name for d in cur.description]
-        invs = [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
-        for v in invs:
-            v["id"] = str(v["id"])
-            e = parse_vec(v.pop("embedding")) if v.get("embedding") is not None else None
-            v["_emb"] = (e / (np.linalg.norm(e) + 1e-9)) if e is not None and e.size else None
+        # Trilha investidor DESATIVADA (spec product-scope-catalog-deactivation.md):
+        # os dados históricos permanecem em `entities` (kind=investidor), mas o
+        # snapshot do match não alimenta mais a trilha paralela de investidores.
+        invs: list[dict] = []
 
     chunks = {
         eid: _EntityChunks(
@@ -297,6 +294,11 @@ class OpportunityMatch:
     decision_source: str | None = None
     last_verified_at: str | None = None
     technical_score: float | None = None  # melhor par; detalhe técnico, não ranking
+    # Caminho de inovação (spec product-pathways-domain-matching.md) — anotação
+    # ADITIVA: não entra no ranking. `tipo` nunca é "investidor".
+    tipo: str | None = None
+    caminho: dict | None = None
+    explicacao: dict | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -321,6 +323,9 @@ class OpportunityMatch:
             "temporal_value": self.temporal_value,
             "decision_source": self.decision_source,
             "last_verified_at": self.last_verified_at,
+            "tipo": self.tipo,
+            "caminho": self.caminho,
+            "explicacao": self.explicacao,
         }
 
 
@@ -375,6 +380,11 @@ def _prazo_display(temporal) -> str | None:
 def _split_native(native_id: str) -> tuple[str, str]:
     src, _, local = (native_id or "").partition(":")
     return (src, local) if local else ("", native_id)
+
+
+def _node_id(kind: str, native_id: str) -> str:
+    """Id de nó do spike: `<kind>:<native_id>` (ex.: `edital:finep:589`)."""
+    return f"{kind}:{native_id}"
 
 
 def _status_from_temporal(temporal) -> str:
@@ -444,13 +454,17 @@ def find_matching_opportunities(
     use_hyde: bool = True,
     rerank: bool | None = None,
     prepared_company=None,
+    structural_boost: bool = False,
+    structural_alpha: float | None = None,
 ) -> list[OpportunityMatch]:
     """Funil completo §7 sobre editais/programas. `profile` (dict, pydantic ou
     CompanyProfile) alimenta o lado empresa (chunks) E o Stage 1 (constraints).
 
     `as_of` parametriza o Stage 0 (default: hoje). `min_affinity` sobrescreve o
     piso (0 = sem piso — usado pela eval p/ medir o ranking completo).
-    `rerank` força/desliga o Stage 3 (default: env MATCH_RERANK_ENABLED)."""
+    `rerank` força/desliga o Stage 3 (default: env MATCH_RERANK_ENABLED).
+    `structural_boost` (default off) aplica o boost de vizinhança `similar_a`
+    do kg_spike no Stage 2 (célula A/B de avaliação — nunca muda produção)."""
     as_of = as_of or _today_sao_paulo()
     floor = MIN_AFFINITY if min_affinity is None else min_affinity
     prof = _as_profile_dict(profile)
@@ -472,9 +486,13 @@ def find_matching_opportunities(
         subjects_from_rows(snap.opportunities), as_of=as_of,
     )
     company_setores = infer_company_setores(prof) if boost else set()
+    # Temas do perfil p/ anotação de caminho (independente do boost de ranking).
+    company_themes = infer_company_setores(prof)
+    has_project = domain_paths.has_project(prof)
 
     matches: list[OpportunityMatch] = []
     n_stage0 = n_stage1 = 0
+    scored: list[dict] = []
     for e in snap.opportunities:
         if e["kind"] not in kinds:
             continue
@@ -492,20 +510,57 @@ def find_matching_opportunities(
         affinity, best, excerpts = score_entity(company_emb, company_texts, ec, company_origins)
         if boost and company_setores & set(e.get("setores") or []):
             affinity *= BOOST_SETORES
+        scored.append({
+            "e": e, "temporal": temporal, "eleg": eleg,
+            "affinity": affinity, "best": best, "excerpts": excerpts,
+        })
+
+    if structural_boost:
+        from radar.core.kg.spike import match_boost
+        # Seeds = match que já passariam o piso de produção (MIN_AFFINITY), não
+        # o piso da eval — a célula A/B mede o ranking completo com min_affinity=0.
+        seeds = {
+            _node_id(s["e"]["kind"], s["e"]["native_id"])
+            for s in scored if s["affinity"] >= MIN_AFFINITY
+        }
+        if seeds:
+            factors = match_boost.structural_factors(
+                seeds, alpha=structural_alpha,
+            )
+            for s in scored:
+                s["affinity"] *= factors.get(
+                    _node_id(s["e"]["kind"], s["e"]["native_id"]), 1.0,
+                )
+
+    for s in scored:
+        e, temporal, eleg = s["e"], s["temporal"], s["eleg"]
+        affinity = s["affinity"]
         if affinity < floor:
             continue
         src, local = _split_native(e["native_id"])
+        url = (e.get("metadata") or {}).get("url")
+        shared_themes = company_themes & set(e.get("setores") or [])
+        tipo = domain_paths.classify_tipo(e)
         matches.append(OpportunityMatch(
             kind=e["kind"], source=src or e.get("source", ""), edital_id=local,
             entity_id=e["native_id"], name=e.get("name") or "",
             description=(e.get("description") or "")[:240],
-            score=affinity, affinity=affinity, technical_score=best,
-            setores=list(e.get("setores") or []), matched_excerpts=excerpts,
+            score=affinity, affinity=affinity, technical_score=s["best"],
+            setores=list(e.get("setores") or []), matched_excerpts=s["excerpts"],
             status=_status_from_temporal(temporal),
             prazo=_prazo_display(temporal), valor=_valor_display(e),
-            url=(e.get("metadata") or {}).get("url"),
+            url=url,
             elegibilidade=eleg,
             **temporal.public_payload(),
+            tipo=tipo,
+            caminho=domain_paths.build_path(
+                e, profile=prof, eleg=eleg, url=url,
+                shared_themes=shared_themes, excerpts=s["excerpts"],
+            ),
+            explicacao=domain_paths.build_explanation(
+                tipo, e=e, eleg=eleg, profile=prof,
+                has_project=has_project, shared_themes=shared_themes,
+            ),
         ))
     matches.sort(key=lambda m: m.affinity, reverse=True)
     matches = matches[:top_k]
@@ -519,6 +574,60 @@ def find_matching_opportunities(
         len(matches), as_of, n_stage0, n_stage1, floor,
     )
     return matches
+
+
+def find_ict_partners(profile, *, limit: int = 4) -> list[dict]:
+    """Parceiros de P&D (ICTs/laboratórios) que compartilham temas com o perfil.
+
+    ICTs são capacidades/parceiros (spec product-pathways-domain-matching.md),
+    NÃO editais: não entram no ranking de afinidade e nunca viram
+    "oportunidade". Exigem projeto definido (competência/equipamento só fazem
+    sentido com um escopo); sem projeto → []. Best-effort: erro de DB → [].
+    Cada item segue o contrato `caminho` com tipo=ict (status "possibilidade").
+    """
+    from radar.core.kg import entity_catalog
+
+    if not domain_paths.has_project(profile):
+        return []
+    themes = infer_company_setores(profile)
+    if not themes:
+        return []
+    found: dict[str, dict] = {}
+    try:
+        for tema in sorted(themes):
+            for item in entity_catalog.list_entity_catalog("ict", tema=tema, limit=50):
+                eid = item["id"]
+                if eid in found:
+                    continue
+                url = item.get("url") or ""
+                e = {
+                    "kind": "ict",
+                    "native_id": eid,
+                    "name": item.get("name") or "",
+                    "description": item.get("description") or "",
+                    "setores": item.get("themes") or [],
+                    "metadata": {"url": url},
+                    "capacidades": item.get("capacidades"),
+                    "requisitos_texto": [],
+                }
+                shared = set(item.get("themes") or []) & themes
+                found[eid] = {
+                    **item,
+                    "kind": "ict",
+                    "caminho": domain_paths.build_path(
+                        e, profile=profile, eleg=None, url=url,
+                        shared_themes=shared, excerpts=[],
+                    ),
+                    "explicacao": domain_paths.build_explanation(
+                        domain_paths.PATH_TIPO_ICT, e=e, eleg=None,
+                        profile=profile, has_project=True, shared_themes=shared,
+                    ),
+                }
+                if len(found) >= limit:
+                    return list(found.values())
+    except Exception as err:  # noqa: BLE001 — parceiros são best-effort
+        logger.warning("match_v3: ICT partners indisponíveis (%s)", err)
+    return list(found.values())
 
 
 def _rerank_enabled() -> bool:
@@ -548,7 +657,7 @@ def _stage3_rerank(prof, matches: list[OpportunityMatch]) -> list[OpportunityMat
 
 
 # ===========================================================================
-# Trilha investidor
+# Trilha investidor — DESATIVADA (spec product-scope-catalog-deactivation.md)
 # ===========================================================================
 
 def find_matching_investors(
@@ -561,87 +670,11 @@ def find_matching_investors(
     use_hyde: bool = True,
     prepared_company=None,
 ) -> list[InvestorMatch]:
-    """Cosseno perfil-agregado × tese (entities.embedding, kind=investidor,
-    fund_status ativo) + gates determinísticos de metadata: estágio e setores
-    só eliminam quando os DOIS lados declaram e não casam (unknown não
-    elimina). Investidor generalista/Multissetorial nunca é gateado por setor."""
-    floor = MIN_INVESTOR_SCORE if min_score is None else min_score
-    prof = _as_profile_dict(profile)
-
-    company_texts, company_emb, inv_origins = _unpack_company_side(
-        prepared_company or _company_side(prof, workspace_id=workspace_id, db=db, use_hyde=use_hyde)
-    )
-    if not company_texts:
-        return []
-    agg = company_emb.mean(axis=0)
-    agg = agg / (np.linalg.norm(agg) + 1e-9)
-
-    from radar.core.services.eligibility import _profile_get
-    estagio = str(_profile_get(prof, "estagio") or "").strip().lower()
-    company_setores = infer_company_setores(prof)
-
-    snap = _get_snapshot()
-    out: list[InvestorMatch] = []
-    for v in snap.investors:
-        meta = v.get("metadata") or {}
-        if (meta.get("fund_status") or "").lower() != "ativo":
-            continue
-        if v.get("_emb") is None:
-            continue
-        # Gate de estágio: elimina só quando perfil E tese declaram e não casam.
-        alvo = [str(s).lower() for s in (meta.get("estagio_alvo") or [])]
-        if estagio and alvo and estagio not in alvo:
-            continue
-        # Gate de setores: só p/ investidor NÃO-generalista com setor declarado.
-        inv_setores = set(v.get("setores") or [])
-        setor_declarado = inv_setores and inv_setores != {"Multissetorial"}
-        if (not meta.get("generalista")) and setor_declarado and company_setores \
-                and not (company_setores & inv_setores):
-            continue
-        score = float(agg @ v["_emb"])
-        if score < floor:
-            continue
-        # Excerpt: melhor chunk da empresa contra a tese (justificativa do card).
-        sims = company_emb @ v["_emb"]
-        bi = int(np.argmax(sims))
-        origin = inv_origins[bi] if bi < len(inv_origins) else None
-        if origin not in {"profile", "library_doc"}:
-            real = [i for i, origin in enumerate(inv_origins) if origin in {"profile", "library_doc"}]
-            if not real:
-                excerpt = []
-            else:
-                bi = max(real, key=lambda i: float(sims[i]))
-                excerpt = [{
-                    "company_text": _clip(company_texts[bi]),
-                    "edital_text": _clip(v.get("description") or ""),
-                    "section": "tese", "score": round(float(sims[bi]), 3), "origin": inv_origins[bi],
-                }]
-        else:
-            excerpt = [{
-                "company_text": _clip(company_texts[bi]),
-                "edital_text": _clip(v.get("description") or ""),
-                "section": "tese", "score": round(float(sims[bi]), 3), "origin": inv_origins[bi],
-            }]
-        out.append(InvestorMatch(
-            entity_id=v["native_id"], name=v.get("name") or "",
-            description=v.get("description") or "", score=score,
-            setores=sorted(inv_setores), estagio_alvo=list(meta.get("estagio_alvo") or []),
-            matched_excerpts=excerpt,
-            offer={
-                "offer_name": v.get("name") or "",
-                "official_url": meta.get("site") or "",
-                "estagio_alvo": list(meta.get("estagio_alvo") or []),
-                "ticket_range": (
-                    {"min_brl": v.get("ticket_min"), "max_brl": v.get("ticket_max")}
-                    if v.get("ticket_min") is not None or v.get("ticket_max") is not None
-                    else None
-                ),
-            },
-            verificado=v.get("verificado_em") is not None,
-        ))
-    out.sort(key=lambda m: m.score, reverse=True)
-    logger.info("match_v3: %d investidores (piso=%.2f)", len(out[:top_k]), floor)
-    return out[:top_k]
+    """Trilha investidor desativada: investidores privados estão fora do escopo
+    ativo. Mantida apenas para compatibilidade de assinatura (routers/eval);
+    sempre devolve lista vazia — nenhum fundo é recomendado."""
+    logger.debug("match_v3: trilha investidor desativada (find_matching_investors) — retornando []")
+    return []
 
 
 # ===========================================================================

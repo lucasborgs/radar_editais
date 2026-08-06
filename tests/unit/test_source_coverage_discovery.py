@@ -23,6 +23,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+import radar.core.ingestion.deep_research_discovery as drd
 import radar.core.ingestion.dou_feeder as dou_feeder
 import radar.core.ingestion.opportunity_discovery as od
 from radar.core.services import source_runs
@@ -210,6 +211,35 @@ class Harness:
             return len(records)
         monkeypatch.setattr(od, "_stage_records", _fake_stage)
 
+        # Canal Deep Research (spec discovery-deep-research.md): mock do
+        # channel module (o orchestrator importa lazy) + config do schema.
+        self.deep_research_findings: list[dict] = []
+        self.deep_research_error: Exception | None = None
+        self.deep_research_calls: list[dict] = []
+
+        def _fake_dr_channel(targets, *, max_findings, exclude_urls):
+            self.deep_research_calls.append({
+                "targets": list(targets), "max_findings": max_findings,
+                "exclude_urls": set(exclude_urls or []),
+            })
+            if self.deep_research_error is not None:
+                raise self.deep_research_error
+            return [dict(r) for r in self.deep_research_findings]
+        monkeypatch.setattr(drd, "run_deep_research_channel", _fake_dr_channel)
+        monkeypatch.setattr(od.ws, "deep_research_config", lambda: {
+            "enabled": False, "provider": "anthropic", "max_findings": 10,
+        })
+        monkeypatch.setattr(od.ws, "deep_research_targets", lambda: [
+            {"key": "credit_lines", "brief": "linhas de crédito", "type_hint": "edital"},
+        ])
+
+    def enable_deep_research(self):
+        self.env["DISCOVERY_DEEP_RESEARCH_ENABLED"] = "1"
+        monkeypatch = self.monkeypatch
+        monkeypatch.setattr(od.ws, "deep_research_config", lambda: {
+            "enabled": True, "provider": "anthropic", "max_findings": 10,
+        })
+
     def _fake_getenv(self, key, default=""):
         return self.env.get(key, default)
 
@@ -342,6 +372,81 @@ class TestHubExpansion:
 
         records = h.run()
         assert records == []
+
+
+class TestDeepResearchChannel:
+    """Canal Deep Research (spec discovery-deep-research.md): gated por env,
+    roda depois dos determinísticos, staging com atribuição, fail-open."""
+
+    def test_disabled_skips_channel(self, monkeypatch):
+        h = Harness(monkeypatch)
+        h.env["DISCOVERY_DOU_ENABLED"] = "0"
+        h.search_hits = [_HIT_A]
+        h.triage_map = {_HIT_A.url: _APPROVE}
+        h.extract_map = {_HIT_A.url: _make_record(_HIT_A.url)}
+        records = h.run()
+        assert all(r["discovery_channel"] != "deep_research" for r in records)
+        dr_finish = [f for f in h.finish_calls
+                     if f.get("run_id") and f.get("status") == "skipped"]
+        assert dr_finish, "deep_research desabilitado deve ser finish_run skipped"
+        assert h.deep_research_calls == [], "canal off não deve rodar o engine"
+
+    def test_enabled_stages_with_attribution(self, monkeypatch):
+        h = Harness(monkeypatch)
+        h.enable_deep_research()
+        h.env["DISCOVERY_DOU_ENABLED"] = "0"
+        h.search_hits = [_HIT_A]
+        h.triage_map = {_HIT_A.url: _APPROVE}
+        h.extract_map = {_HIT_A.url: _make_record(_HIT_A.url)}
+
+        rec = _make_record("https://bndes.gov.br/credito", title="BNDES Crédito")
+        rec["fonte"] = "Deep Research"
+        rec["verificacao"] = "provisorio"
+        rec["evidence_package"] = {
+            "identity": {"collector": "deep_research", "canonical_url": rec["url"]},
+            "deep_research": {"target_key": "credit_lines", "confidence": "high"},
+        }
+        h.deep_research_findings = [rec]
+
+        records = h.run()
+        dr = [r for r in records if r["discovery_channel"] == "deep_research"]
+        assert len(dr) == 1
+        r = dr[0]
+        assert r["discovery_run_id"] == "mock-run-id"
+        assert r["query_family"] is None
+        assert r["origin_domain"] == "bndes.gov.br"
+        assert r["url"] == "https://bndes.gov.br/credito"
+        assert r["evidence_package"]["identity"]["collector"] == "deep_research"
+        # run agentic + alvos do doc + dedup contra ledger
+        assert ("deep_research", "agentic") in {
+            (s["source_key"], s["mode"]) for s in h.start_calls}
+        assert h.deep_research_calls[0]["targets"]
+        assert h.deep_research_calls[0]["exclude_urls"] is not None
+
+    def test_enabled_no_findings_records_unaffected(self, monkeypatch):
+        h = Harness(monkeypatch)
+        h.enable_deep_research()
+        h.env["DISCOVERY_DOU_ENABLED"] = "0"
+        h.search_hits = [_HIT_A]
+        h.triage_map = {_HIT_A.url: _APPROVE}
+        h.extract_map = {_HIT_A.url: _make_record(_HIT_A.url)}
+        records = h.run()
+        assert len(records) == 1
+        assert records[0]["discovery_channel"] == "open_search"
+
+    def test_channel_error_fail_open(self, monkeypatch):
+        """Aceite 5: falha do canal Deep Research não interrompe a descoberta."""
+        h = Harness(monkeypatch)
+        h.enable_deep_research()
+        h.env["DISCOVERY_DOU_ENABLED"] = "0"
+        h.search_hits = [_HIT_A]
+        h.triage_map = {_HIT_A.url: _APPROVE}
+        h.extract_map = {_HIT_A.url: _make_record(_HIT_A.url)}
+        h.deep_research_error = RuntimeError("credencial")
+        records = h.run()
+        assert len(records) == 1
+        assert records[0]["discovery_channel"] == "open_search"
+        assert len(h.finish_calls) >= 1
 
 
 class TestOriginDomain:
@@ -498,7 +603,7 @@ class TestNoQueries:
         records = h.run()
         assert records == []
 
-    def test_all_three_channels_skipped(self, monkeypatch):
+    def test_all_four_channels_skipped(self, monkeypatch):
         h = Harness(monkeypatch)
         h.monkeypatch.setattr(od.ws, "discovery_config", lambda: {
             "queries": [],
@@ -509,10 +614,10 @@ class TestNoQueries:
             "reject_cache_ttl_days": 30,
         })
         h.run()
-        # start_run deve ter sido chamado 3x (dou, open_search, hub_expansion)
-        assert len(h.start_calls) == 3, "deve ter 3 start_run calls"
-        # finish_run deve ter sido chamado 3x, todos skipped/empty_result
-        assert len(h.finish_calls) == 3, "deve ter 3 finish_run calls"
+        # start_run deve ter sido chamado 4x (dou, open_search, hub_expansion, deep_research)
+        assert len(h.start_calls) == 4, "deve ter 4 start_run calls"
+        # finish_run deve ter sido chamado 4x, todos skipped/empty_result
+        assert len(h.finish_calls) == 4, "deve ter 4 finish_run calls"
         for fc in h.finish_calls:
             assert fc["status"] == "skipped", f"todos os canais devem ser skipped: {fc}"
             assert fc.get("reason_code") == "empty_result", f"reason deve ser empty_result: {fc}"

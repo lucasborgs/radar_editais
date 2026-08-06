@@ -1,0 +1,68 @@
+[
+  {
+    "name": "Laboratório de Inteligência Artificial e Robótica",
+    "slug": "lab-ia-robotica",
+    "source": "pnipe",
+    "kind": "laboratorio",
+    "url": "https://pnipe.mcti.gov.br/laboratorio/lab-ia-robotica",
+    "about": "Laboratório de P&D em inteligência artificial e robótica, com competências em visão computacional, aprendizado de máquina e controle de robôs.",
+    "institution": "UFSC",
+    "institution_type": "Universidade Federal",
+    "address": "Campus Universitário Reitor João David Ferreira Lima, Florianópolis, SC",
+    "municipio": "Florianópolis",
+    "competencias": [
+      "Visão computacional",
+      "Aprendizado de máquina",
+      "Robótica móvel"
+    ],
+    "equipamentos": [
+      "Cluster GPU",
+      "Bancada de robôs móveis",
+      "Câmeras de alta velocidade"
+    ],
+    "condicoes_acesso": "Acesso mediante proposta de projeto e disponibilidade de agenda.",
+    "contact": {
+      "responsavel": "",
+      "email": "lab@ufsc.br",
+      "telefone": "",
+      "site": "https://lab.ufsc.br"
+    },
+    "areas_raw": [
+      "Inteligência artificial",
+      "Robótica"
+    ],
+    "data_extracao": "2026-08-04"
+  },
+  {
+    "name": "Laboratório de Microeletrônica e Materiais Avançados",
+    "slug": "lab-microeletronica-materiais",
+    "source": "pnipe",
+    "kind": "laboratorio",
+    "url": "https://pnipe.mcti.gov.br/laboratorio/lab-microeletronica",
+    "about": "Laboratório de caracterização de materiais e microeletrônica, com infraestrutura para análise de superfícies e dispositivos semicondutores.",
+    "institution": "UNICAMP",
+    "institution_type": "Universidade Estadual",
+    "address": "Cidade Universitária Zeferino Vaz, Campinas, SP",
+    "municipio": "Campinas",
+    "competencias": [
+      "Caracterização de materiais",
+      "Microeletrônica"
+    ],
+    "equipamentos": [
+      "Microscópio eletrônico de varredura",
+      "Sala limpa classe 1000"
+    ],
+    "condicoes_acesso": "",
+    "contact": {
+      "responsavel": "",
+      "email": "",
+      "telefone": "",
+      "site": ""
+    },
+    "areas_raw": [
+      "Materiais",
+      "Semiconductores"
+    ],
+    "data_extracao": "2026-08-04"
+  }
+]

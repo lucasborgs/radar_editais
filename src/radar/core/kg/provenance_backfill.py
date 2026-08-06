@@ -334,15 +334,21 @@ def _load_programa_catalog() -> dict[str, _CatalogRecord]:
 
 def _load_ict_catalog() -> dict[str, _CatalogRecord]:
     ict_dir = gold.BRONZE_DIR / "ict_raw"
-    files = sorted(ict_dir.glob("embrapii_*.json")) if ict_dir.exists() else []
-    if not files:
+    if not ict_dir.exists():
         return {}
-    document = files[-1].name
-    recs = json.loads(files[-1].read_text(encoding="utf-8"))
     out: dict[str, _CatalogRecord] = {}
-    for r in recs:
-        slug = r.get("slug") or schema.slugify(r.get("name") or "")
-        out[f"embrapii:{slug}"] = _CatalogRecord(r, document, r.get("url"))
+    # EMBRAPII (unidades credenciadas) + PNIPE (laboratórios como capacidades —
+    # spec docs/specs/ict-pnipe-capabilities.md): mesmo formato de registro
+    # versionado, IDs nativos distintos por fonte.
+    for source, glob_pat in (("embrapii", "embrapii_*.json"), ("pnipe", "pnipe_*.json")):
+        files = sorted(ict_dir.glob(glob_pat))
+        if not files:
+            continue
+        document = files[-1].name
+        recs = json.loads(files[-1].read_text(encoding="utf-8"))
+        for r in recs:
+            slug = r.get("slug") or schema.slugify(r.get("name") or "")
+            out[f"{source}:{slug}"] = _CatalogRecord(r, document, r.get("url"))
     return out
 
 

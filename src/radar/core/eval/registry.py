@@ -10,12 +10,14 @@ from radar.core.eval import (
     explore,
     extraction,
     matching,
+    matching_structural,
     opportunity_type,
     profile_extractor,
     provenance,
     rag,
     relevance_shadow,
     reranker,
+    spike_kg,
     structurer,
     triage,
     writing,
@@ -24,6 +26,7 @@ from radar.core.eval.harness import Suite
 
 SUITES: dict[str, Suite] = {
     matching.SUITE.name: matching.SUITE,
+    matching_structural.SUITE.name: matching_structural.SUITE,
     rag.SUITE.name: rag.SUITE,
     writing.SUITE.name: writing.SUITE,
     extraction.SUITE.name: extraction.SUITE,
@@ -37,6 +40,7 @@ SUITES: dict[str, Suite] = {
     writing.SUITE_WRITING_V2.name: writing.SUITE_WRITING_V2,
     relevance_shadow.SUITE.name: relevance_shadow.SUITE,
     e2e_health.SUITE.name: e2e_health.SUITE,
+    spike_kg.SUITE.name: spike_kg.SUITE,
 }
 
 

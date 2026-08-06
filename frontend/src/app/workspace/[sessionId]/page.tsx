@@ -46,11 +46,6 @@ function nowTime(): string {
   return new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
-const WELCOME_BY_MODE: Record<"explorer" | "escrita", string> = {
-  explorer: "🧭 Contexto ativado (`/explorer`). Tire dúvidas sobre o edital. Para escrever, digite `/escrita`.",
-  escrita: "✍️ Escrita ativada (`/escrita`). Desenvolva sua proposta. Para dúvidas sobre o edital, digite `/explorer`.",
-};
-
 export default function WorkspacePage() {
   const params = useParams();
   const sessionId = Array.isArray(params.sessionId) ? params.sessionId[0] : params.sessionId;
@@ -71,14 +66,13 @@ export default function WorkspacePage() {
   const [pending, setPending] = useState<PendingUserInput | null>(null);
   const [savingSection, setSavingSection] = useState<string | null>(null);
   const [refining, setRefining] = useState<string | null>(null);
-  const [wsMode, setWsMode] = useState<"explorer" | "escrita">("explorer");
 
-  function parseCommand(input: string): { command?: "explorer" | "escrita" | "profile" | "review"; message: string } {
-    const match = input.trim().match(/^\/(explorer|escrita|help|profile|review)\b/);
+  function parseCommand(input: string): { command?: "profile" | "review"; message: string } {
+    const match = input.trim().match(/^\/(profile|review|help)\b/);
     if (!match) return { message: input };
     if (match[1] === "help") return { message: "" };
     return {
-      command: match[1] as "explorer" | "escrita" | "profile" | "review",
+      command: match[1] as "profile" | "review",
       message: input.slice(match[0].length).trim(),
     };
   }
@@ -128,8 +122,9 @@ export default function WorkspacePage() {
   const reloadDocument = useCallback(async (): Promise<{
     sections: WorkspaceSection[];
     editalId: string;
+    hasPlan: boolean;
   }> => {
-    if (!sessionId) return { sections: [], editalId: "" };
+    if (!sessionId) return { sections: [], editalId: "", hasPlan: false };
     const doc = await getWritingDocument(sessionId);
     const next = doc.sections.map((s) => ({ title: s.title, content: s.content }));
     setSections(next);
@@ -141,7 +136,13 @@ export default function WorkspacePage() {
     } else if (!doc.plan_pending) {
       setPlanPending(null);
     }
-    return { sections: next, editalId: doc.edital_id };
+    // Contrato do plano (Bloco 2): "plano carregado" só quando __plan__ real.
+    const hasPlan = !!(
+      doc.plan &&
+      typeof doc.plan === "object" &&
+      Object.keys(doc.plan).length > 0
+    );
+    return { sections: next, editalId: doc.edital_id, hasPlan };
   }, [sessionId]);
 
   useEffect(() => {
@@ -151,7 +152,7 @@ export default function WorkspacePage() {
       setDocLoading(true);
       setLoadError(null);
       try {
-        const { sections: next, editalId: id } = await reloadDocument();
+        const { sections: next, editalId: id, hasPlan } = await reloadDocument();
         if (cancelled) return;
         if (!id.startsWith("investidor:")) {
           try {
@@ -164,14 +165,19 @@ export default function WorkspacePage() {
           setTargetTitle(id);
         }
 
-        // Mensagem inicial.
+        // Mensagem inicial — contrato do plano (Bloco 2):
+        //   plano persistido → "Plano de proposta carregado";
+        //   só outline/seções → "Proposta carregada";
+        //   nada → mensagem inicial.
         if (!cancelled) {
           const anyContent = next.some((s) => s.content.trim());
           const welcome = anyContent
             ? "Pronto para revisar a proposta. Edite as seções à esquerda ou continue conversando no chat."
-            : next.length > 0
-              ? "Plano de proposta carregado. Converse para começar a preencher cada seção.\n\n" + WELCOME_BY_MODE.explorer
-              : WELCOME_BY_MODE.explorer;
+            : hasPlan
+              ? "Plano de proposta carregado. Converse para começar a preencher cada seção."
+              : next.length > 0
+                ? "Proposta carregada. Converse para continuar."
+                : "Converse sobre o edital ou peça para começar a sua proposta.";
           setMessages([{ role: "assistant", content: welcome, timestamp: nowTime() }]);
         }
       } catch (e) {
@@ -271,7 +277,7 @@ export default function WorkspacePage() {
       const content = text.trim();
       if (!content || !sessionId || working) return;
 
-      // Detecta comandos de modo (/explorer, /escrita, /help)
+      // Detecta comandos de ação (/profile, /review, /help)
       const { command, message } = parseCommand(content);
 
       // /help: mostra comandos disponíveis
@@ -280,19 +286,17 @@ export default function WorkspacePage() {
         setMessages((prev) => [...prev, { role: "user", content, timestamp: nowTime() }]);
         setInput("");
         const helpText = `**Comandos disponíveis:**
-  • \`/explorer\` — explorar o edital, tirar dúvidas
-  • \`/escrita\` — escrever/refinar as seções
   • \`/profile\` — extrair sugestão de perfil de uma URL
   • \`/review\` — revisar uma seção com o Critic
   • \`/help\` — mostrar esta mensagem
 
-  Modo atual: **/${wsMode}**`;
+O chat fala direto com a escrita da proposta.`;
         setMessages((prev) => [...prev, { role: "assistant", content: helpText, timestamp: nowTime() }]);
         setWorking(false);
         return;
       }
 
-      // Ações one-shot: /profile, /review — não mudam wsMode
+      // Ações one-shot: /profile, /review
       if (command === "profile" || command === "review") {
         setMessages((prev) => [...prev, { role: "user", content, timestamp: nowTime() }]);
         setInput("");
@@ -312,51 +316,7 @@ export default function WorkspacePage() {
         return;
       }
 
-      // Troca de modo: /explorer, /escrita
-      if (command && command !== wsMode) {
-        setWsMode(command);
-        setMessages((prev) => [...prev, { role: "user", content: content, timestamp: nowTime() }]);
-        setInput("");
-        if (!message) {
-          // Só trocou de modo sem mensagem
-          setMessages((prev) => [...prev, { role: "assistant", content: WELCOME_BY_MODE[command], timestamp: nowTime() }]);
-          return;
-        }
-      }
-
-      const activeMode = command || wsMode;
-
-      // Modos não-escrita: roteia via workspaceMode endpoint
-      if (activeMode !== "escrita") {
-        setMessages((prev) => [...prev, { role: "user", content: message || content, timestamp: nowTime() }]);
-        setInput("");
-        setPending(null);
-        setWorking(true);
-        try {
-          const res = await workspaceMode(sessionId, activeMode, message || content);
-          if (res.error) {
-            toast.error(res.error);
-            return;
-          }
-          // Handoff fluido: se o backend trocou de modo, sincroniza o front
-          if (res.mode && res.mode !== wsMode) {
-            setWsMode(res.mode);
-          }
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: res.response, timestamp: nowTime() },
-          ]);
-        } catch (e) {
-          toast.error(
-            e instanceof Error ? e.message : "Erro ao enviar mensagem.",
-          );
-        } finally {
-          setWorking(false);
-        }
-        return;
-      }
-
-      // Modo /escrita: fluxo normal de escrita (streaming first, fallback batch)
+      // Fluxo normal de escrita (streaming first, fallback batch)
       setMessages((prev) => [...prev, { role: "user", content: message || content, timestamp: nowTime() }]);
       setInput("");
       setPending(null);
@@ -458,6 +418,23 @@ export default function WorkspacePage() {
         try {
           const res = await sendWritingTurn(sessionId, message || content, sectionHint, undefined, idempotencyKeyRef.current ?? undefined);
 
+          // O backend pode retornar success:false (erro de geração/persistência)
+          // sem lançar exceção HTTP. Nesse caso renderizamos um banner de erro
+          // explícito — e NÃO uma bolha normal do assistente com "Erro ao processar:".
+          if (res.success === false) {
+            console.error(
+              "writing turn failed (batch):",
+              res.error ?? res.assistant_message,
+            );
+            setTurnError("A geração falhou no servidor. Tente novamente.");
+            toast.error("A geração falhou no servidor. Tente novamente.");
+            idempotencyKeyRef.current = null;
+            setStreamingText(null);
+            abortRef.current = null;
+            setWorking(false);
+            return;
+          }
+
           if (res.plan_pending && res.plan) {
             setPlanPending(res.plan);
           }
@@ -526,7 +503,7 @@ export default function WorkspacePage() {
       abortRef.current = null;
       setWorking(false);
     },
-    [sessionId, working, reloadDocument, wsMode],
+    [sessionId, working, reloadDocument],
   );
 
   // F4: gera a proposta completa após confirmação do plano
@@ -660,16 +637,15 @@ export default function WorkspacePage() {
   return (
     <div className="h-screen flex flex-col bg-app-bg overflow-hidden">
       <WorkspaceHeader
-        title={targetTitle || editalId || "Carregando…"}
+        title={targetTitle || "Carregando…"}
         mode={mode}
         filled={filled}
         total={sections.length}
-        wsMode={wsMode}
         sessionId={sessionId}
       />
 
       {/* Mobile: abas Documento | Chat + drawer da estrutura */}
-      {wsMode === "escrita" && sections.length > 0 && (
+      {sections.length > 0 && (
         <div className="md:hidden flex items-center border-b border-border bg-surface">
           <button
             onClick={() => setMobileDrawer(true)}
@@ -747,8 +723,8 @@ export default function WorkspacePage() {
           </div>
         )}
 
-        {/* Editor — só quando /escrita estiver ativo e há seções */}
-        {wsMode === "escrita" && sections.length > 0 && (
+        {/* Editor — sempre que há seções */}
+        {sections.length > 0 && (
           <div
             className={cn(
               "flex-1 min-w-0 flex flex-col",
@@ -779,7 +755,7 @@ export default function WorkspacePage() {
         {/* Chat — sempre visível, ocupa espaço restante */}
         <div className={cn(
           "flex-1 flex min-h-0",
-          wsMode === "escrita" && sections.length > 0
+          sections.length > 0
             ? mobileTab === "doc" ? "hidden md:flex md:max-w-sm" : "flex"
             : "flex",
         )}>
@@ -794,7 +770,7 @@ export default function WorkspacePage() {
             onAnswerPending={(answer) => void runTurn(answer)}
             onUndoSection={(title) => void handleUndoSection(title)}
             token={token}
-            fullWidth={wsMode !== "escrita" || sections.length === 0}
+            fullWidth={sections.length === 0}
             streamingText={streamingText}
             agentTrace={streamingTrace.length > 0 ? streamingTrace : undefined}
             onStop={() => {

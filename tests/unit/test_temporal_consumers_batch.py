@@ -35,7 +35,7 @@ def test_investor_preserves_legacy_card_without_temporal_payload():
     assert not {"temporal_mode", "validity_state", "temporal_value", "decision_source", "last_verified_at"} & set(card)
 
 
-def test_get_investor_opportunity_does_not_load_temporal(monkeypatch):
+def test_get_investor_opportunity_returns_none_and_does_not_load_temporal(monkeypatch):
     row = {
         "id": "investor-id", "native_id": "investidor:acme", "source": "curadoria",
         "kind": "investidor", "name": "Acme Capital", "description": "Tese",
@@ -53,8 +53,9 @@ def test_get_investor_opportunity_does_not_load_temporal(monkeypatch):
 
     card = entity_catalog.get_opportunity("investidor:acme")
 
-    assert card and card["status"] == "ABERTA"
-    assert "temporal_mode" not in card
+    # Investidores desativados das superfícies ativas: a ficha nem chega a ser
+    # montada (sem leitura temporal), o router responde 404.
+    assert card is None
 
 
 def test_program_card_receives_canonical_temporal_payload():

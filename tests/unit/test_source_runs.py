@@ -93,13 +93,6 @@ class TestStartRun:
         assert insert_data["source_key"] == "finep"
         assert insert_data["status"] == "running"
 
-    def test_creates_new_run_when_maybe_single_returns_none(self, mock_db):
-        """The installed Supabase client may return None for no matching row."""
-        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.maybe_single.return_value.execute.return_value = None
-        mock_db.table.return_value.insert.return_value.execute.return_value = MagicMock(data=[{"id": "new-id"}])
-
-        assert start_run(mock_db, batch_id="b1", source_key="finep", mode="dedicated") == "new-id"
-
     def test_returns_existing_if_running(self, mock_db):
         """Select encontra running → retorna ID sem insert."""
         existing_id = str(uuid.uuid4())

@@ -15,7 +15,6 @@ from datetime import date, timedelta
 import pytest
 
 import radar.api.routers.applications as api
-from radar.core.services.temporal_read_model import today_sao_paulo
 
 pytestmark = pytest.mark.unit
 
@@ -36,7 +35,7 @@ def _row(**over):
 # ---- days_left -------------------------------------------------------------
 
 def test_days_left_future_deadline_positive():
-    future = (today_sao_paulo() + timedelta(days=10)).strftime("%d/%m/%Y")
+    future = (date.today() + timedelta(days=10)).strftime("%d/%m/%Y")
     item = api._serialize_application(_row(), {"title": "Edital X", "deadline": future}, None)
     assert item["days_left"] == 10
     assert item["deadline"] == future
@@ -44,7 +43,7 @@ def test_days_left_future_deadline_positive():
 
 
 def test_days_left_past_deadline_negative():
-    past = (today_sao_paulo() - timedelta(days=5)).strftime("%d/%m/%Y")
+    past = (date.today() - timedelta(days=5)).strftime("%d/%m/%Y")
     item = api._serialize_application(_row(), {"title": "Edital Y", "deadline": past}, None)
     assert item["days_left"] == -5
 
@@ -111,7 +110,7 @@ def test_serialize_uses_session_progress():
 # ---- _build_pipeline_items (cards temporais + sessions em lote) -------------
 
 def test_build_pipeline_items_maps_card_and_session(monkeypatch):
-    future = (today_sao_paulo() + timedelta(days=3)).strftime("%d/%m/%Y")
+    future = (date.today() + timedelta(days=3)).strftime("%d/%m/%Y")
     cards = {
         "finep:1": {"title": "Edital Um", "deadline": future},
         # card ausente não precisa aparecer no mapa

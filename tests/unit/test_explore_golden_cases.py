@@ -5,7 +5,6 @@ import json
 import unicodedata
 
 import pytest
-from pydantic import ValidationError
 
 from radar.core.config import ROOT
 
@@ -76,28 +75,14 @@ def test_barn_golden_esta_preservado_no_catalogo_curado():
 
 
 def test_golden_declara_casos_sem_compensacao_por_media():
+    """Casos de explore cobrem editais ativos; investidores ficaram fora do escopo
+    (spec product-scope-catalog-deactivation.md) e não têm mais golden case."""
     golden = json.loads(
         (ROOT / "data/evaluation/golden/explore.json").read_text(encoding="utf-8")
     )
     assert [c["id"] for c in golden["cases"]] == [
         "finep-745-itens-financiaveis",
         "fapesc-31-2026-admissibilidade",
-        "barn-verticais",
-        "barn-tese",
-        "iforestal-profile-strategy",
     ]
     assert all(c["assertions"]["required"] for c in golden["cases"])
     assert all(c["assertions"]["forbidden"] for c in golden["cases"])
-
-
-def test_iforestal_golden_usa_o_perfil_http_canonico():
-    golden = json.loads(
-        (ROOT / "data/evaluation/golden/explore.json").read_text(encoding="utf-8")
-    )
-    case = next(item for item in golden["cases"] if item["id"] == "iforestal-profile-strategy")
-    from radar.domain.profile_schema import CompanyProfilePayload
-
-    profile = CompanyProfilePayload.model_validate(case["profile"])
-    assert profile.nome == "iFlorestal"
-    with pytest.raises(ValidationError):
-        CompanyProfilePayload.model_validate({**case["profile"], "setores": ["Agro"]})
