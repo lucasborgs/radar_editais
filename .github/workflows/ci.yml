@@ -178,6 +178,7 @@ jobs:
   consultant-journey-smoke:
     name: ConsultantGraph authenticated smoke (local)
     runs-on: ubuntu-latest
+    environment: staging
     env:
       ENVIRONMENT: test
       INTEGRATION_TARGET: local
