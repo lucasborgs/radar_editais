@@ -21,7 +21,6 @@ cat <<'EOF'
 ════════════════════════════════════════════════════════════════════════════
 1) SUPABASE CLOUD — schema
    a. Aplicar TODAS as migrations versionadas em supabase/migrations/:
-        supabase link --project-ref <ref>
         ENVIRONMENT=production ALLOW_ENVIRONMENT_INITIALIZATION=1 \
         ALLOW_PRODUCTION_MUTATION=1 CONFIRM_PROJECT_REF=<ref> \
         python scripts/supabase_safe.py push

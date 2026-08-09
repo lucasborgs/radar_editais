@@ -55,15 +55,9 @@ remove ao final. Não coloque os arquivos diretamente em `_work/...`: o
 O `.env` deve apontar para o mesmo projeto Supabase de produção e declarar
 `ENVIRONMENT=production`. Não copie esses arquivos para o repositório.
 
-Faça uma vez o vínculo da CLI Supabase com o projeto de produção no usuário do
-runner:
-
-```bash
-supabase link --project-ref <production-project-ref>
-```
-
 O `PROD_DATABASE_URL` do Environment `Production` é usado pela migration
-protegida. A `OPENAI_API_KEY` deve existir também no Environment `Production`;
+protegida via URL explícita; o CD não depende de `supabase link` persistido no
+runner. A `OPENAI_API_KEY` deve existir também no Environment `Production`;
 ela é injetada somente durante a atualização dos containers.
 
 ## Aprovação de produção

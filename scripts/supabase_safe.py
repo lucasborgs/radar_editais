@@ -8,6 +8,7 @@ O push aceita uma sentinela ainda ausente para resolver o bootstrap da migration
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 
 from radar.core.environment import (
@@ -33,7 +34,15 @@ def main() -> int:
         f"supabase db {args.command}",
         allow_uninitialized_sentinel=True,
     )
-    subprocess.run(["supabase", "db", args.command], check=True)
+    supabase_command = ["supabase", "db", args.command]
+    if args.command == "push" and not identity.is_local:
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            parser.error("DATABASE_URL é obrigatório para migration remota")
+        # A URL explícita torna o deploy reproduzível no runner e não depende
+        # de estado persistente criado por `supabase link`.
+        supabase_command.extend(["--db-url", database_url])
+    subprocess.run(supabase_command, check=True)
 
     # reset reaplica seed local; push cria a tabela vazia no primeiro deploy.
     project_ref = identity.project_ref or "local"
