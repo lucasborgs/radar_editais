@@ -92,6 +92,7 @@ def authenticated_smoke() -> Iterator[tuple[requests.Session, Client, str, str]]
     })
     user_id = created.user.id
     opportunity_id: str | None = None
+    gold_native_id = f"smoke-gold:{suffix}"
 
     try:
         auth = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"])
@@ -128,6 +129,21 @@ def authenticated_smoke() -> Iterator[tuple[requests.Session, Client, str, str]]
         }).execute()
         opportunity_id = opportunity.data[0]["id"]
 
+        service.table("entities").insert({
+            "kind": "edital",
+            "source": "smoke",
+            "native_id": gold_native_id,
+            "name": "Chamada smoke de subvenção industrial",
+            "description": "Apoio público não reembolsável para inovação industrial.",
+            "mecanismo": "subvencao",
+            "formato": "edital_periodico",
+            "setores": ["Indústria"],
+            "status": "aberta",
+            "deadline": "2099-12-31",
+            "requisitos_texto": ["Descreva o problema, a solução e o plano de inovação."],
+            "metadata": {"url": f"https://example.test/consultant-smoke/gold/{suffix}"},
+        }).execute()
+
         legacy = service.table("writing_sessions").insert({
             "workspace_id": workspace_id,
             "kind": "frontdoor",
@@ -143,6 +159,9 @@ def authenticated_smoke() -> Iterator[tuple[requests.Session, Client, str, str]]
     finally:
         if opportunity_id:
             service.table("discovered_opportunities").delete().eq("id", opportunity_id).execute()
+        service.table("entities").delete().eq("source", "smoke").eq(
+            "native_id", gold_native_id,
+        ).execute()
         _delete_auth_user(service, user_id)
 
 
