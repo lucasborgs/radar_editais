@@ -41,11 +41,16 @@ O runner precisa ter:
 
 ### Arquivos locais protegidos
 
-No workspace usado pelo runner, crie os arquivos gitignored:
+Fora do workspace do runner, crie a pasta persistente
+`$HOME/.config/radar-editais/` e coloque nela:
 
 - `.env.staging-local`, com base em `envs/.env.staging-local.example`;
 - `.env`, com base em `envs/.env.production.example`;
 - `cloudflared/config.yml` e as credenciais do tunnel.
+
+O workflow copia esses arquivos para o checkout somente durante o job e os
+remove ao final. Não coloque os arquivos diretamente em `_work/...`: o
+`actions/checkout` limpa esse diretório no início de cada execução.
 
 O `.env` deve apontar para o mesmo projeto Supabase de produção e declarar
 `ENVIRONMENT=production`. Não copie esses arquivos para o repositório.

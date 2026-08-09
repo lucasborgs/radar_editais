@@ -29,10 +29,19 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
+      - name: Load staging deployment files
+        run: |
+          source_dir="$HOME/.config/radar-editais"
+          test -f "$source_dir/.env.staging-local" || {
+            echo "Missing $source_dir/.env.staging-local on the deployment host" >&2
+            exit 1
+          }
+          install -m 600 "$source_dir/.env.staging-local" .env.staging-local
+
       - name: Validate deployment host
         run: |
           test -f .env.staging-local || {
-            echo "Missing .env.staging-local in the runner workspace" >&2
+            echo "Missing .env.staging-local after loading runner-local files" >&2
             exit 1
           }
           docker info >/dev/null
@@ -110,6 +119,10 @@ jobs:
             kill "$(cat "$RUNNER_TEMP/radar-staging-frontend.pid")" 2>/dev/null || true
           fi
 
+      - name: Remove staging deployment files from checkout
+        if: always()
+        run: rm -f .env.staging-local
+
   production:
     name: Deploy production
     needs: staging
@@ -122,14 +135,29 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
+      - name: Load production deployment files
+        run: |
+          source_dir="$HOME/.config/radar-editais"
+          test -f "$source_dir/.env" || {
+            echo "Missing $source_dir/.env on the deployment host" >&2
+            exit 1
+          }
+          test -f "$source_dir/cloudflared/config.yml" || {
+            echo "Missing $source_dir/cloudflared/config.yml on the deployment host" >&2
+            exit 1
+          }
+          install -m 600 "$source_dir/.env" .env
+          mkdir -p cloudflared
+          cp -R "$source_dir/cloudflared/." cloudflared/
+
       - name: Validate production host
         run: |
           test -f .env || {
-            echo "Missing .env in the runner workspace" >&2
+            echo "Missing .env after loading runner-local files" >&2
             exit 1
           }
           test -f cloudflared/config.yml || {
-            echo "Missing cloudflared/config.yml in the runner workspace" >&2
+            echo "Missing cloudflared/config.yml after loading runner-local files" >&2
             exit 1
           }
           grep -q '^ENVIRONMENT=production$' .env || {
@@ -185,3 +213,7 @@ jobs:
           scripts/compose.sh production ps
           scripts/compose.sh production logs --tail=120 app worker >&2
           exit 1
+
+      - name: Remove production deployment files from checkout
+        if: always()
+        run: rm -rf .env cloudflared
