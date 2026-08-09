@@ -60,8 +60,7 @@ export function PipelineCard({ app, onStatusChange, busy }: PipelineCardProps) {
 
   const openSession = () => {
     if (!app.session_id) return;
-    // Chat reconstrói/retoma a sessão a partir do edital (mesma rota usada em /sessions).
-    router.push(`/chat?edital=${encodeURIComponent(app.edital_id)}`);
+    router.push(`/workspace/${app.session_id}`);
   };
 
   return (

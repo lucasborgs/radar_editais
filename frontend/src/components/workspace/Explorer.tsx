@@ -27,6 +27,7 @@ export function Explorer({
   attachments,
   findingCounts,
   reviewing,
+  reviewBlocked,
   onSelectSection,
   onSelectAttachment,
   onReview,
@@ -37,6 +38,7 @@ export function Explorer({
   // Mapa título-da-seção → nº de findings (inclui chave "Geral").
   findingCounts: Map<string, number>;
   reviewing: boolean;
+  reviewBlocked: boolean;
   onSelectSection: (title: string) => void;
   onSelectAttachment: (item: ContentItemSummary) => void;
   onReview: () => void;
@@ -79,8 +81,8 @@ export function Explorer({
           </span>
           <button
             onClick={onReview}
-            disabled={reviewing}
-            title="Revisar"
+            disabled={reviewing || reviewBlocked}
+            title={reviewBlocked ? "Plano pendente: dispense ou gere a proposta antes de revisar" : "Revisar"}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-app-bg transition-colors disabled:opacity-40"
           >
             {reviewing ? (
@@ -183,7 +185,8 @@ export function Explorer({
       <div className="shrink-0 border-t border-border p-2 space-y-1">
         <button
           onClick={onReview}
-          disabled={reviewing}
+          disabled={reviewing || reviewBlocked}
+          title={reviewBlocked ? "Plano pendente: dispense ou gere a proposta antes de revisar" : "Revisar"}
           className="w-full text-xs font-sans text-content-primary border border-border rounded-lg py-1.5 hover:bg-app-bg transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
         >
           {reviewing ? (

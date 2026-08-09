@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -293,11 +294,28 @@ def eval_operational_error(*, output: Any, **_: Any) -> Evaluation:
 # =============================================================================
 
 
-def _prereqs() -> str | None:
+def _import_pytest() -> None:
+    """Importa pytest sem tornar a dependência obrigatória no runtime."""
+    import pytest  # noqa: F401
+
+
+def _pytest_prereq() -> str | None:
     try:
-        import pytest  # noqa: F401
-    except ImportError:
-        return "requer pytest (extra dev) para o harness hermético de captura gold"
+        _import_pytest()
+    except ImportError as exc:
+        return (
+            "pytest indisponível no interpretador ativo "
+            f"{sys.executable}; instale o extra dev neste mesmo ambiente com "
+            f'`{sys.executable} -m pip install -e ".[dev]"` '
+            f"(detalhe: {exc})"
+        )
+    return None
+
+
+def _prereqs() -> str | None:
+    pytest_reason = _pytest_prereq()
+    if pytest_reason:
+        return pytest_reason
     if not FINEP_JSONL.exists():
         return f"fixture silver ausente: {FINEP_JSONL}"
     if not FINEP_META.exists():

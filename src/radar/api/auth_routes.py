@@ -34,7 +34,7 @@ def _ensure_workspace(user_id: str, db) -> dict:
     user_id = auth.uid().
     """
     result = db.table("workspaces").select("*").eq("user_id", user_id).maybe_single().execute()
-    if result.data:
+    if result is not None and result.data:
         return result.data
 
     created = db.table("workspaces").insert({"user_id": user_id, "profile": {}}).execute()

@@ -53,9 +53,7 @@ export interface ProfileIncompleteEntry {
   missingFields: string[];
 }
 
-// Snapshot de match devolvido durante Explorar. A entrada preserva o contrato e
-// o histórico, mas a home mostra apenas uma prévia; a experiência completa vive
-// em /radar.
+// Snapshot de match preservado apenas para leitura de conversas antigas.
 export interface RadarEntry {
   kind: "radar";
   matchedEditais: MatchedEdital[];
@@ -138,11 +136,10 @@ export function migrateHistory(raw: unknown): TranscriptEntry[] {
   return out;
 }
 
-// Reconstrói o transcript a partir do GET /conversations/{id} (retomada de
-// conversa frontdoor, spec chat-first fase 2). Mesma postura defensiva do
+// Reconstrói um transcript antigo a partir do GET /conversations/{id}. Mesma
+// postura defensiva do
 // migrateHistory: entradas malformadas/kinds desconhecidos são ignorados.
-// O payload de diff/radar é a própria entrada serializada (persist_frontdoor_turn
-// e o POST /entries gravam {items,status,origin} / {data,ts}).
+// O payload de diff/radar antigo é somente renderizado.
 export function entriesFromServer(entries: ConversationEntry[]): TranscriptEntry[] {
   const out: TranscriptEntry[] = [];
   for (const e of entries) {

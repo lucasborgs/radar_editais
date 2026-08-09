@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from pathlib import Path
 
 from radar.core.environment import load_environment_profile
 from radar.core.eval.harness import run_suite
@@ -64,8 +65,19 @@ def _normalize_legacy_args(argv: list[str]) -> list[str]:
     return normalized
 
 
+def _load_eval_environment() -> bool:
+    """Carrega o perfil e recusa um ``ENV_FILE`` explícito que não existe."""
+    explicit = os.getenv("ENV_FILE")
+    if explicit and not Path(explicit).expanduser().is_file():
+        print(f"ENV_FILE não encontrado: {explicit}", file=sys.stderr)
+        return False
+    load_environment_profile()
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
-    load_environment_profile()  # CLI standalone: perfil antes dos consumidores
+    if not _load_eval_environment():
+        return 2
     args = _parser().parse_args(_normalize_legacy_args(list(argv or sys.argv[1:])))
     if args.intent == "smoke-cache":
         if not args.allow_remote:

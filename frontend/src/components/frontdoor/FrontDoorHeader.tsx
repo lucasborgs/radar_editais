@@ -92,10 +92,7 @@ export function FrontDoorHeader({
                 className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-border bg-surface py-1 shadow-lg"
               >
                 <Link href="/" role="menuitem" onClick={() => setMenuOpen(false)} className={itemCls}>
-                  Explorar
-                </Link>
-                <Link href="/radar" role="menuitem" onClick={() => setMenuOpen(false)} className={itemCls}>
-                  Radar
+                  Consultor
                 </Link>
                 <Link href="/projects" role="menuitem" onClick={() => setMenuOpen(false)} className={itemCls}>
                   Projetos

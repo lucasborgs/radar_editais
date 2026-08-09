@@ -253,6 +253,33 @@ def evaluate_opportunity(constraints: list[dict] | None, profile: Any) -> dict:
     return {"status": status, "unsat": unsat, "unknown": unknown}
 
 
+def evaluate_opportunity_detailed(constraints: list[dict] | None, profile: Any) -> dict:
+    """Avalia uma oportunidade preservando o resultado de cada regra.
+
+    O retorno agregado continua sendo o contrato de ``evaluate_opportunity``;
+    esta extensão só dá à jornada do consultor a trilha normativa necessária
+    para explicar por que uma regra foi satisfeita, ficou desconhecida ou
+    eliminou o candidato.
+    """
+    evaluations: list[dict] = []
+    for constraint in constraints or []:
+        verdict, reason = evaluate_constraint(constraint, profile)
+        status = {
+            SAT: "satisfied",
+            UNKNOWN: "unknown",
+            UNSAT: "unsatisfied",
+        }.get(verdict, "unknown")
+        evaluations.append({
+            "rule": constraint.get("tipo") or "regra não tipada",
+            "status": status,
+            "reason": reason,
+            "constraint": constraint,
+        })
+    aggregate = evaluate_opportunity(constraints, profile)
+    aggregate["evaluations"] = evaluations
+    return aggregate
+
+
 # ── Regras curadas (KG v2 resíduos PR-E.2, R4) ───────────────────────────────
 
 _CACHED_RULES: dict | None = None

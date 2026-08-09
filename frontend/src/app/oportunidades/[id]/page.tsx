@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatusBadge } from "@/components/ui";
-import { VerdictBlock } from "@/components/frontdoor/VerdictBlock";
-import { getOportunidadeById, fetchMatchVerdicts } from "@/lib/api";
+import { getOportunidadeById } from "@/lib/api";
 import { cn, parseDeadline } from "@/lib/utils";
 import {
   isContinuousConfirmed,
@@ -13,7 +12,6 @@ import {
   temporalDeadlineText,
   temporalVerificationNote,
 } from "@/lib/opportunity-temporal";
-import type { MatchVerdict } from "@/lib/api";
 import type {
   OportunidadeDetail,
   EligibilityConstraint,
@@ -75,10 +73,6 @@ function valueLabel(val: string | TicketRange | null | undefined): string | null
 
 // A chave do cache de veredito é o file_key do hipergrado (`source__native`) p/
 // editais; curados (Parte B) usam o node-id. Editais são o caso com veredito hoje.
-function verdictKeyFor(detail: OportunidadeDetail): string {
-  return detail.kind === "edital" ? detail.id.replace(":", "__") : detail.id;
-}
-
 // ── Sub-components ───────────────────────────────────────────────────────────
 
 function InfoRow({ label, value, provenance }: { label: string; value: React.ReactNode; provenance?: FieldProvenance }) {
@@ -137,7 +131,6 @@ export default function OportunidadeDetailPage() {
   const id = decodeURIComponent((params?.id as string) || "");
 
   const [detail, setDetail] = useState<OportunidadeDetail | null>(null);
-  const [verdict, setVerdict] = useState<MatchVerdict | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -148,11 +141,6 @@ export default function OportunidadeDetailPage() {
     getOportunidadeById(id)
       .then((d) => {
         setDetail(d);
-        // Veredito (Estágio 2) quando existir p/ o workspace — cache-only, auth.
-        // Anônimo/sem veredito → silencioso (o card renderiza sem ele).
-        fetchMatchVerdicts([verdictKeyFor(d)])
-          .then((r) => setVerdict(r.verdicts[verdictKeyFor(d)] ?? null))
-          .catch(() => setVerdict(null));
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Erro desconhecido"))
       .finally(() => setLoading(false));
@@ -281,16 +269,6 @@ export default function OportunidadeDetailPage() {
         )}
       </div>
 
-      {/* Veredito (Estágio 2) quando existir para o workspace */}
-      {verdict && (
-        <div className="bg-surface rounded-xl border border-border p-5 mb-4">
-          <h2 className="font-heading text-sm font-bold text-content-primary mb-1">
-            Análise para o seu perfil
-          </h2>
-          <VerdictBlock verdict={verdict} />
-        </div>
-      )}
-
       {/* Objetivo */}
       {detail.objective && (
         <Section title="Objetivo">
@@ -397,21 +375,21 @@ export default function OportunidadeDetailPage() {
         <div className="bg-surface rounded-xl border border-border p-5 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-content-primary font-sans">
-              Pronto para escrever a proposta?
+              Quer continuar esta oportunidade no consultor?
             </p>
             <p className="text-xs text-content-secondary font-sans mt-0.5">
-              Inicie uma sessão de escrita assistida por IA para este edital.
+              A escrita só começa depois que o consultor formar e selecionar um caminho.
             </p>
           </div>
           <button
-            onClick={() => router.push(`/chat?edital=${detail.id}`)}
+            onClick={() => router.push("/")}
             className={cn(
               "px-5 py-2.5 rounded-xl text-sm font-semibold font-sans text-white shrink-0",
               "bg-primary hover:bg-primary-hover transition-colors",
               "focus:outline-none focus:ring-2 focus:ring-primary/50",
             )}
           >
-            Iniciar Escrita
+            Continuar no consultor
           </button>
         </div>
       )}

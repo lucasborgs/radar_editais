@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from radar.core.infra.auth import CurrentUserId, DbClient
 from radar.core.kg import entity_catalog
+from radar.core.services.consultant import ConsultantRepository
 from radar.core.services.content_library import get_workspace_id
 from radar.core.services.writing_session import (
     append_entry,
@@ -39,7 +40,7 @@ class ConversationSummary(BaseModel):
     """Item da lista unificada do sidebar (spec, Contratos de API)."""
 
     session_id: str
-    kind: Literal["frontdoor", "writing"]
+    kind: Literal["frontdoor", "writing", "consultant"]
     title: str | None = None  # frontdoor usa title; writing deriva edital_title
     edital_id: str | None = None
     edital_title: str | None = None  # resolvido server-side (batch), p/ writing
@@ -107,6 +108,12 @@ def list_conversations(user_id: CurrentUserId, db: DbClient):
     """
     workspace_id = get_workspace_id(db, user_id)
     sessions = list_sessions(db, workspace_id)
+    try:
+        sessions.extend(ConsultantRepository().list(db, workspace_id))
+    except Exception:
+        # A deploy ainda sem a migration nova não derruba o histórico legado.
+        pass
+    sessions.sort(key=lambda item: item.get("updated_at") or "", reverse=True)
 
     # Resolve títulos de edital em batch (mesmo helper do /writing/sessions).
     # get_opportunity_titles não depende do read model temporal (mais robusto
@@ -166,6 +173,12 @@ def append_conversation_entry(
     turn_index, role='assistant', content=''. 404 se a conversa for de outro
     workspace."""
     workspace_id = get_workspace_id(db, user_id)
+    conversation = get_conversation(db, session_id, workspace_id)
+    if conversation and conversation.get("kind") == "frontdoor":
+        raise HTTPException(
+            status_code=410,
+            detail="Conversas antigas são somente leitura; continue pela jornada do consultor.",
+        )
     entry = append_entry(db, session_id, workspace_id, req.entry_kind, req.payload)
     if entry is None:
         raise HTTPException(status_code=404, detail="Conversa não encontrada")
@@ -188,6 +201,12 @@ def patch_conversation_entry(
     aceita/descarta o diff (status pending→accepted/dismissed). 404 se a
     entrada/conversa não pertencer ao workspace."""
     workspace_id = get_workspace_id(db, user_id)
+    conversation = get_conversation(db, session_id, workspace_id)
+    if conversation and conversation.get("kind") == "frontdoor":
+        raise HTTPException(
+            status_code=410,
+            detail="Conversas antigas são somente leitura; continue pela jornada do consultor.",
+        )
     entry = update_entry_payload(db, session_id, entry_id, workspace_id, req.payload)
     if entry is None:
         raise HTTPException(status_code=404, detail="Entrada não encontrada")

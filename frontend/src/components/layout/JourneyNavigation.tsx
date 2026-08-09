@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-type Journey = "explore" | "radar" | "projects";
+type Journey = "explore" | "projects";
 
 const JOURNEYS: Array<{ id: Journey; href: string; label: string }> = [
-  { id: "explore", href: "/", label: "Explorar" },
-  { id: "radar", href: "/radar", label: "Radar" },
+  { id: "explore", href: "/", label: "Consultor" },
   { id: "projects", href: "/projects", label: "Projetos" },
 ];
 

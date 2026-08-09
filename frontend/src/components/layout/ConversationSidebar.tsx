@@ -1,12 +1,10 @@
 "use client";
 
-// Sidebar do produto: destinos primários, histórico de conversas e páginas de
-// suporte. A conversa continua sendo a entrada de Explorar, mas não precisa
-// carregar sozinha o modelo mental das demais capacidades.
+// Sidebar do produto: o ConsultantGraph é a entrada única da jornada; dados
+// frontdoor antigos continuam listados somente para leitura.
 //
 // Fase 2: o histórico vem de `listConversations` (/conversations) — lista
-// unificada de conversas de escrita (kind=writing, retomada via /chat?edital=)
-// e do front door (kind=frontdoor, retomada via /?c=<session_id>).
+// unificada de conversas de escrita e de conversas antigas.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -16,24 +14,26 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useIsAdmin } from "@/lib/hooks";
 import { ThemeToggle } from "./ThemeToggle";
-import { HISTORY_KEY, SESSION_ID_KEY } from "@/types/frontdoor";
 import {
   listConversations,
   deleteWritingSession,
+  deleteConsultantState,
   type ConversationSummary,
 } from "@/lib/api";
 
-// Histórico secundário: conversas feitas em Explorar e projetos de escrita.
+// Histórico secundário: consultorias, conversas antigas e execuções de escrita.
 // Os destinos primários ficam estáveis acima; aqui entram apenas retomadas
 // recentes, ordenadas por updated_at desc pela API.
-type Section = "Explorar" | "Projetos recentes";
-const SECTION_ORDER: Section[] = ["Explorar", "Projetos recentes"];
+type Section = "Consultor" | "Histórico antigo" | "Projetos recentes";
+const SECTION_ORDER: Section[] = ["Consultor", "Histórico antigo", "Projetos recentes"];
 const SECTION_KIND: Record<Section, ConversationSummary["kind"]> = {
-  Explorar: "frontdoor",
+  Consultor: "consultant",
+  "Histórico antigo": "frontdoor",
   "Projetos recentes": "writing",
 };
 const SECTION_EMPTY: Record<Section, string> = {
-  Explorar: "Nenhuma conversa ainda.",
+  Consultor: "Nenhum brief ainda.",
+  "Histórico antigo": "Nenhuma conversa antiga.",
   "Projetos recentes": "Nenhum projeto em andamento.",
 };
 
@@ -73,8 +73,7 @@ const ICON_PATHS = {
 } as const;
 
 const PRIMARY_ITEMS = [
-  { href: "/", label: "Explorar", d: ICON_PATHS.discovered },
-  { href: "/radar", label: "Radar", d: ICON_PATHS.radar },
+  { href: "/", label: "Consultor", d: ICON_PATHS.discovered },
   { href: "/projects", label: "Projetos", d: ICON_PATHS.projects },
 ] as const;
 
@@ -161,7 +160,7 @@ export function ConversationSidebar() {
   // Título exibido: frontdoor usa `title` do banco (1ª mensagem truncada);
   // writing usa `edital_title` resolvido server-side → fallback no ID cru.
   const titleFor = useCallback((s: ConversationSummary) => {
-    if (s.kind === "frontdoor") return s.title || "Conversa";
+    if (s.kind === "frontdoor" || s.kind === "consultant") return s.title || "Conversa";
     return s.edital_title || s.edital_id || "Proposta";
   }, []);
 
@@ -184,14 +183,8 @@ export function ConversationSidebar() {
   // estamos em "/", a home não remonta — disparamos um evento que ela escuta
   // para resetar o estado em memória.
   const handleNew = useCallback(() => {
-    try {
-      window.sessionStorage.removeItem(HISTORY_KEY);
-      window.sessionStorage.removeItem(SESSION_ID_KEY);
-    } catch {
-      /* quota/modo privado — segue */
-    }
     if (pathname === "/") {
-      window.dispatchEvent(new Event("frontdoor:new"));
+      window.dispatchEvent(new Event("consultant:new"));
     } else {
       router.push("/");
     }
@@ -200,12 +193,12 @@ export function ConversationSidebar() {
   // Retomada de conversa frontdoor: navegando de outra página, a home monta e
   // lê o ?c=; já estando em "/", o Link não remonta a página — disparamos o
   // evento que a home escuta (mesmo seam do "Nova conversa").
-  const handleOpenFrontdoor = useCallback(
+  const handleOpenConversation = useCallback(
     (e: React.MouseEvent, sessionId: string) => {
       if (pathname !== "/") return; // deixa o Link navegar normalmente
       e.preventDefault();
       window.dispatchEvent(
-        new CustomEvent("frontdoor:resume", { detail: sessionId }),
+        new CustomEvent("consultant:resume", { detail: sessionId }),
       );
     },
     [pathname],
@@ -219,7 +212,12 @@ export function ConversationSidebar() {
       try {
         const token = await getToken();
         if (!token) return;
-        await deleteWritingSession(sessionId, token);
+        const session = sessions.find((item) => item.session_id === sessionId);
+        if (session?.kind === "consultant") {
+          await deleteConsultantState(sessionId, token);
+        } else {
+          await deleteWritingSession(sessionId, token);
+        }
         setSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
       } catch {
         toast.error("Erro ao excluir a conversa.");
@@ -345,13 +343,13 @@ export function ConversationSidebar() {
               ) : (
               <div className="space-y-0.5">
                 {items.map((s) => {
-                  // Retomada por kind: escrita resolve a sessão pelo edital
-                  // (/chat?edital={id}; /chat não consome ?session); frontdoor
-                  // retoma pela home (/?c={session_id}).
-                  const isFrontdoor = s.kind === "frontdoor";
+                  // Sessões de escrita já existentes retornam ao workspace;
+                  // ConsultantGraph e históricos antigos retornam à home.
+                  const isConsultant = s.kind === "consultant";
+                  const isFrontdoor = s.kind === "frontdoor" || isConsultant;
                   const href = isFrontdoor
                     ? `/?c=${encodeURIComponent(s.session_id)}`
-                    : `/chat?edital=${encodeURIComponent(s.edital_id ?? "")}`;
+                    : `/workspace/${encodeURIComponent(s.session_id)}`;
                   return (
                     <div key={s.session_id} className="group relative">
                       <Link
@@ -365,7 +363,7 @@ export function ConversationSidebar() {
                         }
                         onClick={
                           isFrontdoor
-                            ? (e) => handleOpenFrontdoor(e, s.session_id)
+                            ? (e) => handleOpenConversation(e, s.session_id)
                             : undefined
                         }
                         className={cn(

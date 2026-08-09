@@ -22,7 +22,6 @@ from radar.api.common import CompanyProfileSchema, explore_agent
 from radar.api.rate_limit import get_client_ip, limiter
 from radar.core.infra.auth import CurrentUserId, DbClient, OptionalDbClient, OptionalUserId
 from radar.core.ingestion.profile_extractor import ProfileExtractor
-from radar.core.kg.planning_node import is_complex_proposal
 from radar.core.services.content_library import get_workspace_id
 from radar.core.services.writing_session import persist_frontdoor_turn
 
@@ -172,14 +171,6 @@ def _post_process(
         "truncated": explore_meta["truncated"],
         "called_tools": explore_meta.get("called_tools", []),
     }
-    if is_complex_proposal(message, answer, len(req.history)):
-        result["next_action"] = {
-            "offer": "Estruturar proposta?",
-            "options": [
-                {"label": "Estruturar", "action": "goto_planning"},
-                {"label": "Começar a escrever", "action": "goto_execution"},
-            ],
-        }
     diff = None
     if req.profile is not None:
         diff = ProfileExtractor().extract_diff_from_message(message, current)

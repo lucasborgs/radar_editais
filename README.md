@@ -113,6 +113,22 @@ Os detalhes e resultados que sustentam essas escolhas estão em [arquitetura](do
 
 O harness unificado cobre matching, RAG, escrita, extração, triagem, reranking e componentes auxiliares. Runs locais sempre registram um manifesto; publicação no Langfuse é opt-in.
 
+Para reproduzir a avaliação hermética `e2e_health`, use o mesmo interpretador
+que recebeu o extra de desenvolvimento e selecione explicitamente um perfil
+local. A avaliação não usa banco, rede ou LLM reais, mas o harness reutilizado
+depende de `pytest`:
+
+```bash
+.venv/bin/python -m pip install -e ".[dev]"
+ENV_FILE=.env.staging-local ENVIRONMENT=test PYTHONPATH=src \
+  .venv/bin/python -m radar.core.eval run e2e_health
+```
+
+Se o arquivo indicado por `ENV_FILE` não existir, o CLI encerra antes de
+carregar o `.env` legado. Se `pytest` não estiver instalado no interpretador
+ativo, o preflight informa o caminho exato para instalar o extra nesse mesmo
+ambiente. Nunca execute essa avaliação com um perfil de produção ou staging.
+
 ## Rodar localmente
 
 Pré-requisitos: Python 3.12, Node.js 20, Docker e Supabase CLI.

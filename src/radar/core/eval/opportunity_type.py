@@ -51,13 +51,19 @@ def task(*, item: Any, **_) -> dict:
     return {"opportunity_type": rec.get("opportunity_type", "edital")}
 
 
-def eval_type_accuracy(*, output, expected_output, **_) -> Evaluation:
-    """O tipo-evento previsto bate com o esperado?"""
+def eval_type_accuracy(*, output, expected_output, **_) -> Evaluation | None:
+    """Compara classificações válidas sem pontuar falhas operacionais.
+
+    ``task`` preserva a falha de extração em ``output["error"]``. Esse caso
+    não é uma classificação errada e, portanto, não deve produzir score de
+    qualidade (nem contaminar a média com ``0.0``).
+    """
     if not isinstance(output, dict) or "error" in output:
-        return {"name": "type_accuracy", "value": 0.0,
-                "comment": (output or {}).get("error", "output inválido")}
+        return None
     pred = output.get("opportunity_type")
     exp = (expected_output or {}).get("opportunity_type")
+    if not isinstance(pred, str) or pred not in {"edital", "desafio", "programa"}:
+        return None
     return {"name": "type_accuracy", "value": pred == exp,
             "comment": f"previsto={pred} esperado={exp}"}
 

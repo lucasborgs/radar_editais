@@ -1,31 +1,5 @@
 // Tipos de resposta da API v2
 
-// ── Planning (FASE 1 do four-phase-workflow) ─────────────
-
-export interface PlanSection {
-  id: string;
-  title: string;
-  description: string;
-  key_points: string[];
-  estimated_length: string;
-  pre_fill: string | null;
-}
-
-export interface PlanAlignment {
-  company_themes: string[];
-  edital_themes: string[];
-  match_score: number;
-  critical_gaps: string[];
-}
-
-export interface Plan {
-  title: string;
-  sections_total: number;
-  sections: PlanSection[];
-  alignment: PlanAlignment;
-  compliance_hints: string[];
-}
-
 export interface WritingMessage {
   role: "user" | "assistant";
   content: string;
@@ -34,22 +8,6 @@ export interface WritingMessage {
 }
 
 export type WritingMode = "proposal" | "pitch";
-
-export interface WritingStartResponse {
-  session_id: string;
-  edital_id: string;
-  // W-D3: modo derivado do id (ou override) — front usa p/ o badge do header.
-  mode?: WritingMode;
-  section_titles: string[];
-  content_source: "section_index" | "live_fetch";
-  success: boolean;
-  // get_info também devolve isto ao retomar uma sessão.
-  pending_user_input?: PendingUserInput | null;
-  turn_count?: number;
-  // F4: plano gerado no 1º turno (plan-first), exposto também em get_info.
-  plan?: Record<string, unknown> | null;
-  plan_pending?: boolean;
-}
 
 // Sprint 2 do Cenário B: agente pode pedir info ao usuário via tool dedicada.
 // Quando presente, frontend renderiza prompt destacado em vez de [COMPLETAR: ...].

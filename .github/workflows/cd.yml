@@ -1,0 +1,187 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radar-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    name: Deploy and smoke staging-local
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: [self-hosted, radar-production-host]
+    environment: staging
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Validate deployment host
+        run: |
+          test -f .env.staging-local || {
+            echo "Missing .env.staging-local in the runner workspace" >&2
+            exit 1
+          }
+          docker info >/dev/null
+          supabase --version
+          node --version
+          npm --version
+
+      - name: Start local Supabase and apply migrations
+        run: |
+          supabase start
+          supabase migration up
+          eval "$(supabase status -o env | sed 's/^/LOCAL_/')"
+          {
+            echo "SUPABASE_URL=$LOCAL_API_URL"
+            echo "SUPABASE_ANON_KEY=$LOCAL_ANON_KEY"
+            echo "SUPABASE_SERVICE_KEY=$LOCAL_SERVICE_ROLE_KEY"
+            echo "SUPABASE_JWT_SECRET=$LOCAL_JWT_SECRET"
+            echo "DATABASE_URL=$LOCAL_DB_URL"
+            echo "ENVIRONMENT=test"
+            echo "INTEGRATION_TARGET=local"
+            echo "EMBEDDING_DIMENSIONS=1536"
+          } >> "$GITHUB_ENV"
+
+      - name: Install smoke dependencies
+        run: |
+          python3 -m venv .ci-venv
+          .ci-venv/bin/python -m pip install --upgrade pip
+          .ci-venv/bin/pip install -e ".[dev]"
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build and start staging services
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          scripts/compose.sh staging-local build app worker
+          scripts/compose.sh staging-local up -d app worker
+
+      - name: Start frontend for staging smoke
+        working-directory: frontend
+        run: |
+          export NEXT_PUBLIC_API_URL=http://127.0.0.1:8001
+          export NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+          npm run dev -- --hostname 127.0.0.1 --port 3000 \
+            > "$RUNNER_TEMP/radar-staging-frontend.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/radar-staging-frontend.pid"
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000/login >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/radar-staging-frontend.log" >&2
+          exit 1
+
+      - name: Run authenticated staging smoke
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CONSULTANT_SMOKE_API_URL: http://127.0.0.1:8001
+          CONSULTANT_SMOKE_FRONTEND_URL: http://127.0.0.1:3000
+        run: |
+          .ci-venv/bin/pytest -m integration \
+            tests/integration/test_consultant_journey_smoke.py -v
+
+      - name: Stop staging smoke frontend
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/radar-staging-frontend.pid"; then
+            kill "$(cat "$RUNNER_TEMP/radar-staging-frontend.pid")" 2>/dev/null || true
+          fi
+
+  production:
+    name: Deploy production
+    needs: staging
+    runs-on: [self-hosted, radar-production-host]
+    environment: Production
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Validate production host
+        run: |
+          test -f .env || {
+            echo "Missing .env in the runner workspace" >&2
+            exit 1
+          }
+          test -f cloudflared/config.yml || {
+            echo "Missing cloudflared/config.yml in the runner workspace" >&2
+            exit 1
+          }
+          grep -q '^ENVIRONMENT=production$' .env || {
+            echo ".env must declare ENVIRONMENT=production" >&2
+            exit 1
+          }
+          if grep -Eq '^DEMO_MODE=(1|true|yes|on)$' .env; then
+            echo "DEMO_MODE is forbidden in production" >&2
+            exit 1
+          fi
+          docker info >/dev/null
+          supabase --version
+
+      - name: Confirm production project identity
+        run: |
+          project_ref="$(sed -n 's#^SUPABASE_URL=https://\([^./]*\)\..*#\1#p' .env | head -n 1)"
+          test -n "$project_ref" || {
+            echo "Could not derive the production Supabase project ref from .env" >&2
+            exit 1
+          }
+          echo "CONFIRM_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
+
+      - name: Apply production migrations with the safety guard
+        env:
+          ENV_FILE: .env
+          ENVIRONMENT: production
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          ALLOW_ENVIRONMENT_INITIALIZATION: "1"
+          ALLOW_PRODUCTION_MUTATION: "1"
+        run: |
+          python3 -m venv .ci-venv
+          .ci-venv/bin/python -m pip install --upgrade pip
+          .ci-venv/bin/pip install -e .
+          .ci-venv/bin/python scripts/supabase_safe.py push
+
+      - name: Build and start production services
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          scripts/compose.sh production build app worker
+          scripts/compose.sh production up -d --no-build app worker tunnel
+
+      - name: Verify production health
+        run: |
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              scripts/compose.sh production ps
+              exit 0
+            fi
+            sleep 2
+          done
+          scripts/compose.sh production ps
+          scripts/compose.sh production logs --tail=120 app worker >&2
+          exit 1

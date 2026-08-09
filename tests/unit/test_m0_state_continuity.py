@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from radar.api.auth_routes import ProfilePayload, update_profile
+from radar.api.auth_routes import ProfilePayload, _ensure_workspace, update_profile
 from radar.api.common import profile_from_workspace, to_py_profile
 from radar.api.routers.explore import _history_without_current
 from radar.core.llm.agent_graph import StreamDelta
@@ -50,6 +50,47 @@ class _Db:
     def table(self, _name):
         row = {"id": "ws-1", "profile": self.profile}
         return _Query(self, row)
+
+
+class _EnsureWorkspaceQuery:
+    def __init__(self, db, result):
+        self.db = db
+        self.result = result
+
+    def select(self, *_args):
+        return self
+
+    def eq(self, *_args):
+        return self
+
+    def maybe_single(self):
+        return self
+
+    def insert(self, payload):
+        self.db.inserted = payload
+        return _EnsureWorkspaceQuery(self.db, _Result([{"id": "ws-new", "profile": {}}]))
+
+    def execute(self):
+        return self.result
+
+
+class _EnsureWorkspaceDb:
+    def __init__(self, select_result):
+        self.select_result = select_result
+        self.inserted = None
+
+    def table(self, _name):
+        return _EnsureWorkspaceQuery(self, self.select_result)
+
+
+def test_ensure_workspace_creates_on_missing_supabase_result():
+    for select_result in (None, _Result(None)):
+        db = _EnsureWorkspaceDb(select_result)
+
+        workspace = _ensure_workspace("user-1", db)
+
+        assert workspace == {"id": "ws-new", "profile": {}}
+        assert db.inserted == {"user_id": "user-1", "profile": {}}
 
 
 def test_profile_http_round_trip_preserves_every_supported_field():

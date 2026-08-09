@@ -9,7 +9,7 @@ import logging
 import threading
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from radar.api.common import (
@@ -23,7 +23,6 @@ from radar.core.infra.auth import CurrentUserId, DbClient
 from radar.core.kg import entity_catalog
 from radar.core.services.content_library import get_workspace_id
 from radar.core.services.writing_session import (
-    ProfileIncompleteError,
     WritingSession,
     cancel_turn,
     delete_session,
@@ -41,24 +40,6 @@ router = APIRouter(tags=["writing"])
 # =============================================================================
 # SCHEMAS
 # =============================================================================
-
-
-class WritingStartRequest(BaseModel):
-    edital_id: str
-    profile: CompanyProfileSchema
-    library_item_ids: list[str] = []
-    # W-D3: modo de escrita explícito ('proposal' | 'pitch'). Opcional — quando
-    # ausente (default), a WritingSession deriva o modo do namespace do id
-    # (`investidor:<slug>` → pitch; demais → proposal). Hoje todo pitch entra por
-    # um id `investidor:`, então o override raramente é necessário; expomos o
-    # campo para o front poder sinalizar a intenção (badge/header) sem depender
-    # de inspecionar o id. Não altera a lógica do pitch em si.
-    mode: str | None = None
-    # PR1 (four-phase-workflow): plano de proposta gerado pelo Planning.
-    # Se presente, WritingSession usa suas seções como outline.
-    plan: dict | None = None
-    # PR1: ajustes do usuário ao plano (merge sobre o plan antes de usar).
-    user_adjustments: dict | None = None
 
 
 class WritingTurnRequest(BaseModel):
@@ -213,76 +194,6 @@ def _record_idempotency(db: DbClient, key: str | None, session_id: str, response
         }).execute()
     except Exception as e:
         logger.warning("failed to record idempotency key %s: %s", _truncate_key(key), e)
-
-
-@router.post("/writing/start", summary="Inicia sessão de escrita de proposta")
-@limiter.limit("10/minute")
-def writing_start(
-    request: Request,
-    req: WritingStartRequest,
-    user_id: CurrentUserId,
-    db: DbClient,
-):
-    """
-    Cria uma sessão de escrita persistida em Postgres para o edital selecionado.
-    Retorna session_id, títulos das seções e contexto da sessão.
-    """
-    # Alvo de escrita: evento (edital/desafio/programa, no índice) OU entidade
-    # (investidor:<slug>/programa:<slug>, em JSON curado → modo derivado do id).
-    # Fundos/programas não encontrados no JSON curado prosseguem sem dados do nó
-    # (WritingSession tolera contexto vazio — os builders retornam "" graciosamente).
-    if req.edital_id.startswith("investidor:"):
-        if entity_catalog.get_investidor(req.edital_id) is None:
-            logger.warning("writing/start: fundo '%s' não encontrado em entities — sessão prossegue sem dados do fundo", req.edital_id)
-    elif req.edital_id.startswith("programa:"):
-        if entity_catalog.get_programa(req.edital_id) is None:
-            logger.warning("writing/start: programa '%s' não encontrado em entities — sessão prossegue sem dados do programa", req.edital_id)
-    else:
-        if entity_catalog.get_edital(req.edital_id) is None:
-            raise HTTPException(status_code=404, detail=f"Edital '{req.edital_id}' não encontrado")
-        # Chunking inline (síncrono): verifica se já existem chunks no banco;
-        # se não, roda o pipeline completo (PDF → Documento Canônico → silver →
-        # chunk → contextual retrieval → embed → upsert). Leva ~1min na primeira
-        # vez; idempotente (re-chunking só força com force=True).
-        try:
-            from radar.core.infra.db import get_supabase_service
-            svc = get_supabase_service()
-            existing = svc.table("edital_chunks").select("id", count="exact").eq(
-                "edital_id", req.edital_id,
-            ).limit(1).execute()
-            if existing.count == 0:
-                import asyncio
-
-                from radar.core.tasks import chunk_edital_task
-                asyncio.run(chunk_edital_task(req.edital_id))
-        except Exception as e:
-            logger.warning("falha ao chunkear %s inline: %s", req.edital_id, e)
-
-    workspace_id = get_workspace_id(db, user_id)
-    profile = to_py_profile(req.profile)
-    library_items = load_library_items(db, workspace_id, req.library_item_ids)
-
-    # Gate de perfil (Fase 2): perfil sem os campos mínimos não inicia sessão.
-    # Devolve payload estruturado (não um 500) para o front renderizar o
-    # formulário inline / acionar o ProfileAgent — mesmo padrão de
-    # request_user_info. 422 = entidade compreendida mas não-processável.
-    try:
-        session = WritingSession(
-            db=db,
-            workspace_id=workspace_id,
-            profile=profile,
-            edital_id=req.edital_id,
-            library_items=library_items,
-            mode=req.mode,  # W-D3: opcional; None → modo derivado do id
-            plan=req.plan,  # PR1: plano do Planning (se houver)
-            user_adjustments=req.user_adjustments,  # PR1: ajustes do usuário
-        )
-    except ProfileIncompleteError as e:
-        return JSONResponse(
-            status_code=422,
-            content={"error": "profile_incomplete", "missing_fields": e.missing_fields},
-        )
-    return session.get_info()
 
 
 @router.post(

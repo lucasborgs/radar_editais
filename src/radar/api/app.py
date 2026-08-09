@@ -34,14 +34,13 @@ from radar.api.library_routes import router as library_router
 from radar.api.rate_limit import limiter
 from radar.api.routers.applications import router as applications_router
 from radar.api.routers.catalog import router as catalog_router
+from radar.api.routers.consultant import router as consultant_router
 from radar.api.routers.conversations import router as conversations_router
 from radar.api.routers.cron_operations import router as cron_operations_router
 from radar.api.routers.data_quality import router as data_quality_router
 from radar.api.routers.discovered import router as discovered_router
-from radar.api.routers.explore import router as explore_router
-from radar.api.routers.planning import router as planning_router
+from radar.api.routers.grounded_writing import router as grounded_writing_router
 from radar.api.routers.profile import router as profile_router
-from radar.api.routers.radar import router as radar_router
 from radar.api.routers.research import router as research_router
 from radar.api.routers.source_coverage import router as source_coverage_router
 from radar.api.routers.workspace import router as workspace_router
@@ -209,15 +208,14 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(auth_router)
 app.include_router(library_router)
 app.include_router(catalog_router)
-app.include_router(explore_router)
-app.include_router(planning_router)
+app.include_router(consultant_router)
+app.include_router(grounded_writing_router)
 app.include_router(applications_router)
 app.include_router(workspace_router)
 app.include_router(writing_router)
 app.include_router(conversations_router)
 app.include_router(cron_operations_router)
 app.include_router(profile_router)
-app.include_router(radar_router)
 app.include_router(research_router)
 app.include_router(source_coverage_router)
 app.include_router(discovered_router)

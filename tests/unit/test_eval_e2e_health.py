@@ -38,6 +38,18 @@ def test_prereqs_pass_when_fixtures_present():
     assert e2e_health._prereqs() is None
 
 
+def test_prereqs_reports_missing_pytest(monkeypatch):
+    def _missing_pytest():
+        raise ImportError("No module named pytest")
+
+    monkeypatch.setattr(e2e_health, "_import_pytest", _missing_pytest)
+    reason = e2e_health._prereqs()
+    assert reason is not None
+    assert "pytest indisponível" in reason
+    assert ".[dev]" in reason
+    assert e2e_health.sys.executable in reason
+
+
 def test_prereqs_skip_honestly_when_fixture_missing(monkeypatch, tmp_path):
     monkeypatch.setattr(e2e_health, "FINEP_JSONL", tmp_path / "does-not-exist.jsonl")
     reason = e2e_health._prereqs()

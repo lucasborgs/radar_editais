@@ -18,19 +18,23 @@ import { GateCard } from "@/components/frontdoor/GateCard";
 import { ProfileIncompleteCard } from "@/components/frontdoor/ProfileIncompleteCard";
 import { UrlHero } from "@/components/frontdoor/UrlHero";
 import { UnlockCard } from "@/components/frontdoor/UnlockCard";
-import { ProfileGate } from "@/components/frontdoor/ProfileGate";
+import { ConsultantJourneyCard } from "@/components/consultant/ConsultantJourneyCard";
 import {
-  frontdoorTurn,
-  exploreStream,
+  consultantTurn,
+  openGroundedWriting,
   getMe,
   saveProfile,
   extractProfileFromDocument,
   getConversation,
-  updateConversationEntry,
+  getConsultantState,
+  updateConsultantBrief,
+  confirmConsultantProject,
+  selectConsultantPath,
+  reassessConsultantPath,
   type ProfileDiffItem,
-  type ExploreTurnResult,
+  type ConsultantJourneyState,
+  type ConsultantBriefUpdate,
 } from "@/lib/api";
-const PLANNING_CTX_KEY = "planning_context";
 import { useAuth } from "@/lib/auth";
 import {
   CompanyProfile,
@@ -39,10 +43,6 @@ import {
   saveProfileToStorage,
 } from "@/types/profile";
 import {
-  HISTORY_KEY,
-  SESSION_ID_KEY,
-  migrateHistory,
-  toApiHistory,
   applyDiff,
   diffFromProfile,
   diffFromExtracted,
@@ -59,6 +59,14 @@ import {
 const WELCOME =
   "Oi! Me conte o que sua empresa faz — ou explore o que existe de fomento por aí.";
 
+function entriesFromConsultant(state: ConsultantJourneyState): TranscriptEntry[] {
+  return state.messages.map((message) => ({
+    kind: "msg",
+    role: message.role,
+    content: message.content,
+  }));
+}
+
 const SUGGESTIONS = [
   "O que existe de fomento para IA em saúde?",
   "Quais editais estão com prazo aberto?",
@@ -69,45 +77,17 @@ const SUGGESTIONS = [
 // Evita re-disparar o merge de perfil em toda visita logada.
 const MERGED_FLAG = "frontdoor_merged";
 
-// Transcript vive em sessionStorage (decisão 2026-06-11): nova visita/aba =
-// conversa limpa; a mesma aba preserva. O PERFIL continua em localStorage
-// (é o ativo durável). Limpa resíduo da era localStorage do transcript.
-function loadHistory(): TranscriptEntry[] {
-  if (typeof window === "undefined") return [];
-  try {
-    window.localStorage.removeItem(HISTORY_KEY);
-    const raw = window.sessionStorage.getItem(HISTORY_KEY);
-    return raw ? migrateHistory(JSON.parse(raw)) : [];
-  } catch {
-    return [];
-  }
-}
-
 // ── Bolha ─────────────────────────────────────────────────────────────────────
 function Bubble({
   role,
   content,
   truncated,
-  nextAction,
 }: {
   role: "user" | "assistant";
   content: string;
   truncated?: boolean;
-  nextAction?: { offer: string; options: Array<{ label: string; action: string }> };
 }) {
   const isUser = role === "user";
-  const router = useRouter();
-
-  const handleNextAction = useCallback(
-    (action: string) => {
-      if (action === "goto_planning") {
-        router.push("/workspace/planning");
-      } else if (action === "goto_execution") {
-        router.push("/workspace/new?mode=writing");
-      }
-    },
-    [router],
-  );
 
   return (
     <ChatBubble
@@ -118,19 +98,6 @@ function Bubble({
             <p className="px-1 mt-1 text-[11px] italic text-content-secondary font-sans">
               Resposta interrompida no limite de passos — continue a conversa para eu retomar.
             </p>
-          ) : null}
-          {!isUser && nextAction ? (
-            <div className="flex flex-wrap gap-2 px-1 mt-2">
-              {nextAction.options.map((opt) => (
-                <button
-                  key={opt.action}
-                  onClick={() => handleNextAction(opt.action)}
-                  className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
           ) : null}
         </>
       }
@@ -164,6 +131,8 @@ export default function FrontDoorPage() {
   // Conversa persistida no servidor (logado, spec chat-first fase 2). null =
   // ainda sem binding (anônimo, ou logado antes do 1º turno).
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [consultantState, setConsultantState] = useState<ConsultantJourneyState | null>(null);
+  const [legacyReadOnly, setLegacyReadOnly] = useState(false);
   // Retomada via sidebar: /?c=<session_id>. Lido uma vez na montagem.
   const [resumeId, setResumeId] = useState<string | null>(null);
   // Hero de URL (Etapa 1): some quando o usuário extrai um site ou escolhe
@@ -172,19 +141,13 @@ export default function FrontDoorPage() {
   // Card "destravar mais matches" (Etapa 2): dispensável por sessão.
   const [unlockDismissed, setUnlockDismissed] = useState(false);
 
-  // Liga o estado local à conversa do servidor e sobrevive na mesma aba.
-  // Binding novo (1º turno) avisa o sidebar para recarregar a lista.
+  // Liga o estado local à sessão canônica do consultor.
   const bindSession = useCallback(
     (id: string) => {
       if (id !== sessionId) {
         window.dispatchEvent(new Event("conversations:refresh"));
       }
       setSessionId(id);
-      try {
-        window.sessionStorage.setItem(SESSION_ID_KEY, id);
-      } catch {
-        /* quota/modo privado — segue só em memória */
-      }
     },
     [sessionId],
   );
@@ -196,18 +159,13 @@ export default function FrontDoorPage() {
     if (c) {
       setResumeId(c);
     } else {
-      setEntries(loadHistory());
-      try {
-        setSessionId(window.sessionStorage.getItem(SESSION_ID_KEY));
-      } catch {
-        /* noop */
-      }
+      setEntries([]);
     }
     setProfile(loadProfileFromStorage() ?? EMPTY_PROFILE);
     setHydrated(true);
   }, []);
 
-  // Retomada de conversa frontdoor (logado): carrega o transcript do servidor.
+  // Retomada de conversa do consultor (com fallback para conversas antigas).
   // Espera o auth resolver — se o usuário for mesmo anônimo, o efeito nunca
   // dispara e a home fica como conversa nova.
   useEffect(() => {
@@ -217,11 +175,21 @@ export default function FrontDoorPage() {
       try {
         const token = await getToken();
         if (!token || !alive) return;
-        const detail = await getConversation(resumeId, token);
-        if (!alive) return;
-        const serverEntries = entriesFromServer(detail.entries);
-        setEntries(serverEntries);
-        bindSession(detail.session_id);
+        try {
+          const detail = await getConsultantState(resumeId, token);
+          if (!alive) return;
+          setConsultantState(detail.state);
+          setEntries(entriesFromConsultant(detail.state));
+          setLegacyReadOnly(false);
+          bindSession(detail.conversation_id);
+        } catch {
+          const detail = await getConversation(resumeId, token);
+          if (!alive) return;
+          setConsultantState(null);
+          setEntries(entriesFromServer(detail.entries));
+          setLegacyReadOnly(true);
+          bindSession(detail.session_id);
+        }
       } catch {
         if (alive) toast.error("Não consegui retomar esta conversa.");
       }
@@ -231,15 +199,28 @@ export default function FrontDoorPage() {
     };
   }, [hydrated, isAuthed, resumeId, getToken, bindSession]);
 
-  // Persiste transcript a cada mudança (depois de hidratar).
+  // Recarregar a home sem ?c= também recupera a sessão do consultor vinculada
+  // em memória. Conversas antigas nunca são promovidas a uma nova sessão.
   useEffect(() => {
-    if (!hydrated) return;
-    try {
-      window.sessionStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
-    } catch {
-      // quota/modo privado — segue em memória.
-    }
-  }, [entries, hydrated]);
+    if (!hydrated || !isAuthed || resumeId || !sessionId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const detail = await getConsultantState(sessionId, token);
+        if (!alive) return;
+        setConsultantState(detail.state);
+        setEntries(entriesFromConsultant(detail.state));
+        setLegacyReadOnly(false);
+      } catch {
+        // Sessões legacy continuam sendo carregadas apenas quando abertas por ?c=.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [hydrated, isAuthed, resumeId, sessionId, getToken]);
 
   // ── Perfil persistido (anônimo: localStorage; logado: PUT /me/profile) ──────
   const persistProfile = useCallback(
@@ -329,7 +310,7 @@ export default function FrontDoorPage() {
   // card como aplicado (caso típico de clique duplo em fluxo anônimo).
   const decidedDiffEntries = useRef(new WeakSet<object>());
   const radarReadyMessage =
-    "Perfil atualizado. Seu **Radar** está pronto para mostrar as oportunidades mais aderentes. [Abrir o Radar →](/radar)";
+    "Perfil atualizado. Volte ao consultor para continuar formando o brief do seu projeto.";
   const appendRadarReadyMessage = useCallback(() => {
     setEntries((prev) => {
       const last = prev[prev.length - 1];
@@ -344,9 +325,12 @@ export default function FrontDoorPage() {
       const trimmed = text.trim();
       if (!trimmed || sending) return;
 
-      // P2: comando /match → redireciona para o Radar
-      if (trimmed === "/match") {
-        router.push("/radar");
+      if (!isAuthed) {
+        router.push("/login");
+        return;
+      }
+      if (legacyReadOnly) {
+        toast.message("Esta conversa antiga é somente leitura. Inicie uma nova jornada com o consultor.");
         return;
       }
 
@@ -356,99 +340,20 @@ export default function FrontDoorPage() {
       setInput("");
       setSending(true);
 
-      // Aplica o payload de fim de turno (mesmo shape em /explore e no frame
-      // "done" de /explore/stream — ExploreTurnResult) — usado pelos dois
-      // caminhos (streaming e fallback) pra nunca divergir em como o
-      // transcript é montado.
-      const applyTurnResult = (payload: ExploreTurnResult) => {
-        const { answer, truncated, profile_diff, matched_editais, matched_entities, session_id, entry_ids, next_action } = payload;
-        // PR1 (four-phase-workflow): guarda contexto para a fase de planejamento.
-        if (next_action && next_action.options.some((o) => o.action === "goto_planning")) {
-          const editalId = matched_editais?.[0]?.edital_id || undefined;
-          sessionStorage.setItem(PLANNING_CTX_KEY, JSON.stringify({
-            question: trimmed,
-            analysis: answer,
-            editalId,
-          }));
-        }
-        // Logado: o backend persistiu o turno e devolveu o binding da conversa
-        // (1º turno cria; seguintes reusam). Anônimo: session_id ausente.
-        if (session_id) bindSession(session_id);
-        setEntries((prev) => {
-          const next: TranscriptEntry[] = [
-            ...prev,
-            { kind: "msg", role: "assistant", content: answer, truncated: truncated || undefined, nextAction: next_action ? { offer: next_action.offer, options: next_action.options } : undefined },
-          ];
-          if ((matched_editais?.length ?? 0) > 0 || (matched_entities?.length ?? 0) > 0) {
-            next.push({
-              kind: "radar",
-              matchedEditais: matched_editais ?? [],
-              matchedEntities: matched_entities ?? [],
-            });
-          }
-          if (profile_diff && profile_diff.length > 0) {
-            next.push({
-              kind: "diff",
-              items: profile_diff,
-              status: "pending",
-              origin: "turn",
-              // Alvo do PATCH no aceite/descarte (persistido junto ao turno).
-              entryId: entry_ids?.diff ?? undefined,
-            });
-          }
-          return next;
-        });
+      const applyConsultantResult = (payload: import("@/lib/api").ConsultantTurnResult) => {
+        bindSession(payload.conversation_id);
+        setConsultantState(payload.state);
+        setEntries(entriesFromConsultant(payload.state));
       };
 
       try {
-        // `gotAnyFrame` distingue as duas falhas possíveis de `exploreStream`:
-        // (a) nunca chegou nenhum frame do servidor (rede caiu, navegador sem
-        //     suporte a stream reader, HTTP não-ok antes do SSE começar) →
-        //     recuperável, cai pro caminho antigo (`frontdoorTurn`) sem
-        //     incomodar o usuário;
-        // (b) já tínhamos frames (tokens, ou um "error" explícito do SSE) →
-        //     turno genuinamente falhou depois de começar; refazer via
-        //     `frontdoorTurn` duplicaria a chamada ao LLM/efeitos colaterais
-        //     — trata como falha normal (mesmo catch de sempre), sem retry.
-        let gotAnyFrame = false;
-        try {
-          setStreamingText("");
-          await exploreStream(
-            trimmed,
-            toApiHistory(entries),
-            profile.nome ? profile : null,
-            sessionId,
-            {
-              onToken: (delta) => {
-                gotAnyFrame = true;
-                setStreamingText((prev) => (prev ?? "") + delta);
-              },
-              onTool: () => {
-                gotAnyFrame = true;
-              },
-              onDone: (payload) => {
-                applyTurnResult(payload);
-              },
-              onError: (message) => {
-                // TERMINAL (contrato do endpoint): não há "done" depois disto.
-                // Lança pra cair no catch de fora — mesmo tratamento de
-                // falha que o /explore síncrono sempre teve.
-                gotAnyFrame = true;
-                throw new Error(message);
-              },
-            },
-          );
-        } catch (streamErr) {
-          if (gotAnyFrame) throw streamErr;
-          // Fallback: stream não chegou a começar — caminho antigo intacto.
-          const payload = await frontdoorTurn(
-            trimmed,
-            toApiHistory(entries),
-            profile.nome ? profile : null,
-            sessionId,
-          );
-          applyTurnResult(payload);
-        }
+        const payload = await consultantTurn(
+          trimmed,
+          sessionId,
+          crypto.randomUUID(),
+          consultantState?.revision,
+        );
+        applyConsultantResult(payload);
       } catch (e) {
         setEntries((prev) => prev.filter((m) => m !== userEntry));
         setInput(trimmed);
@@ -460,8 +365,72 @@ export default function FrontDoorPage() {
         setSending(false);
       }
     },
-    [entries, sending, profile, sessionId, bindSession],
+    [entries, sending, sessionId, consultantState?.revision, bindSession, isAuthed, legacyReadOnly, router],
   );
+
+  const updateBrief = useCallback(async (updates: ConsultantBriefUpdate) => {
+    if (!sessionId || !consultantState) return;
+    const token = await getToken();
+    if (!token) return;
+    try {
+      const payload = await updateConsultantBrief(sessionId, consultantState.revision, updates, token);
+      setConsultantState(payload.state);
+      setEntries(entriesFromConsultant(payload.state));
+      toast.success("Brief revisado.");
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Não consegui salvar o brief.");
+    }
+  }, [consultantState, getToken, sessionId]);
+
+  const confirmProject = useCallback(async () => {
+    if (!sessionId || !consultantState) return;
+    const token = await getToken();
+    if (!token) return;
+    try {
+      const payload = await confirmConsultantProject(sessionId, consultantState.revision, token);
+      setConsultantState(payload.state);
+      setEntries(entriesFromConsultant(payload.state));
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Não consegui confirmar o projeto.");
+    }
+  }, [consultantState, getToken, sessionId]);
+
+  const selectPath = useCallback(async (pathId: string, reason: string) => {
+    if (!sessionId || !consultantState) return;
+    const token = await getToken();
+    if (!token) return;
+    try {
+      const payload = await selectConsultantPath(sessionId, pathId, consultantState.revision, reason, token);
+      setConsultantState(payload.state);
+      toast.success("Caminho registrado para aprofundamento.");
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Não consegui registrar o caminho.");
+    }
+  }, [consultantState, getToken, sessionId]);
+
+  const reassessPath = useCallback(async (pathId: string, reason: string) => {
+    if (!sessionId || !consultantState) return;
+    const token = await getToken();
+    if (!token) return;
+    try {
+      const payload = await reassessConsultantPath(sessionId, pathId, consultantState.revision, reason, token);
+      setConsultantState(payload.state);
+      setEntries(entriesFromConsultant(payload.state));
+      toast.success("Caminho marcado para reavaliação.");
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Não consegui pedir a reavaliação.");
+    }
+  }, [consultantState, getToken, sessionId]);
+
+  const openWriting = useCallback(async (pathId: string) => {
+    if (!sessionId) return;
+    try {
+      const result = await openGroundedWriting(sessionId, pathId);
+      router.push(`/workspace/${result.writing_session_id}`);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Não consegui abrir a proposta.");
+    }
+  }, [router, sessionId]);
 
   // ── Aceite/descarte de um diff (por índice no transcript) ───────────────────
   const decideDiff = useCallback(
@@ -478,31 +447,6 @@ export default function FrontDoorPage() {
               : e,
           ),
         );
-
-        // Espelha a decisão no servidor quando a entrada está persistida (PATCH
-        // payload — status pending→accepted/dismissed). Fire-and-forget: falha
-        // não bloqueia o aceite local.
-        if (isAuthed && sessionId && entry.entryId) {
-          void (async () => {
-            try {
-              const token = await getToken();
-              if (token) {
-                await updateConversationEntry(
-                  sessionId,
-                  entry.entryId!,
-                  {
-                    items: finalItems ?? entry.items,
-                    status: accepted ? "accepted" : "dismissed",
-                    origin: entry.origin ?? "turn",
-                  },
-                  token,
-                );
-              }
-            } catch (err) {
-              console.warn("Falha ao persistir decisão do diff:", err);
-            }
-          })();
-        }
 
         if (!accepted) return;
 
@@ -524,7 +468,7 @@ export default function FrontDoorPage() {
         // novas entradas e pode ser decidida normalmente.
       }
     },
-    [entries, profile, persistProfile, isAuthed, sessionId, getToken, appendRadarReadyMessage],
+    [entries, profile, persistProfile, appendRadarReadyMessage],
   );
 
   // ── Barra de status: editar perfil (diff manual com todos os campos) ────────
@@ -616,13 +560,9 @@ export default function FrontDoorPage() {
   // Zera transcript local + binding com o servidor. A conversa persistida NÃO
   // é apagada (continua no histórico do sidebar) — só desligamos dela.
   const resetConversation = useCallback(() => {
-    try {
-      window.sessionStorage.removeItem(HISTORY_KEY);
-      window.sessionStorage.removeItem(SESSION_ID_KEY);
-    } catch {
-      /* noop */
-    }
     setEntries([]);
+    setConsultantState(null);
+    setLegacyReadOnly(false);
     setInput("");
     setSessionId(null);
     setResumeId(null);
@@ -638,15 +578,13 @@ export default function FrontDoorPage() {
   }, [resetConversation]);
 
   // "Nova conversa" da ConversationSidebar: quando já estamos em "/", a página
-  // não remonta, então a sidebar dispara `frontdoor:new` (já tendo limpado o
-  // sessionStorage) e nós zeramos o estado em memória aqui.
+  // não remonta, então a sidebar dispara o evento e zeramos o estado em memória.
   useEffect(() => {
-    window.addEventListener("frontdoor:new", resetConversation);
-    return () => window.removeEventListener("frontdoor:new", resetConversation);
+    window.addEventListener("consultant:new", resetConversation);
+    return () => window.removeEventListener("consultant:new", resetConversation);
   }, [resetConversation]);
 
-  // Retomada disparada pelo sidebar quando JÁ estamos em "/" (clicar num Link
-  // /?c=... não remonta a página, então o ?c= lido na montagem não muda).
+  // Retomada disparada pelo sidebar quando já estamos em "/".
   useEffect(() => {
     function onResume(ev: Event) {
       const id = (ev as CustomEvent<string>).detail;
@@ -655,8 +593,8 @@ export default function FrontDoorPage() {
       setResumeId(id);
       window.history.replaceState(null, "", `/?c=${encodeURIComponent(id)}`);
     }
-    window.addEventListener("frontdoor:resume", onResume);
-    return () => window.removeEventListener("frontdoor:resume", onResume);
+    window.addEventListener("consultant:resume", onResume);
+    return () => window.removeEventListener("consultant:resume", onResume);
   }, [resetConversation]);
 
   const isEmpty = hydrated && entries.length === 0;
@@ -670,19 +608,12 @@ export default function FrontDoorPage() {
   const gaps = isRadarReady(profile) ? missingHighImpact(profile) : [];
   const showUnlock = gaps.length > 0 && !unlockDismissed;
 
-  const profileReady = hydrated && isRadarReady(profile);
-
   return (
     <div className="flex h-[100dvh] bg-app-bg">
       <div className="hidden md:flex">
         <ConversationSidebar />
       </div>
       <div className="flex flex-1 flex-col min-w-0">
-        {!profileReady ? (
-          <div className="flex flex-1 items-center justify-center px-4">
-            <ProfileGate onReady={(p) => void persistProfile(p)} />
-          </div>
-        ) : (
         <>
         <FrontDoorHeader isAuthed={isAuthed} onReset={handleReset} onSignOut={signOut} />
       <StatusBar
@@ -692,6 +623,12 @@ export default function FrontDoorPage() {
 
       <ChatMessageList className="mx-auto w-full max-w-2xl" deps={[sending, hydrated]}>
         <Bubble role="assistant" content={WELCOME} />
+
+        {legacyReadOnly && (
+          <div className="mx-1 mb-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+            Esta é uma conversa antiga, disponível somente para leitura. Inicie uma nova jornada para continuar com o ConsultantGraph.
+          </div>
+        )}
 
         {heroActive && (
           <div className="pt-2">
@@ -721,10 +658,16 @@ export default function FrontDoorPage() {
                   role={entry.role}
                   content={entry.content}
                   truncated={entry.truncated}
-                  nextAction={entry.nextAction}
                 />
               );
             case "diff":
+              if (legacyReadOnly) {
+                return (
+                  <div key={i} className="mx-1 rounded-xl border border-border bg-surface p-3 text-xs text-content-secondary">
+                    Rascunho de perfil registrado na conversa antiga (somente leitura).
+                  </div>
+                );
+              }
               return (
                 <DiffCard
                   key={i}
@@ -752,7 +695,7 @@ export default function FrontDoorPage() {
                       Veja a ordem completa, evidências, elegibilidade, filtros e comparação no Radar.
                     </p>
                     <Link
-                      href="/radar"
+                      href="/"
                       className="mt-3 inline-flex rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90"
                     >
                       Abrir o Radar →
@@ -765,6 +708,17 @@ export default function FrontDoorPage() {
               return null;
           }
         })}
+
+        {consultantState && (
+          <ConsultantJourneyCard
+            state={consultantState}
+            onConfirm={() => void confirmProject()}
+            onUpdate={updateBrief}
+            onSelect={selectPath}
+            onReassess={reassessPath}
+            onOpenWriting={openWriting}
+          />
+        )}
 
         {sending && streamingText ? (
           // Preview ao vivo (item 1, TASK 4) — substituído sem glitch pelo
@@ -796,10 +750,10 @@ export default function FrontDoorPage() {
             <div />
             <button
               type="button"
-              onClick={() => router.push("/radar")}
+              onClick={() => router.push("/")}
               className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
             >
-              Ver matches no Radar →
+              Ver caminhos no consultor →
             </button>
           </div>
         )}
@@ -810,11 +764,10 @@ export default function FrontDoorPage() {
           onSend={() => void send(input)}
           onAttach={handleAttachClick}
           onPickFile={handlePickFile}
-          disabled={sending}
-          placeholder="Conte o que sua empresa faz, ou digite /match para o Radar…"
+          disabled={sending || legacyReadOnly}
+          placeholder={legacyReadOnly ? "Conversa antiga somente leitura" : "Conte sua intenção para o consultor…"}
         />
         </>
-        )}
       </div>
     </div>
   );

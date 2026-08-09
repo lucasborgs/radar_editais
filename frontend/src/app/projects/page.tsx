@@ -5,7 +5,13 @@ import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Skeleton } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
-import { listWritingSessions, type WritingSessionSummary } from "@/lib/api";
+import {
+  getConsultantState,
+  listConversations,
+  listWritingSessions,
+  type ConsultantJourneyState,
+  type WritingSessionSummary,
+} from "@/lib/api";
 
 const STATUS_LABEL: Record<WritingSessionSummary["status"], string> = {
   active: "Em andamento",
@@ -23,13 +29,14 @@ function formatUpdatedAt(value: string): string {
   }).format(date);
 }
 
-function projectKind(session: WritingSessionSummary): "Proposta" | "Pitch" {
-  return session.edital_id.startsWith("investidor:") ? "Pitch" : "Proposta";
+function projectKind(): "Execução" {
+  return "Execução";
 }
 
 export default function ProjectsPage() {
   const { getToken } = useAuth();
   const [sessions, setSessions] = useState<WritingSessionSummary[]>([]);
+  const [consultantStates, setConsultantStates] = useState<ConsultantJourneyState[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,9 +49,23 @@ export default function ProjectsPage() {
           if (!cancelled) setError("Entre para acessar seus projetos.");
           return;
         }
-        const response = await listWritingSessions(token);
+        const [response, conversations] = await Promise.all([
+          listWritingSessions(token),
+          listConversations(token),
+        ]);
+        const consultantSummaries = conversations.conversations.filter((item) => item.kind === "consultant");
+        const loadedConsultants = await Promise.all(
+          consultantSummaries.map(async (item) => {
+            try {
+              return (await getConsultantState(item.session_id, token)).state;
+            } catch {
+              return null;
+            }
+          }),
+        );
         if (!cancelled) {
           setSessions(response.sessions.filter((session) => session.kind !== "frontdoor"));
+          setConsultantStates(loadedConsultants.filter((state): state is ConsultantJourneyState => state !== null));
         }
       } catch (cause) {
         if (!cancelled) {
@@ -69,9 +90,9 @@ export default function ProjectsPage() {
       <div className="space-y-6">
         <div>
           <p className="text-sm font-semibold text-primary">Projetos</p>
-          <h1 className="mt-1 text-2xl font-semibold text-content-primary">Propostas e pitches</h1>
+          <h1 className="mt-1 text-2xl font-semibold text-content-primary">Jornadas e execuções</h1>
           <p className="mt-1 text-sm text-content-secondary">
-            Retome o trabalho iniciado a partir de uma oportunidade escolhida no Radar.
+            Retome briefs confirmados, caminhos e propostas iniciadas no Radar.
           </p>
         </div>
 
@@ -88,21 +109,42 @@ export default function ProjectsPage() {
               Entrar
             </Link>
           </div>
-        ) : ordered.length === 0 ? (
+        ) : ordered.length === 0 && consultantStates.length === 0 ? (
           <div className="rounded-xl border border-border bg-surface p-8 text-center">
             <h3 className="font-semibold text-content-primary">Nenhum projeto iniciado</h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-content-secondary">
-              Escolha uma oportunidade no Radar para começar uma proposta ou um pitch.
+              Conte uma intenção ao consultor para formar um brief de projeto.
             </p>
             <Link
-              href="/radar"
+              href="/"
               className="mt-5 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
             >
-              Ir para o Radar →
+              Ir para o consultor →
             </Link>
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
+            {consultantStates.map((state) => (
+              <Link
+                key={state.conversation_id}
+                href={`/?c=${encodeURIComponent(state.conversation_id)}`}
+                className="group rounded-xl border border-primary/25 bg-primary/5 p-5 transition-colors hover:border-primary/50"
+              >
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className="rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">Consultor</span>
+                  <span className="text-content-secondary">
+                    {state.project ? "Projeto confirmado" : "Brief em revisão"}
+                  </span>
+                </div>
+                <h3 className="mt-4 line-clamp-2 font-semibold text-content-primary group-hover:text-primary">
+                  {state.brief?.original_intention || "Nova intenção"}
+                </h3>
+                <div className="mt-4 flex items-center justify-between text-xs text-content-secondary">
+                  <span>Revisão {state.revision}</span>
+                  <span>{state.paths.length} {state.paths.length === 1 ? "caminho" : "caminhos"}</span>
+                </div>
+              </Link>
+            ))}
             {ordered.map((session) => (
               <Link
                 key={session.session_id}
@@ -111,7 +153,7 @@ export default function ProjectsPage() {
               >
                 <div className="flex items-center justify-between gap-3 text-xs">
                   <span className="rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
-                    {projectKind(session)}
+                    {projectKind()}
                   </span>
                   <span className="text-content-secondary">{STATUS_LABEL[session.status]}</span>
                 </div>

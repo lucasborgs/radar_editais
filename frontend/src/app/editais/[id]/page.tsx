@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 
 // KG v2 / PR8: a ficha foi unificada em /oportunidades/[id] (D1 — a unidade é
 // sempre Oportunidade). Esta rota vira um redirect p/ preservar bookmarks e o
-// CTA `chat?edital=` que ainda aponta editais.
+// Deep-link antigo permanece somente como consulta do edital.
 export default function EditalRedirectPage() {
   const params = useParams();
   const router = useRouter();

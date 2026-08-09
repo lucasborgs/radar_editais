@@ -10,6 +10,7 @@ services:
     environment:
       SUPABASE_URL: ${DOCKER_SUPABASE_URL:-${SUPABASE_URL}}
       DATABASE_URL: ${DOCKER_DATABASE_URL:-${DATABASE_URL}}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     volumes:
       - ${DATA_DIR:-./data}:/app/data
     command: uvicorn radar.api.app:app --host 0.0.0.0 --port ${PORT:-8000}
@@ -24,6 +25,7 @@ services:
     environment:
       SUPABASE_URL: ${DOCKER_SUPABASE_URL:-${SUPABASE_URL}}
       DATABASE_URL: ${DOCKER_DATABASE_URL:-${DATABASE_URL}}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       DISCOVERY_CRAWL4AI_ENABLED: ${DISCOVERY_CRAWL4AI_ENABLED:-1}
     volumes:
       - ${DATA_DIR:-./data}:/app/data

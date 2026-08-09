@@ -42,3 +42,9 @@ def test_legacy_command_is_local_run(monkeypatch, capsys):
     assert cli.main(["matching", "--no-push", "--limit", "1"]) == 0
     assert calls == {"intent": "run", "publish": False, "limit": 1}
     assert "deprecated" in capsys.readouterr().err
+
+
+def test_cli_rejects_missing_explicit_env_file(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("ENV_FILE", str(tmp_path / "missing.env"))
+    assert cli.main(["run", "e2e_health"]) == 2
+    assert "ENV_FILE não encontrado" in capsys.readouterr().err

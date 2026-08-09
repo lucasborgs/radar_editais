@@ -328,12 +328,24 @@ def _run_one_item(
     inp = get_input(item)
     expected = item.get("expected_output") if isinstance(item, dict) else None
     meta = (item.get("metadata") if isinstance(item, dict) else None) or {}
+    task_raised = False
     try:
         output = suite.task(item=item)
     except Exception as e:
+        task_raised = True
         logger.error("task falhou (%s): %s", meta.get("case_id", "?"), e)
         output = {"error": str(e)}
         errors.append({"stage": "task", "case_id": meta.get("case_id"), "error": str(e)})
+
+    # Tasks may report an operational failure as data instead of raising. Keep
+    # that distinction out of quality scores, but still make the run fail
+    # closed so CI cannot treat an all-error diagnostic as healthy.
+    if not task_raised and isinstance(output, dict) and output.get("error"):
+        errors.append({
+            "stage": "task",
+            "case_id": meta.get("case_id"),
+            "error": str(output["error"]),
+        })
 
     evals: list[Evaluation] = []
     for ev in suite.evaluators:

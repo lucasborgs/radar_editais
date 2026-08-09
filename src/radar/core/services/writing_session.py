@@ -491,6 +491,8 @@ class WritingSession:
         mode: str | None = None,
         plan: dict | None = None,
         user_adjustments: dict | None = None,
+        writing_context: dict | None = None,
+        allow_incomplete_profile: bool = False,
     ):
         self._db = db
         self.workspace_id = workspace_id
@@ -535,6 +537,7 @@ class WritingSession:
         # __plan__ no section_drafts; vira __plan__ de novo em _drafts_with_plan.
         self._plan: dict | None = None
         self._plan_pending_confirmation: bool = False
+        self._writing_context: dict = {}
 
         if session_id:
             # Retomar sessão existente — carrega tudo do Postgres.
@@ -548,10 +551,11 @@ class WritingSession:
             # row — perfil incompleto não cria sessão órfã. Retomadas (ramo if
             # acima) não passam pelo gate (sessões existentes não são afetadas).
             ok, missing = profile.is_complete_for_writing()
-            if not ok:
+            if not ok and not allow_incomplete_profile:
                 raise ProfileIncompleteError(missing)
             self.edital_id = edital_id
-            self.session_id = self._create_in_db(workspace_id, edital_id)
+            self._writing_context = writing_context if isinstance(writing_context, dict) else {}
+            self.session_id = self._create_in_db(workspace_id, edital_id, self._writing_context)
             self.created_at = datetime.utcnow().isoformat()
 
         # Modo de escrita derivado do namespace do id (stateless — re-derivável no
@@ -724,7 +728,9 @@ class WritingSession:
     # Persistência — header
     # ------------------------------------------------------------------
 
-    def _create_in_db(self, workspace_id: str, edital_id: str) -> str:
+    def _create_in_db(
+        self, workspace_id: str, edital_id: str, writing_context: dict | None = None,
+    ) -> str:
         """INSERT em writing_sessions; retorna o id gerado.
 
         Side effect (Fase 3 #23): se houver application_log existente para
@@ -740,6 +746,7 @@ class WritingSession:
             "summary": None,
             "proposal_outline": [],
             "section_drafts": {},
+            "writing_context": writing_context or {},
         }).execute()
         if not result.data:
             raise RuntimeError("Falha ao criar writing_session no Postgres")
@@ -810,6 +817,8 @@ class WritingSession:
             raise ValueError(f"Sessão '{session_id}' não pertence ao workspace atual")
 
         self._history_summary = row.get("summary") or ""
+        context = row.get("writing_context")
+        self._writing_context = context if isinstance(context, dict) else {}
         outline = row.get("proposal_outline") or []
         self._proposal_outline = [str(s) for s in outline] if outline else []
         drafts = row.get("section_drafts") or {}
@@ -1208,6 +1217,7 @@ class WritingSession:
             # Plano pendente de confirmação (1º turno gerou plano,
             # aguardando usuário confirmar para disparar geração).
             "plan_pending": self._plan_pending_confirmation,
+            "writing_context": getattr(self, "_writing_context", None) or None,
             # Sprint 2 do Cenário B: se há pergunta pendente do agente, frontend
             # renderiza prompt destacado ao retomar a sessão (não só após turn).
             # Só expõe {field, prompt} — thread_id/n_msgs são internos do resume.
@@ -1951,6 +1961,11 @@ class WritingSession:
             messages.append({"role": "user", "content": self._programa_context})
         if self._library_context:
             messages.append({"role": "user", "content": self._library_context})
+        if getattr(self, "_writing_context", None):
+            messages.append({
+                "role": "user",
+                "content": self._grounded_context_block(),
+            })
 
         outline_str = "\n".join(f"- {t}" for t in self._proposal_outline)
         messages.append({
@@ -2354,6 +2369,8 @@ class WritingSession:
             parts.append(self._programa_context)
         if self._library_context:
             parts.append(self._library_context)
+        if getattr(self, "_writing_context", None):
+            parts.append(self._grounded_context_block())
         if self._playbook_writer_block:
             parts.append(f"PLAYBOOK DE ESCRITA:\n{self._playbook_writer_block}")
         # Volátil por último: o outline muda a cada save_draft.
@@ -2377,6 +2394,34 @@ class WritingSession:
                 f"\n{outline_str}"
             )
         return "\n\n".join(parts)
+
+    def _grounded_context_block(self) -> str:
+        """Contexto congelado do caminho, separado de instruções externas."""
+        context = self._writing_context
+        lines = [
+            "CONTEXTO AUTORIZADO DO CAMINHO SELECIONADO:",
+            f"Projeto: {context.get('project_id', '(não informado)')}",
+            f"Caminho: {context.get('path_id', '(não informado)')}",
+            f"Artefato: {context.get('artifact_type', 'proposta_tecnica')}",
+        ]
+        for label, key in (("Fatos", "facts"), ("Requisitos", "requirements"), ("Lacunas", "gaps")):
+            values = [str(item).strip() for item in context.get(key, []) if str(item).strip()]
+            if values:
+                lines.append(f"{label}:")
+                lines.extend(f"- {item}" for item in values)
+        refs = context.get("source_refs") or []
+        if refs:
+            lines.append("Fontes autorizadas:")
+            for ref in refs:
+                if isinstance(ref, dict):
+                    label = ref.get("label") or ref.get("ref") or "fonte"
+                    locator = ref.get("locator") or ref.get("document") or "localização não informada"
+                    lines.append(f"- {label} — {locator}")
+        lines.append(
+            "Use o RAG para confirmar afirmações documentais. Se o trecho recuperado "
+            "não sustentar uma afirmação, marque-a como lacuna ou inferência e peça validação."
+        )
+        return "\n".join(lines)
 
     def _build_thread_initial_messages(
         self,
@@ -3101,7 +3146,7 @@ def get_session_document(
     """
     result = (
         db.table("writing_sessions")
-        .select("id, edital_id, proposal_outline, section_drafts, workspace_id")
+        .select("id, edital_id, proposal_outline, section_drafts, workspace_id, writing_context")
         .eq("id", session_id)
         .maybe_single()
         .execute()
@@ -3116,6 +3161,7 @@ def get_session_document(
     critic_annotations = drafts.pop("_critic_annotations", {})
     plan_data = drafts.pop("__plan__", None)
     drafts.pop("_style_edit_log", None)  # combustível interno; não exposto no doc
+    writing_context = row.get("writing_context")
     return {
         "session_id": row["id"],
         "edital_id": row["edital_id"],
@@ -3133,6 +3179,7 @@ def get_session_document(
             plan_data is not None
             and not any(drafts.get(t, "").strip() for t in outline)
         ),
+        "writing_context": writing_context if isinstance(writing_context, dict) else None,
     }
 
 

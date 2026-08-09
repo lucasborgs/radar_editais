@@ -4,20 +4,14 @@ import type { EditalEntry, EditalCard, OportunidadeDetail, DashboardStats } from
 import type { OpportunityEntry } from "@/types/oportunidade";
 import type { CompanyProfile } from "@/types/profile";
 import type {
-  WritingStartResponse,
   WritingTurnResponse,
-  WritingMode,
   SectionStartResponse,
   ExtractProfileResponse,
   ContentItemSummary,
   ContentItemFull,
-  Plan,
 } from "@/types/api";
 
-// Recupera o JWT corrente da sessão Supabase (lazy). Existir aqui evita
-// que cada função de API tenha que receber e propagar o token manualmente —
-// problema antigo onde algumas funções passavam (getMe, saveProfile) e
-// outras não (getMatches, startWritingSession, …), causando 401 em massa.
+// Recupera o JWT corrente da sessão Supabase (lazy).
 async function getAccessToken(): Promise<string | undefined> {
   try {
     const supabase = createSupabaseClient();
@@ -172,29 +166,236 @@ export const getOpportunities = (filters?: OpportunitiesFilters) => {
   return apiFetch<OpportunityEntry[]>(`/opportunities${qs ? `?${qs}` : ""}`);
 };
 
-export interface KGChatMessage {
-  role: "user" | "assistant";
-  content: string;
+// ── ConsultantGraph (SCV1-T01) ─────────────────────────────
+export interface ConsultantBrief {
+  id: string;
+  status: "draft" | "confirmed";
+  original_intention: string;
+  problem_hypothesis: string;
+  affected_users: string;
+  solution_hypothesis: string;
+  technologies_capabilities: string[];
+  innovation_objective: string;
+  stage_maturity: string;
+  location_constraints: string;
+  impact_expected: string;
+  partnership_needs: string;
+  doubts: string[];
+  source_refs: Record<string, string[]>;
+  review_state: "draft" | "needs_review" | "confirmed";
+  version: number;
+  confidence: number;
+  needs_review: boolean;
+  updated_at: string;
 }
 
-// ── Explore (turno conversacional exploratório) ────────────
-// POST /explore (backend/routers/explore.py): resposta sobre a base +
-// proposta de diff de perfil. O front aplica o diff só após aceite (D4).
-// Autenticado: persiste a conversa (kind='frontdoor') e devolve session_id.
+export interface ConsultantPath {
+  id: string;
+  status: "proposed" | "investigating" | "selected" | "reassess_needed" | "discarded" | "completed";
+  tipo: string;
+  kind?: string | null;
+  project_id: string;
+  entity_ref: string;
+  opportunity_ref?: string | null;
+  actors: Array<Record<string, unknown>>;
+  facts: string[];
+  inferences: string[];
+  requirements: string[];
+  gaps: string[];
+  risks: string[];
+  recommendation: string;
+  next_step: string;
+  evidence: Array<{
+    kind: string;
+    ref: string;
+    label: string;
+    locator?: string | null;
+    quote?: string | null;
+    document?: string | null;
+    source_url?: string | null;
+    source_hash?: string | null;
+    version?: string | null;
+    source_role?: string;
+  }>;
+  rule_evaluations: Array<{
+    rule: string;
+    status: "satisfied" | "unknown" | "unsatisfied";
+    reason: string;
+  }>;
+  temporal_state: string;
+  formal_instrument?: boolean;
+  freshness?: Record<string, unknown>;
+  last_evaluated_at?: string | null;
+  confidence: number;
+  needs_review: boolean;
+  source?: string | null;
+  decision?: {
+    kind: "selected" | "discarded" | "completed";
+    reason: string;
+    decided_at: string;
+    actor: "user" | "assistant" | "system";
+  } | null;
+  state_history: Array<{
+    from_status?: ConsultantPath["status"] | null;
+    to_status: ConsultantPath["status"];
+    reason: string;
+    at: string;
+    actor: "user" | "assistant" | "system";
+    context_revision: number;
+  }>;
+  reassessment_reason?: string | null;
+  context_revision: number;
+}
+
+export interface ConsultantJourneyState {
+  conversation_id: string;
+  workspace_id: string;
+  profile_snapshot: Record<string, unknown>;
+  profile_version: string | null;
+  messages: Array<{ id: string; role: "user" | "assistant"; content: string; created_at: string }>;
+  brief_id: string | null;
+  project_id: string | null;
+  path_ids: string[];
+  brief: ConsultantBrief | null;
+  project: {
+    id: string;
+    status: "confirmed";
+    workspace_id: string;
+    brief_id: string;
+    profile_version: string | null;
+    brief_snapshot: ConsultantBrief | null;
+    decisions: string[];
+    decision_history: Array<Record<string, unknown>>;
+    path_ids: string[];
+  } | null;
+  paths: ConsultantPath[];
+  selected_path_id: string | null;
+  gaps: string[];
+  next_step: string | null;
+  pending_confirmation: boolean;
+  revision: number;
+  needs_review: boolean;
+  review_state: "draft" | "needs_review" | "confirmed";
+  conversation_summary: string;
+  memory_context: Array<{
+    kind: "working" | "episodic" | "semantic" | "procedural";
+    scope: "workspace" | "project";
+    scope_id: string;
+    content: string;
+    origin: string;
+    confidence: number;
+    read_allowed: boolean;
+    source_ref?: string | null;
+  }>;
+  updated_at: string;
+}
+
+export interface ConsultantTurnResult {
+  conversation_id: string;
+  assistant_message: string;
+  events: string[];
+  state: ConsultantJourneyState;
+}
+
+export const consultantTurn = (
+  message: string,
+  conversationId: string | null,
+  idempotencyKey: string,
+  expectedRevision?: number,
+) =>
+  apiFetch<ConsultantTurnResult>("/consultant/turn", {
+    method: "POST",
+    body: JSON.stringify({
+      message,
+      conversation_id: conversationId,
+      idempotency_key: idempotencyKey,
+      expected_revision: expectedRevision,
+    }),
+  });
+
+export type ConsultantBriefUpdate = Partial<Pick<
+  ConsultantBrief,
+  | "original_intention"
+  | "problem_hypothesis"
+  | "affected_users"
+  | "solution_hypothesis"
+  | "technologies_capabilities"
+  | "innovation_objective"
+  | "stage_maturity"
+  | "location_constraints"
+  | "impact_expected"
+  | "partnership_needs"
+>>;
+
+export const updateConsultantBrief = (
+  conversationId: string,
+  expectedRevision: number,
+  updates: ConsultantBriefUpdate,
+  token: string,
+) =>
+  apiFetch<{ conversation_id: string; state: ConsultantJourneyState }>(
+    `/consultant/${encodeURIComponent(conversationId)}/brief`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ expected_revision: expectedRevision, ...updates }),
+    },
+    token,
+  );
+
+export const confirmConsultantProject = (
+  conversationId: string,
+  expectedRevision: number,
+  token: string,
+) =>
+  apiFetch<ConsultantTurnResult>(
+    `/consultant/${encodeURIComponent(conversationId)}/project/confirm`,
+    { method: "POST", body: JSON.stringify({ expected_revision: expectedRevision }) },
+    token,
+  );
+
+export const selectConsultantPath = (
+  conversationId: string,
+  pathId: string,
+  expectedRevision: number,
+  reason: string,
+  token: string,
+) =>
+  apiFetch<{ conversation_id: string; events: string[]; state: ConsultantJourneyState }>(
+    `/consultant/${encodeURIComponent(conversationId)}/paths/${encodeURIComponent(pathId)}/select`,
+    { method: "POST", body: JSON.stringify({ expected_revision: expectedRevision, reason }) },
+    token,
+  );
+
+export const reassessConsultantPath = (
+  conversationId: string,
+  pathId: string,
+  expectedRevision: number,
+  reason: string,
+  token: string,
+) =>
+  apiFetch<{ conversation_id: string; events: string[]; state: ConsultantJourneyState }>(
+    `/consultant/${encodeURIComponent(conversationId)}/paths/${encodeURIComponent(pathId)}/reassess`,
+    { method: "POST", body: JSON.stringify({ expected_revision: expectedRevision, reason }) },
+    token,
+  );
+
+export const getConsultantState = (conversationId: string, token: string) =>
+  apiFetch<{ conversation_id: string; state: ConsultantJourneyState }>(
+    `/consultant/${encodeURIComponent(conversationId)}`,
+    undefined,
+    token,
+  );
+
+export const deleteConsultantState = (conversationId: string, token: string) =>
+  apiFetch<{ ok: boolean }>(`/consultant/${encodeURIComponent(conversationId)}`, { method: "DELETE" }, token);
+
+// ── Compatibilidade de perfil e objetos antigos ───────────
 
 export interface ProfileDiffItem {
   field: keyof CompanyProfile;
   label: string;              // já em PT-BR (vem do backend)
   old: unknown;
   new: unknown;
-}
-
-// Ids das entradas persistidas num turno logado via
-// persist_frontdoor_turn. `diff` é o que o front usa (PATCH no aceite/descarte).
-export interface FrontdoorEntryIds {
-  user: number | null;
-  assistant: number | null;
-  diff?: number | null;
 }
 
 // Par de trechos reais que gerou o match (motor v3, Stage 2) — a explicação
@@ -216,9 +417,7 @@ export interface Elegibilidade {
   unknown: string[];
 }
 
-// Veredito LLM do match (Estágio 3 do funil v3). Nullable: o card renderiza sem
-// ele e o recebe quando a task terminar (poll via fetchMatchVerdicts). Anônimo
-// nunca recebe veredito (o cache é por workspace).
+// Tipo mantido para leitura de objetos históricos; não é parte da jornada nova.
 export interface MatchVerdict {
   racional_afinidade: string;
   red_flags_elegibilidade: string[];
@@ -313,7 +512,7 @@ export interface IctPartner {
   name: string;
   description: string;
   themes: string[];
-  type: string;
+  tipo: string;
   kind: "ict";
   source?: string;            // fonte (embrapii | pnipe)
   uf?: string;
@@ -323,142 +522,51 @@ export interface IctPartner {
   explicacao?: PathExplanation | null;
 }
 
-export interface RadarMatchesResponse {
-  matched_editais: MatchedEdital[];
-  matched_programas: MatchedEntity[];
-  matched_investidores: MatchedEntity[];
-  matched_icts?: IctPartner[];
-  meta: {
-    ranking: "affinity";
-    uses_workspace_chunks: boolean;
-    ict_lookup_attempted?: boolean;
-  };
+export interface GroundedWritingOpenResult {
+  writing_session_id: string;
+  project_id: string;
+  path_id: string;
+  artifact_type: string;
+  outline: string[];
+  requirements: string[];
+  gaps: string[];
+  context: Record<string, unknown>;
 }
 
-export const getRadarMatches = (profile: CompanyProfile) =>
-  apiFetch<RadarMatchesResponse>("/radar/matches", {
-    method: "POST",
-    body: JSON.stringify({ profile }),
-  });
-
-// Payload de fim de turno — mesmo shape em `POST /explore` (JSON único) e no
-// frame `done` de `POST /explore/stream` (SSE, item 1/TASK 4): o backend
-// gera os dois a partir do mesmo `_post_process`, então um único tipo cobre
-// ambos os transportes.
-export interface ExploreTurnResult {
-  answer: string;
-  truncated?: boolean; // PR6.2: resposta cortada no teto de passos do agente
-  profile_diff: ProfileDiffItem[] | null;
-  matched_editais?: MatchedEdital[];
-  matched_entities?: MatchedEntity[];
-  session_id?: string;
-  entry_ids?: FrontdoorEntryIds;
-  next_action?: {
-    offer: string;
-    options: Array<{ label: string; action: string }>;
-  }; // PR1 (4-phase): oferta de planejamento
-}
-
-export const frontdoorTurn = (
-  message: string,
-  history: KGChatMessage[],
-  profile: Partial<CompanyProfile> | null,
-  sessionId?: string | null,
+export const openGroundedWriting = (
+  conversationId: string,
+  pathId: string,
+  artifactType = "proposta_tecnica",
 ) =>
-  apiFetch<ExploreTurnResult>("/explore", {
+  apiFetch<GroundedWritingOpenResult>("/writing/grounded/open", {
     method: "POST",
     body: JSON.stringify({
-      message,
-      history,
-      profile,
-      session_id: sessionId ?? null,
+      conversation_id: conversationId,
+      path_id: pathId,
+      artifact_type: artifactType,
     }),
   });
 
-// ── Explore streaming (SSE) — item 1, TASK 4 ────────────────
-// Variação de `frontdoorTurn` que consome `POST /explore/stream`. Callbacks
-// em vez de um retorno único: `onToken` chega ao vivo, `onDone`/`onError` são
-// TERMINAIS (mutuamente exclusivos — nunca os dois no mesmo turno; um `error`
-// NUNCA é seguido de `done`, contrato do endpoint). Não passa por `apiFetch`
-// (que faz `res.json()` de corpo único) — lê o stream via `getReader()`.
-export interface ExploreStreamCallbacks {
-  onToken: (text: string) => void;
-  onTool?: (name: string) => void;
-  onDone: (payload: ExploreTurnResult) => void;
-  onError: (message: string) => void;
-}
-
-export async function exploreStream(
-  message: string,
-  history: KGChatMessage[],
-  profile: Partial<CompanyProfile> | null,
-  sessionId: string | null | undefined,
-  callbacks: ExploreStreamCallbacks,
-): Promise<void> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Accept: "text/event-stream",
-  };
-  const token = await getAccessToken();
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const res = await fetch(`${API_BASE_URL}/explore/stream`, {
+export const groundedWritingReview = (sessionId: string) =>
+  apiFetch<Record<string, unknown>>(`/writing/grounded/${sessionId}/review`, {
     method: "POST",
-    headers,
-    body: JSON.stringify({ message, history, profile, session_id: sessionId ?? null }),
   });
-  if (!res.ok) throw await buildApiError(res);
-  if (!res.body) throw new Error("Streaming não suportado neste navegador.");
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    // Frames SSE terminam em uma linha em branco (\n\n). Um frame pode
-    // chegar fatiado entre dois reads — só processa o que já está completo,
-    // mantém o resto no buffer pro próximo chunk.
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      const frame = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
-
-      let eventName = "message";
-      let dataLine = "";
-      for (const line of frame.split("\n")) {
-        if (line.startsWith("event:")) eventName = line.slice(6).trim();
-        else if (line.startsWith("data:")) dataLine += line.slice(5).trim();
-      }
-      if (!dataLine) continue;
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(dataLine);
-      } catch {
-        continue;
-      }
-
-      if (eventName === "token") {
-        callbacks.onToken((parsed as { text: string }).text);
-      } else if (eventName === "tool") {
-        callbacks.onTool?.((parsed as { name: string }).name);
-      } else if (eventName === "done") {
-        callbacks.onDone(parsed as ExploreTurnResult);
-        return;
-      } else if (eventName === "error") {
-        // TERMINAL (contrato do endpoint, backend/routers/explore.py): nunca
-        // há um "done" depois. Lança pra quem chamou tratar como falha de
-        // turno — igual ao catch de `frontdoorTurn` hoje, sem esperar mais nada.
-        callbacks.onError((parsed as { message: string }).message);
-        return;
-      }
-    }
-  }
-}
+export const groundedWritingTurn = (
+  sessionId: string,
+  instruction: string,
+  sectionHint?: string,
+  idempotencyKey?: string,
+) =>
+  apiFetch<Record<string, unknown>>("/writing/grounded/turn", {
+    method: "POST",
+    body: JSON.stringify({
+      session_id: sessionId,
+      instruction,
+      section_hint: sectionHint,
+      idempotency_key: idempotencyKey,
+    }),
+  });
 
 // ── Writing Turn Stream (Sprint 1 — C1) ─────────────────────
 
@@ -569,57 +677,6 @@ export async function writingTurnStream(
     }
   }
 }
-
-// Poll cache-only dos vereditos (Estágio 2): a chave é o file_key do hipergrado
-// (`${source}__${edital_id}`). Auth obrigatória — anônimo não tem workspace.
-export const fetchMatchVerdicts = (oportunidadeIds: string[]) =>
-  apiFetch<{ verdicts: Record<string, MatchVerdict | null> }>("/match/verdicts", {
-    method: "POST",
-    body: JSON.stringify({ oportunidade_ids: oportunidadeIds }),
-  });
-
-// ── Planning (FASE 1 do four-phase-workflow) ───────────────
-
-export const planningGenerate = (
-  question: string,
-  analysis: string,
-  editalId?: string | null,
-) =>
-  apiFetch<Plan>("/planning/generate", {
-    method: "POST",
-    body: JSON.stringify({
-      question,
-      analysis,
-      edital_id: editalId ?? null,
-    }),
-  });
-
-export const getExistingPlan = (sessionId: string) =>
-  apiFetch<Plan>(`/planning/${sessionId}`);
-
-export const planningAdjust = (sessionId: string, instruction: string) =>
-  apiFetch<Plan>(`/planning/${sessionId}/adjust`, {
-    method: "POST",
-    body: JSON.stringify({ instruction }),
-  });
-
-// ── Writing Session ────────────────────────────────────────
-
-export const startWritingSession = (
-  editalId: string,
-  profile: CompanyProfile,
-  mode?: WritingMode,
-  plan?: Plan | null,
-) =>
-  apiFetch<WritingStartResponse>("/writing/start", {
-    method: "POST",
-    body: JSON.stringify({
-      edital_id: editalId,
-      profile,
-      mode,
-      plan: plan ?? undefined,
-    }),
-  });
 
 export type ModelTier = "fast" | "auto" | "pro";
 
@@ -768,7 +825,11 @@ export const deleteLibraryItem = (id: string, token: string) =>
 
 // ── Writing Document (P1-A) ────────────────────────────────
 
-export interface DocumentSection { title: string; content: string }
+export interface DocumentSection {
+  title: string;
+  content: string;
+  citations?: unknown[] | null;
+}
 
 // GET /writing/{id}/document → outline (em ordem) + conteúdo por seção + o
 // edital/alvo da sessão. É a fonte de verdade do documento que o workspace
@@ -779,6 +840,12 @@ export interface WritingDocument {
   sections: DocumentSection[];
   plan?: Record<string, unknown> | null;
   plan_pending?: boolean;
+  writing_context?: {
+    artifact_type?: string;
+    requirements?: string[];
+    gaps?: string[];
+    source_refs?: Array<Record<string, unknown>>;
+  } | null;
 }
 
 export const getWritingDocument = (sessionId: string) =>
@@ -900,7 +967,7 @@ export const deleteWritingSession = (sessionId: string, token: string) =>
 
 export interface ConversationSummary {
   session_id: string;
-  kind: "frontdoor" | "writing";
+  kind: "frontdoor" | "writing" | "consultant";
   title: string | null; // frontdoor; writing usa edital_title (server-side)
   edital_id: string | null;
   edital_title?: string | null; // resolvido server-side em batch para writing
@@ -921,7 +988,7 @@ export interface ConversationEntry {
 
 export interface ConversationDetail {
   session_id: string;
-  kind: "frontdoor" | "writing";
+  kind: "frontdoor" | "writing" | "consultant";
   title: string | null;
   edital_id: string | null;
   status: "active" | "completed" | "abandoned";
@@ -935,29 +1002,6 @@ export const listConversations = (token: string) =>
 
 export const getConversation = (sessionId: string, token: string) =>
   apiFetch<ConversationDetail>(`/conversations/${sessionId}`, undefined, token);
-
-export const appendConversationEntry = (
-  sessionId: string,
-  body: { entry_kind: "radar" | "diff"; payload: Record<string, unknown> },
-  token: string,
-) =>
-  apiFetch<ConversationEntry>(
-    `/conversations/${sessionId}/entries`,
-    { method: "POST", body: JSON.stringify(body) },
-    token,
-  );
-
-export const updateConversationEntry = (
-  sessionId: string,
-  entryId: number,
-  payload: Record<string, unknown>,
-  token: string,
-) =>
-  apiFetch<ConversationEntry>(
-    `/conversations/${sessionId}/entries/${entryId}`,
-    { method: "PATCH", body: JSON.stringify({ payload }) },
-    token,
-  );
 
 // ── Applications (Pipeline) ────────────────────────────────
 

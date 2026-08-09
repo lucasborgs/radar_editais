@@ -12,6 +12,8 @@ import {
   getLibraryItems,
   getEditalById,
   autoReviewChecklist,
+  groundedWritingReview,
+  groundedWritingTurn,
   refineSection,
   sendWritingTurn,
   workspaceMode,
@@ -59,6 +61,12 @@ export default function WorkspacePage() {
   const [mode, setMode] = useState<WritingMode>("proposal");
   const [targetTitle, setTargetTitle] = useState<string>("");
   const [attachments, setAttachments] = useState<ContentItemSummary[]>([]);
+  const [groundingContext, setGroundingContext] = useState<{
+    artifact_type?: string;
+    requirements?: string[];
+    gaps?: string[];
+    source_refs?: Array<Record<string, unknown>>;
+  } | null>(null);
 
   const [messages, setMessages] = useState<WorkspaceMessage[]>([]);
   const [input, setInput] = useState("");
@@ -130,6 +138,7 @@ export default function WorkspacePage() {
     setSections(next);
     setEditalId(doc.edital_id);
     setMode(modeFromEditalId(doc.edital_id));
+    setGroundingContext(doc.writing_context ?? null);
     // F4: restaura estado do plano pendente
     if (doc.plan_pending && doc.plan) {
       setPlanPending(doc.plan);
@@ -332,6 +341,41 @@ O chat fala direto com a escrita da proposta.`;
         idempotencyKeyRef.current = crypto.randomUUID();
       }
 
+      // Sessões abertas por CaminhoInovacao passam exclusivamente pelo
+      // adapter GroundedWriting. Sessões antigas continuam carregáveis pelo
+      // runtime legado, sem criar novos projetos ou contextos paralelos.
+      if (groundingContext) {
+        try {
+          const result = await groundedWritingTurn(
+            sessionId,
+            message || content,
+            sectionHint,
+            idempotencyKeyRef.current,
+          );
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: String(result.assistant_message ?? "Turno concluído."),
+              timestamp: nowTime(),
+            },
+          ]);
+          if (result.pending_user_input) {
+            setPending(result.pending_user_input as PendingUserInput);
+          }
+          await reloadDocument();
+        } catch (cause) {
+          setTurnError(cause instanceof Error ? cause.message : "Erro ao enviar mensagem.");
+          toast.error(cause instanceof Error ? cause.message : "Erro ao enviar mensagem.");
+        }
+        idempotencyKeyRef.current = null;
+        setStreamingText(null);
+        setStreamingTrace([]);
+        abortRef.current = null;
+        setWorking(false);
+        return;
+      }
+
       let streamOk = false;
       const tryStream = async (): Promise<Record<string, unknown> | null> => {
         return new Promise((resolve) => {
@@ -503,7 +547,7 @@ O chat fala direto com a escrita da proposta.`;
       abortRef.current = null;
       setWorking(false);
     },
-    [sessionId, working, reloadDocument],
+    [sessionId, working, reloadDocument, groundingContext],
   );
 
   // F4: gera a proposta completa após confirmação do plano
@@ -540,7 +584,10 @@ O chat fala direto com a escrita da proposta.`;
     if (!sessionId || !token || reviewing) return;
     setReviewing(true);
     try {
-      const { review } = await autoReviewChecklist(sessionId, token);
+      const response = groundingContext
+        ? await groundedWritingReview(sessionId)
+        : await autoReviewChecklist(sessionId, token);
+      const review = response.review as Parameters<typeof flattenReview>[0];
       const flat = flattenReview(review);
       setFindings(flat);
       if (flat.length === 0) {
@@ -556,7 +603,9 @@ O chat fala direto com a escrita da proposta.`;
     } finally {
       setReviewing(false);
     }
-  }, [sessionId, token, reviewing]);
+  }, [groundingContext, sessionId, token, reviewing]);
+
+  const reviewBlocked = Boolean(planPending && !generating);
 
   const handleFixWithAI = useCallback(
     (sectionHint: string | null, finding: Finding) => {
@@ -641,8 +690,28 @@ O chat fala direto com a escrita da proposta.`;
         mode={mode}
         filled={filled}
         total={sections.length}
-        sessionId={sessionId}
       />
+
+      {groundingContext && (
+        <section className="shrink-0 border-b border-primary/20 bg-primary/5 px-4 py-3 text-xs text-content-secondary">
+          <div className="mx-auto flex max-w-6xl flex-wrap gap-x-6 gap-y-2">
+            <span className="font-semibold text-content-primary">
+              Artefato fundamentado: {groundingContext.artifact_type || "proposta técnica"}
+            </span>
+            {(groundingContext.requirements?.length ?? 0) > 0 && (
+              <span>Requisitos: {groundingContext.requirements?.length}</span>
+            )}
+            {(groundingContext.gaps?.length ?? 0) > 0 && (
+              <span className="text-amber-700 dark:text-amber-300">
+                Lacunas: {groundingContext.gaps?.slice(0, 2).join(" · ")}
+              </span>
+            )}
+            {(groundingContext.source_refs?.length ?? 0) > 0 && (
+              <span>Fontes autorizadas: {groundingContext.source_refs?.length}</span>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Mobile: abas Documento | Chat + drawer da estrutura */}
       {sections.length > 0 && (
@@ -680,6 +749,7 @@ O chat fala direto com a escrita da proposta.`;
               attachments={attachments}
               findingCounts={findingCounts}
               reviewing={reviewing}
+              reviewBlocked={reviewBlocked}
               onSelectSection={handleSelectSection}
               onSelectAttachment={handleSelectAttachment}
               onReview={() => void handleReview()}
@@ -702,6 +772,7 @@ O chat fala direto com a escrita da proposta.`;
                 attachments={attachments}
                 findingCounts={findingCounts}
                 reviewing={reviewing}
+                reviewBlocked={reviewBlocked}
                 onSelectSection={(t) => {
                   handleSelectSection(t);
                   setMobileDrawer(false);
@@ -804,7 +875,7 @@ O chat fala direto com a escrita da proposta.`;
                 </h2>
               </div>
               <p className="text-xs text-content-secondary font-sans mt-1">
-                Revise o plano antes de gerar a proposta completa.
+                Dispense o plano ou gere a proposta para liberar a revisão do documento.
               </p>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">

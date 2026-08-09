@@ -67,6 +67,20 @@ idempotentes e os gates:
 ENV_FILE=.env.staging-local python -m radar.core.eval run explore
 ```
 
+Para o sinal hermético `e2e_health`, use um ambiente virtual com o extra de
+desenvolvimento e um perfil local explícito:
+
+```bash
+.venv/bin/python -m pip install -e ".[dev]"
+ENV_FILE=.env.staging-local ENVIRONMENT=test PYTHONPATH=src \
+  .venv/bin/python -m radar.core.eval run e2e_health
+```
+
+O comando não acessa banco, rede ou LLM reais. Ele exige `pytest` porque
+reutiliza o harness de captura gold existente. `ENV_FILE` inexistente e
+`pytest` ausente são reportados pelo preflight; não há fallback para um perfil
+`.env` potencialmente remoto.
+
 Somente corpus público e usuários/workspaces sintéticos são permitidos. E-mail,
 cobrança, tunnel e promoção automática de descoberta permanecem desligados.
 
