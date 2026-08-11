@@ -1,0 +1,541 @@
+{
+  "schema_version": 9,
+  "subject_id": "finep:769",
+  "document": "Anexo_1_-_DEFINIÇÃO_DE_NÍVEL_DE_MATURIDADE_TECNOLÓGICA.pdf",
+  "document_role": "annex",
+  "asset_hash": "sha256:cb0ecfb4fdbecd990cf265ce8c0db18c51ec0e8c2b2fa5f80e8e174b4434d28e",
+  "bundle_hash": "sha256:95fb724ac02d859375195bfe44dc77bec75557315554fbffff1d4b70a7a4eb64",
+  "targets_requested": [
+    {
+      "field_path": "eligibility_constraints",
+      "value_type": "list[constraint]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "eligible_entities",
+      "value_type": "list[str]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "exclusions",
+      "value_type": "list[str]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "publico_alvo",
+      "value_type": "list[str]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "requirements",
+      "value_type": "list[str]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "continuous_flow",
+      "value_type": "bool",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "deadline",
+      "value_type": "date",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "submission_window",
+      "value_type": "submission_window",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "counterpart",
+      "value_type": "counterpart",
+      "required_for": "eligibility",
+      "criticality": "advisory"
+    },
+    {
+      "field_path": "funding_amount",
+      "value_type": "monetary_range",
+      "required_for": "eligibility",
+      "criticality": "advisory"
+    },
+    {
+      "field_path": "funding_limits",
+      "value_type": "funding_limits",
+      "required_for": "eligibility",
+      "criticality": "advisory"
+    },
+    {
+      "field_path": "table_references",
+      "value_type": "list[table_reference]",
+      "required_for": "writing",
+      "criticality": "advisory"
+    }
+  ],
+  "claims": [
+    {
+      "subject_id": "finep:769",
+      "field_path": "eligibility_constraints",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:57.436940Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "eligible_entities",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:57.437120Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "exclusions",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:57.437179Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "publico_alvo",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:57.437231Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "requirements",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:57.437281Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "continuous_flow",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:57.437331Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "deadline",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:57.437382Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "submission_window",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:57.437443Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "counterpart",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:57.437512Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "funding_amount",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:57.437576Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "funding_limits",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:57.437630Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "table_references",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:57.437673Z"
+      }
+    }
+  ],
+  "unresolved_targets": [
+    "continuous_flow",
+    "counterpart",
+    "deadline",
+    "eligibility_constraints",
+    "eligible_entities",
+    "exclusions",
+    "funding_amount",
+    "funding_limits",
+    "publico_alvo",
+    "requirements",
+    "submission_window",
+    "table_references"
+  ],
+  "structured_blocks": [
+    {
+      "kind": "heading",
+      "page": 1,
+      "unit_id": "381",
+      "document": "Anexo_1_-_DEFINIÇÃO_DE_NÍVEL_DE_MATURIDADE_TECNOLÓGICA.pdf",
+      "block_idx": 381,
+      "section_path": [
+        "ANEXO 1 - DEFINIÇÃO DE NÍVEL DE MATURIDADE TECNOLÓGICA"
+      ],
+      "document_metadata": {
+        "family": "anexo_1",
+        "revision": 0,
+        "published_at": null,
+        "version_score": 0,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "382",
+      "document": "Anexo_1_-_DEFINIÇÃO_DE_NÍVEL_DE_MATURIDADE_TECNOLÓGICA.pdf",
+      "block_idx": 382,
+      "section_path": [
+        "ANEXO 1 - DEFINIÇÃO DE NÍVEL DE MATURIDADE TECNOLÓGICA"
+      ],
+      "document_metadata": {
+        "family": "anexo_1",
+        "revision": 0,
+        "published_at": null,
+        "version_score": 0,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "383",
+      "document": "Anexo_1_-_DEFINIÇÃO_DE_NÍVEL_DE_MATURIDADE_TECNOLÓGICA.pdf",
+      "block_idx": 383,
+      "section_path": [
+        "ANEXO 1 - DEFINIÇÃO DE NÍVEL DE MATURIDADE TECNOLÓGICA"
+      ],
+      "document_metadata": {
+        "family": "anexo_1",
+        "revision": 0,
+        "published_at": null,
+        "version_score": 0,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 1,
+      "unit_id": "384",
+      "document": "Anexo_1_-_DEFINIÇÃO_DE_NÍVEL_DE_MATURIDADE_TECNOLÓGICA.pdf",
+      "block_idx": 384,
+      "section_path": [
+        "ANEXO 1 - DEFINIÇÃO DE NÍVEL DE MATURIDADE TECNOLÓGICA"
+      ],
+      "document_metadata": {
+        "family": "anexo_1",
+        "revision": 0,
+        "published_at": null,
+        "version_score": 0,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "385",
+      "document": "Anexo_1_-_DEFINIÇÃO_DE_NÍVEL_DE_MATURIDADE_TECNOLÓGICA.pdf",
+      "block_idx": 385,
+      "section_path": [
+        "ANEXO 1 - DEFINIÇÃO DE NÍVEL DE MATURIDADE TECNOLÓGICA"
+      ],
+      "document_metadata": {
+        "family": "anexo_1",
+        "revision": 0,
+        "published_at": null,
+        "version_score": 0,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    }
+  ],
+  "table_fragments": [],
+  "route_trace": [
+    {
+      "route": "text",
+      "reason": "rota inicial; parada por suficiência dos alvos decision",
+      "pages_or_units": [
+        "381",
+        "382",
+        "383",
+        "384",
+        "385"
+      ],
+      "targets_before": [
+        "eligibility_constraints",
+        "eligible_entities",
+        "exclusions",
+        "publico_alvo",
+        "requirements",
+        "continuous_flow",
+        "deadline",
+        "submission_window",
+        "counterpart",
+        "funding_amount",
+        "funding_limits",
+        "table_references"
+      ],
+      "targets_resolved": [],
+      "duration_ms": 5755,
+      "status": "partial"
+    }
+  ],
+  "status": "partial",
+  "producer_versions": {
+    "adaptive_text": "text-v3",
+    "edital_extraction_schema": "v3"
+  },
+  "attempt_id": "7520f697c33c49baabd3c3873ef5236b",
+  "fingerprint": "sha256:5d37ae7e5ce91682f6659de48a4937e7c19fbfeb46cd9b589635f53fa3384ed8",
+  "created_at": "2026-08-10T23:17:57.437870Z"
+}

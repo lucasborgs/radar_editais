@@ -1,0 +1,99 @@
+{
+  "package_version": "t07-a-v2",
+  "approved_golden": false,
+  "human_decision_default": "pending",
+  "human_comment_default": "",
+  "examples": [
+    {
+      "example_type": "valor_correto",
+      "subject": "finep:602",
+      "document": "Edital.pdf",
+      "family": "financial",
+      "field": "funding_amount",
+      "candidate_value": {
+        "max": 2000000.0,
+        "min": 0.0,
+        "currency": "BRL"
+      },
+      "state": "stated",
+      "schema_valid": true,
+      "evidence_resolved": true,
+      "material_conflict": false,
+      "error_codes": [],
+      "evidence_literal": "Serão comprometidos recursos não reembolsáveis do Fundo Nacional de Desenvolvimento Científico e Tecnológico - FNDCT, operados pela Finep, até o limite de R$ 2.000.000,00.",
+      "page": 5,
+      "human_decision": "pending",
+      "human_comment": ""
+    },
+    {
+      "example_type": "unknown_conservador",
+      "subject": "finep:602",
+      "document": "Edital.pdf",
+      "family": "eligibility",
+      "field": "eligibility_constraints",
+      "candidate_value": null,
+      "state": "unknown",
+      "schema_valid": true,
+      "evidence_resolved": false,
+      "material_conflict": false,
+      "error_codes": [],
+      "evidence_literal": null,
+      "page": null,
+      "human_decision": "pending",
+      "human_comment": ""
+    },
+    {
+      "example_type": "retificacao",
+      "subject": "finep:769",
+      "document": "2ª_Rerratificação_-_documento_rerratificado.pdf",
+      "family": "eligibility",
+      "field": "eligibility_constraints",
+      "candidate_value": null,
+      "state": "unknown",
+      "schema_valid": true,
+      "evidence_resolved": false,
+      "material_conflict": false,
+      "error_codes": [],
+      "evidence_literal": null,
+      "page": null,
+      "human_decision": "pending",
+      "human_comment": ""
+    },
+    {
+      "example_type": "tabela_compreensivel",
+      "subject": "finep:602",
+      "document": "Edital.pdf",
+      "family": "table_evidence",
+      "field": "table_references",
+      "candidate_value": null,
+      "state": "unknown",
+      "schema_valid": true,
+      "evidence_resolved": false,
+      "material_conflict": false,
+      "error_codes": [],
+      "evidence_literal": null,
+      "page": null,
+      "human_decision": "pending",
+      "human_comment": ""
+    },
+    {
+      "example_type": "estrutura_tabela_perdida",
+      "subject": "corpus:t07-a-v2",
+      "document": "nenhum documento observado",
+      "family": "table_evidence",
+      "field": "table_references",
+      "candidate_value": null,
+      "state": "unknown",
+      "schema_valid": true,
+      "evidence_resolved": false,
+      "material_conflict": false,
+      "error_codes": [
+        "table_structure_lost"
+      ],
+      "evidence_literal": null,
+      "page": null,
+      "human_decision": "pending",
+      "human_comment": "Confirmar se a estrutura da tabela foi preservada; não ativar OCR/layout/visão sem perda medida."
+    }
+  ]
+}
