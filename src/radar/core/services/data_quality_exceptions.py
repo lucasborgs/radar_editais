@@ -355,6 +355,34 @@ def list_exceptions(
         ) from None
 
 
+def list_exceptions_for_subjects(subject_ids: list[str]) -> dict[str, list[dict]]:
+    """Carrega exceções de vários sujeitos em uma leitura."""
+    ids = sorted({sid for sid in subject_ids if isinstance(sid, str) and sid.strip()})
+    out: dict[str, list[dict]] = {sid: [] for sid in ids}
+    if not ids or not _configured():
+        return out
+    try:
+        from radar.core.infra.db import get_supabase_service
+
+        response = (
+            get_supabase_service()
+            .table(_TABLE_EXCEPTIONS)
+            .select("*")
+            .eq("subject_kind", "opportunity")
+            .in_("subject_id", ids)
+            .order("last_observed_at", desc=True)
+            .execute()
+        )
+        for row in response.data or []:
+            sid = row.get("subject_id")
+            if sid in out:
+                out[sid].append(row)
+        return out
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("data_quality_exceptions.list_many: type=%s", type(exc).__name__)
+        raise DataQualityStorageError("list_exceptions failed") from None
+
+
 def _row_matches_source(row: dict, normalized_source: str) -> bool:
     refs = row.get("evidence_refs") or []
     for ref in refs:
@@ -783,6 +811,7 @@ __all__ = [
     "mark_exception_resolved",
     "append_review",
     "get_current_review_projection",
+    "list_exceptions_for_subjects",
     "load_current_temporal_reviews",
     "DataQualityReviewConflictError",
     "_evidence_refs_payload",

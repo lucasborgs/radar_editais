@@ -1144,13 +1144,18 @@ def _existing_hash(cur, source: str, native_id: str) -> str | None:
     return row[0] if row else None
 
 
-def _legacy_eligibility_values(elig_text: str, producer) -> dict[str, Any]:
+def _legacy_eligibility_values(
+    elig_text: str,
+    producer,
+    publico_alvo_fallback: Any = None,
+) -> dict[str, Any]:
     constraints, requirements, exclusions, publico_alvo = producer(elig_text)
+    if not publico_alvo and publico_alvo_fallback:
+        publico_alvo = [str(publico_alvo_fallback)]
     return {
         "eligibility_constraints": constraints,
         "requirements": requirements,
         "exclusions": exclusions,
-        "eligible_entities": [],
         "publico_alvo": publico_alvo,
     }
 
@@ -1324,17 +1329,20 @@ def _ingest_editais(
             description = (md["descricao_bronze"] or thematic_text)[:_DESC_CHARS]
 
             setores_raw, tags_raw = _tag_edital(thematic_text, client=client, model=model)
-            from radar.core.kg.adaptive_read_model import family_values
+            from radar.core.kg.adaptive_read_model import family_is_active, family_values
 
+            legacy_publico_alvo = md["metadata"].get("publico_alvo")
             adaptive_values = family_values(
                 native_id,
-                legacy_factory=lambda text=elig_text: _legacy_eligibility_values(text, produce_from_text),
+                legacy_factory=lambda text=elig_text, fallback=legacy_publico_alvo:
+                    _legacy_eligibility_values(text, produce_from_text, fallback),
             )
             # A seleção entre legado e adaptativo já ocorreu no read model.
             # Claims unknown/absent não ressuscitam valores de outro produtor.
             constraints = list(adaptive_values.get("eligibility_constraints") or [])
             requisitos = list(adaptive_values.get("requirements") or [])
             exclusoes = list(adaptive_values.get("exclusions") or [])
+            adaptive_eligibility_active = family_is_active("eligibility")
             eligible_entities = list(adaptive_values.get("eligible_entities") or [])
             publico_alvo = list(adaptive_values.get("publico_alvo") or [])
             mecanismo_value = _infer_mecanismo_from_text(md["descricao_bronze"] or thematic_text)
@@ -1349,7 +1357,8 @@ def _ingest_editais(
             meta["source_hash"] = src_hash
             meta["exclusoes"] = exclusoes
             meta["publico_alvo"] = publico_alvo
-            meta["eligible_entities"] = eligible_entities
+            if adaptive_eligibility_active:
+                meta["eligible_entities"] = eligible_entities
 
             # RT01-T05+/T06 (spec docs/specs/radar-data-trust-01-provenance.md
             # §4/§6): dual-write de proveniência para TODAS as fontes de

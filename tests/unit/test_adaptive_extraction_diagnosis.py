@@ -66,13 +66,17 @@ def test_t04_texto_nativo_resolve_alvo_critico_sem_escalada(source, stem, quote)
             class completions:  # noqa: N801
                 @staticmethod
                 def create(**kwargs):
-                    payload = json.loads(kwargs["messages"][1]["content"])
-                    text = payload["text"]
-                    evidence = next(line.strip() for line in text.splitlines() if line.strip())
+                    evidence = next(
+                        unit.text
+                        for unit in document.text_units
+                        if unit.text.strip()
+                        and (unit.model_extra or {}).get("kind")
+                        not in {"heading", "signature"}
+                    )
                     return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(
                         content=json.dumps({"claims": {
                             "eligible_entities": {
-                                "value": ["alvo"], "state": "stated", "evidence": evidence,
+                                "value": [evidence], "state": "stated", "evidence": evidence,
                             },
                         }})
                     ))])
