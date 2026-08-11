@@ -134,6 +134,24 @@ def constraint_ops() -> list[str]:
     return load().get("constraint_enums", {}).get("constraint_ops", [])
 
 
+def constraint_ops_by_type() -> dict[str, list[str]]:
+    """Operadores permitidos por tipo, do schema autoritativo."""
+    raw = load().get("constraint_vocab", {}).get("ops_by_type")
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError("authoritative constraint ops_by_type is unavailable")
+    valid_ops = set(constraint_ops())
+    result: dict[str, list[str]] = {}
+    for tipo, ops in raw.items():
+        if (
+            not isinstance(tipo, str) or not tipo.strip()
+            or not isinstance(ops, list) or not ops
+            or any(not isinstance(op, str) or op not in valid_ops for op in ops)
+        ):
+            raise ValueError("authoritative constraint ops_by_type is invalid")
+        result[tipo] = list(dict.fromkeys(ops))
+    return result
+
+
 def trl_faixas() -> dict:
     return load().get("trl_faixas", {})
 

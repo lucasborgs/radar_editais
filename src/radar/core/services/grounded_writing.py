@@ -103,6 +103,7 @@ class GroundedWriting:
             requirements=list(path.requirements),
             facts=list(path.facts),
             gaps=list(path.gaps),
+            claims=list(path.claims),
         )
 
     @staticmethod
@@ -116,6 +117,7 @@ class GroundedWriting:
             "sections": [{"id": f"section_{i}", "title": title} for i, title in enumerate(outline, 1)],
             "requirements": requirements,
             "gaps": context.gaps,
+            "claims": context.claims,
         }
 
     @staticmethod

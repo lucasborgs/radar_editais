@@ -95,6 +95,8 @@ class KnowledgeSignal(BaseModel):
     knowledge_level: Literal["fact", "inference", "unknown"] = "fact"
     validity: Literal["unknown", "needs_review", "active"] = "needs_review"
     evidence_refs: list[EvidenceReference] = Field(default_factory=list)
+    claims: list[dict] = Field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
     reason: str = ""
 
 
@@ -215,6 +217,8 @@ class CaminhoInovacao(BaseModel):
     recommendation: str
     next_step: str
     evidence: list[EvidenceReference] = Field(default_factory=list)
+    claims: list[dict] = Field(default_factory=list)
+    claim_gaps: list[str] = Field(default_factory=list)
     rule_evaluations: list[RuleEvaluation] = Field(default_factory=list)
     temporal_state: str = "needs_review"
     last_evaluated_at: datetime | None = None
@@ -287,4 +291,5 @@ class WritingContext(BaseModel):
     requirements: list[str] = Field(default_factory=list)
     facts: list[str] = Field(default_factory=list)
     gaps: list[str] = Field(default_factory=list)
+    claims: list[dict] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=_now)

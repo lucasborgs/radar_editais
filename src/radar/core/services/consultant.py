@@ -50,6 +50,8 @@ class KnowledgeEntity(TypedDict, total=False):
     name: str
     description: str
     card: dict
+    adaptive_claims: list[dict]
+    adaptive_gaps: list[str]
 
 
 class Knowledge(Protocol):
@@ -75,6 +77,68 @@ class Pathways(Protocol):
 
 class DocumentIntelligence(Protocol):
     def ingest(self, document: dict[str, Any]) -> DocumentIntelligenceResult: ...
+
+
+def _adaptive_evidence_for_entity(entity: KnowledgeEntity) -> list[EvidenceReference]:
+    """Converte a evidência da projeção comum para o contrato consultivo."""
+    evidence: list[EvidenceReference] = []
+    seen: set[tuple[str, str, str | None, str | None]] = set()
+    entity_ref = str(entity.get("id") or "")
+    entity_name = str(entity.get("name") or "")
+    for claim in entity.get("adaptive_claims") or []:
+        provenance = claim.get("provenance") or {}
+        state = provenance.get("state")
+        if state == "absent":
+            continue
+        refs = [
+            ref for ref in provenance.get("evidence_refs") or []
+            if isinstance(ref, dict)
+            and ref.get("locator_quality") in {"exact", "document_only"}
+            and (ref.get("canonical_content_hash") or ref.get("silver_source_hash"))
+        ]
+        for ref in refs:
+            item = EvidenceReference(
+                kind="adaptive_claim",
+                ref=entity_ref,
+                label=entity_name,
+                locator=str(ref.get("page") or ref.get("block_idx") or ref.get("document") or ""),
+                locator_quality=ref.get("locator_quality") or "unresolved",
+                quote=ref.get("quote"), document=ref.get("document"),
+                source_url=ref.get("source_url"),
+                source_hash=ref.get("silver_source_hash") or ref.get("canonical_content_hash"),
+                version=ref.get("collected_at"), source_role="primary",
+            )
+            key = (item.kind, item.ref, item.document, item.locator)
+            if key not in seen:
+                seen.add(key)
+                evidence.append(item)
+
+        if claim.get("field_path") != "table_references" or state != "stated":
+            continue
+        source_ref = refs[0] if refs else {}
+        for index, table in enumerate(claim.get("value") or []):
+            if not isinstance(table, dict):
+                continue
+            document = str(table.get("document") or "")
+            locator = table.get("page") or table.get("section") or document
+            if not document or not locator:
+                continue
+            item = EvidenceReference(
+                kind="table_reference",
+                ref=f"{entity_ref}:table:{index}",
+                label=str(table.get("title") or table.get("caption") or document),
+                locator=str(locator),
+                locator_quality="exact" if table.get("page") or table.get("section") else "document_only",
+                quote=table.get("caption") or table.get("title"), document=document,
+                source_url=source_ref.get("source_url"),
+                source_hash=source_ref.get("silver_source_hash") or source_ref.get("canonical_content_hash"),
+                version=source_ref.get("collected_at"), source_role="primary",
+            )
+            key = (item.kind, item.ref, item.document, item.locator)
+            if key not in seen:
+                seen.add(key)
+                evidence.append(item)
+    return evidence
 
 
 def _parse_datetime(value: object) -> datetime | None:
@@ -186,6 +250,23 @@ class DiscoveryDocumentIntelligence:
 class RelationalKnowledge:
     """Adapter fino do catálogo gold, sem vazar SQL para a jornada."""
 
+    def __init__(self, adaptive_read_model=None):
+        if adaptive_read_model is None:
+            from radar.core.kg import adaptive_read_model as default_read_model
+
+            adaptive_read_model = default_read_model
+        self.adaptive_read_model = adaptive_read_model
+
+    @staticmethod
+    def _legacy_values(card: dict) -> dict[str, Any]:
+        return {
+            "eligibility_constraints": card.get("constraints"),
+            "requirements": card.get("key_requirements"),
+            "exclusions": card.get("exclusoes"),
+            "eligible_entities": card.get("eligible_entities"),
+            "publico_alvo": card.get("publico_alvo"),
+        }
+
     def search(self, query: str, *, profile: dict, limit: int = 3) -> list[KnowledgeEntity]:
         results: list[KnowledgeEntity] = []
         try:
@@ -194,13 +275,19 @@ class RelationalKnowledge:
             logger.warning("consultant: busca semântica indisponível: %s", exc)
             semantic = []
 
-        for item in semantic:
-            entity_ref = item.get("id") or ""
-            if not entity_ref or item.get("kind") not in {"edital", "programa"}:
-                continue
-            card = self.get(entity_ref)
-            if card:
-                results.append(card)
+        semantic_ids = [
+            str(item.get("id") or "") for item in semantic
+            if item.get("id") and item.get("kind") in {"edital", "programa"}
+        ]
+        try:
+            cards_by_id = entity_catalog.get_opportunity_cards_by_native_ids(semantic_ids)
+            results = self._from_cards([
+                cards_by_id[entity_ref] for entity_ref in semantic_ids
+                if entity_ref in cards_by_id
+            ])
+        except Exception as exc:
+            logger.warning("consultant: leitura semântica em lote falhou: %s", exc)
+            results = []
         if results:
             return results[:limit]
 
@@ -209,7 +296,7 @@ class RelationalKnowledge:
         except Exception as exc:
             logger.warning("consultant: catálogo gold indisponível: %s", exc)
             cards = []
-        results = [self._from_card(card) for card in cards if card.get("id")]
+        results = self._from_cards([card for card in cards if card.get("id")])
         if len(results) < limit:
             try:
                 programs = entity_catalog.list_entity_catalog("programas", limit=limit)
@@ -241,9 +328,9 @@ class RelationalKnowledge:
                 role="opportunity",
                 knowledge_level="fact",
                 validity=_validity_value(card.get("validity_state")),
-                evidence_refs=GoldPathways._evidence(
-                    str(entity.get("id") or ""), str(entity.get("name") or ""), card,
-                ),
+                evidence_refs=self._evidence_for(entity),
+                claims=list(entity.get("adaptive_claims") or []),
+                gaps=list(entity.get("adaptive_gaps") or []),
                 reason="Recuperada do catálogo gold por intenção e afinidade semântica.",
             ))
         return signals
@@ -257,23 +344,101 @@ class RelationalKnowledge:
             entity=dict(entity), role="opportunity", knowledge_level="fact",
             validity=_validity_value(card.get("validity_state")),
             evidence_refs=self._evidence_for(entity),
+            claims=list(entity.get("adaptive_claims") or []),
+            gaps=list(entity.get("adaptive_gaps") or []),
             reason="Entidade lida diretamente do catálogo gold.",
         )
 
     @staticmethod
     def _evidence_for(entity: KnowledgeEntity) -> list[EvidenceReference]:
-        return GoldPathways._evidence(
+        return _adaptive_evidence_for_entity(entity) or GoldPathways._evidence(
             str(entity.get("id") or ""), str(entity.get("name") or ""), entity.get("card") or {},
         )
 
-    @staticmethod
-    def _from_card(card: dict) -> KnowledgeEntity:
+    def _from_cards(self, cards: list[dict]) -> list[KnowledgeEntity]:
+        if not cards:
+            return []
+        projections = {}
+        if self.adaptive_read_model is not None:
+            resolve_many = getattr(self.adaptive_read_model, "resolve_many", None)
+            if resolve_many is not None:
+                entity_refs = [str(card.get("id") or "") for card in cards if card.get("id")]
+                try:
+                    projections = resolve_many(
+                        entity_refs,
+                        legacy_values_by_subject={
+                            str(card.get("id")): self._legacy_values(card)
+                            for card in cards if card.get("id")
+                        },
+                    )
+                except Exception as exc:
+                    logger.warning("consultant: leitura adaptativa em lote falhou: %s", exc)
+        return [
+            self._from_card(card, projection=projections.get(str(card.get("id") or "")))
+            for card in cards
+        ]
+
+    def _from_card(self, card: dict, *, projection=None) -> KnowledgeEntity:
+        card = dict(card)
+        entity_ref = str(card.get("id") or "")
+        adaptive_claims: list[dict] = []
+        adaptive_gaps: list[str] = []
+        if self.adaptive_read_model is not None and entity_ref:
+            try:
+                projection = projection or self.adaptive_read_model.resolve(
+                    entity_ref,
+                    legacy_values=self._legacy_values(card),
+                )
+            except Exception as exc:  # noqa: BLE001 — falha vira lacuna, não fato
+                logger.warning("consultant: projeção adaptativa indisponível: %s", exc)
+                adaptive_gaps = [
+                    "Projeção adaptativa indisponível; fatos adaptativos não publicados."
+                ]
+                for field in (
+                    "constraints", "key_requirements", "exclusoes",
+                    "eligible_entities", "publico_alvo",
+                ):
+                    card[field] = []
+            if projection is not None:
+                payload = projection.consumer_payload()
+                adaptive_claims = list(payload["claims"])
+                adaptive_gaps = list(payload["gaps"])
+                if projection.has_effective_projection:
+                    by_field = {
+                        claim.get("field_path"): claim
+                        for claim in adaptive_claims
+                    }
+                    # Uma projeção parcial ainda é a autoridade dos campos
+                    # cobertos: apagar primeiro evita ressuscitar o legado em
+                    # unknown/absent/conflicting ou quando o claim não existe.
+                    card_fields = {
+                        "eligibility_constraints": ("constraints",),
+                        "requirements": ("key_requirements",),
+                        "exclusions": ("exclusoes",),
+                        "eligible_entities": ("eligible_entities",),
+                        "publico_alvo": ("publico_alvo",),
+                    }
+                    for fields in card_fields.values():
+                        for field in fields:
+                            card[field] = []
+                    for source_field, fields in card_fields.items():
+                        claim = by_field.get(source_field)
+                        if not claim:
+                            continue
+                        if (claim.get("provenance") or {}).get("state") == "stated":
+                            for field in fields:
+                                card[field] = claim.get("value")
+                    card["adaptive_state"] = payload["source_state"]
+                    card["adaptive_claims"] = adaptive_claims
+                    card["adaptive_gaps"] = adaptive_gaps
         return {
             "id": card.get("id", ""),
             "kind": card.get("kind") or "edital",
             "name": card.get("title") or "",
             "description": card.get("objective") or "",
             "card": card,
+            "adaptive_claims": adaptive_claims,
+            "adaptive_gaps": adaptive_gaps,
         }
 
     def paths(self, entity_ref: str) -> list[KnowledgeSignal]:
@@ -700,6 +865,10 @@ class GoldPathways:
             ))
         return evidence
 
+    @staticmethod
+    def _adaptive_evidence(entity: KnowledgeEntity) -> list[EvidenceReference]:
+        return _adaptive_evidence_for_entity(entity)
+
     def _from_entity(
         self, entity: KnowledgeEntity, *, profile: dict, project: ProjetoInovacao,
     ) -> CaminhoInovacao | None:
@@ -714,7 +883,7 @@ class GoldPathways:
         status = str(card.get("status") or "").strip().lower()
         if temporal_state == "closed" or status in {"encerrada", "fechada", "closed", "finished"}:
             return None
-        evidence = self._evidence(raw["native_id"], raw["name"], card)
+        evidence = self._adaptive_evidence(entity) or self._evidence(raw["native_id"], raw["name"], card)
         detailed = eligibility.evaluate_opportunity_detailed(raw["constraints"], profile)
         if detailed["status"] == eligibility.INELEGIVEL:
             return None
@@ -730,6 +899,7 @@ class GoldPathways:
             has_project=True, shared_themes=shared,
         ) or {}
         gaps = list(explanation.get("pendentes") or []) + list(explanation.get("lacunas") or [])
+        gaps.extend(str(gap) for gap in (entity.get("adaptive_gaps") or []) if str(gap).strip())
         if temporal_state == "needs_review":
             gaps.append("A validade ou o prazo da oportunidade precisa de revisão antes de uma decisão.")
         if not any(item.locator_quality in {"exact", "document_only"} for item in evidence):
@@ -760,6 +930,8 @@ class GoldPathways:
             requirements=list(raw["requisitos_texto"] or []), gaps=gaps, risks=risks,
             recommendation=f"Avalie a subvenção com base nas regras e evidências de {raw['name']}.",
             next_step=path_seed["proximo_passo"], evidence=evidence,
+            claims=list(entity.get("adaptive_claims") or []),
+            claim_gaps=list(entity.get("adaptive_gaps") or []),
             rule_evaluations=rule_evaluations, temporal_state=temporal_state,
             last_evaluated_at=datetime.now(timezone.utc), confidence=0.5,
             needs_review=bool(gaps) or temporal_state == "needs_review",
