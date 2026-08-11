@@ -45,7 +45,7 @@ import unicodedata
 from collections import defaultdict
 from datetime import date, datetime, timezone
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import psycopg
 from pydantic import ValidationError
@@ -1144,6 +1144,44 @@ def _existing_hash(cur, source: str, native_id: str) -> str | None:
     return row[0] if row else None
 
 
+def _legacy_eligibility_values(
+    elig_text: str,
+    producer,
+    publico_alvo_fallback: Any = None,
+) -> dict[str, Any]:
+    constraints, requirements, exclusions, publico_alvo = producer(elig_text)
+    if not publico_alvo and publico_alvo_fallback:
+        publico_alvo = [str(publico_alvo_fallback)]
+    return {
+        "eligibility_constraints": constraints,
+        "requirements": requirements,
+        "exclusions": exclusions,
+        "publico_alvo": publico_alvo,
+    }
+
+
+def _run_adaptive_shadow(
+    *,
+    documents: list,
+    targets: list,
+    extractor_factory=None,
+) -> bool:
+    """Executa shadow somente por flag explícita e com seam injetável."""
+    enabled = os.getenv("RADAR_ADAPTIVE_EXTRACTION_SHADOW", "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+    from radar.core.services import document_extractions
+
+    if not enabled or (extractor_factory is None and not document_extractions.is_configured()):
+        return False
+    from radar.core.ingestion.adaptive_extraction import AdaptiveDocumentExtraction
+
+    service = extractor_factory() if extractor_factory is not None else AdaptiveDocumentExtraction()
+    for document in documents:
+        service.extract(document, targets)
+    return True
+
+
 def _programa_id_map(conn) -> dict[str, str]:
     with conn.cursor() as cur:
         cur.execute("select native_id, id from public.entities where kind='programa'")
@@ -1158,7 +1196,11 @@ def _ingest_editais(
     limit: int | None,
     skip_unchanged: bool,
     edital_ids: list[str] | None = None,
+    adaptive_shadow_factory=None,
 ) -> None:
+    from radar.core.ingestion.adaptive_extraction import (
+        document_assets_from_blocks,
+    )
     from radar.core.kg import provenance_writer
     from radar.core.kg.constraints_producer import CONSTRAINTS_MODEL, produce_from_text
     from radar.core.llm.llm_client import make_client
@@ -1192,6 +1234,85 @@ def _ingest_editais(
                 stats["skipped"] += 1
                 continue
             src_hash = _read_silver_hash(src, stem)
+            md = _edital_metadata(src, stem, blocks)
+
+            # RT06-T02: o artifact textual permanece em shadow e não altera o
+            # produto enquanto T07 não for promovida.
+            from radar.domain.adaptive_extraction import ExtractionTarget
+
+            adaptive_targets = [
+                ExtractionTarget(
+                    field_path="eligibility_constraints",
+                    value_type="list[constraint]",
+                    required_for="eligibility",
+                    criticality="decision",
+                ),
+                ExtractionTarget(
+                    field_path="requirements", value_type="list[str]",
+                    required_for="eligibility", criticality="decision",
+                ),
+                ExtractionTarget(
+                    field_path="exclusions", value_type="list[str]",
+                    required_for="eligibility", criticality="decision",
+                ),
+                ExtractionTarget(
+                    field_path="eligible_entities", value_type="list[str]",
+                    required_for="eligibility", criticality="decision",
+                ),
+                ExtractionTarget(
+                    field_path="publico_alvo", value_type="list[str]",
+                    required_for="eligibility", criticality="advisory",
+                ),
+                ExtractionTarget(
+                    field_path="deadline", value_type="date",
+                    required_for="eligibility", criticality="decision",
+                ),
+                ExtractionTarget(
+                    field_path="submission_window", value_type="submission_window",
+                    required_for="eligibility", criticality="decision",
+                ),
+                ExtractionTarget(
+                    field_path="continuous_flow", value_type="bool",
+                    required_for="eligibility", criticality="decision",
+                ),
+                ExtractionTarget(
+                    field_path="funding_amount", value_type="monetary_range",
+                    required_for="eligibility", criticality="decision",
+                ),
+                ExtractionTarget(
+                    field_path="funding_limits", value_type="funding_limits",
+                    required_for="eligibility", criticality="decision",
+                ),
+                ExtractionTarget(
+                    field_path="counterpart", value_type="counterpart",
+                    required_for="eligibility", criticality="decision",
+                ),
+                ExtractionTarget(
+                    field_path="table_references", value_type="list[table_reference]",
+                    required_for="eligibility", criticality="advisory",
+                ),
+            ]
+            try:
+                _run_adaptive_shadow(
+                    documents=document_assets_from_blocks(
+                        subject_id=native_id,
+                        source=src,
+                        blocks=blocks,
+                        source_url=md["metadata"].get("url"),
+                    ),
+                    targets=adaptive_targets,
+                    extractor_factory=adaptive_shadow_factory,
+                )
+            except Exception as exc:  # noqa: BLE001 — shadow não bloqueia o gold
+                logger.warning(
+                    "adaptive extraction shadow failed subject=%s category=%s",
+                    native_id, type(exc).__name__,
+                )
+
+            # A entidade gold inalterada ainda pode não ter artifact adaptativo
+            # (por exemplo, após a ativação do shadow). O produtor consulta seu
+            # próprio cache/fingerprint antes de executar; só então o caminho
+            # legado pode pular o restante do processamento.
             if skip_unchanged and src_hash:
                 with conn.cursor() as cur:
                     if _existing_hash(cur, src, native_id) == src_hash:
@@ -1205,11 +1326,25 @@ def _ingest_editais(
             ).strip()
             thematic_text = "\n".join(_ws(b.get("text") or "") for b in thematic).strip()
 
-            md = _edital_metadata(src, stem, blocks)
             description = (md["descricao_bronze"] or thematic_text)[:_DESC_CHARS]
 
             setores_raw, tags_raw = _tag_edital(thematic_text, client=client, model=model)
-            constraints, requisitos, exclusoes, publico_alvo = produce_from_text(elig_text)
+            from radar.core.kg.adaptive_read_model import family_is_active, family_values
+
+            legacy_publico_alvo = md["metadata"].get("publico_alvo")
+            adaptive_values = family_values(
+                native_id,
+                legacy_factory=lambda text=elig_text, fallback=legacy_publico_alvo:
+                    _legacy_eligibility_values(text, produce_from_text, fallback),
+            )
+            # A seleção entre legado e adaptativo já ocorreu no read model.
+            # Claims unknown/absent não ressuscitam valores de outro produtor.
+            constraints = list(adaptive_values.get("eligibility_constraints") or [])
+            requisitos = list(adaptive_values.get("requirements") or [])
+            exclusoes = list(adaptive_values.get("exclusions") or [])
+            adaptive_eligibility_active = family_is_active("eligibility")
+            eligible_entities = list(adaptive_values.get("eligible_entities") or [])
+            publico_alvo = list(adaptive_values.get("publico_alvo") or [])
             mecanismo_value = _infer_mecanismo_from_text(md["descricao_bronze"] or thematic_text)
             setores_norm = normalize_setores(setores_raw)
             tags_norm = normalize_tags(tags_raw)
@@ -1220,13 +1355,10 @@ def _ingest_editais(
 
             meta = dict(md["metadata"])
             meta["source_hash"] = src_hash
-            # Campos de display do card (call B): exclusoes/publico_alvo vêm do
-            # LLM sobre as seções de elegibilidade. `publico_alvo` (lista tipada)
-            # substitui o `publico_alvo` cru do bronze (string livre) — o card
-            # espera lista; se o LLM não delimitou, cai no bronze como 1 item.
-            bronze_pa = md["metadata"].get("publico_alvo")
             meta["exclusoes"] = exclusoes
-            meta["publico_alvo"] = publico_alvo or ([str(bronze_pa)] if bronze_pa else [])
+            meta["publico_alvo"] = publico_alvo
+            if adaptive_eligibility_active:
+                meta["eligible_entities"] = eligible_entities
 
             # RT01-T05+/T06 (spec docs/specs/radar-data-trust-01-provenance.md
             # §4/§6): dual-write de proveniência para TODAS as fontes de
@@ -1303,6 +1435,7 @@ def ingest_all(
     limit: int | None = None,
     skip_unchanged: bool = True,
     edital_ids: list[str] | None = None,
+    adaptive_shadow_factory=None,
 ) -> dict:
     """Ingesta as 4 fontes pré-beta nas tabelas gold. `sources` filtra
     ('investidor','programa','ict','edital'); `limit` corta os editais (debug).
@@ -1325,6 +1458,7 @@ def ingest_all(
                 limit=limit,
                 skip_unchanged=skip_unchanged,
                 edital_ids=edital_ids,
+                adaptive_shadow_factory=adaptive_shadow_factory,
             )
     stats["agencia"] = len(agency_cache)
     logger.info("ingest_all concluído: %s", dict(stats))

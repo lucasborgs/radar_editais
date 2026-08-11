@@ -1065,6 +1065,17 @@ constraint_vocab:
     - vinculo_incubacao     # exige  (incubadora/aceleradora credenciada)
     - investidor_privado    # exige  (aporte privado — ex. PIPE Invest)
   ops: [in, not_in, lte, gte, exige]
+  ops_by_type:
+    porte: [in, not_in]
+    faturamento: [lte, gte]
+    idade_empresa_meses: [lte, gte]
+    sede_uf: [in, not_in]
+    forma_juridica: [in, not_in]
+    trl: [in, lte, gte]
+    cnae: [in, not_in]
+    parceria: [exige]
+    vinculo_incubacao: [exige]
+    investidor_privado: [exige]
   # Enums fechados para os tipos categóricos — validados em `produce_from_text`
   # (achado do bake-off Fase 1.5: sem isso o produtor vazava valores fora do
   # vocabulário, ex. forma_juridica="sociedade limitada"/"fundacao", porte="250",

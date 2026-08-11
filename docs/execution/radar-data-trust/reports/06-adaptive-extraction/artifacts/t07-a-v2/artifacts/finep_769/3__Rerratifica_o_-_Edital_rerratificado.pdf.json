@@ -1,0 +1,4677 @@
+{
+  "schema_version": 9,
+  "subject_id": "finep:769",
+  "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+  "document_role": "amendment",
+  "asset_hash": "sha256:925ec22b961604737bd6667fdc00c2330b81d40433336437d6aab88a0cb079c4",
+  "bundle_hash": "sha256:95fb724ac02d859375195bfe44dc77bec75557315554fbffff1d4b70a7a4eb64",
+  "targets_requested": [
+    {
+      "field_path": "eligibility_constraints",
+      "value_type": "list[constraint]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "eligible_entities",
+      "value_type": "list[str]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "exclusions",
+      "value_type": "list[str]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "publico_alvo",
+      "value_type": "list[str]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "requirements",
+      "value_type": "list[str]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "continuous_flow",
+      "value_type": "bool",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "deadline",
+      "value_type": "date",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "submission_window",
+      "value_type": "submission_window",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "counterpart",
+      "value_type": "counterpart",
+      "required_for": "eligibility",
+      "criticality": "advisory"
+    },
+    {
+      "field_path": "funding_amount",
+      "value_type": "monetary_range",
+      "required_for": "eligibility",
+      "criticality": "advisory"
+    },
+    {
+      "field_path": "funding_limits",
+      "value_type": "funding_limits",
+      "required_for": "eligibility",
+      "criticality": "advisory"
+    },
+    {
+      "field_path": "table_references",
+      "value_type": "list[table_reference]",
+      "required_for": "writing",
+      "criticality": "advisory"
+    }
+  ],
+  "claims": [
+    {
+      "subject_id": "finep:769",
+      "field_path": "eligibility_constraints",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:51.535616Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "eligible_entities",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "quote_resolved",
+            "status": "failed"
+          },
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:51.589516Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "exclusions",
+      "value": [
+        "pessoas jurídicas sem finalidade lucrativa",
+        "pessoas físicas (associação, fundação, empresário individual, o microempreendedor individual e a Empresa Simples de Inovação)"
+      ],
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "stated",
+        "evidence_refs": [
+          {
+            "schema_version": 1,
+            "source": "finep",
+            "native_id": "finep:769",
+            "edital_id": "finep:769",
+            "source_url": null,
+            "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+            "page": 3,
+            "block_idx": 224,
+            "section_path": [
+              "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+              "Subvenção Econômica à Inovação",
+              "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+              "4. CRITÉRIOS DE ELEGIBILIDADE"
+            ],
+            "quote": "Além de outras figuras que não se enquadrem na definição do item 4.1, não são elegíveis à Subvenção Econômica as pessoas jurídicas sem finalidade lucrativa e as pessoas físicas (associação, fundação, empresário individual, o microempreendedor individual e a Empresa Simples de Inovação).",
+            "canonical_content_hash": null,
+            "silver_source_hash": "sha256:925ec22b961604737bd6667fdc00c2330b81d40433336437d6aab88a0cb079c4",
+            "bundle_hash": null,
+            "content_hash": null,
+            "collected_at": null,
+            "locator_quality": "exact"
+          }
+        ],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "quote_resolved",
+            "status": "passed"
+          },
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:51.592453Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "publico_alvo",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:51.592487Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "requirements",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "quote_resolved",
+            "status": "failed"
+          },
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:51.606637Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "continuous_flow",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:51.606694Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "deadline",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "quote_resolved",
+            "status": "failed"
+          },
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:51.621960Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "submission_window",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:51.622016Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "counterpart",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:51.622045Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "funding_amount",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:51.622082Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "funding_limits",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:51.622109Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "table_references",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:17:51.622135Z"
+      }
+    }
+  ],
+  "unresolved_targets": [
+    "continuous_flow",
+    "counterpart",
+    "deadline",
+    "eligibility_constraints",
+    "eligible_entities",
+    "funding_amount",
+    "funding_limits",
+    "publico_alvo",
+    "requirements",
+    "submission_window",
+    "table_references"
+  ],
+  "structured_blocks": [
+    {
+      "kind": "heading",
+      "page": 1,
+      "unit_id": "195",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 195,
+      "section_path": [],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 1,
+      "unit_id": "196",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 196,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 1,
+      "unit_id": "197",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 197,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "198",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 198,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 1,
+      "unit_id": "199",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 199,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "200",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 200,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "1. OBJETIVO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "201",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 201,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "1. OBJETIVO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "202",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 202,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "1. OBJETIVO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "203",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 203,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "1. OBJETIVO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "204",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 204,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "1. OBJETIVO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "205",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 205,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "1. OBJETIVO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "206",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 206,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "1. OBJETIVO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "207",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 207,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "1. OBJETIVO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 2,
+      "unit_id": "208",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 208,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "2. GRUPO DE CONCORRÊNCIA"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "209",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 209,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "2. GRUPO DE CONCORRÊNCIA"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "210",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 210,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "2. GRUPO DE CONCORRÊNCIA"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "211",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 211,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "2. GRUPO DE CONCORRÊNCIA"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "212",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 212,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "2. GRUPO DE CONCORRÊNCIA"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "213",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 213,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "2. GRUPO DE CONCORRÊNCIA"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "214",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 214,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "2. GRUPO DE CONCORRÊNCIA"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "215",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 215,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "2. GRUPO DE CONCORRÊNCIA"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 2,
+      "unit_id": "216",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 216,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "3. RECURSOS FINANCEIROS A SEREM CONCEDIDOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "217",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 217,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "3. RECURSOS FINANCEIROS A SEREM CONCEDIDOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "218",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 218,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "3. RECURSOS FINANCEIROS A SEREM CONCEDIDOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 2,
+      "unit_id": "219",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 219,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "4. CRITÉRIOS DE ELEGIBILIDADE"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "220",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 220,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "4. CRITÉRIOS DE ELEGIBILIDADE"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 3,
+      "unit_id": "221",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 221,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "4. CRITÉRIOS DE ELEGIBILIDADE"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 3,
+      "unit_id": "222",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 222,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "4. CRITÉRIOS DE ELEGIBILIDADE"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 3,
+      "unit_id": "223",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 223,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "4. CRITÉRIOS DE ELEGIBILIDADE"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 3,
+      "unit_id": "224",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 224,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "4. CRITÉRIOS DE ELEGIBILIDADE"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 3,
+      "unit_id": "225",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 225,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "4. CRITÉRIOS DE ELEGIBILIDADE"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 3,
+      "unit_id": "226",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 226,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "4. CRITÉRIOS DE ELEGIBILIDADE"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 3,
+      "unit_id": "227",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 227,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "4. CRITÉRIOS DE ELEGIBILIDADE"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 3,
+      "unit_id": "228",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 228,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "4. CRITÉRIOS DE ELEGIBILIDADE"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 3,
+      "unit_id": "229",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 229,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "5. CARACTERÍSTICAS DAS PROPOSTAS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 3,
+      "unit_id": "230",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 230,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "5. CARACTERÍSTICAS DAS PROPOSTAS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 3,
+      "unit_id": "231",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 231,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "5. CARACTERÍSTICAS DAS PROPOSTAS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 4,
+      "unit_id": "232",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 232,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "5. CARACTERÍSTICAS DAS PROPOSTAS",
+        "5.3"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 4,
+      "unit_id": "233",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 233,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "5. CARACTERÍSTICAS DAS PROPOSTAS",
+        "5.4"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 4,
+      "unit_id": "234",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 234,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "5. CARACTERÍSTICAS DAS PROPOSTAS",
+        "5.5"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 4,
+      "unit_id": "235",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 235,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "5. CARACTERÍSTICAS DAS PROPOSTAS",
+        "5.6"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 4,
+      "unit_id": "236",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 236,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "6. ITENS APOIÁVEIS",
+        "6.1"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 4,
+      "unit_id": "237",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 237,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "6. ITENS APOIÁVEIS",
+        "6.2"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 4,
+      "unit_id": "238",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 238,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "6. ITENS APOIÁVEIS",
+        "6.3"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 4,
+      "unit_id": "239",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 239,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "6. ITENS APOIÁVEIS",
+        "6.4"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 4,
+      "unit_id": "240",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 240,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "6. ITENS APOIÁVEIS",
+        "6.5"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 4,
+      "unit_id": "241",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 241,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "7. ITENS NÃO APOIÁVEIS",
+        "7.1"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 5,
+      "unit_id": "242",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 242,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "7. ITENS NÃO APOIÁVEIS",
+        "7.1"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 5,
+      "unit_id": "243",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 243,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "7. ITENS NÃO APOIÁVEIS",
+        "7.2"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 5,
+      "unit_id": "244",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 244,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "7. ITENS NÃO APOIÁVEIS",
+        "7.3"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 5,
+      "unit_id": "245",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 245,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "7. ITENS NÃO APOIÁVEIS",
+        "7.4"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 5,
+      "unit_id": "246",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 246,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "8. VALORES SOLICITADOS",
+        "8.1"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "table",
+      "page": 5,
+      "unit_id": "247",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 247,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "8. VALORES SOLICITADOS",
+        "8.1"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 5,
+      "unit_id": "248",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 248,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "8. VALORES SOLICITADOS",
+        "8.1.1"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 5,
+      "unit_id": "249",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 249,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "8. VALORES SOLICITADOS",
+        "8.2"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 5,
+      "unit_id": "250",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 250,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "8. VALORES SOLICITADOS",
+        "8.3"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 5,
+      "unit_id": "251",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 251,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "9. POLÍTICA DE CONTRAPARTIDA",
+        "9.1"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 5,
+      "unit_id": "252",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 252,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "9. POLÍTICA DE CONTRAPARTIDA",
+        "9.2"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 6,
+      "unit_id": "253",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 253,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "9. POLÍTICA DE CONTRAPARTIDA",
+        "9.2"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 6,
+      "unit_id": "254",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 254,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "9. POLÍTICA DE CONTRAPARTIDA",
+        "9.2"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 6,
+      "unit_id": "255",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 255,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "9. POLÍTICA DE CONTRAPARTIDA",
+        "9.3"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 6,
+      "unit_id": "256",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 256,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "9. POLÍTICA DE CONTRAPARTIDA",
+        "9.4"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 6,
+      "unit_id": "257",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 257,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "9. POLÍTICA DE CONTRAPARTIDA",
+        "9.5"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 6,
+      "unit_id": "258",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 258,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "9. POLÍTICA DE CONTRAPARTIDA",
+        "9.5"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 6,
+      "unit_id": "259",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 259,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "9. POLÍTICA DE CONTRAPARTIDA",
+        "9.6"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "table",
+      "page": 6,
+      "unit_id": "260",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 260,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "9. POLÍTICA DE CONTRAPARTIDA",
+        "9.6"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 6,
+      "unit_id": "261",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 261,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "9. POLÍTICA DE CONTRAPARTIDA",
+        "9.7"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 7,
+      "unit_id": "262",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 262,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "9. POLÍTICA DE CONTRAPARTIDA",
+        "9.7"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 7,
+      "unit_id": "263",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 263,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "10. PRAZO DE EXECUÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 7,
+      "unit_id": "264",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 264,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "10. PRAZO DE EXECUÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 7,
+      "unit_id": "265",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 265,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "11. APRESENTAÇÃO DA PROPOSTA E DA DOCUMENTAÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 7,
+      "unit_id": "266",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 266,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "11. APRESENTAÇÃO DA PROPOSTA E DA DOCUMENTAÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 7,
+      "unit_id": "267",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 267,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "11. APRESENTAÇÃO DA PROPOSTA E DA DOCUMENTAÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 7,
+      "unit_id": "268",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 268,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "11. APRESENTAÇÃO DA PROPOSTA E DA DOCUMENTAÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 7,
+      "unit_id": "269",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 269,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "11. APRESENTAÇÃO DA PROPOSTA E DA DOCUMENTAÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 7,
+      "unit_id": "270",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 270,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "11. APRESENTAÇÃO DA PROPOSTA E DA DOCUMENTAÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 7,
+      "unit_id": "271",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 271,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "11. APRESENTAÇÃO DA PROPOSTA E DA DOCUMENTAÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 7,
+      "unit_id": "272",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 272,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "11. APRESENTAÇÃO DA PROPOSTA E DA DOCUMENTAÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 7,
+      "unit_id": "273",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 273,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 7,
+      "unit_id": "274",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 274,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 8,
+      "unit_id": "275",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 275,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "1ª ETAPA – HABILITAÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 8,
+      "unit_id": "276",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 276,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "1ª ETAPA – HABILITAÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 8,
+      "unit_id": "277",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 277,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "1ª ETAPA – HABILITAÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 8,
+      "unit_id": "278",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 278,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "1ª ETAPA – HABILITAÇÃO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 8,
+      "unit_id": "279",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 279,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "1ª ETAPA – HABILITAÇÃO",
+        "12.3. Capacidade Financeira."
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 8,
+      "unit_id": "280",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 280,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "1ª ETAPA – HABILITAÇÃO",
+        "12.3. Capacidade Financeira."
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 8,
+      "unit_id": "281",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 281,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "1ª ETAPA – HABILITAÇÃO",
+        "12.3. Capacidade Financeira."
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 8,
+      "unit_id": "282",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 282,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "1ª ETAPA – HABILITAÇÃO",
+        "12.3. Capacidade Financeira."
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 9,
+      "unit_id": "283",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 283,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "1ª ETAPA – HABILITAÇÃO",
+        "12.3. Capacidade Financeira."
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 9,
+      "unit_id": "284",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 284,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "1ª ETAPA – HABILITAÇÃO",
+        "12.3. Capacidade Financeira."
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 9,
+      "unit_id": "285",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 285,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "1ª ETAPA – HABILITAÇÃO",
+        "12.3. Capacidade Financeira."
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 9,
+      "unit_id": "286",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 286,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 9,
+      "unit_id": "287",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 287,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 9,
+      "unit_id": "288",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 288,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 9,
+      "unit_id": "289",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 289,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "table",
+      "page": 9,
+      "unit_id": "290",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 290,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "table",
+      "page": 9,
+      "unit_id": "291",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 291,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "292",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 292,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "293",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 293,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "294",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 294,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "295",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 295,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "296",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 296,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "297",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 297,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "298",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 298,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "299",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 299,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "300",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 300,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "301",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 301,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "302",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 302,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "303",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 303,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "304",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 304,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "305",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 305,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "306",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 306,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "307",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 307,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "308",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 308,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "309",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 309,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 10,
+      "unit_id": "310",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 310,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 10,
+      "unit_id": "311",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 311,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "table",
+      "page": 11,
+      "unit_id": "312",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 312,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 11,
+      "unit_id": "313",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 313,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 11,
+      "unit_id": "314",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 314,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 11,
+      "unit_id": "315",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 315,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 11,
+      "unit_id": "316",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 316,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 11,
+      "unit_id": "317",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 317,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 11,
+      "unit_id": "318",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 318,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 11,
+      "unit_id": "319",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 319,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "boilerplate",
+      "page": 11,
+      "unit_id": "320",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 320,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "321",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 321,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "322",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 322,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "323",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 323,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "324",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 324,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "12. DIRETRIZES GERAIS DA SELEÇÃO",
+        "2ª ETAPA – ANÁLISE DE MÉRITO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "325",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 325,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "326",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 326,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "327",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 327,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "328",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 328,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "329",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 329,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "330",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 330,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "331",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 331,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "332",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 332,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "333",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 333,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "334",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 334,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 12,
+      "unit_id": "335",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 335,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 13,
+      "unit_id": "336",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 336,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 13,
+      "unit_id": "337",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 337,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 13,
+      "unit_id": "338",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 338,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 13,
+      "unit_id": "339",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 339,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 13,
+      "unit_id": "340",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 340,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 13,
+      "unit_id": "341",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 341,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 13,
+      "unit_id": "342",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 342,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 13,
+      "unit_id": "343",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 343,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 13,
+      "unit_id": "344",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 344,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 13,
+      "unit_id": "345",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 345,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "13. RESULTADOS, DELIBERAÇÃO E INTERPOSIÇÃO DE RECURSOS",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 14,
+      "unit_id": "346",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 346,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 14,
+      "unit_id": "347",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 347,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 14,
+      "unit_id": "348",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 348,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 14,
+      "unit_id": "349",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 349,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 14,
+      "unit_id": "350",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 350,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 14,
+      "unit_id": "351",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 351,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 14,
+      "unit_id": "352",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 352,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 14,
+      "unit_id": "353",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 353,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 14,
+      "unit_id": "354",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 354,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 14,
+      "unit_id": "355",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 355,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 14,
+      "unit_id": "356",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 356,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 14,
+      "unit_id": "357",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 357,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 14,
+      "unit_id": "358",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 358,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 14,
+      "unit_id": "359",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 359,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "boilerplate",
+      "page": 14,
+      "unit_id": "360",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 360,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 15,
+      "unit_id": "361",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 361,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "15. CRONOGRAMA"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "table",
+      "page": 15,
+      "unit_id": "362",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 362,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "15. CRONOGRAMA"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 15,
+      "unit_id": "363",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 363,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "16. BASE LEGAL"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 15,
+      "unit_id": "364",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 364,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "16. BASE LEGAL"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 15,
+      "unit_id": "365",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 365,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "17. ACOMPANHAMENTO"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "boilerplate",
+      "page": 15,
+      "unit_id": "366",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 366,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 16,
+      "unit_id": "367",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 367,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "18. PROPRIEDADE INTELECTUAL"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 16,
+      "unit_id": "368",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 368,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "19. DISPOSIÇÕES FINAIS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 16,
+      "unit_id": "369",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 369,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "19. DISPOSIÇÕES FINAIS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 16,
+      "unit_id": "370",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 370,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "19. DISPOSIÇÕES FINAIS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 16,
+      "unit_id": "371",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 371,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "19. DISPOSIÇÕES FINAIS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 16,
+      "unit_id": "372",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 372,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "19. DISPOSIÇÕES FINAIS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 16,
+      "unit_id": "373",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 373,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "19. DISPOSIÇÕES FINAIS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 16,
+      "unit_id": "374",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 374,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "19. DISPOSIÇÕES FINAIS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 16,
+      "unit_id": "375",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 375,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "14. CONTRATAÇÃO E REPASSE DE RECURSOS SUBVENCIONADOS",
+        "19. DISPOSIÇÕES FINAIS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 17,
+      "unit_id": "376",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 376,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "19. DISPOSIÇÕES FINAIS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 17,
+      "unit_id": "377",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 377,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "19. DISPOSIÇÕES FINAIS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 17,
+      "unit_id": "378",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 378,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "19. DISPOSIÇÕES FINAIS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 17,
+      "unit_id": "379",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 379,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT",
+        "Subvenção Econômica à Inovação",
+        "DESAFIOS TECNOLÓGICOS PARA AGRICULTURA FAMILIAR",
+        "19. DISPOSIÇÕES FINAIS"
+      ],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "boilerplate",
+      "page": 17,
+      "unit_id": "380",
+      "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+      "block_idx": 380,
+      "section_path": [],
+      "document_metadata": {
+        "family": "edital",
+        "revision": 3,
+        "published_at": null,
+        "version_score": 300000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    }
+  ],
+  "table_fragments": [],
+  "route_trace": [
+    {
+      "route": "text",
+      "reason": "rota inicial; parada por suficiência dos alvos decision",
+      "pages_or_units": [
+        "195",
+        "196",
+        "197",
+        "198",
+        "199",
+        "200",
+        "201",
+        "202",
+        "203",
+        "204",
+        "205",
+        "206",
+        "207",
+        "208",
+        "209",
+        "210",
+        "211",
+        "212",
+        "213",
+        "214",
+        "215",
+        "216",
+        "217",
+        "218",
+        "219",
+        "220",
+        "221",
+        "222",
+        "223",
+        "224",
+        "225",
+        "226",
+        "227",
+        "228",
+        "229",
+        "230",
+        "231",
+        "232",
+        "233",
+        "234",
+        "235",
+        "236",
+        "237",
+        "238",
+        "239",
+        "240",
+        "241",
+        "242",
+        "243",
+        "244",
+        "245",
+        "246",
+        "247",
+        "248",
+        "249",
+        "250",
+        "251",
+        "252",
+        "253",
+        "254",
+        "255",
+        "256",
+        "257",
+        "258",
+        "259",
+        "260",
+        "261",
+        "262",
+        "263",
+        "264",
+        "265",
+        "266",
+        "267",
+        "268",
+        "269",
+        "270",
+        "271",
+        "272",
+        "273",
+        "274",
+        "275",
+        "276",
+        "277",
+        "278",
+        "279",
+        "280",
+        "281",
+        "282",
+        "283",
+        "284",
+        "285",
+        "286",
+        "287",
+        "288",
+        "289",
+        "290",
+        "291",
+        "292",
+        "293",
+        "294",
+        "295",
+        "296",
+        "297",
+        "298",
+        "299",
+        "300",
+        "301",
+        "302",
+        "303",
+        "304",
+        "305",
+        "306",
+        "307",
+        "308",
+        "309",
+        "310",
+        "311",
+        "312",
+        "313",
+        "314",
+        "315",
+        "316",
+        "317",
+        "318",
+        "319",
+        "320",
+        "321",
+        "322",
+        "323",
+        "324",
+        "325",
+        "326",
+        "327",
+        "328",
+        "329",
+        "330",
+        "331",
+        "332",
+        "333",
+        "334",
+        "335",
+        "336",
+        "337",
+        "338",
+        "339",
+        "340",
+        "341",
+        "342",
+        "343",
+        "344",
+        "345",
+        "346",
+        "347",
+        "348",
+        "349",
+        "350",
+        "351",
+        "352",
+        "353",
+        "354",
+        "355",
+        "356",
+        "357",
+        "358",
+        "359",
+        "360",
+        "361",
+        "362",
+        "363",
+        "364",
+        "365",
+        "366",
+        "367",
+        "368",
+        "369",
+        "370",
+        "371",
+        "372",
+        "373",
+        "374",
+        "375",
+        "376",
+        "377",
+        "378",
+        "379",
+        "380"
+      ],
+      "targets_before": [
+        "eligibility_constraints",
+        "eligible_entities",
+        "exclusions",
+        "publico_alvo",
+        "requirements",
+        "continuous_flow",
+        "deadline",
+        "submission_window",
+        "counterpart",
+        "funding_amount",
+        "funding_limits",
+        "table_references"
+      ],
+      "targets_resolved": [
+        "exclusions"
+      ],
+      "duration_ms": 34519,
+      "status": "partial"
+    }
+  ],
+  "status": "partial",
+  "producer_versions": {
+    "adaptive_text": "text-v3",
+    "edital_extraction_schema": "v3"
+  },
+  "attempt_id": "fbb7a4ec1aaa41d0bfdca9b7b66433b6",
+  "fingerprint": "sha256:d50e1bf56629522fefa47a0e369a592cd947aaedecc15f97f5919c77018f2247",
+  "created_at": "2026-08-10T23:17:51.623402Z"
+}

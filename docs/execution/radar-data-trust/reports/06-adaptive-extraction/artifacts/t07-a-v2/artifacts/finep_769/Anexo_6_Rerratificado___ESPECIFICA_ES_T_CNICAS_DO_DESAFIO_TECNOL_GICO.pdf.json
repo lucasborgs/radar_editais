@@ -1,0 +1,1020 @@
+{
+  "schema_version": 9,
+  "subject_id": "finep:769",
+  "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+  "document_role": "annex",
+  "asset_hash": "sha256:8d0396d92f1948276d23ef1ad157f09141b3d0d52675dff24bfbf4b3cfb3041f",
+  "bundle_hash": "sha256:95fb724ac02d859375195bfe44dc77bec75557315554fbffff1d4b70a7a4eb64",
+  "targets_requested": [
+    {
+      "field_path": "eligibility_constraints",
+      "value_type": "list[constraint]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "eligible_entities",
+      "value_type": "list[str]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "exclusions",
+      "value_type": "list[str]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "publico_alvo",
+      "value_type": "list[str]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "requirements",
+      "value_type": "list[str]",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "continuous_flow",
+      "value_type": "bool",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "deadline",
+      "value_type": "date",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "submission_window",
+      "value_type": "submission_window",
+      "required_for": "eligibility",
+      "criticality": "decision"
+    },
+    {
+      "field_path": "counterpart",
+      "value_type": "counterpart",
+      "required_for": "eligibility",
+      "criticality": "advisory"
+    },
+    {
+      "field_path": "funding_amount",
+      "value_type": "monetary_range",
+      "required_for": "eligibility",
+      "criticality": "advisory"
+    },
+    {
+      "field_path": "funding_limits",
+      "value_type": "funding_limits",
+      "required_for": "eligibility",
+      "criticality": "advisory"
+    },
+    {
+      "field_path": "table_references",
+      "value_type": "list[table_reference]",
+      "required_for": "writing",
+      "criticality": "advisory"
+    }
+  ],
+  "claims": [
+    {
+      "subject_id": "finep:769",
+      "field_path": "eligibility_constraints",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:18:56.912750Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "eligible_entities",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:18:56.912955Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "exclusions",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:18:56.912967Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "publico_alvo",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:18:56.912978Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "requirements",
+      "value": [
+        "Cada proposta deverá apresentar a os 6 (seis) implementos agrícolas obrigatórios conforme lista acima."
+      ],
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "stated",
+        "evidence_refs": [
+          {
+            "schema_version": 1,
+            "source": "finep",
+            "native_id": "finep:769",
+            "edital_id": "finep:769",
+            "source_url": null,
+            "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+            "page": 2,
+            "block_idx": 789,
+            "section_path": [
+              "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+            ],
+            "quote": "Cada proposta deverá apresentar a os 6 (seis) implementos agrícolas obrigatórios conforme lista acima.",
+            "canonical_content_hash": null,
+            "silver_source_hash": "sha256:8d0396d92f1948276d23ef1ad157f09141b3d0d52675dff24bfbf4b3cfb3041f",
+            "bundle_hash": null,
+            "content_hash": null,
+            "collected_at": null,
+            "locator_quality": "exact"
+          }
+        ],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "quote_resolved",
+            "status": "passed"
+          },
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:18:56.913291Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "continuous_flow",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "quote_resolved",
+            "status": "failed"
+          },
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:18:56.961371Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "deadline",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:18:56.961438Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "submission_window",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:18:56.961478Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "counterpart",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:18:56.961512Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "funding_amount",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:18:56.961547Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "funding_limits",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:18:56.961573Z"
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "field_path": "table_references",
+      "value": null,
+      "supersedes_content_hash": null,
+      "provenance": {
+        "state": "unknown",
+        "evidence_refs": [],
+        "producer": {
+          "kind": "llm",
+          "name": "adaptive_textual_extractor",
+          "version": "text-v3",
+          "model": "gpt-4o-mini",
+          "prompt_version": "adaptive_textual_extraction:v3"
+        },
+        "derivation": null,
+        "validations": [
+          {
+            "name": "field_shape",
+            "status": "passed"
+          }
+        ],
+        "review": null,
+        "updated_at": "2026-08-10T23:18:56.961614Z"
+      }
+    }
+  ],
+  "unresolved_targets": [
+    "continuous_flow",
+    "counterpart",
+    "deadline",
+    "eligibility_constraints",
+    "eligible_entities",
+    "exclusions",
+    "funding_amount",
+    "funding_limits",
+    "publico_alvo",
+    "submission_window",
+    "table_references"
+  ],
+  "structured_blocks": [
+    {
+      "kind": "heading",
+      "page": 1,
+      "unit_id": "763",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 763,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 1,
+      "unit_id": "764",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 764,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 1,
+      "unit_id": "765",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 765,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 1,
+      "unit_id": "766",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 766,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP",
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "767",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 767,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP",
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "768",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 768,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP",
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 1,
+      "unit_id": "769",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 769,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP",
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 1,
+      "unit_id": "770",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 770,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP",
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 1,
+      "unit_id": "771",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 771,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP",
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 1,
+      "unit_id": "772",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 772,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP",
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "773",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 773,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP",
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 1,
+      "unit_id": "774",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 774,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP",
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "table",
+      "page": 1,
+      "unit_id": "775",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 775,
+      "section_path": [
+        "SELEÇÃO PÚBLICA MCTI/FINEP",
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 2,
+      "unit_id": "776",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 776,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 2,
+      "unit_id": "777",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 777,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 2,
+      "unit_id": "778",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 778,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 2,
+      "unit_id": "779",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 779,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 2,
+      "unit_id": "780",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 780,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "heading",
+      "page": 2,
+      "unit_id": "781",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 781,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 2,
+      "unit_id": "782",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 782,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 2,
+      "unit_id": "783",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 783,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 2,
+      "unit_id": "784",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 784,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 2,
+      "unit_id": "785",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 785,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 2,
+      "unit_id": "786",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 786,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 2,
+      "unit_id": "787",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 787,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "list",
+      "page": 2,
+      "unit_id": "788",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 788,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "789",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 789,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    },
+    {
+      "kind": "paragraph",
+      "page": 2,
+      "unit_id": "790",
+      "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+      "block_idx": 790,
+      "section_path": [
+        "ANEXO 6 – ESPECIFICAÇÕES TÉCNICAS DO DESAFIO TECNOLÓGICO"
+      ],
+      "document_metadata": {
+        "family": "anexo_6",
+        "revision": 6,
+        "published_at": null,
+        "version_score": 600000000,
+        "authority_state": "vigente"
+      },
+      "table_structure_lost": false
+    }
+  ],
+  "table_fragments": [],
+  "route_trace": [
+    {
+      "route": "text",
+      "reason": "rota inicial; parada por suficiência dos alvos decision",
+      "pages_or_units": [
+        "763",
+        "764",
+        "765",
+        "766",
+        "767",
+        "768",
+        "769",
+        "770",
+        "771",
+        "772",
+        "773",
+        "774",
+        "775",
+        "776",
+        "777",
+        "778",
+        "779",
+        "780",
+        "781",
+        "782",
+        "783",
+        "784",
+        "785",
+        "786",
+        "787",
+        "788",
+        "789",
+        "790"
+      ],
+      "targets_before": [
+        "eligibility_constraints",
+        "eligible_entities",
+        "exclusions",
+        "publico_alvo",
+        "requirements",
+        "continuous_flow",
+        "deadline",
+        "submission_window",
+        "counterpart",
+        "funding_amount",
+        "funding_limits",
+        "table_references"
+      ],
+      "targets_resolved": [
+        "requirements"
+      ],
+      "duration_ms": 5372,
+      "status": "partial"
+    }
+  ],
+  "status": "partial",
+  "producer_versions": {
+    "adaptive_text": "text-v3",
+    "edital_extraction_schema": "v3"
+  },
+  "attempt_id": "71a1296cdb9f45df8ea1d366db0a389d",
+  "fingerprint": "sha256:c7377626f407c41d41114ca84f31a66ba17584adf4b4698fb51c553ba180ee68",
+  "created_at": "2026-08-10T23:18:56.961972Z"
+}

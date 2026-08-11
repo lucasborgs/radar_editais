@@ -37,6 +37,7 @@ class ExplicitClaim:
     value: Any
     content_hash: str
     supersedes_content_hash: str | None = None
+    evidence_refs: tuple[EvidenceRef, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -61,7 +62,21 @@ class BundleProjection:
 
     @property
     def by_content_hash(self) -> dict[str, DocumentMetadata]:
-        return {doc.content_hash: doc for doc in self.documents}
+        # Kept for compatibility where the hash is known to be unique.  The
+        # resolver below uses the plural index so identical content in two
+        # document identities is never silently collapsed.
+        return {
+            content_hash: docs[0]
+            for content_hash, docs in self.documents_by_content_hash.items()
+            if len(docs) == 1
+        }
+
+    @property
+    def documents_by_content_hash(self) -> dict[str, list[DocumentMetadata]]:
+        out: dict[str, list[DocumentMetadata]] = {}
+        for doc in self.documents:
+            out.setdefault(doc.content_hash, []).append(doc)
+        return out
 
 
 def project_current_documents(bundle: SourceBundle) -> BundleProjection:
@@ -85,14 +100,21 @@ def resolve_field(bundle: SourceBundle, claims: list[ExplicitClaim], field: str)
 
     valid_supports: list[ClaimSupport] = []
     limitations: list[str] = []
-    documents = projection.by_content_hash
+    documents = projection.documents_by_content_hash
     for claim in field_claims:
-        document = documents.get(claim.content_hash)
-        if document is None:
+        candidates = documents.get(claim.content_hash, [])
+        if len(candidates) > 1:
+            named = {
+                ref.document for ref in claim.evidence_refs
+                if ref.document
+            }
+            candidates = [doc for doc in candidates if doc.doc_name in named]
+        if len(candidates) != 1:
             limitations.append(
-                f"Claim ignorado: documento ausente ou fora da projecao corrente ({claim.content_hash})."
+                f"Claim ignorado: documento ausente, ambiguo ou fora da projecao corrente ({claim.content_hash})."
             )
             continue
+        document = candidates[0]
         valid_supports.append(ClaimSupport(claim=claim, document=document))
 
     if not valid_supports:
@@ -263,10 +285,30 @@ def _support_precedes(winner: ClaimSupport, loser: ClaimSupport) -> bool:
 
 def _evidence_refs(bundle: SourceBundle, supports: list[ClaimSupport]) -> list[EvidenceRef]:
     refs: list[EvidenceRef] = []
-    seen: set[tuple[str, str]] = set()
+    seen: set[tuple[str, str, int | None, int | None, str | None]] = set()
     for support in supports:
         doc = support.document
-        key = (doc.content_hash, doc.doc_name)
+        claim_refs = list(support.claim.evidence_refs)
+        for original in claim_refs:
+            if original.document not in {None, doc.doc_name}:
+                continue
+            try:
+                enriched = attach_bundle_lineage(original, bundle=bundle, document=doc)
+            except ValueError:
+                continue
+            key = (
+                doc.content_hash,
+                doc.doc_name,
+                enriched.page,
+                enriched.block_idx,
+                enriched.quote,
+            )
+            if key not in seen:
+                seen.add(key)
+                refs.append(enriched)
+        if claim_refs and any(ref.document in {None, doc.doc_name} for ref in claim_refs):
+            continue
+        key = (doc.content_hash, doc.doc_name, None, None, None)
         if key in seen:
             continue
         seen.add(key)

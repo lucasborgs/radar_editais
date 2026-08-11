@@ -1,0 +1,710 @@
+{
+  "package_version": "t07-a-v2",
+  "started_at": "2026-08-10T23:20:44.275339+00:00",
+  "finished_at": "2026-08-10T23:20:44.932702+00:00",
+  "shadow": {
+    "enabled": true,
+    "flag": "RADAR_ADAPTIVE_EXTRACTION_SHADOW"
+  },
+  "runtime": {
+    "producer": "adaptive_textual_extractor",
+    "producer_version": "text-v3",
+    "model": "gpt-4o-mini (code default)",
+    "provider_base_url_configured": false,
+    "ocr": false,
+    "vision": false,
+    "deep_research": false,
+    "web_discovery": false
+  },
+  "corpus": [
+    {
+      "subject_id": "finep:602",
+      "source": "finep",
+      "legacy_status": "active (legacy: aberta)",
+      "reason": "PDF textual; prazo explícito e contrapartida mencionada.",
+      "documents": [
+        {
+          "document": "Edital.pdf",
+          "media_type": "application/pdf",
+          "asset_hash": "sha256:e35d5b8863b7deff249fbdb20be93765931a7f612ddbcc1193977d95f9a76b8f",
+          "blocks": 148,
+          "table_structure_lost": false,
+          "status": "partial",
+          "fingerprint": "sha256:697fd88e97f7f400cebd6fb0caef346aa569243b1eb28a881c1ac4918fec5a48",
+          "attempt_id": "9ff823c524a546bbb774f32b7c208e4f",
+          "unresolved_targets": [
+            "continuous_flow",
+            "counterpart",
+            "deadline",
+            "eligibility_constraints",
+            "eligible_entities",
+            "exclusions",
+            "funding_limits",
+            "publico_alvo",
+            "requirements",
+            "submission_window",
+            "table_references"
+          ],
+          "resolved_evidence": 2,
+          "calls": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "latency_ms": 12,
+          "cost": null,
+          "cache_hit": true,
+          "cache_status": "hit"
+        }
+      ],
+      "document_count": 1,
+      "raw_divergences_by_field": {},
+      "source_bundle": {
+        "persisted": true,
+        "loaded": true,
+        "hash": "sha256:93cafc692d03fda2bdce7fda70c6f651793f37c793821919f06cf7e906f2a7d6"
+      },
+      "read_model_smoke": {
+        "eligibility": {
+          "source_state": "adaptive",
+          "needs_review": false,
+          "gaps": [
+            "Nenhum artifact adaptativo compatível e saudável."
+          ],
+          "temporal_state": "needs_review",
+          "artifact_fingerprint": null
+        },
+        "temporal": {
+          "source_state": "adaptive",
+          "needs_review": false,
+          "gaps": [
+            "Nenhum artifact adaptativo compatível e saudável."
+          ],
+          "temporal_state": "needs_review",
+          "artifact_fingerprint": null
+        },
+        "financial": {
+          "source_state": "adaptive",
+          "needs_review": false,
+          "gaps": [
+            "Nenhum artifact adaptativo compatível e saudável."
+          ],
+          "temporal_state": "needs_review",
+          "artifact_fingerprint": null
+        },
+        "table_evidence": {
+          "source_state": "adaptive",
+          "needs_review": false,
+          "gaps": [
+            "Nenhum artifact adaptativo compatível e saudável."
+          ],
+          "temporal_state": "needs_review",
+          "artifact_fingerprint": null
+        }
+      }
+    },
+    {
+      "subject_id": "finep:769",
+      "source": "finep",
+      "legacy_status": "active (legacy: aberta)",
+      "reason": "Oportunidade aberta com múltiplos PDFs, rerratificações, valores, contrapartida e referências de tabela.",
+      "documents": [
+        {
+          "document": "2ª_Rerratificação_-_documento_rerratificado.pdf",
+          "media_type": "application/pdf",
+          "asset_hash": "sha256:4de01e03ba701bfe79333aa231a93ea7c58e3a3ce74ec376e65564ecde085f81",
+          "blocks": 195,
+          "table_structure_lost": false,
+          "status": "partial",
+          "fingerprint": "sha256:fa9336b6783941f739a3a4cab79a3e4e06c18a2ebd4efca61104f090a0ec6186",
+          "attempt_id": "21de2fba291a4810abc7a86720c768e1",
+          "unresolved_targets": [
+            "continuous_flow",
+            "counterpart",
+            "eligibility_constraints",
+            "funding_amount",
+            "funding_limits",
+            "publico_alvo",
+            "submission_window",
+            "table_references"
+          ],
+          "resolved_evidence": 4,
+          "calls": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "latency_ms": 20,
+          "cost": null,
+          "cache_hit": true,
+          "cache_status": "hit"
+        },
+        {
+          "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+          "media_type": "application/pdf",
+          "asset_hash": "sha256:925ec22b961604737bd6667fdc00c2330b81d40433336437d6aab88a0cb079c4",
+          "blocks": 186,
+          "table_structure_lost": false,
+          "status": "partial",
+          "fingerprint": "sha256:d50e1bf56629522fefa47a0e369a592cd947aaedecc15f97f5919c77018f2247",
+          "attempt_id": "fbb7a4ec1aaa41d0bfdca9b7b66433b6",
+          "unresolved_targets": [
+            "continuous_flow",
+            "counterpart",
+            "deadline",
+            "eligibility_constraints",
+            "eligible_entities",
+            "funding_amount",
+            "funding_limits",
+            "publico_alvo",
+            "requirements",
+            "submission_window",
+            "table_references"
+          ],
+          "resolved_evidence": 1,
+          "calls": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "latency_ms": 15,
+          "cost": null,
+          "cache_hit": true,
+          "cache_status": "hit"
+        },
+        {
+          "document": "Anexo_1_-_DEFINIÇÃO_DE_NÍVEL_DE_MATURIDADE_TECNOLÓGICA.pdf",
+          "media_type": "application/pdf",
+          "asset_hash": "sha256:cb0ecfb4fdbecd990cf265ce8c0db18c51ec0e8c2b2fa5f80e8e174b4434d28e",
+          "blocks": 5,
+          "table_structure_lost": false,
+          "status": "partial",
+          "fingerprint": "sha256:5d37ae7e5ce91682f6659de48a4937e7c19fbfeb46cd9b589635f53fa3384ed8",
+          "attempt_id": "7520f697c33c49baabd3c3873ef5236b",
+          "unresolved_targets": [
+            "continuous_flow",
+            "counterpart",
+            "deadline",
+            "eligibility_constraints",
+            "eligible_entities",
+            "exclusions",
+            "funding_amount",
+            "funding_limits",
+            "publico_alvo",
+            "requirements",
+            "submission_window",
+            "table_references"
+          ],
+          "resolved_evidence": 0,
+          "calls": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "latency_ms": 3,
+          "cost": null,
+          "cache_hit": true,
+          "cache_status": "hit"
+        },
+        {
+          "document": "Anexo_3_Rerratificado_-_TERMO_DE_OUTORGA_DE_SUBVENÇÃO_ECONÔMICA_-_CLÁUSULAS_PADR.pdf",
+          "media_type": "application/pdf",
+          "asset_hash": "sha256:5030e8478ae1cc598093cf1e5b04286281d3e19c01361a3c1e15d6db9826a1a5",
+          "blocks": 377,
+          "table_structure_lost": false,
+          "status": "partial",
+          "fingerprint": "sha256:e3f401b1fac5869c8907fa419d9a26a76b5e8b5c56f8e829f6b39c5ecf9a61ec",
+          "attempt_id": "e9cf25453384405498228c95183efa76",
+          "unresolved_targets": [
+            "counterpart",
+            "deadline",
+            "eligibility_constraints",
+            "eligible_entities",
+            "exclusions",
+            "funding_amount",
+            "funding_limits",
+            "publico_alvo",
+            "requirements",
+            "submission_window",
+            "table_references"
+          ],
+          "resolved_evidence": 1,
+          "calls": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "latency_ms": 29,
+          "cost": null,
+          "cache_hit": true,
+          "cache_status": "hit"
+        },
+        {
+          "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+          "media_type": "application/pdf",
+          "asset_hash": "sha256:8d0396d92f1948276d23ef1ad157f09141b3d0d52675dff24bfbf4b3cfb3041f",
+          "blocks": 28,
+          "table_structure_lost": false,
+          "status": "partial",
+          "fingerprint": "sha256:c7377626f407c41d41114ca84f31a66ba17584adf4b4698fb51c553ba180ee68",
+          "attempt_id": "71a1296cdb9f45df8ea1d366db0a389d",
+          "unresolved_targets": [
+            "continuous_flow",
+            "counterpart",
+            "deadline",
+            "eligibility_constraints",
+            "eligible_entities",
+            "exclusions",
+            "funding_amount",
+            "funding_limits",
+            "publico_alvo",
+            "submission_window",
+            "table_references"
+          ],
+          "resolved_evidence": 1,
+          "calls": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "latency_ms": 5,
+          "cost": null,
+          "cache_hit": true,
+          "cache_status": "hit"
+        }
+      ],
+      "document_count": 5,
+      "raw_divergences_by_field": {
+        "requirements": [
+          {
+            "document": "2ª_Rerratificação_-_documento_rerratificado.pdf",
+            "value": [
+              "Ter realizado o registro na Junta Comercial ou no Registro Civil das Pessoas Jurídicas (RCPJ) de sua sede até 31/12 do ano anterior ao da submissão da proposta;",
+              "Ter realizado alguma atividade operacional (constatada pela existência de despesas ou receitas) nos 12 meses anteriores ao da apresentação do projeto, verificável por meio de Demonstrações Financeiras, enviadas conforme Anexo 2;",
+              "Ter objeto social, na data de divulgação da presente Seleção Pública, compatível com as atividades a serem desenvolvidas pela empresa no projeto;",
+              "A principal atividade de pesquisa e desenvolvimento do grupo econômico ao(s) qual(is) pertença(m) a empresa proponente e a(s) empresa(s) coexecutora(s), na área específica do projeto, deve estar localizada no Brasil."
+            ]
+          },
+          {
+            "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+            "value": [
+              "Cada proposta deverá apresentar a os 6 (seis) implementos agrícolas obrigatórios conforme lista acima."
+            ]
+          }
+        ]
+      },
+      "source_bundle": {
+        "persisted": true,
+        "loaded": true,
+        "hash": "sha256:95fb724ac02d859375195bfe44dc77bec75557315554fbffff1d4b70a7a4eb64"
+      },
+      "read_model_smoke": {
+        "eligibility": {
+          "source_state": "adaptive",
+          "needs_review": false,
+          "gaps": [
+            "Nenhum artifact adaptativo compatível e saudável."
+          ],
+          "temporal_state": "needs_review",
+          "artifact_fingerprint": null
+        },
+        "temporal": {
+          "source_state": "adaptive",
+          "needs_review": false,
+          "gaps": [
+            "Nenhum artifact adaptativo compatível e saudável."
+          ],
+          "temporal_state": "needs_review",
+          "artifact_fingerprint": null
+        },
+        "financial": {
+          "source_state": "adaptive",
+          "needs_review": false,
+          "gaps": [
+            "Nenhum artifact adaptativo compatível e saudável."
+          ],
+          "temporal_state": "needs_review",
+          "artifact_fingerprint": null
+        },
+        "table_evidence": {
+          "source_state": "adaptive",
+          "needs_review": false,
+          "gaps": [
+            "Nenhum artifact adaptativo compatível e saudável."
+          ],
+          "temporal_state": "needs_review",
+          "artifact_fingerprint": null
+        }
+      }
+    }
+  ],
+  "coverage_by_family": {
+    "eligibility": {
+      "rows": 30,
+      "fields": [
+        "eligibility_constraints",
+        "eligible_entities",
+        "exclusions",
+        "publico_alvo",
+        "requirements"
+      ],
+      "states": {
+        "stated": 5,
+        "unknown": 25
+      },
+      "evidence_resolved": 6,
+      "evidence_unresolved": 24
+    },
+    "financial": {
+      "rows": 18,
+      "fields": [
+        "counterpart",
+        "funding_amount",
+        "funding_limits"
+      ],
+      "states": {
+        "stated": 1,
+        "unknown": 17
+      },
+      "evidence_resolved": 1,
+      "evidence_unresolved": 17
+    },
+    "table_evidence": {
+      "rows": 6,
+      "fields": [
+        "table_references"
+      ],
+      "states": {
+        "unknown": 6
+      },
+      "evidence_resolved": 0,
+      "evidence_unresolved": 6
+    },
+    "temporal": {
+      "rows": 18,
+      "fields": [
+        "continuous_flow",
+        "deadline",
+        "submission_window"
+      ],
+      "states": {
+        "stated": 2,
+        "unknown": 16
+      },
+      "evidence_resolved": 2,
+      "evidence_unresolved": 16
+    }
+  },
+  "states_total": {
+    "stated": 8,
+    "unknown": 64
+  },
+  "evidence": {
+    "resolved": 9,
+    "unresolved": 63
+  },
+  "diagnostics": {
+    "rows": 72,
+    "states": {
+      "stated": 8,
+      "unknown": 64
+    },
+    "schema_valid": 72,
+    "schema_invalid": 0,
+    "evidence_resolved": 9,
+    "evidence_unresolved": 63,
+    "material_conflicts": 0,
+    "error_codes": {
+      "list_item_evidence": 5
+    },
+    "review_required": 5,
+    "by_family": {
+      "eligibility": {
+        "rows": 30,
+        "states": {
+          "stated": 5,
+          "unknown": 25
+        },
+        "schema_valid": 30,
+        "schema_invalid": 0,
+        "evidence_resolved": 6,
+        "evidence_unresolved": 24,
+        "material_conflicts": 0,
+        "review_required": 5
+      },
+      "financial": {
+        "rows": 18,
+        "states": {
+          "stated": 1,
+          "unknown": 17
+        },
+        "schema_valid": 18,
+        "schema_invalid": 0,
+        "evidence_resolved": 1,
+        "evidence_unresolved": 17,
+        "material_conflicts": 0,
+        "review_required": 0
+      },
+      "table_evidence": {
+        "rows": 6,
+        "states": {
+          "unknown": 6
+        },
+        "schema_valid": 6,
+        "schema_invalid": 0,
+        "evidence_resolved": 0,
+        "evidence_unresolved": 6,
+        "material_conflicts": 0,
+        "review_required": 0
+      },
+      "temporal": {
+        "rows": 18,
+        "states": {
+          "stated": 2,
+          "unknown": 16
+        },
+        "schema_valid": 18,
+        "schema_invalid": 0,
+        "evidence_resolved": 2,
+        "evidence_unresolved": 16,
+        "material_conflicts": 0,
+        "review_required": 0
+      }
+    }
+  },
+  "operational_metrics": {
+    "documents": 6,
+    "artifacts_by_status": {
+      "partial": 6
+    },
+    "reused_artifacts": 6,
+    "cache_misses": 0,
+    "failed": 0,
+    "partial": 6,
+    "unavailable": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "latency_ms_total": 84,
+    "per_document": [
+      {
+        "subject": "finep:602",
+        "document": "Edital.pdf",
+        "calls": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "latency_ms": 12,
+        "cost": null
+      },
+      {
+        "subject": "finep:769",
+        "document": "2ª_Rerratificação_-_documento_rerratificado.pdf",
+        "calls": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "latency_ms": 20,
+        "cost": null
+      },
+      {
+        "subject": "finep:769",
+        "document": "3ª_Rerratificação_-_Edital_rerratificado.pdf",
+        "calls": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "latency_ms": 15,
+        "cost": null
+      },
+      {
+        "subject": "finep:769",
+        "document": "Anexo_1_-_DEFINIÇÃO_DE_NÍVEL_DE_MATURIDADE_TECNOLÓGICA.pdf",
+        "calls": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "latency_ms": 3,
+        "cost": null
+      },
+      {
+        "subject": "finep:769",
+        "document": "Anexo_3_Rerratificado_-_TERMO_DE_OUTORGA_DE_SUBVENÇÃO_ECONÔMICA_-_CLÁUSULAS_PADR.pdf",
+        "calls": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "latency_ms": 29,
+        "cost": null
+      },
+      {
+        "subject": "finep:769",
+        "document": "Anexo_6_Rerratificado___ESPECIFICAÇÕES_TÉCNICAS_DO_DESAFIO_TECNOLÓGICO.pdf",
+        "calls": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "latency_ms": 5,
+        "cost": null
+      }
+    ],
+    "estimated_naive_field_calls": 72,
+    "calls_avoided": 72,
+    "cost": null,
+    "cost_note": "não calculado; o pacote registra chamadas e tokens, sem tabela de preços.",
+    "consumer_consistency": {
+      "status": "not_applicable_in_shadow",
+      "reason": "promoção é proibida nesta execução; não há projeção efetiva para exercitar",
+      "common_projection_contract": "validated_by_rt06_t07_v2_ticket_04",
+      "consumers": [
+        "KG",
+        "Knowledge",
+        "consultoria",
+        "Writing"
+      ]
+    }
+  },
+  "evaluation": {
+    "harness": "src/radar/core/eval",
+    "suite": "extraction",
+    "suite_version": "1",
+    "evaluator_names": [
+      "eval_presence",
+      "eval_value",
+      "eval_faithfulness"
+    ],
+    "mode": "diagnostic-only; evaluators held until human goldens exist",
+    "reuse_status": "existing suite contract referenced; no parallel evaluator registered",
+    "golden_status": "not_approved; human review pending",
+    "legacy_comparison": "removed"
+  },
+  "llm_usage": {
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "response_states": {},
+    "response_non_null_claims": 0,
+    "invalid_response_envelopes": 0,
+    "cost": null,
+    "cost_note": "custo monetário não calculado: tabela de preço não é parte do harness; chamadas e tokens foram registrados."
+  },
+  "read_model_smoke": [
+    {
+      "subject_id": "finep:602",
+      "source_bundle_persisted": true,
+      "source_bundle_loaded": true,
+      "source_bundle_hash": "sha256:93cafc692d03fda2bdce7fda70c6f651793f37c793821919f06cf7e906f2a7d6",
+      "family": "eligibility",
+      "bundle_gap_absent_with_bundle": true,
+      "source_state": "adaptive",
+      "needs_review": false,
+      "gaps": [
+        "Nenhum artifact adaptativo compatível e saudável."
+      ],
+      "temporal_state": "needs_review",
+      "artifact_fingerprint": null
+    },
+    {
+      "subject_id": "finep:602",
+      "source_bundle_persisted": true,
+      "source_bundle_loaded": true,
+      "source_bundle_hash": "sha256:93cafc692d03fda2bdce7fda70c6f651793f37c793821919f06cf7e906f2a7d6",
+      "family": "temporal",
+      "bundle_gap_absent_with_bundle": true,
+      "source_state": "adaptive",
+      "needs_review": false,
+      "gaps": [
+        "Nenhum artifact adaptativo compatível e saudável."
+      ],
+      "temporal_state": "needs_review",
+      "artifact_fingerprint": null
+    },
+    {
+      "subject_id": "finep:602",
+      "source_bundle_persisted": true,
+      "source_bundle_loaded": true,
+      "source_bundle_hash": "sha256:93cafc692d03fda2bdce7fda70c6f651793f37c793821919f06cf7e906f2a7d6",
+      "family": "financial",
+      "bundle_gap_absent_with_bundle": true,
+      "source_state": "adaptive",
+      "needs_review": false,
+      "gaps": [
+        "Nenhum artifact adaptativo compatível e saudável."
+      ],
+      "temporal_state": "needs_review",
+      "artifact_fingerprint": null
+    },
+    {
+      "subject_id": "finep:602",
+      "source_bundle_persisted": true,
+      "source_bundle_loaded": true,
+      "source_bundle_hash": "sha256:93cafc692d03fda2bdce7fda70c6f651793f37c793821919f06cf7e906f2a7d6",
+      "family": "table_evidence",
+      "bundle_gap_absent_with_bundle": true,
+      "source_state": "adaptive",
+      "needs_review": false,
+      "gaps": [
+        "Nenhum artifact adaptativo compatível e saudável."
+      ],
+      "temporal_state": "needs_review",
+      "artifact_fingerprint": null
+    },
+    {
+      "subject_id": "finep:769",
+      "source_bundle_persisted": true,
+      "source_bundle_loaded": true,
+      "source_bundle_hash": "sha256:95fb724ac02d859375195bfe44dc77bec75557315554fbffff1d4b70a7a4eb64",
+      "family": "eligibility",
+      "bundle_gap_absent_with_bundle": true,
+      "source_state": "adaptive",
+      "needs_review": false,
+      "gaps": [
+        "Nenhum artifact adaptativo compatível e saudável."
+      ],
+      "temporal_state": "needs_review",
+      "artifact_fingerprint": null
+    },
+    {
+      "subject_id": "finep:769",
+      "source_bundle_persisted": true,
+      "source_bundle_loaded": true,
+      "source_bundle_hash": "sha256:95fb724ac02d859375195bfe44dc77bec75557315554fbffff1d4b70a7a4eb64",
+      "family": "temporal",
+      "bundle_gap_absent_with_bundle": true,
+      "source_state": "adaptive",
+      "needs_review": false,
+      "gaps": [
+        "Nenhum artifact adaptativo compatível e saudável."
+      ],
+      "temporal_state": "needs_review",
+      "artifact_fingerprint": null
+    },
+    {
+      "subject_id": "finep:769",
+      "source_bundle_persisted": true,
+      "source_bundle_loaded": true,
+      "source_bundle_hash": "sha256:95fb724ac02d859375195bfe44dc77bec75557315554fbffff1d4b70a7a4eb64",
+      "family": "financial",
+      "bundle_gap_absent_with_bundle": true,
+      "source_state": "adaptive",
+      "needs_review": false,
+      "gaps": [
+        "Nenhum artifact adaptativo compatível e saudável."
+      ],
+      "temporal_state": "needs_review",
+      "artifact_fingerprint": null
+    },
+    {
+      "subject_id": "finep:769",
+      "source_bundle_persisted": true,
+      "source_bundle_loaded": true,
+      "source_bundle_hash": "sha256:95fb724ac02d859375195bfe44dc77bec75557315554fbffff1d4b70a7a4eb64",
+      "family": "table_evidence",
+      "bundle_gap_absent_with_bundle": true,
+      "source_state": "adaptive",
+      "needs_review": false,
+      "gaps": [
+        "Nenhum artifact adaptativo compatível e saudável."
+      ],
+      "temporal_state": "needs_review",
+      "artifact_fingerprint": null
+    }
+  ],
+  "human_review": {
+    "status": "Aguardando revisão humana dos goldens",
+    "decision_default": "pending",
+    "comment_default": "",
+    "approval_prohibited": true
+  },
+  "authority": {
+    "promotion": "not performed",
+    "legacy_removal": "not performed",
+    "rt04_composition": "not changed",
+    "rt05_projection": "not changed",
+    "channel": "pending",
+    "temporal_read_model": "continues to calculate active|closed|needs_review; extraction supplies facts only",
+    "table_evidence": "structured evidence for Knowledge/Writing; not necessarily new gold columns"
+  }
+}
