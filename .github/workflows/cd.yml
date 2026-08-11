@@ -33,7 +33,7 @@ jobs:
         run: |
           docker_config="$RUNNER_TEMP/docker-config"
           mkdir -p "$docker_config"
-          printf '{"auths":{}}\n' > "$docker_config/config.json"
+          printf '{"auths":{},"cliPluginsExtraDirs":["/Applications/Docker.app/Contents/Resources/cli-plugins"]}\n' > "$docker_config/config.json"
           chmod 700 "$docker_config"
           chmod 600 "$docker_config/config.json"
           echo "DOCKER_CONFIG=$docker_config" >> "$GITHUB_ENV"
@@ -54,6 +54,7 @@ jobs:
             exit 1
           }
           docker info >/dev/null
+          docker compose version
           supabase --version
           node --version
           npm --version
@@ -148,7 +149,7 @@ jobs:
         run: |
           docker_config="$RUNNER_TEMP/docker-config"
           mkdir -p "$docker_config"
-          printf '{"auths":{}}\n' > "$docker_config/config.json"
+          printf '{"auths":{},"cliPluginsExtraDirs":["/Applications/Docker.app/Contents/Resources/cli-plugins"]}\n' > "$docker_config/config.json"
           chmod 700 "$docker_config"
           chmod 600 "$docker_config/config.json"
           echo "DOCKER_CONFIG=$docker_config" >> "$GITHUB_ENV"
@@ -187,6 +188,7 @@ jobs:
             exit 1
           fi
           docker info >/dev/null
+          docker compose version
           supabase --version
 
       - name: Confirm production project identity
