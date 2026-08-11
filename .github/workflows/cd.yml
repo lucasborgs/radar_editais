@@ -29,6 +29,15 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
+      - name: Configure Docker for the non-interactive runner
+        run: |
+          docker_config="$RUNNER_TEMP/docker-config"
+          mkdir -p "$docker_config"
+          printf '{"auths":{}}\n' > "$docker_config/config.json"
+          chmod 700 "$docker_config"
+          chmod 600 "$docker_config/config.json"
+          echo "DOCKER_CONFIG=$docker_config" >> "$GITHUB_ENV"
+
       - name: Load staging deployment files
         run: |
           source_dir="$HOME/.config/radar-editais"
@@ -134,6 +143,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Configure Docker for the non-interactive runner
+        run: |
+          docker_config="$RUNNER_TEMP/docker-config"
+          mkdir -p "$docker_config"
+          printf '{"auths":{}}\n' > "$docker_config/config.json"
+          chmod 700 "$docker_config"
+          chmod 600 "$docker_config/config.json"
+          echo "DOCKER_CONFIG=$docker_config" >> "$GITHUB_ENV"
 
       - name: Load production deployment files
         run: |
