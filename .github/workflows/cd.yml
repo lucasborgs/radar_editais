@@ -294,20 +294,29 @@ jobs:
           trap 'rm -f "$backup_path"' ERR
 
           umask 077
+          # `pg_dump` resolve o usuário do SO via getpwuid no startup; em sessão
+          # LaunchAgent não interativa o uid local (501) não existe no passwd da
+          # imagem → "local user with ID 501 does not exist". Rodar como root
+          # (uid 0 existe) evita isso; no macOS (bind mount) o arquivo ainda sai
+          # com o owner do host, então `test -O` continua válido. `--dbname` é
+          # obrigatório: a env `PGDATABASE` não é parseada como conninfo/URL
+          # pelo libpq (cai no socket local).
           docker run --rm --pull=never --platform "$RECOVERY_DOCKER_PLATFORM" \
             --env PGDATABASE \
-            --user "$(id -u):$(id -g)" \
+            --env BACKUP_FILE="/backups/$backup_name" \
             --volume "$backup_root:/backups" \
             "$recovery_image_id" \
-            pg_dump --format=custom --file="/backups/$backup_name"
+            sh -c 'pg_dump --dbname="$PGDATABASE" --format=custom --file="$BACKUP_FILE"'
           test -s "$backup_path"
           test -O "$backup_path"
           chmod 600 "$backup_path"
+          # `pg_restore --list` só lê o arquivo do snapshot (sem conexão):
+          # rodar como root, como no pg_dump acima.
           docker run --rm --pull=never --platform "$RECOVERY_DOCKER_PLATFORM" \
-            --user "$(id -u):$(id -g)" \
+            --env BACKUP_NAME="$backup_name" \
             --volume "$backup_root:/backups:ro" \
             "$recovery_image_id" \
-            pg_restore --list "/backups/$backup_name" >/dev/null
+            sh -c 'pg_restore --list "/backups/$BACKUP_NAME" >/dev/null'
 
           digest="$(shasum -a 256 "$backup_path" | awk '{print $1}')"
           {
