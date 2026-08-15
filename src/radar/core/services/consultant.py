@@ -500,8 +500,14 @@ class OpenKnowledge:
         "bolsa acadêmica", "bolsa academica", "licitação", "licitacao",
     )
 
-    def __init__(self, db, document_intelligence: DocumentIntelligence | None = None):
+    def __init__(
+        self,
+        db,
+        workspace_id: str | None = None,
+        document_intelligence: DocumentIntelligence | None = None,
+    ):
         self.db = db
+        self.workspace_id = workspace_id
         self.documents = document_intelligence or DiscoveryDocumentIntelligence()
 
     @classmethod
@@ -578,9 +584,12 @@ class OpenKnowledge:
         # Eles entram no mesmo adapter apenas para a pesquisa solicitada pelo
         # usuário; não são fatos nem publicação no catálogo.
         try:
-            result = self.db.table("research_findings").select(
+            findings = self.db.table("research_findings").select(
                 "id,question,answer,sources,created_at,reviewed_at,promoted_to_library_id"
-            ).is_("reviewed_at", "null").order("created_at", desc=True).limit(limit * 2).execute()
+            ).is_("reviewed_at", "null")
+            if self.workspace_id:
+                findings = findings.eq("workspace_id", self.workspace_id)
+            result = findings.order("created_at", desc=True).limit(limit * 2).execute()
             for finding in result.data or []:
                 rows.append({
                     "id": finding.get("id"), "title": finding.get("question"),
@@ -1064,7 +1073,39 @@ class ConsultantRepository:
         if not result.data:
             raise ConsultantConflictError("O brief mudou em outra aba. Recarregue para revisar a versão atual.")
 
-    def save(self, db, state: ConsultantState, key: str, response: dict, expected_revision: int) -> None:
+    def save(
+        self,
+        db,
+        state: ConsultantState,
+        key: str,
+        response: dict,
+        expected_revision: int,
+    ) -> dict | None:
+        """Persiste estado e replay idempotente na mesma transação Postgres."""
+        rpc = getattr(db, "rpc", None)
+        if callable(rpc):
+            result = rpc("save_consultant_turn", {
+                "p_session_id": state.conversation_id,
+                "p_workspace_id": state.workspace_id,
+                "p_state": state.model_dump(mode="json"),
+                "p_revision": state.revision,
+                "p_expected_revision": expected_revision,
+                "p_idempotency_key": key,
+                "p_response": response,
+            }).execute()
+            rows = result.data if result else None
+            row = rows[0] if isinstance(rows, list) and rows else rows
+            outcome = row.get("outcome") if isinstance(row, dict) else None
+            if outcome == "saved":
+                return None
+            if outcome == "replayed" and isinstance(row.get("response"), dict):
+                return row["response"]
+            if outcome == "conflict":
+                raise ConsultantConflictError(
+                    "O brief mudou em outra aba. Recarregue para revisar a versão atual."
+                )
+            raise RuntimeError("Não foi possível persistir o turno do consultor.")
+
         self.save_state(db, state, expected_revision)
         try:
             db.table("consultant_turns").insert({
@@ -1074,6 +1115,7 @@ class ConsultantRepository:
             }).execute()
         except Exception as exc:
             logger.info("consultant: turno já persistido (%s): %s", key, exc)
+        return None
 
     def list(self, db, workspace_id: str) -> list[dict]:
         rows = (
@@ -1616,7 +1658,7 @@ class ConsultantService:
 
         pathways = GoldPathways(
             RelationalKnowledge(), workspace_id=workspace_id, db=db,
-            open_knowledge=OpenKnowledge(db),
+            open_knowledge=OpenKnowledge(db, workspace_id),
         )
         research_staged = False
         if state.project is not None and _is_open_request(message) and any(
@@ -1634,8 +1676,8 @@ class ConsultantService:
             "brief_id": next_state.brief_id, "project_id": next_state.project_id,
             "path_ids": next_state.path_ids,
         }
-        self.repository.save(db, next_state, idempotency_key, response, persist_revision)
-        return response
+        replay = self.repository.save(db, next_state, idempotency_key, response, persist_revision)
+        return replay or response
 
     @staticmethod
     def _hydrate_memory_context(db, state: ConsultantState, query: str) -> None:
@@ -1765,6 +1807,10 @@ class ConsultantService:
         return {"conversation_id": conversation_id, "state": state.model_dump(mode="json")}
 
     def confirm_project(self, db, workspace_id: str, conversation_id: str, expected_revision: int) -> dict:
+        confirm_key = f"project-confirm:{expected_revision}"
+        prior = self.repository.find_idempotent(db, workspace_id, confirm_key)
+        if prior is not None:
+            return prior
         state = self.repository.load(db, conversation_id, workspace_id)
         if state is None:
             raise ConsultantNotFoundError("Conversa do consultor não encontrada.")
@@ -1777,7 +1823,7 @@ class ConsultantService:
 
         pathways = GoldPathways(
             RelationalKnowledge(), workspace_id=workspace_id, db=db,
-            open_knowledge=OpenKnowledge(db),
+            open_knowledge=OpenKnowledge(db, workspace_id),
         )
         next_state, answer, events = ConsultantGraph(pathways).run(state, "Confirmo este brief")
         response = {
@@ -1786,8 +1832,8 @@ class ConsultantService:
             "brief_id": next_state.brief_id, "project_id": next_state.project_id,
             "path_ids": next_state.path_ids,
         }
-        self.repository.save(db, next_state, f"project-confirm:{expected_revision}", response, expected_revision)
-        return response
+        replay = self.repository.save(db, next_state, confirm_key, response, expected_revision)
+        return replay or response
 
     def select_path(
         self, db, workspace_id: str, conversation_id: str, path_id: str,

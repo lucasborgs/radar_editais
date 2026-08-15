@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # workflow_run has a different github.sha (the workflow's default ref).
+  # Keep source checkout, image tag and runtime identity on the CI-approved SHA.
+  RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
 concurrency:
   group: radar-production-deploy
   cancel-in-progress: false
@@ -27,7 +32,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ env.RELEASE_SHA }}
+
+      - name: Verify staging release identity
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
 
       - name: Configure Docker for the non-interactive runner
         run: |
@@ -89,7 +98,8 @@ jobs:
 
       - name: Build and start staging services
         env:
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_TAG: ${{ env.RELEASE_SHA }}
+          COMMIT_SHA: ${{ env.RELEASE_SHA }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           scripts/compose.sh staging-local build app worker
@@ -143,7 +153,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ env.RELEASE_SHA }}
+
+      - name: Verify production release identity
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
 
       - name: Configure Docker for the non-interactive runner
         run: |
@@ -215,7 +229,8 @@ jobs:
 
       - name: Build and start production services
         env:
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_TAG: ${{ env.RELEASE_SHA }}
+          COMMIT_SHA: ${{ env.RELEASE_SHA }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           scripts/compose.sh production build app worker
