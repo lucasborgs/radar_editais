@@ -119,6 +119,9 @@ jobs:
         env:
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
+      - name: Mark ephemeral database as test
+        run: .ci-venv/bin/python scripts/set_environment_metadata.py --environment test --project-ref local
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
