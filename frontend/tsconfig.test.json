@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".test-dist",
+    "rootDir": ".",
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "incremental": false
+  },
+  "include": [
+    "src/lib/consultant-project.ts",
+    "src/lib/pending-consultant-intent.ts",
+    "src/lib/workspace-policy.ts",
+    "src/components/workspace/types.ts",
+    "tests/*.test.ts"
+  ]
+}
