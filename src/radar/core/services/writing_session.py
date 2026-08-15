@@ -493,6 +493,9 @@ class WritingSession:
         user_adjustments: dict | None = None,
         writing_context: dict | None = None,
         allow_incomplete_profile: bool = False,
+        creation_id: str | None = None,
+        grounded_open_key: str | None = None,
+        create_application_log: bool = False,
     ):
         self._db = db
         self.workspace_id = workspace_id
@@ -533,8 +536,6 @@ class WritingSession:
         # de _critic_annotations acima — evita migration).
         self._style_edit_log: list[dict] = []
 
-        # Plano estruturado (F4) — carregado por _load_from_db a partir de
-        # __plan__ no section_drafts; vira __plan__ de novo em _drafts_with_plan.
         self._plan: dict | None = None
         self._plan_pending_confirmation: bool = False
         self._writing_context: dict = {}
@@ -555,7 +556,30 @@ class WritingSession:
                 raise ProfileIncompleteError(missing)
             self.edital_id = edital_id
             self._writing_context = writing_context if isinstance(writing_context, dict) else {}
-            self.session_id = self._create_in_db(workspace_id, edital_id, self._writing_context)
+            # Sessões novas que já recebem um plano (como a escrita
+            # fundamentada) precisam nascer com ele. Antes, o INSERT acontecia
+            # com outline/drafts vazios e o plano só era salvo ao fim da
+            # construção; uma leitura/reload nesse intervalo podia perder o
+            # contrato da sessão. Sessões sem plano mantêm o fluxo legado de
+            # gerar e salvar o outline depois da criação.
+            initial_plan = (
+                self._merge_adjustments(plan, user_adjustments)
+                if plan is not None
+                else None
+            )
+            initial_outline = self._outline_from_plan(initial_plan)
+            self._plan = initial_plan
+            self._proposal_outline = initial_outline
+            self.session_id = self._create_in_db(
+                workspace_id,
+                edital_id,
+                self._writing_context,
+                proposal_outline=initial_outline,
+                plan=initial_plan,
+                creation_id=creation_id,
+                grounded_open_key=grounded_open_key,
+                create_application_log=create_application_log,
+            )
             self.created_at = datetime.utcnow().isoformat()
 
         # Modo de escrita derivado do namespace do id (stateless — re-derivável no
@@ -597,11 +621,12 @@ class WritingSession:
         # PR1 (four-phase-workflow): plano estruturado vindo do Planning.
         if plan is not None:
             self._plan = self._merge_adjustments(plan, user_adjustments)
-        else:
+        elif not session_id:
             self._plan = None
         # Indica plano pendente de confirmação (1º turno gerou
         # plano, aguardando usuário confirmar para disparar geração).
-        self._plan_pending_confirmation = False
+        if not session_id:
+            self._plan_pending_confirmation = False
 
         # Ids dos items anexados explicitamente — guardados pra dedup contra
         # o retrieval automático da biblioteca em turn() (normalizados lower).
@@ -729,7 +754,16 @@ class WritingSession:
     # ------------------------------------------------------------------
 
     def _create_in_db(
-        self, workspace_id: str, edital_id: str, writing_context: dict | None = None,
+        self,
+        workspace_id: str,
+        edital_id: str,
+        writing_context: dict | None = None,
+        *,
+        proposal_outline: list[str] | None = None,
+        plan: dict | None = None,
+        creation_id: str | None = None,
+        grounded_open_key: str | None = None,
+        create_application_log: bool = False,
     ) -> str:
         """INSERT em writing_sessions; retorna o id gerado.
 
@@ -739,23 +773,39 @@ class WritingSession:
         'proposta_iniciada'. O trigger log_application_event registra a
         transição em application_events.
         """
-        result = self._db.table("writing_sessions").insert({
+        section_drafts = {"__plan__": plan} if plan else {}
+        payload = {
             "workspace_id": workspace_id,
             "edital_id": edital_id,
             "status": "active",
             "summary": None,
-            "proposal_outline": [],
-            "section_drafts": {},
+            "proposal_outline": proposal_outline or [],
+            "section_drafts": section_drafts,
             "writing_context": writing_context or {},
-        }).execute()
+        }
+        if creation_id:
+            payload["id"] = creation_id
+        if grounded_open_key:
+            payload["grounded_open_key"] = grounded_open_key
+        result = self._db.table("writing_sessions").insert(payload).execute()
         if not result.data:
             raise RuntimeError("Falha ao criar writing_session no Postgres")
         session_id = result.data[0]["id"]
-        self._link_application_log(workspace_id, edital_id, session_id)
+        self._link_application_log(
+            workspace_id,
+            edital_id,
+            session_id,
+            create_if_missing=create_application_log,
+        )
         return session_id
 
     def _link_application_log(
-        self, workspace_id: str, edital_id: str, session_id: str,
+        self,
+        workspace_id: str,
+        edital_id: str,
+        session_id: str,
+        *,
+        create_if_missing: bool = False,
     ) -> None:
         """Linka writing_session a uma application_log existente, se houver.
 
@@ -776,7 +826,15 @@ class WritingSession:
             )
             row = existing.data if existing else None
             if not row:
-                return  # Sem application_log prévia — usuário pulou o brief
+                if not create_if_missing:
+                    return  # Sem application_log prévia — usuário pulou o brief
+                self._db.table("application_log").insert({
+                    "workspace_id": workspace_id,
+                    "edital_id": edital_id,
+                    "session_id": session_id,
+                    "status": "proposta_iniciada",
+                }).execute()
+                return
 
             update: dict = {"session_id": session_id}
             if row.get("status") in ("matched", "brief_gerado"):
@@ -890,18 +948,19 @@ class WritingSession:
             ]
         return merged
 
-    def _drafts_with_plan(self) -> dict:
-        """`section_drafts` pronto para persistir, SEMPRE preservando o plano.
-
-        `_load_from_db` retira `__plan__` de `_doc_sections` (vira `self._plan`),
-        então qualquer regravação bruta de `_doc_sections` apagaria o plano do
-        banco (bug: editar uma seção fazia a página Plano perder o plano).
-        """
-        drafts = dict(self._doc_sections or {})
-        plan = getattr(self, "_plan", None)
-        if plan:
-            drafts["__plan__"] = plan
-        return drafts
+    @staticmethod
+    def _outline_from_plan(plan: dict | None) -> list[str]:
+        """Extrai títulos válidos do plano para persistir junto à criação."""
+        if not isinstance(plan, dict):
+            return []
+        sections = plan.get("sections", [])
+        if not isinstance(sections, list):
+            return []
+        return [
+            str(section["title"])
+            for section in sections
+            if isinstance(section, dict) and section.get("title")
+        ]
 
     def _save_plan(self) -> None:
         """Persiste o plano no JSONB section_drafts sob chave __plan__."""
@@ -914,6 +973,14 @@ class WritingSession:
             }).eq("id", self.session_id).execute()
         except Exception as e:
             logger.warning("[%s] Falha ao salvar plan: %s", self.session_id, e)
+
+    def _drafts_with_plan(self) -> dict:
+        """Retorna os rascunhos preservando o plano estruturado da sessão."""
+        drafts = dict(self._doc_sections or {})
+        plan = getattr(self, "_plan", None)
+        if plan:
+            drafts["__plan__"] = plan
+        return drafts
 
     # ------------------------------------------------------------------
     # Carregamento dos documentos
@@ -1962,10 +2029,7 @@ class WritingSession:
         if self._library_context:
             messages.append({"role": "user", "content": self._library_context})
         if getattr(self, "_writing_context", None):
-            messages.append({
-                "role": "user",
-                "content": self._grounded_context_block(),
-            })
+            messages.append({"role": "user", "content": self._grounded_context_block()})
 
         outline_str = "\n".join(f"- {t}" for t in self._proposal_outline)
         messages.append({
@@ -2396,7 +2460,7 @@ class WritingSession:
         return "\n\n".join(parts)
 
     def _grounded_context_block(self) -> str:
-        """Contexto congelado do caminho, separado de instruções externas."""
+        """Renderiza o contexto congelado do caminho separado de instruções externas."""
         context = self._writing_context
         lines = [
             "CONTEXTO AUTORIZADO DO CAMINHO SELECIONADO:",

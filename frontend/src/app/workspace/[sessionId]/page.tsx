@@ -683,6 +683,45 @@ O chat fala direto com a escrita da proposta.`;
     Array.from(grouped.entries()).map(([k, v]) => [k, v.length]),
   );
 
+  // A rota continua abrindo sessões antigas, mas elas não pertencem mais à
+  // jornada ativa e não podem iniciar novas gerações ou edições.
+  if (mode === "pitch") {
+    return (
+      <div className="h-screen flex flex-col bg-app-bg overflow-hidden">
+        <WorkspaceHeader
+          title={targetTitle || "Carregando…"}
+          mode={mode}
+          filled={filled}
+          total={sections.length}
+        />
+        <section className="shrink-0 border-b border-border bg-content-secondary/5 px-4 py-3 text-xs text-content-secondary">
+          Esta sessão foi arquivada do fluxo atual e está disponível apenas para consulta.
+        </section>
+        <main className="flex-1 min-h-0 overflow-y-auto">
+          {docLoading ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <DocumentEditor
+              sections={sections}
+              highlightedSections={new Set<string>()}
+              savingSection={null}
+              findingsBySection={new Map<string, Finding[]>()}
+              generalFindings={[]}
+              onSaveSection={() => {}}
+              onSectionInteract={() => {}}
+              onFixWithAI={() => {}}
+              onRefineSection={() => {}}
+              registerScrollTo={registerScrollTo}
+              readOnly
+            />
+          )}
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col bg-app-bg overflow-hidden">
       <WorkspaceHeader
@@ -883,7 +922,7 @@ O chat fala direto com a escrita da proposta.`;
               {Array.isArray((planPending as Record<string, unknown>).mismatch_warnings) &&
                ((planPending as Record<string, unknown>).mismatch_warnings as string[]).length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-amber-800 font-sans mb-1">{String.fromCodePoint(9888)} Alertas de Misfit</p>
+                  <p className="text-xs font-semibold text-amber-800 font-sans mb-1">{String.fromCodePoint(9888)} Alertas de Incompatibilidade</p>
                   <ul className="space-y-1">
                     {((planPending as Record<string, unknown>).mismatch_warnings as string[]).map((w, i) => (
                       <li key={i} className="text-xs text-amber-700 font-sans flex gap-1">
