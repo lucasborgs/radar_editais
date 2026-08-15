@@ -73,7 +73,15 @@ jobs:
       - name: Preflight recovery tool image for production
         run: |
           set -euo pipefail
-          docker pull --platform "$RECOVERY_DOCKER_PLATFORM" "$RECOVERY_POSTGRES_IMAGE"
+          # Docker Desktop no macOS trava o keychain em sessão de LaunchAgent
+          # não interativa. Se a imagem fixada já estiver no daemon local, não
+          # puxamos de novo: o snapshot usa `docker run --pull=never`, então a
+          # presença local com o digest fixado é suficiente.
+          if docker image inspect --format '{{.Id}}' "$RECOVERY_POSTGRES_IMAGE" >/dev/null 2>&1; then
+            echo "recovery image already present locally; skipping pull"
+          else
+            docker pull --platform "$RECOVERY_DOCKER_PLATFORM" "$RECOVERY_POSTGRES_IMAGE"
+          fi
           recovery_image_id="$(docker image inspect --format '{{.Id}}' "$RECOVERY_POSTGRES_IMAGE")"
           test -n "$recovery_image_id"
           docker run --rm --platform "$RECOVERY_DOCKER_PLATFORM" "$recovery_image_id" \
