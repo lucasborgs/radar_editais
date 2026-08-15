@@ -36,7 +36,7 @@ Deixe o runner configurado como serviço para iniciar com o sistema.
 O runner precisa ter:
 
 - Docker e Docker Compose;
-- cliente PostgreSQL com `pg_dump` e `pg_restore`;
+- Docker apto a executar a imagem ARM64 fixada do cliente PostgreSQL, usada pelo CD;
 - Supabase CLI 2.98.2;
 - Python 3.12;
 - Node.js 20;
@@ -60,7 +60,10 @@ O `.env` deve apontar para o mesmo projeto Supabase de produção e declarar
 
 O `PROD_DATABASE_URL` do Environment `Production` é usado pela migration
 protegida via URL explícita e pelo snapshot lógico pré-migration; o CD não
-depende de `supabase link` persistido no runner. O snapshot fica em
+depende de `supabase link` persistido no runner. A etapa de staging baixa e
+verifica antecipadamente a imagem ARM64 fixada do cliente PostgreSQL. Em
+produção, o dump e sua validação são executados com o ID dessa imagem, sem expor
+a URL de conexão nos argumentos de processo. O snapshot fica em
 `$HOME/.local/share/radar-editais/recovery-snapshots/`, com permissões privadas,
 e o workflow falha antes da migration se não puder criá-lo e validá-lo com
 `pg_restore --list`. A `OPENAI_API_KEY` deve existir também no Environment `Production`;

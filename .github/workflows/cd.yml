@@ -14,6 +14,8 @@ env:
   # workflow_run has a different github.sha (the workflow's default ref).
   # Keep source checkout, image tag and runtime identity on the CI-approved SHA.
   RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+  RECOVERY_POSTGRES_IMAGE: postgres:17.4-alpine3.21
+  RECOVERY_DOCKER_PLATFORM: linux/arm64
 
 concurrency:
   group: radar-production-deploy
@@ -67,6 +69,15 @@ jobs:
           supabase --version
           node --version
           npm --version
+
+      - name: Preflight recovery tool image for production
+        run: |
+          set -euo pipefail
+          docker pull --platform "$RECOVERY_DOCKER_PLATFORM" "$RECOVERY_POSTGRES_IMAGE"
+          recovery_image_id="$(docker image inspect --format '{{.Id}}' "$RECOVERY_POSTGRES_IMAGE")"
+          test -n "$recovery_image_id"
+          docker run --rm --platform "$RECOVERY_DOCKER_PLATFORM" "$recovery_image_id" \
+            sh -ec 'pg_dump --version && pg_restore --version'
 
       - name: Start local Supabase and apply migrations
         run: |
@@ -227,43 +238,57 @@ jobs:
             echo "No running production worker container to use as a rollback reference" >&2
             exit 1
           }
+          app_image="$(docker inspect --format '{{.Config.Image}}' "$app_container")"
+          worker_image="$(docker inspect --format '{{.Config.Image}}' "$worker_container")"
+          app_image_id="$(docker inspect --format '{{.Image}}' "$app_container")"
+          worker_image_id="$(docker inspect --format '{{.Image}}' "$worker_container")"
+          docker image inspect "$app_image" "$worker_image" >/dev/null
+          test -n "$app_image_id"
+          test -n "$worker_image_id"
           {
             echo "### Production rollback reference"
-            echo "- app: \`$(docker inspect --format '{{.Config.Image}} {{.Image}}' "$app_container")\`"
-            echo "- worker: \`$(docker inspect --format '{{.Config.Image}} {{.Image}}' "$worker_container")\`"
+            echo "- app: \`$app_image $app_image_id\`"
+            echo "- worker: \`$worker_image $worker_image_id\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create verified recovery snapshot before migrations
         env:
-          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          PGDATABASE: ${{ secrets.PROD_DATABASE_URL }}
         run: |
           set -euo pipefail
-          command -v pg_dump >/dev/null || {
-            echo "pg_dump is required to create the production recovery snapshot" >&2
-            exit 1
-          }
-          command -v pg_restore >/dev/null || {
-            echo "pg_restore is required to validate the production recovery snapshot" >&2
-            exit 1
-          }
-          command -v shasum >/dev/null || {
-            echo "shasum is required to record the production recovery snapshot" >&2
-            exit 1
-          }
-          test -n "$DATABASE_URL" || {
+          test -n "$PGDATABASE" || {
             echo "PROD_DATABASE_URL is required to create the production recovery snapshot" >&2
             exit 1
           }
+          command -v shasum >/dev/null
 
           backup_root="$HOME/.local/share/radar-editais/recovery-snapshots"
           install -d -m 700 "$backup_root"
           stamp="$(date -u +%Y%m%dT%H%M%SZ)"
           backup_path="$backup_root/radar-editais-${RELEASE_SHA}-${stamp}.dump"
+          backup_name="$(basename "$backup_path")"
+          recovery_image_id="$(docker image inspect --format '{{.Id}}' "$RECOVERY_POSTGRES_IMAGE")"
+          test -n "$recovery_image_id" || {
+            echo "The preflighted recovery image is unavailable" >&2
+            exit 1
+          }
+          trap 'rm -f "$backup_path"' ERR
 
           umask 077
-          pg_dump --format=custom --file="$backup_path" "$DATABASE_URL"
+          docker run --rm --pull=never --platform "$RECOVERY_DOCKER_PLATFORM" \
+            --env PGDATABASE \
+            --user "$(id -u):$(id -g)" \
+            --volume "$backup_root:/backups" \
+            "$recovery_image_id" \
+            pg_dump --format=custom --file="/backups/$backup_name"
           test -s "$backup_path"
-          pg_restore --list "$backup_path" >/dev/null
+          test -O "$backup_path"
+          chmod 600 "$backup_path"
+          docker run --rm --pull=never --platform "$RECOVERY_DOCKER_PLATFORM" \
+            --user "$(id -u):$(id -g)" \
+            --volume "$backup_root:/backups:ro" \
+            "$recovery_image_id" \
+            pg_restore --list "/backups/$backup_name" >/dev/null
 
           digest="$(shasum -a 256 "$backup_path" | awk '{print $1}')"
           {
@@ -274,6 +299,7 @@ jobs:
             echo "- sha256: \`$digest\`"
             echo "- validation: \`pg_restore --list\` passed"
           } >> "$GITHUB_STEP_SUMMARY"
+          trap - ERR
 
       - name: Apply production migrations with the safety guard
         env:
