@@ -214,6 +214,67 @@ jobs:
           }
           echo "CONFIRM_PROJECT_REF=$project_ref" >> "$GITHUB_ENV"
 
+      - name: Inspect currently running production images
+        run: |
+          set -euo pipefail
+          app_container="$(scripts/compose.sh production ps -q app)"
+          worker_container="$(scripts/compose.sh production ps -q worker)"
+          test -n "$app_container" || {
+            echo "No running production app container to use as a rollback reference" >&2
+            exit 1
+          }
+          test -n "$worker_container" || {
+            echo "No running production worker container to use as a rollback reference" >&2
+            exit 1
+          }
+          {
+            echo "### Production rollback reference"
+            echo "- app: \`$(docker inspect --format '{{.Config.Image}} {{.Image}}' "$app_container")\`"
+            echo "- worker: \`$(docker inspect --format '{{.Config.Image}} {{.Image}}' "$worker_container")\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create verified recovery snapshot before migrations
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          command -v pg_dump >/dev/null || {
+            echo "pg_dump is required to create the production recovery snapshot" >&2
+            exit 1
+          }
+          command -v pg_restore >/dev/null || {
+            echo "pg_restore is required to validate the production recovery snapshot" >&2
+            exit 1
+          }
+          command -v shasum >/dev/null || {
+            echo "shasum is required to record the production recovery snapshot" >&2
+            exit 1
+          }
+          test -n "$DATABASE_URL" || {
+            echo "PROD_DATABASE_URL is required to create the production recovery snapshot" >&2
+            exit 1
+          }
+
+          backup_root="$HOME/.local/share/radar-editais/recovery-snapshots"
+          install -d -m 700 "$backup_root"
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          backup_path="$backup_root/radar-editais-${RELEASE_SHA}-${stamp}.dump"
+
+          umask 077
+          pg_dump --format=custom --file="$backup_path" "$DATABASE_URL"
+          test -s "$backup_path"
+          pg_restore --list "$backup_path" >/dev/null
+
+          digest="$(shasum -a 256 "$backup_path" | awk '{print $1}')"
+          {
+            echo "### Production recovery snapshot"
+            echo "- release: \`$RELEASE_SHA\`"
+            echo "- created_at: \`$stamp\`"
+            echo "- file: \`$(basename "$backup_path")\`"
+            echo "- sha256: \`$digest\`"
+            echo "- validation: \`pg_restore --list\` passed"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Apply production migrations with the safety guard
         env:
           ENV_FILE: .env
