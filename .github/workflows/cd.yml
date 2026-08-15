@@ -95,9 +95,10 @@ jobs:
           # ainda não mergeadas (ex.: 058/059 da RT), deixando o histórico à
           # frente do diretório de main — `supabase migration up` recusa esse
           # drift. `db reset` recria o schema a partir das migrations do
-          # checkout (001-057), determinístico por deploy. Sem seed para
-          # ficar em paridade com o smoke do CI.
-          supabase db reset --no-seed
+          # checkout (001-057), determinístico por deploy. O seed é obrigatório:
+          # insere a sentinela environment_metadata e o workspace EVAL que o
+          # app enforca em startup (assert_runtime_environment).
+          supabase db reset
           eval "$(supabase status -o env | sed 's/^/LOCAL_/')"
           {
             echo "SUPABASE_URL=$LOCAL_API_URL"
