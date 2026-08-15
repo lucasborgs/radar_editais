@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import pytest
+
 from radar.core.services.consultant import (
+    ConsultantConflictError,
     ConsultantGraph,
+    ConsultantRepository,
+    ConsultantService,
     DiscoveryDocumentIntelligence,
     GoldPathways,
+    OpenKnowledge,
     OpenPathways,
 )
 from radar.core.services.eligibility import evaluate_opportunity_detailed
@@ -358,3 +364,121 @@ def test_memory_context_is_typed_and_not_catalog_fact():
     assert memory.origin == "reflection_insights"
     assert memory.read_allowed is True
     assert not hasattr(memory, "entity")
+
+
+class _RowsResult:
+    def __init__(self, data):
+        self.data = data
+
+
+class _ResearchQuery:
+    def __init__(self, db, table):
+        self.db = db
+        self.table_name = table
+        self.filters = {}
+
+    def select(self, *_fields):
+        return self
+
+    def neq(self, *_args):
+        return self
+
+    def eq(self, key, value):
+        self.filters[key] = value
+        return self
+
+    def is_(self, *_args):
+        return self
+
+    def order(self, *_args, **_kwargs):
+        return self
+
+    def limit(self, *_args):
+        return self
+
+    def execute(self):
+        if self.table_name == "discovered_opportunities":
+            return _RowsResult([])
+        self.db.research_filters = dict(self.filters)
+        return _RowsResult([
+            item for item in self.db.findings
+            if item["workspace_id"] == self.filters.get("workspace_id")
+        ])
+
+
+class _ResearchDb:
+    def __init__(self):
+        self.research_filters = {}
+        self.findings = [
+            {"id": "a", "workspace_id": "workspace-a", "question": "desafio A", "answer": "A"},
+            {"id": "b", "workspace_id": "workspace-b", "question": "desafio B", "answer": "B"},
+        ]
+
+    def table(self, table):
+        return _ResearchQuery(self, table)
+
+
+def test_open_knowledge_research_findings_are_explicitly_workspace_scoped():
+    db = _ResearchDb()
+
+    rows = OpenKnowledge(db, "workspace-a")._rows(limit=3)
+
+    assert db.research_filters["workspace_id"] == "workspace-a"
+    assert [row["id"] for row in rows] == ["a"]
+
+
+class _RpcCall:
+    def __init__(self, db, name, params):
+        self.db = db
+        self.name = name
+        self.params = params
+
+    def execute(self):
+        self.db.calls.append((self.name, self.params))
+        return _RowsResult(self.db.outcomes.pop(0))
+
+
+class _RpcDb:
+    def __init__(self, outcomes):
+        self.outcomes = outcomes
+        self.calls = []
+
+    def rpc(self, name, params):
+        return _RpcCall(self, name, params)
+
+
+def test_consultant_repository_replays_or_conflicts_from_atomic_save_rpc():
+    state = _state()
+    state.revision = 1
+    response = {"conversation_id": "c1", "assistant_message": "ok"}
+    db = _RpcDb([
+        [{"outcome": "replayed", "response": {"conversation_id": "c1", "assistant_message": "cached"}}],
+        [{"outcome": "conflict", "response": None}],
+    ])
+    repository = ConsultantRepository()
+
+    replay = repository.save(db, state, "retry-key", response, expected_revision=0)
+
+    assert replay == {"conversation_id": "c1", "assistant_message": "cached"}
+    assert db.calls[0][0] == "save_consultant_turn"
+    assert db.calls[0][1]["p_expected_revision"] == 0
+    with pytest.raises(ConsultantConflictError):
+        repository.save(db, state, "conflict-key", response, expected_revision=0)
+
+
+class _ReplayRepository:
+    def find_idempotent(self, _db, _workspace_id, key):
+        if key == "project-confirm:3":
+            return {"conversation_id": "c1", "project_id": "p1"}
+        return None
+
+    def load(self, *_args):
+        raise AssertionError("a confirmation replay must return before loading state")
+
+
+def test_project_confirmation_replays_after_the_state_revision_advances():
+    service = ConsultantService(repository=_ReplayRepository())
+
+    response = service.confirm_project(object(), "w1", "c1", expected_revision=3)
+
+    assert response == {"conversation_id": "c1", "project_id": "p1"}

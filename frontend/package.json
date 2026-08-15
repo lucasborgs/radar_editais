@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "npm run test:consultant-project",
+    "test:consultant-project": "rm -rf .test-dist && tsc --project tsconfig.test.json && node --test .test-dist/tests/*.test.js && rm -rf .test-dist"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",

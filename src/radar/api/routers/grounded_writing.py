@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from radar.api.rate_limit import limiter
 from radar.core.infra.auth import CurrentUserId, DbClient
@@ -24,7 +24,21 @@ class GroundedWritingOpenRequest(BaseModel):
     conversation_id: str
     path_id: str
     artifact_type: str = "proposta_tecnica"
-    allowed_material_ids: list[str] = Field(default_factory=list)
+    allowed_material_ids: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("allowed_material_ids")
+    @classmethod
+    def validate_allowed_material_ids(cls, values: list[str]) -> list[str]:
+        normalized: list[str] = []
+        for value in values:
+            item_id = value.strip()
+            if not item_id:
+                raise ValueError("Cada material autorizado precisa ter um identificador.")
+            if len(item_id) > 128:
+                raise ValueError("Cada identificador de material pode ter no máximo 128 caracteres.")
+            if item_id not in normalized:
+                normalized.append(item_id)
+        return normalized
 
 
 class GroundedWritingTurnRequest(BaseModel):

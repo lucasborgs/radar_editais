@@ -1,39 +1,44 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useIsAdmin } from "@/lib/hooks";
+import {
+  PRIMARY_NAV_DESTINATIONS,
+  UTILITY_NAV_DESTINATIONS,
+  visibleNavigationDestinations,
+} from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
 /**
  * Header fino do front-door: nome do produto + ação de conta + menu "⋮".
  *
- * - Anônimo: "Entrar" (→ /login) e o menu só tem "Começar de novo".
+ * - Anônimo: "Entrar" (→ /login) e as jornadas ficam no menu "⋮".
  * - Logado: o menu "⋮" reúne navegação de suporte e operação. As jornadas de
- *   produto permanecem visíveis fora dele. "Começar de novo" limpa o transcript
- *   local em ambos os casos.
+ *   produto permanecem visíveis fora dele.
+ * - A ação opcional "Começar de novo" limpa o transcript local no front door;
+ *   shells secundários reutilizam a mesma navegação sem essa ação.
  */
-const AUTHED_LINKS: { href: string; label: string; adminOnly?: boolean }[] = [
-  { href: "/library", label: "Biblioteca" },
-  { href: "/pipeline", label: "Pipeline" },
-  { href: "/oportunidades", label: "Ecossistema" },
-  // Fila da Descoberta é ferramenta do operador (ADMIN_EMAILS), não do cliente.
-  { href: "/discovered", label: "Descobertas", adminOnly: true },
-];
-
 export function FrontDoorHeader({
   isAuthed,
   onReset,
   onSignOut,
+  label,
 }: {
   isAuthed: boolean;
-  onReset: () => void;
+  onReset?: () => void;
   onSignOut?: () => void;
+  label?: string;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
   const isAdmin = useIsAdmin();
-  const links = AUTHED_LINKS.filter((l) => !l.adminOnly || isAdmin);
+  const utilityLinks = visibleNavigationDestinations(
+    UTILITY_NAV_DESTINATIONS,
+    isAdmin,
+  );
 
   // Fecha o menu ao clicar fora.
   useEffect(() => {
@@ -43,8 +48,18 @@ export function FrontDoorHeader({
         setMenuOpen(false);
       }
     };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
     document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [menuOpen]);
 
   const itemCls =
@@ -53,10 +68,29 @@ export function FrontDoorHeader({
   return (
     <header className="shrink-0 border-b border-border bg-surface">
       <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-        <Link href="/" aria-label="Radar de Editais" className="text-sm font-semibold text-content-primary font-sans">
-          <span className="hidden sm:inline">Radar de Editais</span>
-          <span className="sm:hidden">RE</span>
-        </Link>
+        {label ? (
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Link
+              href="/"
+              aria-label="Radar de Editais"
+              className="shrink-0 text-sm font-semibold text-content-primary font-sans"
+            >
+              RE
+            </Link>
+            <h1 className="truncate text-sm font-semibold text-content-primary font-sans">
+              {label}
+            </h1>
+          </div>
+        ) : (
+          <Link
+            href="/"
+            aria-label="Radar de Editais"
+            className="min-w-0 flex-1 truncate text-sm font-semibold text-content-primary font-sans"
+          >
+            <span className="hidden sm:inline">Radar de Editais</span>
+            <span className="sm:hidden">RE</span>
+          </Link>
+        )}
 
         <div className="flex items-center gap-1">
           {!isAuthed && (
@@ -70,10 +104,11 @@ export function FrontDoorHeader({
 
           <div className="relative" ref={menuRef}>
             <button
+              ref={menuButtonRef}
               type="button"
-              aria-label="Mais ações"
-              aria-haspopup="menu"
+              aria-label={menuOpen ? "Fechar navegação" : "Abrir navegação"}
               aria-expanded={menuOpen}
+              aria-controls={menuId}
               onClick={() => setMenuOpen((v) => !v)}
               className={cn(
                 "rounded-lg px-2 py-1.5 text-content-secondary hover:bg-app-bg transition-colors",
@@ -87,45 +122,49 @@ export function FrontDoorHeader({
             </button>
 
             {menuOpen && (
-              <div
-                role="menu"
+              <nav
+                id={menuId}
+                aria-label="Navegação"
                 className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-border bg-surface py-1 shadow-lg"
               >
-                <Link href="/" role="menuitem" onClick={() => setMenuOpen(false)} className={itemCls}>
-                  Consultor
-                </Link>
-                <Link href="/projects" role="menuitem" onClick={() => setMenuOpen(false)} className={itemCls}>
-                  Projetos
-                </Link>
+                {PRIMARY_NAV_DESTINATIONS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMenuOpen(false)}
+                    className={itemCls}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
                 <div className="my-1 border-t border-border" />
                 {isAuthed &&
-                  links.map((l) => (
+                  utilityLinks.map((link) => (
                     <Link
-                      key={l.href}
-                      href={l.href}
-                      role="menuitem"
+                      key={link.href}
+                      href={link.href}
                       onClick={() => setMenuOpen(false)}
                       className={itemCls}
                     >
-                      {l.label}
+                      {link.label}
                     </Link>
                   ))}
                 {isAuthed && <div className="my-1 border-t border-border" />}
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onReset();
-                  }}
-                  className={itemCls}
-                >
-                  Começar de novo
-                </button>
+                {onReset && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onReset();
+                    }}
+                    className={itemCls}
+                  >
+                    Começar de novo
+                  </button>
+                )}
                 {isAuthed && onSignOut && (
                   <button
                     type="button"
-                    role="menuitem"
                     onClick={() => {
                       setMenuOpen(false);
                       onSignOut();
@@ -135,7 +174,7 @@ export function FrontDoorHeader({
                     Sair
                   </button>
                 )}
-              </div>
+              </nav>
             )}
           </div>
         </div>

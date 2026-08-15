@@ -29,10 +29,6 @@ function formatUpdatedAt(value: string): string {
   }).format(date);
 }
 
-function projectKind(): "Execução" {
-  return "Execução";
-}
-
 export default function ProjectsPage() {
   const { getToken } = useAuth();
   const [sessions, setSessions] = useState<WritingSessionSummary[]>([]);
@@ -90,9 +86,9 @@ export default function ProjectsPage() {
       <div className="space-y-6">
         <div>
           <p className="text-sm font-semibold text-primary">Projetos</p>
-          <h1 className="mt-1 text-2xl font-semibold text-content-primary">Jornadas e execuções</h1>
+          <h1 className="mt-1 text-2xl font-semibold text-content-primary">Seus projetos</h1>
           <p className="mt-1 text-sm text-content-secondary">
-            Retome briefs confirmados, caminhos e propostas iniciadas no Radar.
+            Retome projetos iniciados, caminhos avaliados e propostas em andamento.
           </p>
         </div>
 
@@ -111,15 +107,15 @@ export default function ProjectsPage() {
           </div>
         ) : ordered.length === 0 && consultantStates.length === 0 ? (
           <div className="rounded-xl border border-border bg-surface p-8 text-center">
-            <h3 className="font-semibold text-content-primary">Nenhum projeto iniciado</h3>
+            <h3 className="font-semibold text-content-primary">Nenhum projeto ainda</h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-content-secondary">
-              Conte uma intenção ao consultor para formar um brief de projeto.
+              Comece pelo Consultor para transformar o contexto da sua empresa em um projeto.
             </p>
             <Link
               href="/"
               className="mt-5 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
             >
-              Ir para o consultor →
+              Ir para o Consultor
             </Link>
           </div>
         ) : (
@@ -153,7 +149,7 @@ export default function ProjectsPage() {
               >
                 <div className="flex items-center justify-between gap-3 text-xs">
                   <span className="rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
-                    {projectKind()}
+                    Execução
                   </span>
                   <span className="text-content-secondary">{STATUS_LABEL[session.status]}</span>
                 </div>

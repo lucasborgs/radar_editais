@@ -498,6 +498,21 @@ export interface MatchedEntity {
   explicacao?: PathExplanation | null;
 }
 
+export interface RadarMatchesResponse {
+  matched_editais: MatchedEdital[];
+  matched_programas: MatchedEntity[];
+  meta: {
+    ranking: "affinity";
+    uses_workspace_chunks: boolean;
+  };
+}
+
+export const getRadarMatches = (profile: CompanyProfile) =>
+  apiFetch<RadarMatchesResponse>("/radar/matches", {
+    method: "POST",
+    body: JSON.stringify({ profile }),
+  });
+
 export interface IctCapabilities {
   institution: string;
   municipio: string;

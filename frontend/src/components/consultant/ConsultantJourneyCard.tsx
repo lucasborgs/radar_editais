@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ConsultantBrief, ConsultantBriefUpdate, ConsultantJourneyState } from "@/lib/api";
 
 const EDITABLE_FIELDS: Array<{ field: keyof ConsultantBriefUpdate; label: string }> = [
@@ -17,38 +17,48 @@ function valueFor(brief: ConsultantBrief, field: keyof ConsultantBriefUpdate): s
   return Array.isArray(value) ? value.join(", ") : String(value ?? "");
 }
 
+function draftFor(brief: ConsultantBrief): Record<string, string> {
+  return Object.fromEntries(EDITABLE_FIELDS.map(({ field }) => [field, valueFor(brief, field)]));
+}
+
 export function ConsultantJourneyCard({
   state,
-  onConfirm,
-  onUpdate,
+  onSaveAndConfirm,
   onSelect,
   onReassess,
   onOpenWriting,
 }: {
   state: ConsultantJourneyState;
-  onConfirm: () => void;
-  onUpdate: (updates: ConsultantBriefUpdate) => Promise<void>;
+  onSaveAndConfirm: (updates: ConsultantBriefUpdate) => Promise<void>;
   onSelect: (pathId: string, reason: string) => Promise<void>;
   onReassess: (pathId: string, reason: string) => Promise<void>;
   onOpenWriting: (pathId: string) => Promise<void>;
 }) {
   const brief = state.brief;
   const paths = state.paths;
-  const [draft, setDraft] = useState<Record<string, string>>({});
+  const briefKey = brief ? `${brief.id}:${brief.version}` : null;
+  const [draft, setDraft] = useState<Record<string, string>>(() =>
+    brief ? draftFor(brief) : {},
+  );
+  const [draftBriefKey, setDraftBriefKey] = useState<string | null>(null);
   const [decisionReason, setDecisionReason] = useState<Record<string, string>>({});
   const [reassessmentReason, setReassessmentReason] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [openingPathId, setOpeningPathId] = useState<string | null>(null);
+  const openingPathRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!brief) return;
-    setDraft(Object.fromEntries(EDITABLE_FIELDS.map(({ field }) => [field, valueFor(brief, field)])));
-  }, [brief]);
+    if (briefKey === draftBriefKey) return;
+    setDraft(brief ? draftFor(brief) : {});
+    setDraftBriefKey(briefKey);
+  }, [brief, briefKey, draftBriefKey]);
 
   if (!brief && paths.length === 0) return null;
 
-  const save = async () => {
-    if (!brief) return;
-    setSaving(true);
+  const draftReady = briefKey !== null && draftBriefKey === briefKey;
+
+  const saveAndConfirm = async () => {
+    if (!brief || !draftReady) return;
     try {
       const updates: ConsultantBriefUpdate = {};
       for (const { field } of EDITABLE_FIELDS) {
@@ -56,9 +66,22 @@ export function ConsultantJourneyCard({
           (updates as Record<string, unknown>)[field] = draft[field] ?? "";
         }
       }
-      if (Object.keys(updates).length > 0) await onUpdate(updates);
+      setSaving(true);
+      await onSaveAndConfirm(updates);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openWriting = async (pathId: string) => {
+    if (openingPathRef.current) return;
+    openingPathRef.current = pathId;
+    setOpeningPathId(pathId);
+    try {
+      await onOpenWriting(pathId);
+    } finally {
+      openingPathRef.current = null;
+      setOpeningPathId(null);
     }
   };
 
@@ -69,11 +92,11 @@ export function ConsultantJourneyCard({
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-content-primary">Brief do projeto</h2>
             <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary">
-              {brief.status === "confirmed" ? "confirmado" : `revisão ${brief.version}`}
+              {brief.status === "confirmed" ? "confirmado" : "em revisão"}
             </span>
           </div>
           <p className="mt-2 text-xs text-content-secondary">
-            Intenção original · origem: {brief.source_refs.original_intention?.join(", ") || "conversa"}
+            Intenção inicial
           </p>
           <p className="mt-2 text-sm text-content-primary">{brief.original_intention}</p>
 
@@ -82,23 +105,24 @@ export function ConsultantJourneyCard({
               {EDITABLE_FIELDS.map(({ field, label }) => (
                 <label key={field} className="block">
                   <span className="mb-1 block text-xs font-medium text-content-secondary">
-                    {label} · origem: {brief.source_refs[field]?.join(", ") || "não informado"}
+                    {label}
                   </span>
                   <textarea
                     value={draft[field] ?? ""}
                     onChange={(event) => setDraft((current) => ({ ...current, [field]: event.target.value }))}
+                    disabled={saving}
                     rows={field === "problem_hypothesis" || field === "solution_hypothesis" ? 2 : 1}
-                    className="w-full rounded-lg border border-border bg-app-bg px-3 py-2 text-sm text-content-primary outline-none focus:border-primary"
+                    className="w-full rounded-lg border border-border bg-app-bg px-3 py-2 text-sm text-content-primary focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
                   />
                 </label>
               ))}
               <button
                 type="button"
-                onClick={() => void save()}
-                disabled={saving}
-                className="rounded-lg border border-primary/30 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 disabled:opacity-50"
+                onClick={() => void saveAndConfirm()}
+                disabled={saving || !draftReady}
+                className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
-                {saving ? "Salvando…" : "Salvar revisão"}
+                {saving ? "Salvando e confirmando…" : draftReady ? "Salvar e confirmar projeto" : "Preparando revisão…"}
               </button>
             </div>
           )}
@@ -109,13 +133,9 @@ export function ConsultantJourneyCard({
             </div>
           )}
           {state.pending_confirmation && brief.status === "draft" && (
-            <button
-              type="button"
-              onClick={onConfirm}
-              className="mt-4 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white hover:opacity-90"
-            >
-              Confirmar e criar projeto
-            </button>
+            <p className="mt-2 text-xs text-content-secondary">
+              A confirmação usa a revisão persistida acima.
+            </p>
           )}
         </section>
       )}
@@ -123,9 +143,6 @@ export function ConsultantJourneyCard({
       {state.project && (
         <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
           <h2 className="text-sm font-semibold text-content-primary">Projeto confirmado</h2>
-          <p className="mt-1 text-xs text-content-secondary">
-            ID {state.project.id} · perfil usado em {state.project.profile_version || "versão não informada"}
-          </p>
           {state.project.decisions.map((decision) => (
             <p key={decision} className="mt-2 text-sm text-content-primary">{decision}</p>
           ))}
@@ -134,14 +151,13 @@ export function ConsultantJourneyCard({
 
       {paths.map((path) => (
         <section key={path.id} className="rounded-xl border border-primary/25 bg-primary/5 p-4">
-          <div className="flex items-center justify-between gap-3">
+          <div>
             <h2 className="text-sm font-semibold text-content-primary">
               {path.kind === "open_innovation" ? "Inovação aberta" : "Caminho potencial"}
             </h2>
-            <span className="text-xs font-medium text-primary">{path.kind || path.tipo}</span>
           </div>
           <p className="mt-1 text-[11px] text-content-secondary">
-            Estado: {path.status === "reassess_needed" ? "reavaliação necessária" : path.status}
+            {path.status === "reassess_needed" ? "Reavaliação necessária" : "Em avaliação"}
           </p>
           {path.kind === "open_innovation" && (
             <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
@@ -218,8 +234,9 @@ export function ConsultantJourneyCard({
                 <input
                   value={reassessmentReason[path.id] ?? ""}
                   onChange={(event) => setReassessmentReason((current) => ({ ...current, [path.id]: event.target.value }))}
+                  disabled={saving}
                   placeholder="O que mudou?"
-                  className="min-w-0 flex-1 rounded-lg border border-border bg-app-bg px-3 py-2 text-content-primary outline-none focus:border-primary"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-app-bg px-3 py-2 text-content-primary focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
                 />
                 <button
                   type="button"
@@ -230,13 +247,18 @@ export function ConsultantJourneyCard({
                   Reavaliar
                 </button>
               </div>
-              {path.formal_instrument !== false && (
+              {path.status === "selected" && (
                 <button
                   type="button"
-                  onClick={() => void onOpenWriting(path.id)}
-                  className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white hover:opacity-90"
+                  onClick={() => void openWriting(path.id)}
+                  disabled={openingPathId !== null}
+                  className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
                 >
-                  Abrir proposta técnica
+                  {openingPathId === path.id
+                    ? "Abrindo documento…"
+                    : path.formal_instrument === false
+                      ? "Abrir abordagem"
+                      : "Abrir proposta"}
                 </button>
               )}
             </div>
@@ -245,8 +267,9 @@ export function ConsultantJourneyCard({
               <input
                 value={decisionReason[path.id] ?? ""}
                 onChange={(event) => setDecisionReason((current) => ({ ...current, [path.id]: event.target.value }))}
+                disabled={saving}
                 placeholder="Por que este caminho faz sentido agora?"
-                className="w-full rounded-lg border border-border bg-app-bg px-3 py-2 text-xs text-content-primary outline-none focus:border-primary"
+                className="w-full rounded-lg border border-border bg-app-bg px-3 py-2 text-xs text-content-primary focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
               />
               <button
                 type="button"

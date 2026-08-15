@@ -43,7 +43,7 @@ export function PipelineBriefing({ applications }: PipelineBriefingProps) {
     <section className="rounded-xl border border-border bg-surface shadow-card p-5 space-y-4">
       <div>
         <h2 className="font-heading text-lg font-bold text-content-primary">
-          {greeting()} — seu pipeline hoje
+          {greeting()} — seu acompanhamento hoje
         </h2>
         <p className="text-sm text-content-secondary font-sans mt-0.5">
           {total === 0
@@ -55,7 +55,7 @@ export function PipelineBriefing({ applications }: PipelineBriefingProps) {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard label="No pipeline" value={total} subtext="propostas" />
+        <MetricCard label="Em acompanhamento" value={total} subtext="propostas" />
         <MetricCard
           label="Urgentes"
           value={urgent}

@@ -115,8 +115,11 @@ local → CI/test → pré-produção local → production
 3. Pré-produção local: reseta o Supabase CLI, carrega seed/corpus público,
    executa app+worker em containers isolados, backfills, suites `rag`, `explore`,
    tenant isolation e smoke do frontend.
-4. Produção: exige aprovação humana, backup/ponto de recuperação, migrations
+4. Produção: backup/ponto de recuperação, migrations
    aprovadas no schema local construído do zero e runbook de rollback/kill switch.
+   Em pré-beta (dados descartáveis), o deploy é automático após CI verde — sem
+   aprovação humana; os guards de máquina (snapshot pré-migration, migration
+   protegida, health check) permanecem.
 
 Migrations são sempre forward-only. Backfill é uma etapa separada, idempotente
 e observável; não fica oculto dentro da migration. O mesmo artefato/commit
@@ -192,7 +195,8 @@ Cloud; ele deve ser reavaliado antes de ampliar tráfego, equipe ou criticidade.
 - Os quatro casos do Explore passam na pré-produção local nas camadas de rota, autoridade,
   retrieval, grounding e resposta.
 - Produção só recebe o mesmo commit aprovado na pré-produção e mediante guard
-  explícito de mutação.
+  explícito de mutação; o deploy é automático após o CI verde (sem gate humano
+  em pré-beta).
 
 ## 8. Fora de escopo
 

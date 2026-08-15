@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any
+from uuid import NAMESPACE_URL, uuid5
 
 from radar.api.common import load_library_items, profile_from_workspace
 from radar.core.services.checklist_service import auto_review_checklist
@@ -124,6 +126,54 @@ class GroundedWriting:
     def _context_for_prompt(context: WritingContext) -> dict[str, Any]:
         return context.model_dump(mode="json")
 
+    @staticmethod
+    def _open_key(
+        workspace_id: str,
+        conversation_id: str,
+        context: WritingContext,
+    ) -> str:
+        """Identidade estável de uma abertura fundamentada.
+
+        A revisão do caminho e os materiais efetivamente autorizados fazem
+        parte do contrato. A ordenação evita que a mesma seleção em outra
+        ordem abra uma segunda sessão.
+        """
+        identity = "|".join((
+            workspace_id,
+            conversation_id,
+            context.path_id,
+            str(context.path_revision),
+            context.artifact_type,
+            ",".join(sorted(set(context.allowed_materials))),
+        ))
+        return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _existing_session_id(db, workspace_id: str, open_key: str) -> str | None:
+        result = (
+            db.table("writing_sessions")
+            .select("id")
+            .eq("workspace_id", workspace_id)
+            .eq("grounded_open_key", open_key)
+            .maybe_single()
+            .execute()
+        )
+        row = result.data if result else None
+        return str(row["id"]) if isinstance(row, dict) and row.get("id") else None
+
+    @staticmethod
+    def _open_response(session: WritingSession, context: WritingContext) -> dict[str, Any]:
+        return {
+            "writing_session_id": session.session_id,
+            "context": context.model_dump(mode="json"),
+            "project_id": context.project_id,
+            "path_id": context.path_id,
+            "outline": session.get_info()["section_titles"],
+            "requirements": context.requirements,
+            "gaps": context.gaps,
+            "artifact_type": context.artifact_type,
+        }
+
     def open(
         self,
         db,
@@ -142,7 +192,9 @@ class GroundedWriting:
         if path is None:
             raise ConsultantValidationError("Caminho não encontrado nesta conversa.")
 
-        requested_materials = [str(item) for item in (allowed_material_ids or []) if str(item).strip()]
+        requested_materials = list(dict.fromkeys(
+            str(item).strip() for item in (allowed_material_ids or []) if str(item).strip()
+        ))
         materials = load_library_items(db, workspace_id, requested_materials)
         authorized_ids = [str(item["id"]) for item in materials if item.get("id")]
         context = self.build_context(state, path, artifact_type, authorized_ids)
@@ -151,27 +203,50 @@ class GroundedWriting:
         if not target:
             raise ConsultantValidationError("O caminho selecionado não possui fonte para escrita.")
 
-        session = WritingSession(
-            db=db,
-            workspace_id=workspace_id,
-            profile=profile,
-            edital_id=target,
-            library_items=materials,
-            mode="proposal",
-            plan=self._plan(context, self.build_outline(artifact_type)),
-            writing_context=self._context_for_prompt(context),
-            allow_incomplete_profile=True,
-        )
-        return {
-            "writing_session_id": session.session_id,
-            "context": context.model_dump(mode="json"),
-            "project_id": context.project_id,
-            "path_id": context.path_id,
-            "outline": session.get_info()["section_titles"],
-            "requirements": context.requirements,
-            "gaps": context.gaps,
-            "artifact_type": context.artifact_type,
-        }
+        open_key = self._open_key(workspace_id, conversation_id, context)
+        existing_id = self._existing_session_id(db, workspace_id, open_key)
+        if existing_id:
+            existing_context = self._load_context(db, existing_id, workspace_id)
+            session = WritingSession(
+                db=db, workspace_id=workspace_id, profile=profile,
+                session_id=existing_id,
+                library_items=load_library_items(db, workspace_id, existing_context.allowed_materials),
+                mode="proposal", allow_incomplete_profile=True,
+            )
+            return self._open_response(session, existing_context)
+
+        # A PK determinística ajuda a recuperar a sessão mesmo se o timeout
+        # acontecer após o INSERT. O índice unique da migration 054 cobre a
+        # mesma garantia no banco para qualquer instância concorrente.
+        creation_id = str(uuid5(NAMESPACE_URL, f"radar-grounded-writing:{workspace_id}:{open_key}"))
+        try:
+            session = WritingSession(
+                db=db,
+                workspace_id=workspace_id,
+                profile=profile,
+                edital_id=target,
+                library_items=materials,
+                mode="proposal",
+                plan=self._plan(context, self.build_outline(artifact_type)),
+                writing_context=self._context_for_prompt(context),
+                allow_incomplete_profile=True,
+                creation_id=creation_id,
+                grounded_open_key=open_key,
+                create_application_log=path.formal_instrument,
+            )
+        except Exception:
+            existing_id = self._existing_session_id(db, workspace_id, open_key)
+            if not existing_id:
+                raise
+            existing_context = self._load_context(db, existing_id, workspace_id)
+            session = WritingSession(
+                db=db, workspace_id=workspace_id, profile=profile,
+                session_id=existing_id,
+                library_items=load_library_items(db, workspace_id, existing_context.allowed_materials),
+                mode="proposal", allow_incomplete_profile=True,
+            )
+            return self._open_response(session, existing_context)
+        return self._open_response(session, context)
 
     def _load_context(self, db, session_id: str, workspace_id: str) -> WritingContext:
         result = (

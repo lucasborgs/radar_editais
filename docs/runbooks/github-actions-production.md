@@ -9,11 +9,12 @@ Cada push em `main` executa:
 
 1. deploy do `radar-staging-local`;
 2. smoke autenticado real contra Supabase local, backend e frontend;
-3. espera por aprovação no Environment `Production`;
-4. migration protegida do Supabase Cloud;
-5. build versionado pelo SHA do commit;
-6. atualização do `radar-production`;
-7. health check da API.
+3. registro das imagens de produção atualmente em execução, para rollback;
+4. snapshot lógico validado do Supabase Cloud, persistido no host antes de qualquer migration;
+5. migration protegida do Supabase Cloud;
+6. build versionado pelo SHA do commit;
+7. atualização do `radar-production`;
+8. health check da API.
 
 Pull Requests nunca executam deploy.
 
@@ -34,6 +35,7 @@ Deixe o runner configurado como serviço para iniciar com o sistema.
 O runner precisa ter:
 
 - Docker e Docker Compose;
+- Docker apto a executar a imagem ARM64 fixada do cliente PostgreSQL, usada pelo CD;
 - Supabase CLI 2.98.2;
 - Python 3.12;
 - Node.js 20;
@@ -56,19 +58,32 @@ O `.env` deve apontar para o mesmo projeto Supabase de produção e declarar
 `ENVIRONMENT=production`. Não copie esses arquivos para o repositório.
 
 O `PROD_DATABASE_URL` do Environment `Production` é usado pela migration
-protegida via URL explícita; o CD não depende de `supabase link` persistido no
-runner. A `OPENAI_API_KEY` deve existir também no Environment `Production`;
+protegida via URL explícita e pelo snapshot lógico pré-migration; o CD não
+depende de `supabase link` persistido no runner. A etapa de staging baixa e
+verifica antecipadamente a imagem ARM64 fixada do cliente PostgreSQL. Em
+produção, o dump e sua validação são executados com o ID dessa imagem, sem expor
+a URL de conexão nos argumentos de processo. O snapshot fica em
+`$HOME/.local/share/radar-editais/recovery-snapshots/`, com permissões privadas,
+e o workflow falha antes da migration se não puder criá-lo e validá-lo com
+`pg_restore --list`. A `OPENAI_API_KEY` deve existir também no Environment `Production`;
 ela é injetada somente durante a atualização dos containers.
 
-## Aprovação de produção
+## Segurança da produção
 
-No GitHub, configure o Environment `Production` com pelo menos um revisor
-obrigatório. O job de produção não inicia antes dessa aprovação.
+Como o projeto roda em pré-beta com dados descartáveis, o CD não exige
+aprovação humana: um push verde em `main` chega a produção automaticamente.
+Os gates restantes são de máquina: snapshot lógico validado com `pg_restore --list`
+antes de cada migration, migration protegida e health check pós-deploy.
+
+O Environment `Production` mantém apenas escopo de secret e a política de branch
+(`main`): `PROD_DATABASE_URL` e `OPENAI_API_KEY` são resolvidos de lá pelo job;
+nenhuma regra de revisão (`required_reviewers`) está configurada.
 
 ## Rollback
 
-As imagens são marcadas com o SHA do commit. Para retornar à versão anterior,
-defina `IMAGE_TAG` com o SHA validado anterior e execute manualmente:
+As imagens são marcadas com o SHA do commit. O resumo do job de produção registra
+a imagem e o digest dos containers anteriores antes de cada migration. Para retornar
+à versão anterior, use esse SHA validado e execute manualmente:
 
 ```bash
 IMAGE_TAG=<sha-anterior> scripts/compose.sh production up -d --no-build app worker tunnel

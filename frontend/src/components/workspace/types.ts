@@ -121,11 +121,11 @@ export function sectionAnchorId(title: string): string {
 }
 
 export function modeLabel(mode: WritingMode | undefined): string {
-  return mode === "pitch" ? "Pitch" : "Proposta";
+  return mode === "pitch" ? "Sessão legada" : "Proposta";
 }
 
-// Deriva o modo a partir do id do alvo quando o backend não o expõe (ex.: ao
-// retomar uma sessão só com o /document). `investidor:<slug>` → pitch.
+// Deriva o modo persistido a partir do id do alvo quando o backend não o expõe
+// (ex.: ao retomar uma sessão antiga só com o /document).
 export function modeFromEditalId(editalId: string): WritingMode {
   return editalId.startsWith("investidor:") ? "pitch" : "proposal";
 }

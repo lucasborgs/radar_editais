@@ -119,8 +119,9 @@ TLS, latência e configuração gerenciada antes da produção.
 
 ## Promover para produção
 
-Pré-condições: mesmo commit aprovado na pré-produção local, backup/ponto de recuperação,
-resultado 4/4 dos casos motivadores e aprovação humana registrada.
+Pré-condições: mesmo commit aprovado na pré-produção local, backup/ponto de
+recuperação e resultado 4/4 dos casos motivadores. Em pré-beta, o deploy é
+automático via CD após CI verde — não há aprovação humana registrada.
 
 ```bash
 ENVIRONMENT=production ALLOW_ENVIRONMENT_INITIALIZATION=1 \

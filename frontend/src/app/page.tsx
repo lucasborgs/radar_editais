@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
@@ -19,6 +18,11 @@ import { ProfileIncompleteCard } from "@/components/frontdoor/ProfileIncompleteC
 import { UrlHero } from "@/components/frontdoor/UrlHero";
 import { UnlockCard } from "@/components/frontdoor/UnlockCard";
 import { ConsultantJourneyCard } from "@/components/consultant/ConsultantJourneyCard";
+import {
+  artifactTypeForConsultantPath,
+  saveAndConfirmConsultantProject,
+} from "@/lib/consultant-project";
+import { savePendingConsultantIntent, takePendingConsultantIntent } from "@/lib/pending-consultant-intent";
 import {
   consultantTurn,
   openGroundedWriting,
@@ -115,7 +119,7 @@ function Bubble({
 
 // ── Página ──────────────────────────────────────────────────────────────────
 export default function FrontDoorPage() {
-  const { session, getToken, signOut } = useAuth();
+  const { session, getToken, signOut, loading: authLoading } = useAuth();
   const router = useRouter();
   const isAuthed = !!session;
 
@@ -135,6 +139,7 @@ export default function FrontDoorPage() {
   const [legacyReadOnly, setLegacyReadOnly] = useState(false);
   // Retomada via sidebar: /?c=<session_id>. Lido uma vez na montagem.
   const [resumeId, setResumeId] = useState<string | null>(null);
+  const [isResumeLoading, setIsResumeLoading] = useState(false);
   // Hero de URL (Etapa 1): some quando o usuário extrai um site ou escolhe
   // "prefiro descrever" (cai no chat). Estado de sessão — não persiste.
   const [heroDismissed, setHeroDismissed] = useState(false);
@@ -158,6 +163,7 @@ export default function FrontDoorPage() {
     const c = new URLSearchParams(window.location.search).get("c");
     if (c) {
       setResumeId(c);
+      setIsResumeLoading(true);
     } else {
       setEntries([]);
     }
@@ -166,11 +172,17 @@ export default function FrontDoorPage() {
   }, []);
 
   // Retomada de conversa do consultor (com fallback para conversas antigas).
-  // Espera o auth resolver — se o usuário for mesmo anônimo, o efeito nunca
-  // dispara e a home fica como conversa nova.
   useEffect(() => {
-    if (!hydrated || !isAuthed || !resumeId) return;
+    if (!hydrated || !resumeId || authLoading) return;
+    if (!isAuthed) {
+      setConsultantState(null);
+      setEntries([]);
+      setLegacyReadOnly(false);
+      setIsResumeLoading(false);
+      return;
+    }
     let alive = true;
+    setIsResumeLoading(true);
     (async () => {
       try {
         const token = await getToken();
@@ -192,12 +204,14 @@ export default function FrontDoorPage() {
         }
       } catch {
         if (alive) toast.error("Não consegui retomar esta conversa.");
+      } finally {
+        if (alive) setIsResumeLoading(false);
       }
     })();
     return () => {
       alive = false;
     };
-  }, [hydrated, isAuthed, resumeId, getToken, bindSession]);
+  }, [hydrated, isAuthed, resumeId, authLoading, getToken, bindSession]);
 
   // Recarregar a home sem ?c= também recupera a sessão do consultor vinculada
   // em memória. Conversas antigas nunca são promovidas a uma nova sessão.
@@ -326,6 +340,7 @@ export default function FrontDoorPage() {
       if (!trimmed || sending) return;
 
       if (!isAuthed) {
+        savePendingConsultantIntent(window.localStorage, trimmed);
         router.push("/login");
         return;
       }
@@ -368,30 +383,45 @@ export default function FrontDoorPage() {
     [entries, sending, sessionId, consultantState?.revision, bindSession, isAuthed, legacyReadOnly, router],
   );
 
-  const updateBrief = useCallback(async (updates: ConsultantBriefUpdate) => {
-    if (!sessionId || !consultantState) return;
-    const token = await getToken();
-    if (!token) return;
-    try {
-      const payload = await updateConsultantBrief(sessionId, consultantState.revision, updates, token);
-      setConsultantState(payload.state);
-      setEntries(entriesFromConsultant(payload.state));
-      toast.success("Brief revisado.");
-    } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Não consegui salvar o brief.");
-    }
-  }, [consultantState, getToken, sessionId]);
+  useEffect(() => {
+    if (!hydrated || !isAuthed || sending || legacyReadOnly) return;
+    const pendingIntent = takePendingConsultantIntent(window.localStorage);
+    if (pendingIntent) void send(pendingIntent);
+  }, [hydrated, isAuthed, sending, legacyReadOnly, send]);
 
-  const confirmProject = useCallback(async () => {
+  const saveAndConfirmProject = useCallback(async (updates: ConsultantBriefUpdate) => {
     if (!sessionId || !consultantState) return;
     const token = await getToken();
     if (!token) return;
+
+    let stage: "save" | "confirm" = Object.keys(updates).length > 0 ? "save" : "confirm";
     try {
-      const payload = await confirmConsultantProject(sessionId, consultantState.revision, token);
-      setConsultantState(payload.state);
-      setEntries(entriesFromConsultant(payload.state));
+      await saveAndConfirmConsultantProject({
+        updates,
+        revision: consultantState.revision,
+        confirmation: {
+          saveBrief: async (briefUpdates, expectedRevision) => {
+            const saved = await updateConsultantBrief(sessionId, expectedRevision, briefUpdates, token);
+            stage = "confirm";
+            setConsultantState(saved.state);
+            setEntries(entriesFromConsultant(saved.state));
+            return { revision: saved.state.revision };
+          },
+          confirmProject: async (expectedRevision) => {
+            const payload = await confirmConsultantProject(sessionId, expectedRevision, token);
+            setConsultantState(payload.state);
+            setEntries(entriesFromConsultant(payload.state));
+          },
+        },
+      });
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Não consegui confirmar o projeto.");
+      toast.error(
+        cause instanceof Error
+          ? cause.message
+          : stage === "save"
+            ? "Não consegui salvar o brief."
+            : "Não consegui confirmar o projeto.",
+      );
     }
   }, [consultantState, getToken, sessionId]);
 
@@ -425,12 +455,14 @@ export default function FrontDoorPage() {
   const openWriting = useCallback(async (pathId: string) => {
     if (!sessionId) return;
     try {
-      const result = await openGroundedWriting(sessionId, pathId);
+      const path = consultantState?.paths.find((item) => item.id === pathId);
+      const artifactType = artifactTypeForConsultantPath(path ?? {});
+      const result = await openGroundedWriting(sessionId, pathId, artifactType);
       router.push(`/workspace/${result.writing_session_id}`);
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : "Não consegui abrir a proposta.");
     }
-  }, [router, sessionId]);
+  }, [consultantState, router, sessionId]);
 
   // ── Aceite/descarte de um diff (por índice no transcript) ───────────────────
   const decideDiff = useCallback(
@@ -566,6 +598,7 @@ export default function FrontDoorPage() {
     setInput("");
     setSessionId(null);
     setResumeId(null);
+    setIsResumeLoading(false);
     // Derruba um eventual ?c= da URL sem remontar a página.
     if (window.location.search) {
       window.history.replaceState(null, "", "/");
@@ -590,6 +623,7 @@ export default function FrontDoorPage() {
       const id = (ev as CustomEvent<string>).detail;
       if (!id) return;
       resetConversation();
+      setIsResumeLoading(true);
       setResumeId(id);
       window.history.replaceState(null, "", `/?c=${encodeURIComponent(id)}`);
     }
@@ -597,7 +631,8 @@ export default function FrontDoorPage() {
     return () => window.removeEventListener("consultant:resume", onResume);
   }, [resetConversation]);
 
-  const isEmpty = hydrated && entries.length === 0;
+  const isEmpty = hydrated && !isResumeLoading && entries.length === 0;
+  const hasConversationContext = hydrated && !isResumeLoading && entries.length > 0;
   // Hero de URL na 1ª tela (Etapa 1): só com perfil ainda não-rodável, conversa
   // vazia e antes de o usuário optar por descrever. Some ao extrair ou pular.
   const heroActive = isEmpty && !heroDismissed && !isRadarReady(profile);
@@ -606,7 +641,7 @@ export default function FrontDoorPage() {
   // Gaps de alto impacto (Etapa 2). Profile-only pós-Sprint 3 (o radar saiu): só
   // nudge quando o perfil já é rodável. Some sozinho quando os campos são preenchidos.
   const gaps = isRadarReady(profile) ? missingHighImpact(profile) : [];
-  const showUnlock = gaps.length > 0 && !unlockDismissed;
+  const showUnlock = hasConversationContext && gaps.length > 0 && !unlockDismissed;
 
   return (
     <div className="flex h-[100dvh] bg-app-bg">
@@ -689,17 +724,11 @@ export default function FrontDoorPage() {
                 <div key={i} className="px-4 pb-2 pt-1">
                   <div className="rounded-xl border border-primary/25 bg-primary/5 p-4">
                     <p className="text-sm font-semibold text-content-primary">
-                      Seu Radar encontrou {total} {total === 1 ? "aderência" : "aderências"}
+                      O Consultor encontrou {total} {total === 1 ? "aderência" : "aderências"}
                     </p>
                     <p className="mt-1 text-sm text-content-secondary">
-                      Veja a ordem completa, evidências, elegibilidade, filtros e comparação no Radar.
+                      Avalie evidências, elegibilidade, filtros e comparação para cada caminho.
                     </p>
-                    <Link
-                      href="/"
-                      className="mt-3 inline-flex rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90"
-                    >
-                      Abrir o Radar →
-                    </Link>
                   </div>
                 </div>
               );
@@ -712,8 +741,7 @@ export default function FrontDoorPage() {
         {consultantState && (
           <ConsultantJourneyCard
             state={consultantState}
-            onConfirm={() => void confirmProject()}
-            onUpdate={updateBrief}
+            onSaveAndConfirm={saveAndConfirmProject}
             onSelect={selectPath}
             onReassess={reassessPath}
             onOpenWriting={openWriting}
@@ -743,27 +771,12 @@ export default function FrontDoorPage() {
           </div>
         )}
 
-        {entries.some(
-          (e) => e.kind === "radar" && e.matchedEditais.length + e.matchedEntities.length > 0,
-        ) && (
-          <div className="mx-auto flex w-full max-w-2xl items-center justify-between px-1 pb-1.5">
-            <div />
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
-            >
-              Ver caminhos no consultor →
-            </button>
-          </div>
-        )}
-
         <Composer
           value={input}
           onChange={setInput}
           onSend={() => void send(input)}
-          onAttach={handleAttachClick}
-          onPickFile={handlePickFile}
+          onAttach={hasConversationContext ? handleAttachClick : undefined}
+          onPickFile={hasConversationContext ? handlePickFile : undefined}
           disabled={sending || legacyReadOnly}
           placeholder={legacyReadOnly ? "Conversa antiga somente leitura" : "Conte sua intenção para o consultor…"}
         />

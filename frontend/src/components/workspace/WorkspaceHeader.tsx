@@ -7,7 +7,7 @@ import { modeLabel } from "./types";
 
 /**
  * Header fino do projeto: nome do edital/alvo + badge do modo
- * (Proposta/Pitch) + completude do documento + retorno aos projetos.
+ * (Proposta/sessão legada) + completude do documento + retorno aos projetos.
  */
 export function WorkspaceHeader({
   title,
@@ -34,7 +34,7 @@ export function WorkspaceHeader({
         className={cn(
           "shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full font-sans",
           mode === "pitch"
-            ? "bg-purple-500/15 text-purple-700"
+            ? "bg-content-secondary/15 text-content-secondary"
             : "bg-primary/15 text-primary",
         )}
       >
