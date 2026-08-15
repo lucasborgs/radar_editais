@@ -63,7 +63,7 @@ export function PathBlock({
       <details className="group mt-1.5">
         <summary className="flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-primary hover:underline [&::-webkit-details-marker]:hidden">
           <span className="transition-transform group-open:rotate-90">›</span>
-          Como o Radar vê este caminho
+          Como o Consultor avalia este caminho
         </summary>
         <div className="mt-2 space-y-2">
           {explanation?.criterios && (
