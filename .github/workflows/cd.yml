@@ -90,7 +90,14 @@ jobs:
       - name: Start local Supabase and apply migrations
         run: |
           supabase start
-          supabase migration up
+          # O banco local é compartilhado com o host de dev (mesma máquina do
+          # runner). Jobs anteriores podem ter aplicado migrations de branches
+          # ainda não mergeadas (ex.: 058/059 da RT), deixando o histórico à
+          # frente do diretório de main — `supabase migration up` recusa esse
+          # drift. `db reset` recria o schema a partir das migrations do
+          # checkout (001-057), determinístico por deploy. Sem seed para
+          # ficar em paridade com o smoke do CI.
+          supabase db reset --no-seed
           eval "$(supabase status -o env | sed 's/^/LOCAL_/')"
           {
             echo "SUPABASE_URL=$LOCAL_API_URL"
