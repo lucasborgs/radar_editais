@@ -169,7 +169,9 @@ def test_consultant_graph_t04_to_t07_smoke(authenticated_smoke):
     client, _service, _opportunity_id, legacy_id = authenticated_smoke
 
     # T07: deep-links antigos continuam apontando para a entrada única da jornada.
-    for route in ("/radar", "/chat", "/workspace/planning"):
+    # `/radar` é destino primário (não redireciona); apenas as rotas legadas de
+    # escrita retornam à entrada.
+    for route in ("/chat", "/workspace/planning"):
         response = requests.get(f"{_FRONTEND_URL}{route}", allow_redirects=False, timeout=30)
         assert response.status_code in {307, 308}, (route, response.status_code, response.text)
         assert response.headers.get("location", "").rstrip("/") in {"", "/"}
