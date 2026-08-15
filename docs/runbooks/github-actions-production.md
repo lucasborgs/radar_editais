@@ -9,13 +9,12 @@ Cada push em `main` executa:
 
 1. deploy do `radar-staging-local`;
 2. smoke autenticado real contra Supabase local, backend e frontend;
-3. espera por aprovação no Environment `Production`;
-4. registro das imagens de produção atualmente em execução, para rollback;
-5. snapshot lógico validado do Supabase Cloud, persistido no host antes de qualquer migration;
-6. migration protegida do Supabase Cloud;
-7. build versionado pelo SHA do commit;
-8. atualização do `radar-production`;
-9. health check da API.
+3. registro das imagens de produção atualmente em execução, para rollback;
+4. snapshot lógico validado do Supabase Cloud, persistido no host antes de qualquer migration;
+5. migration protegida do Supabase Cloud;
+6. build versionado pelo SHA do commit;
+7. atualização do `radar-production`;
+8. health check da API.
 
 Pull Requests nunca executam deploy.
 
@@ -69,10 +68,16 @@ e o workflow falha antes da migration se não puder criá-lo e validá-lo com
 `pg_restore --list`. A `OPENAI_API_KEY` deve existir também no Environment `Production`;
 ela é injetada somente durante a atualização dos containers.
 
-## Aprovação de produção
+## Segurança da produção
 
-No GitHub, configure o Environment `Production` com pelo menos um revisor
-obrigatório. O job de produção não inicia antes dessa aprovação.
+Como o projeto roda em pré-beta com dados descartáveis, o CD não exige
+aprovação humana: um push verde em `main` chega a produção automaticamente.
+Os gates restantes são de máquina: snapshot lógico validado com `pg_restore --list`
+antes de cada migration, migration protegida e health check pós-deploy.
+
+O Environment `Production` mantém apenas escopo de secret e a política de branch
+(`main`): `PROD_DATABASE_URL` e `OPENAI_API_KEY` são resolvidos de lá pelo job;
+nenhuma regra de revisão (`required_reviewers`) está configurada.
 
 ## Rollback
 
