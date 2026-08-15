@@ -7,8 +7,7 @@ import { toast } from "sonner";
 import { MatchedEditalCard } from "@/components/frontdoor/MatchedEditalCard";
 import { MatchedEntityCard } from "@/components/frontdoor/MatchedEntityCard";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { getRadarMatches, startWritingSession, type RadarMatchesResponse } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { getRadarMatches, type RadarMatchesResponse } from "@/lib/api";
 import {
   availableSetores,
   DEFAULT_RADAR_FILTERS,
@@ -19,7 +18,7 @@ import {
   type RadarFilters,
 } from "@/lib/radar-utils";
 import { temporalDeadlineText } from "@/lib/opportunity-temporal";
-import { isCompleteForWriting, isRadarReady } from "@/types/frontdoor";
+import { isRadarReady } from "@/types/frontdoor";
 import { EMPTY_PROFILE, loadProfileFromStorage, type CompanyProfile } from "@/types/profile";
 
 function LoadingCards() {
@@ -75,7 +74,6 @@ function ComparisonPanel({
 
 export default function RadarPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<CompanyProfile>(EMPTY_PROFILE);
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -106,17 +104,13 @@ export default function RadarPage() {
     if (current.length >= 3) { toast.message("Compare até três oportunidades por vez."); return current; }
     return [...current, id];
   }), []);
-  const startWriting = useCallback(async (id: string) => {
-    if (!isCompleteForWriting(profile).ok) { toast.message("Complete o perfil para iniciar uma proposta."); router.push("/perfil"); return; }
-    if (!user) { toast.message("Entre para iniciar uma proposta."); router.push("/login"); return; }
-    try {
-      const session = await startWritingSession(id, profile);
-      if (session.session_id) router.push(`/workspace/${session.session_id}`);
-    } catch (cause) { toast.error(cause instanceof Error ? cause.message : "Não consegui iniciar agora."); }
-  }, [profile, router, user]);
+  const startWriting = useCallback(() => {
+    toast.message("Escolha um caminho no Consultor antes de abrir uma proposta.");
+    router.push("/");
+  }, [router]);
 
   let content: React.ReactNode;
-  if (!hydrated || authLoading) {
+  if (!hydrated) {
     content = <LoadingCards />;
   } else if (!ready) {
     content = <div className="mx-auto max-w-2xl"><div className="mt-24 rounded-xl border border-border bg-surface p-6"><p className="text-sm font-semibold text-primary">Radar</p><h1 className="mt-2 text-2xl font-semibold text-content-primary">Conte o que sua empresa faz.</h1><p className="mt-2 text-content-secondary">Com o nome e uma descrição das atividades, encontramos oportunidades por aderência de escopo — não por promessa de aprovação.</p><Link href="/" className="mt-5 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90">Completar contexto no Consultor</Link></div></div>;
