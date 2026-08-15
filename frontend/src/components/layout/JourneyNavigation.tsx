@@ -15,7 +15,7 @@ export function JourneyNavigation({ active }: { active: Journey }) {
       className="mb-8 flex items-center justify-between border-b border-border pb-3 text-sm"
     >
       <Link href="/" className="font-semibold text-content-primary">
-        Radar Editais
+        Radar de Editais
       </Link>
       <div className="flex items-center gap-1">
         {JOURNEYS.map((journey) =>

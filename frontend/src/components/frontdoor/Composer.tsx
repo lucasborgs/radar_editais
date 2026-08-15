@@ -55,29 +55,34 @@ export function Composer({
   };
 
   const canSend = value.trim().length > 0 && !disabled;
+  const canAttach = !!onAttach || !!onPickFile;
 
   return (
     <div className="border-t border-border bg-surface px-4 py-3">
       <div className="mx-auto flex max-w-2xl items-end gap-2">
-        <input
-          ref={fileRef}
-          type="file"
-          accept={ACCEPT}
-          className="hidden"
-          onChange={handleFile}
-        />
-        <button
-          type="button"
-          onClick={handleAttach}
-          disabled={disabled}
-          aria-label="Anexar arquivo"
-          className={cn(
-            "shrink-0 rounded-full border border-border px-3 py-2.5 text-sm text-content-secondary",
-            "transition-colors hover:bg-app-bg disabled:cursor-not-allowed disabled:opacity-40",
-          )}
-        >
-          <span aria-hidden>📎</span>
-        </button>
+        {canAttach && (
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              accept={ACCEPT}
+              className="hidden"
+              onChange={handleFile}
+            />
+            <button
+              type="button"
+              onClick={handleAttach}
+              disabled={disabled}
+              aria-label="Anexar arquivo"
+              className={cn(
+                "shrink-0 rounded-full border border-border px-3 py-2.5 text-sm text-content-secondary",
+                "transition-colors hover:bg-app-bg disabled:cursor-not-allowed disabled:opacity-40",
+              )}
+            >
+              <span aria-hidden>📎</span>
+            </button>
+          </>
+        )}
         <textarea
           ref={ref}
           value={value}

@@ -31,7 +31,7 @@ export default function PipelinePage() {
       try {
         const token = await getToken();
         if (!token) {
-          setError("Faça login para ver seu pipeline.");
+          setError("Faça login para ver seu acompanhamento.");
           setLoading(false);
           return;
         }
@@ -39,10 +39,10 @@ export default function PipelinePage() {
         if (cancelled) return;
         setApps(res ?? []);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Erro ao carregar o pipeline";
+        const msg = e instanceof Error ? e.message : "Erro ao carregar o acompanhamento";
         if (cancelled) return;
         if (msg.includes("404")) {
-          setError("Pipeline ainda não disponível neste ambiente.");
+          setError("O acompanhamento ainda não está disponível.");
         } else {
           setError(msg);
         }
@@ -79,7 +79,7 @@ export default function PipelinePage() {
     apps.filter((a) => a.status === status);
 
   return (
-    <DashboardLayout title="Pipeline">
+    <DashboardLayout title="Acompanhamento">
       <div className="space-y-6">
         {loading ? (
           <>
@@ -108,18 +108,16 @@ export default function PipelinePage() {
             {error}
           </div>
         ) : apps.length === 0 ? (
-          <div className="text-center py-20 space-y-3">
-            <p className="text-4xl">📋</p>
-            <p className="text-sm font-sans text-content-secondary">
-              Seu pipeline está vazio.
-              <br />
-              Faça um match e gere um brief para começar.
+          <div className="rounded-xl border border-border bg-surface p-8 text-center">
+            <h2 className="font-semibold text-content-primary">Nada em acompanhamento</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-content-secondary">
+              Inicie uma proposta a partir de um edital ou programa no Radar para começar a acompanhá-la.
             </p>
             <Link
-              href="/"
-              className="inline-block mt-2 px-4 py-2 rounded-xl text-sm font-semibold font-sans text-white bg-primary hover:bg-primary-hover transition-colors"
+              href="/radar"
+              className="mt-5 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
             >
-              Ir para o consultor
+              Ir para o Radar
             </Link>
           </div>
         ) : (

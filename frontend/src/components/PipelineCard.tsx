@@ -16,7 +16,7 @@ const STATUS_ORDER: ApplicationStatus[] = [
 ];
 
 const STATUS_LABEL: Record<ApplicationStatus, string> = {
-  matched: "Match",
+  matched: "Caminho identificado",
   brief_gerado: "Brief",
   proposta_iniciada: "Em escrita",
   submetida: "Submetida",
@@ -88,7 +88,7 @@ export function PipelineCard({ app, onStatusChange, busy }: PipelineCardProps) {
       <div className="flex items-center justify-between gap-2">
         {app.match_score != null ? (
           <span className="font-data text-xs text-content-secondary tabular-nums">
-            fit {Math.round(app.match_score)}
+            Afinidade {Math.round(app.match_score)}
           </span>
         ) : (
           <span className="text-xs text-content-secondary font-sans">—</span>

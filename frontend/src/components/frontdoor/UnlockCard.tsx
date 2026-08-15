@@ -7,7 +7,7 @@ import { coerceFieldValue } from "./profileFields";
 import type { CompanyProfile } from "@/types/profile";
 import type { ProfileGap } from "@/types/frontdoor";
 
-// Card "Destravar mais matches" — Etapa 2 do onboarding progressivo (spec
+// Card de refinamento de caminhos — Etapa 2 do onboarding progressivo (spec
 // onboarding-input-ux, Decisão 3). Mostra os campos faltantes de maior impacto
 // (missingHighImpact) com inputs tipados inline. Ao aplicar, devolve só os campos
 // preenchidos (coeridos); o caller persiste e re-roda o radar — o usuário vê o
@@ -48,7 +48,7 @@ export function UnlockCard({
     <div className="rounded-xl border border-primary/30 bg-surface px-4 py-3 text-sm font-sans shadow-card">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-wide text-content-secondary">
-          Destravar mais matches
+          Encontrar caminhos mais aderentes
         </span>
         <button
           type="button"
@@ -83,13 +83,13 @@ export function UnlockCard({
             "hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
           )}
         >
-          Aplicar e atualizar radar
+          Aplicar informações
         </button>
       </div>
 
       <p className="mt-2 text-xs text-content-secondary">
-        Tem uma proposta antiga? Anexe pelo 📎 do campo de mensagem para enriquecer
-        o perfil.
+        Tem uma proposta antiga? Anexe pelo 📎 do campo de mensagem para considerar
+        essas informações no perfil.
       </p>
     </div>
   );

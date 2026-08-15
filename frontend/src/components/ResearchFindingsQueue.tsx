@@ -13,7 +13,13 @@ import {
 // Fila da Fase B do deep_research: findings que o sub-agente de pesquisa
 // descobriu (verified=false) e ainda não foram revisados. O usuário promove à
 // biblioteca o que quiser manter. Estilo coerente com MatchingWeightsSection.
-export function ResearchFindingsQueue({ token }: { token: string | null }) {
+export function ResearchFindingsQueue({
+  token,
+  onPendingFindingsChange,
+}: {
+  token: string | null;
+  onPendingFindingsChange?: (hasPending: boolean | null) => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [findings, setFindings] = useState<ResearchFinding[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +47,11 @@ export function ResearchFindingsQueue({ token }: { token: string | null }) {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (!onPendingFindingsChange) return;
+    onPendingFindingsChange(!token || loading || error ? null : findings.length > 0);
+  }, [error, findings.length, loading, onPendingFindingsChange, token]);
 
   async function handlePromote(finding: ResearchFinding) {
     if (!token) return;

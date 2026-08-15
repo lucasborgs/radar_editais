@@ -13,15 +13,14 @@ superfície atual não as apresenta como um modelo coerente:
 
 - a entrada `/` funciona como exploração conversacional e construção de perfil,
   mas não recebe um nome estável na navegação;
-- `/oportunidades` se chama **Oportunidades**, embora catalogue também programas,
-  investidores e ICTs;
+- `/oportunidades` se chama **Oportunidades**, embora catalogue também programas
+  e ICTs;
 - **Radar** aparece no header da entrada, mas não na navegação lateral que reúne
   as demais áreas;
 - a entrada pode renderizar uma lista de matches, enquanto `/radar` também se
   apresenta como superfície completa de resultados;
-- sessões de escrita aparecem no histórico sob o verbo **Escrever**, enquanto a
-  capacidade produz tanto propostas quanto pitches e não possui um destino
-  primário próprio na navegação;
+- sessões de escrita aparecem no histórico sob o verbo **Escrever**, sem um
+  destino primário próprio na navegação;
 - o workspace usa **Explorer** para navegação/estrutura interna, ao mesmo tempo
   que a jornada de mapeamento também é descrita como Explorer; e
 - o retorno do workspace é rotulado `Radar`, mas aponta para `/`, a superfície de
@@ -47,7 +46,7 @@ jornada, sem que a ordem imponha um fluxo obrigatório:
 
 1. **Explorar:** compreender o ecossistema e formar contexto;
 2. **Radar:** avaliar o que tem aderência à empresa e por quê; e
-3. **Projetos:** desenvolver propostas e pitches a partir de uma escolha.
+3. **Projetos:** desenvolver propostas a partir de uma escolha.
 
 As capacidades continuam acessíveis de forma independente quando houver
 contexto suficiente. A interface deve revelar detalhes técnicos, evidências e
@@ -58,9 +57,9 @@ ferramentas avançadas apenas quando forem úteis à decisão corrente.
 | Conceito | Nome de produto | Uso pretendido |
 |---|---|---|
 | capacidade de mapeamento | **Explorar** | ação e destino primário; entrada `/` |
-| catálogo amplo | **Ecossistema** | título da visão que reúne oportunidades, programas, investidores e ICTs |
+| catálogo amplo | **Ecossistema** | título da visão que reúne oportunidades, programas e ICTs |
 | capacidade de match | **Radar** | destino primário e superfície canônica dos resultados priorizados |
-| capacidade de escrita | **Projetos** | destino primário para propostas e pitches em andamento |
+| capacidade de escrita | **Projetos** | destino primário para propostas em andamento |
 | ambiente interno de autoria | workspace | termo técnico interno; não é a proposta de valor na navegação |
 | painel de seções do projeto | **Estrutura** | evita competir com o nome da jornada Explorar |
 | descoberta de fontes | **Descobertas** | superfície operacional restrita; não é capacidade primária do produto |
@@ -86,7 +85,7 @@ A navegação global deve apresentar, no mesmo nível:
 |---|---|---|
 | Explorar | `/` | perguntar, compreender o ecossistema e completar contexto |
 | Radar | `/radar` | ver e comparar aderências explicadas |
-| Projetos | `/projects` | retomar propostas e pitches |
+| Projetos | `/projects` | retomar propostas |
 
 A implementação pode preservar aliases e rotas internas existentes. A criação
 do destino de listagem de Projetos é apenas composição sobre sessões já
@@ -136,8 +135,8 @@ A visão atualmente em `/oportunidades` é a exploração estruturada do catálo
 Seu título de produto passa a ser **Ecossistema** porque seu conteúdo inclui
 oportunidades e atores.
 
-Filtros por tipo preservam **Oportunidades**, **Programas**, **Investidores** e
-**ICTs** como categorias de domínio. A rota pode permanecer `/oportunidades`
+Filtros por tipo preservam **Oportunidades**, **Programas** e **ICTs** como
+categorias de domínio. A rota pode permanecer `/oportunidades`
 para evitar migração sem valor imediato; nome visível e URL não precisam mudar
 juntos.
 
@@ -157,7 +156,7 @@ de aprovação.
 
 ### 5.4 Projetos
 
-**Projetos** reúne o trabalho persistente de proposta e pitch. O workspace
+**Projetos** reúne o trabalho persistente de proposta. O workspace
 existente continua sendo o ambiente de execução de um projeto, com RAG, agentes,
 estrutura, checklist e exportação preservados.
 
@@ -192,7 +191,7 @@ Esta mudança preserva:
 - a exploração conversacional e o catálogo amplo;
 - o contrato de perfil mínimo do Radar;
 - ranking, elegibilidade, evidências, filtros e comparação existentes;
-- os fluxos de proposta e pitch, seus agentes, RAG, memória e checklist;
+- o fluxo de proposta, seus agentes, RAG, memória e checklist;
 - contratos de API, schemas, migrations e persistência de sessões;
 - Descoberta com gate humano e superfícies operacionais; e
 - o laboratório técnico como parte explícita do propósito do sistema.
@@ -225,7 +224,7 @@ Aplicam-se integralmente as invariantes da
 2. limitar resultados na entrada a contexto ou prévia, sem duplicar a experiência
    completa de match;
 3. preservar a listagem, filtros e comparação no Radar; e
-4. expor retomada de propostas e pitches sob Projetos, reutilizando sessões.
+4. expor retomada de propostas sob Projetos, reutilizando sessões.
 
 ### Etapa 3 — Vocabulário local de autoria
 
@@ -273,7 +272,7 @@ O eixo estará concluído quando:
 2. Ecossistema nomear o catálogo amplo sem apagar suas categorias;
 3. `/radar` for a única superfície completa de resultados de match;
 4. a entrada conduzir explicitamente ao Radar quando houver perfil suficiente;
-5. propostas e pitches existentes puderem ser retomados sob Projetos;
+5. propostas existentes puderem ser retomadas sob Projetos;
 6. nenhum rótulo de navegação apontar para uma capacidade diferente;
 7. Descobertas permanecer separada e restrita à operação;
 8. a pessoa conseguir atravessar Explorar → Radar → Projetos sem precisar
@@ -289,7 +288,7 @@ Implementado em 2026-07-14:
   `/oportunidades` e suas categorias;
 - entradas de match na conversa passaram a renderizar uma prévia com CTA, sem
   duplicar a lista completa, filtros e comparação de `/radar`;
-- `/projects` passou a listar e retomar as sessões de proposta e pitch já
+- `/projects` passou a listar e retomar as sessões de proposta já
   persistidas por `GET /writing/sessions`;
 - Radar e Projetos passaram a compartilhar um shell focado e responsivo;
 - o painel visível do projeto passou de Explorer para Estrutura, e seus modos

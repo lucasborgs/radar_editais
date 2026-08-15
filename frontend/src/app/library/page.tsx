@@ -44,10 +44,10 @@ const TYPE_LABELS: Record<ContentItemType, string> = {
 };
 
 const ENRICHMENT_LABEL: Record<EnrichmentStatus, string> = {
-  pending: "enriquecendo…",
-  processing: "enriquecendo…",
-  done: "pronto",
-  failed: "falhou",
+  pending: "Processamento em andamento",
+  processing: "Processamento em andamento",
+  done: "Processado",
+  failed: "Processamento indisponível",
 };
 
 const ENRICHMENT_COLOR: Record<EnrichmentStatus, string> = {
@@ -94,7 +94,7 @@ function UploadModal({
     setError(null);
     try {
       await uploadLibraryPdf(file, { title: finalTitle, type, tags: "" }, token);
-      toast.success("Arquivo enviado — enriquecendo em segundo plano.");
+      toast.success("Arquivo enviado — processamento em andamento.");
       onSaved();
       onClose();
     } catch (e: unknown) {
@@ -402,6 +402,7 @@ export default function FilesPage() {
   const [items, setItems] = useState<ContentItemSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [includeArchived, setIncludeArchived] = useState(false);
+  const [hasPendingResearchFindings, setHasPendingResearchFindings] = useState<boolean | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [viewingId, setViewingId] = useState<string | null>(null);
 
@@ -486,19 +487,24 @@ export default function FilesPage() {
           <div>
             <h1 className="font-heading text-xl font-bold text-content-primary">Arquivos</h1>
             <p className="text-sm text-content-secondary font-sans mt-0.5">
-              Documentos disponíveis para mencionar (@) na escrita das suas propostas
+              Documentos para consultar enquanto escreve suas propostas
             </p>
           </div>
-          <button
-            onClick={() => setShowUpload(true)}
-            className="shrink-0 px-4 py-2 rounded-xl text-sm font-semibold font-sans text-white bg-primary hover:bg-primary-hover transition-colors"
-          >
-            + Enviar
-          </button>
+          {items.length > 0 && (
+            <button
+              onClick={() => setShowUpload(true)}
+              className="shrink-0 px-4 py-2 rounded-xl text-sm font-semibold font-sans text-white bg-primary hover:bg-primary-hover transition-colors"
+            >
+              + Enviar
+            </button>
+          )}
         </div>
 
         {/* Fila de findings do deep_research (Item 2, Fase B) — aditivo, some se vazia */}
-        <ResearchFindingsQueue token={token} />
+        <ResearchFindingsQueue
+          token={token}
+          onPendingFindingsChange={setHasPendingResearchFindings}
+        />
 
         {/* Toggle de arquivados */}
         <div className="flex items-center justify-end">
@@ -521,18 +527,26 @@ export default function FilesPage() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="text-center py-16 space-y-3">
-            <p className="text-4xl">📂</p>
-            <p className="text-sm font-sans text-content-secondary">
-              Nenhum arquivo ainda.
-              <br />
-              Envie propostas ou documentos para mencioná-los na escrita.
+          <div className="rounded-xl border border-border bg-surface p-8 text-center">
+            <h2 className="font-semibold text-content-primary">
+              {hasPendingResearchFindings === true
+                ? "Há pesquisas pendentes de revisão"
+                : hasPendingResearchFindings === false
+                  ? "Nenhum material ativo por enquanto"
+                  : "Preparando sua biblioteca"}
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-content-secondary">
+              {hasPendingResearchFindings === true
+                ? "Revise e promova os achados acima para adicioná-los à biblioteca."
+                : hasPendingResearchFindings === false
+                  ? "Envie um material para consultá-lo enquanto escreve uma proposta."
+                  : "Verificando materiais disponíveis para você."}
             </p>
             <button
               onClick={() => setShowUpload(true)}
-              className="mt-2 px-4 py-2 rounded-xl text-sm font-semibold font-sans text-white bg-primary hover:bg-primary-hover transition-colors"
+              className="mt-5 inline-flex rounded-lg px-4 py-2 text-sm font-semibold font-sans text-white bg-primary hover:bg-primary-hover transition-colors"
             >
-              Enviar primeiro arquivo
+              Enviar material
             </button>
           </div>
         ) : (
@@ -578,7 +592,7 @@ export default function FilesPage() {
                         "text-[10px] font-medium px-2 py-0.5 rounded-full font-sans inline-flex items-center gap-1 shrink-0",
                         ENRICHMENT_COLOR[status]
                       )}
-                      title={`enrichment_status: ${status}`}
+                      title="Status do processamento"
                     >
                       {(status === "pending" || status === "processing") && (
                         <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />

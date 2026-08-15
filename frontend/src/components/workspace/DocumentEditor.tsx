@@ -32,6 +32,7 @@ export function DocumentEditor({
   onFixWithAI,
   onRefineSection,
   registerScrollTo,
+  readOnly = false,
 }: {
   sections: WorkspaceSection[];
   highlightedSections: Set<string>;
@@ -48,6 +49,8 @@ export function DocumentEditor({
   onRefineSection: (title: string, instruction: string) => void;
   // O pai registra um callback p/ rolar até uma seção (clique no explorer).
   registerScrollTo: (fn: (title: string) => void) => void;
+  // Sessões legadas continuam consultáveis, sem permitir alterações.
+  readOnly?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -75,6 +78,7 @@ export function DocumentEditor({
             onInteract={() => onSectionInteract(s.title)}
             onFixWithAI={onFixWithAI}
             onRefine={(instruction) => onRefineSection(s.title, instruction)}
+            readOnly={readOnly}
           />
         ))}
         {sections.length === 0 && (
@@ -151,6 +155,7 @@ function SectionBlock({
   onInteract,
   onFixWithAI,
   onRefine,
+  readOnly,
 }: {
   section: WorkspaceSection;
   highlighted: boolean;
@@ -160,6 +165,7 @@ function SectionBlock({
   onInteract: () => void;
   onFixWithAI: (sectionHint: string | null, finding: Finding) => void;
   onRefine: (instruction: string) => void;
+  readOnly: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(section.content);
@@ -237,7 +243,7 @@ function SectionBlock({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {hasContent && (
+          {hasContent && !readOnly && (
             <button
               type="button"
               onClick={() => {
@@ -306,7 +312,7 @@ function SectionBlock({
         </div>
       )}
 
-      {editing ? (
+      {editing && !readOnly ? (
         <textarea
           ref={textareaRef}
           value={draft}
@@ -320,6 +326,17 @@ function SectionBlock({
             "focus:outline-none focus:ring-2 focus:ring-primary/40",
           )}
         />
+      ) : readOnly ? (
+        <div className="w-full rounded-md -mx-2 px-2 py-1">
+          {hasContent ? (
+            <div className="prose prose-sm max-w-none prose-p:my-1.5 prose-li:my-0.5 prose-headings:font-semibold prose-headings:text-content-primary font-sans">
+              <ReactMarkdown>{section.content}</ReactMarkdown>
+            </div>
+          ) : (
+            <p className="text-sm text-content-secondary/70 font-sans italic">— sem conteúdo</p>
+          )}
+          <CitationTooltip citations={section.citations ?? []} />
+        </div>
       ) : (
         <button
           type="button"

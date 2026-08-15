@@ -18,23 +18,23 @@ export function ProfileIncompleteCard({
 }) {
   if (missingFields.length === 0) return null;
 
+  const nextField = MISSING_FIELD_LABELS[missingFields[0]];
+
   return (
     <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm font-sans">
-      <p className="font-medium text-content-primary mb-2">
-        Para escrever uma proposta, complete estes campos no seu perfil:
+      <p className="font-medium text-content-primary">
+        Falta uma informação para continuar
       </p>
-      <ul className="list-disc list-inside space-y-1 mb-3 text-content-secondary">
-        {missingFields.map((f) => (
-          <li key={f}>
-            {MISSING_FIELD_LABELS[f] ?? f} — está em branco
-          </li>
-        ))}
-      </ul>
+      <p className="mt-1 text-content-secondary">
+        {nextField
+          ? `No seu perfil, preencha: ${nextField}.`
+          : "No seu perfil, preencha a próxima informação necessária."}
+      </p>
       <Link
         href="/perfil"
-        className="inline-block rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+        className="mt-3 inline-block rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
       >
-        Ir para perfil →
+        Completar no perfil
       </Link>
     </div>
   );

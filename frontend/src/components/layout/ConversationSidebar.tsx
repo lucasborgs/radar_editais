@@ -13,6 +13,11 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useIsAdmin } from "@/lib/hooks";
+import {
+  PRIMARY_NAV_DESTINATIONS,
+  UTILITY_NAV_DESTINATIONS,
+  visibleNavigationDestinations,
+} from "@/lib/navigation";
 import { ThemeToggle } from "./ThemeToggle";
 import {
   listConversations,
@@ -66,25 +71,20 @@ const ICON_PATHS = {
   dots: "M5 12h.01M12 12h.01M19 12h.01",
   discovered:
     "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm4-12l-6 2-2 6 6-2 2-6z",
-  radar:
-    "M12 3a9 9 0 109 9M12 7a5 5 0 105 5M12 11a1 1 0 100 2M12 12l6.5-6.5",
   projects:
     "M4 7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V7z",
 } as const;
 
-const PRIMARY_ITEMS = [
-  { href: "/", label: "Consultor", d: ICON_PATHS.discovered },
-  { href: "/projects", label: "Projetos", d: ICON_PATHS.projects },
-] as const;
-
-const UTILITY_ITEMS: { href: string; label: string; d: string; adminOnly?: boolean }[] = [
-  { href: "/perfil", label: "Perfil", d: ICON_PATHS.profile },
-  { href: "/pipeline", label: "Pipeline", d: ICON_PATHS.pipeline },
-  { href: "/oportunidades", label: "Ecossistema", d: ICON_PATHS.editais },
-  { href: "/library", label: "Arquivos", d: ICON_PATHS.files },
-  // Fila da Descoberta é ferramenta do operador (ADMIN_EMAILS), não do cliente.
-  { href: "/discovered", label: "Descobertas", d: ICON_PATHS.discovered, adminOnly: true },
-];
+const NAVIGATION_ICONS: Record<string, string> = {
+  "/": ICON_PATHS.discovered,
+  "/radar": ICON_PATHS.editais,
+  "/projects": ICON_PATHS.projects,
+  "/perfil": ICON_PATHS.profile,
+  "/library": ICON_PATHS.files,
+  "/pipeline": ICON_PATHS.pipeline,
+  "/oportunidades": ICON_PATHS.editais,
+  "/discovered": ICON_PATHS.discovered,
+};
 
 // ── Componente ─────────────────────────────────────────────────────────────────
 export function ConversationSidebar() {
@@ -247,7 +247,7 @@ export function ConversationSidebar() {
             </svg>
           </div>
           <span className="font-heading text-sm font-bold text-content-primary">
-            Radar Editais
+            Radar de Editais
           </span>
         </Link>
 
@@ -263,7 +263,7 @@ export function ConversationSidebar() {
         </button>
 
         <nav aria-label="Jornadas principais" className="space-y-0.5">
-          {PRIMARY_ITEMS.map(({ href, label, d }) => {
+          {PRIMARY_NAV_DESTINATIONS.map(({ href, label }) => {
             const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
             return (
               <Link
@@ -276,7 +276,7 @@ export function ConversationSidebar() {
                     : "text-content-secondary hover:bg-content-secondary/10 hover:text-content-primary",
                 )}
               >
-                <Icon d={d} />
+                <Icon d={NAVIGATION_ICONS[href]} />
                 {label}
               </Link>
             );
@@ -421,7 +421,7 @@ export function ConversationSidebar() {
 
       {/* Rodapé: utilitárias discretas + identidade */}
       <div className="border-t border-border px-3 py-2 space-y-0.5">
-        {UTILITY_ITEMS.filter((i) => !i.adminOnly || isAdmin).map(({ href, label, d }) => {
+        {visibleNavigationDestinations(UTILITY_NAV_DESTINATIONS, isAdmin).map(({ href, label }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
@@ -434,7 +434,7 @@ export function ConversationSidebar() {
                   : "text-content-secondary hover:bg-content-secondary/10 hover:text-content-primary",
               )}
             >
-              <Icon d={d} />
+              <Icon d={NAVIGATION_ICONS[href]} />
               {label}
             </Link>
           );

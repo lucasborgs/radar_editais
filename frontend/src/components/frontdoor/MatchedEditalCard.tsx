@@ -145,7 +145,7 @@ export function MatchedEditalCard({
       )}
       {edital.matched_excerpts.length === 0 && (
         <p className="mt-2 pt-2 border-t border-border text-[11px] text-content-secondary">
-          Resultado exploratório: ainda não há evidência textual real para explicar este match.
+          Resultado exploratório: ainda não há evidência textual real para explicar esta aderência.
         </p>
       )}
 
