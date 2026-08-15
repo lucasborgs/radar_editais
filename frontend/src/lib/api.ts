@@ -719,52 +719,6 @@ export const generateWritingProposal = (sessionId: string) =>
     body: JSON.stringify({}),
   });
 
-export interface GroundedWritingOpenResult {
-  writing_session_id: string;
-  project_id: string;
-  path_id: string;
-  artifact_type: string;
-  outline: string[];
-  requirements: string[];
-  gaps: string[];
-  context: Record<string, unknown>;
-}
-
-export const openGroundedWriting = (
-  conversationId: string,
-  pathId: string,
-  artifactType = "proposta_tecnica",
-) =>
-  apiFetch<GroundedWritingOpenResult>("/writing/grounded/open", {
-    method: "POST",
-    body: JSON.stringify({
-      conversation_id: conversationId,
-      path_id: pathId,
-      artifact_type: artifactType,
-    }),
-  });
-
-export const groundedWritingReview = (sessionId: string) =>
-  apiFetch<Record<string, unknown>>(`/writing/grounded/${sessionId}/review`, {
-    method: "POST",
-  });
-
-export const groundedWritingTurn = (
-  sessionId: string,
-  instruction: string,
-  sectionHint?: string,
-  idempotencyKey?: string,
-) =>
-  apiFetch<Record<string, unknown>>("/writing/grounded/turn", {
-    method: "POST",
-    body: JSON.stringify({
-      session_id: sessionId,
-      instruction,
-      section_hint: sectionHint,
-      idempotency_key: idempotencyKey,
-    }),
-  });
-
 export const startSectionChat = (sessionId: string, sectionTitle: string) =>
   apiFetch<SectionStartResponse>("/writing/section-start", {
     method: "POST",
